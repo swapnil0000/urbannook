@@ -1,16 +1,46 @@
-import Header from "./component/layout/Header"
+
+import { ThemeProvider } from './component/ThemeProvider';
+import NewHeader from './component/layout/NewHeader';
+import NewBanner from './component/layout/NewBanner';
+import LoginForm from './component/layout/LoginForm';
+import SignupForm from './component/layout/SignupForm';
+import HomePage from './pages/HomePage';
 
 function App() {
+  // const [showLogin, setShowLogin] = useState(false);
+  // const [showSignup, setShowSignup] = useState(false);
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <Header/>
-      <div className="container mx-auto p-4">
-        <h1 className="text-3xl font-bold text-blue-600">to Urban Nook</h1>
-        <p className="text-gray-700 mt-2"> is working!</p>
-      </div>
-    </div>
-  )
+    
+    <ThemeProvider>
+      <NewHeader />
+      <HomePage/>
+      {/* <div className="min-h-screen bg-bgPrimary">
+        <NewHeader />
+        <NewBanner />
+        
+        {showLogin && (
+          <LoginForm 
+            onClose={() => setShowLogin(false)}
+            onSwitchToSignup={() => {
+              setShowLogin(false);
+              setShowSignup(true);
+            }}
+          />
+        )}
+        
+        {showSignup && (
+          <SignupForm 
+            onClose={() => setShowSignup(false)}
+            onSwitchToLogin={() => {
+              setShowSignup(false);
+              setShowLogin(true);
+            }}
+          />
+        )}
+      </div> */}
+    </ThemeProvider>
+  );
 }
 
 export default App

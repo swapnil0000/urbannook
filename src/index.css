@@ -1,3 +1,138 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* CSS Variables for Theme System */
+:root {
+  /* Colors - Based on the aesthetic images */
+  --color-primary: #FF6B6B;    /* Coral red from the UI */
+  --color-secondary: #F8F9FA;  /* Light gray background */
+  --color-accent: #4ECDC4;     /* Mint green accent */
+  
+  /* Background Colors */
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #F8F9FA;
+  --color-bg-tertiary: #E9ECEF;
+  
+  /* Text Colors */
+  --color-text-primary: #2D3436;   /* Dark gray for good contrast */
+  --color-text-secondary: #636E72; /* Medium gray */
+  --color-text-muted: #B2BEC3;     /* Light gray */
+  
+  /* Border Colors */
+  --color-border-primary: #E9ECEF;
+  --color-border-secondary: #DDD6FE;
+  
+  /* Status Colors */
+  --color-success: #00B894;
+  --color-warning: #FDCB6E;
+  --color-error: #E17055;
+  --color-info: #74B9FF;
+  
+  /* Animation durations */
+  --duration-300: 300ms;
+  --duration-400: 400ms;
+  --duration-500: 500ms;
+}
+
+/* Dark Theme */
+[data-theme="dark"] {
+  --color-primary: #FF8A80;
+  --color-secondary: #2D3436;
+  --color-accent: #81ECEC;
+  
+  --color-bg-primary: #2D3436;
+  --color-bg-secondary: #636E72;
+  --color-bg-tertiary: #74B9FF;
+  
+  --color-text-primary: #FFFFFF;
+  --color-text-secondary: #DDD6FE;
+  --color-text-muted: #B2BEC3;
+  
+  --color-border-primary: #636E72;
+  --color-border-secondary: #74B9FF;
+  
+  --color-success: #00B894;
+  --color-warning: #FDCB6E;
+  --color-error: #E17055;
+  --color-info: #74B9FF;
+}
+
+@layer base {
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+  
+  * {
+    box-sizing: border-box;
+  }
+}
+
+@layer utilities {
+  @keyframes subtleZoom {
+    0% { transform: scale(1); }
+    100% { transform: scale(1.05); }
+  }
+  
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-20px); }
+  }
+  
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+  
+  .animate-float-reverse {
+    animation: float 8s ease-in-out infinite reverse;
+  }
+  
+  .animate-fadeInUp {
+    animation: fadeInUp 0.6s ease backwards;
+  }
+  
+  .rotate-360 {
+    transform: rotate(360deg);
+  }
+  
+  /* Custom spacing utilities */
+  .w-15 { width: 3.75rem; }
+  .h-15 { height: 3.75rem; }
+  .w-20 { width: 5rem; }
+  .h-20 { height: 5rem; }
+  .w-25 { width: 6.25rem; }
+  .h-25 { height: 6.25rem; }
+  .w-38 { width: 9.5rem; }
+  .h-38 { height: 9.5rem; }
+  .mb-15 { margin-bottom: 3.75rem; }
+  .mt-15 { margin-top: 3.75rem; }
+  
+  /* Line clamp utilities */
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
