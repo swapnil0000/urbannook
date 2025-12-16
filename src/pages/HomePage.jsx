@@ -5,7 +5,8 @@ import Footer from '../component/layout/Footer';
 import InstagramFeed from './InstagramFeed';
 import Testimonials from './Testimonials';
 import WhyChooseUs from './WhyChooseUs';
-import ProductListing from './ProductListing';
+import ProductListing from '../feature/product/component/ProductListing';
+import FeaturedProducts from '../component/FeaturedProducts';
 
 const HomePage = () => {
   return (
@@ -13,6 +14,9 @@ const HomePage = () => {
       
       {/* Hero Banner */}
       <NewBanner />
+      
+      {/* Featured Products */}
+      <FeaturedProducts />
       
       {/* Product Listing */}
       <ProductListing />

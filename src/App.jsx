@@ -1,44 +1,19 @@
-
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from './component/ThemeProvider';
 import NewHeader from './component/layout/NewHeader';
-import NewBanner from './component/layout/NewBanner';
-import LoginForm from './component/layout/LoginForm';
-import SignupForm from './component/layout/SignupForm';
 import HomePage from './pages/HomePage';
+import ProductDetails from './feature/product/component/ProductDetails';
 
 function App() {
-  // const [showLogin, setShowLogin] = useState(false);
-  // const [showSignup, setShowSignup] = useState(false);
-
   return (
-    
     <ThemeProvider>
-      <NewHeader />
-      <HomePage/>
-      {/* <div className="min-h-screen bg-bgPrimary">
+      <Router>
         <NewHeader />
-        <NewBanner />
-        
-        {showLogin && (
-          <LoginForm 
-            onClose={() => setShowLogin(false)}
-            onSwitchToSignup={() => {
-              setShowLogin(false);
-              setShowSignup(true);
-            }}
-          />
-        )}
-        
-        {showSignup && (
-          <SignupForm 
-            onClose={() => setShowSignup(false)}
-            onSwitchToLogin={() => {
-              setShowSignup(false);
-              setShowLogin(true);
-            }}
-          />
-        )}
-      </div> */}
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/product/:id" element={<ProductDetails />} />
+        </Routes>
+      </Router>
     </ThemeProvider>
   );
 }

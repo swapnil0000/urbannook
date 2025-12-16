@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const productCategories = [
   {
@@ -105,6 +106,7 @@ const productCategories = [
 
 const ProductListing = () => {
   const [activeCategory, setActiveCategory] = useState('keychains');
+  const navigate = useNavigate();
 
   const activeProducts = productCategories.find(cat => cat.id === activeCategory)?.products || [];
 
@@ -183,10 +185,32 @@ const ProductListing = () => {
                 
                 {/* Quick Actions */}
                 <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-3">
-                  <button className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-textPrimary hover:bg-primary hover:text-white transition-all">
+                  <button 
+                    onClick={() => {
+                      const saved = JSON.parse(localStorage.getItem('likedProducts') || '[]');
+                      const isLiked = saved.some(p => p.id === product.id);
+                      let updated;
+                      if (isLiked) {
+                        updated = saved.filter(p => p.id !== product.id);
+                      } else {
+                        updated = [...saved, product];
+                      }
+                      localStorage.setItem('likedProducts', JSON.stringify(updated));
+                      window.dispatchEvent(new Event('storage'));
+                    }}
+                    className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-textPrimary hover:bg-primary hover:text-white transition-all"
+                  >
                     <i className="fa-solid fa-heart"></i>
                   </button>
-                  <button className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-textPrimary hover:bg-primary hover:text-white transition-all">
+                  <button 
+                    onClick={() => {
+                      const viewed = JSON.parse(localStorage.getItem('recentlyViewed') || '[]');
+                      const updated = [product, ...viewed.filter(p => p.id !== product.id)].slice(0, 6);
+                      localStorage.setItem('recentlyViewed', JSON.stringify(updated));
+                      navigate(`/product/${product.id}`);
+                    }}
+                    className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-textPrimary hover:bg-primary hover:text-white transition-all"
+                  >
                     <i className="fa-solid fa-eye"></i>
                   </button>
                   <button className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-textPrimary hover:bg-primary hover:text-white transition-all">
