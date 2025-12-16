@@ -13,14 +13,16 @@ const productCategories = [
         originalPrice: 299,
         image: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=300&h=300&fit=crop',
         badge: 'BESTSELLER',
-        rating: 4.8
+        rating: 4.8,
+        description: 'Sleek and durable metal keychain with minimalist design. Perfect for everyday use and makes a great gift.'
       },
       {
         id: 2,
         title: 'Wooden Aesthetic Keychain',
         price: 249,
         image: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=300&h=300&fit=crop',
-        rating: 4.7
+        rating: 4.7,
+        description: 'Handcrafted wooden keychain with natural finish. Eco-friendly and stylish accessory for your keys.'
       },
       {
         id: 3,
@@ -28,7 +30,8 @@ const productCategories = [
         price: 179,
         image: 'https://images.unsplash.com/photo-1581833971358-2c8b550f87b3?w=300&h=300&fit=crop',
         badge: 'NEW',
-        rating: 4.9
+        rating: 4.9,
+        description: 'Modern acrylic keychain with unique design patterns. Lightweight and colorful addition to your keyring.'
       }
     ]
   },
@@ -44,21 +47,24 @@ const productCategories = [
         originalPrice: 799,
         image: 'https://images.unsplash.com/photo-1513519245088-0e12902e35ca?w=300&h=300&fit=crop',
         badge: 'SALE',
-        rating: 4.6
+        rating: 4.6,
+        description: 'Set of 3 abstract art posters with premium quality prints. Perfect for modern home and office decor.'
       },
       {
         id: 5,
         title: 'Minimalist Typography',
         price: 399,
         image: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=300&h=300&fit=crop',
-        rating: 4.8
+        rating: 4.8,
+        description: 'Clean typography poster with inspirational quotes. Minimalist design that complements any interior.'
       },
       {
         id: 6,
         title: 'Nature Photography Print',
         price: 449,
         image: 'https://images.unsplash.com/photo-1586717791821-3f44a563fa4c?w=300&h=300&fit=crop',
-        rating: 4.7
+        rating: 4.7,
+        description: 'High-quality nature photography print on premium paper. Brings the beauty of outdoors to your space.'
       }
     ]
   },
@@ -72,7 +78,8 @@ const productCategories = [
         title: 'Bamboo Pen Stand',
         price: 349,
         image: 'https://images.unsplash.com/photo-1586717799252-bd134ad00e26?w=300&h=300&fit=crop',
-        rating: 4.5
+        rating: 4.5,
+        description: 'Sustainable bamboo pen stand with multiple compartments. Eco-friendly desk organization solution.'
       },
       {
         id: 8,
@@ -81,14 +88,16 @@ const productCategories = [
         originalPrice: 999,
         image: 'https://images.unsplash.com/photo-1581833971358-2c8b550f87b3?w=300&h=300&fit=crop',
         badge: 'POPULAR',
-        rating: 4.9
+        rating: 4.9,
+        description: 'Complete desk organizer set with multiple compartments. Keep your workspace tidy and productive.'
       },
       {
         id: 9,
         title: 'Cable Management Box',
         price: 299,
         image: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=300&h=300&fit=crop',
-        rating: 4.4
+        rating: 4.4,
+        description: 'Smart cable management solution to hide and organize all your cables. Clean desk, clear mind.'
       }
     ]
   }

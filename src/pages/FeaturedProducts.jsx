@@ -1,5 +1,5 @@
 import React from "react";
-import { theme2 } from "../../theme";
+import { theme2 } from "../theme";
 
 const featuredProducts = [
   {

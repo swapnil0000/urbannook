@@ -1,11 +1,11 @@
 import React from 'react';
 import NewHeader from '../component/layout/NewHeader';
 import NewBanner from '../component/layout/NewBanner';
-import ProductListing from '../component/layout/ProductListing';
-import WhyChooseUs from '../component/layout/WhyChooseUs';
-import Testimonials from '../component/layout/Testimonials';
-import InstagramFeed from '../component/layout/InstagramFeed';
 import Footer from '../component/layout/Footer';
+import InstagramFeed from './InstagramFeed';
+import Testimonials from './Testimonials';
+import WhyChooseUs from './WhyChooseUs';
+import ProductListing from './ProductListing';
 
 const HomePage = () => {
   return (
@@ -21,7 +21,7 @@ const HomePage = () => {
       <WhyChooseUs />
       
       {/* Testimonials Section */}
-      <Testimonials />
+      <Testimonials/>
       
       {/* Instagram Feed Section */}
       <InstagramFeed />
