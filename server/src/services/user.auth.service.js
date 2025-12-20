@@ -1,7 +1,6 @@
 import User from "../model/user.model.js";
-const loginService = async (email, password) => {
-  const res = await User.findOne({ email });
-
+const loginService = async (userEmail, userPassword) => {
+  const res = await User.findOne({ userEmail });
   if (!res) {
     return {
       statusCode: 404,
@@ -12,7 +11,8 @@ const loginService = async (email, password) => {
   }
 
   //pass check
-  const passCheck = (await res.passCheck(password)) ? true : false;
+  const passCheck = (await res.passCheck(userPassword)) ? true : false;
+
   if (!passCheck) {
     return {
       statusCode: 401,
@@ -28,9 +28,9 @@ const loginService = async (email, password) => {
     statusCode: 200,
     message: "user details",
     data: {
-      email: res?.email,
-      mobileNumber: res?.mobileNumber,
-      previousOrder: res?.previousOrder,
+      userEmail: res?.userEmail,
+      userMobileNumber: res?.userMobileNumber,
+      userPreviousOrder: res?.userPreviousOrder,
       role: res?.role,
       accessToken,
     },
@@ -38,32 +38,34 @@ const loginService = async (email, password) => {
   };
 };
 
-const registerService = async (email, mobileNumber) => {
-  const res = await User.findOne({ $or: [{ mobileNumber }, { email }] });
+const registerService = async (userEmail, userMobileNumber) => {
+  const res = await User.findOne({
+    $or: [{ userMobileNumber }, { userEmail }],
+  });
 
   // check for pre-exist
   if (res) {
     return {
       statusCode: 409,
       message: "User Already exist",
-      data: email,
+      data: userEmail,
       success: false,
     };
   }
 };
 
-const addToCart = async (email, productName, productQuanity) => {
-  console.log(email, productName, productQuanity);
+const addToCart = async (userEmail, productName, productQuanity) => {
+  console.log(userEmail, productName, productQuanity);
 
   const quantityToAdd = productQuanity || 1;
 
   const updatedUser = await User.findOneAndUpdate(
-    { email },
+    { userEmail },
     {
       $inc: { [`addedToCart.${productName}`]: quantityToAdd },
     },
     { new: true }
-  ).select("-password -userRefreshToken -__v -_id -createdAt");
+  ).select("-userPassword -userRefreshToken -__v -_id -createdAt");
 
   if (!updatedUser) {
     return {

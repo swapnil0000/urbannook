@@ -33,8 +33,8 @@ const productExisting = async (productName, productQuantity) => {
       };
 };
 
-const admingLoginService = async (email, password) => {
-  const res = await Admin.findOne({ email });
+const admingLoginService = async (userEmail, userPassword) => {
+  const res = await Admin.findOne({ userEmail });
   if (!res) {
     return {
       statusCode: 404,
@@ -44,12 +44,12 @@ const admingLoginService = async (email, password) => {
     };
   }
   //pass check
-  const passCheck = (await res.passCheck(password)) ? true : false;
+  const passCheck = (await res.passCheck(userPassword)) ? true : false;
   if (!passCheck) {
     return {
       statusCode: 401,
-      message: "Password is wronng",
-      data: email,
+      message: "userPassword is wronng",
+      data: userEmail,
       success: false,
     };
   }
@@ -59,7 +59,7 @@ const admingLoginService = async (email, password) => {
     statusCode: 200,
     message: "user details",
     data: {
-      email: res?.email,
+      userEmail: res?.userEmail,
       refreshToken,
     },
     success: true,

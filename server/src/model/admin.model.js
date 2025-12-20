@@ -9,14 +9,14 @@ dotenv.config({
 
 const adminSchema = mongoose.Schema(
   {
-    email: {
+    userEmail: {
       type: String,
-      required: [true, "Email is required"],
+      required: [true, "userEmail is required"],
       unique: true,
     },
-    password: {
+    userPassword: {
       type: String,
-      required: [true, "Password is required"],
+      required: [true, "userPassword is required"],
     },
     userRefreshToken: {
       type: String,
@@ -27,8 +27,8 @@ const adminSchema = mongoose.Schema(
   }
 );
 
-adminSchema.methods.passCheck = async function (password) {
-  return await bcrypt.compare(password, this.password);
+adminSchema.methods.passCheck = async function (userPassword) {
+  return await bcrypt.compare(userPassword, this.userPassword);
 };
 
 adminSchema.methods.genAccessToken = function () {
@@ -38,7 +38,7 @@ adminSchema.methods.genAccessToken = function () {
   return jwt.sign(
     {
       _id: this._id,
-      email: this.email,
+      userEmail: this.userEmail,
       username: this.username,
     },
     process.env.ADMIN_ACCESS_TOKEN_SECRET,

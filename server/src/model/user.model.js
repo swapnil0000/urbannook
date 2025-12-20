@@ -9,21 +9,34 @@ dotenv.config({
 
 const userSchema = mongoose.Schema(
   {
-    email: {
+    userName: {
       type: String,
-      required: [true, "Email is required"],
+      required: [true, "Name is required"],
       unique: true,
     },
-    password: {
+    userEmail: {
       type: String,
-      required: [true, "Password is required"],
+      required: [true, "userEmail is required"],
+      unique: true,
     },
-    mobileNumber: {
+    userPassword: {
+      type: String,
+      required: [true, "userPassword is required"],
+    },
+    userMobileNumber: {
       type: Number,
-      required: [true, "mobileNumber is required"],
+      required: [true, "userMobileNumber is required"],
       unique: true,
     },
-    previousOrder: {
+    userAddress: {
+      type: String,
+      required: [true, "userAddress is required"],
+    },
+    userPinCode: {
+      type: Number,
+      required: [true, "userPinCode is required"],
+    },
+    userPreviousOrder: {
       type: [
         {
           orderId: String,
@@ -52,13 +65,13 @@ const userSchema = mongoose.Schema(
 );
 
 userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next();
-  this.password = await bcrypt.hash(this.password, 12);
+  if (!this.isModified("userPassword")) return next();
+  this.userPassword = await bcrypt.hash(this.userPassword, 12);
   next();
 });
 
-userSchema.methods.passCheck = async function (password) {
-  return await bcrypt.compare(password, this.password);
+userSchema.methods.passCheck = async function (userPassword) {
+  return await bcrypt.compare(userPassword, this.userPassword);
 };
 
 userSchema.methods.genAccessToken = function () {
@@ -68,7 +81,7 @@ userSchema.methods.genAccessToken = function () {
   return jwt.sign(
     {
       _id: this._id,
-      email: this.email,
+      userEmail: this.userEmail,
       username: this.username,
     },
     process.env.USER_ACCESS_TOKEN_SECRET,

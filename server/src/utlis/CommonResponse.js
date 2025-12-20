@@ -1,9 +1,23 @@
-const fieldMissing = (email, password, mobileNumber, action) => {
+const fieldMissing = (
+  userName,
+  userEmail,
+  userPassword,
+  userMobileNumber,
+  userAddress,
+  userPinCode,
+  action
+) => {
   let calledController;
-  action == "login";
-  action == "login"
-    ? (calledController = !email || !password)
-    : (calledController = !email || !password || !mobileNumber);
+  if (action == "login") calledController = !userEmail || !userPassword;
+  if (action == "register")
+    calledController =
+      !userName ||
+      !userEmail ||
+      !userPassword ||
+      !userMobileNumber ||
+      !userAddress ||
+      !userPinCode;
+
   if (calledController) {
     return {
       statusCode: 400,
@@ -42,8 +56,8 @@ const productUpdateFieldMissing = (
   };
 };
 
-const addToCartDetailsMissing = (email, productName) => {
-  if (!email || !productName) {
+const addToCartDetailsMissing = (userEmail, productName) => {
+  if (!userEmail || !productName) {
     return {
       statusCode: 400,
       message: "All fields are required for adding to cart",
