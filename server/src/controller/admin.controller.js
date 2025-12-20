@@ -8,9 +8,9 @@ import cookieOptions from "../config/config.js";
 import { profileFetchService } from "../services/common.auth.service.js";
 const adminLogin = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { userEmail, userPassword } = req.body;
     const action = "login";
-    let missing = fieldMissing(email, password, action);
+    let missing = fieldMissing(userEmail, userPassword, action);
     if (!missing?.success) {
       return res
         .status(Number(missing?.statusCode))
@@ -24,7 +24,7 @@ const adminLogin = async (req, res) => {
         );
     }
     // existing User and pass check
-    let result = await admingLoginService(email, password);
+    let result = await admingLoginService(userEmail, userPassword);
 
     if (result?.statusCode >= 400) {
       return res.status(Number(result?.statusCode)).json(result);
@@ -33,7 +33,7 @@ const adminLogin = async (req, res) => {
       .status(Number(result?.statusCode))
       .cookie("adminAccessToken", result?.data?.refreshToken, cookieOptions)
       .json({
-        email: result?.data?.email,
+        userEmail: result?.data?.userEmail,
         message: result?.message,
         accessToken: result?.data?.refreshToken,
       });
@@ -44,8 +44,8 @@ const adminLogin = async (req, res) => {
 
 const adminProfile = async (req, res) => {
   try {
-    const { email } = req.body;
-    const userDetails = await profileFetchService({ email, role: "Admin" });
+    const { userEmail } = req.body;
+    const userDetails = await profileFetchService({ userEmail, role: "Admin" });
     if (!userDetails) {
       return res
         .status(404)
@@ -195,8 +195,8 @@ const productListing = async (req, res) => {
 };
 
 const adminLogout = (req, res) => {
-  const { email } = req.body;
-  if (!email)
+  const { userEmail } = req.body;
+  if (!userEmail)
     return res
       .status(400)
       .json(new ApiError(400, `UserId not avaialable`, [], false));

@@ -46,9 +46,9 @@ const authGuard = (role) => {
 };
 
 const logoutService = async (req, res) => {
-  const { email } = req.body;
+  const { userEmail } = req.body;
   const Model = req.authRole == "User" ? User : Admin;
-  const roleDetails = await Model.findOne({ email });
+  const roleDetails = await Model.findOne({ userEmail });
 
   if (!roleDetails) {
     return res
@@ -76,29 +76,34 @@ const logoutService = async (req, res) => {
 };
 
 const profileFetchService = async (data) => {
-  if (!data?.email)
+  if (!data?.userEmail)
     return res
       .status(400)
       .json(new ApiError(400, `UserId not avaialable`, [], false));
   const Model = data?.role === "Admin" ? Admin : User;
-  const profile = await Model.findOne({ email: data?.email }).select(
-    "-_id -password -createdAt -updatedAt -__v"
+  const profile = await Model.findOne({ userEmail: data?.userEmail }).select(
+    "-_id -userPassword -createdAt -updatedAt -__v"
   );
   return profile;
 };
 
 const regenerateToken = async (req, res) => {
-  const { email } = req.body;
-  if (!email) {
+  const { userEmail } = req.body;
+  if (!userEmail) {
     return res
       .status(401)
       .json(
-        new ApiError(401, `Unauthorized User - can't find email`, null, false)
+        new ApiError(
+          401,
+          `Unauthorized User - can't find userEmail`,
+          null,
+          false
+        )
       );
   }
 
   const Model = req.authRole == "User" ? User : Admin;
-  const roleDetails = await Model.findOne({ email });
+  const roleDetails = await Model.findOne({ userEmail });
   console.log(roleDetails);
 };
 export { authGuard, logoutService, profileFetchService, regenerateToken };

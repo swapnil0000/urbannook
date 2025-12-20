@@ -14,18 +14,15 @@ import cookieOptions from "../config/config.js";
 import { profileFetchService } from "../services/common.auth.service.js";
 const userLogin = async (req, res) => {
   try {
-    const { email, password, mobileNumber } = req.body;
+    const { userEmail, userPassword, userMobileNumber } = req.body;
     //fieldMissing
-    const action = "login";
-    const actionRoute = "admin";
-
-    let missing = fieldMissing(
-      email,
-      password,
-      mobileNumber,
-      action,
-      actionRoute
-    );
+    let missing = fieldMissing({
+      userEmail,
+      userPassword,
+      userMobileNumber,
+      action: "login",
+      actionRoute: "admin",
+    });
     if (!missing?.success) {
       return res
         .status(Number(missing?.statusCode))
@@ -38,9 +35,8 @@ const userLogin = async (req, res) => {
           )
         );
     }
-
     // existing User and pass check
-    let result = await loginService(email, password);
+    let result = await loginService(userEmail, userPassword);
     if (result?.statusCode >= 400) {
       return res.status(Number(result?.statusCode)).json(result);
     }
@@ -60,10 +56,25 @@ const userLogin = async (req, res) => {
 
 const userRegister = async (req, res) => {
   try {
-    const { email, password, mobileNumber } = req.body;
+    const {
+      userEmail,
+      userPassword,
+      userName,
+      userAddress,
+      userPinCode,
+      userMobileNumber,
+    } = req.body;
+
     //fieldMissing
-    let action = "register";
-    let missing = fieldMissing(email, password, mobileNumber, action);
+    let missing = fieldMissing({
+      userName,
+      userEmail,
+      userPassword,
+      userMobileNumber,
+      userAddress,
+      userPinCode,
+      action: "register",
+    });
     if (!missing?.success) {
       return res
         .status(Number(missing?.statusCode))
@@ -77,25 +88,33 @@ const userRegister = async (req, res) => {
         );
     }
     // existing User
-    let result = await registerService(email, mobileNumber);
+    let result = await registerService(userEmail, userMobileNumber);
     if (result?.success == false) {
       return res.status(Number(result?.statusCode)).json(result);
     }
     const newRegisteringUser = await User.create({
-      email,
-      password,
-      mobileNumber,
-      previousOrder: null,
+      userName,
+      userEmail,
+      userPassword,
+      userMobileNumber,
+      userAddress,
+      userPinCode,
+      userPreviousOrder: null,
     });
     if (!newRegisteringUser)
       return res
         .status(400)
         .json(
-          new ApiError(400, `Failed to create user with ${email}`, email, true)
+          new ApiError(
+            400,
+            `Failed to create user with ${userEmail}`,
+            userEmail,
+            true
+          )
         );
     return res
       .status(200)
-      .json(new ApiRes(200, `User created with ${email}`, email, true));
+      .json(new ApiRes(200, `User created with ${userEmail}`, userEmail, true));
   } catch (error) {
     return res
       .status(500)
@@ -105,8 +124,8 @@ const userRegister = async (req, res) => {
 
 const userProfile = async (req, res) => {
   try {
-    const { email } = req.body;
-    const userDetails = await profileFetchService({ email, role: "User" });
+    const { userEmail } = req.body;
+    const userDetails = await profileFetchService({ userEmail, role: "User" });
     if (!userDetails) {
       return res
         .status(404)
@@ -121,8 +140,8 @@ const userProfile = async (req, res) => {
 };
 
 const userAddToCart = async (req, res) => {
-  const { email, productName, productQuanity } = req.body;
-  let missing = addToCartDetailsMissing(email, productName);
+  const { userEmail, productName, productQuanity } = req.body;
+  let missing = addToCartDetailsMissing(userEmail, productName);
 
   if (!missing?.success) {
     return res
@@ -139,7 +158,7 @@ const userAddToCart = async (req, res) => {
 
   // adding to cart
   const productAdditionToCart = await addToCart(
-    email,
+    userEmail,
     productName,
     productQuanity
   );
@@ -167,16 +186,16 @@ const userAddToCart = async (req, res) => {
     );
 };
 
-const userForgetPassword = async (req, res) => {
-  const { email, mobileNumber } = req.body;
+const userForgetuserPassword = async (req, res) => {
+  const { userEmail, userMobileNumber } = req.body;
 
-  if (!email || !mobileNumber) {
+  if (!userEmail || !userMobileNumber) {
     return res
       .status(400)
       .json(
         new ApiError(
           400,
-          `Email or Mobile Number is required`,
+          `userEmail or Mobile Number is required`,
           missing?.data,
           missing?.success
         )
@@ -184,7 +203,7 @@ const userForgetPassword = async (req, res) => {
   }
 
   const userDetails = await User.findOne({
-    $or: [{ email }, { mobileNumber }],
+    $or: [{ userEmail }, { userMobileNumber }],
   });
   if (!userDetails) {
     return {
@@ -194,37 +213,37 @@ const userForgetPassword = async (req, res) => {
       success: false,
     };
   }
-  // send otp to email or mno whichever is used
+  // send otp to userEmail or mno whichever is used
   //verify otp
-  // forgot password
+  // forgot userPassword
 };
 
 const userResetPassword = async (req, res) => {
-  const { email, currentPassword, newPassword } = req.body;
-  if (!email || !currentPassword) {
+  const { userEmail, currentuserPassword, newuserPassword } = req.body;
+  if (!userEmail || !currentuserPassword) {
     return res
       .status(400)
       .json(
         new ApiError(
           400,
-          `Email or currentPassword is required`,
+          `userEmail or currentuserPassword is required`,
           missing?.data,
           missing?.success
         )
       );
   }
-  const userDetails = await User.findOne({ email });
-  let result = await loginService(email, currentPassword);
+  const userDetails = await User.findOne({ userEmail });
+  let result = await loginService(userEmail, currentuserPassword);
   if (result?.statusCode >= 400) {
     return res.status(Number(result?.statusCode)).json(result);
   }
   //new pass and curr pass comparison
-  const passCheck = (await userDetails.passCheck(currentPassword))
+  const passCheck = (await userDetails.passCheck(currentuserPassword))
     ? true
     : false;
   const oldPassAndNewPassCompare = await bcrypt.compare(
-    newPassword,
-    userDetails?.password
+    newuserPassword,
+    userDetails?.userPassword
   );
 
   if (passCheck) {
@@ -234,8 +253,8 @@ const userResetPassword = async (req, res) => {
         .json(
           new ApiRes(
             200,
-            `Current Password and New Password is same for user - ${email}`,
-            email,
+            `Current userPassword and New userPassword is same for user - ${userEmail}`,
+            userEmail,
             true
           )
         );
@@ -244,28 +263,28 @@ const userResetPassword = async (req, res) => {
   if (!userDetails?._id) {
     return res
       .status(Number(400))
-      .json(new ApiError(400, `Unable to reset password`, null, false));
+      .json(new ApiError(400, `Unable to reset userPassword`, null, false));
   }
-  userDetails.password = newPassword;
+  userDetails.userPassword = newuserPassword;
   await userDetails.save(); // using this because while using findOneAndUpdate it doesn't trigger pre middleware and hence plain text saved
   return res
     .status(Number(200))
     .json(
       new ApiRes(
         200,
-        `Password updated successfully for user ${email}`,
-        email,
+        `userPassword updated successfully for user ${userEmail}`,
+        userEmail,
         true
       )
     );
 };
 
 const userUpdateProfile = async (req, res) => {
-  const { email } = req.body;
+  const { userEmail } = req.body;
   const action = "login";
   const actionRoute = "User" || "user" || "USER";
 
-  let missing = fieldMissing(email, action, actionRoute);
+  let missing = fieldMissing(userEmail, action, actionRoute);
   if (!missing?.success) {
     return res
       .status(Number(missing?.statusCode))
@@ -278,6 +297,19 @@ const userUpdateProfile = async (req, res) => {
         )
       );
   }
+
+  const userDetails = await User.findOne({ userEmail });
+
+  return res
+    .status(200)
+    .json(
+      new ApiRes(
+        200,
+        `User Details Updated of - ${userEmail}`,
+        userDetails,
+        true
+      )
+    );
 };
 export {
   userLogin,
