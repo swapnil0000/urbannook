@@ -11,6 +11,10 @@ import {
   userAccountDeleteConfirm,
   userOrderPreviousHistory,
   userAddToCart,
+  userPreviewAddToCart,
+  userAddToWishList,
+  userGetProductWishList,
+  userDeleteFromProductWishList,
 } from "../controller/user.controller.js";
 
 /* ===================== AUTH & COMMON SERVICES ===================== */
@@ -52,6 +56,21 @@ userRouter
 
 userRouter.route("/user/addtocart").post(authGuard("User"), userAddToCart); // Add items to cart
 
+userRouter
+  .route("/user/preview-addtocart")
+  .get(authGuard("User"), userPreviewAddToCart); // Add items to cart
+
+userRouter
+  .route("/user/addtowishlist")
+  .post(authGuard("User"), userAddToWishList); // Add items to cart
+
+userRouter
+  .route("/user/wishlist")
+  .get(authGuard("User"), userGetProductWishList); // Add items to cart
+
+userRouter
+  .route("/user/wishlist/:productId")
+  .delete(authGuard("User"), userDeleteFromProductWishList); // Add items to cart
 /* ===============================================================
    ACCOUNT DELETION FLOW (Protected Routes)
    - Two-step delete: preview → confirm
