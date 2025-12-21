@@ -1,6 +1,6 @@
 import { Router } from "express";
 
-/* ===================== USER CONTROLLERS ===================== */
+/* ===================== CONTROLLERS ===================== */
 import {
   userLogin,
   userRegister,
@@ -17,7 +17,7 @@ import {
   userDeleteFromProductWishList,
 } from "../controller/user.controller.js";
 
-/* ===================== AUTH & COMMON SERVICES ===================== */
+/* ===================== AUTH SERVICES ===================== */
 import {
   authGuard,
   logoutService,
@@ -27,67 +27,73 @@ import {
 const userRouter = Router();
 
 /* ===============================================================
-   AUTHENTICATION (Public Routes)
-   - No token required
+   AUTH (PUBLIC)
 ================================================================ */
-userRouter.route("/user/login").post(userLogin); // User login
-userRouter.route("/user/register").post(userRegister); // User registration
+userRouter.post("/user/login", userLogin);
+userRouter.post("/user/register", userRegister);
 
 /* ===============================================================
-   PROFILE & ACCOUNT (Protected Routes)
-   - Requires valid user token
+   PROFILE & ACCOUNT (PROTECTED)
 ================================================================ */
-userRouter.route("/user/profile").post(authGuard("User"), userProfile); // Fetch user profile
+userRouter.post("/user/profile", authGuard("User"), userProfile);
 
-userRouter
-  .route("/user/profile/update")
-  .put(authGuard("User"), userUpdateProfile); // Update profile details
+userRouter.put("/user/profile/update", authGuard("User"), userUpdateProfile);
 
-userRouter
-  .route("/user-reset-password")
-  .post(authGuard("User"), userResetPassword); // Reset password
+userRouter.post("/user/reset-password", authGuard("User"), userResetPassword);
 
 /* ===============================================================
-   ORDER & CART MANAGEMENT (Protected Routes)
+   ORDER HISTORY (PROTECTED)
 ================================================================ */
-userRouter
-  .route("/user/order-history")
-  .post(authGuard("User"), userOrderPreviousHistory); // Previous orders
-
-userRouter.route("/user/addtocart").post(authGuard("User"), userAddToCart); // Add items to cart
-
-userRouter
-  .route("/user/preview-addtocart")
-  .get(authGuard("User"), userPreviewAddToCart); // Add items to cart
-
-userRouter
-  .route("/user/addtowishlist")
-  .post(authGuard("User"), userAddToWishList); // Add items to cart
-
-userRouter
-  .route("/user/wishlist")
-  .get(authGuard("User"), userGetProductWishList); // Add items to cart
-
-userRouter
-  .route("/user/wishlist/:productId")
-  .delete(authGuard("User"), userDeleteFromProductWishList); // Add items to cart
-/* ===============================================================
-   ACCOUNT DELETION FLOW (Protected Routes)
-   - Two-step delete: preview → confirm
-================================================================ */
-userRouter
-  .route("/user/delete-preview")
-  .post(authGuard("User"), userAccountDeletePreview); // Delete confirmation token
-
-userRouter
-  .route("/user/delete-confirm")
-  .delete(authGuard("User"), userAccountDeleteConfirm); // Final delete
+userRouter.post(
+  "/user/order-history",
+  authGuard("User"),
+  userOrderPreviousHistory
+);
 
 /* ===============================================================
-   SESSION & TOKEN MANAGEMENT (Protected Routes)
+   CART MANAGEMENT (PROTECTED)
 ================================================================ */
-userRouter.route("/user/logout").post(authGuard("User"), logoutService); // Logout user
+userRouter.post("/user/addtocart", authGuard("User"), userAddToCart);
 
-userRouter.route("/refresh-token").post(authGuard("User"), regenerateToken); // Refresh access token
+userRouter.get(
+  "/user/preview-addtocart",
+  authGuard("User"),
+  userPreviewAddToCart
+);
+
+/* ===============================================================
+   WISHLIST MANAGEMENT (PROTECTED)
+================================================================ */
+userRouter.post("/user/addtowishlist", authGuard("User"), userAddToWishList);
+
+userRouter.get("/user/wishlist", authGuard("User"), userGetProductWishList);
+
+userRouter.delete(
+  "/user/wishlist/:productId",
+  authGuard("User"),
+  userDeleteFromProductWishList
+);
+
+/* ===============================================================
+   ACCOUNT DELETION (2-STEP FLOW)
+================================================================ */
+userRouter.post(
+  "/user/delete-preview",
+  authGuard("User"),
+  userAccountDeletePreview
+);
+
+userRouter.delete(
+  "/user/delete-confirm",
+  authGuard("User"),
+  userAccountDeleteConfirm
+);
+
+/* ===============================================================
+   SESSION & TOKEN
+================================================================ */
+userRouter.post("/user/logout", authGuard("User"), logoutService);
+
+userRouter.post("/refresh-token", authGuard("User"), regenerateToken);
 
 export default userRouter;

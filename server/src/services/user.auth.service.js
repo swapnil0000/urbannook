@@ -1,7 +1,6 @@
 import User from "../model/user.model.js";
 import Product from "../model/product.model.js";
 import mongoose from "mongoose";
-import ApiRes from "../utlis/ApiRes.js";
 const loginService = async (userEmail, userPassword) => {
   const res = await User.findOne({ userEmail });
   if (!res) {
@@ -46,11 +45,10 @@ const loginService = async (userEmail, userPassword) => {
   };
 };
 
-const registerService = async (userEmail, userMobileNumber) => {
+const registerService = async (userEmail, userMobileNumber,userName) => {
   const res = await User.findOne({
-    $or: [{ userMobileNumber }, { userEmail }],
+    $or: [{ userMobileNumber }, { userEmail },{userName}],
   });
-
   // check for pre-exist
   if (res) {
     return {
@@ -60,6 +58,12 @@ const registerService = async (userEmail, userMobileNumber) => {
       success: false,
     };
   }
+  return {
+    statusCode: 200,
+    message: `Creating user with - ${userEmail}`,
+    data: userEmail,
+    success: true,
+  };
 };
 
 const addToCart = async (userEmail, productName, productQuanity) => {

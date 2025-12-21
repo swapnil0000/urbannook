@@ -17,12 +17,11 @@ import cookieOptions from "../config/config.js";
 import { profileFetchService } from "../services/common.auth.service.js";
 const userLogin = async (req, res) => {
   try {
-    const { userEmail, userPassword, userMobileNumber } = req.body;
+    const { userEmail, userPassword } = req.body;
     //fieldMissing
     let missing = fieldMissing({
       userEmail,
       userPassword,
-      userMobileNumber,
       action: "login",
     });
     if (!missing?.success) {
@@ -99,8 +98,9 @@ const userRegister = async (req, res) => {
         );
     }
     // existing User
-    let result = await registerService(userEmail, userMobileNumber);
-    if (result?.success == false) {
+    let result = await registerService(userEmail, userMobileNumber, userName);
+
+    if (result?.statusCode >= 400) {
       return res.status(Number(result?.statusCode)).json(result);
     }
     const newRegisteringUser = await User.create({
@@ -120,7 +120,7 @@ const userRegister = async (req, res) => {
             400,
             `Failed to create user with ${userEmail}`,
             userEmail,
-            true
+            false
           )
         );
     return res
