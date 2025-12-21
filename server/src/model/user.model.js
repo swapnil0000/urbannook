@@ -13,6 +13,8 @@ const userSchema = mongoose.Schema(
       type: String,
       required: [true, "Name is required"],
       unique: true,
+      lowercase: true,
+      trim: true,
     },
     userEmail: {
       type: String,
@@ -40,8 +42,15 @@ const userSchema = mongoose.Schema(
       type: [
         {
           orderId: String,
-          datePurchased: String,
-          productId: String,
+          datePurchased: {
+            type: Date,
+            default: Date.now,
+          },
+          productId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Product",
+          },
+          quantity: Number,
         },
       ],
       default: [],
@@ -89,7 +98,7 @@ userSchema.methods.genAccessToken = function () {
     {
       _id: this._id,
       userEmail: this.userEmail,
-      username: this.username,
+      userName: this.userName,
     },
     process.env.USER_ACCESS_TOKEN_SECRET,
     {

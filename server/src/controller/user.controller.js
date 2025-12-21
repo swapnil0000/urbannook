@@ -15,6 +15,7 @@ import {
 } from "../services/user.auth.service.js";
 import cookieOptions from "../config/config.js";
 import { profileFetchService } from "../services/common.auth.service.js";
+import Product from "../model/product.model.js";
 const userLogin = async (req, res) => {
   try {
     const { userEmail, userPassword } = req.body;
@@ -44,8 +45,7 @@ const userLogin = async (req, res) => {
     }
     return res
       .status(Number(result?.statusCode))
-      .cookie("userAccessToken", result?.data?.accessToken, cookieOptions)
-      .cookie("role", result?.data?.role, cookieOptions)
+      .cookie("userRefreshToken", result?.data?.userRefreshToken, cookieOptions)
       .json(
         new ApiRes(Number(result?.statusCode), `User Details`, {
           role: result?.data?.role,
@@ -56,6 +56,7 @@ const userLogin = async (req, res) => {
           userPinCode: result?.data?.userPinCode,
           addedToCart: result?.data?.addedToCart,
           userPreviousOrder: result?.data?.userPreviousOrder,
+          userAccessToken: result?.data?.userAccessToken,
         }),
         true
       );
@@ -303,16 +304,12 @@ const userGetProductWishList = async (req, res) => {
           false
         )
       );
+  const productDetails = await Product.findById(
+    userExist?.addedToWishList
+  ).select("-_id");
   return res
     .status(200)
-    .json(
-      new ApiRes(
-        200,
-        `Preview of Added to cart`,
-        userExist?.addedToWishList,
-        true
-      )
-    );
+    .json(new ApiRes(200, `Preview of Added to cart`, productDetails, true));
 };
 
 const userDeleteFromProductWishList = async (req, res) => {
