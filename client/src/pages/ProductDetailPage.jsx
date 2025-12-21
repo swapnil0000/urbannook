@@ -11,7 +11,7 @@ const ProductDetailPage = () => {
   const [selectedImage, setSelectedImage] = useState(0);
   const [isWishlisted, setIsWishlisted] = useState(false);
 
-  const product = products.find(p => p.category === category && p.slug === slug);
+  const product = products.find(p => p.category === category && p.slug === slug) 
   const categoryInfo = productCategories.find(cat => cat.id === category);
   const relatedProducts = products.filter(p => p.category === category && p.id !== product?.id).slice(0, 4);
 
