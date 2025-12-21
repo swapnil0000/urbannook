@@ -51,6 +51,13 @@ const userSchema = mongoose.Schema(
       of: Number,
       default: {},
     },
+    addedToWishList: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Product",
+        default: [],
+      },
+    ],
     userRefreshToken: {
       type: String,
     },

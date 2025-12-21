@@ -8,8 +8,10 @@ import { ApiError, ApiRes } from "../utlis/index.js";
 import User from "../model/user.model.js";
 import {
   addToCart,
+  addToWishList,
   loginService,
   registerService,
+  deleteFromWishList,
 } from "../services/user.auth.service.js";
 import cookieOptions from "../config/config.js";
 import { profileFetchService } from "../services/common.auth.service.js";
@@ -149,9 +151,22 @@ const userProfile = async (req, res) => {
 };
 
 const userAddToCart = async (req, res) => {
-  const { userEmail, productName, productQuanity } = req.body;
-  let missing = addToCartDetailsMissing(userEmail, productName);
+  const { userEmail } = req.user;
+  const { productName, productQuanity } = req.body;
+  const userExist = await User.findOne({ userEmail });
+  if (!userExist)
+    return res
+      .status(404)
+      .json(
+        new ApiError(
+          404,
+          `User Email not found or user doesn't exist`,
+          null,
+          false
+        )
+      );
 
+  let missing = addToCartDetailsMissing(userEmail, productName);
   if (!missing?.success) {
     return res
       .status(Number(missing?.statusCode))
@@ -193,6 +208,133 @@ const userAddToCart = async (req, res) => {
         productAdditionToCart?.success
       )
     );
+};
+
+const userPreviewAddToCart = async (req, res) => {
+  const { userEmail } = req.user;
+  const userExist = await User.findOne({ userEmail });
+  if (!userExist)
+    return res
+      .status(404)
+      .json(
+        new ApiError(
+          404,
+          `User Email not found or user doesn't exist`,
+          null,
+          false
+        )
+      );
+
+  return res
+    .status(200)
+    .json(
+      new ApiRes(200, `Preview of Added to cart`, userExist?.addedToCart, true)
+    );
+};
+
+const userAddToWishList = async (req, res) => {
+  const { userEmail } = req.user;
+  const { productName } = req.body;
+  const userExist = await User.findOne({ userEmail });
+
+  if (!userExist)
+    return res
+      .status(404)
+      .json(
+        new ApiError(
+          404,
+          `User Email not found or user doesn't exist`,
+          null,
+          false
+        )
+      );
+
+  let missing = addToCartDetailsMissing(userEmail, productName);
+  if (!missing?.success) {
+    return res
+      .status(Number(missing?.statusCode))
+      .json(
+        new ApiError(
+          missing?.statusCode,
+          missing?.message,
+          missing?.data,
+          missing?.success
+        )
+      );
+  }
+  // Addition To WishList
+  const productAdditionToWishList = await addToWishList(userEmail, productName);
+
+  if (!productAdditionToWishList?.success) {
+    return res
+      .status(Number(productAdditionToWishList?.statusCode))
+      .json(
+        new ApiError(
+          productAdditionToWishList?.statusCode,
+          productAdditionToWishList?.message,
+          productAdditionToWishList?.data,
+          productAdditionToWishList?.success
+        )
+      );
+  }
+  return res
+    .status(Number(productAdditionToWishList?.statusCode))
+    .json(
+      new ApiRes(
+        productAdditionToWishList?.statusCode,
+        productAdditionToWishList?.message,
+        productAdditionToWishList?.data,
+        productAdditionToWishList?.success
+      )
+    );
+};
+
+const userGetProductWishList = async (req, res) => {
+  const { userEmail } = req.user;
+  const userExist = await User.findOne({ userEmail });
+  if (!userExist)
+    return res
+      .status(404)
+      .json(
+        new ApiError(
+          404,
+          `User Email not found or user doesn't exist`,
+          null,
+          false
+        )
+      );
+  return res
+    .status(200)
+    .json(
+      new ApiRes(
+        200,
+        `Preview of Added to cart`,
+        userExist?.addedToWishList,
+        true
+      )
+    );
+};
+
+const userDeleteFromProductWishList = async (req, res) => {
+  const { userEmail } = req.user;
+  const { productId } = req.params;
+  const deleteProduct = await deleteFromWishList(userEmail, productId);
+  if (!deleteProduct?.success) {
+    return res
+      .status(Number(deleteProduct?.statusCode))
+      .json(
+        new ApiError(
+          deleteProduct?.statusCode,
+          deleteProduct?.message,
+          deleteProduct?.data,
+          deleteProduct?.success
+        )
+      );
+  }
+
+  return res
+    .status(200)
+    .json(new ApiRes(200, `Deleted from wish list`, deleteProduct, true));
 };
 
 const userForgetuserPassword = async (req, res) => {
@@ -491,9 +633,13 @@ export {
   userRegister,
   userProfile,
   userAddToCart,
+  userPreviewAddToCart,
   userOrderPreviousHistory,
   userAccountDeletePreview,
   userAccountDeleteConfirm,
   userResetPassword,
   userUpdateProfile,
+  userAddToWishList,
+  userGetProductWishList,
+  userDeleteFromProductWishList,
 };
