@@ -3,6 +3,7 @@ import Admin from "../model/admin.model.js";
 import User from "../model/user.model.js";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
+import cookieOptions from "../config/config.js";
 dotenv.config({
   path: "./.env",
 });
@@ -13,26 +14,28 @@ const authGuard = (role) => {
  */
   return (req, res, next) => {
     try {
-      const token =
-        role === "Admin"
-          ? req.cookies?.adminAccessToken
-          : req.cookies?.userAccessToken;
-      if (!token) {
+      const authHeader = req.headers.authorization;
+
+      if (!authHeader?.startsWith("Bearer ")) {
         return res
           .status(401)
-          .json(new ApiError(401, "Token Not Available", null, false));
+          .json(new ApiError(401, "Auth Bearer Header Missing", null, false));
       }
-      const adminSecretToken = process.env.ADMIN_ACCESS_TOKEN_SECRET;
-      const userSecretToken = process.env.USER_ACCESS_TOKEN_SECRET;
-      const decodedToken = jwt.verify(
-        token,
-        role == "Admin" ? adminSecretToken : userSecretToken
-      );
+      const token = authHeader.split(" ")[1];
+      const secret =
+        role === "Admin"
+          ? process.env.ADMIN_ACCESS_TOKEN_SECRET
+          : process.env.USER_ACCESS_TOKEN_SECRET;
+      if (!secret) {
+        throw new Error("JWT secret missing in env");
+      }
+      const decodedToken = jwt.verify(token, secret);
+
       /* The verified user data is attached to the request object here,
        so that all subsequent middlewares and controllers can identify
        the authenticated user without re-verifying the token again on any controller or route. */
-
       req.user = decodedToken;
+
       req.authRole = role;
       next();
     } catch (error) {
@@ -40,7 +43,7 @@ const authGuard = (role) => {
       return res
         .status(401)
         .json(
-          new ApiError(401, "Bad Token - Modified or Expired", null, false)
+          new ApiError(401, "Access Token Expired or Malformed", null, false)
         );
     }
   };
@@ -48,6 +51,7 @@ const authGuard = (role) => {
 
 const logoutService = async (req, res) => {
   const { userEmail } = req.user;
+  console.log(userEmail);
   const Model = req.authRole == "User" ? User : Admin;
   const roleDetails = await Model.findOne({ userEmail });
 
@@ -68,12 +72,10 @@ const logoutService = async (req, res) => {
     }
   );
 
-  return (
-    res
-      // .clearCookie("userAccessToken", cookieOptions)
-      .status(200)
-      .json(new ApiRes(200, "User Logout Successfully", null, true))
-  );
+  return res
+    .clearCookie("userRefreshToken", cookieOptions)
+    .status(200)
+    .json(new ApiRes(200, "User Logout Successfully", null, true));
 };
 
 const profileFetchService = async (data) => {
@@ -104,7 +106,37 @@ const regenerateToken = async (req, res) => {
   }
 
   const Model = req.authRole == "User" ? User : Admin;
-  const roleDetails = await Model.findOne({ userEmail });
-  console.log(roleDetails);
+  const tokenName =
+    req.authRole == "User" ? `userRefreshToken` : `adminRefreshToken`;
+  const accessToken = await Model.userRefreshToken();
+
+  Model.userRefreshToken = accessToken;
+  await res.save();
+  const roleDetails = await Model.findOneAndUpdate(
+    { userEmail },
+    {
+      $set: {
+        tokenName,
+      },
+    },
+    {
+      new: true,
+    }
+  );
+  if (!roleDetails) {
+    return res
+      .status(404)
+      .json(new ApiError(401, ` User - can't find userEmail`, null, false));
+  }
+  return res
+    .status(200)
+    .json(
+      new ApiRes(
+        200,
+        ` ${tokenName} generated for ${roleDetails?.role}  `,
+        null,
+        false
+      )
+    );
 };
 export { authGuard, logoutService, profileFetchService, regenerateToken };

@@ -11,7 +11,6 @@ const loginService = async (userEmail, userPassword) => {
       success: false,
     };
   }
-
   //pass check
   const passCheck = (await res.passCheck(userPassword)) ? true : false;
 
@@ -24,8 +23,10 @@ const loginService = async (userEmail, userPassword) => {
     };
   }
 
-  const accessToken = await res.genAccessToken();
-  res.userRefreshToken = accessToken;
+  const userRefreshToken = await res?.genRefreshToken();
+  const userAccessToken = await res?.genAccessToken();
+
+  res.userRefreshToken = userRefreshToken;
   await res.save();
   return {
     statusCode: 200,
@@ -39,15 +40,16 @@ const loginService = async (userEmail, userPassword) => {
       addedToCart: res?.addedToCart,
       userPreviousOrder: res?.userPreviousOrder,
       role: res?.role,
-      accessToken,
+      userRefreshToken,
+      userAccessToken,
     },
     success: true,
   };
 };
 
-const registerService = async (userEmail, userMobileNumber,userName) => {
+const registerService = async (userEmail, userMobileNumber, userName) => {
   const res = await User.findOne({
-    $or: [{ userMobileNumber }, { userEmail },{userName}],
+    $or: [{ userMobileNumber }, { userEmail }, { userName }],
   });
   // check for pre-exist
   if (res) {
