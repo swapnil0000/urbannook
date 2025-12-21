@@ -21,6 +21,7 @@ const loginService = async (userEmail, userPassword) => {
       success: false,
     };
   }
+
   const accessToken = await res.genAccessToken();
   res.userRefreshToken = accessToken;
   await res.save();
@@ -28,8 +29,12 @@ const loginService = async (userEmail, userPassword) => {
     statusCode: 200,
     message: "user details",
     data: {
+      userName: res?.userName,
       userEmail: res?.userEmail,
       userMobileNumber: res?.userMobileNumber,
+      userAddress: res?.userAddress,
+      userPinCode: res?.userPinCode,
+      addedToCart: res?.addedToCart,
       userPreviousOrder: res?.userPreviousOrder,
       role: res?.role,
       accessToken,
@@ -55,7 +60,6 @@ const registerService = async (userEmail, userMobileNumber) => {
 };
 
 const addToCart = async (userEmail, productName, productQuanity) => {
-  console.log(userEmail, productName, productQuanity);
 
   const quantityToAdd = productQuanity || 1;
 

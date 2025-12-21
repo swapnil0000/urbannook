@@ -2,6 +2,7 @@ import bcrypt from "bcrypt";
 import {
   addToCartDetailsMissing,
   fieldMissing,
+  validateUserInput,
 } from "../utlis/CommonResponse.js";
 import { ApiError, ApiRes } from "../utlis/index.js";
 import User from "../model/user.model.js";
@@ -21,7 +22,6 @@ const userLogin = async (req, res) => {
       userPassword,
       userMobileNumber,
       action: "login",
-      actionRoute: "admin",
     });
     if (!missing?.success) {
       return res
@@ -37,6 +37,7 @@ const userLogin = async (req, res) => {
     }
     // existing User and pass check
     let result = await loginService(userEmail, userPassword);
+
     if (result?.statusCode >= 400) {
       return res.status(Number(result?.statusCode)).json(result);
     }
@@ -44,11 +45,19 @@ const userLogin = async (req, res) => {
       .status(Number(result?.statusCode))
       .cookie("userAccessToken", result?.data?.accessToken, cookieOptions)
       .cookie("role", result?.data?.role, cookieOptions)
-      .json({
-        email: result?.data?.email,
-        message: result?.message,
-        role: result?.data?.role,
-      });
+      .json(
+        new ApiRes(Number(result?.statusCode), `User Details`, {
+          role: result?.data?.role,
+          userName: result?.data?.userName,
+          userEmail: result?.data?.userEmail,
+          userMobileNumber: result?.data?.userMobileNumber,
+          userAddresults: result?.data?.userAddress,
+          userPinCode: result?.data?.userPinCode,
+          addedToCart: result?.data?.addedToCart,
+          userPreviousOrder: result?.data?.userPreviousOrder,
+        }),
+        true
+      );
   } catch (error) {
     return new ApiError(500, null, `Internal Server Error -${error}`, false);
   }
@@ -124,7 +133,7 @@ const userRegister = async (req, res) => {
 
 const userProfile = async (req, res) => {
   try {
-    const { userEmail } = req.body;
+    const { userEmail } = req.user;
     const userDetails = await profileFetchService({ userEmail, role: "User" });
     if (!userDetails) {
       return res
@@ -266,7 +275,7 @@ const userResetPassword = async (req, res) => {
       .json(new ApiError(400, `Unable to reset userPassword`, null, false));
   }
   userDetails.userPassword = newuserPassword;
-  await userDetails.save(); // using this because while using findOneAndUpdate it doesn't trigger pre middleware and hence plain text saved
+  await userDetails.save(); // using this because while using findOne it doesn't trigger pre middleware and hence plain text saved
   return res
     .status(Number(200))
     .json(
@@ -280,11 +289,19 @@ const userResetPassword = async (req, res) => {
 };
 
 const userUpdateProfile = async (req, res) => {
-  const { userEmail } = req.body;
-  const action = "login";
-  const actionRoute = "User" || "user" || "USER";
-
-  let missing = fieldMissing(userEmail, action, actionRoute);
+  // not adding userMobileNumber becuase they would be requiring otp verification
+  const { userEmail, userName, userAddress, userPinCode } = req.body;
+  if (!userEmail) {
+    return res
+      .status(404)
+      .json(new ApiError(404, `Email is required for update`, null, false));
+  }
+  let missing = fieldMissing({
+    userName,
+    userAddress,
+    userPinCode,
+    action: "Update",
+  });
   if (!missing?.success) {
     return res
       .status(Number(missing?.statusCode))
@@ -297,25 +314,186 @@ const userUpdateProfile = async (req, res) => {
         )
       );
   }
+  let validate = validateUserInput({ userName, userAddress });
+  if (!validate?.success) {
+    return res
+      .status(Number(validate?.statusCode))
+      .json(
+        new ApiError(
+          validate?.statusCode,
+          validate?.message,
+          validate?.data,
+          validate?.success
+        )
+      );
+  }
+
+  if (String(userPinCode).length > 0 && String(userPinCode).length != 6) {
+    return res
+      .status(404)
+      .json(new ApiError(404, `userPinCode must be of 6 digits`, null, false));
+  }
+
+  const updatingFieldValues = {};
+  userName?.length > 0 && (updatingFieldValues.userName = userName);
+  userAddress?.length > 0 && (updatingFieldValues.userAddress = userAddress);
+  String(userPinCode).length > 0 &&
+    String(userPinCode).length < 7 &&
+    String(userPinCode).length == 6 &&
+    (updatingFieldValues.userPinCode = userPinCode);
+
+  /* This is for finding and updating the fields only and only if the currValu and DB Stored values are different  i.e. $or does this for us firstly checks then $ne compares the values from db and currentValue*/
+  const updatedUserDetails = await User.findOneAndUpdate(
+    {
+      userEmail,
+      $or: [
+        userName ? { userName: { $ne: userName } } : {},
+        userAddress ? { userAddress: { $ne: userAddress } } : {},
+        userPinCode ? { userPinCode: { $ne: userPinCode } } : {},
+      ],
+    },
+    {
+      $set: updatingFieldValues,
+    },
+    {
+      new: true,
+    }
+  );
+  if (!updatedUserDetails) {
+    return res
+      .status(400)
+      .json(new ApiError(400, "No changes detected", null, false));
+  }
+  return res.status(200).json(
+    new ApiRes(
+      200,
+      `User Details Updated of - ${userEmail}`,
+      {
+        userName: updatedUserDetails?.userName,
+        userAddress: updatedUserDetails?.userAddress,
+        userPinCode: updatedUserDetails?.userPinCode,
+      },
+      true
+    )
+  );
+};
+
+const userAccountDeletePreview = async (req, res) => {
+  const { userEmail } = req.user;
+
+  if (!userEmail) {
+    return res
+      .status(400)
+      .json(new ApiError(400, `Email is required for deleting`, null, false));
+  }
 
   const userDetails = await User.findOne({ userEmail });
+  if (!userDetails) {
+    return res
+      .status(404)
+      .json(new ApiError(404, "User not found", null, false));
+  }
 
-  return res
-    .status(200)
-    .json(
-      new ApiRes(
-        200,
-        `User Details Updated of - ${userEmail}`,
-        userDetails,
-        true
-      )
-    );
+  // Generate token (base64 encode the email)
+  const confirmToken = Buffer.from(userEmail).toString("base64");
+
+  return res.status(200).json(
+    new ApiRes(
+      200,
+      "Are you sure you want to delete your account?",
+      {
+        userEmail,
+        confirmToken,
+        confirmDelete: true,
+        note: "Send this token with confirmDelete=true to delete account",
+      },
+      true
+    )
+  );
 };
+
+const userAccountDeleteConfirm = async (req, res) => {
+  const { confirmToken, confirmDelete } = req.body;
+
+  if (!confirmToken || confirmDelete !== true) {
+    return res
+      .status(400)
+      .json(
+        new ApiError(
+          400,
+          `confirmToken and confirmDelete=true are required for deleting`,
+          null,
+          false
+        )
+      );
+  }
+
+  try {
+    // Decode token to get userEmail
+    const userEmail = Buffer.from(confirmToken, "base64").toString("utf-8");
+
+    // Find user
+    const user = await User.findOne({ userEmail });
+    if (!user) {
+      return res
+        .status(404)
+        .json(new ApiError(404, "User not found", null, false));
+    }
+
+    // Delete user
+    await User.deleteOne({ userEmail });
+
+    return res
+      .status(200)
+      .json(new ApiRes(200, "User account deleted successfully", null, true));
+  } catch (err) {
+    return res
+      .status(500)
+      .json(new ApiError(500, "Internal server error", err, false));
+  }
+};
+
+const userOrderPreviousHistory = async (req, res) => {
+  const { userEmail } = req.user;
+  if (!userEmail) {
+    return res
+      .status(404)
+      .json(new ApiError(404, `User Email Not found`, null, false));
+  }
+  const userPreviousOrder = await User.findOne({ userEmail });
+  return userPreviousOrder?.userPreviousOrder == null
+    ? res.status(200).json(
+        new ApiRes(
+          200,
+          `No Order has been by place by you`,
+          {
+            userEmail,
+            userPreviousOrder: userPreviousOrder?.userPreviousOrder,
+          },
+          true
+        )
+      )
+    : res.status(200).json(
+        new ApiRes(
+          200,
+          `Order has been by place by you -`,
+          {
+            userEmail,
+            userPreviousOrder: userPreviousOrder?.userPreviousOrder,
+          },
+          true
+        )
+      );
+};
+
 export {
   userLogin,
   userRegister,
   userProfile,
   userAddToCart,
+  userOrderPreviousHistory,
+  userAccountDeletePreview,
+  userAccountDeleteConfirm,
   userResetPassword,
   userUpdateProfile,
 };

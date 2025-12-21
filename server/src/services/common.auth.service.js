@@ -31,6 +31,7 @@ const authGuard = (role) => {
       /* The verified user data is attached to the request object here,
        so that all subsequent middlewares and controllers can identify
        the authenticated user without re-verifying the token again on any controller or route. */
+
       req.user = decodedToken;
       req.authRole = role;
       next();
@@ -46,7 +47,7 @@ const authGuard = (role) => {
 };
 
 const logoutService = async (req, res) => {
-  const { userEmail } = req.body;
+  const { userEmail } = req.user;
   const Model = req.authRole == "User" ? User : Admin;
   const roleDetails = await Model.findOne({ userEmail });
 
@@ -88,7 +89,7 @@ const profileFetchService = async (data) => {
 };
 
 const regenerateToken = async (req, res) => {
-  const { userEmail } = req.body;
+  const { userEmail } = req.user;
   if (!userEmail) {
     return res
       .status(401)
