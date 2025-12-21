@@ -33,6 +33,9 @@ const NewHeader = () => {
             <a href="/" className="text-textSecondary hover:text-primary font-medium transition-colors">
               Home
             </a>
+            <a href="/products" className="text-textSecondary hover:text-primary font-medium transition-colors">
+              Products
+            </a>
             <a href="/customize-products" className="text-textSecondary hover:text-primary font-medium transition-colors">
               Customization
             </a>
@@ -102,20 +105,20 @@ const NewHeader = () => {
             
             {/* Mobile Navigation */}
             <nav className="space-y-1">
-              <a href="/keychains" className="block py-3 px-2 text-textSecondary hover:text-primary hover:bg-bgSecondary rounded-lg font-medium transition-all">
-                Keychains
+              <a href="/" className="block py-3 px-2 text-textSecondary hover:text-primary hover:bg-bgSecondary rounded-lg font-medium transition-all">
+                Home
               </a>
-              <a href="/posters" className="block py-3 px-2 text-textSecondary hover:text-primary hover:bg-bgSecondary rounded-lg font-medium transition-all">
-                Posters
+              <a href="/products" className="block py-3 px-2 text-textSecondary hover:text-primary hover:bg-bgSecondary rounded-lg font-medium transition-all">
+                Products
               </a>
-              <a href="/pen-stands" className="block py-3 px-2 text-textSecondary hover:text-primary hover:bg-bgSecondary rounded-lg font-medium transition-all">
-                Pen Stands
+              <a href="/customize-products" className="block py-3 px-2 text-textSecondary hover:text-primary hover:bg-bgSecondary rounded-lg font-medium transition-all">
+                Customization
               </a>
-              <a href="/car-accessories" className="block py-3 px-2 text-textSecondary hover:text-primary hover:bg-bgSecondary rounded-lg font-medium transition-all">
-                Car Accessories
+              <a href="/about-us" className="block py-3 px-2 text-textSecondary hover:text-primary hover:bg-bgSecondary rounded-lg font-medium transition-all">
+                About Us
               </a>
-              <a href="/key-holders" className="block py-3 px-2 text-textSecondary hover:text-primary hover:bg-bgSecondary rounded-lg font-medium transition-all">
-                Key Holders
+              <a href="/contact-us" className="block py-3 px-2 text-textSecondary hover:text-primary hover:bg-bgSecondary rounded-lg font-medium transition-all">
+                Contact Us
               </a>
             </nav>
           </div>

@@ -263,8 +263,11 @@ const ProductListing = () => {
 
         {/* View All Button */}
         <div className="text-center">
-          <button className="bg-transparent border-2 border-primary text-primary hover:bg-primary hover:text-white px-8 py-4 rounded-lg font-semibold transition-all duration-300 inline-flex items-center gap-3">
-            View All Products
+          <button 
+            onClick={() => navigate(`/product/${activeCategory}`)}
+            className="bg-transparent border-2 border-primary text-primary hover:bg-primary hover:text-white px-8 py-4 rounded-lg font-semibold transition-all duration-300 inline-flex items-center gap-3"
+          >
+            View All {productCategories.find(cat => cat.id === activeCategory)?.name}
             <i className="fa-solid fa-arrow-right"></i>
           </button>
         </div>
