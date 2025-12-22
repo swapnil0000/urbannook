@@ -154,45 +154,6 @@ const updateProduct = async (req, res) => {
     .status(200)
     .json(new ApiRes(200, "Product updated successfully", product, true));
 };
-const productListing = async (req, res) => {
-  try {
-    const { limit, currentPage, search, status, category } = req.query;
-    const query = {};
-    if (status) {
-      query.productStatus = status;
-    }
-    if (category) {
-      query.productCategory = {
-        $regex: String(category),
-        $options: "i", // makes it case - insensitive Eg - Chair , chair, CHAIR - all same
-      };
-    }
-    if (search) {
-      query.productName = {
-        $regex: String(search),
-        $options: "i", // makes it case - insensitive Eg - Chair , chair, CHAIR - all same
-      };
-    }
-
-    const listOfProducts = await Product.find(query)
-      .skip((currentPage - 1) * limit)
-      .limit(Number(limit)) // for limit
-      .sort({ createdAt: -1 }); // latest one
-
-    return res.status(200).json(
-      new ApiRes(
-        200,
-        `Product List`,
-        {
-          listOfProducts,
-        },
-        true
-      )
-    );
-  } catch (error) {
-    return res.status(500).json(new ApiError(500, error.message, null, false));
-  }
-};
 
 const adminLogout = (req, res) => {
   const { userEmail } = req.body;
@@ -206,11 +167,4 @@ const adminLogout = (req, res) => {
     .json(new ApiRes(200, `Logout Successfully`, [], true));
 };
 
-export {
-  adminLogin,
-  adminLogout,
-  adminProfile,
-  createProduct,
-  updateProduct,
-  productListing,
-};
+export { adminLogin, adminLogout, adminProfile, createProduct, updateProduct };
