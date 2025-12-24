@@ -18,7 +18,7 @@ const loginService = async (userEmail, userPassword) => {
     return {
       statusCode: 401,
       message: "Password is wronng",
-      data: email,
+      data: userEmail,
       success: false,
     };
   }

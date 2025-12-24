@@ -1,3 +1,4 @@
 import userRouter from "./user.route.js";
 import adminRouter from "./admin.route.js";
-export { userRouter,adminRouter };
+import productRouter from "./product.route.js";
+export { userRouter, adminRouter,productRouter };
