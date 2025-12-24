@@ -27,18 +27,26 @@ jobs:
         run: |
           npm ci
           npm run build
-          echo "Client dist contents:"
-          ls -l dist  # Debug: check build output
+          echo "Client dist contents (debug):"
+          ls -l dist  # Debug: confirm build output
 
       # 4️⃣ Install server dependencies
       - name: Install Server Dependencies
         working-directory: ./server
         run: |
           npm ci
-          echo "Server folder contents:"
+          echo "Server folder contents (debug):"
           ls -l   # Debug: confirm server files
 
-      # 5️⃣ Copy files to EC2 via SCP
+      # 5️⃣ Debug before SCP (optional)
+      - name: Debug files before SCP
+        run: |
+          echo "Client dist files:"
+          ls -l client/dist
+          echo "Server files:"
+          ls -l server
+
+      # 6️⃣ Copy files to EC2 via SCP
       - name: Deploy to EC2
         uses: appleboy/scp-action@v0.1.0
         with:
@@ -52,7 +60,7 @@ jobs:
           target: /home/ubuntu/urbannook-pre-prod/
           debug: true
 
-      # 6️⃣ Restart server using PM2
+      # 7️⃣ Restart server using PM2
       - name: Restart Server on EC2
         uses: appleboy/ssh-action@v0.1.6
         with:
