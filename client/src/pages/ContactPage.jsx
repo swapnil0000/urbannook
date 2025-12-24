@@ -29,7 +29,7 @@ const ContactPage = () => {
       id: 1,
       icon: "fa-solid fa-phone",
       title: "Call Us",
-      info: "+91 98765 43210",
+      info: "+91 63864 55982",
       subInfo: "Mon-Sat 9AM-7PM",
       colorClass: "text-primary",
       bgClass: "bg-primary/10"
@@ -38,7 +38,7 @@ const ContactPage = () => {
       id: 2,
       icon: "fa-solid fa-envelope",
       title: "Email Us",
-      info: "hello@urbannook.com",
+      info: "support@urbannook.in",
       subInfo: "We reply within 24 hours",
       colorClass: "text-accent",
       bgClass: "bg-accent/10"
@@ -47,7 +47,7 @@ const ContactPage = () => {
       id: 3,
       icon: "fa-solid fa-location-dot",
       title: "Visit Us",
-      info: "Mumbai, India",
+      info: "Gurgaon India",
       subInfo: "By appointment only",
       colorClass: "text-primary",
       bgClass: "bg-primary/10"

@@ -6,8 +6,8 @@ import { products, productCategories, colors, priceRanges, sortOptions } from '.
 const CategoryProductsPage = () => {
   const { category } = useParams();
   const navigate = useNavigate();
-  const [selectedColors, setSelectedColors] = useState([]);
   const [selectedPriceRange, setSelectedPriceRange] = useState(null);
+  const [selectedRating, setSelectedRating] = useState(null);
   const [sortBy, setSortBy] = useState('featured');
   const [showFilters, setShowFilters] = useState(false);
 
@@ -17,16 +17,14 @@ const CategoryProductsPage = () => {
   const filteredProducts = useMemo(() => {
     let filtered = categoryProducts;
 
-    if (selectedColors.length > 0) {
-      filtered = filtered.filter(p => 
-        p.colors.some(color => selectedColors.includes(color))
-      );
-    }
-
     if (selectedPriceRange) {
       filtered = filtered.filter(p => 
         p.price >= selectedPriceRange.min && p.price <= selectedPriceRange.max
       );
+    }
+
+    if (selectedRating) {
+      filtered = filtered.filter(p => p.rating >= selectedRating);
     }
 
     switch (sortBy) {
@@ -47,17 +45,11 @@ const CategoryProductsPage = () => {
     }
 
     return filtered;
-  }, [categoryProducts, selectedColors, selectedPriceRange, sortBy]);
-
-  const toggleColor = (colorId) => {
-    setSelectedColors(prev =>
-      prev.includes(colorId) ? prev.filter(c => c !== colorId) : [...prev, colorId]
-    );
-  };
+  }, [categoryProducts, selectedPriceRange, selectedRating, sortBy]);
 
   const clearFilters = () => {
-    setSelectedColors([]);
     setSelectedPriceRange(null);
+    setSelectedRating(null);
     setSortBy('featured');
   };
 
@@ -114,21 +106,43 @@ const CategoryProductsPage = () => {
                 </button>
               </div>
 
-              {/* Color Filter */}
+              {/* Rating Filter */}
               <div className="mb-6">
-                <h4 className="font-semibold text-textPrimary mb-3">Colors</h4>
-                <div className="flex flex-wrap gap-3">
-                  {colors.map(color => (
-                    <button
-                      key={color.id}
-                      onClick={() => toggleColor(color.id)}
-                      className={`w-10 h-10 rounded-full border-2 transition-all ${
-                        selectedColors.includes(color.id) ? 'border-primary scale-110' : 'border-borderPrimary'
-                      }`}
-                      style={{ backgroundColor: color.hex }}
-                      title={color.name}
-                    />
+                <h4 className="font-semibold text-textPrimary mb-3">Minimum Rating</h4>
+                <div className="space-y-2">
+                  {[4.5, 4.0, 3.5, 3.0].map(rating => (
+                    <label key={rating} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        checked={selectedRating === rating}
+                        onChange={() => setSelectedRating(rating)}
+                        className="w-4 h-4 text-primary"
+                      />
+                      <div className="flex items-center gap-1">
+                        {[...Array(5)].map((_, i) => (
+                          <i key={i} className={`fa-solid fa-star text-xs ${
+                            i < Math.floor(rating) ? 'text-warning' : 'text-borderSecondary'
+                          }`} />
+                        ))}
+                        <span className="text-textSecondary text-sm ml-1">& up</span>
+                      </div>
+                    </label>
                   ))}
+                </div>
+              </div>
+
+              {/* Availability Filter */}
+              <div className="mb-6">
+                <h4 className="font-semibold text-textPrimary mb-3">Availability</h4>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" className="w-4 h-4 text-primary" />
+                    <span className="text-textSecondary">In Stock Only</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" className="w-4 h-4 text-primary" />
+                    <span className="text-textSecondary">On Sale</span>
+                  </label>
                 </div>
               </div>
 
@@ -229,23 +243,24 @@ const CategoryProductsPage = () => {
                           <span className="text-textMuted text-xs ml-1">({product.reviews})</span>
                         </div>
                         <h3 className="text-textPrimary font-semibold mb-2 line-clamp-2">{product.title}</h3>
+                        <p className="text-textSecondary text-sm mb-3 line-clamp-2">{product.description}</p>
                         <div className="flex items-center gap-2 mb-3">
                           <span className="text-primary font-bold text-lg">₹{product.price}</span>
                           {product.originalPrice && (
                             <span className="text-textMuted line-through text-sm">₹{product.originalPrice}</span>
                           )}
                         </div>
-                        <div className="flex gap-2">
-                          {product.colors.slice(0, 4).map(colorId => {
-                            const color = colors.find(c => c.id === colorId);
-                            return (
-                              <div
-                                key={colorId}
-                                className="w-6 h-6 rounded-full border border-borderPrimary"
-                                style={{ backgroundColor: color?.hex }}
-                              />
-                            );
-                          })}
+                        <div className="flex items-center justify-between">
+                          <div className="flex gap-1">
+                            {product.features?.slice(0, 2).map((feature, index) => (
+                              <span key={index} className="px-2 py-1 bg-primary/10 text-primary text-xs rounded-full">
+                                {feature.split(' ')[0]}
+                              </span>
+                            ))}
+                          </div>
+                          {product.inStock && (
+                            <span className="text-accent text-xs font-semibold">In Stock</span>
+                          )}
                         </div>
                       </div>
                     </div>
