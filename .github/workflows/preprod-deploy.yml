@@ -64,3 +64,4 @@ jobs:
             pm2 restart urbannook-preprod || pm2 start src/server.js --name urbannook-preprod
             pm2 save
           EOF
+ 
