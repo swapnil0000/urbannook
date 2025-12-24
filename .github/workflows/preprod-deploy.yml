@@ -27,11 +27,16 @@ jobs:
         run: |
           npm ci
           npm run build
+          echo "Client dist contents:"
+          ls -l dist  # Debug: check build output
 
       # 4️⃣ Install server dependencies
       - name: Install Server Dependencies
         working-directory: ./server
-        run: npm ci
+        run: |
+          npm ci
+          echo "Server folder contents:"
+          ls -l   # Debug: confirm server files
 
       # 5️⃣ Copy files to EC2 via SCP
       - name: Deploy to EC2
@@ -42,9 +47,10 @@ jobs:
           key: ${{ secrets.PREPROD_SSH_KEY }}
           port: 22
           source: |
-            client/dist/*
-            server/*
+            client/dist/
+            server/
           target: /home/ubuntu/urbannook-pre-prod/
+          debug: true
 
       # 6️⃣ Restart server using PM2
       - name: Restart Server on EC2
