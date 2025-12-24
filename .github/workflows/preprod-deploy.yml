@@ -1,0 +1,59 @@
+name: Pre-Prod Deploy
+
+# Sirf pre-prod branch push par trigger
+on:
+  push:
+    branches:
+      - pre-prod
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout repo
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2️⃣ Set up Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      # 3️⃣ Install client dependencies and build
+      - name: Build Client
+        working-directory: ./client
+        run: |
+          npm ci
+          npm run build
+
+      # 4️⃣ Install server dependencies
+      - name: Install Server Dependencies
+        working-directory: ./server
+        run: npm ci
+
+      # 5️⃣ Copy files to EC2 via SCP
+      - name: Deploy to EC2
+        uses: appleboy/scp-action@v0.1.0
+        with:
+          host: ${{ secrets.PREPROD_HOST }}
+          username: ubuntu
+          key: ${{ secrets.PREPROD_SSH_KEY }}
+          port: 22
+          source: |
+            client/dist/*
+            server/*
+          target: /home/ubuntu/urbannook-pre-prod/
+
+      # 6️⃣ Restart server using PM2
+      - name: Restart Server on EC2
+        uses: appleboy/ssh-action@v0.1.6
+        with:
+          host: ${{ secrets.PREPROD_HOST }}
+          username: ubuntu
+          key: ${{ secrets.PREPROD_SSH_KEY }}
+          script: |
+            cd /home/ubuntu/urbannook-pre-prod/server
+            pm2 stop urbannook-preprod || true
+            pm2 start src/server.js --name urbannook-preprod
