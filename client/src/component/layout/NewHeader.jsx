@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import LoginForm from './LoginForm';
 import SignupForm from './SignupForm';
 
@@ -6,6 +6,21 @@ const NewHeader = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showSignup, setShowSignup] = useState(false);
+  const [showCart, setShowCart] = useState(false);
+  const [cart, setCart] = useState([]);
+
+  useEffect(() => {
+    const savedCart = JSON.parse(localStorage.getItem('cart') || '[]');
+    setCart(savedCart);
+    
+    const handleStorageChange = () => {
+      const updatedCart = JSON.parse(localStorage.getItem('cart') || '[]');
+      setCart(updatedCart);
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
 
   const hadleClickLogin = () =>{
@@ -36,9 +51,9 @@ const NewHeader = () => {
             <a href="/products" className="text-textSecondary hover:text-primary font-medium transition-colors">
               Products
             </a>
-            <a href="/customize-products" className="text-textSecondary hover:text-primary font-medium transition-colors">
+            {/* <a href="/customize-products" className="text-textSecondary hover:text-primary font-medium transition-colors">
               Customization
-            </a>
+            </a> */}
             <a href="/about-us" className="text-textSecondary hover:text-primary font-medium transition-colors">
               About Us
             </a>
@@ -75,9 +90,16 @@ const NewHeader = () => {
               </button>
               
               {/* Cart */}
-              <button className="p-2 rounded-full text-textSecondary hover:bg-bgSecondary hover:text-primary transition-all relative">
+              <button 
+                onClick={() => setShowCart(true)}
+                className="p-2 rounded-full text-textSecondary hover:bg-bgSecondary hover:text-primary transition-all relative"
+              >
                 <i className="fa-solid fa-shopping-cart"></i>
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-white text-xs rounded-full flex items-center justify-center">2</span>
+                {cart.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-white text-xs rounded-full flex items-center justify-center">
+                    {cart.reduce((total, item) => total + item.quantity, 0)}
+                  </span>
+                )}
               </button>
               
               {/* User */}
@@ -111,9 +133,9 @@ const NewHeader = () => {
               <a href="/products" className="block py-3 px-2 text-textSecondary hover:text-primary hover:bg-bgSecondary rounded-lg font-medium transition-all">
                 Products
               </a>
-              <a href="/customize-products" className="block py-3 px-2 text-textSecondary hover:text-primary hover:bg-bgSecondary rounded-lg font-medium transition-all">
+              {/* <a href="/customize-products" className="block py-3 px-2 text-textSecondary hover:text-primary hover:bg-bgSecondary rounded-lg font-medium transition-all">
                 Customization
-              </a>
+              </a> */}
               <a href="/about-us" className="block py-3 px-2 text-textSecondary hover:text-primary hover:bg-bgSecondary rounded-lg font-medium transition-all">
                 About Us
               </a>
@@ -143,6 +165,79 @@ const NewHeader = () => {
             }}
             />
             )}
+
+      {/* Cart Sidebar */}
+      {showCart && (
+        <>
+          {/* Overlay */}
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity duration-300"
+            onClick={() => setShowCart(false)}
+          ></div>
+          
+          {/* Cart Panel */}
+          <div className="fixed right-0 top-0 h-full w-96 bg-bgPrimary shadow-2xl z-50 transform transition-transform duration-300 flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-borderPrimary">
+              <h3 className="text-xl font-bold text-textPrimary">Shopping Cart</h3>
+              <button 
+                onClick={() => setShowCart(false)}
+                className="w-8 h-8 rounded-full bg-bgSecondary hover:bg-borderPrimary transition-colors flex items-center justify-center"
+              >
+                <i className="fa-solid fa-times text-textSecondary"></i>
+              </button>
+            </div>
+
+            {/* Cart Items */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {cart.length === 0 ? (
+                <div className="text-center py-12">
+                  <i className="fa-solid fa-shopping-cart text-4xl text-textMuted mb-4"></i>
+                  <p className="text-textSecondary">Your cart is empty</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {cart.map((item) => (
+                    <div key={item.cartId} className="flex gap-4 p-4 bg-bgSecondary rounded-lg">
+                      <img 
+                        src={item.image} 
+                        alt={item.title} 
+                        className="w-16 h-16 object-cover rounded-lg"
+                      />
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-textPrimary text-sm mb-1">{item.title}</h4>
+                        <p className="text-primary font-bold">₹{item.price?.toLocaleString()}</p>
+                        <p className="text-textSecondary text-xs">Qty: {item.quantity}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            {cart.length > 0 && (
+              <div className="p-6 border-t border-borderPrimary">
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-lg font-semibold text-textPrimary">Total:</span>
+                  <span className="text-2xl font-bold text-primary">
+                    ₹{cart.reduce((total, item) => total + (item.price * item.quantity), 0).toLocaleString()}
+                  </span>
+                </div>
+                <button 
+                  onClick={() => {
+                    setShowCart(false);
+                    window.location.href = '/products';
+                  }}
+                  className="w-full bg-primary hover:bg-accent text-white py-3 rounded-lg font-semibold transition-colors"
+                >
+                  View Cart
+                </button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </header>
   );
 };
