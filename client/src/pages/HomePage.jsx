@@ -1,6 +1,6 @@
 import React from 'react';
 import NewHeader from '../component/layout/NewHeader';
-import NewBanner from '../component/layout/NewBanner';
+import VideoBanner from '../component/layout/VideoBanner';
 import Footer from '../component/layout/Footer';
 import InstagramFeed from './InstagramFeed';
 import Testimonials from './Testimonials';
@@ -13,7 +13,7 @@ const HomePage = () => {
     <div className="min-h-screen">
       
       {/* Hero Banner */}
-      <NewBanner />
+      <VideoBanner />
       
       {/* Featured Products */}
       <FeaturedProducts />

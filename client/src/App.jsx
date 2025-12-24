@@ -2,12 +2,13 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from './component/ThemeProvider';
 import NewHeader from './component/layout/NewHeader';
 import HomePage from './pages/HomePage';
-import AboutPage from './feature/product/component/AboutPage';
 import ContactPage from './pages/ContactPage';
 import AllProductsPage from './pages/AllProductsPage';
 import CategoryProductsPage from './pages/CategoryProductsPage';
 import ProductDetailPage from './pages/ProductDetailPage';
+import CheckoutPage from './pages/CheckoutPage';
 import ProductDetails from './feature/product/component/ProductDetails';
+import AboutPage from './feature/product/component/AboutPage';
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
           <Route path="/products" element={<AllProductsPage />} />
           <Route path="/product/:category" element={<CategoryProductsPage />} />
           <Route path="/product/:category/:slug" element={<ProductDetailPage />} />
+          <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="/product/:id" element={<ProductDetails />} />
         </Routes>
       </Router>

@@ -4,30 +4,30 @@
 
 /* CSS Variables for Theme System */
 :root {
-  /* Colors - Based on the aesthetic images */
-  --color-primary: #FF6B6B;    /* Coral red from the UI */
-  --color-secondary: #F8F9FA;  /* Light gray background */
-  --color-accent: #4ECDC4;     /* Mint green accent */
+  /* Colors - Warm Brown Palette */
+  --color-primary: #8B4513;    /* Saddle Brown */
+  --color-secondary: #F4F1E8;  /* Warm cream background */
+  --color-accent: #D2691E;     /* Chocolate accent */
   
   /* Background Colors */
-  --color-bg-primary: #ffffff;
-  --color-bg-secondary: #F8F9FA;
-  --color-bg-tertiary: #E9ECEF;
+  --color-bg-primary: #FEFEFE;
+  --color-bg-secondary: #F4F1E8;
+  --color-bg-tertiary: #E6D7C3;
   
   /* Text Colors */
-  --color-text-primary: #2D3436;   /* Dark gray for good contrast */
-  --color-text-secondary: #636E72; /* Medium gray */
-  --color-text-muted: #B2BEC3;     /* Light gray */
+  --color-text-primary: #3E2723;   /* Dark brown for good contrast */
+  --color-text-secondary: #5D4037; /* Medium brown */
+  --color-text-muted: #8D6E63;     /* Light brown */
   
   /* Border Colors */
-  --color-border-primary: #E9ECEF;
-  --color-border-secondary: #DDD6FE;
+  --color-border-primary: #D7CCC8;
+  --color-border-secondary: #BCAAA4;
   
   /* Status Colors */
-  --color-success: #00B894;
-  --color-warning: #FDCB6E;
-  --color-error: #E17055;
-  --color-info: #74B9FF;
+  --color-success: #689F38;
+  --color-warning: #FF8F00;
+  --color-error: #D32F2F;
+  --color-info: #1976D2;
   
   /* Animation durations */
   --duration-300: 300ms;
@@ -37,25 +37,25 @@
 
 /* Dark Theme */
 [data-theme="dark"] {
-  --color-primary: #FF8A80;
-  --color-secondary: #2D3436;
-  --color-accent: #81ECEC;
+  --color-primary: #A0522D;
+  --color-secondary: #3E2723;
+  --color-accent: #D2691E;
   
-  --color-bg-primary: #2D3436;
-  --color-bg-secondary: #636E72;
-  --color-bg-tertiary: #74B9FF;
+  --color-bg-primary: #3E2723;
+  --color-bg-secondary: #5D4037;
+  --color-bg-tertiary: #6D4C41;
   
-  --color-text-primary: #FFFFFF;
-  --color-text-secondary: #DDD6FE;
-  --color-text-muted: #B2BEC3;
+  --color-text-primary: #F5F5DC;
+  --color-text-secondary: #D7CCC8;
+  --color-text-muted: #BCAAA4;
   
-  --color-border-primary: #636E72;
-  --color-border-secondary: #74B9FF;
+  --color-border-primary: #5D4037;
+  --color-border-secondary: #6D4C41;
   
-  --color-success: #00B894;
-  --color-warning: #FDCB6E;
-  --color-error: #E17055;
-  --color-info: #74B9FF;
+  --color-success: #689F38;
+  --color-warning: #FF8F00;
+  --color-error: #D32F2F;
+  --color-info: #1976D2;
 }
 
 @layer base {
