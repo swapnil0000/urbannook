@@ -55,8 +55,8 @@ jobs:
           key: ${{ secrets.PREPROD_SSH_KEY }}
           port: 22
           source: |
-            client/dist/
-            server/
+            client/dist/**
+            server/**
           target: /home/ubuntu/urbannook-pre-prod/
           debug: true
 
