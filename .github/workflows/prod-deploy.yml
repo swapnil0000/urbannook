@@ -1,0 +1,67 @@
+name: Prod Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2️⃣ Node setup
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # 3️⃣ Build client
+      - name: Build Client
+        working-directory: client
+        run: |
+          npm ci
+          npm run build
+          ls -l dist
+
+      # 4️⃣ Install server deps
+      - name: Install Server Dependencies
+        working-directory: server
+        run: |
+          npm ci
+
+      # 5️⃣ Setup SSH
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.PROD_HOST }} >> ~/.ssh/known_hosts
+
+      # 6️⃣ Upload client build
+      - name: Upload Client
+        run: |
+          rsync -avz --delete \
+          client/dist/ \
+          ubuntu@${{ secrets.PROD_HOST }}:/home/ubuntu/urbannook-prod/client/dist/
+
+      # 7️⃣ Upload server
+      - name: Upload Server
+        run: |
+          rsync -avz \
+          server/ \
+          ubuntu@${{ secrets.PROD_HOST }}:/home/ubuntu/urbannook-prod/server/
+
+      # 8️⃣ Restart PM2
+      - name: Restart Server
+        run: |
+          ssh ubuntu@${{ secrets.PROD_HOST }} << 'EOF'
+            cd /home/ubuntu/urbannook-prod/server
+            pm2 restart urbannook-prod || pm2 start src/server.js --name urbannook-prod
+            pm2 save
+          EOF
+ 
