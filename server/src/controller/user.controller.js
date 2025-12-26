@@ -99,31 +99,18 @@ const userRegister = async (req, res) => {
         );
     }
     // existing User
-    let result = await registerService(userEmail, userMobileNumber, userName);
-
-    if (result?.statusCode >= 400) {
-      return res.status(Number(result?.statusCode)).json(result);
-    }
-    const newRegisteringUser = await User.create({
-      userName,
+    let result = await registerService(
       userEmail,
       userPassword,
       userMobileNumber,
       userAddress,
       userPinCode,
-      userPreviousOrder: null,
-    });
-    if (!newRegisteringUser)
-      return res
-        .status(400)
-        .json(
-          new ApiError(
-            400,
-            `Failed to create user with ${userEmail}`,
-            userEmail,
-            false
-          )
-        );
+      userName
+    );
+
+    if (result?.statusCode >= 400) {
+      return res.status(Number(result?.statusCode)).json(result);
+    }
     return res
       .status(200)
       .json(new ApiRes(200, `User created with ${userEmail}`, userEmail, true));
@@ -154,18 +141,6 @@ const userProfile = async (req, res) => {
 const userAddToCart = async (req, res) => {
   const { userEmail } = req.user;
   const { productName, productQuanity } = req.body;
-  const userExist = await User.findOne({ userEmail });
-  if (!userExist)
-    return res
-      .status(404)
-      .json(
-        new ApiError(
-          404,
-          `User Email not found or user doesn't exist`,
-          null,
-          false
-        )
-      );
 
   let missing = addToCartDetailsMissing(userEmail, productName);
   if (!missing?.success) {
@@ -211,8 +186,16 @@ const userAddToCart = async (req, res) => {
     );
 };
 
-const userPreviewAddToCart = async (req, res) => {
+const userGetAddToCart = async (req, res) => {
   const { userEmail } = req.user;
+  if (!userEmail) {
+    return {
+      statusCode: 404,
+      message: "userEmail not found",
+      data: [],
+      success: false,
+    };
+  }
   const userExist = await User.findOne({ userEmail });
   if (!userExist)
     return res
@@ -236,20 +219,6 @@ const userPreviewAddToCart = async (req, res) => {
 const userAddToWishList = async (req, res) => {
   const { userEmail } = req.user;
   const { productName } = req.body;
-  const userExist = await User.findOne({ userEmail });
-
-  if (!userExist)
-    return res
-      .status(404)
-      .json(
-        new ApiError(
-          404,
-          `User Email not found or user doesn't exist`,
-          null,
-          false
-        )
-      );
-
   let missing = addToCartDetailsMissing(userEmail, productName);
   if (!missing?.success) {
     return res
@@ -335,7 +304,8 @@ const userDeleteFromProductWishList = async (req, res) => {
 };
 
 const userForgetuserPassword = async (req, res) => {
-  const { userEmail, userMobileNumber } = req.body;
+  const { userEmail } = req.user;
+  const { userMobileNumber } = req.body;
 
   if (!userEmail || !userMobileNumber) {
     return res
@@ -367,7 +337,8 @@ const userForgetuserPassword = async (req, res) => {
 };
 
 const userResetPassword = async (req, res) => {
-  const { userEmail, currentuserPassword, newuserPassword } = req.body;
+  const { userEmail } = req.user;
+  const { currentuserPassword, newuserPassword } = req.body;
   if (!userEmail || !currentuserPassword) {
     return res
       .status(400)
@@ -428,8 +399,9 @@ const userResetPassword = async (req, res) => {
 };
 
 const userUpdateProfile = async (req, res) => {
+  const { userEmail } = req.user;
   // not adding userMobileNumber becuase they would be requiring otp verification
-  const { userEmail, userName, userAddress, userPinCode } = req.body;
+  const { userName, userAddress, userPinCode } = req.body;
   if (!userEmail) {
     return res
       .status(404)
@@ -630,7 +602,7 @@ export {
   userRegister,
   userProfile,
   userAddToCart,
-  userPreviewAddToCart,
+  userGetAddToCart,
   userOrderPreviousHistory,
   userAccountDeletePreview,
   userAccountDeleteConfirm,

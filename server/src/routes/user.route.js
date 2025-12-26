@@ -11,7 +11,7 @@ import {
   userAccountDeleteConfirm,
   userOrderPreviousHistory,
   userAddToCart,
-  userPreviewAddToCart,
+  userGetAddToCart,
   userAddToWishList,
   userGetProductWishList,
   userDeleteFromProductWishList,
@@ -55,11 +55,7 @@ userRouter.post(
 ================================================================ */
 userRouter.post("/user/addtocart", authGuard("User"), userAddToCart);
 
-userRouter.get(
-  "/user/preview-addtocart",
-  authGuard("User"),
-  userPreviewAddToCart
-);
+userRouter.get("/user/preview-addtocart", authGuard("User"), userGetAddToCart);
 
 /* ===============================================================
    WISHLIST MANAGEMENT (PROTECTED)
