@@ -82,7 +82,7 @@ const profileFetchService = async (data) => {
   if (!data?.userEmail)
     return res
       .status(400)
-      .json(new ApiError(400, `UserId not avaialable`, [], false));
+      .json(new ApiError(400, `userEmail not avaialable`, [], false));
   const Model = data?.role === "Admin" ? Admin : User;
   const profile = await Model.findOne({ userEmail: data?.userEmail }).select(
     "-_id -userPassword -createdAt -updatedAt -__v"
