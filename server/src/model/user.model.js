@@ -38,6 +38,16 @@ const userSchema = mongoose.Schema(
       type: Number,
       required: [true, "userPinCode is required"],
     },
+    userVerificationOtp: {
+      type: Number,
+    },
+    userVerificationOtpExpiresAt: {
+      type: Date,
+    },
+    isUserVerified: {
+      type: Boolean,
+      default: false,
+    },
     userPreviousOrder: {
       type: [
         {
