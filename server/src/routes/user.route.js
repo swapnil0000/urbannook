@@ -64,6 +64,7 @@ userRouter.post("/user/addtowishlist", authGuard("User"), userAddToWishList);
 
 userRouter.get("/user/wishlist", authGuard("User"), userGetProductWishList);
 
+
 userRouter.delete(
   "/user/wishlist/:productId",
   authGuard("User"),

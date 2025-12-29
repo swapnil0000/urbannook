@@ -47,8 +47,14 @@ const loginService = async (userEmail, userPassword) => {
   };
 };
 
-const registerService = async (userEmail,userPassword, userMobileNumber, userAddress,
-    userPinCode, userName) => {
+const registerService = async (
+  userEmail,
+  userPassword,
+  userMobileNumber,
+  userAddress,
+  userPinCode,
+  userName
+) => {
   const res = await User.findOne({
     $or: [{ userMobileNumber }, { userEmail }, { userName }],
   });
@@ -258,6 +264,7 @@ const deleteFromWishList = async (userEmail, productId) => {
     };
   }
 };
+
 export {
   loginService,
   registerService,
