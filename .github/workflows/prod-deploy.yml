@@ -14,7 +14,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Node setup
+      # 2️⃣ Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -26,7 +26,6 @@ jobs:
         run: |
           npm ci
           npm run build
-          ls -l dist
 
       # 4️⃣ Install server deps
       - name: Install Server Dependencies
@@ -42,26 +41,44 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.PROD_HOST }} >> ~/.ssh/known_hosts
 
-      # 6️⃣ Upload client build
+      # 6️⃣ Check if PROD EC2 is running
+      - name: Check PROD server availability
+        id: prod_check
+        run: |
+          if ssh -o ConnectTimeout=5 ubuntu@${{ secrets.PROD_HOST }} "echo 'EC2 UP'" >/dev/null 2>&1; then
+            echo "server_up=true" >> $GITHUB_OUTPUT
+          else
+            echo "server_up=false" >> $GITHUB_OUTPUT
+          fi
+
+      # 7️⃣ Skip message if EC2 is stopped
+      - name: Skip deploy (PROD server stopped)
+        if: steps.prod_check.outputs.server_up == 'false'
+        run: |
+          echo "🛑 PROD EC2 is stopped. Skipping deployment safely."
+
+      # 8️⃣ Upload client build
       - name: Upload Client
+        if: steps.prod_check.outputs.server_up == 'true'
         run: |
           rsync -avz --delete \
           client/dist/ \
           ubuntu@${{ secrets.PROD_HOST }}:/home/ubuntu/urbannook-prod/client/dist/
 
-      # 7️⃣ Upload server
+      # 9️⃣ Upload server
       - name: Upload Server
+        if: steps.prod_check.outputs.server_up == 'true'
         run: |
           rsync -avz \
           server/ \
           ubuntu@${{ secrets.PROD_HOST }}:/home/ubuntu/urbannook-prod/server/
 
-      # 8️⃣ Restart PM2
+      # 🔟 Restart PM2
       - name: Restart Server
+        if: steps.prod_check.outputs.server_up == 'true'
         run: |
           ssh ubuntu@${{ secrets.PROD_HOST }} << 'EOF'
             cd /home/ubuntu/urbannook-prod/server
             pm2 restart urbannook-prod || pm2 start src/server.js --name urbannook-prod
             pm2 save
           EOF
- 
