@@ -10,11 +10,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout code
+      # 1️⃣ Checkout
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Setup Node.js
+      # 2️⃣ Node setup
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -30,52 +30,46 @@ jobs:
       # 4️⃣ Install server deps
       - name: Install Server Dependencies
         working-directory: server
-        run: |
-          npm ci
+        run: npm ci
 
-      # 5️⃣ Setup SSH
+      # 5️⃣ Setup SSH (NON-FAILING)
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.PROD_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ secrets.PROD_HOST }} >> ~/.ssh/known_hosts || true
 
-      # 6️⃣ Check if PROD EC2 is running
-      - name: Check PROD server availability
-        id: prod_check
+      # 6️⃣ Check EC2 availability
+      - name: Check Prod EC2 availability
         run: |
-          if ssh -o ConnectTimeout=5 ubuntu@${{ secrets.PROD_HOST }} "echo 'EC2 UP'" >/dev/null 2>&1; then
-            echo "server_up=true" >> $GITHUB_OUTPUT
+          echo "Checking Prod EC2..."
+          if ssh -o ConnectTimeout=5 ubuntu@${{ secrets.PROD_HOST }} "echo EC2 is running" >/dev/null 2>&1; then
+            echo "EC2_AVAILABLE=true" >> $GITHUB_ENV
           else
-            echo "server_up=false" >> $GITHUB_OUTPUT
+            echo "EC2_AVAILABLE=false" >> $GITHUB_ENV
+            echo "Prod EC2 is stopped. Deployment skipped."
           fi
 
-      # 7️⃣ Skip message if EC2 is stopped
-      - name: Skip deploy (PROD server stopped)
-        if: steps.prod_check.outputs.server_up == 'false'
-        run: |
-          echo "🛑 PROD EC2 is stopped. Skipping deployment safely."
-
-      # 8️⃣ Upload client build
+      # 7️⃣ Upload client
       - name: Upload Client
-        if: steps.prod_check.outputs.server_up == 'true'
+        if: env.EC2_AVAILABLE == 'true'
         run: |
           rsync -avz --delete \
           client/dist/ \
           ubuntu@${{ secrets.PROD_HOST }}:/home/ubuntu/urbannook-prod/client/dist/
 
-      # 9️⃣ Upload server
+      # 8️⃣ Upload server
       - name: Upload Server
-        if: steps.prod_check.outputs.server_up == 'true'
+        if: env.EC2_AVAILABLE == 'true'
         run: |
           rsync -avz \
           server/ \
           ubuntu@${{ secrets.PROD_HOST }}:/home/ubuntu/urbannook-prod/server/
 
-      # 🔟 Restart PM2
+      # 9️⃣ Restart PM2
       - name: Restart Server
-        if: steps.prod_check.outputs.server_up == 'true'
+        if: env.EC2_AVAILABLE == 'true'
         run: |
           ssh ubuntu@${{ secrets.PROD_HOST }} << 'EOF'
             cd /home/ubuntu/urbannook-prod/server
