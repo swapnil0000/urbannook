@@ -17,6 +17,7 @@
     "mongoose": "^8.20.1",
     "nodemailer": "^7.0.12",
     "otp-generator": "^4.0.1",
+    "razorpay": "^2.9.6",
     "uuid": "^13.0.0"
   },
   "devDependencies": {

@@ -16,14 +16,16 @@ const authGuard = (role) => {
  */
   return (req, res, next) => {
     try {
-      const authHeader = req.headers.authorization;
+      let token = req.cookies?.userAccessToken;
 
-      if (!authHeader?.startsWith("Bearer ")) {
+      if (!token && req.headers.authorization?.startsWith("Bearer ")) {
+        token = req.headers.authorization.split(" ")[1];
+      }
+      if (!token) {
         return res
           .status(401)
-          .json(new ApiError(401, "Auth Bearer Header Missing", null, false));
+          .json(new ApiError(401, "Authentication token missing", null, false));
       }
-      const token = authHeader.split(" ")[1];
       const secret =
         role === "Admin"
           ? process.env.ADMIN_ACCESS_TOKEN_SECRET
@@ -37,7 +39,6 @@ const authGuard = (role) => {
        so that all subsequent middlewares and controllers can identify
        the authenticated user without re-verifying the token again on any controller or route. */
       req.user = decodedToken;
-
       req.authRole = role;
       next();
     } catch (error) {

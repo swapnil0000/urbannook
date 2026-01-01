@@ -7,6 +7,28 @@ dotenv.config({
   path: "./.env",
 });
 
+// PaymentDetails sub-schema
+const paymentDetailsSchema = new mongoose.Schema({
+  _id: false,
+  razorpay_order_id: { type: String, required: true },
+  razorpay_payment_id: { type: String, required: true },
+  razorpay_signature: { type: String, required: true },
+});
+
+// ProductOrder sub-schema
+const productOrderSchema = new mongoose.Schema({
+  _id: false,
+  orderId: { type: String, required: true },
+  datePurchased: { type: Date, default: Date.now },
+  productId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Product",
+    required: true,
+  },
+  quantity: { type: Number, default: 1 },
+  paymentDetails: { type: paymentDetailsSchema, required: true },
+});
+
 const userSchema = mongoose.Schema(
   {
     userName: {
@@ -49,20 +71,7 @@ const userSchema = mongoose.Schema(
       default: false,
     },
     userPreviousOrder: {
-      type: [
-        {
-          orderId: String,
-          datePurchased: {
-            type: Date,
-            default: Date.now,
-          },
-          productId: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "Product",
-          },
-          quantity: Number,
-        },
-      ],
+      type: [productOrderSchema],
       default: [],
     },
     addedToCart: [

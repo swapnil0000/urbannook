@@ -1,5 +1,4 @@
 import { Router } from "express";
-
 /* ===================== CONTROLLERS ===================== */
 import {
   userLogin,
@@ -15,6 +14,9 @@ import {
   userAddToWishList,
   userGetProductWishList,
   userDeleteFromProductWishList,
+  userUpdateCartQuantity,
+  userRemoveFromCart,
+  userClearCart,
 } from "../controller/user.controller.js";
 
 /* ===================== AUTH SERVICES ===================== */
@@ -23,6 +25,11 @@ import {
   logoutService,
   regenerateToken,
 } from "../services/common.auth.service.js";
+import {
+  razorpayCreateOrderController,
+  razorpayPaymentVerificationController,
+  razorpayKeyGetController,
+} from "../controller/rp.payment.controller.js";
 
 const userRouter = Router();
 
@@ -57,13 +64,22 @@ userRouter.post("/user/addtocart", authGuard("User"), userAddToCart);
 
 userRouter.get("/user/preview-addtocart", authGuard("User"), userGetAddToCart);
 
+userRouter.put("/user/cart/update", authGuard("User"), userUpdateCartQuantity);
+
+userRouter.delete(
+  "/user/cart/:productId",
+  authGuard("User"),
+  userRemoveFromCart
+);
+
+userRouter.delete("/user/cart/clear", authGuard("User"), userClearCart);
+
 /* ===============================================================
    WISHLIST MANAGEMENT (PROTECTED)
 ================================================================ */
 userRouter.post("/user/addtowishlist", authGuard("User"), userAddToWishList);
 
 userRouter.get("/user/wishlist", authGuard("User"), userGetProductWishList);
-
 
 userRouter.delete(
   "/user/wishlist/:productId",
@@ -92,5 +108,21 @@ userRouter.delete(
 userRouter.post("/user/logout", authGuard("User"), logoutService);
 
 userRouter.post("/refresh-token", authGuard("User"), regenerateToken);
+
+// user checkout
+
+userRouter.get("/rp/get-key", authGuard("User"), razorpayKeyGetController);
+
+userRouter.post(
+  "/user/create-order",
+  authGuard("User"),
+  razorpayCreateOrderController
+);
+
+userRouter.post(
+  "/user/paymentverification",
+  authGuard("User"),
+  razorpayPaymentVerificationController
+);
 
 export default userRouter;

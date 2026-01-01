@@ -45,7 +45,7 @@ const userLogin = async (req, res) => {
     }
     return res
       .status(Number(result?.statusCode))
-      .cookie("userRefreshToken", result?.data?.userRefreshToken, cookieOptions)
+      .cookie("userAccessToken", result?.data?.userAccessToken, cookieOptions)
       .json(
         new ApiRes(Number(result?.statusCode), `User Details`, {
           role: result?.data?.role,
@@ -53,6 +53,7 @@ const userLogin = async (req, res) => {
           userEmail: result?.data?.userEmail,
           userMobileNumber: result?.data?.userMobileNumber,
           userAddresults: result?.data?.userAddress,
+          authorization: "Bearer undefined",
           userPinCode: result?.data?.userPinCode,
           addedToCart: result?.data?.addedToCart,
           userPreviousOrder: result?.data?.userPreviousOrder,
@@ -165,13 +166,13 @@ const userAddToCart = async (req, res) => {
     );
     if (!productAdditionToCart?.success) {
       return res
-        .status(Number(missing?.statusCode))
+        .status(Number(productAdditionToCart?.statusCode))
         .json(
           new ApiError(
-            missing?.statusCode,
-            missing?.message,
-            missing?.data,
-            missing?.success
+            productAdditionToCart?.statusCode,
+            productAdditionToCart?.message,
+            productAdditionToCart?.data,
+            productAdditionToCart?.success
           )
         );
     }
@@ -230,6 +231,121 @@ const userGetAddToCart = async (req, res) => {
     return res
       .status(500)
       .json(new ApiError(500, `Internal Server Error - ${error}`, [], false));
+  }
+};
+
+const userUpdateCartQuantity = async (req, res) => {
+  try {
+    const { userEmail } = req.user;
+    const { productId, quantity } = req.body;
+
+    if (!productId || quantity === undefined) {
+      return res
+        .status(400)
+        .json(
+          new ApiError(400, "productId and quantity are required", null, false)
+        );
+    }
+
+    const user = await User.findOne({ userEmail });
+    if (!user) {
+      return res
+        .status(404)
+        .json(new ApiError(404, "User not found", null, false));
+    }
+
+    const cartItem = user.addedToCart.find(
+      (item) => item.productId.toString() === productId
+    );
+
+    if (!cartItem) {
+      return res
+        .status(404)
+        .json(new ApiError(404, "Product not found in cart", null, false));
+    }
+
+    // Quantity <= 0 → remove item
+    if (quantity <= 0) {
+      user.addedToCart = user.addedToCart.filter(
+        (item) => item.productId.toString() !== productId
+      );
+    } else {
+      cartItem.quantity = quantity;
+    }
+
+    await user.save();
+
+    return res
+      .status(200)
+      .json(
+        new ApiRes(200, "Cart updated successfully", user.addedToCart, true)
+      );
+  } catch (error) {
+    return res
+      .status(500)
+      .json(new ApiError(500, `Internal Server Error - ${error}`, null, false));
+  }
+};
+
+const userRemoveFromCart = async (req, res) => {
+  try {
+    const { userEmail } = req.user;
+    const { productId } = req.params;
+
+    const user = await User.findOne({ userEmail });
+    if (!user) {
+      return res
+        .status(404)
+        .json(new ApiError(404, "User not found", null, false));
+    }
+
+    const initialLength = user.addedToCart.length;
+
+    user.addedToCart = user.addedToCart.filter(
+      (item) => item.productId.toString() !== productId
+    );
+
+    if (initialLength === user.addedToCart.length) {
+      return res
+        .status(404)
+        .json(new ApiError(404, "Product not found in cart", null, false));
+    }
+
+    await user.save();
+
+    return res
+      .status(200)
+      .json(
+        new ApiRes(200, "Product removed from cart", user.addedToCart, true)
+      );
+  } catch (error) {
+    return res
+      .status(500)
+      .json(new ApiError(500, `Internal Server Error - ${error}`, null, false));
+  }
+};
+
+const userClearCart = async (req, res) => {
+  try {
+    const { userEmail } = req.user;
+
+    const user = await User.findOne({ userEmail });
+    if (!user) {
+      return res
+        .status(404)
+        .json(new ApiError(404, "User not found", null, false));
+    }
+
+    user.addedToCart = [];
+    await user.save();
+
+    return res
+      .status(200)
+      .json(new ApiRes(200, "Cart cleared successfully", [], true));
+  } catch (error) {
+    return res
+      .status(500)
+      .json(new ApiError(500, `Internal Server Error - ${error}`, null, false));
   }
 };
 
@@ -636,30 +752,24 @@ const userOrderPreviousHistory = async (req, res) => {
         .status(404)
         .json(new ApiError(404, `User Email Not found`, null, false));
     }
-    const userPreviousOrder = await User.findOne({ userEmail });
-    return userPreviousOrder?.userPreviousOrder == null
-      ? res.status(200).json(
-          new ApiRes(
-            200,
-            `No Order has been by place by you`,
-            {
-              userEmail,
-              userPreviousOrder: userPreviousOrder?.userPreviousOrder,
-            },
-            true
-          )
+    const userPreviousOrder = await User.findOne({ userEmail }).populate(
+      "userPreviousOrder.productId",
+      "productName sellingPrice"
+    );
+    const orders = userPreviousOrder?.userPreviousOrder || [];
+
+    return res
+      .status(200)
+      .json(
+        new ApiRes(
+          200,
+          orders.length === 0
+            ? "No orders placed yet"
+            : "Orders fetched successfully",
+          { userEmail, userPreviousOrder: orders },
+          true
         )
-      : res.status(200).json(
-          new ApiRes(
-            200,
-            `Order has been by place by you -`,
-            {
-              userEmail,
-              userPreviousOrder: userPreviousOrder?.userPreviousOrder,
-            },
-            true
-          )
-        );
+      );
   } catch (error) {
     return res
       .status(500)
@@ -681,4 +791,8 @@ export {
   userAddToWishList,
   userGetProductWishList,
   userDeleteFromProductWishList,
+  userUpdateCartQuantity,
+  userRemoveFromCart,
+  userClearCart,
+  userForgetuserPassword,
 };
