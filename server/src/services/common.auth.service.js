@@ -9,7 +9,7 @@ import crypto from "crypto";
 dotenv.config({
   path: "./.env",
 });
-const authGuard = (role) => {
+const authGuardService = (role) => {
   /* The return is placed outside the try–catch because jwt.verify() runs
      during request execution, while a try–catch outside the middleware
      would only apply at function creation time, not at runtime.
@@ -92,19 +92,15 @@ const profileFetchService = async (data) => {
   return profile;
 };
 
-const regenerateToken = async (req, res) => {
+const regenerateTokenService = async (req, res) => {
   const { userEmail } = req.user;
   if (!userEmail) {
-    return res
-      .status(401)
-      .json(
-        new ApiError(
-          401,
-          `Unauthorized User - can't find userEmail`,
-          null,
-          false
-        )
-      );
+    return {
+      statusCode: 401,
+      message: `Unauthorized User - can't find userEmail`,
+      data: null,
+      success: false,
+    };
   }
 
   const Model = req.authRole == "User" ? User : Admin;
@@ -142,7 +138,7 @@ const regenerateToken = async (req, res) => {
     );
 };
 
-const generateOtpResponse = async () => {
+const generateOtpResponseService = async () => {
   try {
     const otpValue = crypto.randomInt(100000, 1000000);
 
@@ -163,7 +159,7 @@ const generateOtpResponse = async () => {
   }
 };
 
-const sendOtpViaEmail = async (userEmail) => {
+const sendOtpViaEmailService = async (userEmail) => {
   try {
     if (!userEmail) {
       return {
@@ -174,7 +170,7 @@ const sendOtpViaEmail = async (userEmail) => {
       };
     }
 
-    const otpResponse = await generateOtpResponse();
+    const otpResponse = await generateOtpResponseService();
     const OTP_EXPIRY_TIME = 5 * 60 * 1000; // 5 minutes
     if (!otpResponse?.success) {
       return {
@@ -195,20 +191,22 @@ const sendOtpViaEmail = async (userEmail) => {
       },
       { new: true }
     );
-
+    const zohoEmail = process.env.ZOHO_ADMIN_EMAIL;
+    const zohoEmailSMTPSecret = process.env.ZOHO_SMTP_SECRET;
     const transporter = nodemailer.createTransport({
       secure: true,
-      host: "smtp.gmail.com",
+      host: "smtp.zoho.in",
       port: 465,
       auth: {
-        user: "yashk8119@gmail.com",
-        pass: "ofldgykoidaoayjf",
+        user: zohoEmail,
+        pass: zohoEmailSMTPSecret,
       },
     });
 
     const sendOtpEmail = (to, subject, otp) => {
       try {
         transporter.sendMail({
+          from: `urbanadmin@urbannook.in`,
           to,
           subject,
           html: `
@@ -268,7 +266,7 @@ const sendOtpViaEmail = async (userEmail) => {
   }
 };
 
-const verifyOtpEmail = async (userEmail, userEmailOtp) => {
+const verifyOtpEmailService = async (userEmail, userEmailOtp) => {
   try {
     if (!userEmail || !userEmailOtp) {
       return {
@@ -321,11 +319,11 @@ const verifyOtpEmail = async (userEmail, userEmailOtp) => {
 };
 
 export {
-  authGuard,
+  authGuardService,
   logoutService,
   profileFetchService,
-  regenerateToken,
-  sendOtpViaEmail,
-  verifyOtpEmail,
-  generateOtpResponse,
+  regenerateTokenService,
+  sendOtpViaEmailService,
+  verifyOtpEmailService,
+  generateOtpResponseService,
 };

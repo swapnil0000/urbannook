@@ -3,6 +3,8 @@ import Product from "../model/product.model.js";
 const productListing = async (req, res) => {
   try {
     const { limit, currentPage, search, status, category } = req.query;
+    const page = Number(currentPage) || 1;
+    const perPage = Number(limit) || 10;
     /*category -> Filter by category	Electronics , search -> Keyword search in name	iPhone */
     const query = {};
     if (status) {
@@ -20,12 +22,11 @@ const productListing = async (req, res) => {
         $options: "i", // makes it case - insensitive Eg - Chair , chair, CHAIR - all same
       };
     }
-
+    const totalProducts = await Product.countDocuments(query);
     const listOfProducts = await Product.find(query)
-      .skip((currentPage - 1) * limit)
-      .limit(Number(limit)) // for limit
+      .skip((page - 1) * perPage)
+      .limit(perPage) // for limit
       .sort({ createdAt: -1 }); // latest one
-    console.log();
 
     return res.status(200).json(
       new ApiRes(
@@ -34,7 +35,17 @@ const productListing = async (req, res) => {
           ? `No Product found for your search`
           : `Product List`,
         {
-          listOfProducts: listOfProducts?.length == 0 ? null : listOfProducts,
+          listOfProducts:
+            listOfProducts?.length == 0
+              ? null
+              : {
+                  listOfProducts,
+                  pagination: {
+                    totalProducts,
+                    currentPage: page,
+                    totalPages: Math.ceil(totalProducts / perPage),
+                  },
+                },
         },
         true
       )

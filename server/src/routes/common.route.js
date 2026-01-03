@@ -1,9 +1,9 @@
 import { Router } from "express";
 import {
-  sendOtpViaEmailController,
+  sendOtpViaEmailServiceController,
   verifyEmailOtpController,
 } from "../controller/common.controller.js";
 const commonRouter = Router();
-commonRouter.post("/send-otp", sendOtpViaEmailController);
+commonRouter.post("/send-otp", sendOtpViaEmailServiceController);
 commonRouter.post("/verify-otp", verifyEmailOtpController);
 export default commonRouter;
