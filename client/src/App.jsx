@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from './component/ThemeProvider';
 import NewHeader from './component/layout/NewHeader';
+import MobileBottomNav from './component/layout/MobileBottomNav';
 import HomePage from './pages/HomePage';
 import ContactPage from './pages/ContactPage';
 import AllProductsPage from './pages/AllProductsPage';
@@ -13,8 +14,8 @@ import AboutPage from './feature/product/component/AboutPage';
 function App() {
   return (
     <ThemeProvider>
-      <Router>
-        <NewHeader />
+      <Router> 
+        <NewHeader/>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/about-us" element={<AboutPage />} />
@@ -25,6 +26,7 @@ function App() {
           <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="/product/:id" element={<ProductDetails />} />
         </Routes>
+        <MobileBottomNav />
       </Router>
     </ThemeProvider>
   );
