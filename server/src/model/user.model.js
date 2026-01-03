@@ -38,38 +38,49 @@ const userSchema = mongoose.Schema(
       type: Number,
       required: [true, "userPinCode is required"],
     },
-    userPreviousOrder: {
-      type: [
-        {
-          orderId: String,
-          datePurchased: {
-            type: Date,
-            default: Date.now,
-          },
-          productId: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "Product",
-          },
-          quantity: Number,
-        },
-      ],
-      default: [],
+    userVerificationOtp: {
+      type: Number,
     },
-    addedToCart: {
-      type: Map,
-      of: Number,
-      default: {},
+    userVerificationOtpExpiresAt: {
+      type: Date,
     },
-    addedToWishList: [
+    isUserVerified: {
+      type: Boolean,
+      default: false,
+    },
+    userPreviousOrder: [
       {
+        _id: false,
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Product",
-        default: [],
+        ref: "Order",
       },
     ],
-    userRefreshToken: {
-      type: String,
-    },
+    addedToCart: [
+      {
+        _id: false,
+        productId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Product",
+          required: true,
+        },
+        quantity: {
+          type: Number,
+          default: 1,
+          min: 1,
+        },
+      },
+    ],
+    addedToWishList: [
+      {
+        _id: false,
+        productId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Product",
+          required: true,
+        },
+      },
+    ],
+    userRefreshToken: String,
     role: {
       type: String,
       default: "User",

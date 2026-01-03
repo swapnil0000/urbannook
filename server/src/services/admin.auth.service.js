@@ -21,7 +21,7 @@ const productExisting = async (productName, productQuantity) => {
       }
     : {
         statusCode: 200,
-        message: `Product already exists with name: ${res?.productName}`,
+        message: `Product Details: ${res?.productName}`,
         data: {
           productName: res?.productName,
           productId: res?.productId,

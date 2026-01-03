@@ -4,6 +4,8 @@ import User from "../model/user.model.js";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import cookieOptions from "../config/config.js";
+import nodemailer from "nodemailer";
+import crypto from "crypto";
 dotenv.config({
   path: "./.env",
 });
@@ -14,14 +16,16 @@ const authGuard = (role) => {
  */
   return (req, res, next) => {
     try {
-      const authHeader = req.headers.authorization;
+      let token = req.cookies?.userAccessToken;
 
-      if (!authHeader?.startsWith("Bearer ")) {
+      if (!token && req.headers.authorization?.startsWith("Bearer ")) {
+        token = req.headers.authorization.split(" ")[1];
+      }
+      if (!token) {
         return res
           .status(401)
-          .json(new ApiError(401, "Auth Bearer Header Missing", null, false));
+          .json(new ApiError(401, "Authentication token missing", null, false));
       }
-      const token = authHeader.split(" ")[1];
       const secret =
         role === "Admin"
           ? process.env.ADMIN_ACCESS_TOKEN_SECRET
@@ -35,7 +39,6 @@ const authGuard = (role) => {
        so that all subsequent middlewares and controllers can identify
        the authenticated user without re-verifying the token again on any controller or route. */
       req.user = decodedToken;
-
       req.authRole = role;
       next();
     } catch (error) {
@@ -51,7 +54,6 @@ const authGuard = (role) => {
 
 const logoutService = async (req, res) => {
   const { userEmail } = req.user;
-  console.log(userEmail);
   const Model = req.authRole == "User" ? User : Admin;
   const roleDetails = await Model.findOne({ userEmail });
 
@@ -82,7 +84,7 @@ const profileFetchService = async (data) => {
   if (!data?.userEmail)
     return res
       .status(400)
-      .json(new ApiError(400, `UserId not avaialable`, [], false));
+      .json(new ApiError(400, `userEmail not avaialable`, [], false));
   const Model = data?.role === "Admin" ? Admin : User;
   const profile = await Model.findOne({ userEmail: data?.userEmail }).select(
     "-_id -userPassword -createdAt -updatedAt -__v"
@@ -139,4 +141,191 @@ const regenerateToken = async (req, res) => {
       )
     );
 };
-export { authGuard, logoutService, profileFetchService, regenerateToken };
+
+const generateOtpResponse = async () => {
+  try {
+    const otpValue = crypto.randomInt(100000, 1000000);
+
+    if (otpValue)
+      return {
+        statusCode: 200,
+        message: `Generated OTP successfully`,
+        data: `${otpValue}`,
+        success: true,
+      };
+  } catch (error) {
+    return {
+      statusCode: 500,
+      message: `Not able to generate OTP - ${error} try after some time`,
+      data: userEmail,
+      success: false,
+    };
+  }
+};
+
+const sendOtpViaEmail = async (userEmail) => {
+  try {
+    if (!userEmail) {
+      return {
+        statusCode: 404,
+        message: `Email is required to send otp`,
+        data: null,
+        success: false,
+      };
+    }
+
+    const otpResponse = await generateOtpResponse();
+    const OTP_EXPIRY_TIME = 5 * 60 * 1000; // 5 minutes
+    if (!otpResponse?.success) {
+      return {
+        statusCode: otpResponse?.statusCode,
+        message: otpResponse?.message,
+        data: otpResponse?.data,
+        success: otpResponse?.success,
+      };
+    }
+
+    const userDetails = await User.findOneAndUpdate(
+      { userEmail },
+      {
+        $set: {
+          userVerificationOtp: Number(otpResponse?.data),
+          userVerificationOtpExpiresAt: new Date(Date.now() + OTP_EXPIRY_TIME),
+        },
+      },
+      { new: true }
+    );
+
+    const transporter = nodemailer.createTransport({
+      secure: true,
+      host: "smtp.gmail.com",
+      port: 465,
+      auth: {
+        user: "yashk8119@gmail.com",
+        pass: "ofldgykoidaoayjf",
+      },
+    });
+
+    const sendOtpEmail = (to, subject, otp) => {
+      try {
+        transporter.sendMail({
+          to,
+          subject,
+          html: `
+            <div style="font-family: Arial, sans-serif;">
+              <h2>OTP Verification</h2>
+              <p>Your OTP is:</p>
+              <h1 style="letter-spacing: 3px;">${String(otp)}</h1>
+              <p>This OTP is valid for 5 minutes.</p>
+            </div>
+          `,
+        });
+
+        return {
+          statusCode: 200,
+          message: `OTP sent to` - userEmail,
+          data: userEmail,
+          success: true,
+        };
+      } catch (error) {
+        return {
+          statusCode: 500,
+          message: `Internal Server Error`,
+          data: userEmail,
+          success: false,
+        };
+      }
+    };
+
+    const emailResult = sendOtpEmail(
+      String(userEmail),
+      `OTP Verification`,
+      userDetails?.userVerificationOtp
+    );
+
+    if (!emailResult?.success) {
+      return {
+        statusCode: 500,
+        message: `Not able to send OTP - ${error} try after some time`,
+        data: userEmail,
+        success: false,
+      };
+    }
+
+    return {
+      statusCode: 200,
+      message: `OTP sent successfully`,
+      data: `${emailResult?.data}`,
+      success: true,
+    };
+  } catch (error) {
+    return {
+      statusCode: 500,
+      message: `Internal Server Error - ${error} try after some time`,
+      data: null,
+      success: false,
+    };
+  }
+};
+
+const verifyOtpEmail = async (userEmail, userEmailOtp) => {
+  try {
+    if (!userEmail || !userEmailOtp) {
+      return {
+        statusCode: 400,
+        message: "Email and OTP is required",
+        success: false,
+      };
+    }
+
+    const now = new Date();
+
+    const verifiedUser = await User.findOneAndUpdate(
+      {
+        userEmail,
+        isUserVerified: false,
+        userVerificationOtp: Number(userEmailOtp), // 👈 OTP MATCH FIRST
+        userVerificationOtpExpiresAt: { $gt: now }, // 👈 NOT EXPIRED
+      },
+      {
+        $set: { isUserVerified: true },
+        $unset: {
+          userVerificationOtp: "",
+          userVerificationOtpExpiresAt: "",
+        },
+      },
+      { new: true }
+    );
+
+    if (!verifiedUser) {
+      return {
+        statusCode: 403,
+        message: "Invalid or expired OTP",
+        success: false,
+      };
+    }
+
+    return {
+      statusCode: 200,
+      message: "OTP verified successfully",
+      data: userEmail,
+      success: true,
+    };
+  } catch (error) {
+    return {
+      statusCode: 500,
+      message: `Internal Server Error - ${error}`,
+      success: false,
+    };
+  }
+};
+
+export {
+  authGuard,
+  logoutService,
+  profileFetchService,
+  regenerateToken,
+  sendOtpViaEmail,
+  verifyOtpEmail,
+  generateOtpResponse,
+};

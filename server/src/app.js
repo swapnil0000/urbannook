@@ -1,7 +1,12 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import { userRouter, adminRouter, productRouter } from "./routes/index.js";
+import {
+  userRouter,
+  adminRouter,
+  productRouter,
+  commonRouter,
+} from "./routes/index.js";
 import cookieParser from "cookie-parser";
 dotenv.config({
   path: "./.env",
@@ -21,7 +26,8 @@ app.use(
   })
 );
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-app.use("/api/v1", userRouter, adminRouter, productRouter);
+app.use("/api/v1", userRouter, adminRouter, productRouter, commonRouter);
 export default app;

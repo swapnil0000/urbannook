@@ -47,7 +47,14 @@ const loginService = async (userEmail, userPassword) => {
   };
 };
 
-const registerService = async (userEmail, userMobileNumber, userName) => {
+const registerService = async (
+  userEmail,
+  userPassword,
+  userMobileNumber,
+  userAddress,
+  userPinCode,
+  userName
+) => {
   const res = await User.findOne({
     $or: [{ userMobileNumber }, { userEmail }, { userName }],
   });
@@ -60,43 +67,92 @@ const registerService = async (userEmail, userMobileNumber, userName) => {
       success: false,
     };
   }
+  const newRegisteringUser = await User.create({
+    userName,
+    userEmail,
+    userPassword,
+    userMobileNumber,
+    userAddress,
+    userPinCode,
+  });
+  if (!newRegisteringUser)
+    return {
+      statusCode: 400,
+      message: `Failed to create user with ${userEmail}`,
+      data: userEmail,
+      success: false,
+    };
   return {
     statusCode: 200,
-    message: `Creating user with - ${userEmail}`,
+    message: `Created user with - ${userEmail}`,
     data: userEmail,
     success: true,
   };
 };
 
 const addToCart = async (userEmail, productName, productQuanity) => {
-  const quantityToAdd = productQuanity || 1;
+  try {
+    if (!userEmail) {
+      return {
+        statusCode: 404,
+        message: "userEmail is empty",
+        data: [],
+        success: false,
+      };
+    }
+    const quantityToAdd = productQuanity || 1;
+    const updatedUser = await User.findOne({ userEmail });
+    if (!updatedUser) {
+      return {
+        statusCode: 404,
+        message: "User not found in DB",
+        data: null,
+        success: false,
+      };
+    }
+    const productDetails = await Product.findOne({ productName });
+    if (!productDetails) {
+      return {
+        statusCode: 404,
+        message: "Product not found in DB",
+        data: [],
+        success: false,
+      };
+    }
 
-  const updatedUser = await User.findOneAndUpdate(
-    { userEmail },
-    {
-      $inc: { [`addedToCart.${productName}`]: quantityToAdd },
-    },
-    { new: true }
-  ).select("-userPassword -userRefreshToken -__v -_id -createdAt");
+    const cartItem = updatedUser.addedToCart.find((item) =>
+      item.productId?.equals(productDetails._id)
+    );
 
-  if (!updatedUser) {
+    if (cartItem) {
+      cartItem.quantity += quantityToAdd;
+    } else {
+      updatedUser.addedToCart.push({
+        productId: productDetails._id,
+        quantity: quantityToAdd,
+      });
+    }
+
+    await updatedUser.save();
+
     return {
-      statusCode: 400,
-      message: "Failed to add to cart",
-      data: [],
+      statusCode: 200,
+      message: `Added to cart: ${productName}`,
+      data: {
+        productName,
+        productQuanityAdded: quantityToAdd,
+      },
+      success: true,
+    };
+  } catch (error) {
+    console.error("AddToCart Error:", error);
+    return {
+      statusCode: 500,
+      message: "Internal server error",
+      data: error.message,
       success: false,
     };
   }
-
-  return {
-    statusCode: 200,
-    message: `Added to cart: ${productName}`,
-    data: {
-      productName,
-      productQuanityAdded: quantityToAdd,
-    },
-    success: true,
-  };
 };
 
 const addToWishList = async (userEmail, productName) => {
@@ -104,7 +160,7 @@ const addToWishList = async (userEmail, productName) => {
     if (!userEmail) {
       return {
         statusCode: 404,
-        message: "Product not found",
+        message: "userEmail not found",
         data: [],
         success: false,
       };
@@ -123,7 +179,7 @@ const addToWishList = async (userEmail, productName) => {
     // update wishlist
     const updatedUser = await User.findOneAndUpdate(
       { userEmail },
-      { $addToSet: { addedToWishList: productDetails?._id } },
+      { $addToSet: { addedToWishList: { productId: productDetails?._id } } },
       { new: true }
     ).select("-userPassword -userRefreshToken -__v -_id -createdAt");
 
@@ -207,6 +263,7 @@ const deleteFromWishList = async (userEmail, productId) => {
     };
   }
 };
+
 export {
   loginService,
   registerService,
