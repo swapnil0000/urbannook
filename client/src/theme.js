@@ -1,22 +1,22 @@
 // Clean, modern theme based on the provided UI
 export const theme = {
   colors: {
-    primary: '#FF6B6B',      // Coral red from the UI
-    secondary: '#F8F9FA',    // Light gray background
-    accent: '#4ECDC4',       // Mint green accent
+    primary: '#3B82F6',      // Blue
+    secondary: '#F0F9FF',    // Light blue background
+    accent: '#06B6D4',       // Cyan accent
     text: {
-      primary: '#2D3436',    // Dark gray
-      secondary: '#636E72',  // Medium gray
-      light: '#B2BEC3'       // Light gray
+      primary: '#1E293B',    // Dark slate
+      secondary: '#475569',  // Medium slate
+      light: '#64748B'       // Light slate
     },
     background: {
       primary: '#FFFFFF',    // White
-      secondary: '#F8F9FA',  // Light gray
-      tertiary: '#E9ECEF'    // Lighter gray
+      secondary: '#F0F9FF',  // Light blue
+      tertiary: '#E0F2FE'    // Light cyan
     },
-    success: '#00B894',
-    warning: '#FDCB6E',
-    error: '#E17055'
+    success: '#10B981',
+    warning: '#F59E0B',
+    error: '#EF4444'
   },
   spacing: {
     xs: '4px',
@@ -51,20 +51,20 @@ export const theme1 = {
 };
 
 export const theme2 = {
-  primary: "#00ABE4",
-  secondary: "#E9F1FA",
-  accent: "#00ABE4",
-  accentOrange: "#FF6B35",
+  primary: "#3B82F6",
+  secondary: "#F0F9FF",
+  accent: "#06B6D4",
+  accentOrange: "#22D3EE",
   background: "#FFFFFF",
-  text: "#0A1A2F"
+  text: "#1E293B"
 };
 
 export const theme3 = {
-  primary: "#4F0341",
+  primary: "#3B82F6",
   secondary: "#FFFFFF",
-  accent: "#C6A667",
+  accent: "#06B6D4",
   background: "#FFFFFF",
-  text: "#2A0A1B"
+  text: "#1E293B"
 };
 
 

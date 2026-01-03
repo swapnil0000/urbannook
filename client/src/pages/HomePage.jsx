@@ -1,37 +1,32 @@
-import React from 'react';
-import NewHeader from '../component/layout/NewHeader';
-import VideoBanner from '../component/layout/VideoBanner';
-import Footer from '../component/layout/Footer';
-import InstagramFeed from './InstagramFeed';
-import Testimonials from './Testimonials';
+
 import WhyChooseUs from './WhyChooseUs';
-import ProductListing from '../feature/product/component/ProductListing';
-import FeaturedProducts from '../component/FeaturedProducts';
+import AireHeroBanner from '../component/layout/AireHeroBanner';
+import AireFeaturedProducts from '../component/layout/AireFeaturedProducts';
+import AireTestimonials from '../component/layout/AireTestimonials';
+import AireInstagramFeed from '../component/layout/AireInstagramFeed';
+import Footer from '../component/layout/Footer';
 
 const HomePage = () => {
   return (
     <div className="min-h-screen">
+      <AireHeroBanner />
       
-      {/* Hero Banner */}
-      <VideoBanner />
+      <AireFeaturedProducts />
       
-      {/* Featured Products */}
-      <FeaturedProducts />
-      
-      {/* Product Listing */}
-      <ProductListing />
-      
-      {/* Why Choose Us Section */}
       <WhyChooseUs />
       
-      {/* Testimonials Section */}
-      <Testimonials/>
+      <AireTestimonials />
+     
+      <AireInstagramFeed />
       
-      {/* Instagram Feed Section */}
-      <InstagramFeed />
-      
-      {/* Footer */}
       <Footer />
+      
+      {/* Previous UI (Commented out) */}
+      {/* 
+      <NewBanner />
+      <FeaturedSection />
+      <CategoriesSection />
+      */}
     </div>
   );
 };

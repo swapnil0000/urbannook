@@ -1,244 +1,241 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import LoginForm from './LoginForm';
 import SignupForm from './SignupForm';
+import UserProfile from './UserProfile';
 
 const NewHeader = () => {
+  const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showSignup, setShowSignup] = useState(false);
   const [showCart, setShowCart] = useState(false);
   const [cart, setCart] = useState([]);
+  const [showHeader, setShowHeader] = useState(true);
+  const lastScrollY = useRef(0);
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [user, setUser] = useState(null);
+  const [showUserProfile, setShowUserProfile] = useState(false);
+
+  const getActiveRoute = () => {
+    const path = location.pathname;
+    if (path === '/') return 'home';
+    if (path.startsWith('/products') || path.startsWith('/product')) return 'products';
+    if (path === '/about-us') return 'about-us';
+    if (path === '/contact-us') return 'contact-us';
+    return '';
+  };
 
   useEffect(() => {
     const savedCart = JSON.parse(localStorage.getItem('cart') || '[]');
     setCart(savedCart);
     
+    const savedUser = JSON.parse(localStorage.getItem('user') || 'null');
+    setUser(savedUser);
+
     const handleStorageChange = () => {
       const updatedCart = JSON.parse(localStorage.getItem('cart') || '[]');
       setCart(updatedCart);
+      
+      const updatedUser = JSON.parse(localStorage.getItem('user') || 'null');
+      setUser(updatedUser);
     };
-    
+
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
+        setShowHeader(false);
+      } else {
+        setShowHeader(true);
+      }
+      lastScrollY.current = currentScrollY;
+    };
 
-  const hadleClickLogin = () =>{
-    setShowLogin(true);
-  }
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const handleLoginSuccess = (userData) => {
+    setUser(userData);
+  };
+
+  const handleSignupSuccess = (userData) => {
+    setUser(userData);
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+  };
 
   return (
-    <header className="bg-bgPrimary border-b border-borderPrimary shadow-sm">
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <div className="flex items-center">
-            <a href="/" className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center text-white font-bold text-lg">
-                UN
-              </div>
-              <h1 className="text-2xl font-bold text-textPrimary">
-                UrbanNook
-              </h1>
-            </a>
-          </div>
-
-          {/* Desktop Navigation */}
-          <nav className="hidden lg:flex items-center gap-8">
-            <a href="/" className="text-textSecondary hover:text-primary font-medium transition-colors">
-              Home
-            </a>
-            <a href="/products" className="text-textSecondary hover:text-primary font-medium transition-colors">
-              Products
-            </a>
-            {/* <a href="/customize-products" className="text-textSecondary hover:text-primary font-medium transition-colors">
-              Customization
-            </a> */}
-            <a href="/about-us" className="text-textSecondary hover:text-primary font-medium transition-colors">
-              About Us
-            </a>
-            <a href="/contact-us" className="text-textSecondary hover:text-primary font-medium transition-colors">
-             Contact Us
-            </a>
-            {/* <a href="/key-holders" className="text-textSecondary hover:text-primary font-medium transition-colors">
-              Key Holders
-            </a> */}
-          </nav>
-
-          {/* Right Side */}
-          <div className="flex items-center gap-6">
-            {/* Search */}
-            <div className="hidden md:flex relative">
-              <input 
-                type="text" 
-                placeholder="Search products..." 
-                className="w-80 pl-4 pr-12 py-2 bg-bgSecondary border border-borderPrimary rounded-full text-sm text-textPrimary placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-              />
-              <button className="absolute right-3 top-1/2 transform -translate-y-1/2 text-textMuted hover:text-primary">
-                <i className="fa-solid fa-search"></i>
-              </button>
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center gap-2">
-              {/* Mobile menu button */}
-              <button 
-                className="lg:hidden p-2 rounded-full text-textSecondary hover:bg-bgSecondary"
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-              >
-                <i className="fa-solid fa-bars"></i>
-              </button>
-              
-              {/* Cart */}
-              <button 
-                onClick={() => setShowCart(true)}
-                className="p-2 rounded-full text-textSecondary hover:bg-bgSecondary hover:text-primary transition-all relative"
-              >
-                <i className="fa-solid fa-shopping-cart"></i>
-                {cart.length > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-white text-xs rounded-full flex items-center justify-center">
-                    {cart.reduce((total, item) => total + item.quantity, 0)}
-                  </span>
-                )}
-              </button>
-              
-              {/* User */}
-              <button onClick={hadleClickLogin} className="p-2 rounded-full text-textSecondary hover:bg-bgSecondary hover:text-primary transition-all">
-                <i className="fa-solid fa-user"></i>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile Menu */}
-        {isMenuOpen && (
-          <div className="lg:hidden py-4 border-t border-borderPrimary">
-            {/* Mobile Search */}
-            <div className="mb-4">
-              <div className="relative">
-                <input 
-                  type="text" 
-                  placeholder="Search products..." 
-                  className="w-full pl-4 pr-10 py-2 bg-bgSecondary border border-borderPrimary rounded-full text-sm text-textPrimary placeholder-textMuted focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-                <i className="fa-solid fa-search absolute right-3 top-1/2 transform -translate-y-1/2 text-textMuted"></i>
-              </div>
-            </div>
+    <>
+      <header
+        className="fixed top-7 left-6 right-6 z-50 bg-[#e8f8d7]/90 backdrop-blur-md shadow-md transition-all duration-300 rounded-full"
+        style={{
+          transform: showHeader ? 'translateY(0)' : 'translateY(-150%)',
+        }}
+      >
+        <div className="max-w-7xl mx-auto px-5">
+          <div className="flex items-center justify-between h-14">
             
-            {/* Mobile Navigation */}
-            <nav className="space-y-1">
-              <a href="/" className="block py-3 px-2 text-textSecondary hover:text-primary hover:bg-bgSecondary rounded-lg font-medium transition-all">
-                Home
+            <div className="flex items-center">
+              <a href="/" className="flex items-center">
+                <img 
+                    src="/assets/logo.jpeg" 
+                    alt="UrbanNook Logo" 
+                    className="h-7 w-auto object-contain" 
+                />
               </a>
-              <a href="/products" className="block py-3 px-2 text-textSecondary hover:text-primary hover:bg-bgSecondary rounded-lg font-medium transition-all">
-                Products
-              </a>
-              {/* <a href="/customize-products" className="block py-3 px-2 text-textSecondary hover:text-primary hover:bg-bgSecondary rounded-lg font-medium transition-all">
-                Customization
-              </a> */}
-              <a href="/about-us" className="block py-3 px-2 text-textSecondary hover:text-primary hover:bg-bgSecondary rounded-lg font-medium transition-all">
-                About Us
-              </a>
-              <a href="/contact-us" className="block py-3 px-2 text-textSecondary hover:text-primary hover:bg-bgSecondary rounded-lg font-medium transition-all">
-                Contact Us
-              </a>
-            </nav>
-          </div>
-        )}
-      </div>
-         {showLogin && (
-          <LoginForm 
-            onClose={() => setShowLogin(false)}
-            onSwitchToSignup={() => {
-              setShowLogin(false);
-              setShowSignup(true);
-            }}
-          />
-        )}
-        {
-          showSignup && (
-            <SignupForm 
-              onClose={() => setShowSignup(false)}
-              onSwitchToLogin={() => {
-              setShowSignup(false);
-              setShowLogin(true);
-            }}
-            />
-            )}
-
-      {/* Cart Sidebar */}
-      {showCart && (
-        <>
-          {/* Overlay */}
-          <div 
-            className="fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity duration-300"
-            onClick={() => setShowCart(false)}
-          ></div>
-          
-          {/* Cart Panel */}
-          <div className="fixed right-0 top-0 h-full w-96 bg-bgPrimary shadow-2xl z-50 transform transition-transform duration-300 flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-borderPrimary">
-              <h3 className="text-xl font-bold text-textPrimary">Shopping Cart</h3>
-              <button 
-                onClick={() => setShowCart(false)}
-                className="w-8 h-8 rounded-full bg-bgSecondary hover:bg-borderPrimary transition-colors flex items-center justify-center"
-              >
-                <i className="fa-solid fa-times text-textSecondary"></i>
-              </button>
             </div>
 
-            {/* Cart Items */}
-            <div className="flex-1 overflow-y-auto p-6">
-              {cart.length === 0 ? (
-                <div className="text-center py-12">
-                  <i className="fa-solid fa-shopping-cart text-4xl text-textMuted mb-4"></i>
-                  <p className="text-textSecondary">Your cart is empty</p>
+            <nav className="hidden lg:flex items-center gap-6">
+              {[
+                { name: 'Home', path: '/', key: 'home' },
+                { name: 'Products', path: '/products', key: 'products' },
+                { name: 'About Us', path: '/about-us', key: 'about' },
+                { name: 'Contact Us', path: '/contact-us', key: 'contact' }
+              ].map((item) => {
+                const isActive = getActiveRoute() === item.key;
+                return (
+                  <a 
+                    key={item.key}
+                    href={item.path}
+                    className={`text-sm font-medium transition-all duration-200 ${
+                      isActive 
+                        ? 'text-emerald-700 bg-white/30 px-4 py-2 rounded-full' 
+                        : 'text-black hover:text-emerald-700'
+                    }`}
+                  >
+                    {item.name}
+                  </a>
+                );
+              })}
+            </nav>
+
+            <div className="flex items-center gap-2">
+              {user ? (
+                <div className="relative">
+                  <button
+                    onClick={() => setShowUserProfile(!showUserProfile)}
+                    className="flex items-center gap-2 px-3 py-2 bg-white/20 backdrop-blur-sm rounded-full border border-white/30 hover:bg-white/30 hover:scale-105 transition-all duration-200 group"
+                  >
+                    <div className="w-6 h-6 bg-emerald-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                      {user.name.charAt(0).toUpperCase()}
+                    </div>
+                    <span className="hidden sm:inline text-gray-900 text-sm font-medium">{user.name.split(' ')[0]}</span>
+                    <i className="fa-solid fa-chevron-down text-xs text-gray-600"></i>
+                  </button>
+                  
+                  {showUserProfile && (
+                    <UserProfile 
+                      user={user}
+                      onLogout={handleLogout}
+                      onClose={() => setShowUserProfile(false)}
+                    />
+                  )}
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {cart.map((item) => (
-                    <div key={item.cartId} className="flex gap-4 p-4 bg-bgSecondary rounded-lg">
-                      <img 
-                        src={item.image} 
-                        alt={item.title} 
-                        className="w-16 h-16 object-cover rounded-lg"
-                      />
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-textPrimary text-sm mb-1">{item.title}</h4>
-                        <p className="text-primary font-bold">₹{item.price?.toLocaleString()}</p>
-                        <p className="text-textSecondary text-xs">Qty: {item.quantity}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            {cart.length > 0 && (
-              <div className="p-6 border-t border-borderPrimary">
-                <div className="flex justify-between items-center mb-4">
-                  <span className="text-lg font-semibold text-textPrimary">Total:</span>
-                  <span className="text-2xl font-bold text-primary">
-                    ₹{cart.reduce((total, item) => total + (item.price * item.quantity), 0).toLocaleString()}
-                  </span>
-                </div>
-                <button 
-                  onClick={() => {
-                    setShowCart(false);
-                    window.location.href = '/products';
-                  }}
-                  className="w-full bg-primary hover:bg-accent text-white py-3 rounded-lg font-semibold transition-colors"
+                <button
+                  onClick={() => setShowLogin(true)}
+                  className="flex items-center gap-2 px-3 py-2 bg-white/20 backdrop-blur-sm rounded-full border border-white/30 hover:bg-white/30 hover:scale-105 transition-all duration-200 group"
                 >
-                  View Cart
+                  <div className="w-6 h-6 bg-gray-900 rounded-full flex items-center justify-center">
+                    <i className="fa-solid fa-user text-white text-xs"></i>
+                  </div>
+                  <span className="hidden sm:inline text-gray-900 text-sm font-medium">Login</span>
                 </button>
-              </div>
-            )}
+              )}
+
+              <button
+                className="relative flex items-center gap-2 px-3 py-2 bg-white/20 backdrop-blur-sm rounded-full border border-white/30 hover:bg-white/30 hover:scale-105 transition-all duration-200 group"
+                onMouseEnter={() => setShowTooltip(true)}
+                onMouseLeave={() => setShowTooltip(false)}
+                onClick={() => setShowCart(true)}
+              >
+                <div className="w-6 h-6 bg-emerald-700 rounded-full flex items-center justify-center">
+                  <i className="fa-solid fa-shopping-cart text-white text-xs"></i>
+                </div>
+                <span className="hidden sm:inline text-gray-900 text-sm font-medium">Cart</span>
+                
+                {cart.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold shadow-lg">
+                    {cart.length}
+                  </span>
+                )}
+
+                {showTooltip && (
+                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 px-2 py-1 text-xs text-white bg-gray-900 rounded-lg shadow-lg whitespace-nowrap">
+                    {cart.length || 0} items in cart
+                  </div>
+                )}
+              </button>
+
+              <button
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className="lg:hidden w-7 h-7 flex items-center justify-center text-black"
+              >
+                <i className={`fa-solid ${isMenuOpen ? 'fa-times' : 'fa-bars'} text-lg`}></i>
+              </button>
+            </div>
           </div>
-        </>
+
+          {isMenuOpen && (
+            <div className="lg:hidden py-3 border-t border-black/5 animate-in fade-in slide-in-from-top-2">
+              <nav className="flex flex-col gap-1">
+                {[
+                  { name: 'Home', path: '/', key: 'home' },
+                  { name: 'Products', path: '/products', key: 'products' },
+                  { name: 'About Us', path: '/about', key: 'about' },
+                  { name: 'Contact Us', path: '/contact', key: 'contact' }
+                ].map((item) => {
+                  const isActive = getActiveRoute() === item.key;
+                  return (
+                    <a 
+                      key={item.key}
+                      href={item.path}
+                      className={`py-2 px-3 text-sm font-medium transition-all rounded-lg ${
+                        isActive 
+                          ? 'bg-emerald-100 text-emerald-700' 
+                          : 'text-black hover:bg-black/5'
+                      }`}
+                    >
+                      {item.name}
+                    </a>
+                  );
+                })}
+              </nav>
+            </div>
+          )}
+        </div>
+      </header>
+      
+      {showLogin && (
+        <LoginForm 
+          onClose={() => setShowLogin(false)}
+          onLoginSuccess={handleLoginSuccess}
+          onSwitchToSignup={() => {
+            setShowLogin(false);
+            setShowSignup(true);
+          }}
+        />
       )}
-    </header>
+
+      {showSignup && (
+        <SignupForm 
+          onClose={() => setShowSignup(false)}
+          onSignupSuccess={handleSignupSuccess}
+          onSwitchToLogin={() => {
+            setShowSignup(false);
+            setShowLogin(true);
+          }}
+        />
+      )}
+    </>
   );
 };
 

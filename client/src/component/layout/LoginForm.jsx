@@ -1,138 +1,135 @@
 import React, { useState } from 'react';
+import ForgotPassword from './ForgotPassword';
 
-const LoginForm = ({ onClose, onSwitchToSignup }) => {
-  const [formData, setFormData] = useState({
-    email: '',
-    password: ''
-  });
-
-  const handleSuccess = (credentialResponse) => {
-    console.log("Google login success:", credentialResponse);
-    // TODO: Send token to backend for verification & login
-  };
-
-  // const handleError = () => {
-  //   console.log("Google login failed");
-  // };
+const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
+  const [formData, setFormData] = useState({ email: '', password: '' });
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleInputChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Login:', formData);
+    setIsLoading(true);
+    
+    // Simulate login API call
+    setTimeout(() => {
+      const userData = {
+        name: 'John Doe',
+        email: formData.email,
+        mobile: '9876543210'
+      };
+      localStorage.setItem('user', JSON.stringify(userData));
+      onLoginSuccess(userData);
+      onClose();
+      setIsLoading(false);
+    }, 1000);
   };
 
-  const handleLoginWithOutOpt = (type) => {
-    console.log('Login with out opt');
-    if (type === 'google') {
-      console.log('Login with google');
-    } else if (type === 'facebook') {
-      console.log('Login with facebook');
-    } else {
-      console.log('Login with email')
-    }
+  if (showForgotPassword) {
+    return (
+      <ForgotPassword 
+        onClose={onClose}
+        onBackToLogin={() => setShowForgotPassword(false)}
+      />
+    );
   }
 
-const handleGoogleLogin = () => {
-  window.google.accounts.id.initialize({
-    client_id: "YOUR_GOOGLE_CLIENT_ID",
-    callback: handleGoogleResponse
-  });
-  
-  window.google.accounts.id.renderButton(
-    document.getElementById("google-signin-button"),
-    { 
-      theme: "outline", 
-      size: "large",
-      width: "100%"
-    }
-  );
-  
-  // Or use one-tap
-  window.google.accounts.id.prompt();
-};
-
-const handleGoogleResponse = (response) => {
-  console.log("Encoded JWT ID token: " + response.credential);
-  // Send to your backend for verification
-};
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 max-w-screen-2xl" onClick={onClose}>
-      <div className="bg-bgPrimary rounded-lg p-8 w-full max-w-lg shadow-2xl relative" onClick={(e) => e.stopPropagation()}>
-        <button className="absolute top-6 right-6 text-2xl text-textSecondary hover:text-textPrimary cursor-pointer" onClick={onClose}>×</button>
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[100] p-4" onClick={onClose}>
+      <div 
+        className="bg-white rounded-[2.5rem] p-8 md:p-12 w-full max-w-[480px] shadow-2xl relative animate-in fade-in zoom-in duration-300" 
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button 
+          className="absolute top-8 right-8 w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:text-slate-900 transition-colors"
+          onClick={onClose}
+        >
+          <i className="fa-solid fa-xmark"></i>
+        </button>
 
-        <h2 className="text-2xl font-bold text-textPrimary mb-2 text-center">Welcome to <span className='text-primary cursor-pointer font-semibold'>Urban Nook</span></h2>
-        <p className="text-textSecondary mb-8 text-center">Sign in to your account</p>
+        <div className="text-center mb-10">
+          <h2 className="text-3xl md:text-4xl font-serif text-slate-900 mb-2">
+            Welcome <span className="italic font-light text-emerald-700 text-2xl md:text-3xl">Back</span>
+          </h2>
+          <p className="text-slate-500 text-sm tracking-wide">Sign in to your Urban Nook account</p>
+        </div>
 
-        <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold text-textPrimary">Email</label>
+        <form className="space-y-5" onSubmit={handleSubmit}>
+          <div className="flex gap-3 mb-8">
+            {['google', 'facebook', 'mobile'].map((provider) => (
+              <button 
+                key={provider}
+                type="button"
+                className="flex-1 h-12 flex items-center justify-center rounded-xl border border-slate-200 hover:bg-slate-50 hover:border-slate-400 transition-all active:scale-95"
+              >
+                <img src={`/assets/onboardIcon-${provider === 'mobile' ? 'mail' : provider === 'google' ? 'gp' : 'fb'}.svg`} className="w-5 h-5" alt={provider} />
+              </button>
+            ))}
+          </div>
+
+          <div className="relative flex items-center justify-center mb-8">
+            <div className="w-full border-t border-slate-100"></div>
+            <span className="absolute bg-white px-4 text-[10px] uppercase font-bold text-slate-300 tracking-[0.2em]">Or use email</span>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Email Address</label>
             <input
               type="email"
               name="email"
               value={formData.email}
               onChange={handleInputChange}
-              className="p-3 border border-borderPrimary bg-bgSecondary text-textPrimary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-all"
-              placeholder="Enter your email"
+              className="w-full p-4 bg-slate-50 border border-slate-300 rounded-2xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all outline-none text-slate-900 text-sm"
+              placeholder="name@example.com"
               required
             />
           </div>
 
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold text-textPrimary">Password</label>
+          <div className="space-y-2">
+            <div className="flex justify-between items-center px-1">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Password</label>
+              <button 
+                type="button" 
+                onClick={() => setShowForgotPassword(true)}
+                className="text-[10px] font-bold text-emerald-700 hover:underline uppercase tracking-tighter"
+              >
+                Forgot?
+              </button>
+            </div>
             <input
               type="password"
               name="password"
               value={formData.password}
               onChange={handleInputChange}
-              className="p-3 border border-borderPrimary bg-bgSecondary text-textPrimary rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-all"
-              placeholder="Enter your password"
+              className="w-full p-4 bg-slate-50 border border-slate-300 rounded-2xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all outline-none text-slate-900 text-sm"
+              placeholder="••••••••"
               required
             />
           </div>
 
-          <span className='text-center text-textSecondary text-sm'>Or login with</span>
-
-          <div className='flex flex-row justify-between gap-3'>
-            <div className='bg-white rounded-lg shadow-lg border border-borderPrimary flex-1'>
-              <div id="google-signin-button"></div>
-              {/* Fallback custom button */}
-              <button onClick={handleGoogleLogin} className='w-full flex items-center justify-center gap-3 py-3 px-4 hover:bg-bgSecondary transition-colors rounded-md'>
-                <img src='/assets/onboardIcon-gp.svg' className='w-5 h-5' />
-                <span className='text-sm font-medium text-textPrimary'>Google</span>
-              </button>
-            </div>
-
-            <div className='bg-white rounded-lg shadow-lg border border-borderPrimary flex-1'>
-              <button onClick={() => handleLoginWithOutOpt('facebook')} className='w-full flex items-center justify-center gap-3 py-3 px-4 hover:bg-bgSecondary transition-colors rounded-md'>
-                <img src='/assets/onboardIcon-fb.svg' className='w-5 h-5' />
-                <span className='text-sm font-medium text-textPrimary'>Facebook</span>
-              </button>
-            </div>
-
-            <div className='bg-white rounded-lg shadow-lg border border-borderPrimary flex-1'>
-              <button onClick={() => handleLoginWithOutOpt('mobile')} className='w-full flex items-center justify-center gap-3 py-3 px-4 hover:bg-bgSecondary transition-colors rounded-md'>
-                <img src='/assets/onboardIcon-mail.svg' className='w-5 h-5' />
-                <span className='text-sm font-medium text-textPrimary'>Mobile No</span>
-              </button>
-            </div>
-          </div>
-
-          <button type="submit" className="bg-primary text-white p-3 rounded-lg font-semibold hover:opacity-90 transition-all mt-4">
-            Sign In
+          <button 
+            type="submit" 
+            disabled={isLoading}
+            className="w-full py-5 bg-slate-900 text-white rounded-2xl font-bold tracking-widest uppercase hover:bg-emerald-700 transition-all shadow-xl active:scale-[0.98] mt-4 disabled:opacity-50"
+          >
+            {isLoading ? (
+              <div className="flex items-center justify-center gap-2">
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Signing In...
+              </div>
+            ) : (
+              'Sign In'
+            )}
           </button>
         </form>
 
-        <p className="text-sm text-center mt-4">
-          <span className="text-textSecondary">Don't have an account? </span>
-          <span onClick={onSwitchToSignup} className="text-primary cursor-pointer font-semibold hover:underline">
-            Sign up
+        <p className="text-sm text-center mt-8 text-slate-500">
+          New here?{' '}
+          <span onClick={onSwitchToSignup} className="text-emerald-700 cursor-pointer font-bold hover:underline transition-all">
+            Create an account
           </span>
         </p>
       </div>

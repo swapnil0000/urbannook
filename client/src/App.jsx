@@ -1,3 +1,4 @@
+
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "./component/ThemeProvider";
 import NewHeader from "./component/layout/NewHeader";
@@ -11,11 +12,12 @@ import ProductDetails from "./feature/product/component/ProductDetails";
 import AboutPage from "./feature/product/component/AboutPage";
 import CheckChanges from "./pages/CheckChanges";
 
+
 function App() {
   return (
     <ThemeProvider>
-      <Router>
-        <NewHeader />
+      <Router> 
+        <NewHeader/>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/about-us" element={<AboutPage />} />
@@ -30,6 +32,7 @@ function App() {
           <Route path="/product/:id" element={<ProductDetails />} />
           <Route path="/check-changes" element={<CheckChanges />} />
         </Routes>
+        <MobileBottomNav />
       </Router>
     </ThemeProvider>
   );
