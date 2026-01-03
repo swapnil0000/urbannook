@@ -74,7 +74,6 @@ const registerService = async (
     userMobileNumber,
     userAddress,
     userPinCode,
-    userPreviousOrder: null,
   });
   if (!newRegisteringUser)
     return {

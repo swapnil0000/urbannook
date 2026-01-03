@@ -1,6 +1,7 @@
 import Razorpay from "razorpay";
 import crypto from "crypto";
 import dotenv from "dotenv";
+import Order from "../model/order.model.js";
 dotenv.config({
   path: "./.env",
 });
@@ -34,7 +35,7 @@ const razorpayCreateOrderService = async (amount, currency) => {
   }
 };
 
-const razorpayPaymentVerificationService = (
+const razorpayPaymentVerificationService = async (
   razorpay_order_id,
   razorpay_payment_id,
   razorpay_signature
@@ -53,13 +54,16 @@ const razorpayPaymentVerificationService = (
         success: false,
       };
     }
+    const order = await Order.findOne({
+      "payment.razorpayOrderId": razorpay_order_id,
+    });
     return {
       statusCode: 200,
       message: "Payment verified successfully",
       data: {
+        orderId: order._id,
         razorpay_order_id,
         razorpay_payment_id,
-        razorpay_signature,
       },
       success: true,
     };
