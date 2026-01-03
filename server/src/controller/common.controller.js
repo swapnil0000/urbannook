@@ -1,9 +1,17 @@
 import { ApiError, ApiRes } from "../utlis/index.js";
-import { sendOtpViaEmail ,verifyOtpEmail} from "../services/common.auth.service.js";
-const sendOtpViaEmailController = async (req, res) => {
+import {
+  sendOtpViaEmailService,
+  verifyOtpEmailService,
+} from "../services/common.auth.service.js";
+const sendOtpViaEmailServiceController = async (req, res) => {
   try {
     const { userEmail } = req.body;
-    const result = await sendOtpViaEmail(userEmail);
+    if (!userEmail) {
+      return res
+        .status(404)
+        .json(new ApiError(404, `Email is not available`, null, false));
+    }
+    const result = await sendOtpViaEmailService(userEmail);
     if (!result?.success) {
       return res
         .status(Number(result?.statusCode))
@@ -36,7 +44,7 @@ const sendOtpViaEmailController = async (req, res) => {
 const verifyEmailOtpController = async (req, res) => {
   try {
     const { userEmail, userEmailOtp } = req.body;
-    const result = await verifyOtpEmail(userEmail, userEmailOtp);
+    const result = await verifyOtpEmailService(userEmail, userEmailOtp);
     if (!result?.success) {
       return res
         .status(Number(result?.statusCode))
@@ -65,4 +73,4 @@ const verifyEmailOtpController = async (req, res) => {
       .json(new ApiError(500, `Internal Server Error - ${error}`, [], false));
   }
 };
-export { sendOtpViaEmailController, verifyEmailOtpController };
+export { sendOtpViaEmailServiceController, verifyEmailOtpController };

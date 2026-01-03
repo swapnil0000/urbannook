@@ -79,7 +79,7 @@ const createProduct = async (req, res) => {
 
   const product = await Product.create({
     productName: normalizedName,
-    productId: uuidv4(),
+    productId: `UN-PROD-${uuidv4()}`,
     sellingPrice,
     productStatus,
     productQuantity,

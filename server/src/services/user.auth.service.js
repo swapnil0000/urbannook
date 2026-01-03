@@ -1,7 +1,27 @@
 import User from "../model/user.model.js";
 import Product from "../model/product.model.js";
 import mongoose from "mongoose";
+import {
+  cartDetailsMissing,
+  fieldMissing,
+} from "../utlis/CommonResponse.js";
+
 const loginService = async (userEmail, userPassword) => {
+  //fieldMissing
+  let missing = fieldMissing({
+    userEmail,
+    userPassword,
+    action: "login",
+  });
+
+  if (!missing?.success) {
+    return {
+      statusCode: Number(missing?.statusCode),
+      message: missing?.message,
+      data: missing?.data || null,
+      success: missing?.success,
+    };
+  }
   const res = await User.findOne({ userEmail });
   if (!res) {
     return {
@@ -55,6 +75,25 @@ const registerService = async (
   userPinCode,
   userName
 ) => {
+  //fieldMissing
+  let missing = fieldMissing({
+    userName,
+    userEmail,
+    userPassword,
+    userMobileNumber,
+    userAddress,
+    userPinCode,
+    action: "register",
+  });
+
+  if (!missing?.success) {
+    return {
+      statusCode: Number(missing?.statusCode),
+      message: missing?.message,
+      data: missing?.data || null,
+      success: missing?.success,
+    };
+  }
   const res = await User.findOne({
     $or: [{ userMobileNumber }, { userEmail }, { userName }],
   });
@@ -90,17 +129,18 @@ const registerService = async (
   };
 };
 
-const addToCart = async (userEmail, productName, productQuanity) => {
+const addToCartService = async (userEmail, productName, productQuanity) => {
   try {
-    if (!userEmail) {
+    let missing = cartDetailsMissing(userEmail, productName);
+    if (!missing?.success) {
       return {
-        statusCode: 404,
-        message: "userEmail is empty",
-        data: [],
-        success: false,
+        statusCode: Number(missing?.statusCode),
+        message: missing?.message,
+        data: missing?.data || null,
+        success: missing?.success,
       };
     }
-    const quantityToAdd = productQuanity || 1;
+    const quantityToUpdate = productQuanity || 1;
     const updatedUser = await User.findOne({ userEmail });
     if (!updatedUser) {
       return {
@@ -125,11 +165,11 @@ const addToCart = async (userEmail, productName, productQuanity) => {
     );
 
     if (cartItem) {
-      cartItem.quantity += quantityToAdd;
+      cartItem.quantity += quantityToUpdate;
     } else {
       updatedUser.addedToCart.push({
         productId: productDetails._id,
-        quantity: quantityToAdd,
+        quantity: quantityToUpdate,
       });
     }
 
@@ -140,7 +180,7 @@ const addToCart = async (userEmail, productName, productQuanity) => {
       message: `Added to cart: ${productName}`,
       data: {
         productName,
-        productQuanityAdded: quantityToAdd,
+        productQuanityToUpdate: quantityToUpdate,
       },
       success: true,
     };
@@ -157,12 +197,13 @@ const addToCart = async (userEmail, productName, productQuanity) => {
 
 const addToWishList = async (userEmail, productName) => {
   try {
-    if (!userEmail) {
+    let missing = cartDetailsMissing(userEmail, productName);
+    if (!missing?.success) {
       return {
-        statusCode: 404,
-        message: "userEmail not found",
-        data: [],
-        success: false,
+        statusCode: Number(missing?.statusCode),
+        message: missing?.message,
+        data: missing?.data || null,
+        success: missing?.success,
       };
     }
     // Check product
@@ -267,7 +308,7 @@ const deleteFromWishList = async (userEmail, productId) => {
 export {
   loginService,
   registerService,
-  addToCart,
+  addToCartService,
   addToWishList,
   deleteFromWishList,
 };

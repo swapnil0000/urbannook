@@ -33,14 +33,14 @@ import {
 /* ===============================================================
    AUTH SERVICES
    ---------------------------------------------------------------
-   authGuard     → Protects routes using JWT + role
+   authGuardService     → Protects routes using JWT + role
    logoutService → Clears refresh token / session
-   regenerateToken → Issues new access token
+   regenerateTokenService → Issues new access token
 ================================================================ */
 import {
-  authGuard,
+  authGuardService,
   logoutService,
-  regenerateToken,
+  regenerateTokenService,
 } from "../services/common.auth.service.js";
 
 /* ===============================================================
@@ -72,18 +72,26 @@ userRouter.post("/user/register", userRegister);
    ---------------------------------------------------------------
    Requires valid JWT (User role)
 ================================================================ */
-userRouter.post("/user/profile", authGuard("User"), userProfile);
+userRouter.post("/user/profile", authGuardService("User"), userProfile);
 
-userRouter.put("/user/profile/update", authGuard("User"), userUpdateProfile);
+userRouter.put(
+  "/user/profile/update",
+  authGuardService("User"),
+  userUpdateProfile
+);
 
-userRouter.post("/user/reset-password", authGuard("User"), userResetPassword);
+userRouter.post(
+  "/user/reset-password",
+  authGuardService("User"),
+  userResetPassword
+);
 
 /* ===============================================================
    ORDER HISTORY (PROTECTED)
 ================================================================ */
 userRouter.post(
   "/user/order-history",
-  authGuard("User"),
+  authGuardService("User"),
   userOrderPreviousHistory
 );
 
@@ -92,30 +100,46 @@ userRouter.post(
    ---------------------------------------------------------------
    Handles cart CRUD operations
 ================================================================ */
-userRouter.post("/user/addtocart", authGuard("User"), userAddToCart);
+userRouter.post("/user/addtocart", authGuardService("User"), userAddToCart);
 
-userRouter.get("/user/preview-addtocart", authGuard("User"), userGetAddToCart);
+userRouter.get(
+  "/user/preview-addtocart",
+  authGuardService("User"),
+  userGetAddToCart
+);
 
-userRouter.put("/user/cart/update", authGuard("User"), userUpdateCartQuantity);
+userRouter.put(
+  "/user/cart/update",
+  authGuardService("User"),
+  userUpdateCartQuantity
+);
 
 userRouter.delete(
   "/user/cart/:productId",
-  authGuard("User"),
+  authGuardService("User"),
   userRemoveFromCart
 );
 
-userRouter.delete("/user/cart/clear", authGuard("User"), userClearCart);
+userRouter.delete("/user/cart/clear", authGuardService("User"), userClearCart);
 
 /* ===============================================================
    WISHLIST MANAGEMENT (PROTECTED)
 ================================================================ */
-userRouter.post("/user/addtowishlist", authGuard("User"), userAddToWishList);
+userRouter.post(
+  "/user/addtowishlist",
+  authGuardService("User"),
+  userAddToWishList
+);
 
-userRouter.get("/user/wishlist", authGuard("User"), userGetProductWishList);
+userRouter.get(
+  "/user/wishlist",
+  authGuardService("User"),
+  userGetProductWishList
+);
 
 userRouter.delete(
   "/user/wishlist/:productId",
-  authGuard("User"),
+  authGuardService("User"),
   userDeleteFromProductWishList
 );
 
@@ -127,22 +151,26 @@ userRouter.delete(
 ================================================================ */
 userRouter.post(
   "/user/delete-preview",
-  authGuard("User"),
+  authGuardService("User"),
   userAccountDeletePreview
 );
 
 userRouter.delete(
   "/user/delete-confirm",
-  authGuard("User"),
+  authGuardService("User"),
   userAccountDeleteConfirm
 );
 
 /* ===============================================================
    SESSION & TOKEN MANAGEMENT
 ================================================================ */
-userRouter.post("/user/logout", authGuard("User"), logoutService);
+userRouter.post("/user/logout", authGuardService("User"), logoutService);
 
-userRouter.post("/refresh-token", authGuard("User"), regenerateToken);
+userRouter.post(
+  "/refresh-token",
+  authGuardService("User"),
+  regenerateTokenService
+);
 
 /* ===============================================================
    RAZORPAY CHECKOUT FLOW (PROTECTED)
@@ -151,17 +179,21 @@ userRouter.post("/refresh-token", authGuard("User"), regenerateToken);
    - create-order     → Creates Razorpay order + DB order
    - paymentverification → Client-side signature verification
 ================================================================ */
-userRouter.get("/rp/get-key", authGuard("User"), razorpayKeyGetController);
+userRouter.get(
+  "/rp/get-key",
+  authGuardService("User"),
+  razorpayKeyGetController
+);
 
 userRouter.post(
   "/user/create-order",
-  authGuard("User"),
+  authGuardService("User"),
   razorpayCreateOrderController
 );
 
 userRouter.post(
   "/user/paymentverification",
-  authGuard("User"),
+  authGuardService("User"),
   razorpayPaymentVerificationController
 );
 
@@ -171,7 +203,7 @@ userRouter.post(
    ⚠️ IMPORTANT:
    - Uses RAW body (NOT express.json)
    - Required for Razorpay signature verification
-   - No authGuard (Razorpay servers call this)
+   - No authGuardService (Razorpay servers call this)
 ================================================================ */
 userRouter.post(
   "/rp/webhook",

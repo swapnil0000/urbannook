@@ -17,6 +17,10 @@ const productSchema = mongoose.Schema(
       required: [true, "productId is required"],
       unique: true,
     },
+    productDes: {
+      type: String,
+      require: true,
+    },
     sellingPrice: {
       type: Number,
       required: [true, "sellingPrice is required"],

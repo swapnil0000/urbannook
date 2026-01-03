@@ -1,13 +1,9 @@
 import bcrypt from "bcrypt";
-import {
-  addToCartDetailsMissing,
-  fieldMissing,
-  validateUserInput,
-} from "../utlis/CommonResponse.js";
+import { validateUserInput } from "../utlis/CommonResponse.js";
 import { ApiError, ApiRes } from "../utlis/index.js";
 import User from "../model/user.model.js";
 import {
-  addToCart,
+  addToCartService,
   addToWishList,
   loginService,
   registerService,
@@ -19,26 +15,9 @@ import Product from "../model/product.model.js";
 const userLogin = async (req, res) => {
   try {
     const { userEmail, userPassword } = req.body;
-    //fieldMissing
-    let missing = fieldMissing({
-      userEmail,
-      userPassword,
-      action: "login",
-    });
-    if (!missing?.success) {
-      return res
-        .status(Number(missing?.statusCode))
-        .json(
-          new ApiError(
-            missing?.statusCode,
-            missing?.message,
-            missing?.data,
-            missing?.success
-          )
-        );
-    }
-    // existing User and pass check
+    // field Missing , existing User and pass check
     let result = await loginService(userEmail, userPassword);
+    console.log(result, "====result");
 
     if (result?.statusCode >= 400) {
       return res.status(Number(result?.statusCode)).json(result);
@@ -53,7 +32,6 @@ const userLogin = async (req, res) => {
           userEmail: result?.data?.userEmail,
           userMobileNumber: result?.data?.userMobileNumber,
           userAddresults: result?.data?.userAddress,
-          authorization: "Bearer undefined",
           userPinCode: result?.data?.userPinCode,
           addedToCart: result?.data?.addedToCart,
           userPreviousOrder: result?.data?.userPreviousOrder,
@@ -77,29 +55,7 @@ const userRegister = async (req, res) => {
       userMobileNumber,
     } = req.body;
 
-    //fieldMissing
-    let missing = fieldMissing({
-      userName,
-      userEmail,
-      userPassword,
-      userMobileNumber,
-      userAddress,
-      userPinCode,
-      action: "register",
-    });
-    if (!missing?.success) {
-      return res
-        .status(Number(missing?.statusCode))
-        .json(
-          new ApiError(
-            missing?.statusCode,
-            missing?.message,
-            missing?.data,
-            missing?.success
-          )
-        );
-    }
-    // existing User
+    //fieldMissing and existing User check
     let result = await registerService(
       userEmail,
       userPassword,
@@ -108,13 +64,24 @@ const userRegister = async (req, res) => {
       userPinCode,
       userName
     );
+    // when user registers - for first time we are generating token so we can move them directly to home page
+    let token = await loginService(userEmail, userPassword);
 
     if (result?.statusCode >= 400) {
       return res.status(Number(result?.statusCode)).json(result);
     }
+
     return res
       .status(200)
-      .json(new ApiRes(200, `User created with ${userEmail}`, userEmail, true));
+      .cookie("userAccessToken", token?.data?.userAccessToken, cookieOptions)
+      .json(
+        new ApiRes(
+          200,
+          `User created with ${userEmail}`,
+          { userEmail, userAccessToken: token?.data?.userAccessToken },
+          true
+        )
+      );
   } catch (error) {
     return res
       .status(500)
@@ -143,23 +110,8 @@ const userAddToCart = async (req, res) => {
   try {
     const { userEmail } = req.user;
     const { productName, productQuanity } = req.body;
-
-    let missing = addToCartDetailsMissing(userEmail, productName);
-    if (!missing?.success) {
-      return res
-        .status(Number(missing?.statusCode))
-        .json(
-          new ApiError(
-            missing?.statusCode,
-            missing?.message,
-            missing?.data,
-            missing?.success
-          )
-        );
-    }
-
-    // adding to cart
-    const productAdditionToCart = await addToCart(
+    // fieldMissing and adding to cart check
+    const productAdditionToCart = await addToCartService(
       userEmail,
       productName,
       productQuanity
@@ -197,25 +149,15 @@ const userGetAddToCart = async (req, res) => {
   try {
     const { userEmail } = req.user;
     if (!userEmail) {
-      return {
-        statusCode: 404,
-        message: "userEmail not found",
-        data: [],
-        success: false,
-      };
+      return res
+        .status(404)
+        .json(new ApiError(404, `User Email not found exist`, null, false));
     }
     const userExist = await User.findOne({ userEmail });
     if (!userExist)
       return res
         .status(404)
-        .json(
-          new ApiError(
-            404,
-            `User Email not found or user doesn't exist`,
-            null,
-            false
-          )
-        );
+        .json(new ApiError(404, `User doesn't exist in DB`, null, false));
 
     return res
       .status(200)
@@ -353,20 +295,8 @@ const userAddToWishList = async (req, res) => {
   try {
     const { userEmail } = req.user;
     const { productName } = req.body;
-    let missing = addToCartDetailsMissing(userEmail, productName);
-    if (!missing?.success) {
-      return res
-        .status(Number(missing?.statusCode))
-        .json(
-          new ApiError(
-            missing?.statusCode,
-            missing?.message,
-            missing?.data,
-            missing?.success
-          )
-        );
-    }
-    // Addition To WishList
+
+    // fieldMissing and Addition To WishList check
     const productAdditionToWishList = await addToWishList(
       userEmail,
       productName
@@ -405,6 +335,7 @@ const userGetProductWishList = async (req, res) => {
   try {
     const { userEmail } = req.user;
     const userExist = await User.findOne({ userEmail });
+
     if (!userExist)
       return res
         .status(404)
@@ -449,7 +380,14 @@ const userDeleteFromProductWishList = async (req, res) => {
 
     return res
       .status(200)
-      .json(new ApiRes(200, `Deleted from wish list`, deleteProduct, true));
+      .json(
+        new ApiRes(
+          deleteProduct?.statusCode,
+          deleteProduct?.message,
+          deleteProduct?.data,
+          deleteProduct?.success
+        )
+      );
   } catch (error) {
     return res
       .status(500)
@@ -574,25 +512,8 @@ const userUpdateProfile = async (req, res) => {
         .status(404)
         .json(new ApiError(404, `Email is required for update`, null, false));
     }
-    let missing = fieldMissing({
-      userName,
-      userAddress,
-      userPinCode,
-      action: "Update",
-    });
-    if (!missing?.success) {
-      return res
-        .status(Number(missing?.statusCode))
-        .json(
-          new ApiError(
-            missing?.statusCode,
-            missing?.message,
-            missing?.data,
-            missing?.success
-          )
-        );
-    }
-    let validate = validateUserInput({ userName, userAddress });
+
+    let validate = validateUserInput({ userName, userAddress, userPinCode });
     if (!validate?.success) {
       return res
         .status(Number(validate?.statusCode))
