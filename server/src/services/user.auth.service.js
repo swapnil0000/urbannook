@@ -102,7 +102,7 @@ const registerService = async (
   if (!fullNameRegex.test(userName.trim())) {
     return {
       statusCode: 400,
-      message: "Full name must contain only alphabets and single spaces",
+      message: "Full name must contain only alphabets and single spaces ",
       success: false,
     };
   }
