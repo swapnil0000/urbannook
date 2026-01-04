@@ -2,6 +2,7 @@ import { ApiError, ApiRes } from "../utlis/index.js";
 import {
   sendOtpViaEmailService,
   verifyOtpEmailService,
+  verifyOtpEmailForgotPasswordService,
 } from "../services/common.auth.service.js";
 const sendOtpViaEmailServiceController = async (req, res) => {
   try {
@@ -41,6 +42,7 @@ const sendOtpViaEmailServiceController = async (req, res) => {
   }
 };
 
+// to verify new users
 const verifyEmailOtpController = async (req, res) => {
   try {
     const { userEmail, userEmailOtp } = req.body;
@@ -73,4 +75,44 @@ const verifyEmailOtpController = async (req, res) => {
       .json(new ApiError(500, `Internal Server Error - ${error}`, [], false));
   }
 };
-export { sendOtpViaEmailServiceController, verifyEmailOtpController };
+// to verify exisitng user for forgot password
+const verifyOtpEmailForgotPasswordController = async (req, res) => {
+  try {
+    const { userEmail, userEmailOtp } = req.body;
+    const result = await verifyOtpEmailForgotPasswordService(
+      userEmail,
+      userEmailOtp
+    );
+    if (!result?.success) {
+      return res
+        .status(Number(result?.statusCode))
+        .json(
+          new ApiError(
+            Number(result?.statusCode),
+            result?.message,
+            result?.data,
+            result?.success
+          )
+        );
+    }
+    return res
+      .status(200)
+      .json(
+        new ApiRes(
+          200,
+          `${result?.message}`,
+          `${result?.message} for ${result?.data}`,
+          true
+        )
+      );
+  } catch (error) {
+    return res
+      .status(500)
+      .json(new ApiError(500, `Internal Server Error - ${error}`, [], false));
+  }
+};
+export {
+  sendOtpViaEmailServiceController,
+  verifyEmailOtpController,
+  verifyOtpEmailForgotPasswordController,
+};

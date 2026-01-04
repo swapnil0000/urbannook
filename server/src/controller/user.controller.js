@@ -17,8 +17,6 @@ const userLogin = async (req, res) => {
     const { userEmail, userPassword } = req.body;
     // field Missing , existing User and pass check
     let result = await loginService(userEmail, userPassword);
-    console.log(result, "====result");
-
     if (result?.statusCode >= 400) {
       return res.status(Number(result?.statusCode)).json(result);
     }
@@ -397,36 +395,56 @@ const userDeleteFromProductWishList = async (req, res) => {
 
 const userForgetuserPassword = async (req, res) => {
   try {
-    const { userEmail } = req.user;
-    const { userMobileNumber } = req.body;
-
-    if (!userEmail || !userMobileNumber) {
-      return res
-        .status(400)
-        .json(
-          new ApiError(
-            400,
-            `userEmail or Mobile Number is required`,
-            missing?.data,
-            missing?.success
-          )
-        );
-    }
-
-    const userDetails = await User.findOne({
-      $or: [{ userEmail }, { userMobileNumber }],
-    });
-    if (!userDetails) {
+    const { userEmail, userPassword } = req.body;
+    if (!userPassword) {
       return {
-        statusCode: 404,
-        message: "User doesn't exist",
+        statusCode: 400,
+        message: `User Email or Password can't be empty`,
         data: null,
         success: false,
       };
     }
-    // send otp to userEmail or mno whichever is used
-    //verify otp
-    // forgot userPassword
+    const userDetails = await User.findOne({
+      userEmail,
+    });
+    const passCheck = (await userDetails.passCheck(userPassword))
+      ? true
+      : false;
+    const oldPassAndNewPassCompare = await bcrypt.compare(
+      userPassword,
+      userDetails?.userPassword
+    );
+    if (passCheck) {
+      if (oldPassAndNewPassCompare)
+        return res
+          .status(409)
+          .json(
+            new ApiRes(
+              200,
+              `Current userPassword and New userPassword is same for user - ${userEmail}`,
+              userEmail,
+              true
+            )
+          );
+    }
+
+    if (!userDetails?._id) {
+      return res
+        .status(Number(400))
+        .json(new ApiError(400, `Unable to reset userPassword`, null, false));
+    }
+    userDetails.userPassword = userPassword;
+    await userDetails.save(); // using this because while using findOne it doesn't trigger pre middleware and hence plain text saved
+    return res
+      .status(Number(200))
+      .json(
+        new ApiRes(
+          200,
+          `userPassword updated successfully for user ${userEmail}`,
+          userEmail,
+          true
+        )
+      );
   } catch (error) {
     return res
       .status(500)
@@ -437,30 +455,35 @@ const userForgetuserPassword = async (req, res) => {
 const userResetPassword = async (req, res) => {
   try {
     const { userEmail } = req.user;
-    const { currentuserPassword, newuserPassword } = req.body;
-    if (!userEmail || !currentuserPassword) {
+    if (!userEmail) {
+      return res
+        .status(404)
+        .json(new ApiError(404, `Email is not available`, null, false));
+    }
+    const { currentUserPassword, newUserPassword } = req.body || {};
+    if (!newUserPassword || !currentUserPassword) {
       return res
         .status(400)
         .json(
           new ApiError(
             400,
-            `userEmail or currentuserPassword is required`,
-            missing?.data,
-            missing?.success
+            `Both current password and new password is required`,
+            null,
+            false
           )
         );
     }
     const userDetails = await User.findOne({ userEmail });
-    let result = await loginService(userEmail, currentuserPassword);
+    let result = await loginService(userEmail, currentUserPassword);
     if (result?.statusCode >= 400) {
       return res.status(Number(result?.statusCode)).json(result);
     }
     //new pass and curr pass comparison
-    const passCheck = (await userDetails.passCheck(currentuserPassword))
+    const passCheck = (await userDetails.passCheck(currentUserPassword))
       ? true
       : false;
     const oldPassAndNewPassCompare = await bcrypt.compare(
-      newuserPassword,
+      newUserPassword,
       userDetails?.userPassword
     );
 
@@ -483,7 +506,7 @@ const userResetPassword = async (req, res) => {
         .status(Number(400))
         .json(new ApiError(400, `Unable to reset userPassword`, null, false));
     }
-    userDetails.userPassword = newuserPassword;
+    userDetails.userPassword = newUserPassword;
     await userDetails.save(); // using this because while using findOne it doesn't trigger pre middleware and hence plain text saved
     return res
       .status(Number(200))
@@ -505,74 +528,87 @@ const userResetPassword = async (req, res) => {
 const userUpdateProfile = async (req, res) => {
   try {
     const { userEmail } = req.user;
-    // not adding userMobileNumber becuase they would be requiring otp verification
-    const { userName, userAddress, userPinCode } = req.body;
     if (!userEmail) {
       return res
-        .status(404)
-        .json(new ApiError(404, `Email is required for update`, null, false));
+        .status(401)
+        .json(new ApiError(401, "Unauthorized", null, false));
     }
 
-    let validate = validateUserInput({ userName, userAddress, userPinCode });
-    if (!validate?.success) {
+    const { userName, userAddress, userPinCode } = req.body || {};
+    if (
+      userName === undefined &&
+      userAddress === undefined &&
+      userPinCode === undefined
+    ) {
       return res
-        .status(Number(validate?.statusCode))
+        .status(400)
+        .json(new ApiError(400, "No fields provided for update", null, false));
+    }
+
+    const validate = validateUserInput({
+      userName,
+      userAddress,
+      userPinCode,
+    });
+
+    if (!validate.success) {
+      return res
+        .status(validate.statusCode)
         .json(
           new ApiError(
-            validate?.statusCode,
-            validate?.message,
-            validate?.data,
-            validate?.success
+            validate.statusCode,
+            validate.message,
+            validate.data,
+            false
           )
         );
     }
 
-    if (String(userPinCode).length > 0 && String(userPinCode).length != 6) {
-      return res
-        .status(404)
-        .json(
-          new ApiError(404, `userPinCode must be of 6 digits`, null, false)
-        );
-    }
+    const updateFields = {};
+    if (userName !== undefined) updateFields.userName = userName;
+    if (userAddress !== undefined) updateFields.userAddress = userAddress;
+    if (userPinCode !== undefined) updateFields.userPinCode = userPinCode;
 
-    const updatingFieldValues = {};
-    userName?.length > 0 && (updatingFieldValues.userName = userName);
-    userAddress?.length > 0 && (updatingFieldValues.userAddress = userAddress);
-    String(userPinCode).length > 0 &&
-      String(userPinCode).length < 7 &&
-      String(userPinCode).length == 6 &&
-      (updatingFieldValues.userPinCode = userPinCode);
-
-    /* This is for finding and updating the fields only and only if the currValu and DB Stored values are different  i.e. $or does this for us firstly checks then $ne compares the values from db and currentValue*/
-    const updatedUserDetails = await User.findOneAndUpdate(
+    const updatedUser = await User.findOneAndUpdate(
       {
         userEmail,
         $or: [
-          userName ? { userName: { $ne: userName } } : {},
-          userAddress ? { userAddress: { $ne: userAddress } } : {},
-          userPinCode ? { userPinCode: { $ne: userPinCode } } : {},
-        ],
+          userName !== undefined ? { userName: { $ne: userName } } : null,
+          userAddress !== undefined
+            ? { userAddress: { $ne: userAddress } }
+            : null,
+          userPinCode !== undefined
+            ? { userPinCode: { $ne: userPinCode } }
+            : null,
+        ].filter(Boolean),
       },
-      {
-        $set: updatingFieldValues,
-      },
-      {
-        new: true,
-      }
+      { $set: updateFields },
+      { new: true }
     );
-    if (!updatedUserDetails) {
+
+    if (!updatedUser) {
       return res
-        .status(400)
-        .json(new ApiError(400, "No changes detected", null, false));
+        .status(200)
+        .json(
+          new ApiRes(
+            200,
+            "No changes done. Same values already saved.",
+            null,
+            true
+          )
+        );
     }
+
     return res.status(200).json(
       new ApiRes(
         200,
-        `User Details Updated of - ${userEmail}`,
+        "Profile updated successfully",
         {
-          userName: updatedUserDetails?.userName,
-          userAddress: updatedUserDetails?.userAddress,
-          userPinCode: updatedUserDetails?.userPinCode,
+          userEmail: updatedUser.userEmail,
+          userName: updatedUser.userName,
+          userAddress: updatedUser.userAddress,
+          userPinCode: updatedUser.userPinCode,
+          isUserVerified: updatedUser.isUserVerified,
         },
         true
       )
@@ -580,7 +616,14 @@ const userUpdateProfile = async (req, res) => {
   } catch (error) {
     return res
       .status(500)
-      .json(new ApiError(500, `Internal Server Error - ${error}`, [], false));
+      .json(
+        new ApiError(
+          500,
+          `Internal Server Error - ${error.message}`,
+          null,
+          false
+        )
+      );
   }
 };
 

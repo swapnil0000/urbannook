@@ -1,10 +1,7 @@
 import User from "../model/user.model.js";
 import Product from "../model/product.model.js";
 import mongoose from "mongoose";
-import {
-  cartDetailsMissing,
-  fieldMissing,
-} from "../utlis/CommonResponse.js";
+import { cartDetailsMissing, fieldMissing } from "../utlis/CommonResponse.js";
 
 const loginService = async (userEmail, userPassword) => {
   //fieldMissing
@@ -37,7 +34,7 @@ const loginService = async (userEmail, userPassword) => {
   if (!passCheck) {
     return {
       statusCode: 401,
-      message: "Password is wronng",
+      message: "Current Password is wronng",
       data: userEmail,
       success: false,
     };
@@ -75,7 +72,6 @@ const registerService = async (
   userPinCode,
   userName
 ) => {
-  //fieldMissing
   let missing = fieldMissing({
     userName,
     userEmail,
@@ -94,18 +90,82 @@ const registerService = async (
       success: missing?.success,
     };
   }
+
+  const fullNameRegex = /^[A-Za-z]+(?:\s[A-Za-z]+)*$/;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  const passwordRegex =
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,15}$/;
+  const mobileRegex = /^[6-9]\d{9}$/;
+  const addressRegex = /^[A-Za-z0-9\s,./#-]{5,100}$/;
+  const pinCodeRegex = /^[1-9][0-9]{5}$/;
+
+  if (!fullNameRegex.test(userName.trim())) {
+    return {
+      statusCode: 400,
+      message: "Full name must contain only alphabets and single spaces ",
+      success: false,
+    };
+  }
+
+  if (!emailRegex.test(userEmail)) {
+    return {
+      statusCode: 400,
+      message: "Invalid email format",
+      success: false,
+    };
+  }
+
+  if (!passwordRegex.test(userPassword)) {
+    return {
+      statusCode: 400,
+      message:
+        "Password must be at least 8 characters with uppercase, lowercase, number & special character",
+      success: false,
+    };
+  }
+
+  if (!mobileRegex.test(String(userMobileNumber))) {
+    return {
+      statusCode: 400,
+      message: "Invalid mobile number (must be 10 digits, start with 6–9)",
+      success: false,
+    };
+  }
+
+  if (!addressRegex.test(userAddress)) {
+    return {
+      statusCode: 400,
+      message: "Address contains invalid characters or length",
+      success: false,
+    };
+  }
+
+  if (!pinCodeRegex.test(String(userPinCode))) {
+    return {
+      statusCode: 400,
+      message: "Pin code must be exactly 6 digits and cannot start with 0",
+      success: false,
+    };
+  }
+
   const res = await User.findOne({
-    $or: [{ userMobileNumber }, { userEmail }, { userName }],
+    $or: [{ userMobileNumber }, { userEmail }],
   });
-  // check for pre-exist
+
   if (res) {
+    let matchedValue;
+    if (res?.userEmail == userEmail) matchedValue = userEmail;
+    else if (res?.userMobileNumber == userMobileNumber)
+      matchedValue = userMobileNumber;
+
     return {
       statusCode: 409,
-      message: "User Already exist",
+      message: `User Already exist with - ${matchedValue}`,
       data: userEmail,
       success: false,
     };
   }
+
   const newRegisteringUser = await User.create({
     userName,
     userEmail,
@@ -114,6 +174,7 @@ const registerService = async (
     userAddress,
     userPinCode,
   });
+
   if (!newRegisteringUser)
     return {
       statusCode: 400,
@@ -121,6 +182,7 @@ const registerService = async (
       data: userEmail,
       success: false,
     };
+
   return {
     statusCode: 200,
     message: `Created user with - ${userEmail}`,
