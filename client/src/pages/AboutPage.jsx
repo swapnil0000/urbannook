@@ -125,7 +125,7 @@ const AboutPage = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {values.map((value, index) => (
+            {values.map((value) => (
               <div
                 key={value.id}
                 onMouseEnter={() => setHoveredCard(value.id)}
@@ -158,7 +158,7 @@ const AboutPage = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {teamMembers.map((member, index) => (
+            {teamMembers.map((member) => (
               <div
                 key={member.id}
                 className="bg-white/80 backdrop-blur-sm rounded-[2rem] p-8 text-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 border border-white/40"

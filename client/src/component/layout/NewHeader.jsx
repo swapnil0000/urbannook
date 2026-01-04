@@ -177,7 +177,7 @@ const NewHeader = () => {
 
               <button
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="lg:hidden w-7 h-7 flex items-center justify-center text-black"
+                className="lg:hidden w-7 h-7 flex items-center justify-center text-black focus:outline-none"
               >
                 <i className={`fa-solid ${isMenuOpen ? 'fa-times' : 'fa-bars'} text-lg`}></i>
               </button>

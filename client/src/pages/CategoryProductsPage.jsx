@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Footer from '../component/layout/Footer';
-import { products, productCategories, colors, priceRanges, sortOptions } from '../data/products';
+import { products, productCategories, priceRanges, sortOptions } from '../data/products';
 
 const CategoryProductsPage = () => {
   const { category } = useParams();

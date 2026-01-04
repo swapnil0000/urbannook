@@ -1,8 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useAuth, useUI } from '../../hooks/useRedux';
+import { useLogoutMutation } from '../../store/api/authApi';
 
 const UserProfile = ({ user, onLogout, onClose }) => {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const dropdownRef = useRef(null);
+  const { logout } = useAuth();
+  const { showNotification } = useUI();
+  const [logoutApi, { isLoading: isLoggingOut }] = useLogoutMutation();
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -15,18 +20,54 @@ const UserProfile = ({ user, onLogout, onClose }) => {
   }, [onClose]);
 
   const menuItems = [
-    { icon: 'fa-user', label: 'My Profile', action: () => console.log('Profile') },
-    { icon: 'fa-shopping-bag', label: 'My Orders', action: () => console.log('Orders') },
-    { icon: 'fa-heart', label: 'Wishlist', action: () => console.log('Wishlist') },
-    { icon: 'fa-headset', label: 'Customer Support', action: () => console.log('Support') },
-    { icon: 'fa-gift', label: 'Rewards', action: () => console.log('Rewards') },
-    { icon: 'fa-cog', label: 'Settings', action: () => console.log('Settings') },
+    { icon: 'fa-user', label: 'My Profile', action: () => window.location.href = '/my-profile' },
+    { icon: 'fa-shopping-bag', label: 'My Orders', action: () => window.location.href = '/my-orders' },
+    { icon: 'fa-heart', label: 'Wishlist', action: () => window.location.href = '/wishlist' },
+    { icon: 'fa-headset', label: 'Customer Support', action: () => window.location.href = '/customer-support' },
+    { icon: 'fa-gift', label: 'Rewards', action: () => window.location.href = '/rewards' },
+    { icon: 'fa-cog', label: 'Settings', action: () => window.location.href = '/settings' },
   ];
 
-  const handleLogout = () => {
-    localStorage.removeItem('user');
-    onLogout();
-    onClose();
+  const handleLogout = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    console.log("handleLogout called");
+    
+    // Get token from cookie
+    const getCookie = (name) => {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(';').shift();
+    };
+    
+    const token = getCookie('userAccessToken');
+    console.log("Token from cookie:", token);
+    
+    try {
+      console.log("Calling logout API...");
+      const result = await logoutApi().unwrap();
+      console.log("Logout API success:", result);
+      showNotification('Logged out successfully!');
+    } catch (error) {
+      console.warn('Logout API failed, logging out locally:', error);
+      showNotification('Logged out successfully!');
+    } finally {
+      console.log("Cleaning up local state...");
+      
+      // Clear cookie
+      document.cookie = 'userAccessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      
+      // Clear Redux state
+      logout();
+      
+      // Clear localStorage
+      localStorage.removeItem('user');
+      
+      onLogout();
+      onClose();
+      setShowLogoutConfirm(false);
+    }
   };
 
   return (
@@ -104,12 +145,16 @@ const UserProfile = ({ user, onLogout, onClose }) => {
       {/* RESPONSIVE LOGOUT CONFIRMATION MODAL */}
       {showLogoutConfirm && (
         <div 
-          className="h-[100vh] fixed inset-0 flex items-center justify-center z-[9999] p-4"
-          onClick={() => setShowLogoutConfirm(false)}
+          className="h-[100vh] fixed inset-0 flex items-center justify-center z-[9999] p-4 bg-black/50"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowLogoutConfirm(false);
+            }
+          }}
         >
           <div 
             className="bg-white rounded-[3rem] p-8 md:p-14 lg:p-12 w-full max-w-[440px] shadow-2xl relative animate-pop" 
-            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
             style={{ transform: 'translate(0, 0)' }}
           >
             <div className="flex  flex-col items-center text-center">
@@ -126,13 +171,14 @@ const UserProfile = ({ user, onLogout, onClose }) => {
 
               <div className="flex flex-col w-full gap-3">
                 <button
-                  onClick={() => setShowLogoutConfirm(false)}
-                  className="w-full py-5 bg-slate-900 text-white rounded-2xl font-bold text-xs uppercase tracking-[0.2em] hover:bg-red-600 transition-all shadow-xl active:scale-95"
+                  onMouseDown={handleLogout}
+                  disabled={isLoggingOut}
+                  className="w-full py-5 bg-red-600 text-white rounded-2xl font-bold text-xs uppercase tracking-[0.2em] hover:bg-red-700 transition-all shadow-xl active:scale-95 disabled:opacity-50"
                 >
-                  Confirm Logout
+                  {isLoggingOut ? 'Logging out...' : 'Confirm Logout'}
                 </button>
                 <button
-                  onClick={handleLogout}
+                  onClick={() => setShowLogoutConfirm(false)}
                   className="w-full py-5 bg-transparent text-slate-400 rounded-2xl font-bold text-xs uppercase tracking-[0.2em] hover:text-slate-900 transition-all"
                 >
                   Stay with us
