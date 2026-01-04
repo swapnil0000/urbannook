@@ -5,7 +5,7 @@ const Footer = () => {
     <footer className="bg-[#0a1a13] text-white pt-24 pb-8 overflow-hidden relative">
       
       {/* Background Large Typography (Watermark) */}
-      <div className="absolute top-0 left-0 w-full overflow-hidden pointer-events-none opacity-[0.03]">
+      <div className="absolute top-50 left-0 w-full overflow-hidden pointer-events-none opacity-[0.03]">
         <h1 className="text-[15vw] font-bold text-center leading-none text-white tracking-tighter uppercase whitespace-nowrap">
           Urban Nook
         </h1>
@@ -138,7 +138,7 @@ const Footer = () => {
       <div className="border-t border-white/10 pt-8 px-6 md:px-12 relative z-10">
         <div className="max-w-7xl mx-auto flex flex-col-reverse md:flex-row justify-between items-center gap-6">
           <div className="text-gray-500 text-sm font-light">
-            © 2024 UrbanNook Inc. Designed with <span className="text-red-500">♥</span> in India.
+            © 2026 UrbanNook Inc. Designed with <span className="text-red-500">♥</span> in India.
           </div>
           
           <div className="flex gap-4">

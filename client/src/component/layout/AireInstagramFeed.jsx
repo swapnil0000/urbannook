@@ -48,7 +48,7 @@ const AireInstagramFeed = () => {
     <section className=" py-12 w-full flex justify-center items-center">
       
       {/* THE ISLAND: 850px Height Editorial Container */}
-      <div className="w-[98%] max-w-[1700px] h-auto lg:h-[850px] bg-[#0a110e] rounded-[50px] overflow-hidden relative flex flex-col p-8 md:p-16">
+      <div className="w-[98%] max-w-[1700px] h-auto lg:h-[1050px] bg-[#0a110e] rounded-[50px] overflow-hidden relative flex flex-col p-8 md:p-16">
         
         {/* Ambient Glows */}
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-900/20 rounded-full blur-[120px] pointer-events-none"></div>
@@ -140,16 +140,6 @@ const AireInstagramFeed = () => {
                     </div>
                 ))}
             </div>
-        </div>
-
-        {/* REFINED WHATSAPP FAB: Integrated into the Island */}
-        <div className="absolute bottom-10 right-10 z-50 flex flex-col items-end">
-             <div className="mb-4 px-4 py-2 bg-white rounded-2xl shadow-2xl scale-0 group-hover:scale-100 origin-right transition-transform duration-300">
-                 <p className="text-[10px] font-bold text-black uppercase tracking-widest">Connect with a Stylist</p>
-             </div>
-             <button className="w-16 h-16 bg-[#25D366] rounded-full flex items-center justify-center text-white shadow-2xl hover:scale-110 transition-transform active:scale-95 group">
-                <i className="fab fa-whatsapp text-3xl"></i>
-             </button>
         </div>
       </div>
     </section>

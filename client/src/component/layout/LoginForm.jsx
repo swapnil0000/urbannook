@@ -1,31 +1,76 @@
 import React, { useState } from 'react';
+import { useLoginMutation } from '../../store/api/authApi';
+import { useAuth, useUI } from '../../hooks/useRedux';
 import ForgotPassword from './ForgotPassword';
 
 const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
-  const [formData, setFormData] = useState({ email: '', password: '' });
+  // Changed 'email' to 'identifier' to handle both email and username
+  const [formData, setFormData] = useState({ identifier: '', password: '' });
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false); // Toggle state
+  const [errors, setErrors] = useState({});
+  
+  const [login, { isLoading }] = useLoginMutation();
+  const { login: setAuthUser } = useAuth();
+  const { showNotification } = useUI();
 
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+    if (errors[e.target.name]) {
+      setErrors({ ...errors, [e.target.name]: '' });
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    if (!formData.identifier.trim()) {
+      newErrors.identifier = 'Email or Username is required';
+    }
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
+    }
+    return newErrors;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
     
-    // Simulate login API call
-    setTimeout(() => {
+    const validationErrors = validateForm();
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+    
+    try {
+      // The backend should be configured to check the 'identifier' 
+      // against both userEmail and userName columns
+      const result = await login({
+        userIdentifier: formData.identifier, 
+        userPassword: formData.password,
+      }).unwrap();
+        
+      showNotification('Login successful!');
+      
+      if (result.userAccessToken) {
+        document.cookie = `userAccessToken=${result.userAccessToken}; path=/; max-age=2592000`;
+        setAuthUser(result.user, result.userAccessToken);
+      }
+      
       const userData = {
-        name: 'John Doe',
-        email: formData.email,
-        mobile: '9876543210'
+        name: result.user?.userName || result.user?.name || 'User',
+        email: result.user?.userEmail || result.user?.email || '',
+        mobile: result.user?.userMobileNumber || result.user?.mobile || ''
       };
+      
       localStorage.setItem('user', JSON.stringify(userData));
       onLoginSuccess(userData);
       onClose();
-      setIsLoading(false);
-    }, 1000);
+    } catch (error) {
+      showNotification(error.data?.message || 'Login failed. Please check your credentials.');
+      setErrors({ submit: error.data?.message || 'Login failed' });
+    }
   };
 
   if (showForgotPassword) {
@@ -58,6 +103,7 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
         </div>
 
         <form className="space-y-5" onSubmit={handleSubmit}>
+          {/* Social Logins */}
           <div className="flex gap-3 mb-8">
             {['google', 'facebook', 'mobile'].map((provider) => (
               <button 
@@ -72,22 +118,26 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
 
           <div className="relative flex items-center justify-center mb-8">
             <div className="w-full border-t border-slate-100"></div>
-            <span className="absolute bg-white px-4 text-[10px] uppercase font-bold text-slate-300 tracking-[0.2em]">Or use email</span>
+            <span className="absolute bg-white px-4 text-[10px] uppercase font-bold text-slate-300 tracking-[0.2em]">Or use account details</span>
           </div>
 
+          {/* Email or Username Input */}
           <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Email Address</label>
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Email or Username</label>
             <input
-              type="email"
-              name="email"
-              value={formData.email}
+              type="text"
+              name="identifier"
+              value={formData.identifier}
               onChange={handleInputChange}
-              className="w-full p-4 bg-slate-50 border border-slate-300 rounded-2xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all outline-none text-slate-900 text-sm"
-              placeholder="name@example.com"
-              required
+              className={`w-full p-4 bg-slate-50 border rounded-2xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all outline-none text-slate-900 text-sm ${
+                errors.identifier ? 'border-red-500' : 'border-slate-300'
+              }`}
+              placeholder="e.g. johndoe or john@example.com"
             />
+            {errors.identifier && <p className="text-red-500 text-[10px] font-bold ml-1 uppercase">{errors.identifier}</p>}
           </div>
 
+          {/* Password Input with Visibility Toggle */}
           <div className="space-y-2">
             <div className="flex justify-between items-center px-1">
               <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Password</label>
@@ -99,15 +149,26 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
                 Forgot?
               </button>
             </div>
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleInputChange}
-              className="w-full p-4 bg-slate-50 border border-slate-300 rounded-2xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all outline-none text-slate-900 text-sm"
-              placeholder="••••••••"
-              required
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                name="password"
+                value={formData.password}
+                onChange={handleInputChange}
+                className={`w-full p-4 bg-slate-50 border rounded-2xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all outline-none text-slate-900 text-sm pr-12 ${
+                  errors.password ? 'border-red-500' : 'border-slate-300'
+                }`}
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-emerald-700 transition-colors"
+              >
+                <i className={`fa-solid ${showPassword ? 'fa-eye-slash' : 'fa-eye'} text-sm`}></i>
+              </button>
+            </div>
+            {errors.password && <p className="text-red-500 text-[10px] font-bold ml-1 uppercase">{errors.password}</p>}
           </div>
 
           <button 
@@ -124,6 +185,10 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
               'Sign In'
             )}
           </button>
+          
+          {errors.submit && (
+            <p className="text-red-500 text-xs text-center mt-2 font-semibold">{errors.submit}</p>
+          )}
         </form>
 
         <p className="text-sm text-center mt-8 text-slate-500">
