@@ -40,6 +40,8 @@ const authGuardService = (role) => {
        the authenticated user without re-verifying the token again on any controller or route. */
       req.user = decodedToken;
       req.authRole = role;
+      console.log(req.user);
+
       next();
     } catch (error) {
       console.error("JWT Error:", error.message);
@@ -191,6 +193,14 @@ const sendOtpViaEmailService = async (userEmail) => {
       },
       { new: true }
     );
+    if (!userDetails) {
+      return {
+        statusCode: 404,
+        message: `User doesn't exist with email - ${userEmail}`,
+        data: null,
+        success: false,
+      };
+    }
     const zohoEmail = process.env.ZOHO_ADMIN_EMAIL;
     const zohoEmailSMTPSecret = process.env.ZOHO_SMTP_SECRET;
     const transporter = nodemailer.createTransport({
@@ -318,6 +328,54 @@ const verifyOtpEmailService = async (userEmail, userEmailOtp) => {
   }
 };
 
+const verifyOtpEmailForgotPasswordService = async (userEmail, userEmailOtp) => {
+  try {
+    if (!userEmail || !userEmailOtp) {
+      return {
+        statusCode: 400,
+        message: "Email and OTP is required",
+        success: false,
+      };
+    }
+    const now = new Date();
+
+    const verifiedUser = await User.findOneAndUpdate(
+      {
+        userEmail,
+        userVerificationOtp: Number(userEmailOtp), // 👈 OTP MATCH FIRST
+        userVerificationOtpExpiresAt: { $gt: now }, // 👈 NOT EXPIRED
+      },
+      {
+        $unset: {
+          userVerificationOtp: "",
+          userVerificationOtpExpiresAt: "",
+        },
+      },
+      { new: true }
+    );
+    if (!verifiedUser) {
+      return {
+        statusCode: 403,
+        message: "Invalid or expired OTP",
+        success: false,
+      };
+    }
+
+    return {
+      statusCode: 200,
+      message: "Forgot Password OTP verified successfully",
+      data: userEmail,
+      success: true,
+    };
+  } catch (error) {
+    return {
+      statusCode: 500,
+      message: `Internal Server Error - ${error}`,
+      success: false,
+    };
+  }
+};
+
 export {
   authGuardService,
   logoutService,
@@ -325,5 +383,6 @@ export {
   regenerateTokenService,
   sendOtpViaEmailService,
   verifyOtpEmailService,
+  verifyOtpEmailForgotPasswordService,
   generateOtpResponseService,
 };

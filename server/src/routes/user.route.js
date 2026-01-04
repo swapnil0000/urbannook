@@ -28,6 +28,7 @@ import {
   userUpdateCartQuantity,
   userRemoveFromCart,
   userClearCart,
+  userForgetuserPassword,
 } from "../controller/user.controller.js";
 
 /* ===============================================================
@@ -66,6 +67,7 @@ const userRouter = Router();
 ================================================================ */
 userRouter.post("/user/login", userLogin);
 userRouter.post("/user/register", userRegister);
+userRouter.post("/user/forgot-password", userForgetuserPassword);
 
 /* ===============================================================
    PROFILE & ACCOUNT (PROTECTED)
@@ -74,7 +76,7 @@ userRouter.post("/user/register", userRegister);
 ================================================================ */
 userRouter.post("/user/profile", authGuardService("User"), userProfile);
 
-userRouter.put(
+userRouter.patch(
   "/user/profile/update",
   authGuardService("User"),
   userUpdateProfile

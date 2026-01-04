@@ -87,127 +87,86 @@ const finalProductName = (productName) => {
 };
 
 const validateUserInput = ({ userName, userAddress, userPinCode }) => {
-  let missing = fieldMissing({
-    userName,
-    userAddress,
-    userPinCode,
-    action: "Update",
-  });
-  if (!missing?.success) {
-    return {
-      statusCode: Number(missing?.statusCode),
-      message: missing?.message,
-      data: missing?.data || null,
-      success: missing?.success,
-    };
-  }
-  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-  const userNameRegex = /^(?=.*[A-Z])(?=.*[@!#$%^&*])[A-Za-z0-9@!#$%^&*]{1,7}$/;
+  const fullNameRegex = /^[A-Za-z]+(?:\s[A-Za-z]+)*$/;
   const userAddressRegex = /^[A-Za-z0-9\s,./#-]{5,100}$/;
-  if (!emailRegex.test(userEmail)) {
-    return {
-      statusCode: 400,
-      message: "Invalid email format",
-      data: null,
-      success: false,
-    };
+  const pinCodeRegex = /^[1-9][0-9]{5}$/;
+
+  if (userName !== undefined) {
+    if (typeof userName !== "string") {
+      return {
+        statusCode: 400,
+        message: "Full name must be a string",
+        data: null,
+        success: false,
+      };
+    }
+
+    const trimmedName = userName.trim();
+
+    if (!trimmedName) {
+      return {
+        statusCode: 400,
+        message: "Full name cannot be empty",
+        data: null,
+        success: false,
+      };
+    }
+
+    if (trimmedName.length < 3 || trimmedName.length > 50) {
+      return {
+        statusCode: 400,
+        message: "Full name must be between 3 and 50 characters",
+        data: null,
+        success: false,
+      };
+    }
+
+    if (!fullNameRegex.test(trimmedName)) {
+      return {
+        statusCode: 400,
+        message:
+          "Full name can contain only alphabets and single spaces between words",
+        data: null,
+        success: false,
+      };
+    }
   }
 
-  if (userName === undefined || userName === null) {
-    return {
-      statusCode: 400,
-      message: "Username is required",
-      data: null,
-      success: false,
-    };
+  if (userAddress !== undefined) {
+    if (typeof userAddress !== "string" || !userAddress.trim()) {
+      return {
+        statusCode: 400,
+        message: "Invalid address",
+        data: null,
+        success: false,
+      };
+    }
+
+    if (!userAddressRegex.test(userAddress)) {
+      return {
+        statusCode: 400,
+        message: "Address contains invalid characters",
+        data: null,
+        success: false,
+      };
+    }
   }
 
-  if (typeof userName !== "string") {
-    return {
-      statusCode: 400,
-      message: "Username must be a string",
-      data: null,
-      success: false,
-    };
-  }
-
-  if (!userName.trim()) {
-    return {
-      statusCode: 400,
-      message: "Username cannot be empty",
-      data: null,
-      success: false,
-    };
-  }
-
-  if (userName.length > 7) {
-    return {
-      statusCode: 400,
-      message: "Username must not exceed 7 characters",
-      data: null,
-      success: false,
-    };
-  }
-
-  if (!userNameRegex.test(userName)) {
-    return {
-      statusCode: 400,
-      message:
-        "Username must contain at least 1 capital letter and 1 special symbol",
-      data: null,
-      success: false,
-    };
-  }
-
-  if (userAddress === undefined || userAddress === null) {
-    return {
-      statusCode: 400,
-      message: "Address is required",
-      data: null,
-      success: false,
-    };
-  }
-
-  if (typeof userAddress !== "string") {
-    return {
-      statusCode: 400,
-      message: "Address must be a string",
-      data: null,
-      success: false,
-    };
-  }
-
-  if (!userAddress.trim()) {
-    return {
-      statusCode: 400,
-      message: "Address cannot be empty",
-      data: null,
-      success: false,
-    };
-  }
-
-  if (userAddress.length < 5 || userAddress.length > 100) {
-    return {
-      statusCode: 400,
-      message: "Address length must be between 5 and 100 characters",
-      data: null,
-      success: false,
-    };
-  }
-
-  if (!userAddressRegex.test(userAddress)) {
-    return {
-      statusCode: 400,
-      message: "Address contains invalid characters",
-      data: null,
-      success: false,
-    };
+  if (userPinCode !== undefined) {
+    if (!pinCodeRegex.test(String(userPinCode))) {
+      return {
+        statusCode: 400,
+        message: "Pin code must be exactly 6 digits and cannot start with 0",
+        data: null,
+        success: false,
+      };
+    }
   }
 
   return {
     statusCode: 200,
-    message: "Address and Username - Good to go",
-    data: [],
+    message: "Validation passed",
+    data: `Good to go with ${userName}, ${userAddress}, ${userPinCode}`,
     success: true,
   };
 };
