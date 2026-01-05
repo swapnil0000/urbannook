@@ -122,7 +122,7 @@ userRouter.delete(
   userRemoveFromCart
 );
 
-userRouter.delete("/user/cart/clear", authGuardService("User"), userClearCart);
+userRouter.delete("/user/clear-cart", authGuardService("User"), userClearCart);
 
 /* ===============================================================
    WISHLIST MANAGEMENT (PROTECTED)

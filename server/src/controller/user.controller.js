@@ -156,17 +156,23 @@ const userGetAddToCart = async (req, res) => {
       return res
         .status(404)
         .json(new ApiError(404, `User doesn't exist in DB`, null, false));
+    const productIds = userExist?.addedToWishList.map((id) => {
+      return id?.productId;
+    });
+    const productDetails = await Product.find({
+      _id: productIds,
+    }).select("-_id");
 
+    if (userExist?.addedToCart?.length == 0) {
+      return res
+        .status(200)
+        .json(
+          new ApiRes(200, `Nothing in cart for user ${userEmail}`, null, true)
+        );
+    }
     return res
       .status(200)
-      .json(
-        new ApiRes(
-          200,
-          `Preview of Added to cart`,
-          userExist?.addedToCart,
-          true
-        )
-      );
+      .json(new ApiRes(200, `Preview of Added to cart`, productDetails, true));
   } catch (error) {
     return res
       .status(500)
@@ -238,25 +244,53 @@ const userRemoveFromCart = async (req, res) => {
         .status(404)
         .json(new ApiError(404, "User not found", null, false));
     }
-
-    const initialLength = user.addedToCart.length;
-
-    user.addedToCart = user.addedToCart.filter(
-      (item) => item.productId.toString() !== productId
-    );
-
-    if (initialLength === user.addedToCart.length) {
+    const productDetails = await Product.findOne({ productId });
+    if (!productDetails) {
       return res
         .status(404)
-        .json(new ApiError(404, "Product not found in cart", null, false));
+        .json(
+          new ApiError(
+            404,
+            `Product not found with id : ${productId}`,
+            null,
+            false
+          )
+        );
     }
-
-    await user.save();
+    const updatedUser = await User.findOneAndUpdate(
+      { userEmail, "addedToCart.productId": productDetails._id },
+      {
+        $pull: {
+          addedToCart: {
+            productId: productDetails?._id,
+          },
+        },
+      },
+      {
+        new: true,
+      }
+    );
+    if (!updatedUser)
+      return res
+        .status(200)
+        .json(
+          new ApiRes(
+            200,
+            `${productDetails?.productName} Already removed from wishlist`,
+            null,
+            false
+          )
+        );
 
     return res
       .status(200)
       .json(
-        new ApiRes(200, "Product removed from cart", user.addedToCart, true)
+        new ApiRes(
+          200,
+          `${productDetails?.productName} removed from cart`,
+          null,
+          true
+        )
       );
   } catch (error) {
     return res
@@ -278,6 +312,7 @@ const userClearCart = async (req, res) => {
 
     user.addedToCart = [];
     await user.save();
+    console.log(user);
 
     return res
       .status(200)
@@ -292,7 +327,12 @@ const userClearCart = async (req, res) => {
 const userAddToWishList = async (req, res) => {
   try {
     const { userEmail } = req.user;
-    const { productName } = req.body;
+    if (!userEmail) {
+      return res
+        .status(403)
+        .json(new ApiError(403, `Unauthorized Access`, null, false));
+    }
+    const { productName } = req.body || {};
 
     // fieldMissing and Addition To WishList check
     const productAdditionToWishList = await addToWishList(
@@ -345,12 +385,28 @@ const userGetProductWishList = async (req, res) => {
             false
           )
         );
-    const productDetails = await Product.findById(
-      userExist?.addedToWishList
-    ).select("-_id");
+    const productIds = userExist?.addedToWishList.map((id) => {
+      return id?.productId;
+    });
+    const productDetails = await Product.find({
+      _id: productIds,
+    }).select("-_id");
+
+    if (!productDetails) {
+      return res
+        .status(200)
+        .json(
+          new ApiRes(
+            200,
+            `Nothing in wishlist for user ${userEmail}`,
+            null,
+            true
+          )
+        );
+    }
     return res
       .status(200)
-      .json(new ApiRes(200, `Preview of Added to cart`, productDetails, true));
+      .json(new ApiRes(200, `User WishList`, productDetails, true));
   } catch (error) {
     return res
       .status(500)

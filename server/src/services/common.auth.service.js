@@ -40,8 +40,6 @@ const authGuardService = (role) => {
        the authenticated user without re-verifying the token again on any controller or route. */
       req.user = decodedToken;
       req.authRole = role;
-      console.log(req.user);
-
       next();
     } catch (error) {
       console.error("JWT Error:", error.message);

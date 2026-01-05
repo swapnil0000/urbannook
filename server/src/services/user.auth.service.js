@@ -216,7 +216,7 @@ const addToCartService = async (userEmail, productName, productQuanity) => {
     if (!productDetails) {
       return {
         statusCode: 404,
-        message: "Product not found in DB",
+        message: `Product not found in DB with name : ${productName}`,
         data: [],
         success: false,
       };
@@ -259,7 +259,8 @@ const addToCartService = async (userEmail, productName, productQuanity) => {
 
 const addToWishList = async (userEmail, productName) => {
   try {
-    let missing = cartDetailsMissing(userEmail, productName);
+    let missing = cartDetailsMissing(productName);
+
     if (!missing?.success) {
       return {
         statusCode: Number(missing?.statusCode),
@@ -273,7 +274,7 @@ const addToWishList = async (userEmail, productName) => {
     if (!productDetails) {
       return {
         statusCode: 404,
-        message: "Product not found",
+        message: `Product not found with name : ${productName}`,
         data: [],
         success: false,
       };
@@ -316,33 +317,30 @@ const addToWishList = async (userEmail, productName) => {
 
 const deleteFromWishList = async (userEmail, productId) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(productId)) {
-      return {
-        statusCode: 400,
-        message: "Invalid productId - mongoose",
-        data: [],
-        success: false,
-      };
-    }
-    const productDetails = await Product.findById(productId);
+    const productDetails = await Product.findOne({ productId });
     if (!productDetails) {
       return {
         statusCode: 404,
-        message: "Product not found",
+        message: `Product not found with id : ${productId}`,
         data: [],
         success: false,
       };
     }
-
     const userExist = await User.findOneAndUpdate(
       { userEmail },
       {
-        $pull: { addedToWishList: productDetails?._id },
+        $pull: {
+          addedToWishList: {
+            productId: productDetails?._id,
+          },
+        },
       },
       {
         new: true,
       }
     );
+
+    await userExist.save();
     if (!userExist)
       return {
         statusCode: 404,
