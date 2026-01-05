@@ -6,6 +6,7 @@ import {
   adminRouter,
   productRouter,
   commonRouter,
+  userWaitListRouter,
 } from "./routes/index.js";
 import cookieParser from "cookie-parser";
 dotenv.config({
@@ -29,5 +30,12 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-app.use("/api/v1", userRouter, adminRouter, productRouter, commonRouter);
+app.use(
+  "/api/v1",
+  userRouter,
+  adminRouter,
+  productRouter,
+  commonRouter,
+  userWaitListRouter
+);
 export default app;
