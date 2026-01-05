@@ -52,8 +52,8 @@ const OTPVerification = ({ email, onClose, onSuccess, onBack }) => {
     try {
       // Calling API with email
       const result = await verifyOtp({
-        email: email,
-        otp: otpString
+        userEmail: email,
+        userEmailOtp: otpString
       }).unwrap();
       
       onSuccess(result);
@@ -66,13 +66,13 @@ const OTPVerification = ({ email, onClose, onSuccess, onBack }) => {
 
   const handleResend = async () => {
     try {
-      await resendOtp({ email }).unwrap();
+      await resendOtp({ userEmail:email }).unwrap();
       setTimer(30);
       setCanResend(false);
       setOtp(['', '', '', '', '', '']);
       setError('');
     } catch (err) {
-      setError('Failed to resend code');
+      setError('Failed to resend code',err);
     }
   };
 
