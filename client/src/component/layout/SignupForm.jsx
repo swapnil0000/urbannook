@@ -1,9 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { useOtpSentMutation, useRegisterMutation } from '../../store/api/authApi';
-import { useAuth, useUI } from '../../hooks/useRedux';
+import { useUI } from '../../hooks/useRedux';
 import OTPVerification from './OTPVerification';
 
-const SignupForm = ({ onClose, onSwitchToLogin, onSignupSuccess }) => {
+const SignupForm = ({ onClose }) => {
   const [formData, setFormData] = useState({
     name: '', email: '', mobile: '', password: '', confirmPassword: '', address: '', pinCode: ''
   });
@@ -20,7 +20,6 @@ const SignupForm = ({ onClose, onSwitchToLogin, onSignupSuccess }) => {
   const [register, { isLoading: isRegistering }] = useRegisterMutation();
   const [otpSent, { isLoading: isSendingOtp }] = useOtpSentMutation();
   
-  const { login } = useAuth();
   const { showNotification } = useUI();
 
   // Auto-scroll focused element into view
@@ -125,13 +124,13 @@ const SignupForm = ({ onClose, onSwitchToLogin, onSignupSuccess }) => {
 
       // Step 3: Trigger OTP to Email
       try {
-        const response = await otpSent({ email: userData.email, mobile: userData.mobile }).unwrap();
+        const response = await otpSent({ userEmail: userData.email }).unwrap();
         if (response.success) {
           showNotification('OTP sent to your email!');
           setShowOTP(true);
         }
       } catch (otpError) {
-        showNotification('Account created, but failed to send OTP. Please try Resend.');
+        showNotification('Account created, but failed to send OTP. Please try Resend.',otpError);
         setShowOTP(true);
       }
 
@@ -142,8 +141,7 @@ const SignupForm = ({ onClose, onSwitchToLogin, onSignupSuccess }) => {
   };
 
   // Final success handler passed to OTP component
-  const handleVerifySuccess = (verifiedData) => {
-    login(verifiedData.user, verifiedData.token);
+  const handleVerifySuccess = () => {
     showNotification('Account verified successfully!');
     onClose();
   };
