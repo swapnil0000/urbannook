@@ -17,10 +17,16 @@ const productSchema = mongoose.Schema(
       required: [true, "productId is required"],
       unique: true,
     },
+    productImg: {
+      type: String,
+      required: [true, "productImg is required"],
+      unique: true,
+    },
     productDes: {
       type: String,
-      require: true,
+      required: [true, "productDes is required"],
     },
+
     sellingPrice: {
       type: Number,
       required: [true, "sellingPrice is required"],
@@ -36,6 +42,8 @@ const productSchema = mongoose.Schema(
       type: String,
       enum: ["in_stock", "out_of_stock", "discontinued"],
     },
+    productSubDes: String,
+    productSubCategory: String,
   },
   {
     timestamps: true,

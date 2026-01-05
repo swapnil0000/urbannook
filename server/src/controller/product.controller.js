@@ -2,27 +2,36 @@ import { ApiError, ApiRes } from "../utlis/index.js";
 import Product from "../model/product.model.js";
 const productListing = async (req, res) => {
   try {
-    const { limit, currentPage, search, status, category } = req.query;
+    const { limit, currentPage, search, status, category, subCategory } =
+      req.query;
     const page = Number(currentPage) || 1;
     const perPage = Number(limit) || 10;
     /*category -> Filter by category	Electronics , search -> Keyword search in name	iPhone */
     const query = {};
-    if (status) {
-      query.productStatus = status;
-    }
-    if (category) {
-      query.productCategory = {
-        $regex: String(category),
-        $options: "i", // makes it case - insensitive Eg - Chair , chair, CHAIR - all same
-      };
-    }
     if (search) {
       query.productName = {
         $regex: String(search),
         $options: "i", // makes it case - insensitive Eg - Chair , chair, CHAIR - all same
       };
     }
+
+    if (category) {
+      query.productCategory = {
+        $regex: String(category),
+        $options: "i", // makes it case - insensitive Eg - Chair , chair, CHAIR - all same
+      };
+    }
+    if (subCategory) {
+      query.productCategory = {
+        $regex: String(subCategory),
+        $options: "i", // makes it case - insensitive Eg - Chair , chair, CHAIR - all same
+      };
+    }
+    if (status) {
+      query.productStatus = status;
+    }
     const totalProducts = await Product.countDocuments(query);
+
     const listOfProducts = await Product.find(query)
       .skip((page - 1) * perPage)
       .limit(perPage) // for limit
@@ -54,4 +63,23 @@ const productListing = async (req, res) => {
     return res.status(500).json(new ApiError(500, error.message, null, false));
   }
 };
-export { productListing };
+const specificProductDetails = async (req, res) => {
+  const { productId } = req.params;
+  if (!productId) {
+    return res
+      .status(404)
+      .json(new ApiError(404, `Product ID is missing`, null, false));
+  }
+  const productDetails = await Product.findOne({
+    productId,
+  }).select("-_id");
+  if (!productDetails) {
+    return res
+      .status(404)
+      .json(new ApiError(404, `Product Doesn't exist`, null, false));
+  }
+  return res
+    .status(200)
+    .json(new ApiRes(200, `Product Details`, productDetails, true));
+};
+export { productListing, specificProductDetails };

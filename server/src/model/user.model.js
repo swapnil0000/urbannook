@@ -12,7 +12,6 @@ const userSchema = mongoose.Schema(
     userName: {
       type: String,
       required: [true, "Name is required"],
-      unique: true,
       lowercase: true,
       trim: true,
     },
