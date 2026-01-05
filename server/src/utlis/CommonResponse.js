@@ -63,12 +63,11 @@ const productUpdateFieldMissing = (
   };
 };
 
-const cartDetailsMissing = (userEmail, productName) => {
-  if (!userEmail || !productName) {
+const cartDetailsMissing = (productName) => {
+  if (!productName) {
     return {
       statusCode: 400,
-      message:
-        "All fields (userEmail and productName) are required for adding to cart",
+      message: "ProductName is required for adding to cart",
       data: [],
       success: false,
     };
