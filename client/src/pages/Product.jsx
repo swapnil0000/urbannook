@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 
 const products = [
   {
@@ -49,6 +49,9 @@ const products = [
 ];
 
 export default function Product() {
+    useEffect(() => {
+      window.scrollTo(0, 0);
+    }, []);
   return (
     <section className="py-16 px-8 bg-bgSecondary">
       <div className="max-w-6xl mx-auto">

@@ -98,8 +98,8 @@ const Footer = () => {
               <h4 className="text-emerald-400 font-bold uppercase tracking-widest text-xs mb-8">Company</h4>
               <ul className="space-y-4">
                 {[
-                  { name: 'Our Story', link: '/about' },
-                  { name: 'Contact Us', link: '/contact' },
+                  { name: 'Our Story', link: '/about-us' },
+                  { name: 'Contact Us', link: '/contact-us' },
                   { name: 'Privacy Policy', link: '/privacy-policy' },
                   { name: 'Terms & Conditions', link: '/terms-conditions' }
                 ].map((item) => (

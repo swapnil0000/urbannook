@@ -1,11 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Footer from '../component/layout/Footer';
 
 const ContactPage = () => {
+  // --- ADDED: Scroll to top on mount ---
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    subject: '',
+    subject: 'Product Inquiry', // Set a default value to match the select option
     message: ''
   });
 
@@ -19,6 +24,7 @@ const ContactPage = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     console.log('Form submitted:', formData);
+    // Add logic here to send data to backend API
   };
 
   const contactInfo = [
@@ -106,7 +112,7 @@ const ContactPage = () => {
                 <h2 className="text-4xl font-serif text-slate-900 mb-6">Our Location</h2>
                 <div className="aspect-square bg-slate-200 rounded-[3rem] overflow-hidden relative group shadow-inner">
                    {/* Placeholder for Interactive Map */}
-                   <div className="absolute inset-0 bg-[url('https://api.mapbox.com/styles/v1/mapbox/light-v10/static/77.0266,28.4595,12,0/600x600?access_token=YOUR_TOKEN')] bg-cover bg-center grayscale hover:grayscale-0 transition-all duration-700"></div>
+                   <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1524661135-423995f22d0b?q=80&w=1000&auto=format&fit=crop')] bg-cover bg-center grayscale hover:grayscale-0 transition-all duration-700"></div>
                    <div className="absolute inset-0 flex items-center justify-center bg-emerald-900/10 backdrop-blur-[2px] group-hover:backdrop-blur-0 transition-all">
                       <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-2xl animate-bounce">
                         <i className="fa-solid fa-location-dot text-emerald-600 text-2xl"></i>
@@ -168,12 +174,14 @@ const ContactPage = () => {
                     <label className="text-[10px] font-black uppercase tracking-widest text-emerald-700 ml-1">Subject</label>
                     <select
                         name="subject"
+                        value={formData.subject}
+                        onChange={handleInputChange}
                         className="w-full px-6 py-5 bg-slate-50 border border-slate-200 rounded-3xl focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white transition-all appearance-none"
                     >
-                        <option>Product Inquiry</option>
-                        <option>Technical Support</option>
-                        <option>Partnership</option>
-                        <option>Other</option>
+                        <option value="Product Inquiry">Product Inquiry</option>
+                        <option value="Technical Support">Technical Support</option>
+                        <option value="Partnership">Partnership</option>
+                        <option value="Other">Other</option>
                     </select>
                   </div>
 

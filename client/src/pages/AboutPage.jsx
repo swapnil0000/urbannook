@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Footer from '../component/layout/Footer';
 
 const AboutPage = () => {
+    useEffect(() => {
+      window.scrollTo(0, 0);
+    }, []);
   const [hoveredCard, setHoveredCard] = useState(null);
 
   const teamMembers = [

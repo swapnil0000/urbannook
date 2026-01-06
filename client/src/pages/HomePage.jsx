@@ -5,8 +5,12 @@ import AireFeaturedProducts from '../component/layout/AireFeaturedProducts';
 import AireTestimonials from '../component/layout/AireTestimonials';
 import AireInstagramFeed from '../component/layout/AireInstagramFeed';
 import Footer from '../component/layout/Footer';
+import { useEffect } from 'react';
 
 const HomePage = () => {
+    useEffect(() => {
+      window.scrollTo(0, 0);
+    }, []);
   return (
     <div className="min-h-screen">
       <AireHeroBanner />

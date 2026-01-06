@@ -14,6 +14,10 @@ import WishlistPage from '../pages/WishlistPage';
 import CustomerSupportPage from '../pages/CustomerSupportPage';
 import RewardsPage from '../pages/RewardsPage';
 import SettingsPage from '../pages/SettingsPage';
+import TermsConditions from '../pages/TermsCondition';
+import CancellationPolicy from '../pages/CancellationPolicy';
+import PrivacyPolicy from '../pages/PrivacyPolicy';
+import Faq from '../pages/Faqs';
 
 const AppRoutes = () => {
   return (
@@ -33,6 +37,10 @@ const AppRoutes = () => {
       <Route path="/customer-support" element={<CustomerSupportPage />} />
       <Route path="/rewards" element={<RewardsPage />} />
       <Route path="/settings" element={<SettingsPage />} />
+      <Route path="/terms-conditions" element={<TermsConditions/>}/>
+      <Route path='/cancellation-refund' element={<CancellationPolicy/>}/>
+      <Route path='/privacy-policy' element={<PrivacyPolicy/>}/>
+      <Route path='/faqs' element={<Faq/>}/>
     </Routes>
   );
 };

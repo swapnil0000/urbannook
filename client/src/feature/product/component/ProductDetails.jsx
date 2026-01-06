@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
 // Sample product data (in real app, this would come from API)
@@ -62,6 +62,11 @@ const ProductDetails = () => {
   const [is3DView, setIs3DView] = useState(false);
 
   const product = productData[id] || productData[1];
+
+
+    useEffect(() => {
+        window.scrollTo(0, 0);
+      }, []);
 
   const tabs = [
     { id: 'description', label: 'Description', icon: 'fa-solid fa-file-text' },
