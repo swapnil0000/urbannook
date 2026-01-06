@@ -47,7 +47,7 @@ const AireHeroBanner = () => {
             </h1>
             
            <p className="fade-in-up animate-delay-200 text-lg md:text-xl text-stone-500 font-light max-w-lg mt-4">
-  Turn a house into your <span className="font-serif italic text-stone-800 text-2xl ml-1">Urban Nook.</span>
+  Turn a house into your <span className="font-serif italic text-white text-2xl ml-1">Urban Nook.</span>
 </p>
             {/* CTAs */}
             <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto pt-4">
