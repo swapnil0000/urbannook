@@ -62,7 +62,7 @@ const MyProfilePage = () => {
           <div className="md:col-span-4 bg-white rounded-[3rem] p-10 border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.04)] flex flex-col items-center text-center">
              <div className="relative mb-8 group cursor-pointer">
                 <div className="w-32 h-32 rounded-full bg-slate-900 flex items-center justify-center text-white font-serif text-4xl shadow-2xl relative z-10 border-4 border-white transition-transform group-hover:scale-105">
-                   {formData.name.charAt(0)}
+                   {formData?.name?.charAt(0)}
                 </div>
                 {/* Loyalty Tier Ring */}
                 <div className="absolute inset-[-8px] rounded-full border-2 border-dashed border-emerald-500/30 animate-spin-slow"></div>

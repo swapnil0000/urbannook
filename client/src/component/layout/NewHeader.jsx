@@ -125,9 +125,9 @@ const NewHeader = () => {
                     className="flex items-center gap-2 px-3 py-2 bg-white/20 backdrop-blur-sm rounded-full border border-white/30 hover:bg-white/30 hover:scale-105 transition-all duration-200 group"
                   >
                     <div className="w-6 h-6 bg-emerald-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                      {user.name.charAt(0).toUpperCase()}
+                      {user?.name?.charAt(0)?.toUpperCase()}
                     </div>
-                    <span className="hidden sm:inline text-gray-900 text-sm font-medium">{user.name.split(' ')[0]}</span>
+                    <span className="hidden sm:inline text-gray-900 text-sm font-medium">{user?.name?.split(' ')[0]}</span>
                     <i className="fa-solid fa-chevron-down text-xs text-gray-600"></i>
                   </button>
                   

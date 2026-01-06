@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import NewHeader from '../component/layout/NewHeader';
 import Footer from '../component/layout/Footer';
-// import { products } from '../data/products'; // Assuming you have this, but I will mock data below for the image update
+import { products as allProducts } from '../data/products';
 
 const AllProductsPage = () => {
   const navigate = useNavigate();
@@ -21,70 +21,7 @@ const AllProductsPage = () => {
     "md:col-span-6 h-[500px]"  
   ];
 
-  // MOCK DATA WITH NEW HIGH-QUALITY IMAGES
-  // Replace your imported 'products' with this or update your data file
-  const mockProducts = [
-    {
-        id: 1,
-        title: "The Lounge Chair 01",
-        category: "seating",
-        slug: "lounge-chair-01",
-        price: 45000,
-        image: "https://images.unsplash.com/photo-1567538096630-e0c55bd9450b?q=80&w=1000&auto=format&fit=crop", // Clean chair, minimalist studio
-        reviews: 124,
-        features: ["Ergonomic", "Oak Wood"]
-    },
-    {
-        id: 2,
-        title: "Ceramic Vase Set",
-        category: "decor",
-        slug: "ceramic-vase",
-        price: 4500,
-        image: "https://images.unsplash.com/photo-1578500494198-246f612d3b3d?q=80&w=1000&auto=format&fit=crop", // Artistic vase, soft light
-        reviews: 45,
-        features: ["Handcrafted", "Matte Finish"]
-    },
-    {
-        id: 3,
-        title: "Orbit Pendant Light",
-        category: "lighting",
-        slug: "orbit-pendant",
-        price: 12999,
-        image: "https://images.unsplash.com/photo-1513506003011-3b032f737104?q=80&w=1000&auto=format&fit=crop", // Warm lighting, modern lamp
-        reviews: 89,
-        features: ["Dimmable", "Brass"]
-    },
-    {
-        id: 4,
-        title: "Modular Sofa System",
-        category: "seating",
-        slug: "modular-sofa",
-        price: 85000,
-        image: "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?q=80&w=1000&auto=format&fit=crop", // Green velvet sofa, rich texture
-        reviews: 210,
-        features: ["Velvet", "Modular"]
-    },
-    {
-        id: 5,
-        title: "Minimalist Desk",
-        category: "tables",
-        slug: "minimalist-desk",
-        price: 32000,
-        image: "https://images.unsplash.com/photo-1518455027359-f3f8164ba6bd?q=80&w=1000&auto=format&fit=crop", // Clean desk setup
-        reviews: 67,
-        features: ["Solid Wood", "Cable Mgmt"]
-    },
-    {
-        id: 6,
-        title: "Abstract Art Piece",
-        category: "art",
-        slug: "abstract-art",
-        price: 15000,
-        image: "https://images.unsplash.com/photo-1582562124811-c8026933ca8b?q=80&w=1000&auto=format&fit=crop", // Abstract wall art
-        reviews: 32,
-        features: ["Original", "Canvas"]
-    }
-  ];
+  const mockProducts = allProducts;
 
   const displayProducts = useMemo(() => {
     let sorted = [...mockProducts]; // Using mockProducts for image demo

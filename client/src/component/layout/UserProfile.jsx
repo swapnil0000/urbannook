@@ -103,7 +103,7 @@ const UserProfile = ({ user, onLogout, onClose }) => {
         <div className="p-6 md:p-8 lg:p-6 bg-gradient-to-br from-emerald-50 to-slate-50 border-b border-slate-100">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 md:w-14 md:h-14 lg:w-12 lg:h-12 bg-slate-900 rounded-full flex items-center justify-center text-white font-serif text-xl md:text-2xl lg:text-xl shadow-lg ring-4 ring-white">
-              {user.name.charAt(0).toUpperCase()}
+              {user?.name?.charAt(0)?.toUpperCase()}
             </div>
             <div>
               <h3 className="font-bold text-slate-900 text-base md:text-lg lg:text-base leading-none mb-1">{user.name}</h3>
