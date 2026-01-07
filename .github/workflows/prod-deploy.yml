@@ -27,7 +27,16 @@ jobs:
           npm ci
           npm run build
 
-      # 4️⃣ Configure AWS credentials
+      # 4️⃣ Install server dependencies (optional but good)
+      - name: Install Server Dependencies
+        working-directory: server
+        run: npm ci
+
+      # =========================
+      # 🌍 FRONTEND → S3
+      # =========================
+
+      # 5️⃣ Configure AWS credentials
       - name: Configure AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -35,14 +44,55 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_S3_BUCKET_REGION }}
 
-      # 5️⃣ Upload to S3
-      - name: Deploy to S3
+      # 6️⃣ Upload client build to S3
+      - name: Deploy Frontend to S3
         run: |
           aws s3 sync client/dist/ s3://${{ secrets.S3_BUCKET }} --delete
 
-      # 6️⃣ Invalidate CloudFront cache (IMPORTANT)
+      # 7️⃣ Invalidate CloudFront cache
       - name: Invalidate CloudFront
         run: |
           aws cloudfront create-invalidation \
             --distribution-id ${{ secrets.CLOUDFRONT_DIST_ID }} \
             --paths "/*"
+
+      # =========================
+      # ⚙️ BACKEND → EC2
+      # =========================
+
+      # 8️⃣ Setup SSH
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.PROD_HOST }} >> ~/.ssh/known_hosts || true
+
+      # 9️⃣ Check EC2 availability
+      - name: Check Prod EC2 availability
+        run: |
+          echo "Checking Prod EC2..."
+          if ssh -o ConnectTimeout=5 ubuntu@${{ secrets.PROD_HOST }} "echo EC2 is running" >/dev/null 2>&1; then
+            echo "EC2_AVAILABLE=true" >> $GITHUB_ENV
+          else
+            echo "EC2_AVAILABLE=false" >> $GITHUB_ENV
+            echo "Prod EC2 is stopped. Deployment skipped."
+          fi
+
+      # 🔟 Upload server code to EC2
+      - name: Upload Server to EC2
+        if: env.EC2_AVAILABLE == 'true'
+        run: |
+          rsync -avz --delete \
+          server/ \
+          ubuntu@${{ secrets.PROD_HOST }}:/home/ubuntu/urbannook-prod/server/
+
+      # 1️⃣1️⃣ Restart PM2
+      - name: Restart Backend
+        if: env.EC2_AVAILABLE == 'true'
+        run: |
+          ssh ubuntu@${{ secrets.PROD_HOST }} << 'EOF'
+            cd /home/ubuntu/urbannook-prod/server
+            pm2 restart urbannook-prod || pm2 start src/server.js --name urbannook-prod
+            pm2 save
+          EOF
