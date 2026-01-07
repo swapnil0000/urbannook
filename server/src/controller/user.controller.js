@@ -17,6 +17,8 @@ const userLogin = async (req, res) => {
     const { userEmail, userPassword } = req.body;
     // field Missing , existing User and pass check
     let result = await loginService(userEmail, userPassword);
+    console.log(result);
+
     if (result?.statusCode >= 400) {
       return res.status(Number(result?.statusCode)).json(result);
     }
@@ -52,7 +54,28 @@ const userRegister = async (req, res) => {
       userPinCode,
       userMobileNumber,
     } = req.body;
+    const reservedNames = [
+      "admin",
+      "root",
+      "support",
+      "system",
+      "owner",
+      "urbannook",
+      "superuser",
+    ];
 
+    if (reservedNames.includes(userName.toLowerCase())) {
+      return res
+        .status(403)
+        .json(
+          new ApiError(
+            403,
+            `Oops 😅 ${userName} is a VIP name reserved for the system. Please pick something uniquely *you* — we promise we won’t steal it 😉`,
+            { userEmail, userName },
+            false
+          )
+        );
+    }
     //fieldMissing and existing User check
     let result = await registerService(
       userEmail,
@@ -473,13 +496,13 @@ const userForgetuserPassword = async (req, res) => {
     if (passCheck) {
       if (oldPassAndNewPassCompare)
         return res
-          .status(409)
+          .status(400)
           .json(
             new ApiRes(
-              200,
+              400,
               `Current userPassword and New userPassword is same for user - ${userEmail}`,
               userEmail,
-              true
+              false
             )
           );
     }
@@ -546,13 +569,13 @@ const userResetPassword = async (req, res) => {
     if (passCheck) {
       if (oldPassAndNewPassCompare)
         return res
-          .status(200)
+          .status(400)
           .json(
             new ApiRes(
-              200,
+              400,
               `Current userPassword and New userPassword is same for user - ${userEmail}`,
               userEmail,
-              true
+              false
             )
           );
     }

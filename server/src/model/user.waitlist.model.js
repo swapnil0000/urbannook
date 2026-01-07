@@ -1,5 +1,10 @@
 import mongoose from "mongoose";
 const userWaitListSchema = mongoose.Schema({
+  userName: {
+    type: String,
+    required: [true, "userName is required"],
+    unique: true,
+  },
   userEmail: {
     type: String,
     required: [true, "userEmail is required"],
