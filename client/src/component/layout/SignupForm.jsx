@@ -3,88 +3,62 @@ import { useOtpSentMutation, useRegisterMutation } from '../../store/api/authApi
 import { useUI } from '../../hooks/useRedux';
 import OTPVerification from './OTPVerification';
 
-const SignupForm = ({ onClose }) => {
+const SignupForm = ({ onClose, onSwitchToLogin }) => {
   const [formData, setFormData] = useState({
-    name: '', email: '', mobile: '', password: '', confirmPassword: '', address: '', pinCode: ''
+    name: '', 
+    email: '', 
+    mobile: '', 
+    password: '', 
+    confirmPassword: ''
   });
   const [showOTP, setShowOTP] = useState(false);
   const [errors, setErrors] = useState({});
-  
-  // Password visibility states
   const [showPwd, setShowPwd] = useState(false);
   const [showConfirmPwd, setShowConfirmPwd] = useState(false);
 
   const scrollContainerRef = useRef(null);
 
-  // API Hooks
   const [register, { isLoading: isRegistering }] = useRegisterMutation();
   const [otpSent, { isLoading: isSendingOtp }] = useOtpSentMutation();
-  
   const { showNotification } = useUI();
 
-  // Auto-scroll focused element into view
   const handleAutoScroll = (e) => {
-    e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Only scroll on mobile to avoid jarring movements on desktop
+    if (window.innerWidth < 768) {
+        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
   };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     let cleanValue = value;
 
-    // 1. Force Numeric only for Mobile and PinCode
-    if (name === 'mobile' || name === 'pinCode') {
-      cleanValue = value.replace(/\D/g, '');
-    }
-
-    // 2. Strict Mobile Logic: Must start with 6, 7, 8, or 9
+    if (name === 'mobile') cleanValue = value.replace(/\D/g, '');
     if (name === 'mobile' && cleanValue.length > 0) {
       if (!/^[6-9]/.test(cleanValue)) {
         setErrors(prev => ({ ...prev, mobile: 'Mobile number must start with 6-9' }));
-        return; // Prevent typing if invalid first digit
+        return; 
       }
     }
 
     setFormData({ ...formData, [name]: cleanValue });
-    
-    // Clear error when user types
-    if (errors[name]) {
-      setErrors({ ...errors, [name]: '' });
-    }
+    if (errors[name]) setErrors({ ...errors, [name]: '' });
   };
 
   const validateForm = () => {
     const newErrors = {};
-
-    // Name & Email
     if (!formData.name.trim()) newErrors.name = 'Full name is required';
-    if (!formData.email.trim()) newErrors.email = 'Email address is required';
+    if (!formData.email.trim()) newErrors.email = 'Email is required';
     else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Invalid email format';
 
-    // Mobile: 10 digits and starts with 6-9
-    if (!formData.mobile) {
-      newErrors.mobile = 'Mobile number is required';
-    } else if (formData.mobile.length !== 10) {
-      newErrors.mobile = 'Must be exactly 10 digits';
-    }
+    if (!formData.mobile) newErrors.mobile = 'Mobile number is required';
+    else if (formData.mobile.length !== 10) newErrors.mobile = 'Must be exactly 10 digits';
 
-    // Strong Password Validation
-    // Min 8 chars, 1 Uppercase, 1 Lowercase, 1 Number, 1 Special Char
     const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (!strongPasswordRegex.test(formData.password)) {
-      newErrors.password = 'Use 8+ chars with Uppercase, Lowercase, Number & Symbol';
-    }
+    if (!formData.password) newErrors.password = 'Password is required';
+    else if (!strongPasswordRegex.test(formData.password)) newErrors.password = '8+ chars, Upper, Lower, Number & Symbol';
 
-    // Confirm Password
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
-    }
-
-    // Address & Pin
-    if (!formData.address.trim()) newErrors.address = 'Address is required';
-    if (!formData.pinCode.trim()) newErrors.pinCode = 'Pin code is required';
-    else if (formData.pinCode.length !== 6) newErrors.pinCode = 'Must be 6 digits';
+    if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
 
     return newErrors;
   };
@@ -92,25 +66,19 @@ const SignupForm = ({ onClose }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const newErrors = validateForm();
-    
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      // Optional: scroll to the first error field
       return;
     }
 
     try {
-      // Step 1: Register User
       const result = await register({
         userName: formData.name,
         userEmail: formData.email,
         userPassword: formData.password,
-        userAddress: formData.address,
-        userPinCode: formData.pinCode,
         userMobileNumber: formData.mobile,
       }).unwrap();
 
-      // Step 2: Save metadata to Cookies & LocalStorage
       if (result.userAccessToken) {
         document.cookie = `userAccessToken=${result.userAccessToken}; path=/; max-age=2592000`;
       }
@@ -122,7 +90,6 @@ const SignupForm = ({ onClose }) => {
       };
       localStorage.setItem('user', JSON.stringify(userData));
 
-      // Step 3: Trigger OTP to Email
       try {
         const response = await otpSent({ userEmail: userData.email }).unwrap();
         if (response.success) {
@@ -130,20 +97,14 @@ const SignupForm = ({ onClose }) => {
           setShowOTP(true);
         }
       } catch (otpError) {
-        showNotification('Account created, but failed to send OTP. Please try Resend.',otpError);
-        setShowOTP(true);
+        showNotification('Account created, but OTP failed. Please login.');
+        onSwitchToLogin();
       }
 
     } catch (error) {
       showNotification(error.data?.message || 'Registration failed.');
       setErrors({ submit: error.data?.message || 'Registration failed' });
     }
-  };
-
-  // Final success handler passed to OTP component
-  const handleVerifySuccess = () => {
-    showNotification('Account verified successfully!');
-    onClose();
   };
 
   if (showOTP) {
@@ -153,134 +114,160 @@ const SignupForm = ({ onClose }) => {
         email={formData.email}
         onClose={onClose}
         onBack={() => setShowOTP(false)}
-        onSuccess={handleVerifySuccess}
+        onSuccess={() => { showNotification('Account verified!'); onClose(); }}
       />
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[100] p-2 md:p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[100] p-4" onClick={onClose}>
+      
+      {/* CHANGED: w-[96%] to make it wider on mobile.
+      */}
       <div 
-        className="bg-white rounded-[2rem] md:rounded-3xl w-full max-w-6xl shadow-2xl relative max-h-[92vh] md:max-h-[95vh] overflow-hidden flex flex-col md:flex-row animate-in fade-in zoom-in duration-300"
+        className="bg-white rounded-[2rem] w-[96%] md:w-full md:max-w-4xl shadow-2xl relative overflow-hidden flex flex-col md:flex-row animate-in fade-in zoom-in duration-300 max-h-[90vh] md:h-[650px]"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Left Branding - Hidden on Mobile */}
-        <div className="hidden lg:flex lg:w-5/12 bg-gradient-to-br from-emerald-600 to-emerald-800 p-12 flex-col justify-center items-center text-white relative">
-          <div className="relative z-10 text-center">
-            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <i className="fa-solid fa-leaf text-2xl"></i>
+        
+        {/* --- LEFT SIDE (Hidden on Mobile) --- */}
+        <div className="hidden md:flex w-5/12 bg-slate-900 p-10 flex-col justify-between relative overflow-hidden">
+            <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+            
+            <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-8">
+                    <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white">
+                        <i className="fa-solid fa-leaf text-lg"></i>
+                    </div>
+                    <span className="text-white font-serif text-xl">UrbanNook</span>
+                </div>
+                
+                <h2 className="text-3xl font-serif text-white mb-6 leading-tight">
+                    Design your <br/>
+                    <span className="italic text-emerald-500">dream space.</span>
+                </h2>
+
+                <ul className="space-y-5">
+                    {[
+                        { icon: 'fa-truck-fast', text: 'Free Shipping on first order' },
+                        { icon: 'fa-shield-heart', text: 'Secure checkout guaranteed' },
+                        { icon: 'fa-star', text: 'Access exclusive collections' },
+                    ].map((item, idx) => (
+                        <li key={idx} className="flex items-center gap-4 text-slate-300 text-sm">
+                            <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+                                <i className={`fa-solid ${item.icon} text-emerald-400 text-xs`}></i>
+                            </div>
+                            {item.text}
+                        </li>
+                    ))}
+                </ul>
             </div>
-            <h1 className="text-3xl font-serif mb-4">UrbanNook</h1>
-            <p className="text-emerald-100 text-sm">Join our community for sustainable living.</p>
-          </div>
+
+            <div className="relative z-10">
+                <p className="text-xs text-slate-500 leading-relaxed">
+                    By creating an account, you agree to our <span className="text-slate-300 underline cursor-pointer">Terms</span> and <span className="text-slate-300 underline cursor-pointer">Privacy Policy</span>.
+                </p>
+            </div>
         </div>
 
-        {/* Form Section */}
-        <div ref={scrollContainerRef} className="w-full lg:w-7/12 overflow-y-auto px-6 py-8 md:p-12">
-          <button className="absolute top-6 right-6 text-slate-400 hover:text-slate-900" onClick={onClose}>
-            <i className="fa-solid fa-xmark text-xl"></i>
+        {/* --- RIGHT SIDE (Scrollable Form Area) --- */}
+        <div ref={scrollContainerRef} className="w-full md:w-7/12 overflow-y-auto px-6 py-8 md:px-12 md:py-10 relative bg-white">
+          <button className="absolute top-4 right-4 md:top-6 md:right-6 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:text-slate-900 transition-colors z-20" onClick={onClose}>
+            <i className="fa-solid fa-xmark"></i>
           </button>
 
-          <div className="max-w-xl mx-auto">
-            <div className="text-center mb-8">
-              <h2 className="text-3xl font-serif text-slate-900 mb-1">Create Account</h2>
-              <p className="text-slate-400 text-xs uppercase tracking-widest font-bold">Safe & Secure Registration</p>
+          <div className="max-w-md mx-auto h-full flex flex-col justify-center">
+            <div className="mb-2.5 md:mb-5 text-center md:text-left mt-2 md:mt-0">
+              <h2 className="text-2xl md:text-3xl font-serif text-slate-900 mb-1">Create Account</h2>
+              <p className="text-slate-500 text-xs md:text-sm">Join us for a curated shopping experience.</p>
             </div>
 
-            <form className="space-y-4" onSubmit={handleSubmit}>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <form className="space-y-3 md:space-y-4" onSubmit={handleSubmit}>
+              
+              {/* Name & Email */}
+              <div className="space-y-3">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Full Name</label>
+                  <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Full Name</label>
                   <input
                     type="text" name="name" value={formData.name} onChange={handleInputChange} onFocus={handleAutoScroll}
-                    className={`w-full p-4 bg-slate-50 border rounded-2xl text-sm focus:border-emerald-500 outline-none ${errors.name ? 'border-red-400' : 'border-slate-200'}`}
-                    placeholder="Enter full name"
+                    className={`w-full p-2.5 md:p-4 bg-slate-50 border rounded-2xl text-sm focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all ${errors.name ? 'border-red-400' : 'border-slate-200'}`}
+                    placeholder="John Doe"
                   />
-                  {errors.name && <p className="text-[10px] text-red-500 ml-2">{errors.name}</p>}
+                  {errors.name && <p className="text-[10px] text-red-500 ml-2 font-bold">{errors.name}</p>}
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Email</label>
+                  <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Email Address</label>
                   <input
                     type="email" name="email" value={formData.email} onChange={handleInputChange} onFocus={handleAutoScroll}
-                    className={`w-full p-4 bg-slate-50 border rounded-2xl text-sm focus:border-emerald-500 outline-none ${errors.email ? 'border-red-400' : 'border-slate-200'}`}
-                    placeholder="email@example.com"
+                    className={`w-full p-2.5 md:p-4 bg-slate-50 border rounded-2xl text-sm focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all ${errors.email ? 'border-red-400' : 'border-slate-200'}`}
+                    placeholder="john@example.com"
                   />
-                  {errors.email && <p className="text-[10px] text-red-500 ml-2">{errors.email}</p>}
+                  {errors.email && <p className="text-[10px] text-red-500 ml-2 font-bold">{errors.email}</p>}
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Mobile</label>
+              {/* Mobile */}
+              <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Mobile Number</label>
                   <input
                     type="tel" name="mobile" value={formData.mobile} onChange={handleInputChange} onFocus={handleAutoScroll} maxLength="10"
-                    className={`w-full p-4 bg-slate-50 border rounded-2xl text-sm focus:border-emerald-500 outline-none ${errors.mobile ? 'border-red-400' : 'border-slate-200'}`}
-                    placeholder="Starts with 6-9"
+                    className={`w-full p-2.5 md:p-4 bg-slate-50 border rounded-2xl text-sm focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all ${errors.mobile ? 'border-red-400' : 'border-slate-200'}`}
+                    placeholder="9876543210"
                   />
-                  {errors.mobile && <p className="text-[10px] text-red-500 ml-2">{errors.mobile}</p>}
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Pin Code</label>
-                  <input
-                    type="text" name="pinCode" value={formData.pinCode} onChange={handleInputChange} onFocus={handleAutoScroll} maxLength="6"
-                    className={`w-full p-4 bg-slate-50 border rounded-2xl text-sm focus:border-emerald-500 outline-none ${errors.pinCode ? 'border-red-400' : 'border-slate-200'}`}
-                    placeholder="6-digit code"
-                  />
-                </div>
+                  {errors.mobile && <p className="text-[10px] text-red-500 ml-2 font-bold">{errors.mobile}</p>}
               </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Full Address</label>
-                <input
-                  type="text" name="address" value={formData.address} onChange={handleInputChange} onFocus={handleAutoScroll}
-                  className={`w-full p-4 bg-slate-50 border rounded-2xl text-sm focus:border-emerald-500 outline-none ${errors.address ? 'border-red-400' : 'border-slate-200'}`}
-                  placeholder="Street name, Area, Landmark"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Passwords Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Password</label>
+                  <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Password</label>
                   <div className="relative">
                     <input
-                      type={showPwd ? "text" : "password"}
-                       name="password" 
-                       value={formData.password} 
-                       onChange={handleInputChange}
-                       placeholder='**********'
-                      className={`w-full p-4 bg-slate-50 border rounded-2xl text-sm pr-12 outline-none ${errors.password ? 'border-red-400' : 'border-slate-200'}`}
+                      type={showPwd ? "text" : "password"} name="password" value={formData.password} onChange={handleInputChange} onFocus={handleAutoScroll}
+                       placeholder='••••••••'
+                      className={`w-full p-2.5 md:p-4 bg-slate-50 border rounded-2xl text-sm pr-10 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all ${errors.password ? 'border-red-400' : 'border-slate-200'}`}
                     />
-                    <button type="button" onClick={() => setShowPwd(!showPwd)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-emerald-600">
-                      <i className={`fa-solid ${showPwd ? 'fa-eye-slash' : 'fa-eye'} text-sm`}></i>
+                    <button type="button" onClick={() => setShowPwd(!showPwd)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-emerald-600 p-1">
+                      <i className={`fa-solid ${showPwd ? 'fa-eye-slash' : 'fa-eye'} text-xs`}></i>
                     </button>
                   </div>
-                  {errors.password && <p className="text-[10px] text-red-500 leading-tight ml-2">{errors.password}</p>}
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Confirm Password</label>
+                  <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Confirm</label>
                   <div className="relative">
                     <input
-                      type={showConfirmPwd ? "text" : "password"} name="confirmPassword" value={formData.confirmPassword} onChange={handleInputChange}
-                      placeholder='**********'
-                      className={`w-full p-4 bg-slate-50 border rounded-2xl text-sm pr-12 outline-none ${errors.confirmPassword ? 'border-red-400' : 'border-slate-200'}`}
+                      type={showConfirmPwd ? "text" : "password"} name="confirmPassword" value={formData.confirmPassword} onChange={handleInputChange} onFocus={handleAutoScroll}
+                      placeholder='••••••••'
+                      className={`w-full p-2.5 md:p-4 bg-slate-50 border rounded-2xl text-sm pr-10 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all ${errors.confirmPassword ? 'border-red-400' : 'border-slate-200'}`}
                     />
-                    <button type="button" onClick={() => setShowConfirmPwd(!showConfirmPwd)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-emerald-600">
-                      <i className={`fa-solid ${showConfirmPwd ? 'fa-eye-slash' : 'fa-eye'} text-sm`}></i>
+                    <button type="button" onClick={() => setShowConfirmPwd(!showConfirmPwd)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-emerald-600 p-1">
+                      <i className={`fa-solid ${showConfirmPwd ? 'fa-eye-slash' : 'fa-eye'} text-xs`}></i>
                     </button>
                   </div>
-                  {errors.confirmPassword && <p className="text-[10px] text-red-500 ml-2">{errors.confirmPassword}</p>}
                 </div>
               </div>
+              
+              {(errors.password || errors.confirmPassword) && (
+                 <p className="text-[10px] text-red-500 font-bold text-center mt-1">
+                    {errors.password || errors.confirmPassword}
+                 </p>
+              )}
 
               <button
                 type="submit" disabled={isRegistering || isSendingOtp}
-                className="w-full h-12 bg-emerald-600 text-white rounded-2xl font-bold uppercase tracking-widest text-xs hover:bg-emerald-700 transition-all shadow-xl disabled:opacity-50 mt-4"
+                className="w-full py-3 md:py-4 bg-emerald-600 text-white rounded-2xl font-bold uppercase tracking-widest text-xs hover:bg-emerald-700 transition-all shadow-lg active:scale-[0.98] mt-4 md:mt-6 disabled:opacity-50"
               >
-                {isRegistering || isSendingOtp ? 'Please wait...' : 'Create Account'}
+                {isRegistering || isSendingOtp ? 'Processing...' : 'Sign Up'}
               </button>
+
+              {/* CHANGED: Combined onto one line with ml-1 */}
+              <div className="text-xs text-slate-500 mt-4 md:mt-6 pb-2">
+                Already have an account?{' '}
+                <span onClick={onSwitchToLogin} className="text-emerald-700 font-bold cursor-pointer underline ">
+                    Login
+                </span>
+              </div>
             </form>
           </div>
         </div>

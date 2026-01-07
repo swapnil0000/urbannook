@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth, useUI } from '../../hooks/useRedux';
 import { useLogoutMutation } from '../../store/api/authApi';
 
@@ -9,10 +10,14 @@ const UserProfile = ({ user, onLogout, onClose }) => {
   const { showNotification } = useUI();
   const [logoutApi, { isLoading: isLoggingOut }] = useLogoutMutation();
 
+  // Close when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
+      // Check if click is outside the dropdown AND not inside the logout modal
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        onClose();
+        if (!document.getElementById('logout-modal')?.contains(event.target)) {
+            onClose();
+        }
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -20,175 +25,165 @@ const UserProfile = ({ user, onLogout, onClose }) => {
   }, [onClose]);
 
   const menuItems = [
-    { icon: 'fa-user', label: 'My Profile', action: () => window.location.href = '/my-profile' },
-    { icon: 'fa-shopping-bag', label: 'My Orders', action: () => window.location.href = '/my-orders' },
-    { icon: 'fa-heart', label: 'Wishlist', action: () => window.location.href = '/wishlist' },
-    { icon: 'fa-headset', label: 'Customer Support', action: () => window.location.href = '/customer-support' },
-    { icon: 'fa-gift', label: 'Rewards', action: () => window.location.href = '/rewards' },
-    { icon: 'fa-cog', label: 'Settings', action: () => window.location.href = '/settings' },
+    { icon: 'fa-user', label: 'My Profile', desc: 'Manage your account', action: () => window.location.href = '/my-profile' },
+    { icon: 'fa-box-open', label: 'My Orders', desc: 'Track & History', action: () => window.location.href = '/my-orders' },
+    { icon: 'fa-heart', label: 'Wishlist', desc: 'Saved Items', action: () => window.location.href = '/wishlist' },
+    { icon: 'fa-life-ring', label: 'Support', desc: 'Get Help', action: () => window.location.href = '/customer-support' },
   ];
 
   const handleLogout = async (e) => {
     e.preventDefault();
     e.stopPropagation();
     
-    console.log("handleLogout called");
-    
-    // Get token from cookie
-    const getCookie = (name) => {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop().split(';').shift();
-    };
-    
-    const token = getCookie('userAccessToken');
-    console.log("Token from cookie:", token);
-    
     try {
-      console.log("Calling logout API...");
-      const result = await logoutApi().unwrap();
-      console.log("Logout API success:", result);
+      await logoutApi().unwrap();
       showNotification('Logged out successfully!');
     } catch (error) {
-      console.warn('Logout API failed, logging out locally:', error);
+      console.warn('Logout API failed, forcing local logout.');
       showNotification('Logged out successfully!');
     } finally {
-      console.log("Cleaning up local state...");
-      
-      // Clear cookie
       document.cookie = 'userAccessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-      
-      // Clear Redux state
       logout();
-      
-      // Clear localStorage
       localStorage.removeItem('user');
-      
       onLogout();
       onClose();
-      setShowLogoutConfirm(false);
     }
   };
 
-  return (
+  // 1. USE PORTAL: Renders component outside of the Header div to fix positioning
+  return createPortal(
     <>
       <style>{`
         @keyframes slideUp {
-          from { transform: translateY(100%); }
-          to { transform: translateY(0); }
+          from { transform: translateY(100%); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
         }
-        @keyframes popIn {
-          0% { transform: scale(0.9); opacity: 0; }
-          100% { transform: scale(1); opacity: 1; }
+        @keyframes scaleIn {
+          from { transform: scale(0.95); opacity: 0; }
+          to { transform: scale(1); opacity: 1; }
         }
-        .animate-slide-up { animation: slideUp 0.4s cubic-bezier(0.23, 1, 0.32, 1) forwards; }
-        .animate-pop { animation: popIn 0.3s cubic-bezier(0.23, 1, 0.32, 1) forwards; }
+        .animate-sheet { animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .animate-modal { animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
       `}</style>
 
-      {/* MOBILE BACKDROP (Mweb only) */}
-      <div className="lg:hidden fixed inset-0   z-[90]" onClick={onClose} />
+      {/* --- BACKDROP --- */}
+      <div 
+        className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[99998] lg:bg-transparent lg:backdrop-blur-none transition-all"
+        onClick={onClose}
+      />
 
-      {/* MENU CONTAINER: Dropdown (Desktop) / Bottom Sheet (Mobile) */}
+      {/* --- MAIN MENU CONTAINER --- */}
       <div 
         ref={dropdownRef} 
-        className="fixed bottom-0 left-0 right-0 lg:absolute lg:bottom-auto lg:top-full lg:right-0 lg:left-auto lg:mt-4 
-                   w-full lg:w-72 bg-white rounded-t-[2.5rem] lg:rounded-[2.5rem] shadow-[0_-10px_40px_rgba(0,0,0,0.1)] 
-                   lg:shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-t lg:border border-slate-100 z-[100] 
-                   animate-slide-up lg:animate-in lg:fade-in lg:slide-in-from-top-2 overflow-hidden"
+        className={`
+            fixed z-[99999] bg-white overflow-hidden
+            
+            /* Mobile Styles (Bottom Sheet) */
+            bottom-0 left-0 right-0 
+            rounded-t-[2.5rem] 
+            shadow-[0_-10px_60px_-10px_rgba(0,0,0,0.2)]
+            animate-sheet
+
+            /* Desktop Styles (Floating Dropdown) */
+            lg:bottom-auto lg:left-auto 
+            lg:top-20 lg:right-10 
+            lg:w-[360px] 
+            lg:rounded-[2rem] 
+            lg:shadow-2xl
+            lg:animate-none 
+            lg:origin-top-right
+        `}
       >
-        {/* Drag Handle (Mweb only) */}
-        <div className="lg:hidden w-12 h-1 bg-slate-200 rounded-full mx-auto mt-4 mb-2" />
+        {/* Mobile Drag Handle */}
+        <div className="lg:hidden w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-4 mb-2" />
 
-        {/* User Info Header */}
-        <div className="p-6 md:p-8 lg:p-6 bg-gradient-to-br from-emerald-50 to-slate-50 border-b border-slate-100">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 md:w-14 md:h-14 lg:w-12 lg:h-12 bg-slate-900 rounded-full flex items-center justify-center text-white font-serif text-xl md:text-2xl lg:text-xl shadow-lg ring-4 ring-white">
-              {user?.name?.charAt(0)?.toUpperCase()}
+        {/* Header Section */}
+        <div className="p-6 bg-gradient-to-br from-slate-50 to-white border-b border-slate-100">
+            <div className="flex items-center gap-5">
+                <div className="relative">
+                    <div className="w-14 h-14 bg-slate-900 rounded-2xl flex items-center justify-center text-white font-serif text-xl shadow-lg rotate-3">
+                        {user?.name?.charAt(0)?.toUpperCase()}
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 border-2 border-white rounded-full"></div>
+                </div>
+                <div>
+                    <h3 className="font-serif text-xl text-slate-900 leading-none mb-1.5">{user.name}</h3>
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{user.email}</p>
+                </div>
             </div>
-            <div>
-              <h3 className="font-bold text-slate-900 text-base md:text-lg lg:text-base leading-none mb-1">{user.name}</h3>
-              <p className="text-[10px] md:text-xs lg:text-[10px] font-bold text-emerald-700 uppercase tracking-widest">{user.email}</p>
-            </div>
-          </div>
         </div>
 
-        {/* Menu Items: Optimized Hit Areas */}
-        <div className="p-4 md:p-6 lg:p-3 max-h-[60vh] lg:max-h-none overflow-y-auto">
-          {menuItems.map((item, index) => (
+        {/* Menu Items Grid */}
+        <div className="p-4 grid gap-2 max-h-[50vh] overflow-y-auto lg:max-h-none">
+            {menuItems.map((item, index) => (
+                <button
+                    key={index}
+                    onClick={item.action}
+                    className="flex items-center gap-4 p-4 rounded-2xl hover:bg-slate-50 transition-all group active:scale-[0.98]"
+                >
+                    <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 shadow-sm group-hover:border-emerald-500/30 group-hover:text-emerald-600 transition-colors">
+                        <i className={`fa-solid ${item.icon} text-sm`}></i>
+                    </div>
+                    <div className="text-left">
+                        <p className="text-sm font-bold text-slate-700 group-hover:text-slate-900">{item.label}</p>
+                        <p className="text-[10px] text-slate-400 font-medium">{item.desc}</p>
+                    </div>
+                    <i className="fa-solid fa-chevron-right ml-auto text-[10px] text-slate-300 group-hover:text-emerald-500 group-hover:translate-x-1 transition-all"></i>
+                </button>
+            ))}
+        </div>
+
+        {/* Footer Actions */}
+        <div className="p-4 border-t border-slate-100 bg-slate-50/50">
             <button
-              key={index}
-              onClick={item.action}
-              className="w-full flex items-center gap-4 px-4 py-4 lg:py-3 text-left hover:bg-slate-50 transition-all rounded-2xl group active:bg-slate-100"
+                onClick={() => setShowLogoutConfirm(true)}
+                className="w-full flex items-center justify-center gap-2 py-4 rounded-xl text-red-600 hover:bg-red-50 font-bold text-xs uppercase tracking-widest transition-all"
             >
-              <div className="w-10 h-10 md:w-11 md:h-11 lg:w-9 lg:h-9 bg-slate-100 rounded-xl flex items-center justify-center group-hover:bg-white group-hover:shadow-sm transition-all">
-                <i className={`fa-solid ${item.icon} text-slate-500 text-xs md:text-sm lg:text-xs group-hover:text-emerald-700`}></i>
-              </div>
-              <span className="text-slate-700 font-bold text-sm md:text-base lg:text-sm tracking-tight">{item.label}</span>
+                <i className="fa-solid fa-arrow-right-from-bracket"></i>
+                Sign Out
             </button>
-          ))}
-        </div>
-
-        {/* Logout Section */}
-        <div className="border-t border-slate-100 p-4 md:p-6 lg:p-3 mb-4 lg:mb-0">
-          <button
-            onClick={() => setShowLogoutConfirm(true)}
-            className="w-full flex items-center gap-4 px-4 py-4 lg:py-3 text-left hover:bg-red-50 transition-all rounded-2xl group active:bg-red-100/50"
-          >
-            <div className="w-10 h-10 lg:w-9 lg:h-9 bg-red-100/50 rounded-xl flex items-center justify-center">
-              <i className="fa-solid fa-arrow-right-from-bracket text-red-600 text-xs md:text-sm lg:text-xs"></i>
-            </div>
-            <span className="text-red-600 font-bold text-sm md:text-base lg:text-sm tracking-tight">Logout Account</span>
-          </button>
         </div>
       </div>
 
-      {/* RESPONSIVE LOGOUT CONFIRMATION MODAL */}
+      {/* --- LOGOUT CONFIRMATION MODAL --- */}
       {showLogoutConfirm && (
         <div 
-          className="h-[100vh] fixed inset-0 flex items-center justify-center z-[9999] p-4 bg-black/50"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) {
-              setShowLogoutConfirm(false);
-            }
-          }}
+          id="logout-modal"
+          className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+          onClick={(e) => e.stopPropagation()} 
         >
-          <div 
-            className="bg-white rounded-[3rem] p-8 md:p-14 lg:p-12 w-full max-w-[440px] shadow-2xl relative animate-pop" 
-            onMouseDown={(e) => e.stopPropagation()}
-            style={{ transform: 'translate(0, 0)' }}
-          >
-            <div className="flex  flex-col items-center text-center">
-              <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mb-8 ring-8 ring-red-50/50">
-                <i className="fa-solid fa-door-open text-red-600 text-3xl"></i>
-              </div>
+          <div className="bg-white rounded-[3rem] p-10 w-full max-w-sm text-center shadow-2xl animate-modal relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-red-50 to-transparent -z-10"></div>
 
-              <h3 className=" text-3xl md:text-4xl font-serif text-slate-900 mb-3 tracking-tight">
-                Leaving so <span className="italic font-light text-red-600">Soon?</span>
-              </h3>
-              <p className="text-slate-500 text-sm md:text-base leading-relaxed mb-10 max-w-[300px]">
-                Are you sure you want to end your session? We'll miss your presence at Urban Nook.
-              </p>
+            <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl border border-red-50">
+                <i className="fa-solid fa-power-off text-red-500 text-3xl"></i>
+            </div>
 
-              <div className="flex flex-col w-full gap-3">
+            <h3 className="text-3xl font-serif text-slate-900 mb-3">Sign Out?</h3>
+            <p className="text-slate-500 text-sm mb-8 leading-relaxed px-4">
+                You'll need to log back in to access your wishlist and orders.
+            </p>
+
+            <div className="space-y-3">
                 <button
-                  onMouseDown={handleLogout}
-                  disabled={isLoggingOut}
-                  className="w-full py-5 bg-red-600 text-white rounded-2xl font-bold text-xs uppercase tracking-[0.2em] hover:bg-red-700 transition-all shadow-xl active:scale-95 disabled:opacity-50"
+                    onClick={handleLogout}
+                    disabled={isLoggingOut}
+                    className="w-full py-4 bg-red-600 text-white rounded-2xl font-bold uppercase tracking-widest text-xs hover:bg-red-700 transition-all shadow-lg shadow-red-200 active:scale-[0.98]"
                 >
-                  {isLoggingOut ? 'Logging out...' : 'Confirm Logout'}
+                    {isLoggingOut ? 'Signing out...' : 'Confirm Logout'}
                 </button>
                 <button
-                  onClick={() => setShowLogoutConfirm(false)}
-                  className="w-full py-5 bg-transparent text-slate-400 rounded-2xl font-bold text-xs uppercase tracking-[0.2em] hover:text-slate-900 transition-all"
+                    onClick={() => setShowLogoutConfirm(false)}
+                    className="w-full py-4 bg-white text-slate-500 rounded-2xl font-bold uppercase tracking-widest text-xs border border-slate-100 hover:bg-slate-50 transition-all"
                 >
-                  Stay with us
+                    Cancel
                 </button>
-              </div>
             </div>
           </div>
         </div>
       )}
-    </>
+    </>,
+    document.body // 2. RENDER IN BODY TO FIX CSS TRANSFORM BUG
   );
 };
 

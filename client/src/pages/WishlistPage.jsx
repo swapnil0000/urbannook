@@ -1,36 +1,50 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import Footer from '../component/layout/Footer';
+import NewHeader from '../component/layout/NewHeader';
 
 const WishlistPage = () => {
    useEffect(() => {
       window.scrollTo(0, 0);
     }, []);
+
+  const navigate = useNavigate();
+
+  // Mock Data (Replace with real data source)
   const [wishlistItems, setWishlistItems] = useState([
     {
       id: 1,
       name: 'Modern Sectional Sofa',
       price: 45999,
       originalPrice: 52999,
-      image: '/api/placeholder/300/200',
+      // Using Unsplash image for demo match
+      image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?q=80&w=1000&auto=format&fit=crop',
       inStock: true,
-      rating: 4.5
+      rating: 4.5,
+      category: 'seating',
+      slug: 'modern-sectional-sofa'
     },
     {
       id: 2,
       name: 'Wooden Dining Table',
       price: 18999,
       originalPrice: 22999,
-      image: '/api/placeholder/300/200',
+      image: 'https://images.unsplash.com/photo-1617806118233-18e1de247200?q=80&w=1000&auto=format&fit=crop',
       inStock: false,
-      rating: 4.2
+      rating: 4.2,
+      category: 'tables',
+      slug: 'wooden-dining-table'
     },
     {
       id: 3,
       name: 'Luxury Bed Frame',
       price: 32999,
       originalPrice: 38999,
-      image: '/api/placeholder/300/200',
+      image: 'https://images.unsplash.com/photo-1505693416388-b0346efee535?q=80&w=1000&auto=format&fit=crop',
       inStock: true,
-      rating: 4.8
+      rating: 4.8,
+      category: 'bedroom',
+      slug: 'luxury-bed-frame'
     }
   ]);
 
@@ -40,112 +54,149 @@ const WishlistPage = () => {
 
   const addToCart = (item) => {
     console.log('Adding to cart:', item);
-    // Add to cart logic
+    // Add logic to add to cart
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-pink-500 to-rose-500 p-6 text-white">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
-              <i className="fa-solid fa-heart text-2xl"></i>
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold">My Wishlist</h1>
-              <p className="text-pink-100">{wishlistItems.length} items saved for later</p>
-            </div>
-          </div>
-        </div>
+    <div className="bg-[#0a1a13] min-h-screen font-sans text-gray-300 selection:bg-emerald-500 selection:text-white">
+      <NewHeader />
 
-        {/* Wishlist Content */}
-        <div className="p-6">
+      {/* --- HERO SECTION --- */}
+      <section className="pt-40 pb-16 px-6 relative overflow-hidden">
+        {/* Ambient Glows */}
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[120px] pointer-events-none"></div>
+        
+        <div className="max-w-7xl mx-auto border-b border-white/10 pb-12 relative z-10 flex flex-col md:flex-row items-end justify-between gap-8">
+            <div>
+                <span className="inline-block px-3 py-1 mb-6 text-[10px] font-bold tracking-[0.3em] text-emerald-400 uppercase bg-white/5 border border-white/10 rounded-full">
+                    Saved Items
+                </span>
+                <h1 className="text-5xl md:text-7xl font-serif text-white leading-[0.9] mb-4">
+                    Your Curated <br />
+                    <span className="italic font-light text-emerald-500">Collection.</span>
+                </h1>
+                <p className="text-gray-400 font-light max-w-md text-sm md:text-base">
+                    Pieces you love, saved for when the moment is right.
+                </p>
+            </div>
+            
+            <div className="flex items-center gap-4 text-sm font-bold uppercase tracking-widest text-white/50">
+                <i className="fa-solid fa-heart text-emerald-500"></i>
+                <span>{wishlistItems.length} Items</span>
+            </div>
+        </div>
+      </section>
+
+      {/* --- WISHLIST GRID --- */}
+      <section className="px-6 pb-32">
+        <div className="max-w-7xl mx-auto">
+          
           {wishlistItems.length === 0 ? (
-            <div className="text-center py-12">
-              <i className="fa-solid fa-heart text-6xl text-gray-300 mb-4"></i>
-              <h3 className="text-xl font-semibold text-gray-600 mb-2">Your Wishlist is Empty</h3>
-              <p className="text-gray-500 mb-6">Save items you love to buy them later</p>
-              <button className="px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors">
-                Start Shopping
-              </button>
+            // EMPTY STATE
+            <div className="flex flex-col items-center justify-center py-20 text-center opacity-60">
+                <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mb-6">
+                    <i className="fa-regular fa-heart text-4xl text-emerald-500/50"></i>
+                </div>
+                <h3 className="text-3xl font-serif text-white mb-2">Your collection is empty</h3>
+                <p className="text-gray-400 mb-8 max-w-sm">Start exploring our curated pieces to build your dream space.</p>
+                <button 
+                    onClick={() => navigate('/products')}
+                    className="px-8 py-3 bg-white text-[#0a1a13] rounded-full font-bold uppercase tracking-widest text-xs hover:bg-emerald-500 hover:text-white transition-all"
+                >
+                    Explore Products
+                </button>
             </div>
           ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            // GRID STATE
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {wishlistItems.map((item) => (
-                <div key={item.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-shadow">
-                  {/* Product Image */}
-                  <div className="relative">
+                <div key={item.id} className="group relative bg-[#0f251b] rounded-[2rem] overflow-hidden border border-white/5 hover:border-emerald-500/30 transition-all duration-500">
+                  
+                  {/* Image Container */}
+                  <div className="relative aspect-[4/5] overflow-hidden">
                     <img 
                       src={item.image} 
                       alt={item.name}
-                      className="w-full h-48 object-cover"
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-80 group-hover:opacity-100"
                     />
+                    
+                    {/* Gradient Overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0f251b] via-transparent to-transparent opacity-90"></div>
+
+                    {/* Stock Badge */}
+                    {!item.inStock && (
+                        <div className="absolute top-4 left-4 bg-red-500/90 backdrop-blur-sm text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full">
+                            Sold Out
+                        </div>
+                    )}
+
+                    {/* Remove Button (Top Right) */}
                     <button
                       onClick={() => removeFromWishlist(item.id)}
-                      className="absolute top-3 right-3 w-8 h-8 bg-white/90 rounded-full flex items-center justify-center text-red-500 hover:bg-white transition-colors"
+                      className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-black/40 hover:bg-red-500 backdrop-blur-md text-white transition-colors duration-300 z-20 group/btn"
                     >
-                      <i className="fa-solid fa-heart text-sm"></i>
+                      <i className="fa-solid fa-xmark text-sm group-hover/btn:rotate-90 transition-transform"></i>
                     </button>
-                    {!item.inStock && (
-                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                        <span className="bg-red-600 text-white px-3 py-1 rounded-full text-sm font-medium">
-                          Out of Stock
-                        </span>
-                      </div>
-                    )}
                   </div>
 
-                  {/* Product Info */}
-                  <div className="p-4">
-                    <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{item.name}</h3>
-                    
-                    {/* Rating */}
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="flex text-yellow-400">
-                        {[...Array(5)].map((_, i) => (
-                          <i key={i} className={`fa-solid fa-star text-xs ${i < Math.floor(item.rating) ? '' : 'text-gray-300'}`}></i>
-                        ))}
-                      </div>
-                      <span className="text-sm text-gray-600">({item.rating})</span>
-                    </div>
+                  {/* Content Container (Floats over image bottom) */}
+                  <div className="absolute bottom-0 left-0 w-full p-6 md:p-8">
+                    <div className="transform translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
+                        
+                        {/* Rating */}
+                        <div className="flex items-center gap-2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-75">
+                            <div className="flex text-emerald-400 text-[9px] gap-0.5">
+                                {[...Array(5)].map((_, i) => (
+                                    <i key={i} className={`fa-solid fa-star ${i < Math.floor(item.rating) ? '' : 'text-gray-600'}`}></i>
+                                ))}
+                            </div>
+                            <span className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Top Rated</span>
+                        </div>
 
-                    {/* Price */}
-                    <div className="flex items-center gap-2 mb-4">
-                      <span className="text-lg font-bold text-emerald-600">₹{item.price.toLocaleString()}</span>
-                      <span className="text-sm text-gray-500 line-through">₹{item.originalPrice.toLocaleString()}</span>
-                      <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                        {Math.round((1 - item.price / item.originalPrice) * 100)}% OFF
-                      </span>
-                    </div>
+                        {/* Title & Price */}
+                        <div className="flex justify-between items-end mb-6">
+                            <div>
+                                <h3 className="text-2xl font-serif text-white leading-tight mb-1">{item.name}</h3>
+                                <p className="text-xs font-bold uppercase tracking-widest text-gray-500">
+                                    {item.category}
+                                </p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-xl font-light text-emerald-400">₹{item.price.toLocaleString()}</p>
+                                <p className="text-xs text-gray-600 line-through decoration-emerald-900">₹{item.originalPrice.toLocaleString()}</p>
+                            </div>
+                        </div>
 
-                    {/* Actions */}
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => addToCart(item)}
-                        disabled={!item.inStock}
-                        className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
-                          item.inStock 
-                            ? 'bg-emerald-600 text-white hover:bg-emerald-700' 
-                            : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                        }`}
-                      >
-                        {item.inStock ? 'Add to Cart' : 'Out of Stock'}
-                      </button>
-                      <button
-                        onClick={() => removeFromWishlist(item.id)}
-                        className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                      >
-                        <i className="fa-solid fa-trash text-red-500"></i>
-                      </button>
+                        {/* Add to Cart Button */}
+                        <button
+                            onClick={() => addToCart(item)}
+                            disabled={!item.inStock}
+                            className={`w-full py-4 rounded-xl font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-3 transition-all duration-300 ${
+                                item.inStock 
+                                ? 'bg-white text-[#0a1a13] hover:bg-emerald-500 hover:text-white shadow-lg' 
+                                : 'bg-white/10 text-gray-500 cursor-not-allowed'
+                            }`}
+                        >
+                            {item.inStock ? (
+                                <>
+                                    <span>Add to Cart</span>
+                                    <i className="fa-solid fa-arrow-right"></i>
+                                </>
+                            ) : (
+                                <span>Restocking Soon</span>
+                            )}
+                        </button>
                     </div>
                   </div>
+
                 </div>
               ))}
             </div>
           )}
         </div>
-      </div>
+      </section>
+
+      <Footer />
     </div>
   );
 };

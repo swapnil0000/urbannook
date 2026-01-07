@@ -162,7 +162,7 @@ const AireInstagramFeed = () => {
                         />
 
                         {/* HOVER OVERLAY: Glassmorphism */}
-                        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all duration-500 flex flex-col justify-between p-8">
+                        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all duration-500 flex flex-col justify-between p-5">
                             <div className="flex justify-between items-start">
                                 <div className="flex items-center gap-4 text-white">
                                     <div className="flex items-center gap-1.5">

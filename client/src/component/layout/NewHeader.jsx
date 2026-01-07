@@ -3,13 +3,14 @@ import { useLocation, Link } from 'react-router-dom';
 import LoginForm from './LoginForm';
 import SignupForm from './SignupForm';
 import UserProfile from './UserProfile';
+import CartDrawer from './CartDrawer'; // <--- 1. Import the CartDrawer
 
 const NewHeader = () => {
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showSignup, setShowSignup] = useState(false);
-  const [showCart, setShowCart] = useState(false);
+  const [showCart, setShowCart] = useState(false); // Controls the Drawer
   const [cart, setCart] = useState([]);
   const [showHeader, setShowHeader] = useState(true);
   const lastScrollY = useRef(0);
@@ -26,6 +27,7 @@ const NewHeader = () => {
     return '';
   };
 
+  // Sync Cart & User from LocalStorage
   useEffect(() => {
     const syncState = () => {
       setCart(JSON.parse(localStorage.getItem('cart') || '[]'));
@@ -36,6 +38,7 @@ const NewHeader = () => {
     return () => window.removeEventListener('storage', syncState);
   }, []);
 
+  // Hide/Show Header on Scroll
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
@@ -62,9 +65,6 @@ const NewHeader = () => {
   return (
     <>
       <header
-        // CHANGED: Transition logic and border radius
-        // When open: rounded-3xl (Rectangular box with soft corners)
-        // When closed: rounded-full (Pill shape)
         className={`fixed top-4 left-4 right-4 md:top-6 md:left-6 md:right-6 z-50 bg-[#e8f8d7]/95 backdrop-blur-xl shadow-lg transition-all duration-300 ease-in-out ${
           isMenuOpen ? 'rounded-3xl' : 'rounded-full'
         }`}
@@ -75,7 +75,7 @@ const NewHeader = () => {
         <div className="px-4 md:px-6 py-2 md:py-3">
           
           {/* Main Flex Container */}
-          <div className="flex items-center justify-between relative h-8 md:h-8">
+          <div className="flex items-center justify-between relative h-10 md:h-11">
             
             {/* --- LEFT SECTION: Mobile Menu Button --- */}
             <div className="flex items-center z-20">
@@ -97,7 +97,6 @@ const NewHeader = () => {
             </div>
 
             {/* --- CENTER SECTION: Mobile Logo (Absolute Center) & Desktop Nav --- */}
-            {/* On Mobile: Absolute positioned to be perfectly in the middle */}
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 lg:static lg:translate-x-0 lg:translate-y-0 z-10">
               {/* Mobile Logo */}
               <Link to="/" className="lg:hidden flex items-center">
@@ -167,7 +166,6 @@ const NewHeader = () => {
               ) : (
                 <button
                   onClick={() => setShowLogin(true)}
-                  // CHANGED: Fixed width/height on mobile (w-10 h-10) to match Cart button exactly
                   className="flex items-center justify-center w-10 h-10 md:w-auto md:h-auto md:px-4 md:py-2.5 bg-gray-900 text-white rounded-full hover:bg-gray-800 hover:scale-105 transition-all duration-200 shadow-md"
                 >
                   <i className="fa-regular fa-user text-xs md:mr-2"></i>
@@ -175,13 +173,12 @@ const NewHeader = () => {
                 </button>
               )}
 
-              {/* Cart Button */}
+              {/* Cart Button (Now toggles Drawer) */}
               <button
-                // CHANGED: Fixed width/height on mobile (w-10 h-10) to match Login button exactly
                 className="relative flex items-center justify-center w-10 h-10 md:w-auto md:h-auto md:px-4 md:py-2.5 bg-emerald-700 text-white rounded-full hover:bg-emerald-800 hover:shadow-lg transition-all duration-200"
                 onMouseEnter={() => setShowTooltip(true)}
                 onMouseLeave={() => setShowTooltip(false)}
-                onClick={() => setShowCart(true)}
+                onClick={() => setShowCart(true)} // <--- 2. Trigger Drawer Open
               >
                 <i className="fa-solid fa-cart-shopping text-xs"></i>
                 <span className="hidden md:inline ml-2 text-xs font-bold uppercase tracking-wide">Cart</span>
@@ -231,7 +228,8 @@ const NewHeader = () => {
         </div>
       </header>
       
-      {/* Modals */}
+      {/* --- MODALS --- */}
+      
       {showLogin && (
         <LoginForm 
           onClose={() => setShowLogin(false)}
@@ -247,6 +245,13 @@ const NewHeader = () => {
           onSwitchToLogin={() => { setShowSignup(false); setShowLogin(true); }}
         />
       )}
+
+      {/* --- 3. CART DRAWER (THE NEW IMPLEMENTATION) --- */}
+      <CartDrawer 
+        isOpen={showCart} 
+        onClose={() => setShowCart(false)} 
+        cartItems={cart} 
+      />
     </>
   );
 };

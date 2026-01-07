@@ -77,10 +77,8 @@ const Footer = () => {
               <ul className="space-y-4">
                 {[
                   { name: 'Track Order', link: '/track-order' },
-                  { name: 'Shipping Info', link: '/shipping-policy' },
                   { name: 'Returns & Exchange', link: '/return-policy' },
                   { name: 'Cancellation & Refund', link: '/cancellation-refund' },
-                  { name: 'Size Guide', link: '/size-guide' },
                   { name: 'FAQs', link: '/faqs' }
                 ].map((item) => (
                   <li key={item.name}>

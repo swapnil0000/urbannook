@@ -35,7 +35,7 @@ const AllProductsPage = () => {
       <NewHeader />
 
       {/* --- HERO SECTION --- */}
-      <section className="pt-40 pb-20 px-6 relative z-10">
+      <section className="pt-20 pb-20 px-6 relative z-10">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-end gap-12">
           <div className="max-w-xl">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/10 w-fit mb-6 shadow-sm">
