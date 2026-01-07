@@ -1,13 +1,17 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Footer from '../../../component/layout/Footer';
 
 const AboutPage = () => {
   const [hoveredCard, setHoveredCard] = useState(null);
 
+    useEffect(() => {
+      window.scrollTo(0, 0);
+    }, []);
+
   const teamMembers = [
     {
       id: 1,
-      name: "Arjun Sharma",
+      name: "Swapnil Sharma",
       role: "Founder & CEO",
       description: "Passionate about bringing aesthetic design to everyday life"
     },

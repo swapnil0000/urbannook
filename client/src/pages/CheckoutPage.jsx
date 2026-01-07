@@ -4,6 +4,9 @@ import NewHeader from '../component/layout/NewHeader';
 import Footer from '../component/layout/Footer';
 
 const CheckoutPage = () => {
+  useEffect(() => {
+      window.scrollTo(0, 0);
+  }, []);
   const navigate = useNavigate();
   const [cart, setCart] = useState([]);
   const [customerInfo, setCustomerInfo] = useState({

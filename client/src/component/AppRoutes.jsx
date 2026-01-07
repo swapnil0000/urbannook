@@ -6,7 +6,6 @@ import CategoryProductsPage from '../pages/CategoryProductsPage';
 import ProductDetailPage from '../pages/ProductDetailPage';
 import CheckoutPage from '../pages/CheckoutPage';
 import ProductDetails from '../feature/product/component/ProductDetails';
-import AboutPage from '../feature/product/component/AboutPage';
 import RegisterPage from '../pages/RegisterPage';
 import MyProfilePage from '../pages/MyProfilePage';
 import MyOrdersPage from '../pages/MyOrdersPage';
@@ -14,6 +13,12 @@ import WishlistPage from '../pages/WishlistPage';
 import CustomerSupportPage from '../pages/CustomerSupportPage';
 import RewardsPage from '../pages/RewardsPage';
 import SettingsPage from '../pages/SettingsPage';
+import TermsConditions from '../pages/TermsCondition';
+import CancellationPolicy from '../pages/CancellationPolicy';
+import PrivacyPolicy from '../pages/PrivacyPolicy';
+import Faq from '../pages/Faqs';
+import Return from '../pages/Return';
+import AboutPage from '../pages/AboutPage';
 
 const AppRoutes = () => {
   return (
@@ -33,6 +38,11 @@ const AppRoutes = () => {
       <Route path="/customer-support" element={<CustomerSupportPage />} />
       <Route path="/rewards" element={<RewardsPage />} />
       <Route path="/settings" element={<SettingsPage />} />
+      <Route path="/terms-conditions" element={<TermsConditions/>}/>
+      <Route path='/cancellation-refund' element={<CancellationPolicy/>}/>
+      <Route path='/privacy-policy' element={<PrivacyPolicy/>}/>
+      <Route path='/faqs' element={<Faq/>}/>
+      <Route path='/return-policy' element={<Return/>}/>
     </Routes>
   );
 };
