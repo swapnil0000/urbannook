@@ -7,22 +7,63 @@ dotenv.config({ path: "./.env" });
 
 const userWaitListController = async (req, res) => {
   try {
-    const { userEmail } = req.body || {};
+    const { userName, userEmail } = req.body || {};
+    let emptyField = {};
+    userEmail == undefined
+      ? (emptyField.userEmail = true)
+      : (emptyField.userEmail = false);
+    userName == undefined
+      ? (emptyField.userName = true)
+      : (emptyField.userName = false);
+    const missingKey = ((emptyField) => {
+      for (let key in emptyField) {
+        if (emptyField.hasOwnProperty(key) && emptyField[key]) {
+          return key;
+        }
+      }
+    })(emptyField);
 
-    if (!userEmail) {
+    if (
+      Object.keys(emptyField).length > 0 &&
+      (emptyField?.userEmail || emptyField?.userName)
+    ) {
       return res
         .status(400)
         .json(
           new ApiError(
             400,
-            "Can't join the waitlist — email is required",
+            `Can't join the waitlist — ${missingKey} is missing`,
             null,
             false
           )
         );
     }
+    const reservedNames = [
+      "admin",
+      "root",
+      "support",
+      "system",
+      "owner",
+      "urbannook",
+      "superuser",
+    ];
 
-    const existingUser = await UserWaistList.findOne({ userEmail });
+    if (reservedNames.includes(userName.toLowerCase())) {
+      return res
+        .status(403)
+        .json(
+          new ApiError(
+            403,
+            `Oops 😅 ${userName} is a VIP name reserved for the system. Please pick something uniquely *you* — we promise we won’t steal it 😉`,
+            { userEmail, userName },
+            false
+          )
+        );
+    }
+
+    const existingUser = await UserWaistList.findOne({
+      userEmail: userEmail.toLowerCase(),
+    });
 
     if (existingUser) {
       return res
@@ -31,13 +72,16 @@ const userWaitListController = async (req, res) => {
           new ApiRes(
             200,
             "You're already on the UrbanNook waitlist 🎉",
-            userEmail,
+            { userEmail, userName },
             true
           )
         );
     }
 
-    const joinedUser = await UserWaistList.create({ userEmail });
+    const joinedUser = await UserWaistList.create({
+      userName: userName.toLowerCase(),
+      userEmail: userEmail.toLowerCase(),
+    });
 
     if (!joinedUser) {
       return res
@@ -46,7 +90,7 @@ const userWaitListController = async (req, res) => {
           new ApiError(
             500,
             "Unable to join the waitlist at the moment. Please try again later.",
-            userEmail,
+            { userEmail, userName },
             false
           )
         );
@@ -72,22 +116,22 @@ const userWaitListController = async (req, res) => {
           subject: "You're on the UrbanNook Waitlist 🎉",
           html: `
             <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-              <h2>You're on the Waitlist 🎉</h2>
-              <p>Hi there,</p>
-              <p>
-                Thank you for joining the <strong>UrbanNook waitlist</strong>!
-                We're excited to have you with us.
-              </p>
-              <p>
-                You'll be among the first to know when we launch and get early
-                access to exclusive offers and updates.
-              </p>
-              <p style="margin-top: 20px;">
-                Stay tuned — something exciting is coming 🚀
-              </p>
-              <p><strong>Team UrbanNook</strong></p>
-            </div>
-          `,
+            <h2>You're on the Waitlist ✨</h2>
+            <p>Hi ${userName},</p>
+            <p>
+              Thanks for signing up for the <strong>UrbanNook waitlist</strong>. We're genuinely excited to have you with us.
+            </p>
+            <p>
+              As a waitlist member, you’ll get early access to new features, special offers, and updates before anyone else.
+            </p>
+            <p style="margin-top: 20px;">
+              We’re building something thoughtfully crafted—and you’re now part of that journey.
+            </p>
+            <p>
+              Warm regards,<br/>
+              <strong>Team UrbanNook</strong>
+            </p>
+          </div>`,
         });
         return true;
       } catch (err) {

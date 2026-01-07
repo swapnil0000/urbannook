@@ -19,7 +19,7 @@ const loginService = async (userEmail, userPassword) => {
       success: missing?.success,
     };
   }
-  const res = await User.findOne({ userEmail });
+  const res = await User.findOne({ userEmail: userEmail.toLowerCase() });
   if (!res) {
     return {
       statusCode: 404,
@@ -28,6 +28,7 @@ const loginService = async (userEmail, userPassword) => {
       success: false,
     };
   }
+
   //pass check
   const passCheck = (await res.passCheck(userPassword)) ? true : false;
 
@@ -149,7 +150,7 @@ const registerService = async (
   }
 
   const res = await User.findOne({
-    $or: [{ userMobileNumber }, { userEmail }],
+    $or: [{ userMobileNumber }, { userEmail: userEmail.toLowerCase() }],
   });
 
   if (res) {
@@ -167,8 +168,8 @@ const registerService = async (
   }
 
   const newRegisteringUser = await User.create({
-    userName,
-    userEmail,
+    userName: userName.toLowerCase(),
+    userEmail: userEmail.toLowerCase(),
     userPassword,
     userMobileNumber,
     userAddress,
