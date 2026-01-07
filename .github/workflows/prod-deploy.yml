@@ -27,52 +27,22 @@ jobs:
           npm ci
           npm run build
 
-      # 4️⃣ Install server deps
-      - name: Install Server Dependencies
-        working-directory: server
-        run: npm ci
+      # 4️⃣ Configure AWS credentials
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-      # 5️⃣ Setup SSH (NON-FAILING)
-      - name: Setup SSH
+      # 5️⃣ Upload to S3
+      - name: Deploy to S3
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.PROD_HOST }} >> ~/.ssh/known_hosts || true
+          aws s3 sync client/dist/ s3://${{ secrets.S3_BUCKET }} --delete
 
-      # 6️⃣ Check EC2 availability
-      - name: Check Prod EC2 availability
+      # 6️⃣ Invalidate CloudFront cache (IMPORTANT)
+      - name: Invalidate CloudFront
         run: |
-          echo "Checking Prod EC2..."
-          if ssh -o ConnectTimeout=5 ubuntu@${{ secrets.PROD_HOST }} "echo EC2 is running" >/dev/null 2>&1; then
-            echo "EC2_AVAILABLE=true" >> $GITHUB_ENV
-          else
-            echo "EC2_AVAILABLE=false" >> $GITHUB_ENV
-            echo "Prod EC2 is stopped. Deployment skipped."
-          fi
-
-      # 7️⃣ Upload client
-      - name: Upload Client
-        if: env.EC2_AVAILABLE == 'true'
-        run: |
-          rsync -avz --delete \
-          client/dist/ \
-          ubuntu@${{ secrets.PROD_HOST }}:/home/ubuntu/urbannook-prod/client/dist/
-
-      # 8️⃣ Upload server
-      - name: Upload Server
-        if: env.EC2_AVAILABLE == 'true'
-        run: |
-          rsync -avz \
-          server/ \
-          ubuntu@${{ secrets.PROD_HOST }}:/home/ubuntu/urbannook-prod/server/
-
-      # 9️⃣ Restart PM2
-      - name: Restart Server
-        if: env.EC2_AVAILABLE == 'true'
-        run: |
-          ssh ubuntu@${{ secrets.PROD_HOST }} << 'EOF'
-            cd /home/ubuntu/urbannook-prod/server
-            pm2 restart urbannook-prod || pm2 start src/server.js --name urbannook-prod
-            pm2 save
-          EOF
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_DIST_ID }} \
+            --paths "/*"
