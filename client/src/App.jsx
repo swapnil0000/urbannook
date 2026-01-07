@@ -12,9 +12,9 @@ function App() {
     <Provider store={store}>
       <ThemeProvider>
         <Router> 
-          <NewHeader/>
+          {/* <NewHeader/> */}
           <AppRoutes />
-          <WhatsAppButton />
+          {/* <WhatsAppButton /> */}
           {/* <ApiDebugger /> */}
         </Router>
       </ThemeProvider>
