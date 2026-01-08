@@ -87,7 +87,7 @@ const WaitList = () => {
                 </div>
 
                 <h1 className="text-6xl md:text-8xl font-black text-white tracking-tighter leading-none">
-                  URBANNOK
+                  URBANNOOK
                 </h1>
                 <p className="text-2xl md:text-3xl text-stone-200 font-serif italic">
                   Turn a house into your{" "}
