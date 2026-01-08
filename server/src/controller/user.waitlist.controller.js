@@ -82,6 +82,7 @@ const userWaitListController = async (req, res) => {
       userName: userName.toLowerCase(),
       userEmail: userEmail.toLowerCase(),
     });
+    console.log(joinedUser);
 
     if (!joinedUser) {
       return res
@@ -115,23 +116,134 @@ const userWaitListController = async (req, res) => {
           to,
           subject: "You're on the UrbanNook Waitlist 🎉",
           html: `
-            <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-            <h2>You're on the Waitlist ✨</h2>
-            <p>Hi ${userName},</p>
-            <p>
-              Thanks for signing up for the <strong>UrbanNook waitlist</strong>. We're genuinely excited to have you with us.
-            </p>
-            <p>
-              As a waitlist member, you’ll get early access to new features, special offers, and updates before anyone else.
-            </p>
-            <p style="margin-top: 20px;">
-              We’re building something thoughtfully crafted—and you’re now part of that journey.
-            </p>
-            <p>
-              Warm regards,<br/>
-              <strong>Team UrbanNook</strong>
-            </p>
-          </div>`,
+  <div style="
+    margin: 0;
+    padding: 0;
+    background-color: #2E443C;
+    color: #FFFFFF;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    line-height: 1.7;
+  ">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#2E443C; padding: 40px 0;">
+      <tr>
+        <td align="center">
+          <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px; background-color:#2E443C; padding: 20px 30px;">
+
+            <!-- Heading -->
+            <tr>
+              <td style="padding-bottom: 24px;">
+                <h2 style="
+                  margin: 0;
+                  font-size: 22px;
+                  font-weight: 500;
+                  letter-spacing: 0.3px;
+                ">
+                  You’re on the Waitlist
+                </h2>
+              </td>
+            </tr>
+
+            <!-- Greeting -->
+            <tr>
+              <td style="padding-bottom: 14px;">
+                <p style="margin: 0; font-size: 15px;">
+                  Hi ${userName},
+                </p>
+              </td>
+            </tr>
+
+            <!-- Body -->
+            <tr>
+              <td style="padding-bottom: 16px;">
+                <p style="margin: 0; font-size: 15px;">
+                  Thank you for joining the <strong>UrbanNook</strong> waitlist. We’re glad to have you with us.
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding-bottom: 16px;">
+                <p style="margin: 0; font-size: 15px;">
+                  As part of our early community, you’ll receive first access to new features, thoughtful updates, and curated offerings before they’re available to everyone else.
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding-bottom: 24px;">
+                <p style="margin: 0; font-size: 15px;">
+                  We’re creating something intentional — and you’re now a part of that journey.
+                </p>
+              </td>
+            </tr>
+
+            <!-- GIF Section -->
+            <tr>
+              <td align="center" style="padding: 20px 0;">
+                <img 
+                  src="https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif" 
+                  alt="UrbanNook Aesthetic"
+                  width="100%"
+                  style="max-width: 480px; border-radius: 8px; display: block;"
+                />
+              </td>
+            </tr>
+
+            <!-- Website Link -->
+            <tr>
+              <td align="center" style="padding: 10px 0 20px;">
+                <a 
+                  href="https://urbannook.in" 
+                  target="_blank"
+                  style="
+                    color: #FFFFFF;
+                    text-decoration: none;
+                    font-size: 14px;
+                    border-bottom: 1px solid rgba(255,255,255,0.4);
+                    padding-bottom: 2px;
+                  "
+                >
+                  Visit urbannook.in
+                </a>
+              </td>
+            </tr>
+
+            <!-- Footer / Social -->
+            <tr>
+              <td style="padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.2); text-align: center;">
+                <p style="margin: 0 0 8px; font-size: 14px;">
+                  Warm regards,<br/>
+                  <strong>Team UrbanNook</strong>
+                </p>
+
+                <p style="margin: 0; font-size: 13px; opacity: 0.85;">
+                  Follow our journey on Instagram
+                </p>
+
+                <p style="margin: 6px 0 0;">
+                  <a 
+                    href="https://www.instagram.com/urbannook.store?igsh=MW9zYWQwZzUxZmxydg==" 
+                    target="_blank"
+                    style="
+                      color: #FFFFFF;
+                      text-decoration: none;
+                      font-size: 13px;
+                      border-bottom: 1px solid rgba(255,255,255,0.4);
+                      padding-bottom: 2px;
+                    "
+                  >
+                    @urbannook.store
+                  </a>
+                </p>
+              </td>
+            </tr>
+
+          </table>
+        </td>
+      </tr>
+    </table>
+  </div>
+          `,
         });
         return true;
       } catch (err) {
