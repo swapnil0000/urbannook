@@ -85,13 +85,13 @@ jobs:
         run: |
           rsync -avz --delete \
           server/ \
-          ubuntu@${{ secrets.PROD_HOST }}:/home/ubuntu/urbannook-prod/server/
+          ubuntu@${{ secrets.PROD_SSH_HOST }}:/home/ubuntu/urbannook-prod/server/
 
       # 1️⃣1️⃣ Restart PM2
       - name: Restart Backend
         if: env.EC2_AVAILABLE == 'true'
         run: |
-          ssh ubuntu@${{ secrets.PROD_HOST }} << 'EOF'
+          ssh ubuntu@${{ secrets.PROD_SSH_HOST }} << 'EOF'
             cd /home/ubuntu/urbannook-prod/server
             pm2 restart urbannook-prod || pm2 start src/server.js --name urbannook-prod
             pm2 save
