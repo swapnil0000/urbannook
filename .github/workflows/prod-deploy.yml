@@ -87,12 +87,13 @@ jobs:
           server/ \
           ubuntu@${{ secrets.PROD_SSH_HOST }}:/home/ubuntu/urbannook-prod/server/
 
-      # 1️⃣1️⃣ Restart PM2
+        # 1️⃣1️⃣ Restart Backend
       - name: Restart Backend
         if: env.EC2_AVAILABLE == 'true'
         run: |
           ssh ubuntu@${{ secrets.PROD_SSH_HOST }} << 'EOF'
             cd /home/ubuntu/urbannook-prod/server
-            pm2 restart urbannook-prod-api || pm2 start src/server.js --name urbannook-prod-api
+            pm2 restart urbannook-server-prod || pm2 start .ecosystem.config.cjs --env production
             pm2 save
           EOF
+
