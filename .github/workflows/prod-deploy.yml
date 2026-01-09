@@ -93,6 +93,6 @@ jobs:
         run: |
           ssh ubuntu@${{ secrets.PROD_SSH_HOST }} << 'EOF'
             cd /home/ubuntu/urbannook-prod/server
-            pm2 restart urbannook-prod || pm2 start src/server.js --name urbannook-prod
+            pm2 restart urbannook-prod-api || pm2 start src/server.js --name urbannook-prod-api
             pm2 save
           EOF
