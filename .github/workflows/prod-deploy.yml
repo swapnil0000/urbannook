@@ -72,7 +72,7 @@ jobs:
       - name: Check Prod EC2 availability
         run: |
           echo "Checking Prod EC2..."
-          if ssh -o ConnectTimeout=5 ubuntu@${{ secrets.PROD_HOST }} "echo EC2 is running" >/dev/null 2>&1; then
+          if ssh -o ConnectTimeout=5 ubuntu@${{ secrets.PROD_SSH_HOST }} "echo EC2 is running" >/dev/null 2>&1; then
             echo "EC2_AVAILABLE=true" >> $GITHUB_ENV
           else
             echo "EC2_AVAILABLE=false" >> $GITHUB_ENV
