@@ -35,6 +35,7 @@ const WaitList = () => {
 
     try {
       const res = await axios.post(`${serverProBaseUrl}/join/waitlist`, {
+        userName:data?.userName,
         userEmail: data?.userEmail,
       });
 
