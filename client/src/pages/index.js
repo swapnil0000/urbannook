@@ -18,7 +18,6 @@ import PrivacyPolicy from "../pages/PrivacyPolicy";
 import Faq from "../pages/Faqs";
 import Return from "../pages/Return";
 import AboutPage from "../pages/AboutPage";
-import WaitList from "../pages/WaitList.jsx";
 export {
   HomePage,
   ContactPage,
@@ -40,5 +39,4 @@ export {
   Faq,
   Return,
   AboutPage,
-  WaitList,
 };
