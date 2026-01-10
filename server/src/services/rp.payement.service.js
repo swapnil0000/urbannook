@@ -1,10 +1,6 @@
 import Razorpay from "razorpay";
 import crypto from "crypto";
-import dotenv from "dotenv";
 import Order from "../model/order.model.js";
-dotenv.config({
-  path: "./.env",
-});
 
 const razorpayCreateOrderService = async (amount, currency) => {
   try {

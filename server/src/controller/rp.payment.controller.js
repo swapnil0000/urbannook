@@ -4,13 +4,10 @@ import {
 } from "../services/rp.payement.service.js";
 import ApiError from "../utlis/ApiError.js";
 import ApiRes from "../utlis/ApiRes.js";
-import dotenv from "dotenv";
 import User from "../model/user.model.js";
 import Order from "../model/order.model.js";
 import crypto from "crypto";
-dotenv.config({
-  path: "./.env",
-});
+
 const razorpayKeyGetController = async (_, res) => {
   if (!process.env.RP_LOCAL_TEST_KEY_ID)
     return res.status(404).json(new ApiError(404, `Rp - Key`, null, false));
