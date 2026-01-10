@@ -1,9 +1,6 @@
 import UserWaistList from "../model/user.waitlist.model.js";
 import { ApiError, ApiRes } from "../utlis/index.js";
 import nodemailer from "nodemailer";
-import dotenv from "dotenv";
-
-dotenv.config({ path: "./.env" });
 
 const userWaitListController = async (req, res) => {
   try {
