@@ -1,6 +1,5 @@
 import User from "../model/user.model.js";
 import Product from "../model/product.model.js";
-import mongoose from "mongoose";
 import { cartDetailsMissing, fieldMissing } from "../utlis/CommonResponse.js";
 
 const loginService = async (userEmail, userPassword) => {
@@ -45,7 +44,7 @@ const loginService = async (userEmail, userPassword) => {
   const userAccessToken = await res?.genAccessToken();
 
   res.userRefreshToken = userRefreshToken;
-  await res.save();
+  res.save();
   return {
     statusCode: 200,
     message: "user details",

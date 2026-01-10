@@ -2,13 +2,9 @@ import { ApiError, ApiRes } from "../utlis/index.js";
 import Admin from "../model/admin.model.js";
 import User from "../model/user.model.js";
 import jwt from "jsonwebtoken";
-import dotenv from "dotenv";
 import cookieOptions from "../config/config.js";
-import nodemailer from "nodemailer";
 import crypto from "crypto";
-dotenv.config({
-  path: "./.env",
-});
+import sendEmail from "./email.service.js";
 const authGuardService = (role) => {
   /* The return is placed outside the try–catch because jwt.verify() runs
      during request execution, while a try–catch outside the middleware
@@ -199,54 +195,20 @@ const sendOtpViaEmailService = async (userEmail) => {
         success: false,
       };
     }
-    const zohoEmail = process.env.ZOHO_ADMIN_EMAIL;
-    const zohoEmailSMTPSecret = process.env.ZOHO_SMTP_SECRET;
-    const transporter = nodemailer.createTransport({
-      secure: true,
-      host: "smtp.zoho.in",
-      port: 465,
-      auth: {
-        user: zohoEmail,
-        pass: zohoEmailSMTPSecret,
-      },
-    });
 
-    const sendOtpEmail = (to, subject, otp) => {
-      try {
-        transporter.sendMail({
-          from: `urbanadmin@urbannook.in`,
-          to,
-          subject,
-          html: `
+    const emailResult = sendEmail(
+      String(userEmail),
+      `OTP Verification`,
+      `
             <div style="font-family: Arial, sans-serif;">
               <h2>OTP Verification</h2>
               <p>Your OTP is:</p>
-              <h1 style="letter-spacing: 3px;">${String(otp)}</h1>
+              <h1 style="letter-spacing: 3px;">${String(
+                userDetails?.userVerificationOtp
+              )}</h1>
               <p>This OTP is valid for 5 minutes.</p>
             </div>
-          `,
-        });
-
-        return {
-          statusCode: 200,
-          message: `OTP sent to` - userEmail,
-          data: userEmail,
-          success: true,
-        };
-      } catch (error) {
-        return {
-          statusCode: 500,
-          message: `Internal Server Error`,
-          data: userEmail,
-          success: false,
-        };
-      }
-    };
-
-    const emailResult = sendOtpEmail(
-      String(userEmail),
-      `OTP Verification`,
-      userDetails?.userVerificationOtp
+          `
     );
 
     if (!emailResult?.success) {
