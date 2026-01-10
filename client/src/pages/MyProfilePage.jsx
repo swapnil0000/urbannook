@@ -1,173 +1,190 @@
 import React, { useEffect, useState } from 'react';
-import { useAuth } from '../hooks/useRedux';
+import { useAuth } from '../hooks/useRedux'; // Ensure path is correct
+// import NewHeader from '../component/layout/NewHeader'; // Uncomment if needed
+// import Footer from '../component/layout/Footer';       // Uncomment if needed
 
 const MyProfilePage = () => {
   
   const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
-  const [vibe, setVibe] = useState('minimal'); // New Feature: Site Mood
+  const [vibe, setVibe] = useState('minimal');
+  
   const [formData, setFormData] = useState({
-    name: user?.name || 'Alexander Nook',
-    email: user?.email || 'alex@urbannook.in',
-    phone: user?.phone || '+91 98765 43210',
-    address: user?.address || 'Sector 44, Gurgaon, India'
+    name: 'Alexander Nook',
+    email: 'alex@urbannook.in',
+    phone: '+91 98765 43210',
+    address: 'Sector 44, Gurgaon, India'
   });
+
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        name: user.name || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        address: user.address || ''
+      });
+    }
+  }, [user]);
 
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSave = () => {
-    // API logic here
+    console.log("Saving Profile:", formData, vibe);
     setIsEditing(false);
   };
 
-    useEffect(() => {
-        window.scrollTo(0, 0);
-      }, []);
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   return (
-    <div className="min-h-screen bg-[#fafafa] pt-32 pb-20 px-6 font-sans relative overflow-hidden">
+    <div className="bg-[#0a1a13] min-h-screen font-sans text-gray-300 selection:bg-emerald-500 selection:text-white pt-32 pb-20 md:pt-40 px-4 md:px-8 relative overflow-hidden">
       
-      {/* FIXED STUDIO BACKGROUND EFFECT */}
-      <div className="fixed inset-0 pointer-events-none z-0">
-          <div className="absolute top-[-10%] left-[-10%] w-[70vw] h-[70vw] bg-[radial-gradient(circle,rgba(16,185,129,0.05)_0%,rgba(255,255,255,0)_70%)] blur-[100px]"></div>
-          <div className="absolute bottom-[-10%] right-[-10%] w-[70vw] h-[70vw] bg-[radial-gradient(circle,rgba(59,130,246,0.03)_0%,rgba(255,255,255,0)_70%)] blur-[100px]"></div>
-      </div>
+      {/* --- BACKGROUND GLOW EFFECTS --- */}
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[120px] pointer-events-none"></div>
+      <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-white/5 rounded-full blur-[120px] pointer-events-none"></div>
 
-      <div className="max-w-6xl mx-auto relative z-10">
+      <div className="max-w-7xl mx-auto relative z-10">
         
-        {/* HEADER SECTION */}
-        <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
-           <div className="max-w-xl">
-              <span className="inline-block px-3 py-1 mb-4 text-[10px] font-black tracking-[0.3em] text-emerald-800 uppercase bg-emerald-50 rounded-full border border-emerald-100">
+        {/* --- HEADER --- */}
+        <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6 border-b border-white/10 pb-12">
+           <div className="max-w-2xl">
+              <span className="inline-block px-3 py-1 mb-6 text-[10px] font-bold tracking-[0.3em] text-emerald-400 uppercase bg-white/5 border border-white/10 rounded-full">
                 Member Command Center
               </span>
-              <h1 className="text-5xl md:text-7xl font-serif text-slate-900 leading-[0.9]">
-                Your <span className="italic font-light text-emerald-700">Sanctuary.</span>
+              <h1 className="text-5xl md:text-7xl font-serif text-white leading-[0.9] tracking-tight">
+                Your <span className="italic font-light text-emerald-500">Sanctuary.</span>
               </h1>
            </div>
+           
            <button 
              onClick={() => isEditing ? handleSave() : setIsEditing(true)}
-             className="px-10 py-4 bg-slate-900 text-white rounded-2xl font-bold uppercase tracking-widest text-[10px] hover:bg-emerald-700 transition-all shadow-xl active:scale-95"
+             className={`px-8 py-4 rounded-xl font-bold uppercase tracking-widest text-[10px] transition-all duration-300 shadow-lg active:scale-95 flex items-center gap-2 ${
+               isEditing 
+               ? 'bg-emerald-500 text-white hover:bg-emerald-600' 
+               : 'bg-white text-[#0a1a13] hover:bg-emerald-500 hover:text-white'
+             }`}
            >
-             {isEditing ? 'Commit Changes' : 'Refine Profile'}
+             {isEditing ? (
+               <><i className="fa-solid fa-check"></i> Commit Changes</>
+             ) : (
+               <><i className="fa-solid fa-pen"></i> Refine Profile</>
+             )}
            </button>
         </div>
 
-        {/* Bento Grid Layout */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 lg:gap-8">
+        {/* --- BENTO GRID LAYOUT --- */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
-          {/* PROFILE CARD (4 Cols) */}
-          <div className="md:col-span-4 bg-white rounded-[3rem] p-10 border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.04)] flex flex-col items-center text-center">
-             <div className="relative mb-8 group cursor-pointer">
-                <div className="w-32 h-32 rounded-full bg-slate-900 flex items-center justify-center text-white font-serif text-4xl shadow-2xl relative z-10 border-4 border-white transition-transform group-hover:scale-105">
-                   {formData?.name?.charAt(0)}
-                </div>
-                {/* Loyalty Tier Ring */}
-                <div className="absolute inset-[-8px] rounded-full border-2 border-dashed border-emerald-500/30 animate-spin-slow"></div>
-                <div className="absolute -bottom-2 -right-2 bg-emerald-500 text-white w-10 h-10 rounded-full flex items-center justify-center border-4 border-white shadow-lg">
-                   <i className="fa-solid fa-crown text-[10px]"></i>
-                </div>
-             </div>
-             <h2 className="text-2xl font-serif text-slate-900 mb-1">{formData.name}</h2>
-             <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-6">Platinum Resident</p>
-             <div className="w-full pt-6 border-t border-slate-50 space-y-4">
-                <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                   <span>Loyalty Points</span>
-                   <span className="text-slate-900">2,450 XP</span>
-                </div>
-                <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                   <div className="w-[70%] h-full bg-emerald-500 rounded-full"></div>
-                </div>
-             </div>
-          </div>
-
-          {/* MAIN INFORMATION (8 Cols) */}
-          <div className="md:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-6">
+          {/* 1. IDENTITY CARD (4 Cols) */}
+          <div className="lg:col-span-4 bg-white/5 rounded-[2.5rem] p-8 md:p-10 border border-white/10 flex flex-col items-center text-center relative overflow-hidden group hover:border-emerald-500/30 transition-colors">
              
-             {/* Bento Tiles for Info */}
-             {[
-               { label: 'Legal Name', name: 'name', value: formData.name, type: 'text', icon: 'fa-user' },
-               { label: 'Digital Mail', name: 'email', value: formData.email, type: 'email', icon: 'fa-envelope' },
-               { label: 'Mobile Protocol', name: 'phone', value: formData.phone, type: 'tel', icon: 'fa-phone' },
-               { label: 'Primary Residence', name: 'address', value: formData.address, type: 'textarea', icon: 'fa-location-dot' },
-             ].map((field, idx) => (
-               <div key={idx} className={`bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm ${field.name === 'address' ? 'sm:col-span-2' : ''}`}>
-                  <div className="flex items-center gap-3 mb-4">
-                     <i className={`fa-solid ${field.icon} text-emerald-500 text-xs`}></i>
-                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">{field.label}</label>
-                  </div>
-                  {isEditing ? (
-                    field.type === 'textarea' ? (
-                      <textarea
-                        name={field.name}
-                        value={field.value}
-                        onChange={handleInputChange}
-                        className="w-full p-4 bg-slate-50 border border-slate-300 rounded-2xl focus:border-emerald-500 outline-none transition-all text-sm font-medium"
-                        rows="3"
-                      />
-                    ) : (
-                      <input
-                        type={field.type}
-                        name={field.name}
-                        value={field.value}
-                        onChange={handleInputChange}
-                        className="w-full p-4 bg-slate-50 border border-slate-300 rounded-2xl focus:border-emerald-500 outline-none transition-all text-sm font-medium"
-                      />
-                    )
-                  ) : (
-                    <p className="text-lg font-medium text-slate-900">{field.value}</p>
-                  )}
-               </div>
-             ))}
-
-             {/* NEW FEATURE: ATMOSPHERIC PREFERENCE */}
-             <div className="sm:col-span-2 bg-slate-900 rounded-[2.5rem] p-8 lg:p-10 flex flex-col md:flex-row justify-between items-center gap-6">
-                <div>
-                   <h3 className="text-white font-serif text-xl mb-1 tracking-tight">Atmospheric Preference</h3>
-                   <p className="text-slate-400 text-xs font-medium">Customize how Urban Nook responds to your presence.</p>
+             {/* Profile Image / Initials */}
+             <div className="relative mb-6 mt-4 group-hover:scale-105 transition-transform duration-500">
+                <div className="w-32 h-32 rounded-full p-1 border border-white/20">
+                    <div className="w-full h-full rounded-full bg-[#050f0b] flex items-center justify-center text-emerald-500 font-serif text-5xl italic overflow-hidden">
+                        {formData.name?.charAt(0)}
+                    </div>
                 </div>
-                <div className="flex gap-3 bg-white/5 p-2 rounded-2xl border border-white/10">
-                   {['minimal', 'serene', 'vibrant'].map((option) => (
-                     <button 
-                       key={option}
-                       onClick={() => setVibe(option)}
-                       className={`px-6 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all
-                       ${vibe === option ? 'bg-emerald-500 text-white' : 'text-slate-400 hover:text-white'}`}
-                     >
-                       {option}
-                     </button>
-                   ))}
+                {/* Crown Badge */}
+                <div className="absolute bottom-0 right-0 bg-[#0a1a13] p-1.5 rounded-full border border-white/10">
+                   <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-white">
+                        <i className="fa-solid fa-crown text-[10px]"></i>
+                   </div>
                 </div>
              </div>
 
+             <h2 className="text-2xl font-serif text-white mb-1">{formData.name}</h2>
+             <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-8">Platinum Resident</p>
+
+             {/* Stats / XP */}
+             <div className="w-full bg-[#0a1a13] rounded-2xl p-6 border border-white/10">
+                <div className="flex justify-between items-end mb-2">
+                   <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Nook Points</span>
+                   <span className="text-xl font-serif text-white">2,450</span>
+                </div>
+                <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+                   <div className="w-[70%] h-full bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div>
+                </div>
+                <p className="text-[9px] text-gray-500 mt-3 text-left">50 points to next tier.</p>
+             </div>
           </div>
 
-        </div>
+          {/* 2. DETAILS & PREFERENCES (8 Cols) */}
+          <div className="lg:col-span-8 flex flex-col gap-6">
+             
+             {/* Personal Info Grid */}
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {[
+                  { label: 'Full Name', name: 'name', value: formData.name, type: 'text', icon: 'fa-user' },
+                  { label: 'Email Address', name: 'email', value: formData.email, type: 'email', icon: 'fa-envelope' },
+                  { label: 'Mobile Number', name: 'phone', value: formData.phone, type: 'tel', icon: 'fa-phone' },
+                  { label: 'Shipping Address', name: 'address', value: formData.address, type: 'textarea', icon: 'fa-location-dot' },
+                ].map((field, idx) => (
+                  <div key={idx} className={`bg-white/5 rounded-[2rem] p-6 border border-white/10 hover:bg-white/10 transition-colors ${field.name === 'address' ? 'md:col-span-2' : ''}`}>
+                     <div className="flex items-center gap-3 mb-4">
+                        <i className={`fa-solid ${field.icon} text-emerald-500 text-sm`}></i>
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500">{field.label}</label>
+                     </div>
+                     
+                     {isEditing ? (
+                        field.type === 'textarea' ? (
+                          <textarea
+                            name={field.name}
+                            value={field.value}
+                            onChange={handleInputChange}
+                            className="w-full p-3 bg-[#0a1a13] border border-white/20 rounded-xl focus:border-emerald-500 outline-none transition-all text-sm font-medium text-white resize-none placeholder-white/20"
+                            rows="2"
+                          />
+                        ) : (
+                          <input
+                            type={field.type}
+                            name={field.name}
+                            value={field.value}
+                            onChange={handleInputChange}
+                            className="w-full p-3 bg-[#0a1a13] border border-white/20 rounded-xl focus:border-emerald-500 outline-none transition-all text-sm font-medium text-white placeholder-white/20"
+                          />
+                        )
+                     ) : (
+                        <p className={`font-serif text-lg text-white ${field.name === 'email' ? 'truncate' : ''}`}>
+                            {field.value}
+                        </p>
+                     )}
+                  </div>
+                ))}
+             </div>
 
-        {/* RECENT ACQUISITIONS (Similar to a Mini Order History) */}
-        <div className="mt-8 bg-white rounded-[3rem] p-10 border border-slate-100 shadow-sm">
-           <div className="flex justify-between items-center mb-8">
-              <h3 className="text-2xl font-serif text-slate-900">Recent Acquisitions</h3>
-              <button className="text-[10px] font-black uppercase tracking-widest text-emerald-700 border-b border-emerald-700 pb-1">Archive</button>
-           </div>
-           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              {[1, 2].map((item) => (
-                <div key={item} className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-white">
-                   <div className="w-16 h-16 bg-slate-200 rounded-xl overflow-hidden shrink-0">
-                      <img src="https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=200" className="w-full h-full object-cover" alt="product" />
-                   </div>
-                   <div>
-                      <p className="font-bold text-slate-900 text-sm">Aire Series G{item}</p>
-                      <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">Delivered Jan 2026</p>
-                   </div>
-                </div>
-              ))}
-              <div className="flex items-center justify-center p-4 border-2 border-dashed border-slate-200 rounded-2xl">
-                 <p className="text-[10px] font-black uppercase text-slate-300 tracking-widest">New Order available</p>
-              </div>
-           </div>
+             {/* Atmospheric Preference (Vibe Selector) */}
+             <div className="bg-gradient-to-r from-emerald-900/40 to-white/5 rounded-[2.5rem] p-8 md:p-10 border border-white/10 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-8">
+                 
+                 <div className="relative z-10">
+                     <h3 className="text-2xl font-serif text-white mb-2">Space Vibe</h3>
+                     <p className="text-gray-400 text-xs font-medium max-w-xs">
+                         Customize your mood. We curate recommendations based on this setting.
+                     </p>
+                 </div>
+                 
+                 <div className="relative z-10 flex gap-2 bg-[#0a1a13]/50 p-2 rounded-2xl backdrop-blur-md border border-white/10">
+                     {['Minimal', 'Boho', 'Luxe'].map((mood) => (
+                         <button
+                             key={mood}
+                             onClick={() => setVibe(mood.toLowerCase())}
+                             className={`px-6 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all duration-300 ${
+                                 vibe === mood.toLowerCase() 
+                                 ? 'bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' 
+                                 : 'text-gray-500 hover:text-white hover:bg-white/5'
+                             }`}
+                         >
+                             {mood}
+                         </button>
+                     ))}
+                 </div>
+             </div>
+
+          </div>
         </div>
 
       </div>

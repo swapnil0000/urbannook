@@ -26,8 +26,8 @@ import {
 const AppRoutes = () => {
   return (
     <Routes>
-      {/* <Route path="/" element={<HomePage />} /> */}
-       <Route path="/" element={<Navigate to="/wait-list" replace />} />
+      <Route path="/" element={<HomePage />} />
+       {/* <Route path="/" element={<Navigate to="/wait-list" replace />} /> */}
       <Route path="/about-us" element={<AboutPage />} />
       <Route path="/contact-us" element={<ContactPage />} />
       <Route path="/products" element={<AllProductsPage />} />
@@ -36,8 +36,8 @@ const AppRoutes = () => {
       <Route path="/checkout" element={<CheckoutPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/product/:id" element={<ProductDetails />} />
-      <Route path="/my-profile" element={<MyProfilePage />} />
-      <Route path="/my-orders" element={<MyOrdersPage />} />
+      <Route path="/profile" element={<MyProfilePage />} />
+      <Route path="/orders" element={<MyOrdersPage />} />
       <Route path="/wishlist" element={<WishlistPage />} />
       <Route path="/customer-support" element={<CustomerSupportPage />} />
       <Route path="/rewards" element={<RewardsPage />} />
@@ -47,8 +47,8 @@ const AppRoutes = () => {
       <Route path="/privacy-policy" element={<PrivacyPolicy />} />
       <Route path="/faqs" element={<Faq />} />
       <Route path="/return-policy" element={<Return />} />
-      <Route path="/wait-list" element={<WaitList />} />
-      <Route path="*" element={<Navigate to="/wait-list" replace />} />
+      {/* <Route path="/wait-list" element={<WaitList />} /> */}
+      {/* <Route path="*" element={<Navigate to="/wait-list" replace />} /> */}
     </Routes>
   );
 };

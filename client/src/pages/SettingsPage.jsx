@@ -1,11 +1,24 @@
 import React, { useEffect, useState } from 'react';
 
+// --- HELPER: Custom Glowing Toggle ---
+const ToggleSwitch = ({ checked, onChange }) => (
+  <label className="relative inline-flex items-center cursor-pointer shrink-0 group">
+    <input
+      type="checkbox"
+      checked={checked}
+      onChange={onChange}
+      className="sr-only peer"
+    />
+    <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-gray-400 after:rounded-full after:h-5 after:w-5 after:transition-all after:duration-300 peer-checked:bg-emerald-500 peer-checked:after:bg-white peer-checked:shadow-[0_0_15px_rgba(16,185,129,0.4)] transition-all"></div>
+  </label>
+);
+
 const SettingsPage = () => {
 
-    useEffect(() => {
-      window.scrollTo(0, 0);
-    }, []);
-  
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   const [settings, setSettings] = useState({
     notifications: {
       email: true,
@@ -23,11 +36,12 @@ const SettingsPage = () => {
     preferences: {
       language: 'en',
       currency: 'INR',
-      theme: 'light'
+      theme: 'dark'
     }
   });
 
   const [activeTab, setActiveTab] = useState('notifications');
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleToggle = (section, key) => {
     setSettings(prev => ({
@@ -50,250 +64,215 @@ const SettingsPage = () => {
   };
 
   const saveSettings = () => {
-    console.log('Saving settings:', settings);
-    // Save settings API call
+    setIsSaving(true);
+    setTimeout(() => {
+        console.log('Saving settings:', settings);
+        setIsSaving(false);
+    }, 1000);
   };
 
+  // Navigation Config
+  const navItems = [
+    { id: 'notifications', label: 'Notifications', icon: 'fa-bell', desc: 'Alerts & Messages' },
+    { id: 'privacy', label: 'Privacy', icon: 'fa-shield-halved', desc: 'Security & Data' },
+    { id: 'preferences', label: 'Preferences', icon: 'fa-sliders', desc: 'App Settings' },
+  ];
+
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-slate-600 to-slate-700 p-6 text-white">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
-              <i className="fa-solid fa-cog text-2xl"></i>
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold">Settings</h1>
-              <p className="text-slate-200">Manage your account preferences</p>
-            </div>
-          </div>
+    <div className="bg-[#0a1a13] min-h-screen font-sans text-gray-300 selection:bg-emerald-500 selection:text-white pt-32 pb-20 md:pt-40 px-4 md:px-8 relative overflow-hidden">
+      
+      {/* --- BACKGROUND GLOW --- */}
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[120px] pointer-events-none"></div>
+      <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-white/5 rounded-full blur-[120px] pointer-events-none"></div>
+
+      <div className="max-w-7xl mx-auto relative z-10">
+
+        {/* --- PAGE HEADER --- */}
+        <div className="mb-12 border-b border-white/10 pb-8">
+            <span className="inline-block px-3 py-1 mb-6 text-[10px] font-bold tracking-[0.3em] text-emerald-400 uppercase bg-white/5 border border-white/10 rounded-full">
+                System Controls
+            </span>
+            <h1 className="text-5xl md:text-6xl lg:text-7xl font-serif text-white leading-[0.95]">
+                Settings & <span className="italic font-light text-emerald-500">Preferences.</span>
+            </h1>
         </div>
 
-        {/* Tabs */}
-        <div className="border-b border-gray-200">
-          <nav className="flex">
-            <button
-              onClick={() => setActiveTab('notifications')}
-              className={`px-6 py-4 font-medium ${
-                activeTab === 'notifications' 
-                  ? 'border-b-2 border-slate-500 text-slate-600' 
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Notifications
-            </button>
-            <button
-              onClick={() => setActiveTab('privacy')}
-              className={`px-6 py-4 font-medium ${
-                activeTab === 'privacy' 
-                  ? 'border-b-2 border-slate-500 text-slate-600' 
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Privacy
-            </button>
-            <button
-              onClick={() => setActiveTab('preferences')}
-              className={`px-6 py-4 font-medium ${
-                activeTab === 'preferences' 
-                  ? 'border-b-2 border-slate-500 text-slate-600' 
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Preferences
-            </button>
-          </nav>
-        </div>
+        <div className="flex flex-col lg:flex-row gap-8">
+            
+            {/* --- SIDEBAR NAVIGATION --- */}
+            <aside className="lg:w-1/4 shrink-0">
+                <nav className="flex lg:flex-col gap-3 overflow-x-auto pb-4 lg:pb-0 no-scrollbar">
+                    {navItems.map((item) => (
+                        <button
+                            key={item.id}
+                            onClick={() => setActiveTab(item.id)}
+                            className={`flex items-center gap-4 p-4 rounded-2xl transition-all duration-300 text-left whitespace-nowrap min-w-[200px] lg:min-w-0 border ${
+                                activeTab === item.id 
+                                ? 'bg-emerald-500 text-white border-emerald-400 shadow-[0_10px_30px_-10px_rgba(16,185,129,0.4)]' 
+                                : 'bg-white/5 text-gray-400 border-transparent hover:bg-white/10 hover:text-white'
+                            }`}
+                        >
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg transition-colors ${
+                                activeTab === item.id ? 'bg-white/20 text-white' : 'bg-[#0a1a13] text-emerald-500'
+                            }`}>
+                                <i className={`fa-solid ${item.icon}`}></i>
+                            </div>
+                            <div>
+                                <span className={`block text-sm ${activeTab === item.id ? 'font-bold' : 'font-medium'}`}>
+                                    {item.label}
+                                </span>
+                                <span className={`text-[10px] uppercase tracking-wider block ${activeTab === item.id ? 'text-emerald-100' : 'text-gray-600'}`}>
+                                    {item.desc}
+                                </span>
+                            </div>
+                        </button>
+                    ))}
+                </nav>
+            </aside>
 
-        {/* Content */}
-        <div className="p-6">
-          {activeTab === 'notifications' && (
-            <div className="space-y-6">
-              <h3 className="text-lg font-semibold">Notification Settings</h3>
-              
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <h4 className="font-medium">Email Notifications</h4>
-                    <p className="text-sm text-gray-600">Receive notifications via email</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={settings.notifications.email}
-                      onChange={() => handleToggle('notifications', 'email')}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-slate-600"></div>
-                  </label>
+            {/* --- MAIN CONTENT CARD --- */}
+            <main className="flex-1">
+                <div className="bg-white/5 rounded-[2.5rem] border border-white/10 overflow-hidden min-h-[500px] relative backdrop-blur-md">
+                    
+                    {/* Inner Content */}
+                    <div className="p-6 md:p-10 relative z-10">
+                        
+                        {/* 1. NOTIFICATIONS CONTENT */}
+                        {activeTab === 'notifications' && (
+                            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-8">
+                                <div className="border-b border-white/10 pb-6">
+                                    <h2 className="text-2xl font-serif text-white">Notifications</h2>
+                                    <p className="text-gray-500 text-sm mt-1">Control how and when we contact you.</p>
+                                </div>
+
+                                <div className="space-y-4">
+                                    {[
+                                        { id: 'email', label: 'Email Notifications', desc: 'Get updates on your orders and account.', key: 'email' },
+                                        { id: 'sms', label: 'SMS Notifications', desc: 'Receive shipping updates via text.', key: 'sms' },
+                                        { id: 'promo', label: 'Marketing Emails', desc: 'Be the first to know about sales.', key: 'promotions' },
+                                    ].map(item => (
+                                        <div key={item.id} className="flex items-center justify-between p-4 rounded-2xl hover:bg-white/5 transition-colors group">
+                                            <div>
+                                                <h3 className="font-bold text-white group-hover:text-emerald-400 transition-colors">{item.label}</h3>
+                                                <p className="text-xs md:text-sm text-gray-500">{item.desc}</p>
+                                            </div>
+                                            <ToggleSwitch 
+                                                checked={settings.notifications[item.key]} 
+                                                onChange={() => handleToggle('notifications', item.key)} 
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 2. PRIVACY CONTENT */}
+                        {activeTab === 'privacy' && (
+                            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-8">
+                                <div className="border-b border-white/10 pb-6">
+                                    <h2 className="text-2xl font-serif text-white">Privacy & Security</h2>
+                                    <p className="text-gray-500 text-sm mt-1">Manage your data visibility.</p>
+                                </div>
+
+                                <div className="space-y-8">
+                                    {/* Dropdown Section */}
+                                    <div className="bg-[#0a1a13]/50 p-6 rounded-3xl border border-white/10">
+                                        <label className="block text-[10px] font-bold text-emerald-500 uppercase tracking-widest mb-3">Profile Visibility</label>
+                                        <div className="relative group">
+                                            <select
+                                                value={settings.privacy.profileVisibility}
+                                                onChange={(e) => handleSelect('privacy', 'profileVisibility', e.target.value)}
+                                                className="w-full appearance-none bg-[#0a1a13] p-4 pr-10 border border-white/20 rounded-xl focus:border-emerald-500 outline-none font-medium text-white transition-all cursor-pointer hover:border-white/40"
+                                            >
+                                                <option value="public">Public (Everyone)</option>
+                                                <option value="friends">Friends Only</option>
+                                                <option value="private">Private (Only Me)</option>
+                                            </select>
+                                            <i className="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none text-xs group-hover:text-emerald-500 transition-colors"></i>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between p-4 rounded-2xl hover:bg-white/5 transition-colors">
+                                            <div>
+                                                <h3 className="font-bold text-white">Data Usage</h3>
+                                                <p className="text-xs md:text-sm text-gray-500">Allow us to use data for personalization.</p>
+                                            </div>
+                                            <ToggleSwitch 
+                                                checked={settings.privacy.analytics} 
+                                                onChange={() => handleToggle('privacy', 'analytics')} 
+                                            />
+                                        </div>
+                                        <div className="flex items-center justify-between p-4 rounded-2xl hover:bg-white/5 transition-colors">
+                                            <div>
+                                                <h3 className="font-bold text-white">Share with Partners</h3>
+                                                <p className="text-xs md:text-sm text-gray-500">Allow sharing data with trusted partners.</p>
+                                            </div>
+                                            <ToggleSwitch 
+                                                checked={settings.privacy.dataSharing} 
+                                                onChange={() => handleToggle('privacy', 'dataSharing')} 
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 3. PREFERENCES CONTENT */}
+                        {activeTab === 'preferences' && (
+                             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-8">
+                                <div className="border-b border-white/10 pb-6">
+                                    <h2 className="text-2xl font-serif text-white">App Preferences</h2>
+                                    <p className="text-gray-500 text-sm mt-1">Customize your experience.</p>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {[
+                                        { label: 'Language', key: 'language', options: [{v:'en', t:'English'}, {v:'hi', t:'Hindi'}] },
+                                        { label: 'Currency', key: 'currency', options: [{v:'INR', t:'INR (₹)'}, {v:'USD', t:'USD ($)'}] },
+                                        { label: 'Theme', key: 'theme', options: [{v:'light', t:'Light'}, {v:'dark', t:'Dark'}] },
+                                    ].map((field) => (
+                                        <div key={field.key} className="group">
+                                            <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3 ml-1 group-focus-within:text-emerald-500 transition-colors">{field.label}</label>
+                                            <div className="relative">
+                                                <select
+                                                    value={settings.preferences[field.key]}
+                                                    onChange={(e) => handleSelect('preferences', field.key, e.target.value)}
+                                                    className="w-full appearance-none bg-[#0a1a13] p-4 pr-10 border border-white/10 rounded-xl focus:border-emerald-500 outline-none font-medium text-white transition-all cursor-pointer hover:border-white/30"
+                                                >
+                                                    {field.options.map(o => (
+                                                        <option key={o.v} value={o.v}>{o.t}</option>
+                                                    ))}
+                                                </select>
+                                                <i className="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none text-xs group-hover:text-emerald-500 transition-colors"></i>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                             </div>
+                        )}
+                    </div>
+
+                    {/* --- FOOTER (SAVE BUTTON) --- */}
+                    <div className="bg-[#0a1a13]/40 p-6 border-t border-white/10 flex justify-between md:justify-end items-center gap-4">
+                        <span className="text-xs text-gray-600 italic hidden sm:block">
+                            <i className="fa-regular fa-clock mr-1"></i> Auto-saved draft
+                        </span>
+                        <button
+                            onClick={saveSettings}
+                            disabled={isSaving}
+                            className="w-full md:w-auto px-8 py-3 bg-white text-[#0a1a13] rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-emerald-500 hover:text-white hover:shadow-[0_0_20px_rgba(16,185,129,0.4)] active:scale-95 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                        >
+                            {isSaving ? (
+                                <><i className="fa-solid fa-spinner fa-spin"></i> Saving...</>
+                            ) : (
+                                <>Save Changes <i className="fa-solid fa-check ml-1"></i></>
+                            )}
+                        </button>
+                    </div>
+
                 </div>
-
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <h4 className="font-medium">SMS Notifications</h4>
-                    <p className="text-sm text-gray-600">Receive notifications via SMS</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={settings.notifications.sms}
-                      onChange={() => handleToggle('notifications', 'sms')}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-slate-600"></div>
-                  </label>
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <h4 className="font-medium">Order Updates</h4>
-                    <p className="text-sm text-gray-600">Get notified about order status changes</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={settings.notifications.orderUpdates}
-                      onChange={() => handleToggle('notifications', 'orderUpdates')}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-slate-600"></div>
-                  </label>
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <h4 className="font-medium">Promotions & Offers</h4>
-                    <p className="text-sm text-gray-600">Receive promotional offers and discounts</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={settings.notifications.promotions}
-                      onChange={() => handleToggle('notifications', 'promotions')}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-slate-600"></div>
-                  </label>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'privacy' && (
-            <div className="space-y-6">
-              <h3 className="text-lg font-semibold">Privacy Settings</h3>
-              
-              <div className="space-y-4">
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <h4 className="font-medium mb-2">Profile Visibility</h4>
-                  <p className="text-sm text-gray-600 mb-3">Control who can see your profile information</p>
-                  <select
-                    value={settings.privacy.profileVisibility}
-                    onChange={(e) => handleSelect('privacy', 'profileVisibility', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
-                  >
-                    <option value="public">Public</option>
-                    <option value="private">Private</option>
-                    <option value="friends">Friends Only</option>
-                  </select>
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <h4 className="font-medium">Data Sharing</h4>
-                    <p className="text-sm text-gray-600">Allow sharing data with partners for better experience</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={settings.privacy.dataSharing}
-                      onChange={() => handleToggle('privacy', 'dataSharing')}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-slate-600"></div>
-                  </label>
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <h4 className="font-medium">Analytics</h4>
-                    <p className="text-sm text-gray-600">Help us improve by sharing usage analytics</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={settings.privacy.analytics}
-                      onChange={() => handleToggle('privacy', 'analytics')}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-slate-600"></div>
-                  </label>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'preferences' && (
-            <div className="space-y-6">
-              <h3 className="text-lg font-semibold">General Preferences</h3>
-              
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <h4 className="font-medium mb-2">Language</h4>
-                  <p className="text-sm text-gray-600 mb-3">Choose your preferred language</p>
-                  <select
-                    value={settings.preferences.language}
-                    onChange={(e) => handleSelect('preferences', 'language', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
-                  >
-                    <option value="en">English</option>
-                    <option value="hi">Hindi</option>
-                    <option value="bn">Bengali</option>
-                    <option value="ta">Tamil</option>
-                  </select>
-                </div>
-
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <h4 className="font-medium mb-2">Currency</h4>
-                  <p className="text-sm text-gray-600 mb-3">Select your preferred currency</p>
-                  <select
-                    value={settings.preferences.currency}
-                    onChange={(e) => handleSelect('preferences', 'currency', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
-                  >
-                    <option value="INR">Indian Rupee (₹)</option>
-                    <option value="USD">US Dollar ($)</option>
-                    <option value="EUR">Euro (€)</option>
-                  </select>
-                </div>
-
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <h4 className="font-medium mb-2">Theme</h4>
-                  <p className="text-sm text-gray-600 mb-3">Choose your preferred theme</p>
-                  <select
-                    value={settings.preferences.theme}
-                    onChange={(e) => handleSelect('preferences', 'theme', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
-                  >
-                    <option value="light">Light</option>
-                    <option value="dark">Dark</option>
-                    <option value="auto">Auto</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Save Button */}
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            <button
-              onClick={saveSettings}
-              className="px-6 py-3 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors font-medium"
-            >
-              Save Settings
-            </button>
-          </div>
+            </main>
         </div>
       </div>
     </div>

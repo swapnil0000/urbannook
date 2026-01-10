@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useGetFeaturedProductsQuery } from '../store/api/productsApi';
 
 const FeaturedProducts = () => {
   const [likedProducts, setLikedProducts] = useState([]);
@@ -9,7 +10,15 @@ const FeaturedProducts = () => {
   const [cart, setCart] = useState(JSON.parse(localStorage.getItem('cart') || '[]'));
   const navigate = useNavigate();
 
-  const trendingProducts = [
+  // Fetch featured products from API
+  const { 
+    data: featuredProducts = [], 
+    isLoading, 
+    error 
+  } = useGetFeaturedProductsQuery({ limit: 9 });
+
+  // Fallback products for when API is loading or fails
+  const fallbackProducts = [
     {
       id: 1,
       title: 'Minimalist Metal Keychain',
@@ -41,68 +50,13 @@ const FeaturedProducts = () => {
     }
   ];
 
-  const mostSharedProducts = [
-    {
-      id: 4,
-      title: 'Abstract Art Poster Set',
-      price: 599,
-      originalPrice: 799,
-      image: 'https://images.unsplash.com/photo-1513519245088-0e12902e35ca?w=300&h=300&fit=crop',
-      rating: 4.6,
-      badge: 'VIRAL',
-      shares: 2100
-    },
-    {
-      id: 5,
-      title: 'Minimalist Typography',
-      price: 399,
-      image: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=300&h=300&fit=crop',
-      rating: 4.8,
-      badge: 'VIRAL',
-      shares: 1800
-    },
-    {
-      id: 6,
-      title: 'Nature Photography Print',
-      price: 449,
-      image: 'https://images.unsplash.com/photo-1586717791821-3f44a563fa4c?w=300&h=300&fit=crop',
-      rating: 4.7,
-      badge: 'VIRAL',
-      shares: 1650
-    }
-  ];
+  // Use API data or fallback
+  const products = featuredProducts.length > 0 ? featuredProducts : fallbackProducts;
 
-  const famousProducts = [
-    {
-      id: 1,
-      title: 'Minimalist Metal Keychain',
-      price: 199,
-      originalPrice: 299,
-      image: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=300&h=300&fit=crop',
-      rating: 4.8,
-      badge: 'BESTSELLER',
-      orders: 5000
-    },
-    {
-      id: 8,
-      title: 'Desk Organizer Set',
-      price: 799,
-      originalPrice: 999,
-      image: 'https://images.unsplash.com/photo-1581833971358-2c8b550f87b3?w=300&h=300&fit=crop',
-      rating: 4.9,
-      badge: 'POPULAR',
-      orders: 3500
-    },
-    {
-      id: 7,
-      title: 'Bamboo Pen Stand',
-      price: 349,
-      image: 'https://images.unsplash.com/photo-1586717799252-bd134ad00e26?w=300&h=300&fit=crop',
-      rating: 4.5,
-      badge: 'FAMOUS',
-      orders: 2800
-    }
-  ];
+  // Split products into different categories for tabs
+  const trendingProducts = products.slice(0, 3).map(p => ({ ...p, badge: 'TRENDING' }));
+  const mostSharedProducts = products.slice(3, 6).map(p => ({ ...p, badge: 'VIRAL' }));
+  const famousProducts = products.slice(6, 9).map(p => ({ ...p, badge: 'BESTSELLER' }));
 
   const addToCart = (product) => {
     const cartItem = {
@@ -192,9 +146,12 @@ const FeaturedProducts = () => {
     <div className="bg-bgSecondary rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 group">
       <div className="relative overflow-hidden">
         <img
-          src={product.image}
+          src={product.image || product.images?.[0] || 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=300&h=300&fit=crop'}
           alt={product.title}
           className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-500"
+          onError={(e) => {
+            e.target.src = 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=300&h=300&fit=crop';
+          }}
         />
         
         {product.badge && (
@@ -238,11 +195,11 @@ const FeaturedProducts = () => {
             <i
               key={i}
               className={`fa-solid fa-star text-sm ${
-                i < Math.floor(product.rating) ? 'text-warning' : 'text-borderSecondary'
+                i < Math.floor(product.rating || 4.5) ? 'text-warning' : 'text-borderSecondary'
               }`}
             />
           ))}
-          <span className="text-textMuted text-sm ml-2">({product.rating})</span>
+          <span className="text-textMuted text-sm ml-2">({product.rating || 4.5})</span>
         </div>
 
         <h3 className="text-textPrimary font-semibold mb-3 line-clamp-2">
@@ -268,6 +225,48 @@ const FeaturedProducts = () => {
     </div>
   );
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <section className="py-16 px-8 bg-bgPrimary">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-8">
+            <h2 className="text-4xl font-bold text-textPrimary mb-4">Featured Products</h2>
+            <div className="w-20 h-1 bg-accent mx-auto mb-6"></div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map(i => (
+              <div key={i} className="bg-bgSecondary rounded-2xl overflow-hidden shadow-lg animate-pulse">
+                <div className="w-full h-48 bg-borderSecondary"></div>
+                <div className="p-4">
+                  <div className="h-4 bg-borderSecondary rounded mb-2"></div>
+                  <div className="h-6 bg-borderSecondary rounded mb-3"></div>
+                  <div className="h-4 bg-borderSecondary rounded mb-4 w-1/2"></div>
+                  <div className="h-10 bg-borderSecondary rounded"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <section className="py-16 px-8 bg-bgPrimary">
+        <div className="max-w-7xl mx-auto text-center">
+          <div className="bg-bgSecondary rounded-2xl p-8 max-w-md mx-auto">
+            <i className="fa-solid fa-exclamation-triangle text-4xl text-red-500 mb-4"></i>
+            <h3 className="text-xl font-semibold text-textPrimary mb-2">Failed to Load Featured Products</h3>
+            <p className="text-textSecondary mb-6">Using fallback products for now.</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <>
       <section className="py-16 px-8 bg-bgPrimary">
@@ -278,7 +277,7 @@ const FeaturedProducts = () => {
                 <div>
                   <h2 className="text-3xl font-bold text-textPrimary mb-2">
                     <i className="fa-solid fa-heart text-primary mr-3"></i>
-                    Featured Products
+                    Your Favorites
                   </h2>
                   <p className="text-textSecondary">Products you've liked</p>
                 </div>

@@ -3,16 +3,18 @@ import { Provider } from 'react-redux';
 import { store } from './store/store';
 import { ThemeProvider } from './component/ThemeProvider';
 import AppRoutes from './component/AppRoutes';
+import NewHeader from './component/layout/NewHeader';
+import ApiDebugger from './component/ApiDebugger';
 
 function App() {
   return (
     <Provider store={store}>
       <ThemeProvider>
         <Router> 
-          {/* <NewHeader/> */}
+          <NewHeader/>
           <AppRoutes />
           {/* <WhatsAppButton /> */}
-          {/* <ApiDebugger /> */}
+          <ApiDebugger />
         </Router>
       </ThemeProvider>
     </Provider>

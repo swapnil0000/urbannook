@@ -25,8 +25,8 @@ const UserProfile = ({ user, onLogout, onClose }) => {
   }, [onClose]);
 
   const menuItems = [
-    { icon: 'fa-user', label: 'My Profile', desc: 'Manage your account', action: () => window.location.href = '/my-profile' },
-    { icon: 'fa-box-open', label: 'My Orders', desc: 'Track & History', action: () => window.location.href = '/my-orders' },
+    { icon: 'fa-user', label: 'My Profile', desc: 'Manage your account', action: () => window.location.href = '/profile' },
+    { icon: 'fa-box-open', label: 'My Orders', desc: 'Track & History', action: () => window.location.href = '/orders' },
     { icon: 'fa-heart', label: 'Wishlist', desc: 'Saved Items', action: () => window.location.href = '/wishlist' },
     { icon: 'fa-life-ring', label: 'Support', desc: 'Get Help', action: () => window.location.href = '/customer-support' },
   ];

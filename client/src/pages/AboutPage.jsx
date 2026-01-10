@@ -163,7 +163,7 @@ const AboutPage = () => {
       </section>
 
       {/* --- 4. THE TEAM --- */}
-      <section className="py-24 px-6">
+      {/* <section className="py-24 px-6">
         <div className="max-w-7xl mx-auto">
             <div className="text-center mb-16">
                 <h2 className="text-4xl md:text-5xl font-serif text-white mb-4">The Curators</h2>
@@ -184,7 +184,7 @@ const AboutPage = () => {
                 ))}
             </div>
         </div>
-      </section>
+      </section> */}
 
       <Footer />
     </div>

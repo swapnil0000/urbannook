@@ -8,52 +8,44 @@ const features = [
     id: 1,
     title: "Design-Led Aesthetics",
     description: "Minimal, modern designs made to elevate everyday spaces and lives.",
-    // CHANGED: Stone-200 (Warm Light Grey) - Not White, looks premium
-    bg: "#E7E5E4", 
-    color: "#1C1917", 
-    desktopWidth: '100%', 
-    mobileWidth: '100%', 
+    bg: "#E7E5E4",
+    color: "#1C1917",
+    desktopWidth: '100%',
+    mobileWidth: '100%',
     zIndex: 1,
-    // Icon: Pencil & Ruler -> Design
-    icon: "fa-solid fa-pen-ruler" 
+    icon: "fa-solid fa-pen-ruler"
   },
   {
     id: 2,
     title: "Proudly Homegrown",
     description: "Conceptualized, 3D printed, and wired in our own workshop in India. We control every layer.",
-    // CHANGED: Stone-400 (Medium Warm Grey) - Good contrast for transition
-    bg: "#A8A29E", 
-    color: "#1C1917", 
-    desktopWidth: '80%', 
-    mobileWidth: '100%', 
+    bg: "#A8A29E",
+    color: "#1C1917",
+    desktopWidth: '80%',
+    mobileWidth: '100%',
     zIndex: 2,
-    // Icon: Layer Group -> Represents 3D printing layers & workshop process
     icon: "fa-solid fa-layer-group"
   },
   {
     id: 3,
     title: "Fast Pan-India Delivery",
     description: "Reliable shipping across India, delivered to your doorstep.",
-    // CHANGED: Stone-700 (Dark Warm Grey) - Matches 3rd card style you liked
-    bg: "#44403C", 
-    color: "#FFFFFF", 
-    desktopWidth: '60%', 
-    mobileWidth: '100%', 
+    bg: "#44403C",
+    color: "#FFFFFF",
+    desktopWidth: '60%',
+    mobileWidth: '100%',
     zIndex: 3,
-    // Icon: Fast Truck -> Delivery
     icon: "fa-solid fa-truck-fast"
   },
   {
     id: 4,
     title: "Customization Ready",
     description: "Personalize colors, finishes, or details to match your space and style.",
-    // CHANGED: Stone-950 (Deep Warm Black) - Matches 4th card style you liked
-    bg: "#0C0A09", 
-    color: "#FFFFFF", 
-    desktopWidth: '40%', 
-    mobileWidth: '100%', 
+    bg: "#0C0A09",
+    color: "#FFFFFF",
+    desktopWidth: '40%',
+    mobileWidth: '100%',
     zIndex: 4,
-    // Icon: Palette -> Customization/Colors
     icon: "fa-solid fa-palette"
   },
 ];
@@ -82,7 +74,7 @@ export default function WhyChooseUs() {
 
       const rect = containerRef.current.getBoundingClientRect();
       const windowHeight = window.innerHeight;
-      
+
       const totalDist = rect.height - windowHeight;
       let progress = -rect.top / totalDist;
       progress = Math.max(0, Math.min(1, progress));
@@ -113,14 +105,14 @@ export default function WhyChooseUs() {
   }, []);
 
   return (
-    <section 
-      ref={containerRef} 
+    <section
+      ref={containerRef}
       className="relative w-full"
-      style={{ height: '300vh' }} 
+      style={{ height: '300vh' }}
     >
-      <div 
-        className="sticky top-0 md:top-[5vh] mx-auto w-full md:w-[98%] max-w-[1600px] h-[100vh] md:h-[90vh] md:rounded-[40px] overflow-hidden shadow-2xl border-0 md:border border-white/20 bg-gray-900"
-        style={{ 
+      <div
+        className="sticky top-0 md:top-[5vh] mx-auto w-full md:w-[98%] max-w-[1600px] h-[100vh] md:h-[90vh] md:rounded-[40px] overflow-hidden shadow-2xl border-0 md:border"
+        style={{
           backgroundImage: `url(${desktopBgImage})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
@@ -128,13 +120,38 @@ export default function WhyChooseUs() {
       >
         <div className="absolute inset-0 bg-black/60 z-0"></div>
 
-        {/* BACKGROUND CONTENT (TEXT) */}
-        <div className="absolute top-0 left-0 w-full z-0 pt-20 md:pt-32 px-6 flex flex-col items-center text-center">
-      
+        {/* --- UPDATED TEXT CONTAINER --- */}
+        <div className="absolute top-0 left-0 w-full z-0 px-6 flex flex-col 
+          h-[60vh] justify-center items-start text-left 
+          md:h-auto md:justify-start md:pt-32 md:items-center md:text-center"
+        >
           <h2 className="text-4xl md:text-5xl lg:text-6xl font-serif text-white mb-6 tracking-tight leading-tight">
-            Built Here, <span className="italic font-light text-gray-400">Styled Everywhere</span>
+            Built Here, <br className="md:hidden" />
+
+            {/* Wrapper for the highlighted text */}
+            <span className="relative inline-block">
+
+              {/* The Text (Changed to white for contrast against the green line) */}
+              <span className="italic font-light text-white relative z-10">
+                Styled Everywhere
+              </span>
+
+              {/* The Straight Green Underline */}
+              <svg
+                className="absolute w-full h-1 -bottom-1 left-0 text-emerald-400 -z-0"
+                viewBox="0 0 100 10"
+                preserveAspectRatio="none"
+              >
+                <path
+                  d="M0 5 L 100 5"
+                  stroke="currentColor"
+                  strokeWidth="8"
+                  fill="none"
+                />
+              </svg>
+
+            </span>
           </h2>
-          
         </div>
 
         {/* THE CARDS CONTAINER */}
@@ -146,22 +163,22 @@ export default function WhyChooseUs() {
               style={{
                 position: 'absolute',
                 bottom: 0,
-                right: 0, 
-                width: isMobile ? feature.mobileWidth : feature.desktopWidth, 
-                height: isMobile ? '45vh' : '50vh', 
+                right: 0,
+                width: isMobile ? feature.mobileWidth : feature.desktopWidth,
+                height: isMobile ? '35vh' : '40vh',
                 backgroundColor: feature.bg,
                 color: feature.color,
                 zIndex: 10 + feature.zIndex,
-                borderRadius: isMobile ? '24px 24px 0 0' : '30px 0 0 0', 
+                borderRadius: isMobile ? '24px 24px 0 0' : '30px 0 0 0',
                 boxShadow: '-10px -10px 40px rgba(0,0,0,0.3)',
-                transform: 'translateY(100%)', 
+                transform: 'translateY(100%)',
                 willChange: 'transform',
                 pointerEvents: 'auto',
                 overflow: 'hidden'
               }}
             >
               {/* DECORATIVE NUMBER */}
-              <div 
+              <div
                 className="absolute bottom-[-10px] right-[-10px] font-serif font-bold opacity-[0.05] select-none pointer-events-none"
                 style={{ fontSize: isMobile ? '120px' : '250px', lineHeight: 1 }}
               >
@@ -170,11 +187,11 @@ export default function WhyChooseUs() {
 
               {/* CONTENT */}
               <div className="relative z-10 h-full p-6 md:p-10 lg:p-14 flex flex-col">
-                
+
                 <div className="flex items-start justify-between mb-4 md:mb-8 border-b border-current border-opacity-10 pb-4 md:pb-6">
                   <div className="flex items-center gap-3 md:gap-4">
-                    <i className={`${feature.icon} text-lg md:text-2xl opacity-80`}></i>
-                    <h3 className="text-xl md:text-3xl font-serif tracking-tight font-medium">{feature.title}</h3>
+                    <i className={`${feature.icon} text-md md:text-xl opacity-80`}></i>
+                    <h3 className="text-xl md:text-1xl font-serif tracking-tight font-medium">{feature.title}</h3>
                   </div>
                 </div>
 
