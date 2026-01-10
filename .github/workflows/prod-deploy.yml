@@ -14,17 +14,18 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        fetch-depth: 0
 
       - name: Detect changed paths
         id: changes
         run: |
-          if git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '^client/'; then
+          if git diff -w --name-only origin/main~1..origin/main | grep '^client/'; then
             echo "client=true" >> $GITHUB_OUTPUT
           else
             echo "client=false" >> $GITHUB_OUTPUT
           fi
 
-          if git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '^server/'; then
+          if git diff -w --name-only origin/main~1..origin/main | grep '^server/'; then
             echo "server=true" >> $GITHUB_OUTPUT
           else
             echo "server=false" >> $GITHUB_OUTPUT
