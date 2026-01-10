@@ -27,7 +27,7 @@ const WaitListMobile = () => {
 
         try {
             const { data } = await axios.post(
-                `${import.meta.env?.VITE_EC2_PROD_BASE_URL || 'http://localhost:8000/api/v1/'}join/waitlist`,
+                `https://api.urbannook.in/api/v1/join/waitlist`,
                 { userName, userEmail }
             );
 
