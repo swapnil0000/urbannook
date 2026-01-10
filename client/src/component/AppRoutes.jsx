@@ -20,8 +20,8 @@ import {
   Faq,
   Return,
   AboutPage,
-  WaitList,
 } from "../pages/index.js";
+import WaitListMobile from "../pages/WaitListMobile.jsx";
 
 const AppRoutes = () => {
   return (
@@ -47,7 +47,7 @@ const AppRoutes = () => {
       <Route path="/privacy-policy" element={<PrivacyPolicy />} />
       <Route path="/faqs" element={<Faq />} />
       <Route path="/return-policy" element={<Return />} />
-      <Route path="/wait-list" element={<WaitList />} />
+      <Route path="/wait-list" element={<WaitListMobile />} />
       <Route path="*" element={<Navigate to="/wait-list" replace />} />
     </Routes>
   );
