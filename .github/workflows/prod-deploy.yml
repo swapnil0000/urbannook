@@ -129,7 +129,7 @@ jobs:
         run: |
           ssh ubuntu@${{ secrets.PROD_SSH_HOST }} << 'EOF'
             cd /home/ubuntu/urbannook-prod/server
-            pm2 restart urbannook-server-prod || pm2 start .ecosystem.config.cjs --env production
+            pm2 restart urbannook-server || pm2 start .ecosystem.config.cjs --env production
             pm2 save
           EOF
 
