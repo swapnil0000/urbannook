@@ -212,9 +212,9 @@ const registerService = async (
   };
 };
 
-const addToCartService = async (userEmail, productName, productQuanity) => {
+const addToCartService = async (userEmail, mongooseProductId) => {
   try {
-    let missing = cartDetailsMissing(userEmail, productName);
+    let missing = cartDetailsMissing(userEmail, mongooseProductId);
     if (!missing?.success) {
       return {
         statusCode: Number(missing?.statusCode),
@@ -223,7 +223,6 @@ const addToCartService = async (userEmail, productName, productQuanity) => {
         success: missing?.success,
       };
     }
-    const quantityToUpdate = productQuanity || 1;
     const updatedUser = await User.findOne({ userEmail });
     if (!updatedUser) {
       return {
@@ -234,42 +233,36 @@ const addToCartService = async (userEmail, productName, productQuanity) => {
       };
     }
     // const listOfProduct = produc
-    const productDetails = await Product.findOne({
-      productName: {
-        $in: productName,
-      },
-    });
+    const productDetails = await Product.findOne({ _id: mongooseProductId });
     if (!productDetails) {
       return {
         statusCode: 404,
-        message: `Product not found in DB with name : ${productName}`,
+        message: `Product not found in DB with _id : ${mongooseProductId}`,
         data: [],
         success: false,
       };
     }
 
     const cartItem = updatedUser.addedToCart.find((item) =>
-      item.productId?.equals(productDetails._id)
+      item.productId?.equals(mongooseProductId) 
     );
-
     if (cartItem) {
-      cartItem.quantity += quantityToUpdate;
-    } else {
-      updatedUser.addedToCart.push({
-        productId: productDetails._id,
-        quantity: quantityToUpdate,
-      });
+      return {
+        statusCode: 200,
+        message: `Item already in cart: ${mongooseProductId}`,
+        data: mongooseProductId,
+        success: true,
+      };
     }
-
+    updatedUser.addedToCart.push({
+      productId: productDetails._id,
+    });
     await updatedUser.save();
 
     return {
       statusCode: 200,
-      message: `Added to cart: ${productName}`,
-      data: {
-        productName,
-        productQuanityToUpdate: quantityToUpdate,
-      },
+      message: `Added to cart: ${mongooseProductId}`,
+      data: mongooseProductId,
       success: true,
     };
   } catch (error) {

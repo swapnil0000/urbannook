@@ -63,11 +63,11 @@ const productUpdateFieldMissing = (
   };
 };
 
-const cartDetailsMissing = (productName) => {
-  if (!productName) {
+const cartDetailsMissing = (mongooseProductId) => {
+  if (!mongooseProductId) {
     return {
       statusCode: 400,
-      message: "ProductName is required for adding to cart",
+      message: "mongooseProductId is required for adding to cart",
       data: [],
       success: false,
     };
