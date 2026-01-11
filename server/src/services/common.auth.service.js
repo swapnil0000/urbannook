@@ -49,15 +49,15 @@ const authGuardService = (role) => {
 };
 
 const logoutService = async (req, res) => {
-  const { userEmail } = req.user;
+  const { userEmail } = req.user || {};
   const Model = req.authRole == "User" ? User : Admin;
   const roleDetails = await Model.findOne({ userEmail });
-
   if (!roleDetails) {
     return res
       .status(400)
       .json(new ApiError(400, `UserId not avaialable`, [], false));
   }
+
   await Model.findByIdAndUpdate(
     roleDetails?._id,
     {
@@ -71,9 +71,11 @@ const logoutService = async (req, res) => {
   );
 
   return res
-    .clearCookie("userRefreshToken", cookieOptions)
+    .clearCookie("userAccessToken", cookieOptions)
     .status(200)
-    .json(new ApiRes(200, "User Logout Successfully", null, true));
+    .json(
+      new ApiRes(200, `User - ${userEmail} Logout Successfully`, null, true)
+    );
 };
 
 const profileFetchService = async (data) => {

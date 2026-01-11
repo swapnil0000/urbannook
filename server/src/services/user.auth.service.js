@@ -22,7 +22,7 @@ const loginService = async (userEmail, userPassword) => {
   if (!res) {
     return {
       statusCode: 404,
-      message: "User doesn't exist",
+      message: `User - ${userEmail} doesn't exist`,
       data: null,
       success: false,
     };
@@ -35,7 +35,7 @@ const loginService = async (userEmail, userPassword) => {
     return {
       statusCode: 401,
       message: "Current Password is wronng",
-      data: userEmail,
+      data: null,
       success: false,
     };
   }
@@ -90,7 +90,28 @@ const registerService = async (
       success: missing?.success,
     };
   }
+  const reservedNames = [
+    "admin",
+    "root",
+    "support",
+    "system",
+    "owner",
+    "urbannook",
+    "superuser",
+  ];
 
+  if (reservedNames.includes(userName.toLowerCase())) {
+    return res
+      .status(403)
+      .json(
+        new ApiError(
+          403,
+          `Oops 😅 ${userName} is a VIP name reserved for the system. Please pick something uniquely *you* — we promise we won’t steal it 😉`,
+          { userEmail, userName },
+          false
+        )
+      );
+  }
   const fullNameRegex = /^[A-Za-z]+(?:\s[A-Za-z]+)*$/;
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
   const passwordRegex =
@@ -212,7 +233,12 @@ const addToCartService = async (userEmail, productName, productQuanity) => {
         success: false,
       };
     }
-    const productDetails = await Product.findOne({ productName });
+    // const listOfProduct = produc
+    const productDetails = await Product.findOne({
+      productName: {
+        $in: productName,
+      },
+    });
     if (!productDetails) {
       return {
         statusCode: 404,
