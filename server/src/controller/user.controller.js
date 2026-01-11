@@ -17,7 +17,6 @@ const userLogin = async (req, res) => {
     const { userEmail, userPassword } = req.body;
     // field Missing , existing User and pass check
     let result = await loginService(userEmail, userPassword);
-    console.log(result);
 
     if (result?.statusCode >= 400) {
       return res.status(Number(result?.statusCode)).json(result);
@@ -53,29 +52,7 @@ const userRegister = async (req, res) => {
       userAddress,
       userPinCode,
       userMobileNumber,
-    } = req.body;
-    const reservedNames = [
-      "admin",
-      "root",
-      "support",
-      "system",
-      "owner",
-      "urbannook",
-      "superuser",
-    ];
-
-    if (reservedNames.includes(userName.toLowerCase())) {
-      return res
-        .status(403)
-        .json(
-          new ApiError(
-            403,
-            `Oops 😅 ${userName} is a VIP name reserved for the system. Please pick something uniquely *you* — we promise we won’t steal it 😉`,
-            { userEmail, userName },
-            false
-          )
-        );
-    }
+    } = req.body || {};
     //fieldMissing and existing User check
     let result = await registerService(
       userEmail,
@@ -552,6 +529,20 @@ const userResetPassword = async (req, res) => {
           )
         );
     }
+    const passwordRegex =
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,15}$/;
+    if (!passwordRegex.test(newUserPassword)) {
+      return res
+        .status(Number(400))
+        .json(
+          new ApiError(
+            400,
+            "New Password must be at least 8 characters with uppercase, lowercase, number & special character",
+            null,
+            false
+          )
+        );
+    }
     const userDetails = await User.findOne({ userEmail });
     let result = await loginService(userEmail, currentUserPassword);
     if (result?.statusCode >= 400) {
@@ -585,6 +576,7 @@ const userResetPassword = async (req, res) => {
         .status(Number(400))
         .json(new ApiError(400, `Unable to reset userPassword`, null, false));
     }
+
     userDetails.userPassword = newUserPassword;
     await userDetails.save(); // using this because while using findOne it doesn't trigger pre middleware and hence plain text saved
     return res

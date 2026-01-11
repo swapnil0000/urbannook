@@ -10,7 +10,7 @@ const adminLogin = async (req, res) => {
   try {
     const { userEmail, userPassword } = req.body;
     const action = "login";
-    let missing = fieldMissing(userEmail, userPassword, action);
+    const missing = fieldMissing(userEmail, userPassword, action);
     if (!missing?.success) {
       return res
         .status(Number(missing?.statusCode))

@@ -8,30 +8,30 @@ const fieldMissing = ({
   action,
 }) => {
   let calledController;
-
-  if (action.toLowerCase() == "login")
-    calledController = !userEmail || !userPassword;
-  if (action.toLowerCase() == "register")
-    calledController =
-      !userName ||
-      !userEmail ||
-      !userPassword ||
-      !userMobileNumber ||
-      !userAddress ||
-      !userPinCode;
-  if (action.toLowerCase() == "update")
-    calledController = !userEmail && !userName && !userAddress && !userPinCode;
-
-  if (calledController) {
-    return {
-      statusCode: 400,
-      message:
-        action.toLowerCase() == "update"
-          ? `Atleast fill one field is required`
-          : "All fields are required",
-      data: [],
-      success: false,
+  if (action.toLowerCase() == "login") {
+    calledController = { userEmail, userPassword };
+  }
+  if (action.toLowerCase() == "register") {
+    calledController = { userName, userEmail, userPassword, userMobileNumber };
+  }
+  if (action.toLowerCase() == "update") {
+    calledController = {
+      userName,
+      userEmail,
+      userAddress,
+      userPinCode,
     };
+  }
+  for (let [key, val] of Object.entries(calledController)) {
+    if (!val) {
+      console.log(key);
+      return {
+        statusCode: 400,
+        message: `${key} field is required`,
+        data: [],
+        success: false,
+      };
+    }
   }
   return {
     statusCode: 200,

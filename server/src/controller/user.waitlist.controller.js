@@ -5,35 +5,19 @@ import nodemailer from "nodemailer";
 const userWaitListController = async (req, res) => {
   try {
     const { userName, userEmail } = req.body || {};
-    let emptyField = {};
-    userEmail == undefined
-      ? (emptyField.userEmail = true)
-      : (emptyField.userEmail = false);
-    userName == undefined
-      ? (emptyField.userName = true)
-      : (emptyField.userName = false);
-    const missingKey = ((emptyField) => {
-      for (let key in emptyField) {
-        if (emptyField.hasOwnProperty(key) && emptyField[key]) {
-          return key;
-        }
-      }
-    })(emptyField);
-
-    if (
-      Object.keys(emptyField).length > 0 &&
-      (emptyField?.userEmail || emptyField?.userName)
-    ) {
-      return res
-        .status(400)
-        .json(
-          new ApiError(
-            400,
-            `Can't join the waitlist — ${missingKey} is missing`,
-            null,
-            false
-          )
-        );
+    let emptyField = { userEmail, userName };
+    for (let [key, value] of Object.entries(emptyField)) {
+      if (!value)
+        return res
+          .status(400)
+          .json(
+            new ApiError(
+              400,
+              `Can't join the waitlist — ${key} is missing`,
+              null,
+              false
+            )
+          );
     }
     const reservedNames = [
       "admin",
@@ -112,193 +96,96 @@ const userWaitListController = async (req, res) => {
           from: "UrbanNook <urbanadmin@urbannook.in>",
           to,
           subject: "You're on the UrbanNook Waitlist 🎉",
-          html: `<div style="
-  margin: 0;
-  padding: 0;
-  background-color: #2f7f75;
-  color: #1f2f2b;
-  font-family: 'Helvetica Neue', Arial, sans-serif;
-  line-height: 1.7;
-">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#2f7f75; padding: 40px 0;">
-    <tr>
-      <td align="center">
+          html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light only">
+<meta name="supported-color-schemes" content="light">
+<style>
+  :root { color-scheme: light only; supported-color-schemes: light; }
+</style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #2E443C; word-spacing: normal;">
 
-        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px; background-color:#ffffff; padding: 28px 32px; border-radius: 10px;">
+  <div role="article" aria-roledescription="email" lang="en" 
+       style="text-size-adjust: 100%; -webkit-text-size-adjust: 100%; background-color: #2E443C; background-image: linear-gradient(#2E443C, #2E443C); padding: 40px 20px;">
+    
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="width: 100%; margin: 0; background-color: #2E443C;">
+      <tr>
+        <td align="center">
 
-          <!-- Brand Header -->
-          <tr>
-            <td align="center" style="padding-bottom: 18px;">
-              <h1 style="
-                margin: 0;
-                font-size: 22px;
-                letter-spacing: 2px;
-                color: #1f4f4a;
-              ">
-                URBANNOOK
-              </h1>
-              <p style="
-                margin: 6px 0 0;
-                font-size: 11px;
-                letter-spacing: 2px;
-                color: #7a8f8b;
-                text-transform: uppercase;
-              ">
-                The Art of Living Well
-              </p>
-            </td>
-          </tr>
-
-          <!-- Hero Image -->
-          <tr>
-            <td align="center" style="padding: 16px 0 24px;">
-              <img 
-                src="https://your-cdn-link.com/hero-living-room.jpg"
-                alt="UrbanNook Aesthetic Living"
-                width="100%"
-                style="max-width: 520px; border-radius: 8px; display: block;"
-              />
-            </td>
-          </tr>
-
-          <!-- Greeting -->
-          <tr>
-            <td style="padding-bottom: 12px;">
-              <p style="margin: 0; font-size: 15px; color:#1f2f2b;">
-                Hi ${userName},
-              </p>
-            </td>
-          </tr>
-
-          <!-- Body -->
-          <tr>
-            <td style="padding-bottom: 14px;">
-              <p style="margin: 0; font-size: 15px;">
-                Welcome to the <strong>UrbanNook Circle</strong> — a space where thoughtfully designed home essentials meet modern living.
-              </p>
-            </td>
-          </tr>
-
-          <tr>
-            <td style="padding-bottom: 14px;">
-              <p style="margin: 0; font-size: 15px;">
-                As part of our early community, you’ll get first access to curated collections, minimal interiors, and pieces that turn every house into a warm, intentional home.
-              </p>
-            </td>
-          </tr>
-
-          <tr>
-            <td style="padding-bottom: 22px;">
-              <p style="margin: 0; font-size: 15px;">
-                We believe in design that feels calm, personal, and timeless — and we’re excited to have you with us.
-              </p>
-            </td>
-          </tr>
-
-          <!-- New Arrivals Section -->
-          <tr>
-            <td style="padding-bottom: 18px;">
-              <h3 style="
-                margin: 0 0 8px;
-                font-size: 15px;
-                font-weight: 600;
-                color: #1f4f4a;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-              ">
-                New Arrivals
-              </h3>
-              <p style="margin: 0; font-size: 14px; color:#5f6f6c;">
-                Handpicked décor, soft textures, and aesthetic accents for modern homes.
-              </p>
-            </td>
-          </tr>
-
-          <!-- Image Grid -->
-          <tr>
-            <td align="center" style="padding-bottom: 20px;">
-              <table width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td width="50%" style="padding-right: 6px;">
-                    <img 
-                      src="https://your-cdn-link.com/product-1.jpg" 
-                      alt="Decor Item"
-                      width="100%"
-                      style="border-radius: 6px; display:block;"
-                    />
-                  </td>
-                  <td width="50%" style="padding-left: 6px;">
-                    <img 
-                      src="https://your-cdn-link.com/product-2.jpg" 
-                      alt="Home Accent"
-                      width="100%"
-                      style="border-radius: 6px; display:block;"
-                    />
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-
-          <!-- CTA Button -->
-          <tr>
-            <td align="center" style="padding: 12px 0 26px;">
-              <a 
-                href="https://urbannook.in" 
-                target="_blank"
-                style="
-                  background-color: #1f4f4a;
-                  color: #ffffff;
-                  text-decoration: none;
-                  font-size: 13px;
-                  letter-spacing: 1px;
-                  text-transform: uppercase;
-                  padding: 12px 26px;
-                  border-radius: 30px;
-                  display: inline-block;
-                "
-              >
-                Explore the Collection
-              </a>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="padding-top: 16px; border-top: 1px solid #e3e8e7; text-align: center;">
-              <p style="margin: 0 0 6px; font-size: 14px;">
-                With warmth,<br/>
-                <strong>Team UrbanNook</strong>
-              </p>
-
-              <p style="margin: 0; font-size: 13px; color:#6f7f7c;">
-                Follow our journey on Instagram
-              </p>
-
-              <p style="margin: 6px 0 0;">
-                <a 
-                  href="https://www.instagram.com/urbannook.store" 
-                  target="_blank"
-                  style="
-                    color: #1f4f4a;
-                    text-decoration: none;
-                    font-size: 13px;
-                    border-bottom: 1px solid rgba(31,79,74,0.4);
-                    padding-bottom: 2px;
-                  "
-                >
-                  @urbannook.store
+          <table width="600" cellpadding="0" cellspacing="0" role="presentation" style="max-width: 600px;">
+            <tr>
+              <td align="center" style="padding-bottom: 30px;">
+                <a href="https://urbannook.in" target="_blank">
+                  <img 
+                    src="https://urbannook-prod-frontend.s3.ap-south-1.amazonaws.com/Gemini_Generated_Image_vimqzcvimqzcvimq+(1).png" 
+                    alt="Urban Nook" 
+                    width="140" 
+                    style="display: block; border: 0; max-width: 180px; filter: brightness(0) invert(1);"
+                  />
                 </a>
-              </p>
-            </td>
-          </tr>
+              </td>
+            </tr>
+          </table>
 
-        </table>
+          <table width="600" cellpadding="0" cellspacing="0" role="presentation" style="max-width: 600px; background-color: #F9F9F7 !important; background-image: linear-gradient(#F9F9F7, #F9F9F7); color: #2E443C; padding: 40px; border-radius: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);">
+            
+            <tr>
+              <td align="center" style="padding-bottom: 24px;">
+                <h2 style="margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 22px; font-weight: 300; color: #2E443C !important; letter-spacing: 1px;">
+                  Welcome to the Inner Circle.
+                </h2>
+              </td>
+            </tr>
 
-      </td>
-    </tr>
-  </table>
-</div>
+            <tr>
+              <td align="center" style="padding-bottom: 30px;">
+                <img 
+                  src="https://images.unsplash.com/photo-1497215842964-222b430dc094?q=80&w=1200&auto=format&fit=crop" 
+                  alt="Aesthetic Workspace" 
+                  width="100%"
+                  style="display: block; width: 100%; max-width: 520px; border-radius: 12px; object-fit: cover;"
+                />
+              </td>
+            </tr>
+
+            <tr>
+              <td style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 15px; color: #2E443C !important; text-align: left; line-height: 1.7;">
+                <p style="margin: 0 0 20px 0; color: #2E443C !important;">Hi ${userName},</p>
+                <p style="margin: 0 0 20px 0; color: #2E443C !important;">We’re building a collection of affordable, aesthetic essentials to elevate your workspace. We won't keep you waiting long as launch day is approaching fast.</p>
+                <p style="margin: 0 0 20px 0; color: #2E443C !important;">Keep an eye on your inbox—your <strong style="color: #2E443C !important;">members-only discount code</strong> will arrive before we go live.</p>
+                <p style="margin: 0 0 10px 0; color: #2E443C !important;">Until then, see what we’re building over at <strong style="color: #2E443C !important;">@urbannook</strong>.</p>
+              </td>
+            </tr>
+          </table>
+
+          <table width="600" cellpadding="0" cellspacing="0" role="presentation" style="max-width: 600px;">
+            <tr>
+              <td style="padding-top: 30px; text-align: center;">
+                <p style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0 0 10px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #F9F9F7 !important; opacity: 0.7;">
+                  Curating calm in the creative chaos.
+                </p>
+                <p style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0 0 10px 0; font-size: 13px;">
+                  <a href="https://www.instagram.com/urbannook.store" style="color: #F9F9F7 !important; text-decoration: underline; font-weight: bold;">Instagram</a> 
+                  <span style="padding: 0 10px; color: #F9F9F7 !important; opacity: 0.3;">|</span> 
+                  <a href="https://urbannook.in" style="color: #F9F9F7 !important; text-decoration: underline; font-weight: bold;">Website</a>
+                </p>
+                <p style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 15px 0 0 0; font-size: 10px; color: #F9F9F7 !important; opacity: 0.6;">
+                  © 2026 Urban Nook. All rights reserved.
+                </p>
+              </td>
+            </tr>
+          </table>
+
+        </td>
+      </tr>
+    </table>
+  </div>
+</body>
+</html>
 `,
         });
         return true;
@@ -328,7 +215,7 @@ const userWaitListController = async (req, res) => {
       .json(
         new ApiRes(
           200,
-          "🎉 Congrats! You've joined the UrbanNook waitlist. A confirmation email has been sent!",
+          "Congrats 🎉 A confirmation email is on its way to your inbox While you wait, see what we are building",
           userEmail,
           true
         )
