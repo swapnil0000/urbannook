@@ -162,9 +162,7 @@ const WaitListMobile = () => {
                                         <div className="text-stone-200 font-mono text-xs leading-relaxed max-w-[220px]">
                                             {formState.msg ? (
                                                 <>
-                                                    A confirmation email is on its way to your inbox.
-                                                    <br /><br />
-                                                    While you wait, see what we are building
+                                                    {formState?.msg}
                                                 </>
                                             ) : ""}
                                         </div>
