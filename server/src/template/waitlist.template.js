@@ -71,13 +71,13 @@ const waitlistTemplate = ({ userName, logoUrl }) => {
                 <td style="padding:0 25px 10px 25px; font-family:Arial, Helvetica, sans-serif; font-size:15px; line-height:1.7; color:#2E443C;">
                   <p style="margin:0 0 16px 0;">Hi ${userName},</p>
                   <p style="margin:0 0 16px 0;">
-                    We’re building a collection of affordable, aesthetic essentials to elevate your workspace. We won't keep you waiting long as launch day is approaching fast.
+                    We're building a collection of affordable, aesthetic essentials to elevate your workspace. We won't keep you waiting long as launch day is approaching fast.
                   </p>
                   <p style="margin:0 0 16px 0;">
-                    Keep an eye on your inbox—your <strong>members-only discount code</strong> will arrive before we go live.
+                    Keep an eye on your inbox your <strong>members-only discount code</strong> will arrive before we go live.
                   </p>
                   <p style="margin:0 0 0 0; text-align:center;">
-                    Until then, see what we’re building over at
+                    Until then, see what we're building over at
                   </p>
                 </td>
               </tr>
