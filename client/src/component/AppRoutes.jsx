@@ -22,6 +22,8 @@ import {
   AboutPage,
 } from "../pages/index.js";
 import WaitListMobile from "../pages/WaitListMobile.jsx";
+import AdminLoginPage from "../admin/pages/AdminLoginPage.jsx";
+import AdminDashboardPage from "../admin/pages/AdminDashboardPage.jsx";
 
 const AppRoutes = () => {
   return (
@@ -49,6 +51,14 @@ const AppRoutes = () => {
       <Route path="/return-policy" element={<Return />} />
       <Route path="/wait-list" element={<WaitListMobile />} />
       <Route path="*" element={<Navigate to="/wait-list" replace />} />
+
+
+       {/* Admin panel routes */}
+        <Route path="/admin">
+          <Route path="dashboard" element={<AdminDashboardPage />} />
+          {/* <Route path="users" element={<Users />} /> */}
+          <Route path="login" element={<AdminLoginPage />} />
+        </Route>
     </Routes>
   );
 };

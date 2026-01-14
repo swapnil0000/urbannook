@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import  { useState } from 'react';
 import { useRegisterMutation } from '../store/api/authApi';
 import { useAuth, useUI } from '../hooks/useRedux';
 

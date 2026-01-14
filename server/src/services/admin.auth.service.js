@@ -33,7 +33,7 @@ const productExisting = async (productName, productQuantity) => {
       };
 };
 
-const admingLoginService = async (userEmail, userPassword) => {
+const adminLoginService = async (userEmail, userPassword) => {
   const res = await Admin.findOne({ userEmail });
   if (!res) {
     return {
@@ -53,16 +53,16 @@ const admingLoginService = async (userEmail, userPassword) => {
       success: false,
     };
   }
-  const refreshToken = await res.genAccessToken();
+  const adminAccessToken = await res.genAccessToken();
 
   return {
     statusCode: 200,
     message: "user details",
     data: {
       userEmail: res?.userEmail,
-      refreshToken,
+      adminAccessToken,
     },
     success: true,
   };
 };
-export { productExisting, admingLoginService };
+export { productExisting, adminLoginService };

@@ -1,4 +1,3 @@
-import React from 'react';
 import RegisterForm from '../component/RegisterForm';
 import { useUI } from '../hooks/useRedux';
 

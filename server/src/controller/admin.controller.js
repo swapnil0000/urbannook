@@ -1,16 +1,18 @@
 import Product from "../model/product.model.js";
 import { finalProductName } from "../utlis/CommonResponse.js";
-import { admingLoginService } from "../services/admin.auth.service.js";
+import { adminLoginService } from "../services/admin.auth.service.js";
 import { ApiError, ApiRes } from "../utlis/index.js";
 import { v4 as uuidv4 } from "uuid";
 import { fieldMissing } from "../utlis/CommonResponse.js";
 import cookieOptions from "../config/config.js";
 import { profileFetchService } from "../services/common.auth.service.js";
+import UserWaistList from "../model/user.waitlist.model.js";
 const adminLogin = async (req, res) => {
   try {
-    const { userEmail, userPassword } = req.body;
+    const { userEmail, userPassword } = req.body || {};
+
     const action = "login";
-    const missing = fieldMissing(userEmail, userPassword, action);
+    const missing = fieldMissing({ userEmail, userPassword, action });
     if (!missing?.success) {
       return res
         .status(Number(missing?.statusCode))
@@ -24,19 +26,22 @@ const adminLogin = async (req, res) => {
         );
     }
     // existing User and pass check
-    let result = await admingLoginService(userEmail, userPassword);
+    let result = await adminLoginService(userEmail, userPassword);
 
     if (result?.statusCode >= 400) {
       return res.status(Number(result?.statusCode)).json(result);
     }
     return res
       .status(Number(result?.statusCode))
-      .cookie("adminAccessToken", result?.data?.refreshToken, cookieOptions)
-      .json({
-        userEmail: result?.data?.userEmail,
-        message: result?.message,
-        accessToken: result?.data?.refreshToken,
-      });
+      .cookie("adminAccessToken", result?.data?.adminAccessToken, cookieOptions)
+      .json(
+        new ApiRes(
+          Number(result?.statusCode),
+          result?.message,
+          result?.data,
+          result?.success
+        )
+      );
   } catch (error) {
     return new ApiError(500, null, `Internal Server Error -${error}`, false);
   }
@@ -167,4 +172,47 @@ const adminLogout = (req, res) => {
     .json(new ApiRes(200, `Logout Successfully`, [], true));
 };
 
-export { adminLogin, adminLogout, adminProfile, createProduct, updateProduct };
+const getJoinedUserWaitList = async (req, res) => {
+  try {
+    console.log("Cookies:", req.cookies); 
+    const joinedUserWaitList = await UserWaistList.find()
+      .select("-_id")
+      .sort({ createdAt: -1 });
+    if (!joinedUserWaitList) {
+      return res
+        .status(404)
+        .json(
+          new ApiError(404, `Failed to fetch joinedUserWaitList`, null, false)
+        );
+    }
+    const totalJoinedUserWaitList = await UserWaistList.countDocuments(
+      joinedUserWaitList
+    );
+    return res.status(200).json(
+      new ApiRes(
+        200,
+        !totalJoinedUserWaitList
+          ? `Sorry! No User Joined WaitList`
+          : `Joined User WaitList`,
+        !totalJoinedUserWaitList
+          ? null
+          : {
+              joinedUserWaitList,
+              totalJoinedUserWaitList,
+            },
+        true
+      )
+    );
+  } catch (error) {
+    return new ApiError(500, null, `Internal Server Error -${error}`, false);
+  }
+};
+
+export {
+  adminLogin,
+  adminLogout,
+  adminProfile,
+  createProduct,
+  updateProduct,
+  getJoinedUserWaitList,
+};
