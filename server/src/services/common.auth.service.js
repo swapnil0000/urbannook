@@ -12,8 +12,10 @@ const authGuardService = (role) => {
  */
   return (req, res, next) => {
     try {
-      let token = req.cookies?.userAccessToken;
-
+      let token =
+        role === "Admin"
+          ? req.cookies?.adminAccessToken
+          : req.cookies?.userAccessToken;
       if (!token && req.headers.authorization?.startsWith("Bearer ")) {
         token = req.headers.authorization.split(" ")[1];
       }
