@@ -11,6 +11,7 @@ const AdminLogin = () => {
     loading: false,
     isSuccess: false,
   });
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
 
   const navigate = useNavigate()
   const handleChange = (e) => {
@@ -22,7 +23,7 @@ const AdminLogin = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const res = await axios.post(`https://api.urbannook.in/api/v1/admin/login`, {
+    const res = await axios.post(`${apiBaseUrl}/admin/login`, {
       userEmail:formData?.email,
       userPassword:formData?.password,
     },{

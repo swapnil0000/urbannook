@@ -4,10 +4,13 @@ import { useEffect, useState } from "react";
 const AdminDashboard = () => {
   const [joinedwaitlist, setJoinedWaitList] = useState([]);
   const [searcheUser, setSearchUser] = useState("");
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+  console.log(apiBaseUrl);
+  
   useEffect(() => {
     const handleGetJoinedUserWaitList = async () => {
       const res = await axios.get(
-        `http://localhost:8000/api/v1/admin/joinedwaitlist`,
+        `${apiBaseUrl}/admin/joinedwaitlist`,
         {
           withCredentials: true,
         }
@@ -16,7 +19,7 @@ const AdminDashboard = () => {
       setJoinedWaitList(res?.data?.data?.joinedUserWaitList);
     };
     handleGetJoinedUserWaitList();
-  }, []);
+  }, [apiBaseUrl]);
 
   const handleSearchJoinedUser = () => {
     const search = searcheUser.toLowerCase();
