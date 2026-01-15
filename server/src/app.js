@@ -14,20 +14,25 @@ dotenv.config({
 });
 const app = express();
 const whiteListClientUrl = process.env.WHITE_LIST_CLIENT_URI.split(",");
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      if (!origin || whiteListClientUrl.includes(origin.trim())) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin || whiteListClientUrl.includes(origin.trim())) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
+// Use CORS for all normal requests
+app.use(cors(corsOptions));
+
+// Handle preflight OPTIONS requests
+app.options(/.*/, cors(corsOptions));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
