@@ -172,9 +172,8 @@ const adminLogout = (req, res) => {
     .json(new ApiRes(200, `Logout Successfully`, [], true));
 };
 
-const getJoinedUserWaitList = async (req, res) => {
+const getJoinedUserWaitList = async (_, res) => {
   try {
-    console.log("Cookies:", req.cookies); 
     const joinedUserWaitList = await UserWaistList.find()
       .select("-_id")
       .sort({ createdAt: -1 });
