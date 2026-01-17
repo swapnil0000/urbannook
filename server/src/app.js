@@ -33,7 +33,14 @@ app.use(cors(corsOptions));
 // Handle preflight OPTIONS requests
 app.options(/.*/, cors(corsOptions));
 
-app.use(express.json());
+/*Explicity for webhook because it requires rp webhook requires raw not json */
+app.use("/api/v1", (req, res, next) => {
+  if (req.originalUrl === "/api/v1/rp/webhook") {
+    next();
+  } else {
+    express.json()(req, res, next);
+  }
+});
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
