@@ -95,21 +95,29 @@ const razorpayWebHookController = async (req, res) => {
 
   // 1️⃣ Signature verification
   const shasum = crypto.createHmac("sha256", secret);
-  shasum.update(JSON.stringify(req.body));
+  shasum.update(req.body);
   const digest = shasum.digest("hex");
 
   if (digest !== req.headers["x-razorpay-signature"]) {
     return res.status(400).json({ success: false });
   }
 
-  const event = req.body.event;
+  /* CHecking specficially because the webhook url is public we cant use any guard service
+because it is a ser to ser call so checking this helps us to figure the verification
+*/
+  const signature = req.headers["x-razorpay-signature"];
+  if (!signature || digest !== signature) {
+    return res.status(400).json({ success: false });
+  }
+  const payload = JSON.parse(req.body.toString("utf8"));
+  const event = payload.event;
 
   switch (event) {
     /* =======================
        PAYMENT SUCCESS
     ======================== */
     case "payment.captured": {
-      const payment = req.body.payload.payment.entity;
+      const payment = payload.payload.payment.entity;
       const razorpayOrderId = payment.order_id;
 
       const order = await Order.findOne({
@@ -140,11 +148,9 @@ const razorpayWebHookController = async (req, res) => {
        PAYMENT FAILED
     ======================== */
     case "payment.failed": {
-      const payment = req.body.payload.payment.entity;
-      const razorpayOrderId = payment.order_id;
-
+      const payment = payload.payment.entity;
       await Order.updateOne(
-        { "payment.razorpayOrderId": razorpayOrderId },
+        { "payment.razorpayOrderId": payment.order_id },
         { $set: { status: "FAILED" } }
       );
 
