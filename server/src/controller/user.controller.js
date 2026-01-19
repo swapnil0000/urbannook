@@ -3,21 +3,16 @@ import { validateUserInput } from "../utlis/CommonResponse.js";
 import { ApiError, ApiRes } from "../utlis/index.js";
 import User from "../model/user.model.js";
 import {
-  addToCartService,
-  addToWishList,
   loginService,
   registerService,
-  deleteFromWishList,
 } from "../services/user.auth.service.js";
 import cookieOptions from "../config/config.js";
 import { profileFetchService } from "../services/common.auth.service.js";
-import Product from "../model/product.model.js";
 const userLogin = async (req, res) => {
   try {
-    const { userEmail, userPassword } = req.body;
+    const { email, password } = req.body;
     // field Missing , existing User and pass check
-    let result = await loginService(userEmail, userPassword);
-
+    let result = await loginService(email, password);
     if (result?.statusCode >= 400) {
       return res.status(Number(result?.statusCode)).json(result);
     }
@@ -28,7 +23,7 @@ const userLogin = async (req, res) => {
         new ApiRes(Number(result?.statusCode), `User Details`, {
           role: result?.data?.role,
           userName: result?.data?.userName,
-          userEmail: result?.data?.userEmail,
+          email: result?.data?.email,
           userMobileNumber: result?.data?.userMobileNumber,
           userAddresults: result?.data?.userAddress,
           userPinCode: result?.data?.userPinCode,
@@ -36,7 +31,7 @@ const userLogin = async (req, res) => {
           userPreviousOrder: result?.data?.userPreviousOrder,
           userAccessToken: result?.data?.userAccessToken,
         }),
-        true
+        true,
       );
   } catch (error) {
     return new ApiError(500, null, `Internal Server Error -${error}`, false);
@@ -45,25 +40,9 @@ const userLogin = async (req, res) => {
 
 const userRegister = async (req, res) => {
   try {
-    const {
-      userEmail,
-      userPassword,
-      userName,
-      userAddress,
-      userPinCode,
-      userMobileNumber,
-    } = req.body || {};
+    const { name, email, password, mobileNumber } = req.body || {};
     //fieldMissing and existing User check
-    let result = await registerService(
-      userEmail,
-      userPassword,
-      userMobileNumber,
-      userAddress,
-      userPinCode,
-      userName
-    );
-    // when user registers - for first time we are generating token so we can move them directly to home page
-    let token = await loginService(userEmail, userPassword);
+    let result = await registerService(name, email, password, mobileNumber);
 
     if (result?.statusCode >= 400) {
       return res.status(Number(result?.statusCode)).json(result);
@@ -71,14 +50,14 @@ const userRegister = async (req, res) => {
 
     return res
       .status(200)
-      .cookie("userAccessToken", token?.data?.userAccessToken, cookieOptions)
+      .cookie("userAccessToken", result?.data?.userAccessToken, cookieOptions)
       .json(
         new ApiRes(
           200,
-          `User created with ${userEmail}`,
-          { userEmail, userAccessToken: token?.data?.userAccessToken },
-          true
-        )
+          `User created with ${email}`,
+          { email, userAccessToken: result?.data?.userAccessToken },
+          true,
+        ),
       );
   } catch (error) {
     return res
@@ -89,8 +68,8 @@ const userRegister = async (req, res) => {
 
 const userProfile = async (req, res) => {
   try {
-    const { userEmail } = req.user;
-    const userDetails = await profileFetchService({ userEmail, role: "User" });
+    const { userId } = req.user;
+    const userDetails = await profileFetchService({ userId, role: "USER" });
     if (!userDetails) {
       return res
         .status(404)
@@ -104,353 +83,10 @@ const userProfile = async (req, res) => {
   }
 };
 
-const userAddToCart = async (req, res) => {
+const userForgetpassword = async (req, res) => {
   try {
-    const { userEmail } = req.user;
-    const { productName, productQuanity } = req.body;
-    // fieldMissing and adding to cart check
-    const productAdditionToCart = await addToCartService(
-      userEmail,
-      productName,
-      productQuanity
-    );
-    if (!productAdditionToCart?.success) {
-      return res
-        .status(Number(productAdditionToCart?.statusCode))
-        .json(
-          new ApiError(
-            productAdditionToCart?.statusCode,
-            productAdditionToCart?.message,
-            productAdditionToCart?.data,
-            productAdditionToCart?.success
-          )
-        );
-    }
-    return res
-      .status(Number(productAdditionToCart?.statusCode))
-      .json(
-        new ApiRes(
-          productAdditionToCart?.statusCode,
-          productAdditionToCart?.message,
-          productAdditionToCart?.data,
-          productAdditionToCart?.success
-        )
-      );
-  } catch (error) {
-    return res
-      .status(500)
-      .json(new ApiError(500, `Internal Server Error - ${error}`, [], false));
-  }
-};
-
-const userGetAddToCart = async (req, res) => {
-  try {
-    const { userEmail } = req.user;
-    if (!userEmail) {
-      return res
-        .status(404)
-        .json(new ApiError(404, `User Email not found exist`, null, false));
-    }
-    const userExist = await User.findOne({ userEmail });
-    if (!userExist)
-      return res
-        .status(404)
-        .json(new ApiError(404, `User doesn't exist in DB`, null, false));
-    const productIds = userExist?.addedToWishList.map((id) => {
-      return id?.productId;
-    });
-    const productDetails = await Product.find({
-      _id: productIds,
-    }).select("-_id");
-
-    if (userExist?.addedToCart?.length == 0) {
-      return res
-        .status(200)
-        .json(
-          new ApiRes(200, `Nothing in cart for user ${userEmail}`, null, true)
-        );
-    }
-    return res
-      .status(200)
-      .json(new ApiRes(200, `Preview of Added to cart`, productDetails, true));
-  } catch (error) {
-    return res
-      .status(500)
-      .json(new ApiError(500, `Internal Server Error - ${error}`, [], false));
-  }
-};
-
-const userUpdateCartQuantity = async (req, res) => {
-  try {
-    const { userEmail } = req.user;
-    const { productId, quantity, action } = req.body || {};
-
-    if (!productId || quantity === undefined || !action) {
-      return res
-        .status(400)
-        .json(
-          new ApiError(
-            400,
-            "productId, quantity and action are required",
-            null,
-            false
-          )
-        );
-    }
-
-    if (isNaN(quantity) || Number(quantity) < 0) {
-      return res
-        .status(400)
-        .json(
-          new ApiError(
-            400,
-            "quantity must be a non-negative number",
-            null,
-            false
-          )
-        );
-    }
-
-    const user = await User.findOne({ userEmail });
-    const cartItem = user.addedToCart.find(
-      (item) => item.productId.toString() === productId
-    );
-    if (!cartItem) {
-      return res
-        .status(404)
-        .json(new ApiError(404, "Product not found in cart", null, false));
-    }
-
-    switch (action) {
-      case "add":
-        cartItem.quantity += Number(quantity);
-        break;
-      case "sub":
-        cartItem.quantity -= Number(quantity);
-        if (cartItem.quantity <= 0) {
-          user.addedToCart = user.addedToCart.filter(
-            (item) => item.productId.toString() !== productId
-          );
-        }
-        break;
-
-      default:
-        return res
-          .status(400)
-          .json(
-            new ApiError(400, "Invalid action. Use add | sub", null, false)
-          );
-    }
-
-    await user.save();
-
-    return res
-      .status(200)
-      .json(
-        new ApiRes(200, "Cart updated successfully", user.addedToCart, true)
-      );
-  } catch (error) {
-    return res
-      .status(500)
-      .json(new ApiError(500, `Internal Server Error - ${error}`, null, false));
-  }
-};
-
-const userRemoveFromCart = async (req, res) => {
-  try {
-    const { userEmail } = req.user;
-    const { productId } = req.body;
-
-    const user = await User.findOne({ userEmail });
-    if (!user) {
-      return res
-        .status(404)
-        .json(new ApiError(404, "User not found", null, false));
-    }
-    const updatedUser = await User.findOneAndUpdate(
-      { userEmail, "addedToCart.productId": productDetails._id },
-      {
-        $pull: {
-          addedToCart: {
-            productId,
-          },
-        },
-      },
-      {
-        new: true,
-      }
-    );
-    if (!updatedUser)
-      return res
-        .status(200)
-        .json(
-          new ApiRes(200, "Product already removed from cart", null, false)
-        );
-
-    return res
-      .status(200)
-      .json(new ApiRes(200, "Product removed from cart", null, true));
-  } catch (error) {
-    return res
-      .status(500)
-      .json(new ApiError(500, `Internal Server Error - ${error}`, null, false));
-  }
-};
-
-const userClearCart = async (req, res) => {
-  try {
-    const { userEmail } = req.user;
-
-    const user = await User.findOne({ userEmail });
-    if (!user) {
-      return res
-        .status(404)
-        .json(new ApiError(404, "User not found", null, false));
-    }
-
-    user.addedToCart = [];
-    await user.save();
-    console.log(user);
-
-    return res
-      .status(200)
-      .json(new ApiRes(200, "Cart cleared successfully", [], true));
-  } catch (error) {
-    return res
-      .status(500)
-      .json(new ApiError(500, `Internal Server Error - ${error}`, null, false));
-  }
-};
-
-const userAddToWishList = async (req, res) => {
-  try {
-    const { userEmail } = req.user;
-    if (!userEmail) {
-      return res
-        .status(403)
-        .json(new ApiError(403, `Unauthorized Access`, null, false));
-    }
-    const { productName } = req.body || {};
-
-    // fieldMissing and Addition To WishList check
-    const productAdditionToWishList = await addToWishList(
-      userEmail,
-      productName
-    );
-
-    if (!productAdditionToWishList?.success) {
-      return res
-        .status(Number(productAdditionToWishList?.statusCode))
-        .json(
-          new ApiError(
-            productAdditionToWishList?.statusCode,
-            productAdditionToWishList?.message,
-            productAdditionToWishList?.data,
-            productAdditionToWishList?.success
-          )
-        );
-    }
-    return res
-      .status(Number(productAdditionToWishList?.statusCode))
-      .json(
-        new ApiRes(
-          productAdditionToWishList?.statusCode,
-          productAdditionToWishList?.message,
-          productAdditionToWishList?.data,
-          productAdditionToWishList?.success
-        )
-      );
-  } catch (error) {
-    return res
-      .status(500)
-      .json(new ApiError(500, `Internal Server Error - ${error}`, [], false));
-  }
-};
-
-const userGetProductWishList = async (req, res) => {
-  try {
-    const { userEmail } = req.user;
-    const userExist = await User.findOne({ userEmail });
-
-    if (!userExist)
-      return res
-        .status(404)
-        .json(
-          new ApiError(
-            404,
-            `User Email not found or user doesn't exist`,
-            null,
-            false
-          )
-        );
-    const productIds = userExist?.addedToWishList.map((id) => {
-      return id?.productId;
-    });
-    const productDetails = await Product.find({
-      _id: productIds,
-    }).select("-_id");
-
-    if (!productDetails) {
-      return res
-        .status(200)
-        .json(
-          new ApiRes(
-            200,
-            `Nothing in wishlist for user ${userEmail}`,
-            null,
-            true
-          )
-        );
-    }
-    return res
-      .status(200)
-      .json(new ApiRes(200, `User WishList`, productDetails, true));
-  } catch (error) {
-    return res
-      .status(500)
-      .json(new ApiError(500, `Internal Server Error - ${error}`, [], false));
-  }
-};
-
-const userDeleteFromProductWishList = async (req, res) => {
-  try {
-    const { userEmail } = req.user;
-    const { productId } = req.params;
-    const deleteProduct = await deleteFromWishList(userEmail, productId);
-    if (!deleteProduct?.success) {
-      return res
-        .status(Number(deleteProduct?.statusCode))
-        .json(
-          new ApiError(
-            deleteProduct?.statusCode,
-            deleteProduct?.message,
-            deleteProduct?.data,
-            deleteProduct?.success
-          )
-        );
-    }
-
-    return res
-      .status(200)
-      .json(
-        new ApiRes(
-          deleteProduct?.statusCode,
-          deleteProduct?.message,
-          deleteProduct?.data,
-          deleteProduct?.success
-        )
-      );
-  } catch (error) {
-    return res
-      .status(500)
-      .json(new ApiError(500, `Internal Server Error - ${error}`, [], false));
-  }
-};
-
-const userForgetuserPassword = async (req, res) => {
-  try {
-    const { userEmail, userPassword } = req.body;
-    if (!userPassword) {
+    const { email, password } = req.body;
+    if (!password) {
       return {
         statusCode: 400,
         message: `User Email or Password can't be empty`,
@@ -459,14 +95,12 @@ const userForgetuserPassword = async (req, res) => {
       };
     }
     const userDetails = await User.findOne({
-      userEmail,
+      email,
     });
-    const passCheck = (await userDetails.passCheck(userPassword))
-      ? true
-      : false;
+    const passCheck = (await userDetails.passCheck(password)) ? true : false;
     const oldPassAndNewPassCompare = await bcrypt.compare(
-      userPassword,
-      userDetails?.userPassword
+      password,
+      userDetails?.password,
     );
     if (passCheck) {
       if (oldPassAndNewPassCompare)
@@ -475,29 +109,29 @@ const userForgetuserPassword = async (req, res) => {
           .json(
             new ApiRes(
               400,
-              `Current userPassword and New userPassword is same for user - ${userEmail}`,
-              userEmail,
-              false
-            )
+              `Current password and New password is same for user - ${email}`,
+              email,
+              false,
+            ),
           );
     }
 
     if (!userDetails?._id) {
       return res
         .status(Number(400))
-        .json(new ApiError(400, `Unable to reset userPassword`, null, false));
+        .json(new ApiError(400, `Unable to reset password`, null, false));
     }
-    userDetails.userPassword = userPassword;
+    userDetails.password = password;
     await userDetails.save(); // using this because while using findOne it doesn't trigger pre middleware and hence plain text saved
     return res
       .status(Number(200))
       .json(
         new ApiRes(
           200,
-          `userPassword updated successfully for user ${userEmail}`,
-          userEmail,
-          true
-        )
+          `password updated successfully for user ${email}`,
+          email,
+          true,
+        ),
       );
   } catch (error) {
     return res
@@ -508,14 +142,14 @@ const userForgetuserPassword = async (req, res) => {
 
 const userResetPassword = async (req, res) => {
   try {
-    const { userEmail } = req.user;
-    if (!userEmail) {
+    const { userId } = req.user;
+    if (!userId) {
       return res
         .status(404)
-        .json(new ApiError(404, `Email is not available`, null, false));
+        .json(new ApiError(404, `userId is not available`, null, false));
     }
-    const { currentUserPassword, newUserPassword } = req.body || {};
-    if (!newUserPassword || !currentUserPassword) {
+    const { currentpassword, newpassword } = req.body || {};
+    if (!newpassword || !currentpassword) {
       return res
         .status(400)
         .json(
@@ -523,13 +157,13 @@ const userResetPassword = async (req, res) => {
             400,
             `Both current password and new password is required`,
             null,
-            false
-          )
+            false,
+          ),
         );
     }
     const passwordRegex =
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,15}$/;
-    if (!passwordRegex.test(newUserPassword)) {
+    if (!passwordRegex.test(newpassword)) {
       return res
         .status(Number(400))
         .json(
@@ -537,22 +171,22 @@ const userResetPassword = async (req, res) => {
             400,
             "New Password must be at least 8 characters with uppercase, lowercase, number & special character",
             null,
-            false
-          )
+            false,
+          ),
         );
     }
-    const userDetails = await User.findOne({ userEmail });
-    let result = await loginService(userEmail, currentUserPassword);
+    const userDetails = await User.findOne({ email });
+    let result = await loginService(email, currentpassword);
     if (result?.statusCode >= 400) {
       return res.status(Number(result?.statusCode)).json(result);
     }
     //new pass and curr pass comparison
-    const passCheck = (await userDetails.passCheck(currentUserPassword))
+    const passCheck = (await userDetails.passCheck(currentpassword))
       ? true
       : false;
     const oldPassAndNewPassCompare = await bcrypt.compare(
-      newUserPassword,
-      userDetails?.userPassword
+      newpassword,
+      userDetails?.password,
     );
 
     if (passCheck) {
@@ -562,30 +196,30 @@ const userResetPassword = async (req, res) => {
           .json(
             new ApiRes(
               400,
-              `Current userPassword and New userPassword is same for user - ${userEmail}`,
-              userEmail,
-              false
-            )
+              `Current password and New password is same for user - ${email}`,
+              email,
+              false,
+            ),
           );
     }
 
     if (!userDetails?._id) {
       return res
         .status(Number(400))
-        .json(new ApiError(400, `Unable to reset userPassword`, null, false));
+        .json(new ApiError(400, `Unable to reset password`, null, false));
     }
 
-    userDetails.userPassword = newUserPassword;
+    userDetails.password = newpassword;
     await userDetails.save(); // using this because while using findOne it doesn't trigger pre middleware and hence plain text saved
     return res
       .status(Number(200))
       .json(
         new ApiRes(
           200,
-          `userPassword updated successfully for user ${userEmail}`,
-          userEmail,
-          true
-        )
+          `password updated successfully for user ${email}`,
+          email,
+          true,
+        ),
       );
   } catch (error) {
     return res
@@ -596,18 +230,18 @@ const userResetPassword = async (req, res) => {
 
 const userUpdateProfile = async (req, res) => {
   try {
-    const { userEmail } = req.user;
-    if (!userEmail) {
+    const { userId } = req.user;
+    if (!userId) {
       return res
         .status(401)
         .json(new ApiError(401, "Unauthorized", null, false));
     }
 
-    const { userName, userAddress, userPinCode } = req.body || {};
+    const { email, name, mobileNumber } = req.body || {};
     if (
-      userName === undefined &&
-      userAddress === undefined &&
-      userPinCode === undefined
+      name === undefined &&
+      mobileNumber == undefined &&
+      email === undefined
     ) {
       return res
         .status(400)
@@ -615,9 +249,8 @@ const userUpdateProfile = async (req, res) => {
     }
 
     const validate = validateUserInput({
-      userName,
-      userAddress,
-      userPinCode,
+      name,
+      mobileNumber,
     });
 
     if (!validate.success) {
@@ -628,31 +261,33 @@ const userUpdateProfile = async (req, res) => {
             validate.statusCode,
             validate.message,
             validate.data,
-            false
-          )
+            false,
+          ),
         );
     }
 
     const updateFields = {};
-    if (userName !== undefined) updateFields.userName = userName;
-    if (userAddress !== undefined) updateFields.userAddress = userAddress;
-    if (userPinCode !== undefined) updateFields.userPinCode = userPinCode;
+    if (email !== undefined) updateFields.email = email;
 
+    if (name !== undefined) updateFields.name = name;
+    if (mobileNumber !== undefined) updateFields.mobileNumber = mobileNumber;
     const updatedUser = await User.findOneAndUpdate(
       {
-        userEmail,
+        userId,
         $or: [
-          userName !== undefined ? { userName: { $ne: userName } } : null,
-          userAddress !== undefined
-            ? { userAddress: { $ne: userAddress } }
+          email !== undefined ? { email: { $ne: email } } : null,
+          name != undefined ? { name: { $ne: name } } : null,
+          mobileNumber != undefined
+            ? { mobileNumber: { $ne: mobileNumber } }
             : null,
-          userPinCode !== undefined
-            ? { userPinCode: { $ne: userPinCode } }
-            : null,
-        ].filter(Boolean),
+        ],
       },
-      { $set: updateFields },
-      { new: true }
+      {
+        $set: updateFields,
+      },
+      {
+        new: true,
+      },
     );
 
     if (!updatedUser) {
@@ -663,24 +298,21 @@ const userUpdateProfile = async (req, res) => {
             200,
             "No changes done. Same values already saved.",
             null,
-            true
-          )
+            true,
+          ),
         );
     }
-
     return res.status(200).json(
       new ApiRes(
         200,
         "Profile updated successfully",
         {
-          userEmail: updatedUser.userEmail,
-          userName: updatedUser.userName,
-          userAddress: updatedUser.userAddress,
-          userPinCode: updatedUser.userPinCode,
-          isUserVerified: updatedUser.isUserVerified,
+          email: updatedUser.email,
+          name: updatedUser.name,
+          mobileNumber: updatedUser.mobileNumber,
         },
-        true
-      )
+        true,
+      ),
     );
   } catch (error) {
     return res
@@ -690,23 +322,23 @@ const userUpdateProfile = async (req, res) => {
           500,
           `Internal Server Error - ${error.message}`,
           null,
-          false
-        )
+          false,
+        ),
       );
   }
 };
 
 const userAccountDeletePreview = async (req, res) => {
   try {
-    const { userEmail } = req.user;
+    const { userId } = req.user;
 
-    if (!userEmail) {
+    if (!email) {
       return res
         .status(400)
         .json(new ApiError(400, `Email is required for deleting`, null, false));
     }
 
-    const userDetails = await User.findOne({ userEmail });
+    const userDetails = await User.findOne({ email });
     if (!userDetails) {
       return res
         .status(404)
@@ -714,20 +346,20 @@ const userAccountDeletePreview = async (req, res) => {
     }
 
     // Generate token (base64 encode the email)
-    const confirmToken = Buffer.from(userEmail).toString("base64");
+    const confirmToken = Buffer.from(email).toString("base64");
 
     return res.status(200).json(
       new ApiRes(
         200,
         "Are you sure you want to delete your account?",
         {
-          userEmail,
+          email,
           confirmToken,
           confirmDelete: true,
           note: "Send this token with confirmDelete=true to delete account",
         },
-        true
-      )
+        true,
+      ),
     );
   } catch (error) {
     return res
@@ -747,17 +379,17 @@ const userAccountDeleteConfirm = async (req, res) => {
           400,
           `confirmToken and confirmDelete=true are required for deleting`,
           null,
-          false
-        )
+          false,
+        ),
       );
   }
 
   try {
-    // Decode token to get userEmail
-    const userEmail = Buffer.from(confirmToken, "base64").toString("utf-8");
+    // Decode token to get email
+    const email = Buffer.from(confirmToken, "base64").toString("utf-8");
 
     // Find user
-    const user = await User.findOne({ userEmail });
+    const user = await User.findOne({ email });
     if (!user) {
       return res
         .status(404)
@@ -765,7 +397,7 @@ const userAccountDeleteConfirm = async (req, res) => {
     }
 
     // Delete user
-    await User.deleteOne({ userEmail });
+    await User.deleteOne({ email });
 
     return res
       .status(200)
@@ -777,55 +409,13 @@ const userAccountDeleteConfirm = async (req, res) => {
   }
 };
 
-const userOrderPreviousHistory = async (req, res) => {
-  try {
-    const { userEmail } = req.user;
-    if (!userEmail) {
-      return res
-        .status(404)
-        .json(new ApiError(404, `User Email Not found`, null, false));
-    }
-    const userPreviousOrder = await User.findOne({ userEmail }).populate(
-      "userPreviousOrder.productId",
-      "productName sellingPrice"
-    );
-    const orders = userPreviousOrder?.userPreviousOrder || [];
-
-    return res
-      .status(200)
-      .json(
-        new ApiRes(
-          200,
-          orders.length === 0
-            ? "No orders placed yet"
-            : "Orders fetched successfully",
-          { userEmail, userPreviousOrder: orders },
-          true
-        )
-      );
-  } catch (error) {
-    return res
-      .status(500)
-      .json(new ApiError(500, `Internal Server Error - ${error}`, [], false));
-  }
-};
-
 export {
   userLogin,
   userRegister,
   userProfile,
-  userAddToCart,
-  userGetAddToCart,
-  userOrderPreviousHistory,
   userAccountDeletePreview,
   userAccountDeleteConfirm,
   userResetPassword,
   userUpdateProfile,
-  userAddToWishList,
-  userGetProductWishList,
-  userDeleteFromProductWishList,
-  userUpdateCartQuantity,
-  userRemoveFromCart,
-  userClearCart,
-  userForgetuserPassword,
+  userForgetpassword,
 };

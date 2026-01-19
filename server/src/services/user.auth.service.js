@@ -1,12 +1,12 @@
 import User from "../model/user.model.js";
-import Product from "../model/product.model.js";
-import { cartDetailsMissing, fieldMissing } from "../utlis/CommonResponse.js";
+import { fieldMissing } from "../utlis/CommonResponse.js";
+import { v7 as uuid7 } from "uuid";
 
-const loginService = async (userEmail, userPassword) => {
+const loginService = async (email, password) => {
   //fieldMissing
   let missing = fieldMissing({
-    userEmail,
-    userPassword,
+    email,
+    password,
     action: "login",
   });
 
@@ -18,19 +18,18 @@ const loginService = async (userEmail, userPassword) => {
       success: missing?.success,
     };
   }
-  const res = await User.findOne({ userEmail: userEmail.toLowerCase() });
+  const res = await User.findOne({ email: email.toLowerCase() });
+
   if (!res) {
     return {
       statusCode: 404,
-      message: `User - ${userEmail} doesn't exist`,
+      message: `User - ${email} doesn't exist`,
       data: null,
       success: false,
     };
   }
-
   //pass check
-  const passCheck = (await res.passCheck(userPassword)) ? true : false;
-
+  const passCheck = (await res.passCheck(password)) ? true : false;
   if (!passCheck) {
     return {
       statusCode: 401,
@@ -49,13 +48,12 @@ const loginService = async (userEmail, userPassword) => {
     statusCode: 200,
     message: "user details",
     data: {
-      userName: res?.userName,
-      userEmail: res?.userEmail,
-      userMobileNumber: res?.userMobileNumber,
+      name: res?.name,
+      email: res?.email,
+      mobileNumber: res?.mobileNumber,
       userAddress: res?.userAddress,
       userPinCode: res?.userPinCode,
       addedToCart: res?.addedToCart,
-      userPreviousOrder: res?.userPreviousOrder,
       role: res?.role,
       userRefreshToken,
       userAccessToken,
@@ -64,21 +62,12 @@ const loginService = async (userEmail, userPassword) => {
   };
 };
 
-const registerService = async (
-  userEmail,
-  userPassword,
-  userMobileNumber,
-  userAddress,
-  userPinCode,
-  userName
-) => {
+const registerService = async (name, email, password, mobileNumber) => {
   let missing = fieldMissing({
-    userName,
-    userEmail,
-    userPassword,
-    userMobileNumber,
-    userAddress,
-    userPinCode,
+    name,
+    email,
+    password,
+    mobileNumber,
     action: "register",
   });
 
@@ -100,27 +89,25 @@ const registerService = async (
     "superuser",
   ];
 
-  if (reservedNames.includes(userName.toLowerCase())) {
+  if (reservedNames.includes(name.toLowerCase())) {
     return res
       .status(403)
       .json(
         new ApiError(
           403,
-          `Oops 😅 ${userName} is a VIP name reserved for the system. Please pick something uniquely *you* — we promise we won’t steal it 😉`,
-          { userEmail, userName },
-          false
-        )
+          `Oops 😅 ${name} is a VIP name reserved for the system. Please pick something uniquely *you* — we promise we won’t steal it 😉`,
+          { email, name },
+          false,
+        ),
       );
   }
-  const fullNameRegex = /^[A-Za-z]+(?:\s[A-Za-z]+)*$/;
+  const fullNameRegex = /^[A-Za-z]+(?:\s+[A-Za-z]+)*$/;
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
   const passwordRegex =
     /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,15}$/;
   const mobileRegex = /^[6-9]\d{9}$/;
-  const addressRegex = /^[A-Za-z0-9\s,./#-]{5,100}$/;
-  const pinCodeRegex = /^[1-9][0-9]{5}$/;
 
-  if (!fullNameRegex.test(userName.trim())) {
+  if (!fullNameRegex.test(name.trim())) {
     return {
       statusCode: 400,
       message: "Full name must contain only alphabets and single spaces ",
@@ -128,7 +115,7 @@ const registerService = async (
     };
   }
 
-  if (!emailRegex.test(userEmail)) {
+  if (!emailRegex.test(email.trim())) {
     return {
       statusCode: 400,
       message: "Invalid email format",
@@ -136,7 +123,7 @@ const registerService = async (
     };
   }
 
-  if (!passwordRegex.test(userPassword)) {
+  if (!passwordRegex.test(password)) {
     return {
       statusCode: 400,
       message:
@@ -145,7 +132,7 @@ const registerService = async (
     };
   }
 
-  if (!mobileRegex.test(String(userMobileNumber))) {
+  if (!mobileRegex.test(Number(mobileNumber))) {
     return {
       statusCode: 400,
       message: "Invalid mobile number (must be 10 digits, start with 6–9)",
@@ -153,241 +140,57 @@ const registerService = async (
     };
   }
 
-  if (!addressRegex.test(userAddress)) {
-    return {
-      statusCode: 400,
-      message: "Address contains invalid characters or length",
-      success: false,
-    };
-  }
-
-  if (!pinCodeRegex.test(String(userPinCode))) {
-    return {
-      statusCode: 400,
-      message: "Pin code must be exactly 6 digits and cannot start with 0",
-      success: false,
-    };
-  }
-
   const res = await User.findOne({
-    $or: [{ userMobileNumber }, { userEmail: userEmail.toLowerCase() }],
+    $or: [{ mobileNumber }, { email: email.toLowerCase() }],
   });
 
   if (res) {
     let matchedValue;
-    if (res?.userEmail == userEmail) matchedValue = userEmail;
-    else if (res?.userMobileNumber == userMobileNumber)
-      matchedValue = userMobileNumber;
+    if (res?.email == email) matchedValue = email;
+    else if (res?.mobileNumber == mobileNumber) matchedValue = mobileNumber;
 
     return {
       statusCode: 409,
       message: `User Already exist with - ${matchedValue}`,
-      data: userEmail,
+      data: `${matchedValue}`,
       success: false,
     };
   }
-
+  const userId = uuid7();
   const newRegisteringUser = await User.create({
-    userName: userName.toLowerCase(),
-    userEmail: userEmail.toLowerCase(),
-    userPassword,
-    userMobileNumber,
-    userAddress,
-    userPinCode,
+    name: name.toLowerCase(),
+    email: email.toLowerCase(),
+    password,
+    mobileNumber,
+    userId,
   });
-
+  // when user registers - for first time we are generating token so we can move them directly to home page
+  const userAccessToken = newRegisteringUser.genAccessToken();
+  const userRefreshToken = newRegisteringUser.genRefreshToken();
+  newRegisteringUser.userRefreshToken = userRefreshToken;
   if (!newRegisteringUser)
     return {
       statusCode: 400,
-      message: `Failed to create user with ${userEmail}`,
-      data: userEmail,
+      message: `Failed to create user with ${email}`,
+      data: email,
       success: false,
     };
+  newRegisteringUser.save({ validateBeforeSave: false }).catch((err) => {
+    console.error("Refresh token save failed:", err);
+  });
 
   return {
     statusCode: 200,
-    message: `Created user with - ${userEmail}`,
-    data: userEmail,
+    message: `Created user with - ${email}`,
+    data: {
+      user: {
+        id: newRegisteringUser.userId,
+        email: newRegisteringUser.email,
+      },
+      userAccessToken,
+    },
     success: true,
   };
 };
 
-const addToCartService = async (userEmail, mongooseProductId) => {
-  try {
-    let missing = cartDetailsMissing(userEmail, mongooseProductId);
-    if (!missing?.success) {
-      return {
-        statusCode: Number(missing?.statusCode),
-        message: missing?.message,
-        data: missing?.data || null,
-        success: missing?.success,
-      };
-    }
-    const updatedUser = await User.findOne({ userEmail });
-    if (!updatedUser) {
-      return {
-        statusCode: 404,
-        message: "User not found in DB",
-        data: null,
-        success: false,
-      };
-    }
-    // const listOfProduct = produc
-    const productDetails = await Product.findOne({ _id: mongooseProductId });
-    if (!productDetails) {
-      return {
-        statusCode: 404,
-        message: `Product not found in DB with _id : ${mongooseProductId}`,
-        data: [],
-        success: false,
-      };
-    }
-
-    const cartItem = updatedUser.addedToCart.find((item) =>
-      item.productId?.equals(mongooseProductId) 
-    );
-    if (cartItem) {
-      return {
-        statusCode: 200,
-        message: `Item already in cart: ${mongooseProductId}`,
-        data: mongooseProductId,
-        success: true,
-      };
-    }
-    updatedUser.addedToCart.push({
-      productId: productDetails._id,
-    });
-    await updatedUser.save();
-
-    return {
-      statusCode: 200,
-      message: `Added to cart: ${mongooseProductId}`,
-      data: mongooseProductId,
-      success: true,
-    };
-  } catch (error) {
-    console.error("AddToCart Error:", error);
-    return {
-      statusCode: 500,
-      message: "Internal server error",
-      data: error.message,
-      success: false,
-    };
-  }
-};
-
-const addToWishList = async (userEmail, productName) => {
-  try {
-    let missing = cartDetailsMissing(productName);
-
-    if (!missing?.success) {
-      return {
-        statusCode: Number(missing?.statusCode),
-        message: missing?.message,
-        data: missing?.data || null,
-        success: missing?.success,
-      };
-    }
-    // Check product
-    const productDetails = await Product.findOne({ productName });
-    if (!productDetails) {
-      return {
-        statusCode: 404,
-        message: `Product not found with name : ${productName}`,
-        data: [],
-        success: false,
-      };
-    }
-
-    // update wishlist
-    const updatedUser = await User.findOneAndUpdate(
-      { userEmail },
-      { $addToSet: { addedToWishList: { productId: productDetails?._id } } },
-      { new: true }
-    ).select("-userPassword -userRefreshToken -__v -_id -createdAt");
-
-    if (!updatedUser) {
-      return {
-        statusCode: 400,
-        message: "Failed to add to wishlist",
-        data: [],
-        success: false,
-      };
-    }
-
-    return {
-      statusCode: 200,
-      message: `Added to wishlist: ${productName}`,
-      data: {
-        productName,
-      },
-      success: true,
-    };
-  } catch (error) {
-    console.error("Wishlist Error:", error);
-    return {
-      statusCode: 500,
-      message: "Internal server error",
-      data: error.message,
-      success: false,
-    };
-  }
-};
-
-const deleteFromWishList = async (userEmail, productId) => {
-  try {
-    const productDetails = await Product.findOne({ productId });
-    if (!productDetails) {
-      return {
-        statusCode: 404,
-        message: `Product not found with id : ${productId}`,
-        data: [],
-        success: false,
-      };
-    }
-    const userExist = await User.findOneAndUpdate(
-      { userEmail },
-      {
-        $pull: {
-          addedToWishList: {
-            productId: productDetails?._id,
-          },
-        },
-      },
-      {
-        new: true,
-      }
-    );
-
-    await userExist.save();
-    if (!userExist)
-      return {
-        statusCode: 404,
-        message: `Failed to remove from wishlist`,
-        data: [],
-        success: false,
-      };
-
-    return {
-      statusCode: 200,
-      message: `${productDetails?.productName} deleted from wishlist`,
-      data: `${productDetails?.productName}`,
-      success: true,
-    };
-  } catch (error) {
-    return {
-      statusCode: 500,
-      message: "Internal server error",
-      data: error.message,
-      success: false,
-    };
-  }
-};
-
-export {
-  loginService,
-  registerService,
-  addToCartService,
-  addToWishList,
-  deleteFromWishList,
-};
+export { loginService, registerService };

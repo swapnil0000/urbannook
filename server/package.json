@@ -18,6 +18,9 @@
     "nodemailer": "^7.0.12",
     "otp-generator": "^4.0.1",
     "razorpay": "^2.9.6",
+    "swagger-autogen": "^2.23.7",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
     "uuid": "^13.0.0"
   },
   "devDependencies": {

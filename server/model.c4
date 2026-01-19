@@ -1,0 +1,315 @@
+// Urban Nook E-commerce Platform - C4 Model
+// Based on server folder structure with detailed component layers
+
+specification {
+  element actor
+  element system
+  element container
+  element component
+
+  tag ui {
+    color #33B074
+  }
+  tag routes {
+    color #9C27B0
+  }
+  tag controller {
+    color #FF6B35
+  }
+  tag service {
+    color #FFA500
+  }
+  tag model {
+    color #FF6B6B
+  }
+  tag db {
+    color #004E89
+  }
+}
+
+model {
+  customer = actor "Customer" {
+    description "End user or admin"
+  }
+
+  urbanNook = system "Urban Nook" {
+    description "E-commerce platform for sustainable urban living products"
+
+    // Frontend Layer
+    frontend = container "Frontend" {
+      #ui
+      description "React/Vite application on Vercel"
+    }
+
+    // Routes Layer Container
+    routesLayer = container "Routes Layer" {
+      #routes
+      description "API endpoint definitions and routing"
+
+      routeIndex = component "routes/index.js" {
+        #routes
+        description "Main route aggregator"
+      }
+
+      adminRoute = component "routes/admin.route.js" {
+        #routes
+        description "Admin routes"
+      }
+
+      commonRoute = component "routes/common.route.js" {
+        #routes
+        description "Common routes"
+      }
+
+      productRoute = component "routes/product.route.js" {
+        #routes
+        description "Product routes"
+      }
+
+      userRoute = component "routes/user.route.js" {
+        #routes
+        description "User routes"
+      }
+
+      userAddressRoute = component "routes/user.address.route.js" {
+        #routes
+        description "Address routes"
+      }
+
+      userCartRoute = component "routes/user.cart.route.js" {
+        #routes
+        description "Cart routes"
+      }
+
+      userWaitlistRoute = component "routes/user.waitlist.route.js" {
+        #routes
+        description "Waitlist routes"
+      }
+
+      userWishlistRoute = component "routes/user.wishlist.route.js" {
+        #routes
+        description "Wishlist routes"
+      }
+
+      routeIndex -> adminRoute "aggregates"
+      routeIndex -> commonRoute "aggregates"
+      routeIndex -> productRoute "aggregates"
+      routeIndex -> userRoute "aggregates"
+      routeIndex -> userAddressRoute "aggregates"
+      routeIndex -> userCartRoute "aggregates"
+      routeIndex -> userWaitlistRoute "aggregates"
+      routeIndex -> userWishlistRoute "aggregates"
+    }
+
+    // Controllers Layer Container
+    controllersLayer = container "Controllers Layer" {
+      #controller
+      description "Request handlers and business logic orchestration"
+
+      adminCtrl = component "admin.controller.js" {
+        #controller
+        description "Admin operations"
+      }
+
+      commonCtrl = component "common.controller.js" {
+        #controller
+        description "Common operations"
+      }
+
+      productCtrl = component "product.controller.js" {
+        #controller
+        description "Product operations"
+      }
+
+      userCtrl = component "user.controller.js" {
+        #controller
+        description "User operations"
+      }
+
+      userAddressCtrl = component "user.address.controller.js" {
+        #controller
+        description "Address operations"
+      }
+
+      userCartCtrl = component "user.cart.controller.js" {
+        #controller
+        description "Cart operations"
+      }
+
+      userWaitlistCtrl = component "user.waitlist.controller.js" {
+        #controller
+        description "Waitlist operations"
+      }
+
+      userWishlistCtrl = component "user.wishlist.controller.js" {
+        #controller
+        description "Wishlist operations"
+      }
+
+      rpPaymentCtrl = component "rp.payment.controller.js" {
+        #controller
+        description "Razorpay payment operations"
+      }
+    }
+
+    // Services Layer Container
+    servicesLayer = container "Services Layer" {
+      #service
+      description "Business logic and external integrations"
+
+      adminAuthSvc = component "admin.auth.service.js" {
+        #service
+        description "Admin authentication"
+      }
+
+      commonAuthSvc = component "common.auth.service.js" {
+        #service
+        description "Common authentication"
+      }
+
+      userAuthSvc = component "user.auth.service.js" {
+        #service
+        description "User authentication"
+      }
+
+      emailSvc = component "email.service.js" {
+        #service
+        description "Email sending service"
+      }
+
+      rpPaymentSvc = component "rp.payement.service.js" {
+        #service
+        description "Razorpay payment logic"
+      }
+
+      userCartSvc = component "user.cart.service.js" {
+        #service
+        description "Cart business logic"
+      }
+
+      userWishlistSvc = component "user.wishlist.service.js" {
+        #service
+        description "Wishlist business logic"
+      }
+    }
+
+    // Models Layer Container
+    modelsLayer = container "Models Layer" {
+      #model
+      description "Database schemas and data models"
+
+      adminModel = component "admin.model.js" {
+        #model
+        description "Admin schema"
+      }
+
+      userModel = component "user.model.js" {
+        #model
+        description "User schema"
+      }
+
+      productModel = component "product.model.js" {
+        #model
+        description "Product schema"
+      }
+
+      orderModel = component "order.model.js" {
+        #model
+        description "Order schema"
+      }
+
+      userCartModel = component "user.cart.model.js" {
+        #model
+        description "Cart schema"
+      }
+
+      userWishlistModel = component "user.wishlist.model.js" {
+        #model
+        description "Wishlist schema"
+      }
+
+      userWaitlistModel = component "user.waitlist.model.js" {
+        #model
+        description "Waitlist schema"
+      }
+
+      addressModel = component "address.new.model.js" {
+        #model
+        description "Address schema"
+      }
+
+      userAddressModel = component "userAddress.model.js" {
+        #model
+        description "User address schema"
+      }
+    }
+
+    // Database Layer
+    database = container "Database" {
+      #db
+      description "MongoDB"
+    }
+
+    // External Services
+    razorpay = container "Razorpay" {
+      #service
+      description "Payment gateway"
+    }
+
+    // Connections between layers
+    frontend -> routesLayer "HTTP requests"
+    routesLayer -> controllersLayer "calls"
+    controllersLayer -> servicesLayer "uses"
+    servicesLayer -> modelsLayer "queries via"
+    modelsLayer -> database "persists to"
+
+    // External integrations
+    servicesLayer -> razorpay "payment processing"
+    // servicesLayer -> emailSvc "sends emails"
+
+    customer -> frontend "uses"
+  }
+}
+
+views {
+
+  view index {
+    title "Urban Nook System Architecture"
+    description "Complete architecture showing all layers: Frontend, Routes, Controllers, Services, Models, and Database"
+
+    include *
+
+    style * {
+      opacity 100%
+    }
+  }
+
+  view routes of urbanNook.routesLayer {
+    title "Routes Layer"
+    description "All API route definitions and route aggregation"
+
+    include *
+  }
+
+  view controllers of urbanNook.controllersLayer {
+    title "Controllers Layer"
+    description "All controller components handling requests"
+
+    include *
+  }
+
+  view services of urbanNook.servicesLayer {
+    title "Services Layer"
+    description "All service components with business logic"
+
+    include *
+  }
+
+  view models of urbanNook.modelsLayer {
+    title "Models Layer"
+    description "All database model schemas"
+
+    include *
+  }
+
+}

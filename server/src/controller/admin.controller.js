@@ -1,6 +1,9 @@
 import Product from "../model/product.model.js";
 import { finalProductName } from "../utlis/CommonResponse.js";
-import { adminLoginService } from "../services/admin.auth.service.js";
+import {
+  adminLoginService,
+  totalProductService,
+} from "../services/admin.auth.service.js";
 import { ApiError, ApiRes } from "../utlis/index.js";
 import { v4 as uuidv4 } from "uuid";
 import { fieldMissing } from "../utlis/CommonResponse.js";
@@ -207,6 +210,27 @@ const getJoinedUserWaitList = async (_, res) => {
   }
 };
 
+const totalProducts = async (_, res) => {
+  try {
+    const result = await totalProductService();
+
+    return res
+      .status(result.statusCode)
+      .json(
+        new ApiRes(
+          result.statusCode,
+          result.message,
+          result.data,
+          result.success
+        )
+      );
+  } catch (error) {
+    return res
+      .status(500)
+      .json(new ApiError(500, null, `Internal Server Error - ${error}`, false));
+  }
+};
+
 export {
   adminLogin,
   adminLogout,
@@ -214,4 +238,5 @@ export {
   createProduct,
   updateProduct,
   getJoinedUserWaitList,
+  totalProducts,
 };

@@ -4,95 +4,63 @@ import jwt from "jsonwebtoken";
 
 const userSchema = mongoose.Schema(
   {
-    userName: {
+    userId: {
+      type: String,
+      required: [true, "userId is required"],
+      lowercase: true,
+      trim: true,
+      unique: true,
+    },
+    name: {
       type: String,
       required: [true, "Name is required"],
       lowercase: true,
       trim: true,
     },
-    userEmail: {
+    email: {
       type: String,
       required: [true, "userEmail is required"],
       unique: true,
     },
-    userPassword: {
+    password: {
       type: String,
       required: [true, "userPassword is required"],
     },
-    userMobileNumber: {
+    mobileNumber: {
       type: Number,
       required: [true, "userMobileNumber is required"],
       unique: true,
     },
-    userAddress: {
-      type: String,
-      required: [true, "userAddress is required"],
-    },
-    userPinCode: {
-      type: Number,
-      required: [true, "userPinCode is required"],
-    },
-    userVerificationOtp: {
+    verificationOtp: {
       type: Number,
     },
-    userVerificationOtpExpiresAt: {
+    verificationOtpExpiresAt: {
       type: Date,
     },
-    isUserVerified: {
+    isVerified: {
       type: Boolean,
       default: false,
     },
-    userPreviousOrder: [
-      {
-        _id: false,
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Order",
-      },
-    ],
-    addedToCart: [
-      {
-        _id: false,
-        productId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Product",
-          required: true,
-        },
-        quantity: {
-          type: Number,
-          default: 1,
-          min: 1,
-        },
-      },
-    ],
-    addedToWishList: [
-      {
-        _id: false,
-        productId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Product",
-          required: true,
-        },
-      },
-    ],
     userRefreshToken: String,
     role: {
       type: String,
-      default: "User",
+      enum: ["USER", "WAITLIST_USER"],
+      default: "USER",
     },
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 userSchema.pre("save", async function (next) {
-  if (!this.isModified("userPassword")) return next();
-  this.userPassword = await bcrypt.hash(this.userPassword, 12);
+  if (!this.isModified("password")) return next();
+  this.password = await bcrypt.hash(this.password, 12);
   next();
 });
 
-userSchema.methods.passCheck = async function (userPassword) {
-  return await bcrypt.compare(userPassword, this.userPassword);
+userSchema.methods.passCheck = async function (password) {
+  return await bcrypt.compare(password, this.password);
 };
 
 userSchema.methods.genAccessToken = function () {
@@ -101,14 +69,13 @@ userSchema.methods.genAccessToken = function () {
   }
   return jwt.sign(
     {
-      _id: this._id,
-      userEmail: this.userEmail,
-      userName: this.userName,
+      userId: this.userId,
+      userEmail: this.email,
     },
     process.env.USER_ACCESS_TOKEN_SECRET,
     {
       expiresIn: "1d",
-    }
+    },
   );
 };
 
@@ -120,7 +87,7 @@ userSchema.methods.genRefreshToken = function () {
     process.env.REFRESH_TOKEN_SECRET,
     {
       expiresIn: "10d",
-    }
+    },
   );
 };
 
