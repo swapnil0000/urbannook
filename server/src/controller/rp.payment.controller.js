@@ -47,7 +47,7 @@ const razorpayCreateOrderController = async (req, res) => {
 
 const razorpayPaymentVerificationController = async (req, res) => {
   try {
-    const { userEmail } = req.user;
+    const { userId } = req.user;
     if (!userEmail) {
       return res
         .status(404)

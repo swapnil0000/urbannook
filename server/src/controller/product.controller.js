@@ -35,7 +35,8 @@ const productListing = async (req, res) => {
     const listOfProducts = await Product.find(query)
       .skip((page - 1) * perPage)
       .limit(perPage) // for limit
-      .sort({ createdAt: -1 }); // latest one
+      .sort({ createdAt: -1 }) // latest one
+      .select("-_id");
 
     return res.status(200).json(
       new ApiRes(
@@ -56,15 +57,15 @@ const productListing = async (req, res) => {
                   },
                 },
         },
-        true
-      )
+        true,
+      ),
     );
   } catch (error) {
     return res.status(500).json(new ApiError(500, error.message, null, false));
   }
 };
 const specificProductDetails = async (req, res) => {
-  const { productId } = req.params;
+  const { productId } = req.body;
   if (!productId) {
     return res
       .status(404)

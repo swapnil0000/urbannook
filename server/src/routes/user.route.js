@@ -1,6 +1,5 @@
 import { Router } from "express";
 import bodyParser from "body-parser";
-
 /* ===============================================================
    CONTROLLERS
    ---------------------------------------------------------------
@@ -15,22 +14,26 @@ import {
   userLogin,
   userRegister,
   userProfile,
-  userUpdateProfile,
-  userResetPassword,
   userAccountDeletePreview,
   userAccountDeleteConfirm,
-  userOrderPreviousHistory,
+  userResetPassword,
+  userUpdateProfile,
+} from "../controller/user.controller.js";
+
+import {
   userAddToCart,
   userGetAddToCart,
-  userAddToWishList,
-  userGetProductWishList,
-  userDeleteFromProductWishList,
   userUpdateCartQuantity,
   userRemoveFromCart,
   userClearCart,
-  userForgetuserPassword,
-} from "../controller/user.controller.js";
+  userOrderPreviousHistory,
+} from "../controller/user.cart.controller.js";
 
+import {
+  userAddToWishList,
+  userGetProductWishList,
+  userDeleteFromProductWishList,
+} from "../controller/user.wishlist.controller.js";
 /* ===============================================================
    AUTH SERVICES
    ---------------------------------------------------------------
@@ -67,25 +70,25 @@ const userRouter = Router();
 ================================================================ */
 userRouter.post("/user/login", userLogin);
 userRouter.post("/user/register", userRegister);
-userRouter.post("/user/forgot-password", userForgetuserPassword);
+// userRouter.post("/user/forgot-password", userForgetPassword);
 
 /* ===============================================================
    PROFILE & ACCOUNT (PROTECTED)
    ---------------------------------------------------------------
    Requires valid JWT (User role)
 ================================================================ */
-userRouter.post("/user/profile", authGuardService("User"), userProfile);
+userRouter.get("/user/profile", authGuardService("USER"), userProfile);
 
 userRouter.patch(
   "/user/profile/update",
-  authGuardService("User"),
-  userUpdateProfile
+  authGuardService("USER"),
+  userUpdateProfile,
 );
 
 userRouter.post(
   "/user/reset-password",
-  authGuardService("User"),
-  userResetPassword
+  authGuardService("USER"),
+  userResetPassword,
 );
 
 /* ===============================================================
@@ -93,8 +96,8 @@ userRouter.post(
 ================================================================ */
 userRouter.get(
   "/user/order-history",
-  authGuardService("User"),
-  userOrderPreviousHistory
+  authGuardService("USER"),
+  userOrderPreviousHistory,
 );
 
 /* ===============================================================
@@ -102,47 +105,46 @@ userRouter.get(
    ---------------------------------------------------------------
    Handles cart CRUD operations
 ================================================================ */
-userRouter.post("/user/addtocart", authGuardService("User"), userAddToCart);
 
 userRouter.get(
   "/user/preview-addtocart",
-  authGuardService("User"),
-  userGetAddToCart
+  authGuardService("USER"),
+  userGetAddToCart,
 );
 
 userRouter.put(
   "/user/cart/update",
-  authGuardService("User"),
-  userUpdateCartQuantity
+  authGuardService("USER"),
+  userUpdateCartQuantity,
 );
 
 userRouter.delete(
   "/user/cart/:productId",
-  authGuardService("User"),
-  userRemoveFromCart
+  authGuardService("USER"),
+  userRemoveFromCart,
 );
 
-userRouter.delete("/user/clear-cart", authGuardService("User"), userClearCart);
+userRouter.delete("/user/clear-cart", authGuardService("USER"), userClearCart);
 
 /* ===============================================================
    WISHLIST MANAGEMENT (PROTECTED)
 ================================================================ */
 userRouter.post(
   "/user/addtowishlist",
-  authGuardService("User"),
-  userAddToWishList
+  authGuardService("USER"),
+  userAddToWishList,
 );
 
 userRouter.get(
   "/user/wishlist",
-  authGuardService("User"),
-  userGetProductWishList
+  authGuardService("USER"),
+  userGetProductWishList,
 );
 
 userRouter.delete(
   "/user/wishlist/:productId",
-  authGuardService("User"),
-  userDeleteFromProductWishList
+  authGuardService("USER"),
+  userDeleteFromProductWishList,
 );
 
 /* ===============================================================
@@ -153,25 +155,25 @@ userRouter.delete(
 ================================================================ */
 userRouter.post(
   "/user/delete-preview",
-  authGuardService("User"),
-  userAccountDeletePreview
+  authGuardService("USER"),
+  userAccountDeletePreview,
 );
 
 userRouter.delete(
   "/user/delete-confirm",
-  authGuardService("User"),
-  userAccountDeleteConfirm
+  authGuardService("USER"),
+  userAccountDeleteConfirm,
 );
 
 /* ===============================================================
    SESSION & TOKEN MANAGEMENT
 ================================================================ */
-userRouter.post("/user/logout", authGuardService("User"), logoutService);
+userRouter.post("/user/logout", authGuardService("USER"), logoutService);
 
 userRouter.post(
   "/refresh-token",
-  authGuardService("User"),
-  regenerateTokenService
+  authGuardService("USER"),
+  regenerateTokenService,
 );
 
 /* ===============================================================
@@ -183,20 +185,20 @@ userRouter.post(
 ================================================================ */
 userRouter.get(
   "/rp/get-key",
-  authGuardService("User"),
-  razorpayKeyGetController
+  authGuardService("USER"),
+  razorpayKeyGetController,
 );
 
 userRouter.post(
   "/user/create-order",
-  authGuardService("User"),
-  razorpayCreateOrderController
+  authGuardService("USER"),
+  razorpayCreateOrderController,
 );
 
 userRouter.post(
   "/user/paymentverification",
-  authGuardService("User"),
-  razorpayPaymentVerificationController
+  authGuardService("USER"),
+  razorpayPaymentVerificationController,
 );
 
 /* ===============================================================
@@ -210,7 +212,7 @@ userRouter.post(
 userRouter.post(
   "/rp/webhook",
   bodyParser.raw({ type: "application/json" }),
-  razorpayWebHookController
+  razorpayWebHookController,
 );
 
 export default userRouter;
