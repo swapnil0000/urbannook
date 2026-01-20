@@ -21,7 +21,6 @@ import {
 } from "../controller/user.controller.js";
 
 import {
-  userAddToCart,
   userGetAddToCart,
   userUpdateCartQuantity,
   userRemoveFromCart,
@@ -44,7 +43,6 @@ import {
 import {
   authGuardService,
   logoutService,
-  regenerateTokenService,
 } from "../services/common.auth.service.js";
 
 /* ===============================================================
@@ -60,6 +58,7 @@ import {
   razorpayKeyGetController,
   razorpayWebHookController,
 } from "../controller/rp.payment.controller.js";
+
 
 const userRouter = Router();
 
@@ -106,25 +105,7 @@ userRouter.get(
    Handles cart CRUD operations
 ================================================================ */
 
-userRouter.get(
-  "/user/preview-addtocart",
-  authGuardService("USER"),
-  userGetAddToCart,
-);
 
-userRouter.put(
-  "/user/cart/update",
-  authGuardService("USER"),
-  userUpdateCartQuantity,
-);
-
-userRouter.delete(
-  "/user/cart/:productId",
-  authGuardService("USER"),
-  userRemoveFromCart,
-);
-
-userRouter.delete("/user/clear-cart", authGuardService("USER"), userClearCart);
 
 /* ===============================================================
    WISHLIST MANAGEMENT (PROTECTED)
@@ -169,13 +150,6 @@ userRouter.delete(
    SESSION & TOKEN MANAGEMENT
 ================================================================ */
 userRouter.post("/user/logout", authGuardService("USER"), logoutService);
-
-userRouter.post(
-  "/refresh-token",
-  authGuardService("USER"),
-  regenerateTokenService,
-);
-
 /* ===============================================================
    RAZORPAY CHECKOUT FLOW (PROTECTED)
    ---------------------------------------------------------------

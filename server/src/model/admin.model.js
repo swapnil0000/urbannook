@@ -3,12 +3,12 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 const adminSchema = mongoose.Schema(
   {
-    userEmail: {
+    email: {
       type: String,
       required: [true, "userEmail is required"],
       unique: true,
     },
-    userPassword: {
+    password: {
       type: String,
       required: [true, "userPassword is required"],
     },
@@ -21,8 +21,8 @@ const adminSchema = mongoose.Schema(
   }
 );
 
-adminSchema.methods.passCheck = async function (userPassword) {
-  return await bcrypt.compare(userPassword, this.userPassword);
+adminSchema.methods.passCheck = async function (password) {
+  return await bcrypt.compare(password, this.password);
 };
 
 adminSchema.methods.genAccessToken = function () {
@@ -32,7 +32,7 @@ adminSchema.methods.genAccessToken = function () {
   return jwt.sign(
     {
       _id: this._id,
-      userEmail: this.userEmail,
+      email: this.email,
       username: this.username,
     },
     process.env.ADMIN_ACCESS_TOKEN_SECRET,

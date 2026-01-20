@@ -41,6 +41,10 @@ const productSchema = mongoose.Schema(
       type: String,
       enum: ["in_stock", "out_of_stock", "discontinued"],
     },
+    tags: {
+      type: [String],
+      enum: ["featured", "new_arrival", "best_seller", "trending"],
+    },
     productSubDes: String,
     productSubCategory: String,
   },

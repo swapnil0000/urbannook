@@ -71,6 +71,7 @@ userSchema.methods.genAccessToken = function () {
     {
       userId: this.userId,
       userEmail: this.email,
+      userRole: this.role,
     },
     process.env.USER_ACCESS_TOKEN_SECRET,
     {
