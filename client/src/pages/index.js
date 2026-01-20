@@ -1,44 +1,22 @@
-import HomePage from "../pages/HomePage";
-import ContactPage from "../pages/ContactPage";
-import AllProductsPage from "../pages/AllProductsPage";
-import CategoryProductsPage from "../pages/CategoryProductsPage";
-import ProductDetailPage from "../pages/ProductDetailPage";
-import CheckoutPage from "../pages/CheckoutPage";
-import ProductDetails from "../feature/product/component/ProductDetails";
-import RegisterPage from "../pages/RegisterPage";
-import MyProfilePage from "../pages/MyProfilePage";
-import MyOrdersPage from "../pages/MyOrdersPage";
-import WishlistPage from "../pages/WishlistPage";
-import CustomerSupportPage from "../pages/CustomerSupportPage";
-import RewardsPage from "../pages/RewardsPage";
-import SettingsPage from "../pages/SettingsPage";
-import TermsConditions from "../pages/TermsCondition";
-import CancellationPolicy from "../pages/CancellationPolicy";
-import PrivacyPolicy from "../pages/PrivacyPolicy";
-import Faq from "../pages/Faqs";
-import Return from "../pages/Return";
-import AboutPage from "../pages/AboutPage";
-import WaitList from "../pages/WaitList.jsx";
-export {
-  HomePage,
-  ContactPage,
-  AllProductsPage,
-  CategoryProductsPage,
-  ProductDetailPage,
-  CheckoutPage,
-  ProductDetails,
-  RegisterPage,
-  MyProfilePage,
-  MyOrdersPage,
-  WishlistPage,
-  CustomerSupportPage,
-  RewardsPage,
-  SettingsPage,
-  TermsConditions,
-  CancellationPolicy,
-  PrivacyPolicy,
-  Faq,
-  Return,
-  AboutPage,
-  WaitList,
-};
+import { lazy } from 'react';
+
+// Lazy load all pages for better performance
+export const HomePage = lazy(() => import("../pages/HomePage"));
+export const CheckoutPage = lazy(() => import("../pages/CheckoutPage"));
+export const MyOrdersPage = lazy(() => import("./account/MyOrdersPage.jsx"));
+export const WishlistPage = lazy(() => import("./account/WishlistPage.jsx"));
+export const RewardsPage = lazy(() => import("./info/RewardsPage.jsx"));
+export const SettingsPage = lazy(() => import("./account/SettingsPage.jsx"));
+export const TermsConditions = lazy(() => import("./legal/TermsCondition.jsx"));
+export const CancellationPolicy = lazy(() => import("./legal/CancellationPolicy.jsx"));
+export const PrivacyPolicy = lazy(() => import("./legal/PrivacyPolicy.jsx"));
+export const Faq = lazy(() => import("./support/Faqs.jsx"));
+export const Return = lazy(() => import("./legal/Return.jsx"));
+export const WaitList = lazy(() => import("./info/WaitList.jsx"));
+export const ContactPage = lazy(() => import("./support/ContactPage.jsx"));
+export const AllProductsPage = lazy(() => import("./shop/AllProductsPage.jsx"));
+export const CategoryProductsPage = lazy(() => import("./shop/CategoryProductsPage.jsx"));
+export const ProductDetailPage = lazy(() => import("./shop/ProductDetailPage.jsx"));
+export const MyProfilePage = lazy(() => import("./account/MyProfilePage.jsx"));
+export const CustomerSupportPage = lazy(() => import("./support/CustomerSupportPage.jsx"));
+export const AboutPage = lazy(() => import("./info/AboutPage.jsx"));

@@ -54,11 +54,13 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
         document.cookie = `userAccessToken=${result.userAccessToken}; path=/; max-age=2592000`;
         setAuthUser(result.user, result.userAccessToken);
       }
+
+      debugger
       
       const userData = {
-        name: result.user?.userName || result.user?.name || 'User',
-        email: result.user?.userEmail || result.user?.email || '',
-        mobile: result.user?.userMobileNumber || result.user?.mobile || ''
+        name: result.data?.userName || result.user?.name || 'User',
+        email: result.data?.userEmail || result.user?.email || '',
+        mobile: result.data?.userMobileNumber || result.user?.mobile || ''
       };
       
       localStorage.setItem('user', JSON.stringify(userData));

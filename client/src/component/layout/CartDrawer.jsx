@@ -1,24 +1,77 @@
 import React, { useEffect, useState } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
+import { updateQuantity, removeItem } from '../../store/slices/cartSlice';
+import { useUpdateCartMutation, useRemoveFromCartMutation } from '../../store/api/userApi';
 
-const CartDrawer = ({ isOpen, onClose, cartItems = [] }) => {
+const CartDrawer = ({ isOpen, onClose }) => {
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [mounted, setMounted] = useState(false);
+  
+  // Get cart items from Redux store
+  const { items: cartItems, totalAmount } = useSelector((state) => state.cart);
+  
+  const [updateCart] = useUpdateCartMutation();
+  const [removeFromCart] = useRemoveFromCartMutation();
 
   // Handle animation mounting
   useEffect(() => {
     if (isOpen) {
       setMounted(true);
-      document.body.style.overflow = 'hidden'; // Prevent background scrolling
+      document.body.style.overflow = 'hidden';
     } else {
-      const timer = setTimeout(() => setMounted(false), 300); // Wait for animation
+      const timer = setTimeout(() => setMounted(false), 300);
       document.body.style.overflow = 'unset';
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
 
+  const handleQuantityChange = async (productId, newQuantity) => {
+    if (newQuantity <= 0) {
+      handleRemoveItem(productId);
+      return;
+    }
+    
+    try {
+      // Update Redux store immediately
+      dispatch(updateQuantity({ id: productId, quantity: newQuantity }));
+      
+      // Find the item to get mongoId for backend sync
+      const item = cartItems.find(item => item.id === productId);
+      const mongoId = item?.mongoId || productId;
+      
+      // Sync with backend
+      await updateCart({ productId: mongoId, quantity: newQuantity }).unwrap();
+    } catch (error) {
+      console.error('Failed to update cart:', error);
+    }
+  };
+
+  const handleRemoveItem = async (productId) => {
+    try {
+      // Update Redux store immediately
+      dispatch(removeItem(productId));
+      
+      // Find the item to get mongoId for backend sync
+      const item = cartItems.find(item => item.id === productId);
+      const mongoId = item?.mongoId || productId;
+      
+      // Sync with backend
+      await removeFromCart(mongoId).unwrap();
+    } catch (error) {
+      console.error('Failed to remove item:', error);
+    }
+  };
+  
+  const handleCheckout = () => {
+    onClose();
+    navigate('/checkout');
+  };
+
   if (!mounted && !isOpen) return null;
 
-  // Mock data calculations (Replace with real logic)
-  const subtotal = cartItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+  const subtotal = totalAmount;
   const freeShippingThreshold = 5000;
   const progress = Math.min((subtotal / freeShippingThreshold) * 100, 100);
 
@@ -97,28 +150,41 @@ const CartDrawer = ({ isOpen, onClose, cartItems = [] }) => {
                   <div key={item.id} className="flex gap-4 group">
                     {/* Image */}
                     <div className="w-20 h-20 bg-slate-100 rounded-xl overflow-hidden shrink-0">
-                      <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                      <img src={item.image || '/placeholder.jpg'} alt={item.name} className="w-full h-full object-cover" />
                     </div>
                     
                     {/* Details */}
                     <div className="flex-1 flex flex-col justify-between">
                       <div>
                         <h4 className="text-sm font-bold text-slate-900 line-clamp-1">{item.name}</h4>
-                        <p className="text-xs text-slate-500">{item.variant || 'Standard'}</p>
+                        <p className="text-xs text-slate-500">Standard</p>
                       </div>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">
-                            <button className="text-slate-400 hover:text-slate-900 text-xs px-1">-</button>
-                            <span className="text-xs font-bold text-slate-900">{item.quantity}</span>
-                            <button className="text-slate-400 hover:text-slate-900 text-xs px-1">+</button>
+                          <button 
+                            onClick={() => handleQuantityChange(item.id, Math.max(0, item.quantity - 1))}
+                            className="text-slate-400 hover:text-slate-900 text-xs px-1"
+                          >
+                            -
+                          </button>
+                          <span className="text-xs font-bold text-slate-900">{item.quantity}</span>
+                          <button 
+                            onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
+                            className="text-slate-400 hover:text-slate-900 text-xs px-1"
+                          >
+                            +
+                          </button>
                         </div>
-                        <p className="text-sm font-bold text-emerald-700">₹{item.price.toLocaleString()}</p>
+                        <p className="text-sm font-bold text-emerald-700">₹{item.price?.toLocaleString()}</p>
                       </div>
                     </div>
 
                     {/* Remove */}
-                    <button className="text-slate-300 hover:text-red-500 transition-colors self-start p-1">
-                        <i className="fa-regular fa-trash-can text-sm"></i>
+                    <button 
+                      onClick={() => handleRemoveItem(item.id)}
+                      className="text-slate-300 hover:text-red-500 transition-colors self-start p-1"
+                    >
+                      <i className="fa-regular fa-trash-can text-sm"></i>
                     </button>
                   </div>
                 ))}
@@ -135,7 +201,10 @@ const CartDrawer = ({ isOpen, onClose, cartItems = [] }) => {
                 <span className="text-xl font-serif text-slate-900">₹{subtotal.toLocaleString()}</span>
             </div>
             <p className="text-[10px] text-slate-400 mb-4 text-center">Shipping & taxes calculated at checkout</p>
-            <button className="w-full py-4 bg-emerald-700 text-white rounded-2xl font-bold uppercase tracking-widest text-xs hover:bg-emerald-800 transition-all shadow-lg active:scale-[0.98] flex items-center justify-center gap-2">
+            <button 
+              onClick={handleCheckout}
+              className="w-full py-4 bg-emerald-700 text-white rounded-2xl font-bold uppercase tracking-widest text-xs hover:bg-emerald-800 transition-all shadow-lg active:scale-[0.98] flex items-center justify-center gap-2"
+            >
                 <span>Checkout Securely</span>
                 <i className="fa-solid fa-lock text-[10px] opacity-70"></i>
             </button>

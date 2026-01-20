@@ -11,17 +11,24 @@ const cartSlice = createSlice({
   initialState,
   reducers: {
     addItem: (state, action) => {
-      const { id, name, price, image } = action.payload;
+      const { id, name, price, image, quantity = 1, mongoId } = action.payload;
       const existingItem = state.items.find(item => item.id === id);
       
       if (existingItem) {
-        existingItem.quantity += 1;
+        existingItem.quantity += quantity;
       } else {
-        state.items.push({ id, name, price, image, quantity: 1 });
+        state.items.push({ 
+          id, 
+          mongoId: mongoId || id, // Use provided mongoId or fallback to id
+          name, 
+          price, 
+          image, 
+          quantity 
+        });
       }
       
-      state.totalQuantity += 1;
-      state.totalAmount += price;
+      state.totalQuantity += quantity;
+      state.totalAmount += price * quantity;
     },
     removeItem: (state, action) => {
       const id = action.payload;
@@ -49,8 +56,22 @@ const cartSlice = createSlice({
       state.totalQuantity = 0;
       state.totalAmount = 0;
     },
+    syncCartFromProfile: (state, action) => {
+      const profileCartItems = action.payload || [];
+      state.items = profileCartItems.map(item => ({
+        id: item.productId || item._id,
+        mongoId: item.productId || item._id, // Store MongoDB ID
+        name: item.productName || item.name,
+        price: item.productPrice || item.price || item.sellingPrice,
+        image: item.productImage || item.image || item.productImg,
+        quantity: item.quantity || 1
+      }));
+      
+      state.totalQuantity = state.items.reduce((total, item) => total + item.quantity, 0);
+      state.totalAmount = state.items.reduce((total, item) => total + (item.price * item.quantity), 0);
+    },
   },
 });
 
-export const { addItem, removeItem, updateQuantity, clearCart } = cartSlice.actions;
+export const { addItem, removeItem, updateQuantity, clearCart, syncCartFromProfile } = cartSlice.actions;
 export default cartSlice.reducer;

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import LoginForm from './LoginForm';
 import SignupForm from './SignupForm';
 import CartDrawer from './CartDrawer';
@@ -7,11 +8,15 @@ import CartDrawer from './CartDrawer';
 const NewHeader = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  
+  // Get cart and auth state from Redux
+  const { items: cartItems, totalQuantity } = useSelector((state) => state.cart);
+  const { isAuthenticated, user: authUser } = useSelector((state) => state.auth);
+  
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showSignup, setShowSignup] = useState(false);
   const [showCart, setShowCart] = useState(false);
-  const [cart, setCart] = useState([]);
   const [showHeader, setShowHeader] = useState(true);
   const lastScrollY = useRef(0);
   const [user, setUser] = useState(null);
@@ -26,16 +31,20 @@ const NewHeader = () => {
     return '';
   };
 
-  // Sync Cart & User from LocalStorage
+  // Sync User from LocalStorage
   useEffect(() => {
-    const syncState = () => {
-      setCart(JSON.parse(localStorage.getItem('cart') || '[]'));
-      setUser(JSON.parse(localStorage.getItem('user') || 'null'));
+    const syncUser = () => {
+      if (!isAuthenticated) {
+        setUser(JSON.parse(localStorage.getItem('user') || 'null'));
+      } else {
+        setUser(authUser);
+      }
     };
-    syncState();
-    window.addEventListener('storage', syncState);
-    return () => window.removeEventListener('storage', syncState);
-  }, []);
+    
+    syncUser();
+    window.addEventListener('storage', syncUser);
+    return () => window.removeEventListener('storage', syncUser);
+  }, [isAuthenticated, authUser]);
 
   // Hide/Show Header on Scroll
   useEffect(() => {
@@ -218,9 +227,9 @@ const NewHeader = () => {
                 <i className="fa-solid fa-cart-shopping text-sm mr-2"></i>
                 <span className="text-xs font-bold uppercase tracking-wide">Cart</span>
                 
-                {cart.length > 0 && (
+                {totalQuantity > 0 && (
                   <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold border-2 border-[#e8f8d7]">
-                    {cart.length}
+                    {totalQuantity}
                   </span>
                 )}
               </button>
@@ -286,9 +295,9 @@ const NewHeader = () => {
                             <div className="w-12 h-12 rounded-2xl bg-emerald-100 border border-emerald-200 flex items-center justify-center text-emerald-800 shadow-sm group-hover/btn:scale-105 group-hover/btn:bg-emerald-200 transition-all">
                                 <i className="fa-solid fa-cart-shopping text-lg"></i>
                             </div>
-                            {cart.length > 0 && (
+                            {totalQuantity > 0 && (
                                 <span className="absolute top-0 right-1 w-4 h-4 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold border-2 border-white shadow-sm animate-bounce">
-                                    {cart.length}
+                                    {totalQuantity}
                                 </span>
                             )}
                             <span className="text-[10px] font-bold text-emerald-900 uppercase tracking-wide">Cart</span>
@@ -374,7 +383,7 @@ const NewHeader = () => {
       <CartDrawer 
         isOpen={showCart} 
         onClose={() => setShowCart(false)} 
-        cartItems={cart} 
+        cartItems={cartItems} 
       />
     </>
   );

@@ -16,9 +16,6 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000,
   },
 
-  esbuild: {
-    drop: ["console", "debugger"], // removing logs and debugger in prod
-  },
 
   optimizeDeps: {
     include: ["react", "react-dom"],

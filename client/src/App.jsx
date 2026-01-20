@@ -5,16 +5,26 @@ import { ThemeProvider } from './component/ThemeProvider';
 import AppRoutes from './component/AppRoutes';
 import NewHeader from './component/layout/NewHeader';
 import ApiDebugger from './component/ApiDebugger';
+import { useCartSync } from './hooks/useCartSync';
+import SocialMediaFAB from './component/WhatsAppButton';
+
+// Component to handle cart sync
+const CartSyncProvider = ({ children }) => {
+  useCartSync();
+  return children;
+};
 
 function App() {
   return (
     <Provider store={store}>
       <ThemeProvider>
         <Router> 
-          <NewHeader/>
-          <AppRoutes />
-          {/* <WhatsAppButton /> */}
-          <ApiDebugger />
+          <CartSyncProvider>
+            <NewHeader/>
+            <AppRoutes />
+            <SocialMediaFAB />
+            <ApiDebugger />
+          </CartSyncProvider>
         </Router>
       </ThemeProvider>
     </Provider>

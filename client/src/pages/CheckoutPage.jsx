@@ -1,200 +1,289 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import NewHeader from '../component/layout/NewHeader';
 import Footer from '../component/layout/Footer';
+import { useGetUserProfileMutation, useGetRazorpayKeyQuery, useCreateOrderMutation } from '../store/api/userApi';
 
 const CheckoutPage = () => {
-  useEffect(() => {
-      window.scrollTo(0, 0);
-  }, []);
   const navigate = useNavigate();
-  const [cart, setCart] = useState([]);
-  const [customerInfo, setCustomerInfo] = useState({
-    name: '', email: '', phone: '', address: '', city: '', pincode: ''
-  });
+  const { items: cartItems, totalAmount } = useSelector((state) => state.cart);
+  const { isAuthenticated, user } = useSelector((state) => state.auth);
+  
+  const [userProfile, setUserProfile] = useState(null);
+  const [address, setAddress] = useState('');
+  const [pincode, setPincode] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  
+  const [getUserProfile] = useGetUserProfileMutation();
+  const { data: razorpayKeyData } = useGetRazorpayKeyQuery();
+  const [createOrder] = useCreateOrderMutation();
+
+
+  console.log(userProfile?.addedToCart?.[0]?.productId,"razorpayKeyDatarazorpayKeyDatarazorpayKeyData")
+console.log(cartItems,"cartItemscartItemscartItemscartItems")
+
+  const fetchUserProfile = async () => {
+    try {
+      // Get email from multiple sources
+      const localUser = JSON.parse(localStorage.getItem('user') || '{}');
+      const userEmail = user?.email || user?.userEmail || localUser?.email || localStorage.getItem('userEmail');
+      
+      console.log('Fetching profile for email:', userEmail);
+      
+      if (!userEmail) {
+        alert('User email not found. Please login again.');
+        return;
+      }
+      
+      const result = await getUserProfile({ userEmail }).unwrap();
+      const profileData = result.data || result;
+      setUserProfile(profileData);
+      
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Failed to fetch profile:', error);
+      setIsLoading(false);
+    }
+  };
+
 
   useEffect(() => {
-    const savedCart = JSON.parse(localStorage.getItem('cart') || '[]');
-    setCart(savedCart);
-    if (savedCart.length === 0) navigate('/products');
-  }, [navigate]);
+    console.log('Checkout page loaded');
+    console.log('All cookies:', document.cookie);
+    console.log('LocalStorage user:', localStorage.getItem('user'));
+    console.log('Cart items:', cartItems.length);
+    
+    // Check multiple auth sources
+    const getCookie = (name) => {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(';').shift();
+      return null;
+    };
+    
+    const userToken = getCookie('userAccessToken');
+    const hasLocalUser = localStorage.getItem('user');
+    const isLoggedIn = isAuthenticated || userToken || hasLocalUser;
+    
+    console.log('Auth checks:', { isAuthenticated, userToken: !!userToken, hasLocalUser: !!hasLocalUser, isLoggedIn });
+    
+    if (!isLoggedIn) {
+      console.log('Not authenticated, redirecting to home');
+      alert('Please login to access checkout');
+      navigate('/');
+      return;
+    }
+    if (cartItems.length === 0) {
+      console.log('Cart is empty, redirecting to products');
+      navigate('/products');
+      return;
+    }
+    fetchUserProfile();
+  }, [isAuthenticated, cartItems, navigate]);
 
-  const updateQuantity = (cartId, newQuantity) => {
-    if (newQuantity === 0) { removeFromCart(cartId); return; }
-    const updatedCart = cart.map(item => item.cartId === cartId ? { ...item, quantity: newQuantity } : item);
-    setCart(updatedCart);
-    localStorage.setItem('cart', JSON.stringify(updatedCart));
+  const loadRazorpay = () => {
+    return new Promise((resolve) => {
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
   };
 
-  const removeFromCart = (cartId) => {
-    const updatedCart = cart.filter(item => item.cartId !== cartId);
-    setCart(updatedCart);
-    localStorage.setItem('cart', JSON.stringify(updatedCart));
-    if (updatedCart.length === 0) navigate('/products');
+  const handlePayment = async () => {
+    if (!address.trim() || !pincode.trim()) {
+      alert('Please enter address and pincode before proceeding to payment.');
+      return;
+    }
+
+    try {
+      // Get Razorpay key
+      const razorpayKey = razorpayKeyData?.razorPayApiKey || 'rzp_test_9WaeLLJnOFJHHX';
+      
+      // Create order - use correct productId from cart items
+      console.log('Cart items for order:', cartItems);
+      
+      const orderData = {
+        amount: totalAmount,
+        currency: 'INR',
+        items: cartItems.map(item => {
+          console.log('Processing item:', item);
+          return {
+            productId: item.id // Use the id field which should be the productId like "UN-PROD-103"
+          };
+        })
+      };
+      
+      console.log('Order data being sent:', orderData);
+      
+      const orderResult = await createOrder(orderData).unwrap();
+
+
+      console.log(orderResult,"orderResultorderResultorderResultorderResult")
+      
+      // Load Razorpay SDK
+      const res = await loadRazorpay();
+      if (!res) {
+        alert('Razorpay SDK failed to load. Please check your connection.');
+        return;
+      }
+
+      const options = {
+        key: razorpayKey,
+        amount: orderResult.amount,
+        currency: orderResult.currency,
+        name: 'Urban Nook',
+        description: 'Purchase from Urban Nook',
+        image: '/assets/logo.jpeg',
+        order_id: orderResult.id,
+        handler: function (response) {
+          alert(`Payment successful! Payment ID: ${response.razorpay_payment_id}`);
+          navigate('/orders');
+        },
+        prefill: {
+          name: userProfile?.userName || userProfile?.name || '',
+          email: userProfile?.userEmail || userProfile?.email || '',
+          contact: userProfile?.userMobileNumber || userProfile?.mobile || ''
+        },
+        notes: {
+          address: address,
+          pincode: pincode
+        },
+        theme: {
+          color: '#2E443C'
+        },
+        method: {
+          upi: true,
+          card: true,
+          netbanking: true,
+          wallet: true
+        }
+      };
+
+      const paymentObject = new window.Razorpay(options);
+      paymentObject.open();
+      
+    } catch (error) {
+      console.error('Payment initialization failed:', error);
+      alert('Failed to initialize payment. Please try again.');
+    }
   };
 
-  const getTotalPrice = () => cart.reduce((total, item) => total + (item.price * item.quantity), 0);
-
-  const handleInputChange = (e) => setCustomerInfo({ ...customerInfo, [e.target.name]: e.target.value });
-
-  const handlePlaceOrder = (e) => {
-    e.preventDefault();
-    // Simulate Razorpay trigger
-    console.log("Initializing Razorpay for amount:", getTotalPrice());
-    localStorage.removeItem('cart');
-    alert('Transaction Successful. Your series is being prepared.');
-    navigate('/');
-  };
-
-  if (cart.length === 0) return null;
+  if (isLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-[#F9F9F7]">
+        <div className="animate-spin h-10 w-10 border-4 border-[#2E443C] border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-[#fafafa] selection:bg-emerald-100 font-sans relative">
+    <div className="bg-[#F9F9F7] min-h-screen font-sans text-[#1a2822]">
       <NewHeader />
-
-      {/* ARCHITECTURAL BACKGROUND */}
-      <div className="fixed inset-0 pointer-events-none z-0">
-          <div className="absolute inset-0 opacity-[0.02]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M10 10H90V90H10z' fill='none' stroke='%23000' stroke-width='0.5'/%3E%3C/svg%3E")` }}></div>
-          <div className="absolute top-[-10%] left-[-10%] w-[70vw] h-[70vw] bg-[radial-gradient(circle,rgba(255,245,230,0.5)_0%,rgba(255,255,255,0)_70%)] blur-[100px]"></div>
-          <div className="absolute bottom-[-10%] right-[-10%] w-[70vw] h-[70vw] bg-[radial-gradient(circle,rgba(209,250,229,0.4)_0%,rgba(255,255,255,0)_70%)] blur-[100px]"></div>
-      </div>
-
-      <main className="relative z-10 pt-32 lg:pt-44 pb-20 px-6 max-w-[1500px] mx-auto">
+      <main className="max-w-[1200px] mx-auto pt-32 pb-20 px-4 sm:px-6 lg:px-8">
+        <h1 className="text-4xl font-serif text-[#1a2822] mb-8">Checkout</h1>
         
-        {/* BREADCRUMB */}
-        <nav className="mb-10 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
-          <a href="/" className="hover:text-emerald-700">Home</a>
-          <i className="fa-solid fa-chevron-right mx-3 text-[8px]"></i>
-          <span className="text-slate-900">Checkout Console</span>
-        </nav>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-20 items-start">
-          
-          {/* LEFT: SHIPPING CONSOLE (7 Columns) */}
-          <div className="lg:col-span-7 space-y-8">
-            <div className="bg-white rounded-[3rem] p-8 lg:p-12 shadow-[0_20px_50px_rgba(0,0,0,0.05)] border border-slate-100">
-              <div className="mb-10">
-                <h2 className="text-4xl lg:text-5xl font-serif text-slate-900 mb-2">Shipping <span className="italic font-light text-emerald-700">Protocol</span></h2>
-                <p className="text-slate-500 text-sm">Verify your destination for the Urban Nook Series.</p>
-              </div>
-
-              <form className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Full Name</label>
-                    <input type="text" name="name" value={customerInfo.name} onChange={handleInputChange} required className="w-full p-4 bg-slate-50 border border-slate-300 rounded-2xl focus:border-emerald-500 transition-all outline-none text-sm" placeholder="John Doe" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+          <div className="bg-white p-6 rounded-2xl shadow-sm">
+            <h2 className="text-xl font-serif mb-6">Order Summary</h2>
+            <div className="space-y-4">
+              {cartItems.map((item) => (
+                <div key={item.id} className="flex items-center gap-4 pb-4 border-b border-gray-100">
+                  <img 
+                    src={item.image || '/placeholder.jpg'} 
+                    alt={item.name}
+                    className="w-16 h-16 object-contain bg-gray-50 rounded-lg"
+                  />
+                  <div className="flex-1">
+                    <h3 className="font-medium text-sm">{item.name}</h3>
+                    <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Email Address</label>
-                    <input type="email" name="email" value={customerInfo.email} onChange={handleInputChange} required className="w-full p-4 bg-slate-50 border border-slate-300 rounded-2xl focus:border-emerald-500 transition-all outline-none text-sm" placeholder="name@example.com" />
-                  </div>
+                  <p className="font-semibold">₹{(item.price * item.quantity).toLocaleString()}</p>
                 </div>
-                
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Phone Number</label>
-                  <input type="tel" name="phone" value={customerInfo.phone} onChange={handleInputChange} required className="w-full p-4 bg-slate-50 border border-slate-300 rounded-2xl focus:border-emerald-500 transition-all outline-none text-sm" placeholder="+91 00000 00000" />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Delivery Address</label>
-                  <textarea name="address" value={customerInfo.address} onChange={handleInputChange} required rows="3" className="w-full p-4 bg-slate-50 border border-slate-300 rounded-2xl focus:border-emerald-500 transition-all outline-none text-sm resize-none" placeholder="House no, Street, Landmark..."></textarea>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">City</label>
-                    <input type="text" name="city" value={customerInfo.city} onChange={handleInputChange} required className="w-full p-4 bg-slate-50 border border-slate-300 rounded-2xl focus:border-emerald-500 transition-all outline-none text-sm" placeholder="New Delhi" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">PIN Code</label>
-                    <input type="text" name="pincode" value={customerInfo.pincode} onChange={handleInputChange} required className="w-full p-4 bg-slate-50 border border-slate-300 rounded-2xl focus:border-emerald-500 transition-all outline-none text-sm" placeholder="110001" />
-                  </div>
-                </div>
-              </form>
+              ))}
             </div>
-
-            {/* SECURE PAYMENT METHOD CARD */}
-            <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm">
-                <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Payment Gateway</h3>
-                    <div className="flex items-center gap-2">
-                        <i className="fa-solid fa-shield-halved text-emerald-600 text-xs"></i>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Secure 256-bit SSL</span>
-                    </div>
-                </div>
-                <div className="flex items-center justify-between p-6 bg-slate-50 rounded-3xl border border-emerald-500/30">
-                    <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">
-                            <i className="fa-solid fa-credit-card text-emerald-600"></i>
-                        </div>
-                        <div>
-                            <p className="font-bold text-slate-900 text-sm">Razorpay Secure Checkout</p>
-                            <p className="text-[10px] text-slate-500">Cards, UPI, Netbanking, & Wallets</p>
-                        </div>
-                    </div>
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/8/89/Razorpay_logo.svg" className="h-4 opacity-70" alt="Razorpay" />
-                </div>
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <div className="flex justify-between items-center text-lg font-semibold">
+                <span>Total</span>
+                <span>₹{totalAmount.toLocaleString()}</span>
+              </div>
             </div>
           </div>
 
-          {/* RIGHT: ORDER SUMMARY (5 Columns) */}
-          <div className="lg:col-span-5">
-            <div className="bg-white rounded-[3rem] p-8 lg:p-10 sticky top-32 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] border border-slate-100">
-              <h2 className="text-2xl font-serif text-slate-900 mb-8 tracking-tight">Order <span className="italic">Inventory</span></h2>
-              
-              <div className="space-y-4 mb-8 max-h-[400px] overflow-y-auto pr-2 scrollbar-hide">
-                {cart.map((item) => (
-                  <div key={item.cartId} className="flex gap-4 p-4 bg-slate-50 rounded-[2rem] border border-white">
-                    <img src={item.image} alt={item.title} className="w-20 h-20 object-cover rounded-2xl" />
-                    <div className="flex-1 flex flex-col justify-center">
-                      <h4 className="font-bold text-slate-900 text-xs uppercase tracking-tight mb-1">{item.title}</h4>
-                      <p className="text-emerald-700 font-bold text-sm">₹{item.price.toLocaleString()}</p>
-                      
-                      <div className="flex items-center gap-3 mt-3">
-                        <div className="flex items-center bg-white rounded-lg p-1 border border-slate-200">
-                           <button onClick={() => updateQuantity(item.cartId, item.quantity - 1)} className="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-slate-900"><i className="fa-solid fa-minus text-[8px]"></i></button>
-                           <span className="text-xs font-bold text-slate-900 w-6 text-center">{item.quantity}</span>
-                           <button onClick={() => updateQuantity(item.cartId, item.quantity + 1)} className="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-slate-900"><i className="fa-solid fa-plus text-[8px]"></i></button>
-                        </div>
-                        <button onClick={() => removeFromCart(item.cartId)} className="text-[9px] font-black uppercase tracking-widest text-red-400 hover:text-red-600 ml-auto">Remove</button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+          <div className="bg-white p-6 rounded-2xl shadow-sm">
+            <h2 className="text-xl font-serif mb-6">Shipping Information</h2>
+            
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-sm font-medium mb-1">Name</label>
+                <input 
+                  type="text" 
+                  value={userProfile?.userName || userProfile?.name || ''} 
+                  disabled 
+                  className="w-full p-3 border border-gray-200 rounded-lg bg-gray-50"
+                />
               </div>
-
-              {/* PRICE BREAKDOWN */}
-              <div className="border-t border-slate-100 pt-6 space-y-3">
-                <div className="flex justify-between text-xs font-bold text-slate-400 uppercase tracking-widest">
-                  <span>Sub-Protocol Total</span>
-                  <span className="text-slate-900">₹{getTotalPrice().toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-xs font-bold text-slate-400 uppercase tracking-widest">
-                  <span>Architectural Delivery</span>
-                  <span className="text-emerald-600">Complimentary</span>
-                </div>
-                <div className="flex justify-between text-2xl font-serif text-slate-900 border-t border-slate-100 pt-4 mt-2">
-                  <span>Final Total</span>
-                  <span className="font-sans font-light">₹{getTotalPrice().toLocaleString()}</span>
-                </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Email</label>
+                <input 
+                  type="email" 
+                  value={userProfile?.userEmail || userProfile?.email || ''} 
+                  disabled 
+                  className="w-full p-3 border border-gray-200 rounded-lg bg-gray-50"
+                />
               </div>
-
-              <button
-                onClick={handlePlaceOrder}
-                className="w-full bg-slate-900 text-white py-5 rounded-2xl font-bold tracking-[0.2em] uppercase hover:bg-emerald-700 transition-all shadow-xl active:scale-95 mt-8"
-              >
-                Complete Transaction
-              </button>
+              <div>
+                <label className="block text-sm font-medium mb-1">Mobile</label>
+                <input 
+                  type="tel" 
+                  value={userProfile?.userMobileNumber || userProfile?.mobile || ''} 
+                  disabled 
+                  className="w-full p-3 border border-gray-200 rounded-lg bg-gray-50"
+                />
+              </div>
               
-              <p className="mt-6 text-center text-[10px] text-slate-400 uppercase tracking-widest flex items-center justify-center gap-2">
-                <i className="fa-solid fa-lock"></i>
-                End-to-End Encrypted Secure Acquisition
-              </p>
+              <div>
+                <label className="block text-sm font-medium mb-1">Address *</label>
+                <textarea 
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Enter your complete address"
+                  className="w-full p-3 border border-gray-200 rounded-lg focus:border-[#2E443C] focus:outline-none"
+                  rows={3}
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">Pincode *</label>
+                <input 
+                  type="text" 
+                  value={pincode}
+                  onChange={(e) => setPincode(e.target.value)}
+                  placeholder="Enter pincode"
+                  className="w-full p-3 border border-gray-200 rounded-lg focus:border-[#2E443C] focus:outline-none"
+                  required
+                />
+              </div>
+            </div>
+
+            <button 
+              onClick={handlePayment}
+              disabled={!address.trim() || !pincode.trim()}
+              className="w-full py-4 bg-[#2E443C] text-white rounded-lg font-bold uppercase tracking-widest text-sm hover:bg-[#1a2822] transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+            >
+              Pay ₹{totalAmount.toLocaleString()} with Razorpay
+            </button>
+            
+            <div className="mt-4 text-center">
+              <p className="text-xs text-gray-500">Secure payment powered by Razorpay</p>
+              <p className="text-xs text-gray-500 mt-1">Supports UPI, Cards, Net Banking & Wallets</p>
             </div>
           </div>
         </div>
       </main>
-
       <Footer />
     </div>
   );
