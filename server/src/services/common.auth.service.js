@@ -51,9 +51,9 @@ const authGuardService = (role) => {
 };
 
 const logoutService = async (req, res) => {
-  const { userEmail } = req.user || {};
-  const Model = req.authRole == "User" ? User : Admin;
-  const roleDetails = await Model.findOne({ userEmail });
+  const { userId } = req.user || {};
+  const Model = req.authRole == "USER" ? User : Admin;
+  const roleDetails = await Model.findOne({ userId });
   if (!roleDetails) {
     return res
       .status(400)
@@ -95,50 +95,53 @@ const profileFetchService = async (data) => {
   return profile;
 };
 
-const regenerateTokenService = async (req, res) => {
-  const { userId } = req.user;
-  if (!userEmail) {
+const regenerateTokenService = async ({ userId, userRole }) => {
+  if (!userId) {
     return {
       statusCode: 401,
-      message: `Unauthorized User - can't find userEmail`,
+      message: `Unauthorized User`,
       data: null,
       success: false,
     };
   }
 
-  const Model = req.authRole == "User" ? User : Admin;
-  const tokenName =
-    req.authRole == "User" ? `userRefreshToken` : `adminRefreshToken`;
-  const accessToken = await Model.userRefreshToken();
-
-  Model.userRefreshToken = accessToken;
-  await res.save();
-  const roleDetails = await Model.findOneAndUpdate(
-    { userEmail },
-    {
-      $set: {
-        tokenName,
-      },
-    },
-    {
-      new: true,
-    },
-  );
-  if (!roleDetails) {
-    return res
-      .status(404)
-      .json(new ApiError(401, ` User - can't find userEmail`, null, false));
+  const Model = userRole == "USER" ? User : Admin;
+  if (!Model) {
+    return {
+      statusCode: 404,
+      message: `Can't find the model of the userId`,
+      data: null,
+      success: false,
+    };
   }
-  return res
-    .status(200)
-    .json(
-      new ApiRes(
-        200,
-        ` ${tokenName} generated for ${roleDetails?.role}  `,
-        null,
-        false,
-      ),
-    );
+  const tokenName =
+    Model.modelName == "USER" ? `userRefreshToken` : `adminRefreshToken`;
+  const userDetails = await Model.findOne({ userId });
+  if (!userDetails) {
+    return {
+      statusCode: 404,
+      message: `Can't find the user`,
+      data: null,
+      success: false,
+    };
+  }
+  const refreshToken = await userDetails.genRefreshToken();
+  if (!refreshToken) {
+    return {
+      statusCode: 404,
+      message: `Can't generate the refresh token please try after some time! for ${userDetails?.email}`,
+      data: null,
+      success: false,
+    };
+  }
+  userDetails[tokenName] = refreshToken;
+  await userDetails.save();
+  return {
+    statusCode: 200,
+    message: `Successfully generated refresh token for ${userDetails?.email}`,
+    data: null,
+    success: false,
+  };
 };
 
 const generateOtpResponseService = async () => {
