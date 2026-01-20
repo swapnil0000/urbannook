@@ -4,6 +4,6 @@ import {
   specificProductDetails,
 } from "../controller/product.controller.js";
 const productRouter = Router();
-productRouter.route("/products").get(productListing);
-productRouter.route("/products/:productId").get(specificProductDetails);
+productRouter.get("/products", productListing);
+productRouter.post("/product-detail", specificProductDetails);
 export default productRouter;

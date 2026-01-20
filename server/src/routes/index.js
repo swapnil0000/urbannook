@@ -3,10 +3,14 @@ import adminRouter from "./admin.route.js";
 import productRouter from "./product.route.js";
 import commonRouter from "./common.route.js";
 import userWaitListRouter from "./user.waitlist.route.js";
+import userAddressRouter from "./user.address.route.js";
+import userWishListRouter from "./user.wishlist.route.js";
 export {
   userRouter,
   adminRouter,
   productRouter,
   commonRouter,
   userWaitListRouter,
+  userAddressRouter,
+  userWishListRouter
 };

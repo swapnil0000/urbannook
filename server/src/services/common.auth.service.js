@@ -12,8 +12,10 @@ const authGuardService = (role) => {
  */
   return (req, res, next) => {
     try {
-      let token = req.cookies?.userAccessToken;
-
+      let token =
+        role === "Admin"
+          ? req.cookies?.adminAccessToken
+          : req.cookies?.userAccessToken;
       if (!token && req.headers.authorization?.startsWith("Bearer ")) {
         token = req.headers.authorization.split(" ")[1];
       }
@@ -42,22 +44,22 @@ const authGuardService = (role) => {
       return res
         .status(401)
         .json(
-          new ApiError(401, "Access Token Expired or Malformed", null, false)
+          new ApiError(401, "Access Token Expired or Malformed", null, false),
         );
     }
   };
 };
 
 const logoutService = async (req, res) => {
-  const { userEmail } = req.user;
+  const { userEmail } = req.user || {};
   const Model = req.authRole == "User" ? User : Admin;
   const roleDetails = await Model.findOne({ userEmail });
-
   if (!roleDetails) {
     return res
       .status(400)
       .json(new ApiError(400, `UserId not avaialable`, [], false));
   }
+
   await Model.findByIdAndUpdate(
     roleDetails?._id,
     {
@@ -67,29 +69,34 @@ const logoutService = async (req, res) => {
     },
     {
       new: true,
-    }
+    },
   );
 
   return res
-    .clearCookie("userRefreshToken", cookieOptions)
+    .clearCookie("userAccessToken", cookieOptions)
     .status(200)
-    .json(new ApiRes(200, "User Logout Successfully", null, true));
+    .json(
+      new ApiRes(200, `User - ${userEmail} Logout Successfully`, null, true),
+    );
 };
 
 const profileFetchService = async (data) => {
-  if (!data?.userEmail)
-    return res
-      .status(400)
-      .json(new ApiError(400, `userEmail not avaialable`, [], false));
+  if (!data?.userId)
+    return {
+      statusCode: 400,
+      message: `userId not avaialable`,
+      data: null,
+      success: false,
+    };
   const Model = data?.role === "Admin" ? Admin : User;
-  const profile = await Model.findOne({ userEmail: data?.userEmail }).select(
-    "-_id -userPassword -createdAt -updatedAt -__v"
+  const profile = await Model.findOne({ userId: data?.userId }).select(
+    "-_id -password -createdAt -updatedAt -__v -userRefreshToken",
   );
   return profile;
 };
 
 const regenerateTokenService = async (req, res) => {
-  const { userEmail } = req.user;
+  const { userId } = req.user;
   if (!userEmail) {
     return {
       statusCode: 401,
@@ -115,7 +122,7 @@ const regenerateTokenService = async (req, res) => {
     },
     {
       new: true,
-    }
+    },
   );
   if (!roleDetails) {
     return res
@@ -129,8 +136,8 @@ const regenerateTokenService = async (req, res) => {
         200,
         ` ${tokenName} generated for ${roleDetails?.role}  `,
         null,
-        false
-      )
+        false,
+      ),
     );
 };
 
@@ -185,7 +192,7 @@ const sendOtpViaEmailService = async (userEmail) => {
           userVerificationOtpExpiresAt: new Date(Date.now() + OTP_EXPIRY_TIME),
         },
       },
-      { new: true }
+      { new: true },
     );
     if (!userDetails) {
       return {
@@ -204,11 +211,11 @@ const sendOtpViaEmailService = async (userEmail) => {
               <h2>OTP Verification</h2>
               <p>Your OTP is:</p>
               <h1 style="letter-spacing: 3px;">${String(
-                userDetails?.userVerificationOtp
+                userDetails?.userVerificationOtp,
               )}</h1>
               <p>This OTP is valid for 5 minutes.</p>
             </div>
-          `
+          `,
     );
 
     if (!emailResult?.success) {
@@ -262,7 +269,7 @@ const verifyOtpEmailService = async (userEmail, userEmailOtp) => {
           userVerificationOtpExpiresAt: "",
         },
       },
-      { new: true }
+      { new: true },
     );
 
     if (!verifiedUser) {
@@ -311,7 +318,7 @@ const verifyOtpEmailForgotPasswordService = async (userEmail, userEmailOtp) => {
           userVerificationOtpExpiresAt: "",
         },
       },
-      { new: true }
+      { new: true },
     );
     if (!verifiedUser) {
       return {

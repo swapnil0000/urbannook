@@ -121,6 +121,8 @@ jobs:
         if: env.EC2_AVAILABLE == 'true'
         run: |
           rsync -avz --delete \
+          --exclude '.env' \
+          --exclude '.env.production' \
           server/ \
           ubuntu@${{ secrets.PROD_SSH_HOST }}:/home/ubuntu/urbannook-prod/server/
 

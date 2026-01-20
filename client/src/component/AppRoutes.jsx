@@ -20,8 +20,10 @@ import {
   Faq,
   Return,
   AboutPage,
-  WaitList,
 } from "../pages/index.js";
+import WaitListMobile from "../pages/WaitListMobile.jsx";
+import AdminLoginPage from "../admin/pages/AdminLoginPage.jsx";
+import AdminDashboardPage from "../admin/pages/AdminDashboardPage.jsx";
 
 const AppRoutes = () => {
   return (

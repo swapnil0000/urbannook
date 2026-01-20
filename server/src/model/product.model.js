@@ -11,6 +11,11 @@ const productSchema = mongoose.Schema(
       required: [true, "productId is required"],
       unique: true,
     },
+    uiProductId: {
+      type: String,
+      required: [true, "uiProductId is required"],
+      unique: true,
+    },
     productImg: {
       type: String,
       required: [true, "productImg is required"],
@@ -41,7 +46,7 @@ const productSchema = mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 productSchema.index({ productStatus: 1, createdAt: -1 });
