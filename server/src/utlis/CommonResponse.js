@@ -52,8 +52,11 @@ const productUpdateFieldMissing = (
   };
 };
 
-const cartDetailsMissing = (productId) => {
-  if (!productId) {
+const cartDetailsMissing = (userId, productId) => {
+  if (!userId) {
+    return { statusCode: 401, message: "Unauthorized", success: false };
+  }
+  if (userId && !productId) {
     return {
       statusCode: 400,
       message: "productId is required for adding to cart",
