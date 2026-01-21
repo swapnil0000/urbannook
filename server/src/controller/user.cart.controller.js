@@ -1,5 +1,7 @@
-import { addToCartService } from "../services/user.cart.service.js";
-import Product from "../model/product.model.js";
+import {
+  addToCartService,
+  previewCartService,
+} from "../services/user.cart.service.js";
 import { ApiError, ApiRes } from "../utlis/index.js";
 const userAddToCart = async (req, res) => {
   try {
@@ -40,36 +42,32 @@ const userAddToCart = async (req, res) => {
   }
 };
 
-const userGetAddToCart = async (req, res) => {
+const userPreviewCart = async (req, res) => {
   try {
     const { userId } = req.user;
-    if (!userEmail) {
+    const cartDetails = await previewCartService({ userId });
+    if (!cartDetails?.success) {
       return res
-        .status(404)
-        .json(new ApiError(404, `User Email not found exist`, null, false));
-    }
-    const userExist = await User.findOne({ userEmail });
-    if (!userExist)
-      return res
-        .status(404)
-        .json(new ApiError(404, `User doesn't exist in DB`, null, false));
-    const productIds = userExist?.addedToWishList.map((id) => {
-      return id?.productId;
-    });
-    const productDetails = await Product.find({
-      _id: productIds,
-    }).select("-_id");
-
-    if (userExist?.addedToCart?.length == 0) {
-      return res
-        .status(200)
+        .status(Number(cartDetails?.statusCode))
         .json(
-          new ApiRes(200, `Nothing in cart for user ${userEmail}`, null, true),
+          new ApiError(
+            cartDetails?.statusCode,
+            cartDetails?.message,
+            cartDetails?.data,
+            cartDetails?.success,
+          ),
         );
     }
     return res
-      .status(200)
-      .json(new ApiRes(200, `Preview of Added to cart`, productDetails, true));
+      .status(Number(cartDetails?.statusCode))
+      .json(
+        new ApiRes(
+          cartDetails?.statusCode,
+          cartDetails?.message,
+          cartDetails?.data,
+          cartDetails?.success,
+        ),
+      );
   } catch (error) {
     return res
       .status(500)
@@ -251,7 +249,7 @@ const userOrderPreviousHistory = async (req, res) => {
 };
 export {
   userAddToCart,
-  userGetAddToCart,
+  userPreviewCart as userGetAddToCart,
   userUpdateCartQuantity,
   userRemoveFromCart,
   userClearCart,

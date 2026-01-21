@@ -65,7 +65,7 @@ const productListing = async (req, res) => {
   }
 };
 const specificProductDetails = async (req, res) => {
-  const { productId } = req.body;
+  const { productId } = req.params;
   if (!productId) {
     return res
       .status(404)
