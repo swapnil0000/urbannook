@@ -22,13 +22,9 @@ const userLogin = async (req, res) => {
       .json(
         new ApiRes(Number(result?.statusCode), `User Details`, {
           role: result?.data?.role,
-          userName: result?.data?.userName,
+          name: result?.data?.name,
           email: result?.data?.email,
-          userMobileNumber: result?.data?.userMobileNumber,
-          userAddresults: result?.data?.userAddress,
-          userPinCode: result?.data?.userPinCode,
-          addedToCart: result?.data?.addedToCart,
-          userPreviousOrder: result?.data?.userPreviousOrder,
+          userMobileNumber: result?.data?.mobileNumber,
           userAccessToken: result?.data?.userAccessToken,
         }),
         true,

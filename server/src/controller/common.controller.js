@@ -7,13 +7,13 @@ import {
 } from "../services/common.auth.service.js";
 const sendOtpViaEmailServiceController = async (req, res) => {
   try {
-    const { userEmail } = req.body;
-    if (!userEmail) {
+    const { email } = req.body;
+    if (!email) {
       return res
         .status(404)
         .json(new ApiError(404, `Email is not available`, null, false));
     }
-    const result = await sendOtpViaEmailService(userEmail);
+    const result = await sendOtpViaEmailService(email);
     if (!result?.success) {
       return res
         .status(Number(result?.statusCode))
@@ -46,8 +46,8 @@ const sendOtpViaEmailServiceController = async (req, res) => {
 // to verify new users
 const verifyEmailOtpController = async (req, res) => {
   try {
-    const { userEmail, userEmailOtp } = req.body;
-    const result = await verifyOtpEmailService(userEmail, userEmailOtp);
+    const { email, emailOtp } = req.body;
+    const result = await verifyOtpEmailService(email, emailOtp);
     if (!result?.success) {
       return res
         .status(Number(result?.statusCode))
@@ -79,9 +79,9 @@ const verifyEmailOtpController = async (req, res) => {
 // to verify exisitng user for forgot password
 const verifyOtpEmailForgotPasswordController = async (req, res) => {
   try {
-    const { userEmail, userEmailOtp } = req.body;
+    const { email, userEmailOtp } = req.body;
     const result = await verifyOtpEmailForgotPasswordService(
-      userEmail,
+      email,
       userEmailOtp,
     );
     if (!result?.success) {

@@ -165,9 +165,9 @@ const generateOtpResponseService = async () => {
   }
 };
 
-const sendOtpViaEmailService = async (userEmail) => {
+const sendOtpViaEmailService = async (email) => {
   try {
-    if (!userEmail) {
+    if (!email) {
       return {
         statusCode: 404,
         message: `Email is required to send otp`,
@@ -188,11 +188,11 @@ const sendOtpViaEmailService = async (userEmail) => {
     }
 
     const userDetails = await User.findOneAndUpdate(
-      { userEmail },
+      { email },
       {
         $set: {
-          userVerificationOtp: Number(otpResponse?.data),
-          userVerificationOtpExpiresAt: new Date(Date.now() + OTP_EXPIRY_TIME),
+          verificationOtp: Number(otpResponse?.data),
+          verificationOtpExpiresAt: new Date(Date.now() + OTP_EXPIRY_TIME),
         },
       },
       { new: true },
@@ -200,21 +200,21 @@ const sendOtpViaEmailService = async (userEmail) => {
     if (!userDetails) {
       return {
         statusCode: 404,
-        message: `User doesn't exist with email - ${userEmail}`,
+        message: `User doesn't exist with email - ${email}`,
         data: null,
         success: false,
       };
     }
 
     const emailResult = sendEmail(
-      String(userEmail),
+      String(email),
       `OTP Verification`,
       `
             <div style="font-family: Arial, sans-serif;">
               <h2>OTP Verification</h2>
               <p>Your OTP is:</p>
               <h1 style="letter-spacing: 3px;">${String(
-                userDetails?.userVerificationOtp,
+                userDetails?.verificationOtp,
               )}</h1>
               <p>This OTP is valid for 5 minutes.</p>
             </div>
@@ -225,7 +225,7 @@ const sendOtpViaEmailService = async (userEmail) => {
       return {
         statusCode: 500,
         message: `Not able to send OTP - ${error} try after some time`,
-        data: userEmail,
+        data: email,
         success: false,
       };
     }
@@ -246,9 +246,9 @@ const sendOtpViaEmailService = async (userEmail) => {
   }
 };
 
-const verifyOtpEmailService = async (userEmail, userEmailOtp) => {
+const verifyOtpEmailService = async (email, emailOtp) => {
   try {
-    if (!userEmail || !userEmailOtp) {
+    if (!email || !emailOtp) {
       return {
         statusCode: 400,
         message: "Email and OTP is required",
@@ -257,24 +257,22 @@ const verifyOtpEmailService = async (userEmail, userEmailOtp) => {
     }
 
     const now = new Date();
-
     const verifiedUser = await User.findOneAndUpdate(
       {
-        userEmail,
-        isUserVerified: false,
-        userVerificationOtp: Number(userEmailOtp), // 👈 OTP MATCH FIRST
-        userVerificationOtpExpiresAt: { $gt: now }, // 👈 NOT EXPIRED
+        email,
+        isVerified: false,
+        verificationOtp: Number(emailOtp), // 👈 OTP MATCH FIRST
+        verificationOtpExpiresAt: { $gt: now }, // 👈 NOT EXPIRED
       },
       {
-        $set: { isUserVerified: true },
+        $set: { isVerified: true },
         $unset: {
-          userVerificationOtp: "",
-          userVerificationOtpExpiresAt: "",
+          verificationOtp: "",
+          verificationOtpExpiresAt: "",
         },
       },
       { new: true },
     );
-
     if (!verifiedUser) {
       return {
         statusCode: 403,
@@ -286,7 +284,7 @@ const verifyOtpEmailService = async (userEmail, userEmailOtp) => {
     return {
       statusCode: 200,
       message: "OTP verified successfully",
-      data: userEmail,
+      data: email,
       success: true,
     };
   } catch (error) {
