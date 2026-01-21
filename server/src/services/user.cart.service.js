@@ -1,4 +1,5 @@
 import Cart from "../model/user.cart.model.js";
+import User from "../model/user.model.js";
 import { cartDetailsMissing } from "../utlis/CommonResponse.js";
 const addToCartService = async ({ userId, productId, productQuanity }) => {
   try {
@@ -20,9 +21,12 @@ const addToCartService = async ({ userId, productId, productQuanity }) => {
       };
     }
 
+    const userMongoDbId = await User.findOne({ userId });
+    console.log(userMongoDbId?._id);
+
     const cartDetails = await Cart.aggregate([
       {
-        $match: { userId },
+        $match: { user: userMongoDbId?._id },
       },
       {
         $unwind: { path: "$products", preserveNullAndEmptyArrays: true },

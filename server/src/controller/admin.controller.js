@@ -12,10 +12,10 @@ import { profileFetchService } from "../services/common.auth.service.js";
 import UserWaistList from "../model/user.waitlist.model.js";
 const adminLogin = async (req, res) => {
   try {
-    const { userEmail, userPassword } = req.body || {};
+    const { email, password } = req.body || {};
 
     const action = "login";
-    const missing = fieldMissing({ userEmail, userPassword, action });
+    const missing = fieldMissing({ email, password, action });
     if (!missing?.success) {
       return res
         .status(Number(missing?.statusCode))
@@ -24,13 +24,13 @@ const adminLogin = async (req, res) => {
             missing?.statusCode,
             missing?.message,
             missing?.data,
-            missing?.success
-          )
+            missing?.success,
+          ),
         );
     }
     // existing User and pass check
-    let result = await adminLoginService(userEmail, userPassword);
-
+    let result = await adminLoginService(email, password);
+    
     if (result?.statusCode >= 400) {
       return res.status(Number(result?.statusCode)).json(result);
     }
@@ -42,8 +42,8 @@ const adminLogin = async (req, res) => {
           Number(result?.statusCode),
           result?.message,
           result?.data,
-          result?.success
-        )
+          result?.success,
+        ),
       );
   } catch (error) {
     return new ApiError(500, null, `Internal Server Error -${error}`, false);
@@ -121,8 +121,8 @@ const updateProduct = async (req, res) => {
           409,
           `Product with name ${existingProductDetails?.productName} - already exist and it's Product Id is ${existingProductDetails?.productId} `,
           null,
-          false
-        )
+          false,
+        ),
       );
   }
 
@@ -149,7 +149,7 @@ const updateProduct = async (req, res) => {
     },
     {
       new: true,
-    }
+    },
   ).select("-_id -__v -createdAt -updatedAt");
 
   if (!product) {
@@ -184,12 +184,11 @@ const getJoinedUserWaitList = async (_, res) => {
       return res
         .status(404)
         .json(
-          new ApiError(404, `Failed to fetch joinedUserWaitList`, null, false)
+          new ApiError(404, `Failed to fetch joinedUserWaitList`, null, false),
         );
     }
-    const totalJoinedUserWaitList = await UserWaistList.countDocuments(
-      joinedUserWaitList
-    );
+    const totalJoinedUserWaitList =
+      await UserWaistList.countDocuments(joinedUserWaitList);
     return res.status(200).json(
       new ApiRes(
         200,
@@ -202,8 +201,8 @@ const getJoinedUserWaitList = async (_, res) => {
               joinedUserWaitList,
               totalJoinedUserWaitList,
             },
-        true
-      )
+        true,
+      ),
     );
   } catch (error) {
     return new ApiError(500, null, `Internal Server Error -${error}`, false);
@@ -221,8 +220,8 @@ const totalProducts = async (_, res) => {
           result.statusCode,
           result.message,
           result.data,
-          result.success
-        )
+          result.success,
+        ),
       );
   } catch (error) {
     return res

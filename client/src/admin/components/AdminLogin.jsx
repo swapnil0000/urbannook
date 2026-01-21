@@ -12,7 +12,7 @@ const AdminLogin = () => {
     isSuccess: false,
   });
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
-
+  
   const navigate = useNavigate()
   const handleChange = (e) => {
     setFormData({
@@ -24,8 +24,8 @@ const AdminLogin = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const res = await axios.post(`${apiBaseUrl}/admin/login`, {
-      userEmail:formData?.email,
-      userPassword:formData?.password,
+      email:formData?.email,
+      password:formData?.password,
     },{
       withCredentials:true
     });
