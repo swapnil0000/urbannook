@@ -20,9 +20,11 @@ const AllProductsPage = () => {
     window.scrollTo(0, 0);
   }, []);
 
+
+  console.log(productsResponse,"productsResponseproductsResponse")
+
   // Extract products from response
   const products = productsResponse?.data?.listOfProducts?.listOfProducts || [];
-  console.log("Products data:", products);
 
   const displayProducts = useMemo(() => {
     let sorted = [...products];

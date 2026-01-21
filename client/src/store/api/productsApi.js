@@ -20,7 +20,7 @@ export const productsApi = apiSlice.injectEndpoints({
     
     // Get single product by ID
     getProductById: builder.query({
-      query: (productId) => `products/${productId}`,
+      query: (productId) => `product-detail/${productId}`,
       providesTags: (result, error, productId) => [{ type: 'Product', id: productId }],
     }),
     

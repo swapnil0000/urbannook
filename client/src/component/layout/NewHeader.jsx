@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import LoginForm from './LoginForm';
-import SignupForm from './SignupForm';
-import CartDrawer from './CartDrawer';
+import SignupForm from './auth/SignupForm';
+import LoginForm from './auth/LoginForm';
+import CartDrawer from '../layout/CartDrawer';
 
 const NewHeader = () => {
   const location = useLocation();
@@ -125,7 +125,7 @@ const NewHeader = () => {
               {/* Desktop Logo */}
               <Link to="/" className="hidden lg:flex items-center shrink-0">
                 <img 
-                    src="/assets/logo.jpeg" 
+                    src="/assets/logo.webp" 
                     alt="UrbanNook" 
                     className="h-10 w-auto object-contain rounded-full mix-blend-multiply" 
                 />
@@ -137,7 +137,7 @@ const NewHeader = () => {
               {/* Mobile Logo */}
               <Link to="/" className="lg:hidden flex items-center pointer-events-auto">
                  <img 
-                    src="/assets/logo.jpeg" 
+                    src="/assets/logo.webp" 
                     alt="UrbanNook" 
                     className="h-9 w-auto object-contain rounded-full mix-blend-multiply" 
                 />

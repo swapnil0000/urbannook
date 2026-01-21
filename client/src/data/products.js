@@ -58,9 +58,9 @@ export const products = [
     price: 1500,
     originalPrice: 3299,
     colors: ['black', 'white'],
-    image: '/assets/featuredproduct.png',
+    image: '/assets/featuredproduct.webp',
     images: [
-      '/assets/featuredproduct.png'
+      '/assets/featuredproduct.webp'
     ],
     badge: 'BESTSELLER',
     rating: 4.9,

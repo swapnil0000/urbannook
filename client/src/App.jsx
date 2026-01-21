@@ -1,12 +1,11 @@
 import { BrowserRouter as Router } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { store } from './store/store';
-import { ThemeProvider } from './component/ThemeProvider';
-import AppRoutes from './component/AppRoutes';
+import AppRoutes from './store/AppRoutes';
 import NewHeader from './component/layout/NewHeader';
-import ApiDebugger from './component/ApiDebugger';
+// import ApiDebugger from './component/ApiDebugger';
 import { useCartSync } from './hooks/useCartSync';
-import SocialMediaFAB from './component/WhatsAppButton';
+import SocialMediaFAB from './component/layout/WhatsAppButton';
 
 // Component to handle cart sync
 const CartSyncProvider = ({ children }) => {
@@ -17,16 +16,14 @@ const CartSyncProvider = ({ children }) => {
 function App() {
   return (
     <Provider store={store}>
-      <ThemeProvider>
         <Router> 
           <CartSyncProvider>
             <NewHeader/>
             <AppRoutes />
             <SocialMediaFAB />
-            <ApiDebugger />
+            {/* <ApiDebugger /> */}
           </CartSyncProvider>
         </Router>
-      </ThemeProvider>
     </Provider>
   );
 }

@@ -12,16 +12,13 @@ const Footer = () => {
         </h1>
       </div>
 
-      {/* Main Footer Content */}
       <div className="max-w-7xl mx-auto px-6 md:px-12 relative z-10">
         
-        {/* Top Section: Brand & Newsletter */}
         <div className="flex flex-col lg:flex-row justify-between items-start gap-12 mb-20 border-b border-white/10 pb-16">
           <div className="max-w-md">
-            {/* Logo Section */}
             <Link to="/" className="inline-block mb-6">
               <img 
-                src="/assets/logo.jpeg" // Ensure this path is correct
+                src="/assets/logo.webp" 
                 alt="UrbanNook Logo" 
                 className="h-12 w-auto object-contain bg-white/10 rounded-lg p-1" // Added background for visibility if logo has transparency issues
               />
@@ -38,21 +35,19 @@ const Footer = () => {
                 <input 
                   type="email" 
                   placeholder="Enter your email address"
-                  className="w-full bg-transparent border-b border-gray-700 py-4 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 transition-colors pr-12"
+                  className="w-full bg-transparent border-b border-gray-700 py-4 text-white placeholder-gray-500 focus:outline-none focus:border-[#F5DEB3] transition-colors pr-12"
                 />
-                <button type="submit" className="absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-500 transition-colors">
+                <button type="submit" className="absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#F5DEB3] transition-colors">
                   <i className="fa-solid fa-arrow-right text-xl"></i>
                 </button>
              </form>
           </div>
         </div>
 
-        {/* Links Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-12 mb-20">
             
-            {/* Column 1: Shop */}
             <div>
-              <h4 className="text-emerald-400 font-bold uppercase tracking-widest text-xs mb-8">Shop</h4>
+              <h4 className="text-[#F5DEB3] font-bold uppercase tracking-widest text-xs mb-8">Shop</h4>
               <ul className="space-y-4">
                 {[
                   { name: 'Keychains', link: '/shop/keychains' },
@@ -63,7 +58,7 @@ const Footer = () => {
                 ].map((item) => (
                   <li key={item.name}>
                     <Link to={item.link} className="text-gray-400 hover:text-white transition-colors flex items-center gap-2 group">
-                      <span className="w-0 h-[1px] bg-emerald-500 group-hover:w-3 transition-all duration-300"></span>
+                      <span className="w-0 h-[1px] bg-[#F5DEB3] group-hover:w-3 transition-all duration-300"></span>
                       {item.name}
                     </Link>
                   </li>
@@ -71,9 +66,8 @@ const Footer = () => {
               </ul>
             </div>
 
-            {/* Column 2: Help & Policies */}
             <div>
-              <h4 className="text-emerald-400 font-bold uppercase tracking-widest text-xs mb-8">Support</h4>
+              <h4 className="text-[#F5DEB3] font-bold uppercase tracking-widest text-xs mb-8">Support</h4>
               <ul className="space-y-4">
                 {[
                   { name: 'Track Order', link: '/track-order' },
@@ -83,7 +77,7 @@ const Footer = () => {
                 ].map((item) => (
                   <li key={item.name}>
                     <Link to={item.link} className="text-gray-400 hover:text-white transition-colors flex items-center gap-2 group">
-                       <span className="w-0 h-[1px] bg-emerald-500 group-hover:w-3 transition-all duration-300"></span>
+                       <span className="w-0 h-[1px] bg-[#F5DEB3] group-hover:w-3 transition-all duration-300"></span>
                        {item.name}
                     </Link>
                   </li>
@@ -91,9 +85,8 @@ const Footer = () => {
               </ul>
             </div>
 
-            {/* Column 3: Company */}
             <div>
-              <h4 className="text-emerald-400 font-bold uppercase tracking-widest text-xs mb-8">Company</h4>
+              <h4 className="text-[#F5DEB3] font-bold uppercase tracking-widest text-xs mb-8">Company</h4>
               <ul className="space-y-4">
                 {[
                   { name: 'Our Story', link: '/about-us' },
@@ -103,7 +96,7 @@ const Footer = () => {
                 ].map((item) => (
                   <li key={item.name}>
                     <Link to={item.link} className="text-gray-400 hover:text-white transition-colors flex items-center gap-2 group">
-                       <span className="w-0 h-[1px] bg-emerald-500 group-hover:w-3 transition-all duration-300"></span>
+                       <span className="w-0 h-[1px] bg-[#F5DEB3] group-hover:w-3 transition-all duration-300"></span>
                        {item.name}
                     </Link>
                   </li>
@@ -111,11 +104,9 @@ const Footer = () => {
               </ul>
             </div>
 
-            {/* Column 4: Connect */}
             <div>
-              <h4 className="text-emerald-400 font-bold uppercase tracking-widest text-xs mb-8">Connect</h4>
+              <h4 className="text-[#F5DEB3] font-bold uppercase tracking-widest text-xs mb-8">Connect</h4>
               <div className="space-y-6">
-                 {/* Social Icons - Flex wrap fixed for mobile distortion */}
                  <div className="flex flex-wrap gap-3">
                     {[
                       { icon: 'fa-instagram', link: 'https://instagram.com' },
@@ -128,7 +119,7 @@ const Footer = () => {
                         href={social.link} 
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-emerald-500 hover:text-[#0a1a13] hover:border-emerald-500 transition-all duration-300 shrink-0"
+                        className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-[#F5DEB3] hover:text-[#0a1a13] hover:border-[#F5DEB3] transition-all duration-300 shrink-0"
                       >
                         <i className={`fa-brands ${social.icon}`}></i>
                       </a>
@@ -137,20 +128,20 @@ const Footer = () => {
                  
                  <div className="space-y-4 pt-4">
                     <a href="mailto:support@urbannook.in" className="text-gray-400 text-sm flex items-center gap-3 hover:text-white transition-colors group">
-                      <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500 transition-colors">
-                        <i className="fa-solid fa-envelope text-emerald-500 text-xs group-hover:text-white"></i>
+                      <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center group-hover:bg-[#F5DEB3] transition-colors">
+                        <i className="fa-solid fa-envelope text-[#F5DEB3] text-xs group-hover:text-white"></i>
                       </div>
                       support@urbannook.in
                     </a>
                     <a href="tel:+916386455982" className="text-gray-400 text-sm flex items-center gap-3 hover:text-white transition-colors group">
-                      <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500 transition-colors">
-                        <i className="fa-solid fa-phone text-emerald-500 text-xs group-hover:text-white"></i>
+                      <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center group-hover:bg-[#F5DEB3] transition-colors">
+                        <i className="fa-solid fa-phone text-[#F5DEB3] text-xs group-hover:text-white"></i>
                       </div>
                       +91 63864 55982
                     </a>
                     <div className="text-gray-400 text-sm flex items-center gap-3 group cursor-default">
-                      <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500 transition-colors">
-                        <i className="fa-solid fa-location-dot text-emerald-500 text-xs group-hover:text-white"></i>
+                      <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center group-hover:bg-[#F5DEB3] transition-colors">
+                        <i className="fa-solid fa-location-dot text-[#F5DEB3] text-xs group-hover:text-white"></i>
                       </div>
                       Gurgaon, India
                     </div>

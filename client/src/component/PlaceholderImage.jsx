@@ -1,6 +1,6 @@
 import React from 'react';
 
-const PlaceholderImage = ({ className = "", alt = "Product image" }) => {
+const PlaceholderImage = ({ className = "",  }) => {
   return (
     <div className={`bg-gray-200 flex items-center justify-center ${className}`}>
       <svg 

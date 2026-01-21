@@ -20,9 +20,6 @@ const CheckoutPage = () => {
   const [createOrder] = useCreateOrderMutation();
 
 
-  console.log(userProfile?.addedToCart?.[0]?.productId,"razorpayKeyDatarazorpayKeyDatarazorpayKeyData")
-console.log(cartItems,"cartItemscartItemscartItemscartItems")
-
   const fetchUserProfile = async () => {
     try {
       // Get email from multiple sources
@@ -47,13 +44,24 @@ console.log(cartItems,"cartItemscartItemscartItemscartItems")
     }
   };
 
-
+  // Effect to fetch user profile
   useEffect(() => {
-    console.log('Checkout page loaded');
-    console.log('All cookies:', document.cookie);
-    console.log('LocalStorage user:', localStorage.getItem('user'));
-    console.log('Cart items:', cartItems.length);
-    
+    let isMounted = true;
+
+    const loadProfile = async () => {
+      await fetchUserProfile();
+      if (!isMounted) return;
+    };
+
+    loadProfile();
+
+    return () => {
+      isMounted = false;
+    };
+  },);
+
+  // Effect to check authentication and cart
+  useEffect(() => {
     // Check multiple auth sources
     const getCookie = (name) => {
       const value = `; ${document.cookie}`;
@@ -66,7 +74,6 @@ console.log(cartItems,"cartItemscartItemscartItemscartItems")
     const hasLocalUser = localStorage.getItem('user');
     const isLoggedIn = isAuthenticated || userToken || hasLocalUser;
     
-    console.log('Auth checks:', { isAuthenticated, userToken: !!userToken, hasLocalUser: !!hasLocalUser, isLoggedIn });
     
     if (!isLoggedIn) {
       console.log('Not authenticated, redirecting to home');
@@ -79,7 +86,6 @@ console.log(cartItems,"cartItemscartItemscartItemscartItems")
       navigate('/products');
       return;
     }
-    fetchUserProfile();
   }, [isAuthenticated, cartItems, navigate]);
 
   const loadRazorpay = () => {
@@ -136,7 +142,7 @@ console.log(cartItems,"cartItemscartItemscartItemscartItems")
         currency: orderResult.currency,
         name: 'Urban Nook',
         description: 'Purchase from Urban Nook',
-        image: '/assets/logo.jpeg',
+        image: '/assets/logo.webp',
         order_id: orderResult.id,
         handler: function (response) {
           alert(`Payment successful! Payment ID: ${response.razorpay_payment_id}`);
