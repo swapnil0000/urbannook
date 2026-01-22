@@ -1,14 +1,14 @@
 import mongoose from "mongoose";
 const userCommunitySchema = mongoose.Schema({
-  userEmail: {
+  email: {
     type: String,
-    required: [true, "userEmail is required"],
+    required: [true, "email is required"],
     unique: true,
   },
 });
 
 const UserCommunityList = new mongoose.model(
   "UserCommunityList",
-  userCommunitySchema
+  userCommunitySchema,
 );
 export default UserCommunityList;
