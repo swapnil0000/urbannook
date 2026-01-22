@@ -1,6 +1,9 @@
-const addToWishList = async (email, productName) => {
+import Product from "../model/product.model.js";
+import WishList from "../model/user.wishlist.model.js";
+import { cartDetailsMissing } from "../utlis/CommonResponse.js";
+const addToWishListService = async (userId, productId) => {
   try {
-    let missing = cartDetailsMissing(productName);
+    let missing = cartDetailsMissing(userId, productId);
 
     if (!missing?.success) {
       return {
@@ -11,24 +14,43 @@ const addToWishList = async (email, productName) => {
       };
     }
     // Check product
-    const productDetails = await Product.findOne({ productName });
+    const productDetails = await Product.findOne(
+      { productId },
+      { productName: 1 },
+    ).lean();
     if (!productDetails) {
       return {
         statusCode: 404,
-        message: `Product not found with name : ${productName}`,
+        message: `Product not found with name : ${productDetails?.productName}`,
         data: [],
         success: false,
       };
     }
+    const alreadyExists = await WishList.findOne({
+      userId,
+      products: productId,
+    }).select("-__v -_id");
+
+    if (alreadyExists) {
+      return {
+        statusCode: 200,
+        message: "Product already in wishlist",
+        data: {
+          userId: alreadyExists?.userId,
+          productId,
+        },
+        success: true,
+      };
+    }
 
     // update wishlist
-    const updatedUser = await User.findOneAndUpdate(
-      { email },
-      { $addToSet: { addedToWishList: { productId: productDetails?._id } } },
-      { new: true }
-    ).select("-password -userRefreshToken -__v -_id -createdAt");
+    const updatedWishList = await WishList.findOneAndUpdate(
+      { userId },
+      { $addToSet: { products: productId } },
+      { new: true, upsert: true },
+    ).select("-__v -_id");
 
-    if (!updatedUser) {
+    if (!updatedWishList) {
       return {
         statusCode: 400,
         message: "Failed to add to wishlist",
@@ -39,10 +61,8 @@ const addToWishList = async (email, productName) => {
 
     return {
       statusCode: 200,
-      message: `Added to wishlist: ${productName}`,
-      data: {
-        productName,
-      },
+      message: `Added to wishlist: ${productDetails?.productName}`,
+      data: `${productDetails?.productName}`,
       success: true,
     };
   } catch (error) {
@@ -56,7 +76,40 @@ const addToWishList = async (email, productName) => {
   }
 };
 
-const deleteFromWishList = async (email, productId) => {
+const getWishListService = async (userId) => {
+  if (!userId) {
+    return {
+      statusCode: 401,
+      message: "Unauthorized",
+      data: null,
+      success: false,
+    };
+  }
+
+  const wishList = await WishList.findOne({ userId });
+
+  if (!wishList || wishList.products.length === 0) {
+    return {
+      statusCode: 200,
+      message: "Wishlist is empty",
+      data: [],
+      success: true,
+    };
+  }
+
+  const productDetails = await Product.find({
+    productId: { $in: wishList.products },
+  }).select("productName productImg productCategory sellingPrice -_id");
+
+  return {
+    statusCode: 200,
+    message: "Wishlist fetched",
+    data: productDetails,
+    success: true,
+  };
+};
+
+const deleteFromWishListService = async (email, productId) => {
   try {
     const productDetails = await Product.findOne({ productId });
     if (!productDetails) {
@@ -78,7 +131,7 @@ const deleteFromWishList = async (email, productId) => {
       },
       {
         new: true,
-      }
+      },
     );
 
     await userExist.save();
@@ -105,4 +158,4 @@ const deleteFromWishList = async (email, productId) => {
     };
   }
 };
-export { addToWishList, deleteFromWishList };
+export { addToWishListService, deleteFromWishListService, getWishListService };

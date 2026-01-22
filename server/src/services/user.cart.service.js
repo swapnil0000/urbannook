@@ -18,14 +18,11 @@ const addToCartService = async ({ userId, productId }) => {
       It returns a plain JavaScript object instead of a full Mongoose document,
      which improves performance and reduces memory usage. */
 
-    const userDetails = await User.findOne(
-      { userId },
-      { _id: 1, name: 1 },
-    ).lean();
+    const userDetails = await User.findOne({ userId }).lean();
     if (!userDetails) {
       return {
         statusCode: 401,
-        message: "Invalid userDetails",
+        message: "Invalid userDetails - unauthorized",
         data: null,
         success: false,
       };
@@ -33,7 +30,7 @@ const addToCartService = async ({ userId, productId }) => {
 
     const productDetails = await Product.findOne(
       { productId },
-      { _id: 1, productName: 1 },
+      { productName: 1 },
     ).lean();
 
     if (!productDetails) {
@@ -44,17 +41,17 @@ const addToCartService = async ({ userId, productId }) => {
       };
     }
 
-    const key = `products.${productDetails._id}`;
+    const key = `products.${productId}`;
 
     /*
      Existing Cart check and Updating are seperated intentionally because 
      MongoDB update queries do not reliably tell whether a field already existed or was newly added, 
      which makes it difficult to return the correct business message (“Added” vs “Already in cart”).
      */
-    const cart = await Cart.findOne(
-      { user: userDetails._id, [key]: { $exists: true } },
-      { _id: 1 },
-    ).lean();
+    const cart = await Cart.findOne({
+      userId,
+      [key]: { $exists: true },
+    }).lean();
 
     if (cart) {
       return {
@@ -69,9 +66,9 @@ const addToCartService = async ({ userId, productId }) => {
       Here quantity is saved with 1 always - to update we use different endpoints
     */
     await Cart.findOneAndUpdate(
-      { user: userDetails._id },
+      { userId },
       {
-        $setOnInsert: { user: userDetails._id },
+        $setOnInsert: { userId },
         $set: { [key]: 1 },
       },
       { upsert: true },
@@ -104,10 +101,7 @@ const previewCartService = async ({ userId }) => {
         success: false,
       };
     }
-    const userDetails = await User.findOne(
-      { userId },
-      { _id: 1, name: 1 },
-    ).lean();
+    const userDetails = await User.findOne({ userId }, { name: 1 }).lean();
     if (!userDetails) {
       return {
         statusCode: 401,
@@ -121,14 +115,14 @@ const previewCartService = async ({ userId }) => {
       // Match user's cart
       {
         $match: {
-          user: userDetails._id,
+          userId,
         },
       },
 
       // Convert products object → array
       {
         $project: {
-          products: {
+          items: {
             $objectToArray: "$products",
           },
         },
@@ -136,25 +130,15 @@ const previewCartService = async ({ userId }) => {
 
       // 3Expand each product
       {
-        $unwind: "$products",
-      },
-
-      // Convert key (string) → ObjectId
-      {
-        $addFields: {
-          productObjectId: {
-            $toObjectId: "$products.k",
-          },
-          quantity: "$products.v",
-        },
+        $unwind: "$items",
       },
 
       //  Join with Product collection
       {
         $lookup: {
           from: "products",
-          localField: "productObjectId",
-          foreignField: "_id",
+          localField: "items.k",
+          foreignField: "productId",
           as: "product",
         },
       },
@@ -172,9 +156,9 @@ const previewCartService = async ({ userId }) => {
           name: "$product.productName",
           price: "$product.sellingPrice",
           image: "$product.productImg",
-          quantity: 1,
+          quantity: "$items.v",
           subtotal: {
-            $multiply: ["$product.sellingPrice", "$quantity"],
+            $multiply: ["$product.sellingPrice", "$items.v"],
           },
         },
       },
@@ -195,8 +179,8 @@ const previewCartService = async ({ userId }) => {
           _id: 0,
           items: 1,
           summary: {
-            subtotal: "$subtotal",
-            totalQuantity: "$totalQuantity",
+            subtotal: 1,
+            totalQuantity: 1,
             shipping: { $literal: 0 },
             tax: { $literal: 0 },
             grandTotal: "$subtotal",
@@ -231,4 +215,133 @@ const previewCartService = async ({ userId }) => {
   }
 };
 
-export { addToCartService, previewCartService };
+const cartQuantityService = async ({ userId, productId, quantity, action }) => {
+  if (!userId) {
+    return {
+      statusCode: 401,
+      message: "Unauthorized",
+      data: null,
+      success: false,
+    };
+  }
+  if (!productId && (quantity === undefined) & !action) {
+    return {
+      statusCode: 400,
+      message: "productId, quantity and action are required",
+      data: null,
+      success: false,
+    };
+  }
+  if (isNaN(quantity) || Number(quantity) < 0) {
+    return {
+      statusCode: 400,
+      message: "quantity must be a non-negative number",
+      data: null,
+      success: false,
+    };
+  }
+
+  const cartDetails = await Cart.findOne({ userId });
+  const productQuanityMap = cartDetails?.products;
+  const cartHasProductOrNot = productQuanityMap.has(String(productId)); // converting to string because Map has productId stored as string
+  if (!cartHasProductOrNot) {
+    return {
+      statusCode: 400,
+      message: "Product not in cart",
+      data: null,
+      success: false,
+    };
+  }
+
+  const productQuantity = productQuanityMap.get(productId);
+  switch (action) {
+    case "add":
+      productQuanityMap.set(productId, productQuantity + quantity);
+      await cartDetails.save();
+      return {
+        statusCode: 200,
+        message: "Quantity increased",
+        success: true,
+      };
+    case "sub":
+      if (productQuantity <= quantity && action != "remove") {
+        return {
+          statusCode: 400,
+          message:
+            "Product quantity in cart is less than or equal to requested reduction",
+          success: false,
+        };
+      }
+      productQuanityMap.set(productId, productQuantity - quantity);
+      await cartDetails.save();
+
+      return {
+        statusCode: 200,
+        message: "Quantity reduced",
+        success: true,
+      };
+    case "remove":
+      if (!cartHasProductOrNot) {
+        return {
+          statusCode: 404,
+          message: "Product not found in cart",
+          success: false,
+        };
+      }
+
+      productQuanityMap.delete(productId);
+      await cartDetails.save();
+
+      return {
+        statusCode: 200,
+        message: "Product removed from cart",
+        success: true,
+      };
+    default:
+      break;
+  }
+  return {
+    statusCode: 200,
+    message: "quantity updated",
+    data: userId,
+    success: false,
+  };
+};
+
+const clearCartService = async ({ userId }) => {
+  if (!userId) {
+    return {
+      statusCode: 401,
+      message: "Unauthorized",
+      data: null,
+      success: false,
+    };
+  }
+  const cartDetails = await Cart.findOne({ userId });
+  const productQuanityMap = cartDetails?.products;
+  console.log(productQuanityMap);
+
+  if (!productQuanityMap.size) {
+    return {
+      statusCode: 404,
+      message: "Nothing to clear in cart",
+      data: null,
+      success: false,
+    };
+  }
+  productQuanityMap.clear();
+  await cartDetails.save();
+  return {
+    statusCode: 200,
+    message: "Cart cleared successfully",
+    data: [],
+    success: true,
+  };
+};
+
+export {
+  addToCartService,
+  previewCartService,
+  cartQuantityService,
+  clearCartService,
+};

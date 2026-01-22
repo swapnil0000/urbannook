@@ -3,7 +3,6 @@ import {
   userAddToCart,
   userGetAddToCart,
   userUpdateCartQuantity,
-  userRemoveFromCart,
   userClearCart,
 } from "../controller/user.cart.controller.js";
 import { authGuardService } from "../services/common.auth.service.js";
@@ -14,16 +13,10 @@ userCartRouter.get(
   authGuardService("USER"),
   userGetAddToCart,
 );
-userCartRouter.put(
+userCartRouter.post(
   "/user/cart/update",
   authGuardService("USER"),
   userUpdateCartQuantity,
-);
-
-userCartRouter.delete(
-  "/user/cart/:productId",
-  authGuardService("USER"),
-  userRemoveFromCart,
 );
 
 userCartRouter.delete(

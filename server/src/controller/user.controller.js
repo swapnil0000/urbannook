@@ -1,4 +1,3 @@
-import bcrypt from "bcrypt";
 import { validateUserInput } from "../utlis/CommonResponse.js";
 import { ApiError, ApiRes } from "../utlis/index.js";
 import User from "../model/user.model.js";
@@ -7,7 +6,10 @@ import {
   registerService,
 } from "../services/user.auth.service.js";
 import cookieOptions from "../config/config.js";
-import { profileFetchService } from "../services/common.auth.service.js";
+import {
+  profileFetchService,
+  resetPasswordService,
+} from "../services/common.auth.service.js";
 const userLogin = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -139,82 +141,32 @@ const userForgetpassword = async (req, res) => {
 const userResetPassword = async (req, res) => {
   try {
     const { userId } = req.user;
-    if (!userId) {
-      return res
-        .status(404)
-        .json(new ApiError(404, `userId is not available`, null, false));
-    }
-    const { currentpassword, newpassword } = req.body || {};
-    if (!newpassword || !currentpassword) {
-      return res
-        .status(400)
-        .json(
-          new ApiError(
-            400,
-            `Both current password and new password is required`,
-            null,
-            false,
-          ),
-        );
-    }
-    const passwordRegex =
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,15}$/;
-    if (!passwordRegex.test(newpassword)) {
-      return res
-        .status(Number(400))
-        .json(
-          new ApiError(
-            400,
-            "New Password must be at least 8 characters with uppercase, lowercase, number & special character",
-            null,
-            false,
-          ),
-        );
-    }
-    const userDetails = await User.findOne({ email });
-    let result = await loginService(email, currentpassword);
-    if (result?.statusCode >= 400) {
-      return res.status(Number(result?.statusCode)).json(result);
-    }
-    //new pass and curr pass comparison
-    const passCheck = (await userDetails.passCheck(currentpassword))
-      ? true
-      : false;
-    const oldPassAndNewPassCompare = await bcrypt.compare(
-      newpassword,
-      userDetails?.password,
+    const { currentPassword, newPassword } = req.body || {};
+    const resetPasswordSeviceValidation = await resetPasswordService(
+      userId,
+      currentPassword,
+      newPassword,
     );
-
-    if (passCheck) {
-      if (oldPassAndNewPassCompare)
-        return res
-          .status(400)
-          .json(
-            new ApiRes(
-              400,
-              `Current password and New password is same for user - ${email}`,
-              email,
-              false,
-            ),
-          );
-    }
-
-    if (!userDetails?._id) {
+    if (!resetPasswordSeviceValidation?.success) {
       return res
-        .status(Number(400))
-        .json(new ApiError(400, `Unable to reset password`, null, false));
+        .status(Number(resetPasswordSeviceValidation?.statusCode))
+        .json(
+          new ApiError(
+            resetPasswordSeviceValidation?.statusCode,
+            resetPasswordSeviceValidation?.message,
+            resetPasswordSeviceValidation?.data,
+            resetPasswordSeviceValidation?.success,
+          ),
+        );
     }
-
-    userDetails.password = newpassword;
-    await userDetails.save(); // using this because while using findOne it doesn't trigger pre middleware and hence plain text saved
     return res
-      .status(Number(200))
+      .status(Number(resetPasswordSeviceValidation?.statusCode))
       .json(
         new ApiRes(
-          200,
-          `password updated successfully for user ${email}`,
-          email,
-          true,
+          resetPasswordSeviceValidation?.statusCode,
+          resetPasswordSeviceValidation?.message,
+          resetPasswordSeviceValidation?.data,
+          resetPasswordSeviceValidation?.success,
         ),
       );
   } catch (error) {

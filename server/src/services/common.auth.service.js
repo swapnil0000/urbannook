@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 import cookieOptions from "../config/config.js";
 import crypto from "crypto";
 import sendEmail from "./email.service.js";
+import bcrypt from "bcrypt";
 const authGuardService = (role) => {
   /* The return is placed outside the try–catch because jwt.verify() runs
      during request execution, while a try–catch outside the middleware
@@ -75,21 +76,19 @@ const logoutService = async (req, res) => {
   return res
     .clearCookie("userAccessToken", cookieOptions)
     .status(200)
-    .json(
-      new ApiRes(200, `User - ${userEmail} Logout Successfully`, null, true),
-    );
+    .json(new ApiRes(200, `User Logout Successfully`, null, true));
 };
 
-const profileFetchService = async (data) => {
-  if (!data?.userId)
+const profileFetchService = async ({ userId, role }) => {
+  if (!userId)
     return {
       statusCode: 400,
       message: `userId not avaialable`,
       data: null,
       success: false,
     };
-  const Model = data?.role === "Admin" ? Admin : User;
-  const profile = await Model.findOne({ userId: data?.userId }).select(
+  const Model = role === "Admin" ? Admin : User;
+  const profile = await Model.findOne({ userId }).select(
     "-_id -password -createdAt -updatedAt -__v -userRefreshToken",
   );
   return profile;
@@ -252,6 +251,7 @@ const verifyOtpEmailService = async (email, emailOtp) => {
       return {
         statusCode: 400,
         message: "Email and OTP is required",
+        data: null,
         success: false,
       };
     }
@@ -344,6 +344,75 @@ const verifyOtpEmailForgotPasswordService = async (userEmail, userEmailOtp) => {
   }
 };
 
+const resetPasswordService = async (userId, currentPassword, newPassword) => {
+  if (!userId)
+    return {
+      statusCode: 401,
+      message: "Unauthorized",
+      success: false,
+    };
+  if (!newPassword || !currentPassword) {
+    return {
+      statusCode: 400,
+      message: `Both current password and new password is required`,
+      data: null,
+      success: false,
+    };
+  }
+  const passwordRegex =
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,15}$/;
+  if (!passwordRegex.test(newPassword)) {
+    return {
+      statusCode: 400,
+      message:
+        "New Password must be at least 8 characters with uppercase, lowercase, number & special character",
+      data: null,
+      success: false,
+    };
+  }
+  const userDetails = await User.findOne({ userId });
+  const isPasswordValid = await bcrypt.compare(
+    currentPassword,
+    userDetails.password,
+  );
+
+  if (!isPasswordValid) {
+    return {
+      statusCode: 401,
+      message: "Current password is incorrect",
+      success: false,
+    };
+  }
+  //new pass and curr pass comparison
+  const oldPassAndNewPassCompare = await bcrypt.compare(
+    newPassword,
+    userDetails?.password,
+  );
+
+  if (oldPassAndNewPassCompare)
+    return {
+      statusCode: 400,
+      message: `Current password and New password is same for user - ${userDetails?.name}`,
+      data: null,
+      success: false,
+    };
+  if (!userDetails?._id) {
+    return {
+      statusCode: 400,
+      message: `Unable to reset password for - ${userDetails?.name}`,
+      data: null,
+      success: false,
+    };
+  }
+  userDetails.password = newPassword;
+  await userDetails.save(); // using this because while using findOne it doesn't trigger pre middleware and hence plain text saved
+  return {
+    statusCode: 200,
+    message: `password updated successfully for user ${userDetails?.name}`,
+    data: `${userDetails?.name}`,
+    success: true,
+  };
+};
 export {
   authGuardService,
   logoutService,
@@ -353,4 +422,5 @@ export {
   verifyOtpEmailService,
   verifyOtpEmailForgotPasswordService,
   generateOtpResponseService,
+  resetPasswordService,
 };
