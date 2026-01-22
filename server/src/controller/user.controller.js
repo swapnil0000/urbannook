@@ -1,6 +1,7 @@
 import { validateUserInput } from "../utlis/CommonResponse.js";
 import { ApiError, ApiRes } from "../utlis/index.js";
 import User from "../model/user.model.js";
+import bcrypt from "bcrypt";
 import {
   loginService,
   registerService,
@@ -279,6 +280,7 @@ const userUpdateProfile = async (req, res) => {
 const userAccountDeletePreview = async (req, res) => {
   try {
     const { userId } = req.user;
+    const { email } = req.body; // Add this line to get email from request body
 
     if (!email) {
       return res
