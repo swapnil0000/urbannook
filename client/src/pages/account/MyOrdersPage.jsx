@@ -1,13 +1,18 @@
 import React, { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import NewHeader from '../../component/layout/NewHeader';
+import Footer from '../../component/layout/Footer';
 
 const MyOrdersPage = () => {
   
+  // Mock Data
   const [orders] = useState([
     {
       id: 'ORD-7782-XJ',
       date: '2025-10-15',
       status: 'Delivered',
       total: 2499,
+      timeline: 100, // 100% complete
       items: [
         { name: 'Aire Lounge Chair', image: 'https://images.unsplash.com/photo-1567538096630-e0c55bd6374c?w=400', price: 1999, variant: 'Charcoal Grey' },
         { name: 'Marble Coaster Set', image: 'https://images.unsplash.com/photo-1533090161767-e6ffed986c88?w=400', price: 500, variant: 'Carrara White' }
@@ -18,6 +23,7 @@ const MyOrdersPage = () => {
       date: '2026-01-05',
       status: 'Processing',
       total: 1299,
+      timeline: 40, // 40% complete
       items: [
         { name: 'Minimalist Floor Lamp', image: 'https://images.unsplash.com/photo-1507473888900-52e1adad54cd?w=400', price: 1299, variant: 'Matte Black' }
       ]
@@ -26,127 +32,144 @@ const MyOrdersPage = () => {
 
    useEffect(() => {
       window.scrollTo(0, 0);
-    }, []);
+   }, []);
   
-
   const getStatusConfig = (status) => {
     switch (status) {
-      case 'Delivered': return { bg: 'bg-emerald-500/10 border-emerald-500/20', text: 'text-emerald-400', icon: 'fa-check' };
-      case 'Processing': return { bg: 'bg-blue-500/10 border-blue-500/20', text: 'text-blue-400', icon: 'fa-rotate' };
-      case 'Shipped': return { bg: 'bg-amber-500/10 border-amber-500/20', text: 'text-amber-400', icon: 'fa-truck-fast' };
-      default: return { bg: 'bg-white/5 border-white/10', text: 'text-gray-400', icon: 'fa-question' };
+      case 'Delivered': return { text: 'text-[#F5DEB3]', icon: 'fa-check', label: 'Delivered' };
+      case 'Processing': return { text: 'text-blue-400', icon: 'fa-rotate', label: 'In Production' };
+      case 'Shipped': return { text: 'text-emerald-400', icon: 'fa-truck-fast', label: 'On The Way' };
+      default: return { text: 'text-gray-400', icon: 'fa-question', label: status };
     }
   };
 
   return (
-    <div className="bg-[#0a1a13] min-h-screen font-sans text-gray-300 selection:bg-emerald-500 selection:text-white pt-32 pb-20 md:pt-40 px-4 md:px-8 relative overflow-hidden">
-      
-      {/* --- BACKGROUND GLOW --- */}
-      <div className="absolute top-20 right-0 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-[120px] pointer-events-none"></div>
+    <div className="bg-[#1c3026] min-h-screen font-sans text-[#e8e6e1] selection:bg-[#F5DEB3] selection:text-[#1c3026]">
+      <NewHeader />
 
-      <div className="max-w-5xl mx-auto relative z-10">
+      {/* --- AMBIENT BACKGROUND --- */}
+      <div className="fixed top-0 left-0 w-full h-[600px] bg-gradient-to-b from-[#2a4538] to-[#1c3026] pointer-events-none opacity-60"></div>
+      <div className="fixed -bottom-40 -left-40 w-[600px] h-[600px] bg-[#F5DEB3] rounded-full blur-[200px] opacity-[0.03] pointer-events-none"></div>
+
+      <main className="max-w-5xl mx-auto pt-28 pb-20 px-4 lg:px-12 relative z-10">
         
         {/* --- PAGE HEADER --- */}
-        <div className="mb-12 border-b border-white/10 pb-8">
-           <span className="inline-block px-3 py-1 mb-6 text-[10px] font-bold tracking-[0.3em] text-emerald-400 uppercase bg-white/5 border border-white/10 rounded-full">
-             Acquisition Chronicle
-           </span>
-           <h1 className="text-5xl md:text-6xl lg:text-7xl font-serif text-white leading-[0.95]">
-             Your <span className="italic font-light text-emerald-500">History.</span>
+        <div className="mb-12 text-center lg:text-left sticky top-24 z-20 bg-[#1c3026]/90 backdrop-blur-xl py-4 -mx-4 px-4 lg:mx-0 lg:px-0 border-b border-white/5 lg:border-none">
+           <h1 className="text-4xl md:text-6xl font-serif text-white mb-2">
+             Order <span className="italic text-[#F5DEB3]">Archive.</span>
            </h1>
+           <p className="text-[#F5DEB3]/60 text-sm md:text-base font-light tracking-wide">
+             Track your active shipments and view purchase history.
+           </p>
         </div>
 
-        {/* --- EMPTY STATE --- */}
+        {/* --- ORDERS LIST --- */}
+        <AnimatePresence>
         {orders.length === 0 ? (
-          <div className="bg-white/5 rounded-[3rem] p-20 text-center border border-white/10 flex flex-col items-center">
-             <div className="w-24 h-24 bg-[#0a1a13] rounded-full flex items-center justify-center mb-6 border border-white/10">
-                <i className="fa-solid fa-wind text-gray-500 text-3xl"></i>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-[#e8e6e1]/5 rounded-[2.5rem] p-12 lg:p-20 text-center border border-white/5 flex flex-col items-center backdrop-blur-sm"
+          >
+             <div className="w-20 h-20 bg-[#1c3026] rounded-full flex items-center justify-center mb-6 border border-white/10 shadow-inner">
+                <i className="fa-solid fa-box-open text-[#F5DEB3]/50 text-2xl"></i>
              </div>
-             <h3 className="text-2xl font-serif text-white mb-3">The archive is silent.</h3>
-             <p className="text-gray-500 text-sm mb-10 max-w-xs mx-auto leading-relaxed">
-                Your journey with Urban Nook hasn't started yet. Let's find your first piece.
+             <h3 className="text-2xl font-serif text-white mb-3">No orders found.</h3>
+             <p className="text-gray-400 text-sm mb-10 max-w-xs mx-auto leading-relaxed">
+                Your collection awaits. Start your journey with our latest arrivals.
              </p>
-             <button className="px-10 py-4 bg-white text-[#0a1a13] rounded-xl font-bold uppercase tracking-widest text-[10px] hover:bg-emerald-500 hover:text-white transition-all shadow-lg">
-               Explore Collection
+             <button className="px-10 py-4 bg-[#F5DEB3] text-[#1c3026] rounded-full font-bold uppercase tracking-widest text-xs hover:bg-white transition-all shadow-lg active:scale-95">
+               Start Shopping
              </button>
-          </div>
+          </motion.div>
         ) : (
           
-          /* --- ORDERS LIST --- */
-          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {orders.map((order) => {
+          <div className="space-y-8">
+            {orders.map((order, idx) => {
               const status = getStatusConfig(order.status);
               
               return (
-                <div key={order.id} className="bg-white/5 rounded-[2.5rem] p-6 md:p-10 border border-white/10 hover:border-emerald-500/30 hover:bg-white/[0.07] transition-all duration-300 group overflow-hidden relative">
-                    
-                    {/* Decorative Bar on Left */}
-                    <div className={`absolute left-0 top-0 bottom-0 w-1 ${order.status === 'Delivered' ? 'bg-emerald-500' : 'bg-gray-700'}`}></div>
-
-                    {/* 1. TOP ROW: META DATA */}
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10 pb-8 border-b border-white/5">
-                      
-                      <div className="flex flex-col gap-1">
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Series ID</span>
-                          <span className="font-serif text-2xl text-white">{order.id}</span>
-                      </div>
-
-                      <div className="flex flex-wrap gap-8 md:gap-12">
-                          <div className="flex flex-col gap-1">
-                              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Status</span>
-                              <div className={`flex items-center gap-2 px-3 py-1 rounded-full w-fit border ${status.bg} ${status.text}`}>
-                                  <i className={`fa-solid ${status.icon} text-[10px]`}></i>
-                                  <span className="text-[10px] font-bold uppercase tracking-wider">{order.status}</span>
-                              </div>
-                          </div>
-                          
-                          <div className="flex flex-col gap-1">
-                              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Date</span>
-                              <span className="text-sm font-bold text-white">
-                                  {new Date(order.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                              </span>
-                          </div>
-
-                          <div className="flex flex-col gap-1">
-                              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Investment</span>
-                              <span className="text-sm font-bold text-emerald-400">₹{order.total.toLocaleString()}</span>
-                          </div>
-                      </div>
+                <motion.div 
+                    key={order.id}
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.1 }}
+                    className="bg-[#e8e6e1]/5 rounded-[2rem] border border-white/5 hover:border-[#F5DEB3]/20 transition-all duration-300 group overflow-hidden"
+                >
+                    {/* 1. HEADER ROW */}
+                    <div className="p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-white/5 bg-black/10">
+                        <div className="flex items-center gap-4">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center border border-white/10 ${status.text} bg-white/5`}>
+                                <i className={`fa-solid ${status.icon}`}></i>
+                            </div>
+                            <div>
+                                <span className="block font-serif text-lg text-white">{status.label}</span>
+                                <span className="text-xs text-gray-500 font-mono tracking-wider">ID: {order.id}</span>
+                            </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-8 text-right md:text-left">
+                            <div>
+                                <span className="block text-[10px] text-gray-500 uppercase tracking-widest mb-1">Ordered On</span>
+                                <span className="text-sm font-medium text-gray-300">
+                                    {new Date(order.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                </span>
+                            </div>
+                            <div>
+                                <span className="block text-[10px] text-gray-500 uppercase tracking-widest mb-1">Total</span>
+                                <span className="text-sm font-bold text-[#F5DEB3] font-mono">₹{order.total.toLocaleString()}</span>
+                            </div>
+                        </div>
                     </div>
 
-                    {/* 2. MIDDLE ROW: ITEMS GRID */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
+                    {/* PROGRESS BAR (Only if not delivered) */}
+                    {order.status !== 'Delivered' && (
+                        <div className="w-full h-1 bg-white/5">
+                            <div className="h-full bg-gradient-to-r from-blue-500 to-purple-500" style={{ width: `${order.timeline}%` }}></div>
+                        </div>
+                    )}
+
+                    {/* 2. ITEMS GRID */}
+                    <div className="p-6 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-4">
                       {order.items.map((item, index) => (
-                        <div key={index} className="flex items-center gap-5 p-4 rounded-2xl border border-white/5 bg-[#0a1a13]/40 hover:bg-[#0a1a13]/80 transition-all duration-300">
-                          <div className="w-20 h-20 rounded-xl overflow-hidden shadow-lg shrink-0 border border-white/10">
-                            <img src={item.image} alt={item.name} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                        <div key={index} className="flex gap-5 p-4 rounded-xl bg-[#1c3026]/50 border border-white/5 hover:bg-[#1c3026] transition-colors">
+                          <div className="w-16 h-16 rounded-lg bg-[#e8e6e1] p-1 shrink-0 overflow-hidden">
+                            <img src={item.image} alt={item.name} className="w-full h-full object-contain mix-blend-multiply" />
                           </div>
-                          <div className="min-w-0">
-                            <h4 className="font-serif text-white text-lg leading-tight mb-1">{item.name}</h4>
-                            <p className="text-[10px] text-gray-500 font-medium mb-2">{item.variant}</p>
-                            <p className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded w-fit">₹{item.price.toLocaleString()}</p>
+                          <div className="min-w-0 flex flex-col justify-center">
+                            <h4 className="font-medium text-white text-sm truncate mb-1">{item.name}</h4>
+                            <div className="flex items-center gap-3 text-xs text-gray-500">
+                                <span>{item.variant}</span>
+                                <span className="w-1 h-1 rounded-full bg-gray-600"></span>
+                                <span>Qty: 1</span>
+                            </div>
                           </div>
                         </div>
                       ))}
                     </div>
 
-                    {/* 3. BOTTOM ROW: ACTIONS */}
-                    <div className="flex flex-col sm:flex-row items-center justify-end gap-4">
-                        <button className="w-full sm:w-auto px-8 py-3.5 border border-white/20 text-gray-300 rounded-xl font-bold uppercase tracking-widest text-[9px] hover:bg-white hover:text-[#0a1a13] transition-all flex items-center justify-center gap-2">
-                            <i className="fa-solid fa-receipt"></i> Invoice
+                    {/* 3. FOOTER ACTIONS */}
+                    <div className="px-6 md:px-8 pb-6 md:pb-8 pt-0 flex flex-col sm:flex-row justify-end gap-3">
+                        <button className="px-6 py-3 border border-white/10 text-gray-400 rounded-xl font-bold uppercase tracking-widest text-[10px] hover:text-white hover:border-white/30 transition-all flex items-center justify-center gap-2">
+                            <i className="fa-solid fa-file-invoice"></i> Invoice
                         </button>
                         
-                        <button className="w-full sm:w-auto px-8 py-3.5 bg-emerald-500 text-white rounded-xl font-bold uppercase tracking-widest text-[9px] hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2 active:scale-95">
-                            Track Order <i className="fa-solid fa-arrow-right"></i>
+                        <button className="px-6 py-3 bg-[#F5DEB3] text-[#1c3026] rounded-xl font-bold uppercase tracking-widest text-[10px] hover:bg-white transition-all shadow-lg flex items-center justify-center gap-2 active:scale-95">
+                            {order.status === 'Delivered' ? 'Buy Again' : 'Track Package'} 
+                            <i className={`fa-solid ${order.status === 'Delivered' ? 'fa-rotate-right' : 'fa-location-arrow'}`}></i>
                         </button>
                     </div>
 
-                </div>
+                </motion.div>
               );
             })}
           </div>
         )}
-      </div>
+        </AnimatePresence>
+
+      </main>
+      
+      <Footer />
     </div>
   );
 };

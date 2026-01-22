@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import { motion, AnimatePresence } from 'framer-motion';
 import NewHeader from '../component/layout/NewHeader';
 import Footer from '../component/layout/Footer';
-import { useGetUserProfileMutation, useGetRazorpayKeyQuery, useCreateOrderMutation } from '../store/api/userApi';
+import { useGetUserProfileQuery, useGetRazorpayKeyQuery, useCreateOrderMutation } from '../store/api/userApi';
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
@@ -14,29 +15,25 @@ const CheckoutPage = () => {
   const [address, setAddress] = useState('');
   const [pincode, setPincode] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  
-  const [getUserProfile] = useGetUserProfileMutation();
-  const { data: razorpayKeyData } = useGetRazorpayKeyQuery();
-  const [createOrder] = useCreateOrderMutation();
 
+  // API Hooks
+  const { data: userProfileData, isLoading: profileLoading, refetch: refetchProfile } = useGetUserProfileQuery();
+  const { data: razorpayKeyData } = useGetRazorpayKeyQuery();
+  const [createOrder, { isLoading: isOrdering }] = useCreateOrderMutation();
 
   const fetchUserProfile = async () => {
     try {
-      // Get email from multiple sources
       const localUser = JSON.parse(localStorage.getItem('user') || '{}');
-      const userEmail = user?.email || user?.userEmail || localUser?.email || localStorage.getItem('userEmail');
+      const email = user?.email || user?.userEmail || localUser?.email || localStorage.getItem('userEmail');
       
-      console.log('Fetching profile for email:', userEmail);
-      
-      if (!userEmail) {
+      if (!email) {
         alert('User email not found. Please login again.');
         return;
       }
       
-      const result = await getUserProfile({ userEmail }).unwrap();
-      const profileData = result.data || result;
+      const result = await refetchProfile();
+      const profileData = result.data?.data || result.data;
       setUserProfile(profileData);
-      
       setIsLoading(false);
     } catch (error) {
       console.error('Failed to fetch profile:', error);
@@ -44,25 +41,7 @@ const CheckoutPage = () => {
     }
   };
 
-  // Effect to fetch user profile
   useEffect(() => {
-    let isMounted = true;
-
-    const loadProfile = async () => {
-      await fetchUserProfile();
-      if (!isMounted) return;
-    };
-
-    loadProfile();
-
-    return () => {
-      isMounted = false;
-    };
-  },);
-
-  // Effect to check authentication and cart
-  useEffect(() => {
-    // Check multiple auth sources
     const getCookie = (name) => {
       const value = `; ${document.cookie}`;
       const parts = value.split(`; ${name}=`);
@@ -74,19 +53,23 @@ const CheckoutPage = () => {
     const hasLocalUser = localStorage.getItem('user');
     const isLoggedIn = isAuthenticated || userToken || hasLocalUser;
     
-    
     if (!isLoggedIn) {
-      console.log('Not authenticated, redirecting to home');
       alert('Please login to access checkout');
       navigate('/');
       return;
     }
     if (cartItems.length === 0) {
-      console.log('Cart is empty, redirecting to products');
       navigate('/products');
       return;
     }
-  }, [isAuthenticated, cartItems, navigate]);
+    
+    if (userProfileData?.data) {
+      setUserProfile(userProfileData?.data);
+      setIsLoading(false);
+    } else if (!profileLoading) {
+      fetchUserProfile();
+    }
+  }, [isAuthenticated, cartItems, navigate, userProfileData, profileLoading]);
 
   const loadRazorpay = () => {
     return new Promise((resolve) => {
@@ -100,37 +83,24 @@ const CheckoutPage = () => {
 
   const handlePayment = async () => {
     if (!address.trim() || !pincode.trim()) {
-      alert('Please enter address and pincode before proceeding to payment.');
+      alert('Please enter your delivery address and pincode.');
       return;
     }
 
     try {
-      // Get Razorpay key
       const razorpayKey = razorpayKeyData?.razorPayApiKey || 'rzp_test_9WaeLLJnOFJHHX';
-      
-      // Create order - use correct productId from cart items
-      console.log('Cart items for order:', cartItems);
       
       const orderData = {
         amount: totalAmount,
         currency: 'INR',
-        items: cartItems.map(item => {
-          console.log('Processing item:', item);
-          return {
-            productId: item.id // Use the id field which should be the productId like "UN-PROD-103"
-          };
-        })
+        items: cartItems.map(item => ({
+          productId: item.id
+        }))
       };
       
-      console.log('Order data being sent:', orderData);
-      
       const orderResult = await createOrder(orderData).unwrap();
-
-
-      console.log(orderResult,"orderResultorderResultorderResultorderResult")
-      
-      // Load Razorpay SDK
       const res = await loadRazorpay();
+      
       if (!res) {
         alert('Razorpay SDK failed to load. Please check your connection.');
         return;
@@ -142,10 +112,9 @@ const CheckoutPage = () => {
         currency: orderResult.currency,
         name: 'Urban Nook',
         description: 'Purchase from Urban Nook',
-        image: '/assets/logo.webp',
+        image: '/assets/logo.jpeg',
         order_id: orderResult.id,
-        handler: function (response) {
-          alert(`Payment successful! Payment ID: ${response.razorpay_payment_id}`);
+        handler: function () {
           navigate('/orders');
         },
         prefill: {
@@ -160,12 +129,6 @@ const CheckoutPage = () => {
         theme: {
           color: '#2E443C'
         },
-        method: {
-          upi: true,
-          card: true,
-          netbanking: true,
-          wallet: true
-        }
       };
 
       const paymentObject = new window.Razorpay(options);
@@ -179,117 +142,180 @@ const CheckoutPage = () => {
 
   if (isLoading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-[#F9F9F7]">
-        <div className="animate-spin h-10 w-10 border-4 border-[#2E443C] border-t-transparent rounded-full"></div>
+      <div className="h-screen flex items-center justify-center bg-[#2e443c]">
+        <div className="w-12 h-12 border-2 border-[#F5DEB3] border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
   return (
-    <div className="bg-[#F9F9F7] min-h-screen font-sans text-[#1a2822]">
+    <div className="bg-[#2e443c] min-h-screen font-sans text-[#e8e6e1] selection:bg-[#F5DEB3] selection:text-[#2e443c] pb-24 lg:pb-0">
       <NewHeader />
-      <main className="max-w-[1200px] mx-auto pt-32 pb-20 px-4 sm:px-6 lg:px-8">
-        <h1 className="text-4xl font-serif text-[#1a2822] mb-8">Checkout</h1>
+      
+      {/* Background Ambience */}
+      <div className="fixed top-0 left-0 w-full h-[300px] bg-gradient-to-b from-[#3a554a] to-[#2e443c] pointer-events-none opacity-50"></div>
+
+      <main className="max-w-[1200px] mx-auto pt-24 lg:pt-36 px-4 lg:px-8 relative z-10">
         
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          <div className="bg-white p-6 rounded-2xl shadow-sm">
-            <h2 className="text-xl font-serif mb-6">Order Summary</h2>
-            <div className="space-y-4">
-              {cartItems.map((item) => (
-                <div key={item.id} className="flex items-center gap-4 pb-4 border-b border-gray-100">
-                  <img 
-                    src={item.image || '/placeholder.jpg'} 
-                    alt={item.name}
-                    className="w-16 h-16 object-contain bg-gray-50 rounded-lg"
-                  />
-                  <div className="flex-1">
-                    <h3 className="font-medium text-sm">{item.name}</h3>
-                    <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
+        {/* Title Section */}
+        <div className="mb-6 lg:mb-8 text-center lg:text-left">
+          <span className="text-[10px] uppercase tracking-[0.2em] text-[#F5DEB3]/60 font-bold">Secure Checkout</span>
+          <h1 className="text-3xl lg:text-5xl font-serif text-white mt-2">Finalize Your Order</h1>
+        </div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-12 items-start">
+          
+          {/* --- RIGHT: Order Summary (MOVED TO TOP FOR MOBILE) --- */}
+          <div className="lg:col-span-5 lg:sticky lg:top-32 order-1 lg:order-2">
+            <div className="bg-[#1c2b25] rounded-[2rem] p-6 lg:p-8 shadow-2xl border border-white/5">
+              <div className="flex justify-between items-center border-b border-white/10 pb-4 mb-6">
+                <h2 className="text-xl font-serif text-white">Order Summary</h2>
+                <span className="text-xs bg-[#F5DEB3]/10 text-[#F5DEB3] px-3 py-1 rounded-full border border-[#F5DEB3]/20">
+                  {cartItems.length} Items
+                </span>
+              </div>
+              
+              {/* Cart Items List */}
+              <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar mb-6">
+                {cartItems.map((item) => (
+                  <div key={item.id} className="flex gap-4 items-center bg-black/10 p-3 rounded-xl border border-white/5">
+                    <div className="w-14 h-14 bg-[#e8e6e1] rounded-lg flex items-center justify-center p-1 shrink-0">
+                      <img 
+                        src={item.image || '/placeholder.jpg'} 
+                        alt={item.name}
+                        className="w-full h-full object-contain mix-blend-multiply"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-sm text-[#F5DEB3] truncate">{item.name}</h3>
+                      <div className="flex justify-between items-center mt-1">
+                        <p className="text-xs text-gray-400">Qty: {item.quantity}</p>
+                        <p className="font-mono text-sm">₹{(item.price * item.quantity).toLocaleString()}</p>
+                      </div>
+                    </div>
                   </div>
-                  <p className="font-semibold">₹{(item.price * item.quantity).toLocaleString()}</p>
+                ))}
+              </div>
+
+              {/* Totals */}
+              <div className="space-y-3 pt-4 border-t border-white/10 text-sm">
+                <div className="flex justify-between text-gray-400">
+                  <span>Subtotal</span>
+                  <span>₹{totalAmount.toLocaleString()}</span>
                 </div>
-              ))}
-            </div>
-            <div className="mt-6 pt-4 border-t border-gray-200">
-              <div className="flex justify-between items-center text-lg font-semibold">
-                <span>Total</span>
-                <span>₹{totalAmount.toLocaleString()}</span>
+                <div className="flex justify-between text-gray-400">
+                  <span>Shipping</span>
+                  <span className="text-[#F5DEB3]">Free</span>
+                </div>
+                <div className="flex justify-between text-lg font-bold text-white pt-4 border-t border-white/10 mt-2">
+                  <span>Total To Pay</span>
+                  <span>₹{totalAmount.toLocaleString()}</span>
+                </div>
+              </div>
+
+              {/* Desktop Pay Button */}
+              <button 
+                onClick={handlePayment}
+                disabled={isOrdering || !address || !pincode}
+                className="hidden lg:block w-full mt-8 py-4 bg-[#F5DEB3] text-[#2e443c] rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+              >
+                {isOrdering ? 'Processing...' : `Pay ₹${totalAmount.toLocaleString()}`}
+              </button>
+
+              <div className="mt-6 flex justify-center gap-4 opacity-50">
+                 <i className="fa-brands fa-cc-visa text-2xl"></i>
+                 <i className="fa-brands fa-cc-mastercard text-2xl"></i>
+                 <i className="fa-brands fa-google-pay text-2xl"></i>
+                 <i className="fa-solid fa-building-columns text-2xl"></i>
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-2xl shadow-sm">
-            <h2 className="text-xl font-serif mb-6">Shipping Information</h2>
+          {/* --- LEFT: Shipping Form (MOVED BELOW FOR MOBILE) --- */}
+          <div className="lg:col-span-7 space-y-6 order-2 lg:order-1">
             
-            <div className="space-y-4 mb-6">
-              <div>
-                <label className="block text-sm font-medium mb-1">Name</label>
-                <input 
-                  type="text" 
-                  value={userProfile?.userName || userProfile?.name || ''} 
-                  disabled 
-                  className="w-full p-3 border border-gray-200 rounded-lg bg-gray-50"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Email</label>
-                <input 
-                  type="email" 
-                  value={userProfile?.userEmail || userProfile?.email || ''} 
-                  disabled 
-                  className="w-full p-3 border border-gray-200 rounded-lg bg-gray-50"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Mobile</label>
-                <input 
-                  type="tel" 
-                  value={userProfile?.userMobileNumber || userProfile?.mobile || ''} 
-                  disabled 
-                  className="w-full p-3 border border-gray-200 rounded-lg bg-gray-50"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium mb-1">Address *</label>
-                <textarea 
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Enter your complete address"
-                  className="w-full p-3 border border-gray-200 rounded-lg focus:border-[#2E443C] focus:outline-none"
-                  rows={3}
-                  required
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium mb-1">Pincode *</label>
-                <input 
-                  type="text" 
-                  value={pincode}
-                  onChange={(e) => setPincode(e.target.value)}
-                  placeholder="Enter pincode"
-                  className="w-full p-3 border border-gray-200 rounded-lg focus:border-[#2E443C] focus:outline-none"
-                  required
-                />
+            {/* Section 1: Contact Details */}
+            <div className="bg-white/5 backdrop-blur-md rounded-2xl p-6 border border-white/10">
+              <h2 className="text-lg font-serif text-[#F5DEB3] mb-4 flex items-center gap-2">
+                <i className="fa-regular fa-user text-sm"></i> Contact Info
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-300">
+                <div className="bg-black/20 p-3 rounded-lg border border-white/5">
+                  <span className="block text-xs text-gray-500 uppercase tracking-wider mb-1">Name</span>
+                  {userProfile?.userName || userProfile?.name || 'N/A'}
+                </div>
+                <div className="bg-black/20 p-3 rounded-lg border border-white/5">
+                  <span className="block text-xs text-gray-500 uppercase tracking-wider mb-1">Email</span>
+                  {userProfile?.userEmail || userProfile?.email || 'N/A'}
+                </div>
+                <div className="bg-black/20 p-3 rounded-lg border border-white/5 md:col-span-2">
+                  <span className="block text-xs text-gray-500 uppercase tracking-wider mb-1">Phone</span>
+                  {userProfile?.mobileNumber || userProfile?.mobile || 'N/A'}
+                </div>
               </div>
             </div>
 
-            <button 
-              onClick={handlePayment}
-              disabled={!address.trim() || !pincode.trim()}
-              className="w-full py-4 bg-[#2E443C] text-white rounded-lg font-bold uppercase tracking-widest text-sm hover:bg-[#1a2822] transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-            >
-              Pay ₹{totalAmount.toLocaleString()} with Razorpay
-            </button>
-            
-            <div className="mt-4 text-center">
-              <p className="text-xs text-gray-500">Secure payment powered by Razorpay</p>
-              <p className="text-xs text-gray-500 mt-1">Supports UPI, Cards, Net Banking & Wallets</p>
+            {/* Section 2: Delivery Address */}
+            <div className={`bg-white/5 backdrop-blur-md rounded-2xl p-6 border transition-all ${!address ? 'border-[#F5DEB3]/50 shadow-[0_0_20px_rgba(245,222,179,0.1)]' : 'border-white/10'}`}>
+              <h2 className="text-lg font-serif text-[#F5DEB3] mb-4 flex items-center gap-2">
+                <i className="fa-solid fa-truck-fast text-sm"></i> Shipping Details
+              </h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs uppercase tracking-widest text-gray-400 mb-2">Street Address <span className="text-red-400">*</span></label>
+                  <textarea 
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="House No, Building, Street, Area..."
+                    className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-white placeholder-gray-600 focus:outline-none focus:border-[#F5DEB3] focus:ring-1 focus:ring-[#F5DEB3] transition-all resize-none h-24"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-xs uppercase tracking-widest text-gray-400 mb-2">Pincode <span className="text-red-400">*</span></label>
+                  <input 
+                    type="tel" 
+                    value={pincode}
+                    onChange={(e) => setPincode(e.target.value)}
+                    maxLength={6}
+                    placeholder="e.g. 110001"
+                    className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-white placeholder-gray-600 focus:outline-none focus:border-[#F5DEB3] focus:ring-1 focus:ring-[#F5DEB3] transition-all tracking-widest"
+                  />
+                </div>
+              </div>
             </div>
           </div>
+
         </div>
       </main>
+
+      {/* --- MOBILE STICKY BOTTOM BAR --- */}
+      <motion.div 
+        initial={{ y: 100 }}
+        animate={{ y: 0 }}
+        className="fixed bottom-0 left-0 right-0 bg-[#1c2b25]/95 backdrop-blur-xl border-t border-[#F5DEB3]/20 p-4 px-6 z-50 lg:hidden shadow-[0_-10px_40px_rgba(0,0,0,0.5)]"
+      >
+         <div className="flex items-center gap-4">
+            <div className="flex flex-col">
+                <span className="text-[10px] text-gray-400 uppercase tracking-wider">Total</span>
+                <span className="text-xl font-serif text-white">₹{totalAmount.toLocaleString()}</span>
+            </div>
+            <button 
+                onClick={handlePayment}
+                disabled={isOrdering}
+                className={`flex-1 h-12 rounded-full font-bold uppercase tracking-widest text-[10px] shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 ${
+                    !address || !pincode 
+                    ? 'bg-gray-600 text-gray-300' 
+                    : 'bg-[#F5DEB3] text-[#2e443c]'
+                }`}
+            >
+                {isOrdering ? '...' : (!address || !pincode ? 'Enter Address' : 'Pay Now')}
+                <i className="fa-solid fa-arrow-right"></i>
+            </button>
+         </div>
+      </motion.div>
+
       <Footer />
     </div>
   );

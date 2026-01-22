@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Footer from '../../component/layout/Footer';
+import NewHeader from '../../component/layout/NewHeader';
 
 const ContactPage = () => {
   useEffect(() => {
@@ -64,12 +65,12 @@ const ContactPage = () => {
   ];
 
   return (
-    // BASE: Deep Forest Green (Not Black)
-    <div className="bg-[#0F261F] min-h-screen text-[#E2E8F0] font-sans relative selection:bg-[#F5DEB3] selection:text-[#0F261F] overflow-x-hidden">
+    // BASE: Deep Forest Green (Brand Color)
+    <div className="bg-[#2e443c] min-h-screen text-[#E2E8F0] font-sans relative selection:bg-[#F5DEB3] selection:text-[#0F261F] overflow-x-hidden">
+      <NewHeader />
       
       {/* 1. BACKGROUND ATMOSPHERE */}
-      {/* Subtle Radial Gradient to give depth (lighting effect) */}
-      <div className="fixed inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-[#1A3C32] via-[#0F261F] to-[#0a1f18] pointer-events-none z-0"></div>
+      <div className="fixed inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-[#3a554a] via-[#2e443c] to-[#1a2822] pointer-events-none z-0 opacity-50"></div>
       
       {/* Noise Texture for 'Paper/Fabric' feel */}
       <div className="fixed inset-0 opacity-[0.04] pointer-events-none z-0 mix-blend-overlay" 
@@ -107,7 +108,7 @@ const ContactPage = () => {
                 {/* Visual Content (Glassmorphism Card) */}
                 <motion.div 
                   variants={fadeIn}
-                  className="relative h-[500px] w-full bg-white/5 backdrop-blur-sm rounded-[3rem] border border-white/10 p-4"
+                  className="relative h-[400px] lg:h-[500px] w-full bg-white/5 backdrop-blur-sm rounded-[3rem] border border-white/10 p-4 hidden lg:block"
                 >
                     <div className="w-full h-full rounded-[2.5rem] overflow-hidden relative">
                          <img 
@@ -116,10 +117,10 @@ const ContactPage = () => {
                             className="w-full h-full object-cover opacity-80 hover:scale-105 transition-transform duration-[1.5s]"
                         />
                         {/* Overlay to blend image with green theme */}
-                        <div className="absolute inset-0 bg-[#0F261F]/30 mix-blend-multiply"></div>
+                        <div className="absolute inset-0 bg-[#2e443c]/40 mix-blend-multiply"></div>
                         
                         {/* Floating Contact Badge */}
-                        <div className="absolute bottom-8 right-8 bg-[#F5DEB3] text-[#0F261F] w-24 h-24 rounded-full flex flex-col items-center justify-center shadow-lg animate-spin-slow cursor-pointer hover:scale-110 transition-transform">
+                        <div className="absolute bottom-8 right-8 bg-[#F5DEB3] text-[#1c3026] w-24 h-24 rounded-full flex flex-col items-center justify-center shadow-lg animate-spin-slow cursor-pointer hover:scale-110 transition-transform">
                              <i className="fa-solid fa-arrow-down-long text-2xl mb-1"></i>
                         </div>
                     </div>
@@ -129,7 +130,7 @@ const ContactPage = () => {
       </section>
 
       {/* --- CONTACT INFO GRID --- */}
-      <section className="py-20 px-6 relative z-10">
+      <section className="py-12 lg:py-20 px-6 relative z-10">
         <div className="max-w-7xl mx-auto">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {contactInfo.map((item, index) => (
@@ -139,10 +140,10 @@ const ContactPage = () => {
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
                         transition={{ delay: index * 0.1 }}
-                        className="group bg-[#153229] p-10 rounded-[20px] border border-white/5 hover:border-[#F5DEB3]/30 hover:bg-[#1A3C32] transition-all duration-500"
+                        className="group bg-[#233630] p-8 lg:p-10 rounded-[20px] border border-white/5 hover:border-[#F5DEB3]/30 hover:bg-[#1A3C32] transition-all duration-500 shadow-xl"
                     >
-                        <div className="flex justify-between items-start mb-12">
-                            <div className="w-12 h-12 rounded-full border border-white/10 flex items-center justify-center text-[#F5DEB3] group-hover:bg-[#F5DEB3] group-hover:text-[#0F261F] transition-colors duration-500">
+                        <div className="flex justify-between items-start mb-8 lg:mb-12">
+                            <div className="w-12 h-12 rounded-full border border-white/10 flex items-center justify-center text-[#F5DEB3] group-hover:bg-[#F5DEB3] group-hover:text-[#1c3026] transition-colors duration-500">
                                 <i className={item.icon}></i>
                             </div>
                             <span className="text-4xl font-serif text-[#F5DEB3]/10 group-hover:text-[#F5DEB3]/20 transition-colors">
@@ -159,18 +160,18 @@ const ContactPage = () => {
       </section>
 
       {/* --- FORM SECTION --- */}
-      <section className="py-24 px-6 relative z-10">
+      <section className="py-20 lg:py-24 px-6 relative z-10 bg-[#253832]">
         <div className="max-w-4xl mx-auto">
             
-            <div className="mb-16">
+            <div className="mb-12 lg:mb-16">
                 <h2 className="text-4xl md:text-5xl font-serif text-[#F5DEB3] mb-6">Send us a message</h2>
                 <div className="h-[1px] w-full bg-gradient-to-r from-[#F5DEB3]/50 to-transparent"></div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-16">
+            <form onSubmit={handleSubmit} className="space-y-12 lg:space-y-16">
                 
                 {/* Row 1: Name & Email */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-16">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-16">
                     <div className="relative group">
                         <input
                             type="text"
@@ -180,7 +181,7 @@ const ContactPage = () => {
                             onFocus={() => setActiveInput('name')}
                             onBlur={() => setActiveInput(null)}
                             required
-                            className="w-full bg-transparent border-b border-[#F5DEB3]/20 py-4 text-xl text-[#F5DEB3] focus:outline-none focus:border-[#F5DEB3] transition-all duration-500 placeholder-transparent"
+                            className="w-full bg-transparent border-b border-[#F5DEB3]/20 py-4 text-lg lg:text-xl text-[#F5DEB3] focus:outline-none focus:border-[#F5DEB3] transition-all duration-500 placeholder-transparent"
                             placeholder="Name"
                             id="name"
                         />
@@ -205,7 +206,7 @@ const ContactPage = () => {
                             onFocus={() => setActiveInput('email')}
                             onBlur={() => setActiveInput(null)}
                             required
-                            className="w-full bg-transparent border-b border-[#F5DEB3]/20 py-4 text-xl text-[#F5DEB3] focus:outline-none focus:border-[#F5DEB3] transition-all duration-500 placeholder-transparent"
+                            className="w-full bg-transparent border-b border-[#F5DEB3]/20 py-4 text-lg lg:text-xl text-[#F5DEB3] focus:outline-none focus:border-[#F5DEB3] transition-all duration-500 placeholder-transparent"
                             placeholder="Email"
                             id="email"
                         />
@@ -225,15 +226,15 @@ const ContactPage = () => {
                 {/* Subject Pills */}
                 <div>
                     <p className="block uppercase tracking-widest text-[10px] font-bold text-green-100/50 mb-6">Inquiry Type</p>
-                    <div className="flex flex-wrap gap-4">
+                    <div className="flex flex-wrap gap-3 lg:gap-4">
                         {['Product Inquiry', 'Interior Design', 'Partnership', 'Support'].map((option) => (
                             <button
                                 key={option}
                                 type="button"
                                 onClick={() => setFormData({...formData, subject: option})}
-                                className={`px-8 py-3 rounded-full text-sm transition-all duration-300 border ${
+                                className={`px-6 py-3 lg:px-8 lg:py-3 rounded-full text-xs lg:text-sm transition-all duration-300 border ${
                                     formData.subject === option 
-                                    ? 'bg-[#F5DEB3] text-[#0F261F] border-[#F5DEB3] font-bold' 
+                                    ? 'bg-[#F5DEB3] text-[#1c3026] border-[#F5DEB3] font-bold shadow-lg shadow-[#F5DEB3]/20' 
                                     : 'bg-transparent text-green-100/60 border-[#F5DEB3]/20 hover:border-[#F5DEB3] hover:text-[#F5DEB3]'
                                 }`}
                             >
@@ -253,7 +254,7 @@ const ContactPage = () => {
                         onBlur={() => setActiveInput(null)}
                         required
                         rows="1"
-                        className="w-full bg-transparent border-b border-[#F5DEB3]/20 py-4 text-xl text-[#F5DEB3] focus:outline-none focus:border-[#F5DEB3] transition-all duration-500 placeholder-transparent resize-none min-h-[80px]"
+                        className="w-full bg-transparent border-b border-[#F5DEB3]/20 py-4 text-lg lg:text-xl text-[#F5DEB3] focus:outline-none focus:border-[#F5DEB3] transition-all duration-500 placeholder-transparent resize-none min-h-[80px]"
                         placeholder="Message"
                         id="message"
                     ></textarea>
@@ -270,14 +271,14 @@ const ContactPage = () => {
                 </div>
 
                 {/* Submit Button */}
-                <div className="flex justify-start">
+                <div className="flex justify-start pt-4">
                     <button
                         type="submit"
-                        className="group relative px-10 py-5 bg-transparent border border-[#F5DEB3] text-[#F5DEB3] overflow-hidden rounded-full font-bold uppercase tracking-widest text-xs hover:text-[#0F261F] transition-colors duration-500"
+                        className="group relative w-full lg:w-auto px-12 py-5 bg-transparent border border-[#F5DEB3] text-[#F5DEB3] overflow-hidden rounded-full font-bold uppercase tracking-widest text-xs hover:text-[#1c3026] transition-colors duration-500 shadow-[0_0_20px_rgba(245,222,179,0.1)] hover:shadow-[0_0_30px_rgba(245,222,179,0.3)]"
                     >
                         {/* Hover fill effect */}
-                        <div className="absolute inset-0 w-0 bg-[#F5DEB3] transition-all duration-[250ms] ease-out group-hover:w-full"></div>
-                        <span className="relative z-10 flex items-center gap-3">
+                        <div className="absolute inset-0 w-0 bg-[#F5DEB3] transition-all duration-[400ms] ease-out group-hover:w-full"></div>
+                        <span className="relative z-10 flex items-center justify-center gap-3">
                             Send Request
                             <i className="fa-solid fa-arrow-right group-hover:translate-x-1 transition-transform"></i>
                         </span>
@@ -294,10 +295,11 @@ const ContactPage = () => {
             className="w-full h-full object-cover grayscale opacity-40 hover:grayscale-0 hover:opacity-60 transition-all duration-[2s]"
             alt="Location"
          />
-         <div className="absolute inset-0 flex items-center justify-center">
-             <div className="bg-[#0F261F]/90 backdrop-blur-md px-10 py-6 border border-[#F5DEB3]/20 rounded-sm">
-                 <p className="text-[#F5DEB3] text-center font-serif text-2xl italic">Visit the Studio</p>
-                 <p className="text-green-100/60 text-center text-xs uppercase tracking-widest mt-2">Gurgaon, Sector 44</p>
+         <div className="absolute inset-0 flex items-center justify-center p-4">
+             <div className="bg-[#1c3026]/90 backdrop-blur-xl px-10 py-8 border border-[#F5DEB3]/20 rounded-lg text-center shadow-2xl">
+                 <i className="fa-solid fa-map-pin text-[#F5DEB3] text-xl mb-4"></i>
+                 <p className="text-[#F5DEB3] font-serif text-2xl italic mb-2">Visit the Studio</p>
+                 <p className="text-green-100/60 text-xs uppercase tracking-widest">Sector 44, Gurgaon</p>
              </div>
          </div>
       </section>

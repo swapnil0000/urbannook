@@ -3,12 +3,8 @@ import { apiSlice } from './apiSlice';
 export const userApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     // Profile APIs
-    getUserProfile: builder.mutation({
-      query: (data) => ({
-        url: 'user/profile',
-        method: 'POST',
-        body: data,
-      }),
+    getUserProfile: builder.query({
+      query: () => 'user/profile',
       providesTags: ['User'],
     }),
     updateUserProfile: builder.mutation({
@@ -98,7 +94,7 @@ export const userApi = apiSlice.injectEndpoints({
 });
 
 export const {
-  useGetUserProfileMutation,
+  useGetUserProfileQuery,
   useUpdateUserProfileMutation,
   useAddToCartMutation,
   useUpdateCartMutation,

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useVerifyOtpMutation, useResendOtpMutation } from '../../store/api/authApi';
-import { useAuth, useUI } from '../../hooks/useRedux';
+import { useVerifyOtpMutation, useResendOtpMutation } from '../../../store/api/authApi';
+import { useAuth, useUI } from '../../../hooks/useRedux';
 
 const OTPVerificationScreen = ({ email, onClose, onVerified }) => {
   const [otp, setOtp] = useState(['', '', '', '', '', '']);

@@ -103,7 +103,7 @@ const AireTestimonials = () => {
         <div className="absolute inset-0 bg-gradient-to-t from-[#F5F7F8] via-transparent to-[#F5F7F8]"></div>
       </div>
 
-      <div className="relative z-10 w-full max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-20 items-center">
+      <div className="relative z-10 w-full max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12  lg:gap-20 items-center">
         
         {/* --- LEFT COLUMN: TYPOGRAPHY & TESTIMONIAL DISPLAY --- */}
         <div className="lg:col-span-7 space-y-8 md:space-y-12">
@@ -124,7 +124,7 @@ const AireTestimonials = () => {
           </div>
 
           {/* Testimonial Card Display - Height Adjusted for Mobile */}
-          <div className="relative h-[380px] sm:h-[320px] md:h-[280px]">
+          <div className="relative h-[280px] sm:h-[280px] md:h-[280px]">
             {testimonials.map((t, idx) => (
                <div 
                 key={t.id}
@@ -133,7 +133,7 @@ const AireTestimonials = () => {
                     ? 'opacity-100 translate-y-0 scale-100 rotate-0 z-20' 
                     : 'opacity-0 translate-y-8 scale-95 rotate-1 z-10 pointer-events-none'}`}
                >
-                 <div className="bg-white/60 backdrop-blur-md border border-white/60 p-6 md:p-10 rounded-[2rem] md:rounded-[2.5rem] shadow-xl h-full flex flex-col justify-between group hover:border-emerald-200 transition-colors">
+                 <div className="bg-white/60 backdrop-blur-md border border-white/60 p-6 md:p-10 rounded-[2rem] md:rounded-[2.5rem] shadow-xl h-full flex flex-col group hover:border-emerald-200 transition-colors">
                     <div>
                       <div className="flex gap-1 mb-4 md:mb-6">
                         {[1,2,3,4,5].map(star => <i key={star} className="fa-solid fa-star text-emerald-400 text-xs"></i>)}

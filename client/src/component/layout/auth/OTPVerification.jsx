@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useDispatch } from 'react-redux';
 import { useResendOtpMutation, useVerifyOtpMutation } from '../../../store/api/authApi';
+import { setCredentials } from '../../../store/slices/authSlice';
 
 const OTPVerification = ({ email, onClose, onSuccess, onBack }) => {
+  const dispatch = useDispatch();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [timer, setTimer] = useState(30);
   const [canResend, setCanResend] = useState(false);
@@ -52,9 +55,36 @@ const OTPVerification = ({ email, onClose, onSuccess, onBack }) => {
     try {
       // Calling API with email
       const result = await verifyOtp({
-        userEmail: email,
-        userEmailOtp: otpString
+        email: email,
+        emailOtp: otpString
       }).unwrap();
+      
+      // After successful OTP verification, log in the user
+      if (result.success) {
+        // Get user data from localStorage (saved during registration)
+        const userData = JSON.parse(localStorage.getItem('user') || '{}');
+        
+        // Get token from cookies (saved during registration)
+        const getCookie = (name) => {
+          const value = `; ${document.cookie}`;
+          const parts = value.split(`; ${name}=`);
+          if (parts.length === 2) return parts.pop().split(';').shift();
+          return null;
+        };
+        
+        const token = getCookie('userAccessToken');
+        
+        if (token && userData) {
+          // Dispatch login action to Redux
+          dispatch(setCredentials({
+            user: userData,
+            token: token
+          }));
+          
+          // Trigger window storage event to sync across components
+          window.dispatchEvent(new Event('storage'));
+        }
+      }
       
       onSuccess(result);
     } catch (err) {

@@ -26,7 +26,7 @@ const NewHeader = () => {
     const path = location.pathname;
     if (path === '/') return 'home';
     if (path.startsWith('/products')) return 'products';
-    if (path === '/support') return 'support';
+    if (path === '/contact-us') return 'support';
     if (path === '/about-us') return 'about-us';
     return '';
   };
@@ -73,7 +73,7 @@ const NewHeader = () => {
     navigate('/');
   };
 
-  // --- HELPER FUNCTIONS (Fixed) ---
+  // --- HELPER FUNCTIONS ---
   const handleMobileNav = (path) => {
     setIsMenuOpen(false);
     navigate(path);
@@ -95,7 +95,7 @@ const NewHeader = () => {
     { name: 'Home', path: '/', key: 'home' },
     { name: 'Shop', path: '/products', key: 'products' },
     { name: 'About Us', path: '/about-us', key: 'about-us' },
-     { name: 'Contact Us', path: '/contact-us', key: 'support' },
+    { name: 'Contact Us', path: '/contact-us', key: 'support' },
   ];
 
   return (
@@ -192,9 +192,6 @@ const NewHeader = () => {
                           <Link to="/profile" onClick={() => setShowUserDropdown(false)} className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-600 hover:bg-emerald-50 hover:text-emerald-900 rounded-xl transition-colors">
                              <i className="fa-regular fa-user w-5"></i> Profile
                           </Link>
-                          <Link to="/orders" onClick={() => setShowUserDropdown(false)} className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-600 hover:bg-emerald-50 hover:text-emerald-900 rounded-xl transition-colors">
-                             <i className="fa-solid fa-box-open w-5"></i> Orders
-                          </Link>
                           <Link to="/settings" onClick={() => setShowUserDropdown(false)} className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-600 hover:bg-emerald-50 hover:text-emerald-900 rounded-xl transition-colors">
                              <i className="fa-solid fa-gear w-5"></i> Settings
                           </Link>
@@ -239,7 +236,7 @@ const NewHeader = () => {
 
           {/* --- MOBILE MENU DROPDOWN --- */}
           {isMenuOpen && (
-            <div className="lg:hidden mt-4 pt-4 border-t border-emerald-900/10 animate-in fade-in slide-in-from-top-2 pb-2 h-[80vh]  no-scrollbar">
+            <div className="lg:hidden mt-4 pt-4 border-t border-emerald-900/10 animate-in fade-in slide-in-from-top-2 pb-2 h-[62vh]  no-scrollbar">
               
               {/* 1. MOBILE USER CONTROL CENTER */}
               {user ? (
@@ -263,23 +260,15 @@ const NewHeader = () => {
                         </button>
                     </div>
 
-                    {/* THE APP-STYLE GRID (Orders, Settings, Support, Cart) */}
-                    <div className="grid grid-cols-4 gap-3 relative z-10">
+                    {/* THE APP-STYLE GRID (Modified to 3 Cols since Orders is removed) */}
+                    <div className="grid grid-cols-3 gap-5 relative z-10">
                         
-                        {/* Orders */}
-                        <button onClick={() => handleMobileNav('/orders')} className="flex flex-col items-center gap-2 group/btn">
-                            <div className="w-12 h-12 rounded-2xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-700 shadow-sm group-hover/btn:scale-105 group-hover/btn:border-emerald-300 transition-all">
-                                <i className="fa-solid fa-box-open text-lg"></i>
-                            </div>
-                            <span className="text-[10px] font-bold text-emerald-900 uppercase tracking-wide">Orders</span>
-                        </button>
-
                         {/* Settings */}
                         <button onClick={() => handleMobileNav('/settings')} className="flex flex-col items-center gap-2 group/btn">
                             <div className="w-12 h-12 rounded-2xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-700 shadow-sm group-hover/btn:scale-105 group-hover/btn:border-emerald-300 transition-all">
                                 <i className="fa-solid fa-gear text-lg"></i>
                             </div>
-                            <span className="text-[10px] font-bold text-emerald-900 uppercase tracking-wide">Setting</span>
+                            <span className="text-[10px] font-bold text-emerald-900 uppercase tracking-wide">Settings</span>
                         </button>
 
                         {/* Support */}

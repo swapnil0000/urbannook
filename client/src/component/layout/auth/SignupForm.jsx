@@ -73,14 +73,16 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
 
     try {
       const result = await register({
-        userName: formData.name,
-        userEmail: formData.email,
-        userPassword: formData.password,
-        userMobileNumber: formData.mobile,
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        mobileNumber: formData.mobile,
       }).unwrap();
 
       if (result.userAccessToken) {
         document.cookie = `userAccessToken=${result.userAccessToken}; path=/; max-age=2592000`;
+        // Also store in localStorage for backup
+        localStorage.setItem('token', result.userAccessToken);
       }
 
       const userData = {
@@ -91,7 +93,7 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
       localStorage.setItem('user', JSON.stringify(userData));
 
       try {
-        const response = await otpSent({ userEmail: userData.email }).unwrap();
+        const response = await otpSent({ email: userData.email }).unwrap();
         if (response.success) {
           showNotification('OTP sent to your email!');
           setShowOTP(true);

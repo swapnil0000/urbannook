@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import Footer from '../../component/layout/Footer';
+import NewHeader from '../../component/layout/NewHeader';
 
 const aboutValues = [
     {
@@ -52,6 +53,7 @@ const AboutPage = () => {
   return (
     // BASE: Deep Forest Green
     <div className="bg-[#0F261F] min-h-screen text-[#E2E8F0] font-sans relative selection:bg-[#F5DEB3] selection:text-[#0F261F] overflow-x-hidden">
+      <NewHeader />
       
       {/* Texture Overlay */}
       <div className="fixed inset-0 opacity-[0.04] pointer-events-none z-0 mix-blend-overlay" 
@@ -128,6 +130,14 @@ const AboutPage = () => {
                 </div>
             ))}
         </div>
+        <style jsx>{`
+            .stroke-text { -webkit-text-stroke: 1px #F5DEB3; }
+            @keyframes marquee {
+                0% { transform: translateX(0); }
+                100% { transform: translateX(-50%); }
+            }
+            .animate-marquee { animation: marquee 20s linear infinite; }
+        `}</style>
       </section>
 
       {/* --- 3. THE MANIFESTO (Asymmetrical Layout) --- */}
@@ -216,7 +226,7 @@ const AboutPage = () => {
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
                         transition={{ delay: i * 0.1 }}
-                        className="group p-10 rounded-[2rem] bg-[#153229] hover:bg-[#F5DEB3] transition-colors duration-500 cursor-default"
+                        className="group p-10 rounded-[2rem] bg-[#153229] hover:bg-[#F5DEB3] transition-colors duration-500 cursor-default border border-white/5"
                     >
                         <span className="text-5xl font-serif text-[#F5DEB3]/20 group-hover:text-[#0F261F]/20 transition-colors duration-500">
                             {val.id}

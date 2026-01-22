@@ -44,8 +44,8 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
     
     try {
       const result = await login({
-        userEmail: formData.identifier, 
-        userPassword: formData.password,
+        email: formData.identifier, 
+        password: formData.password,
       }).unwrap();
         
       showNotification('Login successful!');
@@ -55,12 +55,16 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
         setAuthUser(result.user, result.userAccessToken);
       }
 
+      console.log(result,"resultresultresultresult")
+
       
       const userData = {
-        name: result.data?.userName || result.user?.name || 'User',
-        email: result.data?.userEmail || result.user?.email || '',
-        mobile: result.data?.userMobileNumber || result.user?.mobile || ''
+        name: result.data?.name || result.user?.name || 'User',
+        email: result.data?.email || result.user?.email || '',
+        mobile: result.data?.mobileNumber || result.user?.mobile || ''
       };
+
+      console.log(userData,"userDatauserDatauserDatauserData")
       
       localStorage.setItem('user', JSON.stringify(userData));
       onLoginSuccess(userData);
