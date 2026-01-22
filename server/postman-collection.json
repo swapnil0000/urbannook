@@ -1,0 +1,566 @@
+{
+  "info": {
+    "name": "UrbanNook API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "common.route",
+      "item": [
+        {
+          "name": "POST /send-otp",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/send-otp",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "send-otp"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /verify-otp",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/verify-otp",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "verify-otp"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /forgot-password/verify-otp",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/forgot-password/verify-otp",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "forgot-password",
+                "verify-otp"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "user.address.route",
+      "item": [
+        {
+          "name": "POST /user/address/update",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/user/address/update",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "user",
+                "address",
+                "update"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /user/address/create",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/user/address/create",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "user",
+                "address",
+                "create"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "user.cart.route",
+      "item": [
+        {
+          "name": "POST /user/addtocart",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/user/addtocart",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "user",
+                "addtocart"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "user.route",
+      "item": [
+        {
+          "name": "POST /user/login",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/user/login",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "user",
+                "login"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /user/register",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/user/register",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "user",
+                "register"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /user/forgot-password",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/user/forgot-password",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "user",
+                "forgot-password"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /user/profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/user/profile",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "user",
+                "profile"
+              ]
+            }
+          }
+        },
+        {
+          "name": "PATCH /user/profile/update",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/user/profile/update",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "user",
+                "profile",
+                "update"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /user/reset-password",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/user/reset-password",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "user",
+                "reset-password"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /user/order-history",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/user/order-history",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "user",
+                "order-history"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /user/preview-addtocart",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/user/preview-addtocart",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "user",
+                "preview-addtocart"
+              ]
+            }
+          }
+        },
+        {
+          "name": "PUT /user/cart/update",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/user/cart/update",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "user",
+                "cart",
+                "update"
+              ]
+            }
+          }
+        },
+        {
+          "name": "DELETE /user/cart/:productId",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/user/cart/:productId",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "user",
+                "cart",
+                ":productId"
+              ]
+            }
+          }
+        },
+        {
+          "name": "DELETE /user/clear-cart",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/user/clear-cart",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "user",
+                "clear-cart"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /user/addtowishlist",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/user/addtowishlist",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "user",
+                "addtowishlist"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /user/wishlist",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/user/wishlist",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "user",
+                "wishlist"
+              ]
+            }
+          }
+        },
+        {
+          "name": "DELETE /user/wishlist/:productId",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/user/wishlist/:productId",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "user",
+                "wishlist",
+                ":productId"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /user/delete-preview",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/user/delete-preview",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "user",
+                "delete-preview"
+              ]
+            }
+          }
+        },
+        {
+          "name": "DELETE /user/delete-confirm",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/user/delete-confirm",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "user",
+                "delete-confirm"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /user/logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/user/logout",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "user",
+                "logout"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /refresh-token",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/refresh-token",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "refresh-token"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /rp/get-key",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/rp/get-key",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "rp",
+                "get-key"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /user/create-order",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/user/create-order",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "user",
+                "create-order"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /user/paymentverification",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/user/paymentverification",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "user",
+                "paymentverification"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /rp/webhook",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/rp/webhook",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "rp",
+                "webhook"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "user.wishlist.route",
+      "item": [
+        {
+          "name": "POST /user/add/wishlist",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/user/add/wishlist",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "user",
+                "add",
+                "wishlist"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /user/get/wishlist",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/user/get/wishlist",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "user",
+                "get",
+                "wishlist"
+              ]
+            }
+          }
+        },
+        {
+          "name": "DELETE /user/delete/wishlist",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{server-local}}/user/delete/wishlist",
+              "host": [
+                "{{server-local}}"
+              ],
+              "path": [
+                "user",
+                "delete",
+                "wishlist"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -20,13 +20,7 @@ import {
   userUpdateProfile,
 } from "../controller/user.controller.js";
 
-import {
-  userGetAddToCart,
-  userUpdateCartQuantity,
-  userRemoveFromCart,
-  userClearCart,
-  userOrderPreviousHistory,
-} from "../controller/user.cart.controller.js";
+import { userOrderPreviousHistory } from "../controller/user.cart.controller.js";
 
 import {
   userAddToWishList,
@@ -58,7 +52,6 @@ import {
   razorpayKeyGetController,
   razorpayWebHookController,
 } from "../controller/rp.payment.controller.js";
-
 
 const userRouter = Router();
 

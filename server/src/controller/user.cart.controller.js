@@ -1,6 +1,8 @@
 import {
   addToCartService,
   previewCartService,
+  cartQuantityService,
+  clearCartService,
 } from "../services/user.cart.service.js";
 import { ApiError, ApiRes } from "../utlis/index.js";
 const userAddToCart = async (req, res) => {
@@ -79,112 +81,34 @@ const userUpdateCartQuantity = async (req, res) => {
   try {
     const { userId } = req.user;
     const { productId, quantity, action } = req.body || {};
-
-    if (!productId || quantity === undefined || !action) {
+    const productAdditionToCart = await cartQuantityService({
+      userId,
+      productId,
+      quantity: quantity || 1,
+      action,
+    });
+    if (!productAdditionToCart?.success) {
       return res
-        .status(400)
+        .status(Number(productAdditionToCart?.statusCode))
         .json(
           new ApiError(
-            400,
-            "productId, quantity and action are required",
-            null,
-            false,
+            productAdditionToCart?.statusCode,
+            productAdditionToCart?.message,
+            productAdditionToCart?.data,
+            productAdditionToCart?.success,
           ),
         );
     }
-
-    if (isNaN(quantity) || Number(quantity) < 0) {
-      return res
-        .status(400)
-        .json(
-          new ApiError(
-            400,
-            "quantity must be a non-negative number",
-            null,
-            false,
-          ),
-        );
-    }
-
-    const user = await User.findOne({ userEmail });
-    const cartItem = user.addedToCart.find(
-      (item) => item.productId.toString() === productId,
-    );
-    if (!cartItem) {
-      return res
-        .status(404)
-        .json(new ApiError(404, "Product not found in cart", null, false));
-    }
-
-    switch (action) {
-      case "add":
-        cartItem.quantity += Number(quantity);
-        break;
-      case "sub":
-        cartItem.quantity -= Number(quantity);
-        if (cartItem.quantity <= 0) {
-          user.addedToCart = user.addedToCart.filter(
-            (item) => item.productId.toString() !== productId,
-          );
-        }
-        break;
-
-      default:
-        return res
-          .status(400)
-          .json(
-            new ApiError(400, "Invalid action. Use add | sub", null, false),
-          );
-    }
-
-    await user.save();
-
     return res
-      .status(200)
+      .status(Number(productAdditionToCart?.statusCode))
       .json(
-        new ApiRes(200, "Cart updated successfully", user.addedToCart, true),
+        new ApiRes(
+          productAdditionToCart?.statusCode,
+          productAdditionToCart?.message,
+          productAdditionToCart?.data,
+          productAdditionToCart?.success,
+        ),
       );
-  } catch (error) {
-    return res
-      .status(500)
-      .json(new ApiError(500, `Internal Server Error - ${error}`, null, false));
-  }
-};
-
-const userRemoveFromCart = async (req, res) => {
-  try {
-    const { userId } = req.user;
-    const { productId } = req.body;
-
-    const user = await User.findOne({ userEmail });
-    if (!user) {
-      return res
-        .status(404)
-        .json(new ApiError(404, "User not found", null, false));
-    }
-    const updatedUser = await User.findOneAndUpdate(
-      { userEmail, "addedToCart.productId": productDetails._id },
-      {
-        $pull: {
-          addedToCart: {
-            productId,
-          },
-        },
-      },
-      {
-        new: true,
-      },
-    );
-    if (!updatedUser)
-      return res
-        .status(200)
-        .json(
-          new ApiRes(200, "Product already removed from cart", null, false),
-        );
-
-    return res
-      .status(200)
-      .json(new ApiRes(200, "Product removed from cart", null, true));
   } catch (error) {
     return res
       .status(500)
@@ -195,19 +119,29 @@ const userRemoveFromCart = async (req, res) => {
 const userClearCart = async (req, res) => {
   try {
     const { userId } = req.user;
-
-    const user = await User.findOne({ userEmail });
-    if (!user) {
+    const clearCartServiceValidation = await clearCartService({ userId });
+    if (!clearCartServiceValidation?.success) {
       return res
-        .status(404)
-        .json(new ApiError(404, "User not found", null, false));
+        .status(Number(clearCartServiceValidation?.statusCode))
+        .json(
+          new ApiError(
+            clearCartServiceValidation?.statusCode,
+            clearCartServiceValidation?.message,
+            clearCartServiceValidation?.data,
+            clearCartServiceValidation?.success,
+          ),
+        );
     }
-
-    user.addedToCart = [];
-    await user.save();
     return res
-      .status(200)
-      .json(new ApiRes(200, "Cart cleared successfully", [], true));
+      .status(Number(clearCartServiceValidation?.statusCode))
+      .json(
+        new ApiRes(
+          clearCartServiceValidation?.statusCode,
+          clearCartServiceValidation?.message,
+          clearCartServiceValidation?.data,
+          clearCartServiceValidation?.success,
+        ),
+      );
   } catch (error) {
     return res
       .status(500)
@@ -251,7 +185,6 @@ export {
   userAddToCart,
   userPreviewCart as userGetAddToCart,
   userUpdateCartQuantity,
-  userRemoveFromCart,
   userClearCart,
   userOrderPreviousHistory,
 };

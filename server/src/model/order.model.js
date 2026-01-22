@@ -2,24 +2,29 @@ import mongoose from "mongoose";
 const orderSchema = new mongoose.Schema(
   {
     userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      type: String,
       required: true,
+      index: true,
     },
-
     items: [
       {
         _id: false,
         productId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Product",
+          type: String,
           required: true,
         },
-        quantity: Number,
+        quantity: {
+          type: Number,
+          required: true,
+          min: 1,
+        },
       },
     ],
 
-    amount: Number,
+    amount: {
+      type: Number,
+      required: true,
+    },
 
     payment: {
       razorpayOrderId: String,
@@ -33,7 +38,7 @@ const orderSchema = new mongoose.Schema(
       default: "CREATED",
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 const Order = mongoose.model("Order", orderSchema);
