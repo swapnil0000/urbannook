@@ -17,10 +17,8 @@ const razorpayKeyGetController = async (_, res) => {
 };
 
 const razorpayCreateOrderController = async (req, res) => {
-  const { amount, currency, items } = req.body;
-
-  const { _id: userId } = req.user;
-
+  const { amount, currency, items } = req.body; // replace items with productId uuid
+  const { userId } = req.user;
   const razorpayOrder = await razorpayCreateOrderService(amount, currency);
   const order = await Order.create({
     userId,
@@ -37,18 +35,19 @@ const razorpayCreateOrderController = async (req, res) => {
       200,
       "Order created",
       {
-        razorpayOrder: razorpayOrder.data,
-        orderId: order._id,
+        // razorpayOrder: razorpayOrder.data?.entity,
+        razorpayOrderId: razorpayOrder?.data?.id,
+        orderId: order?.id, // replace with razorpayOrder?.data?.id
       },
-      true
-    )
+      true,
+    ),
   );
 };
 
 const razorpayPaymentVerificationController = async (req, res) => {
   try {
     const { userId } = req.user;
-    if (!userEmail) {
+    if (!userId) {
       return res
         .status(404)
         .json(new ApiError(404, `User not found for payment`, null, false));
@@ -59,7 +58,7 @@ const razorpayPaymentVerificationController = async (req, res) => {
     const isPaymentVerifiedOrNot = await razorpayPaymentVerificationService(
       razorpay_order_id,
       razorpay_payment_id,
-      razorpay_signature
+      razorpay_signature,
     );
     if (!isPaymentVerifiedOrNot) {
       return res
@@ -69,8 +68,8 @@ const razorpayPaymentVerificationController = async (req, res) => {
             Number(isPaymentVerifiedOrNot?.statusCode),
             isPaymentVerifiedOrNot?.message,
             isPaymentVerifiedOrNot?.data,
-            isPaymentVerifiedOrNot?.success
-          )
+            isPaymentVerifiedOrNot?.success,
+          ),
         );
     }
     return res
@@ -80,8 +79,8 @@ const razorpayPaymentVerificationController = async (req, res) => {
           Number(isPaymentVerifiedOrNot?.statusCode),
           isPaymentVerifiedOrNot?.message,
           isPaymentVerifiedOrNot?.data,
-          isPaymentVerifiedOrNot?.success
-        )
+          isPaymentVerifiedOrNot?.success,
+        ),
       );
   } catch (error) {
     return res
@@ -136,7 +135,7 @@ because it is a ser to ser call so checking this helps us to figure the verifica
           {
             $push: { userPreviousOrder: order._id },
             $set: { addedToCart: [] },
-          }
+          },
         );
       }
 
@@ -151,7 +150,7 @@ because it is a ser to ser call so checking this helps us to figure the verifica
       const payment = payload.payment.entity;
       await Order.updateOne(
         { "payment.razorpayOrderId": payment.order_id },
-        { $set: { status: "FAILED" } }
+        { $set: { status: "FAILED" } },
       );
 
       console.log("❌ Payment Failed:", payment.id);

@@ -1,21 +1,17 @@
 import {
-  addToWishList,
-  deleteFromWishList,
+  addToWishListService,
+  deleteFromWishListService,
+  getWishListService,
 } from "../services/user.wishlist.service.js";
+import { ApiError, ApiRes } from "../utlis/index.js";
 const userAddToWishList = async (req, res) => {
   try {
-    const { userEmail } = req.user;
-    if (!userEmail) {
-      return res
-        .status(403)
-        .json(new ApiError(403, `Unauthorized Access`, null, false));
-    }
-    const { productName } = req.body || {};
-
+    const { userId } = req.user;
+    const { productId } = req.body || {};
     // fieldMissing and Addition To WishList check
-    const productAdditionToWishList = await addToWishList(
-      userEmail,
-      productName
+    const productAdditionToWishList = await addToWishListService(
+      userId,
+      productId,
     );
 
     if (!productAdditionToWishList?.success) {
@@ -26,8 +22,8 @@ const userAddToWishList = async (req, res) => {
             productAdditionToWishList?.statusCode,
             productAdditionToWishList?.message,
             productAdditionToWishList?.data,
-            productAdditionToWishList?.success
-          )
+            productAdditionToWishList?.success,
+          ),
         );
     }
     return res
@@ -37,8 +33,8 @@ const userAddToWishList = async (req, res) => {
           productAdditionToWishList?.statusCode,
           productAdditionToWishList?.message,
           productAdditionToWishList?.data,
-          productAdditionToWishList?.success
-        )
+          productAdditionToWishList?.success,
+        ),
       );
   } catch (error) {
     return res
@@ -49,42 +45,19 @@ const userAddToWishList = async (req, res) => {
 
 const userGetProductWishList = async (req, res) => {
   try {
-    const { userEmail } = req.user;
-    const userExist = await User.findOne({ userEmail });
+    const { userId } = req.user;
+    const response = await getWishListService(userId);
 
-    if (!userExist)
-      return res
-        .status(404)
-        .json(
-          new ApiError(
-            404,
-            `User Email not found or user doesn't exist`,
-            null,
-            false
-          )
-        );
-    const productIds = userExist?.addedToWishList.map((id) => {
-      return id?.productId;
-    });
-    const productDetails = await Product.find({
-      _id: productIds,
-    }).select("-_id");
-
-    if (!productDetails) {
-      return res
-        .status(200)
-        .json(
-          new ApiRes(
-            200,
-            `Nothing in wishlist for user ${userEmail}`,
-            null,
-            true
-          )
-        );
-    }
     return res
-      .status(200)
-      .json(new ApiRes(200, `User WishList`, productDetails, true));
+      .status(response.statusCode)
+      .json(
+        new ApiRes(
+          response.statusCode,
+          response.message,
+          response.data,
+          response.success,
+        ),
+      );
   } catch (error) {
     return res
       .status(500)
@@ -96,7 +69,7 @@ const userDeleteFromProductWishList = async (req, res) => {
   try {
     const { userEmail } = req.user;
     const { productId } = req.params;
-    const deleteProduct = await deleteFromWishList(userEmail, productId);
+    const deleteProduct = await deleteFromWishListService(userEmail, productId);
     if (!deleteProduct?.success) {
       return res
         .status(Number(deleteProduct?.statusCode))
@@ -105,8 +78,8 @@ const userDeleteFromProductWishList = async (req, res) => {
             deleteProduct?.statusCode,
             deleteProduct?.message,
             deleteProduct?.data,
-            deleteProduct?.success
-          )
+            deleteProduct?.success,
+          ),
         );
     }
 
@@ -117,8 +90,8 @@ const userDeleteFromProductWishList = async (req, res) => {
           deleteProduct?.statusCode,
           deleteProduct?.message,
           deleteProduct?.data,
-          deleteProduct?.success
-        )
+          deleteProduct?.success,
+        ),
       );
   } catch (error) {
     return res
@@ -126,6 +99,7 @@ const userDeleteFromProductWishList = async (req, res) => {
       .json(new ApiError(500, `Internal Server Error - ${error}`, [], false));
   }
 };
+
 export {
   userAddToWishList,
   userGetProductWishList,
