@@ -6,7 +6,6 @@ import userWaitListRouter from "./user.waitlist.route.js";
 import userAddressRouter from "./user.address.route.js";
 import userWishListRouter from "./user.wishlist.route.js";
 import userCartRouter from "./user.cart.route.js";
-
 import userCommunityListRouter from "./user.community.js";
 export {
   userRouter,

@@ -1,5 +1,5 @@
 import { Router } from "express";
 import userCommunityController from "../controller/user.community.controller.js";
 const userCommunityListRouter = Router();
-userCommunityListRouter.route("/join/community").post(userCommunityController);
+userCommunityListRouter.post("/join/community", userCommunityController);
 export default userCommunityListRouter;
