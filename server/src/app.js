@@ -9,6 +9,7 @@ import {
   userWaitListRouter,
   userAddressRouter,
   userCartRouter,
+  userCommunityListRouter,
 } from "./routes/index.js";
 import cookieParser from "cookie-parser";
 dotenv.config({
@@ -55,5 +56,6 @@ app.use(
   userWaitListRouter,
   userAddressRouter,
   userCartRouter,
+  userCommunityListRouter,
 );
 export default app;

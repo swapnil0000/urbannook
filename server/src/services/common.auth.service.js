@@ -158,7 +158,7 @@ const generateOtpResponseService = async () => {
     return {
       statusCode: 500,
       message: `Not able to generate OTP - ${error} try after some time`,
-      data: userEmail,
+      data: null,
       success: false,
     };
   }
@@ -296,9 +296,9 @@ const verifyOtpEmailService = async (email, emailOtp) => {
   }
 };
 
-const verifyOtpEmailForgotPasswordService = async (userEmail, userEmailOtp) => {
+const verifyOtpEmailForgotPasswordService = async (email, emailOtp) => {
   try {
-    if (!userEmail || !userEmailOtp) {
+    if (!email || !emailOtp) {
       return {
         statusCode: 400,
         message: "Email and OTP is required",
@@ -309,14 +309,14 @@ const verifyOtpEmailForgotPasswordService = async (userEmail, userEmailOtp) => {
 
     const verifiedUser = await User.findOneAndUpdate(
       {
-        userEmail,
-        userVerificationOtp: Number(userEmailOtp), // 👈 OTP MATCH FIRST
-        userVerificationOtpExpiresAt: { $gt: now }, // 👈 NOT EXPIRED
+        email,
+        verificationOtp: Number(emailOtp),
+        verificationOtpExpiresAt: { $gt: now },
       },
       {
         $unset: {
-          userVerificationOtp: "",
-          userVerificationOtpExpiresAt: "",
+          verificationOtp: "",
+          verificationOtpExpiresAt: "",
         },
       },
       { new: true },
@@ -332,7 +332,7 @@ const verifyOtpEmailForgotPasswordService = async (userEmail, userEmailOtp) => {
     return {
       statusCode: 200,
       message: "Forgot Password OTP verified successfully",
-      data: userEmail,
+      data: email,
       success: true,
     };
   } catch (error) {

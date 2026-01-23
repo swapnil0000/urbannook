@@ -7,14 +7,15 @@ dotenv.config({ path: "./.env" });
 
 const userCommunityController = async (req, res) => {
   try {
-    const { userEmail } = req.body || {};
-    if (!userEmail) {
+    const { email } = req.body;
+
+    if (!email) {
       return res
         .status(404)
         .json(
           new ApiError(
             404,
-            `Can't join the community — ${userEmail} is missing`,
+            `Can't join the community — ${email} is missing`,
             null,
             false,
           ),
@@ -22,7 +23,7 @@ const userCommunityController = async (req, res) => {
     }
 
     const existingUser = await UserCommunityList.findOne({
-      userEmail: userEmail.toLowerCase(),
+      email: email.toLowerCase(),
     });
 
     if (existingUser) {
@@ -32,14 +33,14 @@ const userCommunityController = async (req, res) => {
           new ApiRes(
             200,
             "You're already part of the UrbanNook Community 🎉",
-            { userEmail },
+            { email },
             true,
           ),
         );
     }
 
     const joinedUser = await UserCommunityList.create({
-      userEmail: userEmail.toLowerCase(),
+      email: email.toLowerCase(),
     });
 
     if (!joinedUser) {
@@ -49,7 +50,7 @@ const userCommunityController = async (req, res) => {
           new ApiError(
             500,
             "Unable to join the community at the moment. Please try again later.",
-            { userEmail },
+            { email },
             false,
           ),
         );
@@ -79,7 +80,7 @@ const userCommunityController = async (req, res) => {
       }
     };
 
-    const emailSent = await sendCommunityEmail(userEmail);
+    const emailSent = await sendCommunityEmail(email);
 
     if (!emailSent) {
       return res
@@ -88,7 +89,7 @@ const userCommunityController = async (req, res) => {
           new ApiRes(
             200,
             "You've joined the community 🎉. However, we couldn't send the confirmation email right now.",
-            { userEmail },
+            { email },
             true,
           ),
         );
@@ -100,7 +101,7 @@ const userCommunityController = async (req, res) => {
         new ApiRes(
           200,
           "🎉 Congrats! You've joined the UrbanNook Community. A confirmation email has been sent!",
-          { userEmail },
+          { email },
           true,
         ),
       );
