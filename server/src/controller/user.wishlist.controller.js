@@ -67,9 +67,9 @@ const userGetProductWishList = async (req, res) => {
 
 const userDeleteFromProductWishList = async (req, res) => {
   try {
-    const { userEmail } = req.user;
+    const { userId } = req.user;
     const { productId } = req.params;
-    const deleteProduct = await deleteFromWishListService(userEmail, productId);
+    const deleteProduct = await deleteFromWishListService(userId, productId);
     if (!deleteProduct?.success) {
       return res
         .status(Number(deleteProduct?.statusCode))
