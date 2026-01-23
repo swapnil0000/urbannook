@@ -1,6 +1,6 @@
 import Product from "../model/product.model.js";
 import WishList from "../model/user.wishlist.model.js";
-import { cartDetailsMissing } from "../utlis/CommonResponse.js";
+import { cartDetailsMissing } from "../utlis/ValidateRes.js";
 const addToWishListService = async (userId, productId) => {
   try {
     let missing = cartDetailsMissing(userId, productId);

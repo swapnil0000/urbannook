@@ -9,7 +9,6 @@ const userSchema = mongoose.Schema(
       required: [true, "userId is required"],
       lowercase: true,
       trim: true,
-      unique: true,
     },
     name: {
       type: String,
@@ -20,7 +19,6 @@ const userSchema = mongoose.Schema(
     email: {
       type: String,
       required: [true, "userEmail is required"],
-      unique: true,
     },
     password: {
       type: String,
@@ -29,7 +27,6 @@ const userSchema = mongoose.Schema(
     mobileNumber: {
       type: Number,
       required: [true, "userMobileNumber is required"],
-      unique: true,
     },
     verificationOtp: {
       type: Number,
@@ -52,7 +49,17 @@ const userSchema = mongoose.Schema(
     timestamps: true,
   },
 );
-
+userSchema.index({ userId: 1 });
+userSchema.index({ email: 1 });
+userSchema.index({ mobileNumber: 1 });
+userSchema.index({ verificationOtp: 1 });
+userSchema.index(
+  { verificationOtpExpiresAt: 1 },
+  {
+    expireAfterSeconds: 0,
+    partialFilterExpression: { verificationOtpExpiresAt: { $exists: true } },
+  },
+);
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
   this.password = await bcrypt.hash(this.password, 12);

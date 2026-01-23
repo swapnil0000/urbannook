@@ -1,5 +1,7 @@
 import { Router } from "express";
 import bodyParser from "body-parser";
+import rateLimit from "express-rate-limit";
+
 /* ===============================================================
    CONTROLLERS
    ---------------------------------------------------------------
@@ -18,6 +20,7 @@ import {
   userAccountDeleteConfirm,
   userResetPassword,
   userUpdateProfile,
+  userForgetpassword,
 } from "../controller/user.controller.js";
 
 import { userOrderPreviousHistory } from "../controller/user.cart.controller.js";
@@ -54,15 +57,19 @@ import {
 } from "../controller/rp.payment.controller.js";
 
 const userRouter = Router();
-
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: "Too many login attempts, please try again later",
+});
 /* ===============================================================
    AUTH ROUTES (PUBLIC)
    ---------------------------------------------------------------
    These routes do NOT require authentication
 ================================================================ */
-userRouter.post("/user/login", userLogin);
-userRouter.post("/user/register", userRegister);
-// userRouter.post("/user/forgot-password", userForgetPassword);
+userRouter.post("/user/login", authLimiter, userLogin);
+userRouter.post("/user/register", authLimiter, userRegister);
+userRouter.post("/user/forgot-password", userForgetpassword);
 
 /* ===============================================================
    PROFILE & ACCOUNT (PROTECTED)
@@ -97,8 +104,6 @@ userRouter.get(
    ---------------------------------------------------------------
    Handles cart CRUD operations
 ================================================================ */
-
-
 
 /* ===============================================================
    WISHLIST MANAGEMENT (PROTECTED)

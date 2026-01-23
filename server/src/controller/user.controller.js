@@ -1,4 +1,4 @@
-import { validateUserInput } from "../utlis/CommonResponse.js";
+import { validateUserInput } from "../utlis/ValidateRes.js";
 import { ApiError, ApiRes } from "../utlis/index.js";
 import User from "../model/user.model.js";
 import {
@@ -10,6 +10,7 @@ import {
   profileFetchService,
   resetPasswordService,
 } from "../services/common.auth.service.js";
+import bcrypt from "bcrypt";
 const userLogin = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -32,7 +33,9 @@ const userLogin = async (req, res) => {
         true,
       );
   } catch (error) {
-    return new ApiError(500, null, `Internal Server Error -${error}`, false);
+    return res
+      .status(500)
+      .json(new ApiError(500, null, `Internal Server Error -${error}`, false));
   }
 };
 
@@ -47,7 +50,7 @@ const userRegister = async (req, res) => {
     }
 
     return res
-      .status(200)
+      .status(201)
       .cookie("userAccessToken", result?.data?.userAccessToken, cookieOptions)
       .json(
         new ApiRes(
@@ -87,7 +90,7 @@ const userForgetpassword = async (req, res) => {
     if (!password) {
       return {
         statusCode: 400,
-        message: `User Email or Password can't be empty`,
+        message: `Password can't be empty`,
         data: null,
         success: false,
       };
@@ -279,22 +282,25 @@ const userUpdateProfile = async (req, res) => {
 const userAccountDeletePreview = async (req, res) => {
   try {
     const { userId } = req.user;
-
-    if (!email) {
+    if (!userId) {
       return res
         .status(400)
-        .json(new ApiError(400, `Email is required for deleting`, null, false));
+        .json(new ApiError(400, `Unauthorized`, null, false));
     }
 
-    const userDetails = await User.findOne({ email });
+    const userDetails = await User.findOne({ userId });
     if (!userDetails) {
       return res
         .status(404)
         .json(new ApiError(404, "User not found", null, false));
     }
 
-    // Generate token (base64 encode the email)
-    const confirmToken = Buffer.from(email).toString("base64");
+    // Updated to jwt from Base64
+    const confirmToken = jwt.sign(
+      { email, purpose: "account_deletion", timestamp: Date.now() },
+      process.env.DELETION_TOKEN_SECRET,
+      { expiresIn: "15m" },
+    );
 
     return res.status(200).json(
       new ApiRes(

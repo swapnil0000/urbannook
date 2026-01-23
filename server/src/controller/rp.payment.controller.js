@@ -7,7 +7,8 @@ import ApiRes from "../utlis/ApiRes.js";
 import User from "../model/user.model.js";
 import Order from "../model/order.model.js";
 import crypto from "crypto";
-
+import Product from "../model/product.model.js";
+import { v7 as uuidv7 } from "uuid";
 const razorpayKeyGetController = async (_, res) => {
   if (!process.env.RP_LOCAL_TEST_KEY_ID)
     return res.status(404).json(new ApiError(404, `Rp - Key`, null, false));
@@ -17,31 +18,90 @@ const razorpayKeyGetController = async (_, res) => {
 };
 
 const razorpayCreateOrderController = async (req, res) => {
-  const { amount, currency, items } = req.body; // replace items with productId uuid
-  const { userId } = req.user;
-  const razorpayOrder = await razorpayCreateOrderService(amount, currency);
-  const order = await Order.create({
-    userId,
-    amount,
-    items,
-    payment: {
-      razorpayOrderId: razorpayOrder?.data?.id,
-    },
-    qunatity: items?.qunatity || 1,
-    status: "CREATED",
-  });
-  return res.status(200).json(
-    new ApiRes(
-      200,
-      "Order created",
-      {
-        // razorpayOrder: razorpayOrder.data?.entity,
+  try {
+    /* Not Handling the amount because it could be manipulate at client side like 0 as amount */
+    const { items } = req.body;
+    const { userId } = req.user;
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res
+        .status(400)
+        .json(new ApiError(400, "Items are required", null, false));
+    }
+    // 1Fetch products
+    const productIds = items.map((i) => i.productId);
+    const products = await Product.find({
+      productId: { $in: productIds },
+      productStatus: "in_stock",
+    });
+
+    if (products.length !== productIds.length) {
+      return res
+        .status(400)
+        .json(
+          new ApiError(400, "One or more products unavailable", null, false),
+        );
+    }
+    // order items snapshot
+    let totalAmount = 0;
+
+    const orderItems = items.map((item) => {
+      const product = products.find((p) => p.productId === item.productId);
+      const price = product.sellingPrice * item.quantity;
+      totalAmount += price;
+      return {
+        productId: product.productId,
+        productSnapshot: {
+          quantity: item.quantity,
+          productImg: product.productImg,
+          productName: product.productName,
+          productCategory: product.productCategory,
+          productSubCategory: product.productSubCategory,
+          priceAtPurchase: product.sellingPrice,
+        },
+      };
+    });
+    console.log(orderItems);
+
+    const razorpayOrder = await razorpayCreateOrderService(
+      totalAmount * 100,
+      "INR", //currency
+    );
+    const order = await Order.create({
+      orderId: uuidv7(),
+      userId,
+      items: orderItems,
+      amount: totalAmount,
+      payment: {
         razorpayOrderId: razorpayOrder?.data?.id,
-        orderId: order?.id, // replace with razorpayOrder?.data?.id
       },
-      true,
-    ),
-  );
+      qunatity: items?.qunatity || 1,
+      status: "CREATED",
+    });
+    return res.status(200).json(
+      new ApiRes(
+        200,
+        "Order created",
+        {
+          orderId: order.orderId,
+          razorpayOrderId: razorpayOrder?.data?.id,
+          amount: totalAmount,
+          currency: "INR",
+        },
+        true,
+      ),
+    );
+  } catch (error) {
+    return res
+      .status(500)
+      .json(
+        new ApiError(
+          500,
+          `Internal Server Error - ${error.message}`,
+          null,
+          false,
+        ),
+      );
+  }
 };
 
 const razorpayPaymentVerificationController = async (req, res) => {
@@ -91,23 +151,31 @@ const razorpayPaymentVerificationController = async (req, res) => {
 
 const razorpayWebHookController = async (req, res) => {
   const secret = process.env.RP_WEBHOOK_TEST_SECRET;
-
-  // 1️⃣ Signature verification
+  const signature = req.headers["x-razorpay-signature"];
+  if (!signature) {
+    return res.status(400).json({
+      statusCode: 400,
+      data: null,
+      success: false,
+      message: "Missing signature",
+    });
+  }
+  // Signature verification
   const shasum = crypto.createHmac("sha256", secret);
   shasum.update(req.body);
-  const digest = shasum.digest("hex");
+  const expectedSignature = shasum.digest("hex");
 
-  if (digest !== req.headers["x-razorpay-signature"]) {
-    return res.status(400).json({ success: false });
-  }
-
-  /* CHecking specficially because the webhook url is public we cant use any guard service
+  /* Checking specficially because the webhook url is public we cant use any guard service
 because it is a ser to ser call so checking this helps us to figure the verification
-*/
-  const signature = req.headers["x-razorpay-signature"];
-  if (!signature || digest !== signature) {
-    return res.status(400).json({ success: false });
+*/ if (expectedSignature !== signature) {
+    return res.status(400).json({
+      statusCode: 400,
+      success: false,
+      error: "Invalid signature",
+      data: null,
+    });
   }
+
   const payload = JSON.parse(req.body.toString("utf8"));
   const event = payload.event;
 

@@ -12,7 +12,9 @@ import {
 } from "../services/common.auth.service.js";
 const adminRouter = Router();
 adminRouter.route("/admin/login").post(adminLogin);
-adminRouter.route("/admin/totalproducts").get(totalProducts);
+adminRouter
+  .route("/admin/totalproducts")
+  .get(authGuardService("Admin"), totalProducts);
 adminRouter
   .route("/admin/profile")
   .post(authGuardService("Admin"), adminProfile);

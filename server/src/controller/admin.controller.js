@@ -1,12 +1,12 @@
 import Product from "../model/product.model.js";
-import { finalProductName } from "../utlis/CommonResponse.js";
+import { finalProductName } from "../utlis/ValidateRes.js";
 import {
   adminLoginService,
   totalProductService,
 } from "../services/admin.auth.service.js";
 import { ApiError, ApiRes } from "../utlis/index.js";
 import { v4 as uuidv4 } from "uuid";
-import { fieldMissing } from "../utlis/CommonResponse.js";
+import { fieldMissing } from "../utlis/ValidateRes.js";
 import cookieOptions from "../config/config.js";
 import { profileFetchService } from "../services/common.auth.service.js";
 import UserWaistList from "../model/user.waitlist.model.js";
@@ -30,7 +30,7 @@ const adminLogin = async (req, res) => {
     }
     // existing User and pass check
     let result = await adminLoginService(email, password);
-    
+
     if (result?.statusCode >= 400) {
       return res.status(Number(result?.statusCode)).json(result);
     }

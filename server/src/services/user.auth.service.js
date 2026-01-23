@@ -1,5 +1,5 @@
 import User from "../model/user.model.js";
-import { fieldMissing } from "../utlis/CommonResponse.js";
+import { fieldMissing } from "../utlis/ValidateRes.js";
 import { v7 as uuid7 } from "uuid";
 
 const loginService = async (email, password) => {
@@ -90,16 +90,12 @@ const registerService = async (name, email, password, mobileNumber) => {
   ];
 
   if (reservedNames.includes(name.toLowerCase())) {
-    return res
-      .status(403)
-      .json(
-        new ApiError(
-          403,
-          `Oops 😅 ${name} is a VIP name reserved for the system. Please pick something uniquely *you* — we promise we won’t steal it 😉`,
-          { email, name },
-          false,
-        ),
-      );
+    return {
+      statusCode: 403,
+      message: `Oops 😅 ${name} is a VIP name reserved for the system. Please pick something uniquely *you* — we promise we won't steal it 😉`,
+      data: { email, name } || null,
+      success: false,
+    };
   }
   const fullNameRegex = /^[A-Za-z]+(?:\s+[A-Za-z]+)*$/;
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
