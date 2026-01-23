@@ -99,7 +99,9 @@ const getWishListService = async (userId) => {
 
   const productDetails = await Product.find({
     productId: { $in: wishList.products },
-  }).select("productName productImg productCategory sellingPrice -_id");
+  }).select(
+    "productId productName productImg productCategory sellingPrice -_id",
+  );
 
   return {
     statusCode: 200,
@@ -109,7 +111,7 @@ const getWishListService = async (userId) => {
   };
 };
 
-const deleteFromWishListService = async (email, productId) => {
+const deleteFromWishListService = async (userId, productId) => {
   try {
     const productDetails = await Product.findOne({ productId });
     if (!productDetails) {
@@ -120,13 +122,11 @@ const deleteFromWishListService = async (email, productId) => {
         success: false,
       };
     }
-    const userExist = await User.findOneAndUpdate(
-      { email },
+    const updatedWishList = await WishList.findOneAndUpdate(
+      { userId },
       {
         $pull: {
-          addedToWishList: {
-            productId: productDetails?._id,
-          },
+          products: productId,
         },
       },
       {
@@ -134,8 +134,8 @@ const deleteFromWishListService = async (email, productId) => {
       },
     );
 
-    await userExist.save();
-    if (!userExist)
+    await updatedWishList.save();
+    if (!updatedWishList)
       return {
         statusCode: 404,
         message: `Failed to remove from wishlist`,
