@@ -9,10 +9,17 @@ const productListing = async (req, res) => {
     /*category -> Filter by category	Electronics , search -> Keyword search in name	iPhone */
     const query = {};
     if (search) {
-      query.productName = {
-        $regex: String(search),
-        $options: "i", // makes it case - insensitive Eg - Chair , chair, CHAIR - all same
-      };
+      if (search.length <= 2) {
+        // Short input like p , ph , pho
+        query.productName = {
+          $regex: `^${search}`,
+          $options: "i", // makes it case - insensitive Eg - Chair , chair, CHAIR - all same
+        };
+      } else {
+        // for length inputs like iPhone 15 Pro Max
+        query.$text = { $search: search };
+        sort = { score: { $meta: "textScore" } };
+      }
     }
 
     if (category) {
@@ -22,7 +29,7 @@ const productListing = async (req, res) => {
       };
     }
     if (subCategory) {
-      query.productCategory = {
+      query.productSubCategory = {
         $regex: String(subCategory),
         $options: "i", // makes it case - insensitive Eg - Chair , chair, CHAIR - all same
       };

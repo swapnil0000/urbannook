@@ -18,9 +18,13 @@ const adminSchema = mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
-
+adminSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) return next();
+  this.password = await bcrypt.hash(this.password, 12);
+  next();
+});
 adminSchema.methods.passCheck = async function (password) {
   return await bcrypt.compare(password, this.password);
 };
@@ -38,7 +42,7 @@ adminSchema.methods.genAccessToken = function () {
     process.env.ADMIN_ACCESS_TOKEN_SECRET,
     {
       expiresIn: "1d",
-    }
+    },
   );
 };
 
@@ -50,7 +54,7 @@ adminSchema.methods.genRefreshToken = function () {
     process.env.REFRESH_TOKEN_SECRET,
     {
       expiresIn: "10d",
-    }
+    },
   );
 };
 

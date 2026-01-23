@@ -79,11 +79,8 @@ const verifyEmailOtpController = async (req, res) => {
 // to verify exisitng user for forgot password
 const verifyOtpEmailForgotPasswordController = async (req, res) => {
   try {
-    const { email, userEmailOtp } = req.body;
-    const result = await verifyOtpEmailForgotPasswordService(
-      email,
-      userEmailOtp,
-    );
+    const { email, emailOtp } = req.body;
+    const result = await verifyOtpEmailForgotPasswordService(email, emailOtp);
     if (!result?.success) {
       return res
         .status(Number(result?.statusCode))

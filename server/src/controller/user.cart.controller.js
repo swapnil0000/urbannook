@@ -5,6 +5,7 @@ import {
   clearCartService,
 } from "../services/user.cart.service.js";
 import { ApiError, ApiRes } from "../utlis/index.js";
+import Order from "../model/order.model.js";
 const userAddToCart = async (req, res) => {
   try {
     const { userId } = req.user;
@@ -152,35 +153,45 @@ const userClearCart = async (req, res) => {
 const userOrderPreviousHistory = async (req, res) => {
   try {
     const { userId } = req.user;
-    if (!email) {
-      return res
-        .status(404)
-        .json(new ApiError(404, `User Email Not found`, null, false));
-    }
-    const userPreviousOrder = await User.findOne({ email }).populate(
-      "userPreviousOrder.productId",
-      "productName sellingPrice",
-    );
-    const orders = userPreviousOrder?.userPreviousOrder || [];
 
-    return res
-      .status(200)
-      .json(
-        new ApiRes(
-          200,
-          orders.length === 0
-            ? "No orders placed yet"
-            : "Orders fetched successfully",
-          { email, userPreviousOrder: orders },
-          true,
-        ),
-      );
+    if (!userId) {
+      return res
+        .status(401)
+        .json(new ApiError(401, "Unauthorized", null, false));
+    }
+
+    const orders = await Order.find({ userId })
+      .sort({ createdAt: -1 })
+      .lean()
+      .select("-_id");
+
+    return res.status(200).json(
+      new ApiRes(
+        200,
+        orders.length === 0
+          ? "No orders placed yet"
+          : "Orders fetched successfully",
+        {
+          totalOrders: orders.length,
+          orders,
+        },
+        true,
+      ),
+    );
   } catch (error) {
     return res
       .status(500)
-      .json(new ApiError(500, `Internal Server Error - ${error}`, [], false));
+      .json(
+        new ApiError(
+          500,
+          `Internal Server Error - ${error.message}`,
+          null,
+          false,
+        ),
+      );
   }
 };
+
 export {
   userAddToCart,
   userPreviewCart as userGetAddToCart,

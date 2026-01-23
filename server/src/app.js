@@ -12,6 +12,7 @@ import {
   userCommunityListRouter,
 } from "./routes/index.js";
 import cookieParser from "cookie-parser";
+import healthRouter from "./routes/health.route.js";
 dotenv.config({
   path: "./.env",
 });
@@ -30,6 +31,9 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 
+/* Health Route */
+app.use("/api/v1/health", healthRouter);
+
 // Use CORS for all normal requests
 app.use(cors(corsOptions));
 
@@ -46,7 +50,6 @@ app.use("/api/v1", (req, res, next) => {
 });
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-
 app.use(
   "/api/v1",
   userRouter,
