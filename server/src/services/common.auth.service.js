@@ -4,7 +4,7 @@ import User from "../model/user.model.js";
 import jwt from "jsonwebtoken";
 import cookieOptions from "../config/config.js";
 import crypto from "crypto";
-import sendEmail from "./email.service.js";
+import { sendEmail } from "./email.service.js";
 import bcrypt from "bcrypt";
 const authGuardService = (role) => {
   /* The return is placed outside the try–catch because jwt.verify() runs

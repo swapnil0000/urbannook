@@ -1,6 +1,6 @@
 import Admin from "../model/admin.model.js";
 import Product from "../model/product.model.js";
-import { finalProductName } from "../utlis/CommonResponse.js";
+import { finalProductName } from "../utlis/ValidateRes.js";
 
 const productUpdateExisting = async (productName, productQuantity) => {
   const normalizedName = finalProductName(productName);

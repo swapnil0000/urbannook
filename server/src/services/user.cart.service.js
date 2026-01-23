@@ -1,7 +1,7 @@
 import Product from "../model/product.model.js";
 import Cart from "../model/user.cart.model.js";
 import User from "../model/user.model.js";
-import { cartDetailsMissing } from "../utlis/CommonResponse.js";
+import { cartDetailsMissing } from "../utlis/ValidateRes.js";
 const addToCartService = async ({ userId, productId }) => {
   try {
     const userAndProductIdValidation = cartDetailsMissing(userId, productId);
@@ -224,7 +224,7 @@ const cartQuantityService = async ({ userId, productId, quantity, action }) => {
       success: false,
     };
   }
-  if (!productId && (quantity === undefined) & !action) {
+  if (!productId && quantity === undefined && !action) {
     return {
       statusCode: 400,
       message: "productId, quantity and action are required",

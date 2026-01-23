@@ -52,7 +52,7 @@ const productSchema = mongoose.Schema(
     timestamps: true,
   },
 );
-
+productSchema.index({ productName: "text", productDes: "text" });
 productSchema.index({ productStatus: 1, createdAt: -1 });
 const Product = new mongoose.model("Product", productSchema);
 export default Product;

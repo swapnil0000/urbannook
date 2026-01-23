@@ -4,7 +4,6 @@ const cartSchema = mongoose.Schema({
   userId: {
     type: String,
     required: true,
-    unique: true,
   },
   products: {
     type: Map,
@@ -12,6 +11,7 @@ const cartSchema = mongoose.Schema({
     default: {},
   },
 });
+cartSchema.index({ userId: 1 }, { unique: true });
 
 const Cart = mongoose.model("Cart", cartSchema);
 export default Cart;
