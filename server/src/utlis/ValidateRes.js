@@ -161,6 +161,90 @@ const validateUserInput = ({ email, name, mobileNumber }) => {
 };
 
 const validateUserAddress = ({
+  placeId,
+  lat,
+  long,
+  formattedAddress,
+  city,
+  state,
+  pinCode,
+}) => {
+  const missing = [];
+
+  if (!placeId) missing.push("placeId");
+  if (lat === undefined) missing.push("lat");
+  if (long === undefined) missing.push("long");
+  if (!formattedAddress) missing.push("formattedAddress");
+
+  if (missing.length) {
+    return {
+      success: false,
+      statusCode: 400,
+      message: `Missing fields: ${missing.join(", ")}`,
+    };
+  }
+
+  // lat / long sanity check
+  if (typeof lat !== "number" || lat < -90 || lat > 90) {
+    return {
+      success: false,
+      statusCode: 400,
+      message: "Invalid latitude",
+    };
+  }
+
+  if (typeof long !== "number" || long < -180 || long > 180) {
+    return {
+      success: false,
+      statusCode: 400,
+      message: "Invalid longitude",
+    };
+  }
+
+  // formatted address
+  if (
+    typeof formattedAddress !== "string" ||
+    formattedAddress.length < 5 ||
+    formattedAddress.length > 200
+  ) {
+    return {
+      success: false,
+      statusCode: 400,
+      message: "Invalid formattedAddress",
+    };
+  }
+
+  if (city && typeof city !== "string") {
+    return {
+      success: false,
+      statusCode: 400,
+      message: "Invalid city",
+    };
+  }
+
+  if (state && typeof state !== "string") {
+    return {
+      success: false,
+      statusCode: 400,
+      message: "Invalid state",
+    };
+  }
+
+  if (pinCode && (!Number.isInteger(pinCode) || String(pinCode).length !== 6)) {
+    return {
+      success: false,
+      statusCode: 400,
+      message: "Invalid pinCode",
+    };
+  }
+
+  return {
+    success: true,
+  };
+};
+
+const validateUpdateUserAddress = ({
+  addressId,
   lat,
   long,
   city,
@@ -168,153 +252,77 @@ const validateUserAddress = ({
   pinCode,
   formattedAdress,
 }) => {
-  const missingFields = {};
+  const missing = [];
 
-  if (lat === undefined) missingFields.lat = "lat is required";
-  if (long === undefined) missingFields.long = "long is required";
-  if (city === undefined) missingFields.city = "city is required";
-  if (state === undefined) missingFields.state = "state is required";
-  if (pinCode === undefined) missingFields.pinCode = "pinCode is required";
-  if (formattedAdress === undefined)
-    missingFields.formattedAdress = "formattedAdress is required";
+  if (!addressId) missing.push("addressId");
+  if (!placeId) missing.push("placeId");
+  if (lat === undefined) missing.push("lat");
+  if (long === undefined) missing.push("long");
+  if (!formattedAdress) missing.push("formattedAdress");
 
-  if (Object.keys(missingFields).length > 0) {
+  if (missing.length) {
     return {
-      statusCode: 400,
-      message: `Below fields are missing: ${Object.keys(missingFields).join(", ")}`,
-      data: null,
       success: false,
+      statusCode: 400,
+      message: `Missing fields: ${missing.join(", ")}`,
     };
   }
 
-  const latRegex = /^-?(?:90(?:\.0+)?|[0-8]?\d(?:\.\d+)?)$/;
-  const longRegex =
-    /^-?(?:180(?:\.0+)?|1[0-7]\d(?:\.\d+)?|[0-9]?\d(?:\.\d+)?)$/;
-  const cityStateRegex = /^[A-Za-z\s]{2,50}$/;
-  const pinCodeRegex = /^[1-9][0-9]{5}$/;
-  const formattedAddressRegex = /^[A-Za-z0-9\s,./#-]{5,150}$/;
-  // latitude
-  if (lat !== undefined) {
-    if (typeof lat !== "string") {
-      return {
-        statusCode: 400,
-        message: "Invalid lat type, number required",
-        success: false,
-      };
-    }
-
-    if (!latRegex.test(String(lat))) {
-      return {
-        statusCode: 400,
-        message: "Invalid lat value",
-        success: false,
-      };
-    }
+  // lat / long sanity check
+  if (typeof lat !== "number" || lat < -90 || lat > 90) {
+    return {
+      success: false,
+      statusCode: 400,
+      message: "Invalid latitude",
+    };
   }
 
-  // longitude
-  if (long !== undefined) {
-    if (typeof long !== "string") {
-      return {
-        statusCode: 400,
-        message: "Invalid long type, number required",
-        success: false,
-      };
-    }
-
-    if (!longRegex.test(String(long))) {
-      return {
-        statusCode: 400,
-        message: "Invalid long value",
-        success: false,
-      };
-    }
+  if (typeof long !== "number" || long < -180 || long > 180) {
+    return {
+      success: false,
+      statusCode: 400,
+      message: "Invalid longitude",
+    };
   }
 
-  if (city !== undefined) {
-    if (typeof city !== "string") {
-      return {
-        statusCode: 400,
-        message: "Invalid city",
-        data: null,
-        success: false,
-      };
-    }
-
-    if (!cityStateRegex.test(city)) {
-      return {
-        statusCode: 400,
-        message: "city contains invalid characters",
-        data: null,
-        success: false,
-      };
-    }
-  }
-  if (state !== undefined) {
-    if (typeof state !== "string") {
-      return {
-        statusCode: 400,
-        message: "Invalid state",
-        data: null,
-        success: false,
-      };
-    }
-    if (!cityStateRegex.test(String(state))) {
-      return {
-        statusCode: 400,
-        message: "Invalid state format",
-        success: false,
-      };
-    }
+  // formatted address
+  if (
+    typeof formattedAdress !== "string" ||
+    formattedAdress.length < 5 ||
+    formattedAdress.length > 200
+  ) {
+    return {
+      success: false,
+      statusCode: 400,
+      message: "Invalid formattedAdress",
+    };
   }
 
-  if (formattedAdress !== undefined) {
-    if (typeof formattedAdress !== "string") {
-      return {
-        statusCode: 400,
-        message: "Invalid formattedAdress",
-        data: null,
-        success: false,
-      };
-    }
+  if (city && typeof city !== "string") {
+    return {
+      success: false,
+      statusCode: 400,
+      message: "Invalid city",
+    };
+  }
 
-    if (!formattedAddressRegex.test(formattedAdress)) {
-      return {
-        statusCode: 400,
-        message: "formattedAdress contains invalid characters",
-        data: null,
-        success: false,
-      };
-    }
+  if (state && typeof state !== "string") {
+    return {
+      success: false,
+      statusCode: 400,
+      message: "Invalid state",
+    };
   }
-  if (pinCode !== undefined) {
-    if (typeof pinCode !== "number") {
-      return {
-        statusCode: 400,
-        message: "Invalid pinCode",
-        data: null,
-        success: false,
-      };
-    }
-    if (!pinCodeRegex.test(String(pinCode))) {
-      return {
-        statusCode: 400,
-        message: "Invalid pinCode format",
-        success: false,
-      };
-    }
+
+  if (pinCode && (!Number.isInteger(pinCode) || String(pinCode).length !== 6)) {
+    return {
+      success: false,
+      statusCode: 400,
+      message: "Invalid pinCode",
+    };
   }
+
   return {
-    statusCode: 200,
-    message: "Validation passed",
-    data: `Good to go with ${{
-      lat,
-      long,
-      city,
-      state,
-      pinCode,
-      formattedAdress,
-    }} `,
     success: true,
   };
 };
@@ -326,4 +334,5 @@ export {
   cartDetailsMissing,
   productUpdateFieldMissing,
   validateUserAddress,
+  validateUpdateUserAddress,
 };

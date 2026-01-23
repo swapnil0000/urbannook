@@ -1,20 +1,25 @@
 import nodemailer from "nodemailer";
 
+let transporter = null;
+const getNodeMailerTransporter = () => {
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      secure: true,
+      host: "smtp.zoho.in",
+      port: 465,
+      auth: {
+        user: process.env.ZOHO_ADMIN_EMAIL,
+        pass: process.env.ZOHO_SMTP_SECRET,
+      },
+    });
+  }
+  return transporter;
+};
 const sendEmail = (to, subject, html) => {
-  const zohoEmail = process.env.ZOHO_ADMIN_EMAIL;
-  const zohoEmailSMTPSecret = process.env.ZOHO_SMTP_SECRET;
-  const transporter = nodemailer.createTransport({
-    secure: true,
-    host: "smtp.zoho.in",
-    port: 465,
-    auth: {
-      user: zohoEmail,
-      pass: zohoEmailSMTPSecret,
-    },
-  });
+  const transporter = getNodeMailerTransporter();
   try {
     transporter.sendMail({
-      from: `urbanadmin@urbannook.in`,
+      from: process.env.ZOHO_ADMIN_EMAIL,
       to,
       subject,
       html,
@@ -22,7 +27,7 @@ const sendEmail = (to, subject, html) => {
 
     return {
       statusCode: 200,
-      message: `OTP sent to` - to,
+      message: `OTP sent to ${to}`,
       data: to,
       success: true,
     };
@@ -30,9 +35,9 @@ const sendEmail = (to, subject, html) => {
     return {
       statusCode: 500,
       message: `Internal Server Error`,
-      data: to,
+      data: error,
       success: false,
     };
   }
 };
-export default sendEmail
+export { sendEmail, getNodeMailerTransporter };

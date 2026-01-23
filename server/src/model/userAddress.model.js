@@ -1,17 +1,20 @@
 import mongoose from "mongoose";
 
-const userAddress = mongoose.Schema({
-  user: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-    required: true,
-  },
-  addresses: [
-    {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Address",
+const userAddressSchema = mongoose.Schema(
+  {
+    userId: {
+      type: String,
+      required: true,
     },
-  ],
-});
-const UserAddress = mongoose.model("UserAddress", userAddress);
+    addresses: {
+      type: [String],
+      default: [],
+      validate: [(arr) => arr.length <= 5, "Maximum 5 addresses allowed"],
+    },
+  },
+  { timestamps: true },
+);
+userAddressSchema.index({ userId: 1 }, { unique: true });
+const UserAddress = mongoose.model("UserAddress", userAddressSchema);
+
 export default UserAddress;
