@@ -179,11 +179,25 @@ const previewCartService = async ({ userId }) => {
           _id: 0,
           items: 1,
           summary: {
-            subtotal: 1,
-            totalQuantity: 1,
-            shipping: { $literal: 0 },
-            tax: { $literal: 0 },
-            grandTotal: "$subtotal",
+            subtotal: "$subtotal",
+            totalQuantity: "$totalQuantity",
+            shipping: { $literal: 249 },
+            tax: {
+              $round: [{ $multiply: ["$subtotal", 0.18] }, 0],
+            },
+
+            grandTotal: {
+              $round: [
+                {
+                  $add: [
+                    "$subtotal",
+                    { $literal: 249 },
+                    { $multiply: ["$subtotal", 0.18] },
+                  ],
+                },
+                0,
+              ],
+            },
           },
         },
       },
