@@ -7,9 +7,9 @@ import {
 } from "../controller/user.cart.controller.js";
 import { authGuardService } from "../services/common.auth.service.js";
 const userCartRouter = Router();
-userCartRouter.post("/user/addtocart", authGuardService("USER"), userAddToCart);
+userCartRouter.post("/user/cart/add", authGuardService("USER"), userAddToCart);
 userCartRouter.get(
-  "/user/preview-addtocart",
+  "/user/cart/get",
   authGuardService("USER"),
   userGetAddToCart,
 );
@@ -20,7 +20,7 @@ userCartRouter.post(
 );
 
 userCartRouter.delete(
-  "/user/clear-cart",
+  "/user/cart/clear",
   authGuardService("USER"),
   userClearCart,
 );
