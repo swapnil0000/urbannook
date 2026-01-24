@@ -22,8 +22,9 @@ import {
   AboutPage,
 } from "../pages/index.js";
 import WaitListMobile from "../pages/WaitListMobile.jsx";
-import AdminLoginPage from "../admin/pages/AdminLoginPage.jsx";
-import AdminDashboardPage from "../admin/pages/AdminDashboardPage.jsx";
+import {AdminLoginPage, AdminDashboardPage, JoinedWaitlistPage} from "../admin/components/index.js"
+import AdminProductDetails from "../admin/components/AdminProductDetailsUpdate.jsx";
+import AdminLayout from "../admin/layout/AdminLayout.jsx"
 
 const AppRoutes = () => {
   return (
@@ -54,9 +55,10 @@ const AppRoutes = () => {
 
 
        {/* Admin panel routes */}
-        <Route path="/admin">
+        <Route path="/admin"  element={<AdminLayout />}>
           <Route path="dashboard" element={<AdminDashboardPage />} />
-          {/* <Route path="users" element={<Users />} /> */}
+          <Route path="total-products" element={<AdminProductDetails />} />
+          <Route path="joined-waitlist" element={<JoinedWaitlistPage />} />
           <Route path="login" element={<AdminLoginPage />} />
         </Route>
     </Routes>

@@ -17,7 +17,7 @@ export default defineConfig({
   },
 
   esbuild: {
-    drop: ["console", "debugger"], // removing logs and debugger in prod
+    // drop: ["console", "debugger"], // removing logs and debugger in prod
   },
 
   optimizeDeps: {
