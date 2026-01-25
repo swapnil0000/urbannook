@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import Footer from '../../component/layout/Footer';
-import NewHeader from '../../component/layout/NewHeader';
 
 const ContactPage = () => {
   useEffect(() => {
@@ -67,7 +65,6 @@ const ContactPage = () => {
   return (
     // BASE: Deep Forest Green (Brand Color)
     <div className="bg-[#2e443c] min-h-screen text-[#E2E8F0] font-sans relative selection:bg-[#F5DEB3] selection:text-[#0F261F] overflow-x-hidden">
-      <NewHeader />
       
       {/* 1. BACKGROUND ATMOSPHERE */}
       <div className="fixed inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-[#3a554a] via-[#2e443c] to-[#1a2822] pointer-events-none z-0 opacity-50"></div>
@@ -287,24 +284,6 @@ const ContactPage = () => {
             </form>
         </div>
       </section>
-
-      {/* --- MAP BANNER --- */}
-      <section className="h-[300px] w-full relative z-10 border-t border-[#F5DEB3]/10 overflow-hidden">
-         <img 
-            src="https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=1200&auto=format&fit=crop" 
-            className="w-full h-full object-cover grayscale opacity-40 hover:grayscale-0 hover:opacity-60 transition-all duration-[2s]"
-            alt="Location"
-         />
-         <div className="absolute inset-0 flex items-center justify-center p-4">
-             <div className="bg-[#1c3026]/90 backdrop-blur-xl px-10 py-8 border border-[#F5DEB3]/20 rounded-lg text-center shadow-2xl">
-                 <i className="fa-solid fa-map-pin text-[#F5DEB3] text-xl mb-4"></i>
-                 <p className="text-[#F5DEB3] font-serif text-2xl italic mb-2">Visit the Studio</p>
-                 <p className="text-green-100/60 text-xs uppercase tracking-widest">Sector 44, Gurgaon</p>
-             </div>
-         </div>
-      </section>
-
-      <Footer />
     </div>
   );
 };

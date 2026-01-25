@@ -1,38 +1,33 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect} from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import NewHeader from '../../component/layout/NewHeader';
-import Footer from '../../component/layout/Footer';
+import { useGetOrderHistoryQuery } from '../../store/api/userApi';
 
 const MyOrdersPage = () => {
-  
-  // Mock Data
-  const [orders] = useState([
-    {
-      id: 'ORD-7782-XJ',
-      date: '2025-10-15',
-      status: 'Delivered',
-      total: 2499,
-      timeline: 100, // 100% complete
-      items: [
-        { name: 'Aire Lounge Chair', image: 'https://images.unsplash.com/photo-1567538096630-e0c55bd6374c?w=400', price: 1999, variant: 'Charcoal Grey' },
-        { name: 'Marble Coaster Set', image: 'https://images.unsplash.com/photo-1533090161767-e6ffed986c88?w=400', price: 500, variant: 'Carrara White' }
-      ]
-    },
-    {
-      id: 'ORD-9921-MC',
-      date: '2026-01-05',
-      status: 'Processing',
-      total: 1299,
-      timeline: 40, // 40% complete
-      items: [
-        { name: 'Minimalist Floor Lamp', image: 'https://images.unsplash.com/photo-1507473888900-52e1adad54cd?w=400', price: 1299, variant: 'Matte Black' }
-      ]
-    }
-  ]);
+  const { data: orderResponse, isLoading, error } = useGetOrderHistoryQuery();
+  const orders = orderResponse?.data || [];
 
    useEffect(() => {
       window.scrollTo(0, 0);
    }, []);
+  
+  if (isLoading) {
+    return (
+      <div className="bg-[#1c3026] min-h-screen flex items-center justify-center">
+        <div className="w-12 h-12 border-2 border-[#F5DEB3] border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-[#1c3026] min-h-screen flex items-center justify-center text-white">
+        <div className="text-center">
+          <h2 className="text-2xl mb-4">Failed to load orders</h2>
+          <p className="text-gray-400">Please try again later</p>
+        </div>
+      </div>
+    );
+  }
   
   const getStatusConfig = (status) => {
     switch (status) {
@@ -45,7 +40,6 @@ const MyOrdersPage = () => {
 
   return (
     <div className="bg-[#1c3026] min-h-screen font-sans text-[#e8e6e1] selection:bg-[#F5DEB3] selection:text-[#1c3026]">
-      <NewHeader />
 
       {/* --- AMBIENT BACKGROUND --- */}
       <div className="fixed top-0 left-0 w-full h-[600px] bg-gradient-to-b from-[#2a4538] to-[#1c3026] pointer-events-none opacity-60"></div>
@@ -104,7 +98,7 @@ const MyOrdersPage = () => {
                             </div>
                             <div>
                                 <span className="block font-serif text-lg text-white">{status.label}</span>
-                                <span className="text-xs text-gray-500 font-mono tracking-wider">ID: {order.id}</span>
+                                <span className="text-xs text-gray-500 font-mono tracking-wider">ID: {order.orderId || order.id}</span>
                             </div>
                         </div>
                         
@@ -112,12 +106,12 @@ const MyOrdersPage = () => {
                             <div>
                                 <span className="block text-[10px] text-gray-500 uppercase tracking-widest mb-1">Ordered On</span>
                                 <span className="text-sm font-medium text-gray-300">
-                                    {new Date(order.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                    {new Date(order.createdAt || order.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                                 </span>
                             </div>
                             <div>
                                 <span className="block text-[10px] text-gray-500 uppercase tracking-widest mb-1">Total</span>
-                                <span className="text-sm font-bold text-[#F5DEB3] font-mono">₹{order.total.toLocaleString()}</span>
+                                <span className="text-sm font-bold text-[#F5DEB3] font-mono">₹{(order.totalAmount || order.total)?.toLocaleString()}</span>
                             </div>
                         </div>
                     </div>
@@ -131,17 +125,17 @@ const MyOrdersPage = () => {
 
                     {/* 2. ITEMS GRID */}
                     <div className="p-6 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {order.items.map((item, index) => (
+                      {(order.items || []).map((item, index) => (
                         <div key={index} className="flex gap-5 p-4 rounded-xl bg-[#1c3026]/50 border border-white/5 hover:bg-[#1c3026] transition-colors">
                           <div className="w-16 h-16 rounded-lg bg-[#e8e6e1] p-1 shrink-0 overflow-hidden">
-                            <img src={item.image} alt={item.name} className="w-full h-full object-contain mix-blend-multiply" />
+                            <img src={item.image || item.productImage || '/placeholder.jpg'} alt={item.name || item.productName} className="w-full h-full object-contain mix-blend-multiply" />
                           </div>
                           <div className="min-w-0 flex flex-col justify-center">
-                            <h4 className="font-medium text-white text-sm truncate mb-1">{item.name}</h4>
+                            <h4 className="font-medium text-white text-sm truncate mb-1">{item.name || item.productName}</h4>
                             <div className="flex items-center gap-3 text-xs text-gray-500">
-                                <span>{item.variant}</span>
+                                <span>{item.variant || 'Standard'}</span>
                                 <span className="w-1 h-1 rounded-full bg-gray-600"></span>
-                                <span>Qty: 1</span>
+                                <span>Qty: {item.quantity || 1}</span>
                             </div>
                           </div>
                         </div>
@@ -159,17 +153,13 @@ const MyOrdersPage = () => {
                             <i className={`fa-solid ${order.status === 'Delivered' ? 'fa-rotate-right' : 'fa-location-arrow'}`}></i>
                         </button>
                     </div>
-
                 </motion.div>
               );
             })}
           </div>
         )}
         </AnimatePresence>
-
       </main>
-      
-      <Footer />
     </div>
   );
 };

@@ -1,7 +1,5 @@
 import React, { useEffect, useRef } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
-import Footer from '../../component/layout/Footer';
-import NewHeader from '../../component/layout/NewHeader';
 
 const aboutValues = [
     {
@@ -52,8 +50,7 @@ const AboutPage = () => {
 
   return (
     // BASE: Deep Forest Green
-    <div className="bg-[#0F261F] min-h-screen text-[#E2E8F0] font-sans relative selection:bg-[#F5DEB3] selection:text-[#0F261F] overflow-x-hidden">
-      <NewHeader />
+    <div className="bg-[#2e443c] min-h-screen text-[#E2E8F0] font-sans relative selection:bg-[#F5DEB3] selection:text-[#0F261F] overflow-x-hidden">
       
       {/* Texture Overlay */}
       <div className="fixed inset-0 opacity-[0.04] pointer-events-none z-0 mix-blend-overlay" 
@@ -243,7 +240,6 @@ const AboutPage = () => {
         </div>
       </section>
       
-      <Footer />
     </div>
   );
 };

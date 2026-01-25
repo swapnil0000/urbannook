@@ -36,7 +36,7 @@ const AppRoutes = () => {
         <Route path="/product/:productId" element={<ProductDetailPage />} />
         <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/profile" element={<MyProfilePage />} />
-        {/* <Route path="/orders" element={<MyOrdersPage />} /> */}
+        <Route path="/orders" element={<MyOrdersPage />} />
         <Route path="/wishlist" element={<WishlistPage />} />
         <Route path="/customer-support" element={<CustomerSupportPage />} />
         <Route path="/rewards" element={<RewardsPage />} />

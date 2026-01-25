@@ -32,7 +32,7 @@ const Faq = () => {
   ];
 
   return (
-    <div className="bg-[#0a1a13] min-h-screen text-gray-300 font-sans relative selection:bg-emerald-500 selection:text-white">
+    <div className="bg-[#2e443c] min-h-screen text-gray-300 font-sans relative selection:bg-emerald-500 selection:text-white">
       
       {/* Background Elements */}
       <div className="fixed top-20 left-0 w-full overflow-hidden pointer-events-none opacity-[0.02]">

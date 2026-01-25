@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { updateQuantity, removeItem } from '../../store/slices/cartSlice';
-import { useUpdateCartMutation, useRemoveFromCartMutation } from '../../store/api/userApi';
+import { useUpdateCartMutation, useRemoveFromCartMutation, userApi } from '../../store/api/userApi';
 
 const CartDrawer = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
@@ -43,6 +43,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
       
       // Sync with backend
       await updateCart({ productId: mongoId, quantity: newQuantity }).unwrap();
+      dispatch(userApi.util.invalidateTags(['User']));
     } catch (error) {
       console.error('Failed to update cart:', error);
     }
@@ -59,6 +60,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
       
       // Sync with backend
       await removeFromCart(mongoId).unwrap();
+      dispatch(userApi.util.invalidateTags(['User']));
     } catch (error) {
       console.error('Failed to remove item:', error);
     }

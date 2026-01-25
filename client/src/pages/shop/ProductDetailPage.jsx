@@ -5,11 +5,10 @@ import { useCookies } from 'react-cookie';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // API & Redux imports
-import NewHeader from '../../component/layout/NewHeader';
-import Footer from '../../component/layout/Footer';
 import { useGetProductByIdQuery } from '../../store/api/productsApi';
-import { useAddToCartMutation, userApi, useUpdateCartMutation } from '../../store/api/userApi';
+import { useAddToCartMutation, userApi, useUpdateCartMutation, useAddToWishlistMutation, useRemoveFromWishlistMutation } from '../../store/api/userApi';
 import { addItem, updateQuantity } from '../../store/slices/cartSlice';
+import { addToWishlistLocal, removeFromWishlistLocal } from '../../store/slices/wishlistSlice';
 
 const ProductDetailPage = () => {
   const { productId } = useParams();
@@ -32,6 +31,8 @@ const ProductDetailPage = () => {
   const { data: productResponse, isLoading, error } = useGetProductByIdQuery(productId);
   const [addToCartAPI, { isLoading: isAdding }] = useAddToCartMutation();
   const [updateCart] = useUpdateCartMutation();
+  const [addToWishlist] = useAddToWishlistMutation();
+  const [removeFromWishlist] = useRemoveFromWishlistMutation();
 
   const product = productResponse?.data;
 
@@ -39,6 +40,8 @@ const ProductDetailPage = () => {
   const cartItem = cartItems.find(item => String(item.id) === String(product?.productId));
   const isInCart = !!cartItem;
   const currentCartQty = cartItem?.quantity || 0;
+  const wishlistItems = useSelector((state) => state.wishlist.items);
+  const isInWishlist = wishlistItems.some(item => item.productName === product?.productName);
 
   // MOCK GALLERY
   const galleryImages = product?.productImg 
@@ -107,7 +110,8 @@ const ProductDetailPage = () => {
   const handleUpdateQty = async (newQuantity) => {
     if (newQuantity < 1) return;
     try {
-      await updateCart({ productId: product.productId, quantity: newQuantity }).unwrap();
+      const action = newQuantity > currentCartQty ? 'add' : 'remove';
+      await updateCart({ productId: product.productId, quantity: newQuantity, action:action }).unwrap();
       dispatch(updateQuantity({ id: product.productId, quantity: newQuantity }));
       dispatch(userApi.util.invalidateTags(['User']));
     } catch (err) {
@@ -131,6 +135,24 @@ const ProductDetailPage = () => {
     }
   };
 
+  const handleWishlistToggle = async () => {
+    try {
+      if (isInWishlist) {
+        await removeFromWishlist(product.productName).unwrap();
+        dispatch(removeFromWishlistLocal(product.productName));
+        dispatch(userApi.util.invalidateTags(['User']));
+        setFeedbackMessage("Removed from wishlist");
+      } else {
+        await addToWishlist({ productId: product.productName }).unwrap();
+        dispatch(addToWishlistLocal(product.productName));
+        setFeedbackMessage("Added to wishlist");
+      }
+      setTimeout(() => setFeedbackMessage(""), 2000);
+    } catch (error) {
+      console.error('Failed to toggle wishlist:', error);
+    }
+  };
+
   // Animation Variants
   const fadeIn = { hidden: { opacity: 0, y: 30 }, visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: "easeOut" } } };
 
@@ -149,7 +171,6 @@ const ProductDetailPage = () => {
 
   return (
     <div className="bg-[#2e443c] min-h-screen font-sans text-gray-200 selection:bg-[#F5DEB3] selection:text-[#1c3026] relative overflow-hidden">
-      <NewHeader />
 
       {/* Lighting Effect */}
       <div className="fixed top-0 left-0 w-[800px] h-[800px] bg-[#2e443c] rounded-full blur-[150px] pointer-events-none opacity-40"></div>
@@ -301,8 +322,15 @@ const ProductDetailPage = () => {
                     </button>
                   </>
                 )}
-                <button className="w-14 h-14 border border-[#F5DEB3]/20 rounded-full flex items-center justify-center text-[#F5DEB3] hover:bg-[#F5DEB3] hover:text-[#1c3026] transition-all">
-                  <i className="fa-regular fa-heart"></i>
+                <button 
+                  onClick={handleWishlistToggle}
+                  className={`w-14 h-14 border rounded-full flex items-center justify-center transition-all ${
+                    isInWishlist 
+                      ? 'bg-red-500 border-red-500 text-white' 
+                      : 'border-[#F5DEB3]/20 text-[#F5DEB3] hover:bg-[#F5DEB3] hover:text-[#1c3026]'
+                  }`}
+                >
+                  <i className={`${isInWishlist ? 'fa-solid' : 'fa-regular'} fa-heart`}></i>
                 </button>
               </div>
             </div>
@@ -374,8 +402,15 @@ const ProductDetailPage = () => {
          </div>
          
          {/* Wishlist Button Mobile */}
-         <button className="w-12 h-12 border border-[#F5DEB3]/20 rounded-full flex items-center justify-center text-[#F5DEB3] active:bg-[#F5DEB3] active:text-[#1c3026] transition-colors flex-shrink-0">
-            <i className="fa-regular fa-heart"></i>
+         <button 
+           onClick={handleWishlistToggle}
+           className={`w-12 h-12 border rounded-full flex items-center justify-center transition-colors flex-shrink-0 ${
+             isInWishlist 
+               ? 'bg-red-500 border-red-500 text-white' 
+               : 'border-[#F5DEB3]/20 text-[#F5DEB3] active:bg-[#F5DEB3] active:text-[#1c3026]'
+           }`}
+         >
+            <i className={`${isInWishlist ? 'fa-solid' : 'fa-regular'} fa-heart`}></i>
          </button>
       </motion.div>
 
@@ -393,7 +428,6 @@ const ProductDetailPage = () => {
         )}
       </AnimatePresence>
 
-      <Footer />
     </div>
   );
 };

@@ -28,7 +28,7 @@ export const userApi = apiSlice.injectEndpoints({
     updateCart: builder.mutation({
       query: (data) => ({
         url: 'user/cart/update',
-        method: 'PUT',
+        method: 'POST',
         body: data,
       }),
       invalidatesTags: ['User'],
@@ -79,7 +79,14 @@ export const userApi = apiSlice.injectEndpoints({
       providesTags: ['Order'],
     }),
 
-    // Razorpay APIs
+    // Community APIs
+    joinCommunity: builder.mutation({
+      query: (data) => ({
+        url: 'join/community',
+        method: 'POST',
+        body: data,
+      }),
+    }),
     getRazorpayKey: builder.query({
       query: () => 'rp/get-key',
     }),
@@ -107,4 +114,5 @@ export const {
   useGetOrderHistoryQuery,
   useGetRazorpayKeyQuery,
   useCreateOrderMutation,
+  useJoinCommunityMutation,
 } = userApi;

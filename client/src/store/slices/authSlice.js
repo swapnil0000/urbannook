@@ -40,6 +40,11 @@ const authSlice = createSlice({
       document.cookie = 'userAccessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
     },
   },
+  extraReducers: (builder) => {
+    builder.addCase('auth/logout', (state) => {
+      // This will be caught by wishlist slice to clear wishlist
+    });
+  },
 });
 
 export const { setCredentials, logout } = authSlice.actions;

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import WishlistButton from '../../component/WishlistButton';
 
 // Single Featured Product Data
 const featuredProduct = {
@@ -105,6 +106,15 @@ const AireFeaturedProducts = () => {
                     
                     {/* Gradient Overlay for Text readability if image is bright */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60"></div>
+                </div>
+
+                {/* Wishlist Button */}
+                <div className="absolute top-6 right-6 z-20">
+                    <WishlistButton 
+                        productId="0184a3f0-1c6a-7b00-8000-000000000010" 
+                        className="bg-black/40 hover:bg-red-500 backdrop-blur-md" 
+                        size="lg"
+                    />
                 </div>
 
                 {/* Floating Spec Card (Glassmorphism) */}

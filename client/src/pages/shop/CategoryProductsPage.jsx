@@ -1,9 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { productCategories, priceRanges, sortOptions } from '../../data/products';
-import NewHeader from '../../component/layout/NewHeader';
-import Footer from '../../component/layout/Footer';
 import { useGetProductsByCategoryQuery } from '../../store/api/productsApi';
+import WishlistButton from '../../component/WishlistButton';
 
 const CategoryProductsPage = () => {
   const { category } = useParams();
@@ -77,7 +76,6 @@ const CategoryProductsPage = () => {
 
   return (
     <div className="min-h-screen bg-bgPrimary">
-      <NewHeader />
       
       {/* Hero Section */}
       <section className="py-16 px-8 bg-gradient-to-br from-bgSecondary via-accent/5 to-primary/10 mt-20">
@@ -238,6 +236,7 @@ const CategoryProductsPage = () => {
                         onClick={() => navigate(`/product/${product.productId}`)}
                       >
                         <div className="relative overflow-hidden">
+                          <WishlistButton productId={product.productName} className="absolute top-3 right-3 z-10" size="sm" />
                           <img
                             src={product.productImg}
                             alt={product.productName}
@@ -298,7 +297,6 @@ const CategoryProductsPage = () => {
         </div>
       </section>
 
-      <Footer />
     </div>
   );
 };

@@ -1,8 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import NewHeader from '../../component/layout/NewHeader';
-import Footer from '../../component/layout/Footer';
 import PlaceholderImage from '../../component/PlaceholderImage';
+import WishlistButton from '../../component/WishlistButton';
 import { useGetProductsQuery } from '../../store/api/productsApi';
 
 const AllProductsPage = () => {
@@ -39,7 +38,6 @@ const AllProductsPage = () => {
 
   return (
     <div className="min-h-screen bg-[#2e443c] relative font-sans selection:bg-emerald-500 selection:text-white pb-10">
-      <NewHeader />
 
       {/* Hero Section */}
       <section className="pt-20 pb-4 md:pt-32 md:pb-16 px-6 relative z-10">
@@ -137,17 +135,7 @@ const AllProductsPage = () => {
                       <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-90 transition-opacity duration-500"></div>
                   </div>
 
-                  <div className="absolute top-4 right-4 z-10">
-                    <button 
-                      onClick={(e) => { 
-                        e.stopPropagation(); 
-                        // Add wishlist functionality here
-                      }} 
-                      className="w-9 h-9 bg-white/90 backdrop-blur-md rounded-full flex items-center justify-center text-gray-700 shadow-xl"
-                    >
-                      <i className="fa-solid fa-heart text-xs"></i>
-                    </button>
-                  </div>
+                  <WishlistButton productId={product.productId} className="absolute top-4 right-4 z-10" />
 
                   <div className="absolute bottom-6 left-6 right-6 z-10">
                       <div className="flex flex-col gap-3">
@@ -219,7 +207,6 @@ const AllProductsPage = () => {
         </div>
       )}
 
-      <Footer />
     </div>
   );
 };

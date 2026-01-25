@@ -9,14 +9,14 @@ const SocialMediaFAB = () => {
       name: 'Chat on WhatsApp',
       icon: 'fa-brands fa-whatsapp',
       color: 'bg-[#25D366]',
-      link: 'https://wa.me/+919876543210?text=Hi! I am interested in Urban Nook products.',
+      link: 'https://wa.me/+916386455982?text=Hi! I am interested in Urban Nook products.',
     },
     {
       id: 'instagram',
       name: 'Follow on Instagram',
       icon: 'fa-brands fa-instagram',
       color: 'bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888]', 
-      link: 'https://instagram.com/urbannook',
+      link: 'https://instagram.com/urbannook.store',
     },
     {
       id: 'email',

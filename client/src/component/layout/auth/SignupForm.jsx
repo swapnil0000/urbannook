@@ -191,7 +191,7 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
                   <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Full Name</label>
                   <input
                     type="text" name="name" value={formData.name} onChange={handleInputChange} onFocus={handleAutoScroll}
-                    className={`w-full p-2.5 md:p-4  border rounded-2xl text-sm focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all ${errors.name ? 'border-red-400' : 'border-slate-200'}`}
+                    className={`w-full p-2.5 md:p-4 bg-white border rounded-2xl text-sm text-slate-900 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all ${errors.name ? 'border-red-400' : 'border-slate-200'}`}
                     placeholder="John Doe"
                   />
                   {errors.name && <p className="text-[10px] text-red-500 ml-2 font-bold">{errors.name}</p>}
@@ -201,7 +201,7 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
                   <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Email Address</label>
                   <input
                     type="email" name="email" value={formData.email} onChange={handleInputChange} onFocus={handleAutoScroll}
-                    className={`w-full p-2.5 md:p-4 bg-slate-50 border rounded-2xl text-sm focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all ${errors.email ? 'border-red-400' : 'border-slate-200'}`}
+                    className={`w-full p-2.5 md:p-4 bg-white border rounded-2xl text-sm text-slate-900 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all ${errors.email ? 'border-red-400' : 'border-slate-200'}`}
                     placeholder="john@example.com"
                   />
                   {errors.email && <p className="text-[10px] text-red-500 ml-2 font-bold">{errors.email}</p>}
@@ -213,7 +213,7 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
                   <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Mobile Number</label>
                   <input
                     type="tel" name="mobile" value={formData.mobile} onChange={handleInputChange} onFocus={handleAutoScroll} maxLength="10"
-                    className={`w-full p-2.5 md:p-4 bg-slate-50 border rounded-2xl text-sm focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all ${errors.mobile ? 'border-red-400' : 'border-slate-200'}`}
+                    className={`w-full p-2.5 md:p-4 bg-white border rounded-2xl text-sm text-slate-900 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all ${errors.mobile ? 'border-red-400' : 'border-slate-200'}`}
                     placeholder="9876543210"
                   />
                   {errors.mobile && <p className="text-[10px] text-red-500 ml-2 font-bold">{errors.mobile}</p>}
@@ -227,7 +227,7 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
                     <input
                       type={showPwd ? "text" : "password"} name="password" value={formData.password} onChange={handleInputChange} onFocus={handleAutoScroll}
                        placeholder='••••••••'
-                      className={`w-full p-2.5 md:p-4 bg-slate-50 border rounded-2xl text-sm pr-10 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all ${errors.password ? 'border-red-400' : 'border-slate-200'}`}
+                      className={`w-full p-2.5 md:p-4 bg-white border rounded-2xl text-sm text-slate-900 pr-10 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all ${errors.password ? 'border-red-400' : 'border-slate-200'}`}
                     />
                     <button type="button" onClick={() => setShowPwd(!showPwd)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-emerald-600 p-1">
                       <i className={`fa-solid ${showPwd ? 'fa-eye-slash' : 'fa-eye'} text-xs`}></i>
@@ -241,7 +241,7 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
                     <input
                       type={showConfirmPwd ? "text" : "password"} name="confirmPassword" value={formData.confirmPassword} onChange={handleInputChange} onFocus={handleAutoScroll}
                       placeholder='••••••••'
-                      className={`w-full p-2.5 md:p-4 bg-slate-50 border rounded-2xl text-sm pr-10 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all ${errors.confirmPassword ? 'border-red-400' : 'border-slate-200'}`}
+                      className={`w-full p-2.5 md:p-4 bg-white border rounded-2xl text-sm text-slate-900 pr-10 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all ${errors.confirmPassword ? 'border-red-400' : 'border-slate-200'}`}
                     />
                     <button type="button" onClick={() => setShowConfirmPwd(!showConfirmPwd)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-emerald-600 p-1">
                       <i className={`fa-solid ${showConfirmPwd ? 'fa-eye-slash' : 'fa-eye'} text-xs`}></i>

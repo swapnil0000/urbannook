@@ -2,8 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion'; // Added animations
 import { useAuth } from '../../hooks/useRedux';
 import { useGetUserProfileQuery, useUpdateUserProfileMutation } from '../../store/api/userApi';
-import Footer from '../../component/layout/Footer';
-import NewHeader from '../../component/layout/NewHeader';
 
 const MyProfilePage = () => {
   const { user } = useAuth();
@@ -83,8 +81,7 @@ const MyProfilePage = () => {
   }, []);
 
   return (
-    <div className="bg-[#1c3026] min-h-screen font-sans text-[#e8e6e1] selection:bg-[#F5DEB3] selection:text-[#1c3026]">
-      <NewHeader />
+    <div className="bg-[#2e443c] min-h-screen font-sans text-[#e8e6e1] selection:bg-[#F5DEB3] selection:text-[#1c3026]">
 
       {/* --- AMBIENT BACKGROUND --- */}
       <div className="fixed top-0 left-0 w-full h-[600px] bg-gradient-to-b from-[#2a4538] to-[#1c3026] pointer-events-none opacity-60"></div>
@@ -248,7 +245,6 @@ const MyProfilePage = () => {
 
       </main>
       
-      <Footer />
     </div>
   );
 };

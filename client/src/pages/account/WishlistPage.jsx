@@ -1,10 +1,11 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Footer from '../../component/layout/Footer';
-import NewHeader from '../../component/layout/NewHeader';
+import { useDispatch } from 'react-redux';
 import { useGetWishlistQuery, useRemoveFromWishlistMutation, useAddToCartMutation } from '../../store/api/userApi';
+import { setWishlistItems } from '../../store/slices/wishlistSlice';
 
 const WishlistPage = () => {
+   const dispatch = useDispatch();
    useEffect(() => {
       window.scrollTo(0, 0);
     }, []);
@@ -16,10 +17,17 @@ const WishlistPage = () => {
 
   const wishlistItems = wishlistResponse?.data || [];
 
+  // Load wishlist items into Redux store when component mounts
+  useEffect(() => {
+    if (wishlistResponse?.data) {
+      dispatch(setWishlistItems(wishlistResponse.data));
+    }
+  }, [wishlistResponse, dispatch]);
+
   const handleRemoveFromWishlist = async (productId) => {
     try {
       await removeFromWishlist(productId).unwrap();
-      refetch();
+      refetch(); // Refetch wishlist data from server
     } catch (error) {
       console.error('Failed to remove from wishlist:', error);
     }
@@ -37,7 +45,6 @@ const WishlistPage = () => {
 
   return (
     <div className="bg-[#0a1a13] min-h-screen font-sans text-gray-300 selection:bg-emerald-500 selection:text-white">
-      <NewHeader />
 
       {/* --- HERO SECTION --- */}
       <section className="pt-40 pb-16 px-6 relative overflow-hidden">
@@ -169,7 +176,6 @@ const WishlistPage = () => {
         </div>
       </section>
 
-      <Footer />
     </div>
   );
 };

@@ -2,9 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
-import NewHeader from '../component/layout/NewHeader';
-import Footer from '../component/layout/Footer';
 import { useGetUserProfileQuery, useGetRazorpayKeyQuery, useCreateOrderMutation } from '../store/api/userApi';
+import { useCartData } from '../hooks/useCartSync';
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
@@ -20,6 +19,7 @@ const CheckoutPage = () => {
   const { data: userProfileData, isLoading: profileLoading, refetch: refetchProfile } = useGetUserProfileQuery();
   const { data: razorpayKeyData } = useGetRazorpayKeyQuery();
   const [createOrder, { isLoading: isOrdering }] = useCreateOrderMutation();
+  const { refetch: refetchCart } = useCartData();
 
   const fetchUserProfile = async () => {
     try {
@@ -58,6 +58,10 @@ const CheckoutPage = () => {
       navigate('/');
       return;
     }
+    
+    // Fetch cart data when checkout page loads
+    refetchCart();
+    
     if (cartItems.length === 0) {
       navigate('/products');
       return;
@@ -69,7 +73,7 @@ const CheckoutPage = () => {
     } else if (!profileLoading) {
       fetchUserProfile();
     }
-  }, [isAuthenticated, cartItems, navigate, userProfileData, profileLoading]);
+  }, [isAuthenticated, cartItems, navigate, userProfileData, profileLoading, refetchCart]);
 
   const loadRazorpay = () => {
     return new Promise((resolve) => {
@@ -88,17 +92,21 @@ const CheckoutPage = () => {
     }
 
     try {
-      const razorpayKey = razorpayKeyData?.razorPayApiKey || 'rzp_test_9WaeLLJnOFJHHX';
+      // Get Razorpay key from API response
+      const razorpayKey = razorpayKeyData?.data || 'rzp_test_RxTeOoN8KmHMGG';
       
       const orderData = {
         amount: totalAmount,
         currency: 'INR',
         items: cartItems.map(item => ({
-          productId: item.id
+          productId: item.id,
+          quantity: item.quantity,
         }))
       };
       
       const orderResult = await createOrder(orderData).unwrap();
+      console.log('Order Result:', orderResult);
+      
       const res = await loadRazorpay();
       
       if (!res) {
@@ -108,13 +116,15 @@ const CheckoutPage = () => {
 
       const options = {
         key: razorpayKey,
-        amount: orderResult.amount,
-        currency: orderResult.currency,
+        amount: orderResult.data?.amount || orderResult.amount,
+        currency: orderResult.data?.currency || orderResult.currency || 'INR',
         name: 'Urban Nook',
         description: 'Purchase from Urban Nook',
         image: '/assets/logo.jpeg',
-        order_id: orderResult.id,
-        handler: function () {
+        order_id: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId || orderResult.id,
+        handler: function (response) {
+          console.log('Payment Success:', response);
+          alert(`Payment successful! Payment ID: ${response.razorpay_payment_id}`);
           navigate('/orders');
         },
         prefill: {
@@ -129,8 +139,14 @@ const CheckoutPage = () => {
         theme: {
           color: '#2E443C'
         },
+        modal: {
+          ondismiss: function() {
+            console.log('Payment modal closed');
+          }
+        }
       };
 
+      console.log('Razorpay Options:', options);
       const paymentObject = new window.Razorpay(options);
       paymentObject.open();
       
@@ -150,7 +166,6 @@ const CheckoutPage = () => {
 
   return (
     <div className="bg-[#2e443c] min-h-screen font-sans text-[#e8e6e1] selection:bg-[#F5DEB3] selection:text-[#2e443c] pb-24 lg:pb-0">
-      <NewHeader />
       
       {/* Background Ambience */}
       <div className="fixed top-0 left-0 w-full h-[300px] bg-gradient-to-b from-[#3a554a] to-[#2e443c] pointer-events-none opacity-50"></div>
@@ -316,7 +331,6 @@ const CheckoutPage = () => {
          </div>
       </motion.div>
 
-      <Footer />
     </div>
   );
 };

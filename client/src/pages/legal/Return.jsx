@@ -11,7 +11,7 @@ const Return = () => {
   const lastUpdated = "January 6, 2026";
 
   return (
-    <div className="bg-[#0a1a13] min-h-screen text-gray-300 font-sans relative selection:bg-emerald-500 selection:text-white">
+    <div className="bg-[#2e443c] min-h-screen text-gray-300 font-sans relative selection:bg-emerald-500 selection:text-white">
       
       {/* --- BACKGROUND ELEMENTS --- */}
       {/* Large Watermark */}

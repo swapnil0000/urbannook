@@ -1,5 +1,4 @@
 
-import Footer from '../../component/layout/Footer';
 import { useEffect } from 'react';
 import WhyChooseUs from './WhyChooseUs';
 import AireHeroBanner from './AireHeroBanner';
@@ -20,7 +19,6 @@ const HomePage = () => {
       <WhyChooseUs />
       <AireTestimonials />
       <AireInstagramFeed />
-      <Footer />
     </div>
   );
 };
