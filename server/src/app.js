@@ -10,6 +10,7 @@ import {
   userAddressRouter,
   userCartRouter,
   userCommunityListRouter,
+  userWishListRouter,
 } from "./routes/index.js";
 import cookieParser from "cookie-parser";
 import healthRouter from "./routes/health.route.js";
@@ -18,9 +19,17 @@ dotenv.config({
 });
 const app = express();
 const whiteListClientUrl = process.env.WHITE_LIST_CLIENT_URI.split(",");
+const nodeEnv = process.env.NODE_ENV;
+// env prod
 const corsOptions = {
   origin: function (origin, callback) {
-    if (!origin || whiteListClientUrl.includes(origin.trim())) {
+    if (
+      nodeEnv == "production" &&
+      origin &&
+      whiteListClientUrl.includes(origin.trim())
+    ) {
+      callback(null, true);
+    } else if (!origin || whiteListClientUrl.includes(origin.trim())) {
       callback(null, true);
     } else {
       callback(new Error("Not allowed by CORS"));
@@ -57,6 +66,7 @@ app.use(
   productRouter,
   commonRouter,
   userWaitListRouter,
+  userWishListRouter,
   userAddressRouter,
   userCartRouter,
   userCommunityListRouter,

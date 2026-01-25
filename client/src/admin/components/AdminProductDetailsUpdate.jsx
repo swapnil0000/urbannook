@@ -57,7 +57,7 @@ const AdminProductDetails = () => {
     const fetchProducts = async () => {
       try {
         const res = await axios.get(
-          `${apiBaseUrl}/admin/totalproducts`,
+          `${apiBaseUrl}/admin/total/products`,
           { withCredentials: true }
         );
         setProducts(res?.data?.data || []);

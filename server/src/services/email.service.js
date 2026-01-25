@@ -40,4 +40,17 @@ const sendEmail = (to, subject, html) => {
     };
   }
 };
-export { sendEmail, getNodeMailerTransporter };
+
+const sendEmailCommunityService = (to, subject, html) => {
+  const transporter = getNodeMailerTransporter();
+  try {
+    transporter.sendMail({
+      from: `${process.env.ZOHO_ADMIN_EMAIL}`,
+      to,
+      subject,
+      html,
+    });
+  } catch (error) {}
+};
+
+export { sendEmail, getNodeMailerTransporter, sendEmailCommunityService };

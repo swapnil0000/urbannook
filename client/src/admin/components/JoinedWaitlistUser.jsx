@@ -14,7 +14,7 @@ const JoinedWaitlistUser = () => {
     const fetchUsers = async () => {
       try {
         const res = await axios.get(
-          `${apiBaseUrl}/admin/joinedwaitlist`,
+          `${apiBaseUrl}/admin/joined/waitlist`,
           { withCredentials: true }
         );
         setUsers(res?.data?.data?.joinedUserWaitList || []);
