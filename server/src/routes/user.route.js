@@ -94,7 +94,7 @@ userRouter.post(
    ORDER HISTORY (PROTECTED)
 ================================================================ */
 userRouter.get(
-  "/user/order-history",
+  "/user/order/history",
   authGuardService("USER"),
   userOrderPreviousHistory,
 );
@@ -168,7 +168,7 @@ userRouter.post(
 );
 
 userRouter.post(
-  "/user/paymentverification",
+  "/user/payment/verification",
   authGuardService("USER"),
   razorpayPaymentVerificationController,
 );
