@@ -1,11 +1,13 @@
-import Product from "../model/product.model.js";
-import { finalProductName } from "../utlis/ValidateRes.js";
+import {
+  existingProductUpdateService,
+  createNewProductService,
+} from "../services/admin.auth.service.js";
 import {
   adminLoginService,
   totalProductService,
 } from "../services/admin.auth.service.js";
 import { ApiError, ApiRes } from "../utlis/index.js";
-import { v4 as uuidv4 } from "uuid";
+
 import { fieldMissing } from "../utlis/ValidateRes.js";
 import cookieOptions from "../config/config.js";
 import { profileFetchService } from "../services/common.auth.service.js";
@@ -69,98 +71,112 @@ const adminProfile = async (req, res) => {
 };
 
 const createProduct = async (req, res) => {
+  const { email: adminEmail } = req.user;
   const {
     productName,
-    sellingPrice,
-    productStatus,
-    productQuantity = 1,
-  } = req.body;
-
-  const normalizedName = finalProductName(productName);
-
-  const existing = await Product.findOne({ productName: normalizedName });
-  if (existing) {
-    return res
-      .status(409)
-      .json(new ApiError(409, "Product already exists", null, false));
-  }
-
-  const product = await Product.create({
-    productName: normalizedName,
-    productId: `UN-PROD-${uuidv4()}`,
-    sellingPrice,
-    productStatus,
-    productQuantity,
-  });
-
-  return res
-    .status(201)
-    .json(new ApiRes(201, "Product created", product, true));
-};
-const updateProduct = async (req, res) => {
-  const { productId } = req.params;
-
-  const {
-    productName,
+    productImg,
+    productDes,
     sellingPrice,
     productCategory,
     productQuantity,
     productStatus,
+    tags,
+    productSubDes,
+    productSubCategory,
+  } = req.body || {};
+  const createNewProductServiceValidation = await createNewProductService(
+    adminEmail,
+    productName,
+    productImg,
+    productDes,
+    sellingPrice,
+    productCategory,
+    productQuantity,
+    productStatus,
+    tags,
+    productSubDes,
+    productSubCategory,
+  );
+  return !createNewProductServiceValidation?.success
+    ? res
+        .status(Number(createNewProductServiceValidation?.statusCode))
+        .json(
+          new ApiError(
+            createNewProductServiceValidation?.statusCode,
+            createNewProductServiceValidation?.message,
+            createNewProductServiceValidation?.data,
+            createNewProductServiceValidation?.success,
+          ),
+        )
+    : res
+        .status(Number(createNewProductServiceValidation?.statusCode))
+        .json(
+          new ApiRes(
+            createNewProductServiceValidation?.statusCode,
+            createNewProductServiceValidation?.message,
+            createNewProductServiceValidation?.data,
+            createNewProductServiceValidation?.success,
+          ),
+        );
+};
+
+const updateProduct = async (req, res) => {
+  const { productId } = req.params;
+  const { email: adminEmail } = req.user;
+  const {
+    productName,
+    uiProductId,
+    productImg,
+    productDes,
+    sellingPrice,
+    productCategory,
+    productQuantity,
+    productStatus,
+    tags,
+    productSubDes,
+    productSubCategory,
+    action,
   } = req.body;
 
-  const existingProductDetails = await Product.findOne({
-    productName,
-  });
-  console.log(existingProductDetails);
+  const productUpateExistingServiceValidation =
+    await existingProductUpdateService(
+      adminEmail,
+      productId,
+      productName ? productName : null,
+      uiProductId ? uiProductId : null,
+      productImg ? productImg : null,
+      productDes ? productDes : null,
+      sellingPrice ? sellingPrice : null,
+      productCategory ? productCategory : null,
+      productQuantity ? productQuantity : null,
+      productStatus ? productStatus : null,
+      tags ? tags : null,
+      productSubDes ? productSubDes : null,
+      productSubCategory ? productSubCategory : null,
+      action ? action : null,
+    );
 
-  if (existingProductDetails) {
-    return res
-      .status(409)
-      .json(
-        new ApiError(
-          409,
-          `Product with name ${existingProductDetails?.productName} - already exist and it's Product Id is ${existingProductDetails?.productId} `,
-          null,
-          false,
-        ),
-      );
-  }
-
-  const updatedProductQunatity = {
-    productName: productName?.length > 0 ? productName : null,
-    sellingPrice: sellingPrice?.length > 0 ? sellingPrice : null,
-    productCategory: productCategory?.length > 0 ? productCategory : null,
-    productStatus: productStatus?.length > 0 ? productStatus : null,
-    productQuantity: productQuantity?.length > 0 ? productQuantity : 0,
-  };
-
-  const product = await Product.findOneAndUpdate(
-    { productId },
-    {
-      $set: {
-        productName,
-        sellingPrice,
-        productCategory,
-        productStatus,
-      },
-      $inc: {
-        productQuantity: updatedProductQunatity?.productQuantity,
-      },
-    },
-    {
-      new: true,
-    },
-  ).select("-_id -__v -createdAt -updatedAt");
-
-  if (!product) {
-    return res
-      .status(404)
-      .json(new ApiError(404, "Failed to update details", null, false));
-  }
-
-  return res
-    .status(200)
-    .json(new ApiRes(200, "Product updated successfully", product, true));
+  return !productUpateExistingServiceValidation.success
+    ? res
+        .status(Number(productUpateExistingServiceValidation?.statusCode))
+        .json(
+          new ApiError(
+            productUpateExistingServiceValidation?.statusCode,
+            productUpateExistingServiceValidation?.message,
+            productUpateExistingServiceValidation?.data,
+            productUpateExistingServiceValidation?.success,
+          ),
+        )
+    : res
+        .status(Number(productUpateExistingServiceValidation?.statusCode))
+        .json(
+          new ApiRes(
+            productUpateExistingServiceValidation?.statusCode,
+            productUpateExistingServiceValidation?.message,
+            productUpateExistingServiceValidation?.data,
+            productUpateExistingServiceValidation?.success,
+          ),
+        );
 };
 
 const adminLogout = (req, res) => {

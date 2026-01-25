@@ -5,6 +5,7 @@ import {
   createProduct,
   getJoinedUserWaitList,
   totalProducts,
+  updateProduct,
 } from "../controller/admin.controller.js";
 import {
   authGuardService,
@@ -13,7 +14,7 @@ import {
 const adminRouter = Router();
 adminRouter.route("/admin/login").post(adminLogin);
 adminRouter
-  .route("/admin/totalproducts")
+  .route("/admin/total/products")
   .get(authGuardService("Admin"), totalProducts);
 adminRouter
   .route("/admin/profile")
@@ -22,10 +23,14 @@ adminRouter
   .route("/admin/logout")
   .post(authGuardService("Admin"), logoutService);
 adminRouter
-  .route("/admin/addtoinventory")
+  .route("/admin/add/inventory")
   .post(authGuardService("Admin"), createProduct);
+
 adminRouter
-  .route("/admin/joinedwaitlist")
+  .route("/admin/update/inventory/:productId")
+  .post(authGuardService("Admin"), updateProduct);
+adminRouter
+  .route("/admin/joined/waitlist")
   .get(authGuardService("Admin"), getJoinedUserWaitList);
 
 export default adminRouter;

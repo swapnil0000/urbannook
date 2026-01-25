@@ -73,6 +73,12 @@ const userCommunityController = async (req, res) => {
           subject: "Welcome to the UrbanNook Community 🎉",
           html: communityTemplate,
         });
+        const sendEmailCommunityServiceValidation =
+          await sendEmailCommunityService(
+            to,
+            "Welcome to the UrbanNook Community 🎉",
+            communityTemplate,
+          );
         return true;
       } catch (err) {
         console.error("Community email failed:", err.message);

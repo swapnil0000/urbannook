@@ -4,12 +4,22 @@ import {
   userGetProductWishList,
   userDeleteFromProductWishList,
 } from "../controller/user.wishlist.controller.js";
-const userWaitListRouter = Router();
-userWaitListRouter.post("/user/wishlist/add", userAddToWishList);
-userWaitListRouter.post("/user/wishlist/get", userGetProductWishList);
-userWaitListRouter.delete(
+import { authGuardService } from "../services/common.auth.service.js";
+const userWishListRouter = Router();
+userWishListRouter.post(
+  "/user/wishlist/add",
+  authGuardService("USER"),
+  userAddToWishList,
+);
+userWishListRouter.get(
+  "/user/wishlist/get",
+  authGuardService("USER"),
+  userGetProductWishList,
+);
+userWishListRouter.delete(
   "/user/wishlist/:productId",
+  authGuardService("USER"),
   userDeleteFromProductWishList,
 );
 
-export default userWaitListRouter;
+export default userWishListRouter;

@@ -10,9 +10,10 @@ import {
   X,
   ArrowRight,
 } from "lucide-react";
-
+import { useCookies } from "react-cookie";
 const AdminDashboard = () => {
   const [open, setOpen] = useState(false);
+  const [, , removeCookie] = useCookies(["cookie-name"]);
   const navigate = useNavigate();
 
   const navItems = [
@@ -47,6 +48,11 @@ const AdminDashboard = () => {
       {item.label}
     </button>
   );
+
+  const handleLogout = () => {
+  removeCookie("adminAccessToken", { path: "/" });
+  navigate("/admin/login");
+};
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800">
@@ -86,7 +92,10 @@ const AdminDashboard = () => {
               ))}
             </nav>
 
-            <button className="mt-10 flex items-center gap-3 px-4 py-3 text-red-500 hover:bg-red-50 rounded-xl font-semibold w-full">
+            <button
+              onClick={handleLogout}
+              className="mt-10 flex items-center gap-3 px-4 py-3 text-red-500 hover:bg-red-50 rounded-xl font-semibold w-full"
+            >
               <LogOut size={18} />
               Logout
             </button>
@@ -95,7 +104,7 @@ const AdminDashboard = () => {
       )}
 
       {/* ================= DESKTOP LAYOUT ================= */}
-      <div className="flex">    
+      <div className="flex">
         {/* ===== MAIN CONTENT ===== */}
         <main className="flex-1 p-6 md:p-10">
           <div className="max-w-6xl mx-auto">

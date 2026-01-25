@@ -36,7 +36,7 @@ const getEnvironment = () => {
 // Get current API URL
 export const getApiUrl = () => {
   const env = getEnvironment();
-  return API_URLS[env] || API_URLS.production;
+  return API_URLS[env] || API_URLS?.production;
 };
 
 // Export individual URLs for direct access

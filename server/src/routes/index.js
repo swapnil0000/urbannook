@@ -14,7 +14,7 @@ export {
   commonRouter,
   userWaitListRouter,
   userAddressRouter,
-  userWishListRouter,
   userCartRouter,
+  userWishListRouter,
   userCommunityListRouter,
 };
