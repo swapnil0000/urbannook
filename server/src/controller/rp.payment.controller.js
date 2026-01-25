@@ -60,12 +60,12 @@ const razorpayCreateOrderController = async (req, res) => {
         },
       };
     });
-    console.log(orderItems);
 
     const razorpayOrder = await razorpayCreateOrderService(
       totalAmount * 100,
       "INR", //currency
     );
+
     const order = await Order.create({
       orderId: uuidv7(),
       userId,

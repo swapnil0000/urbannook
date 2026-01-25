@@ -30,20 +30,179 @@ const fieldMissing = ({ name, email, password, mobileNumber, action }) => {
   };
 };
 
-const productUpdateFieldMissing = (
-  productName,
-  sellingPrice,
-  productCategory,
-  productStatus,
-) => {
-  if (!productName || !sellingPrice || !productCategory || !productStatus) {
+const productUpdateFieldMissing = (presentProductDetailsToUpdate) => {
+  const productFieldsBasicCheck = {
+    productName: !presentProductDetailsToUpdate?.productName
+      ? null
+      : presentProductDetailsToUpdate?.productName?.length > 0
+        ? presentProductDetailsToUpdate?.productName
+        : "",
+    uiProductId: !presentProductDetailsToUpdate?.uiProductId
+      ? null
+      : presentProductDetailsToUpdate?.uiProductId?.length > 0
+        ? presentProductDetailsToUpdate?.uiProductId
+        : "",
+    productImg: !presentProductDetailsToUpdate?.productImg
+      ? null
+      : presentProductDetailsToUpdate?.productImg > 0
+        ? presentProductDetailsToUpdate?.productImg
+        : "",
+    productDes: !presentProductDetailsToUpdate?.productDes
+      ? null
+      : presentProductDetailsToUpdate?.productDes?.length > 0
+        ? presentProductDetailsToUpdate?.productDes
+        : "",
+    sellingPrice: !presentProductDetailsToUpdate?.sellingPrice
+      ? null
+      : presentProductDetailsToUpdate?.sellingPrice >= 10
+        ? presentProductDetailsToUpdate?.sellingPrice
+        : 0,
+    productCategory: !presentProductDetailsToUpdate?.productCategory
+      ? null
+      : presentProductDetailsToUpdate?.productCategory?.length > 0
+        ? presentProductDetailsToUpdate?.productCategory
+        : "",
+    productQuantity: !presentProductDetailsToUpdate?.productName
+      ? null
+      : presentProductDetailsToUpdate?.productName > 0
+        ? presentProductDetailsToUpdate?.productName
+        : 0,
+    productStatus: !presentProductDetailsToUpdate?.productName
+      ? null
+      : presentProductDetailsToUpdate?.productName?.length > 0
+        ? presentProductDetailsToUpdate?.productName
+        : "",
+    productSubDes: !presentProductDetailsToUpdate?.productName
+      ? null
+      : presentProductDetailsToUpdate?.productName?.length > 0
+        ? presentProductDetailsToUpdate?.productName
+        : "",
+    productSubCategory: !presentProductDetailsToUpdate?.productName
+      ? null
+      : presentProductDetailsToUpdate?.productName?.length > 0
+        ? presentProductDetailsToUpdate?.productName
+        : "",
+  };
+  if (
+    presentProductDetailsToUpdate?.productName &&
+    productFieldsBasicCheck?.productName == ""
+  ) {
     return {
-      statusCode: 400,
-      message: "All fields are required",
+      statusCode: 404,
+      message: `${presentProductDetailsToUpdate?.productName} is missing`,
       data: [],
-      success: false,
+      success: true,
     };
   }
+
+  if (
+    presentProductDetailsToUpdate?.uiProductId &&
+    productFieldsBasicCheck?.uiProductId == ""
+  ) {
+    return {
+      statusCode: 404,
+      message: `${presentProductDetailsToUpdate?.uiProductId} is missing`,
+      data: [],
+      success: true,
+    };
+  }
+
+  if (
+    presentProductDetailsToUpdate?.productImg &&
+    productFieldsBasicCheck?.productImg == ""
+  ) {
+    return {
+      statusCode: 404,
+      message: `${presentProductDetailsToUpdate?.productImg} is missing`,
+      data: [],
+      success: true,
+    };
+  }
+
+  if (
+    presentProductDetailsToUpdate?.productDes &&
+    productFieldsBasicCheck?.productDes == ""
+  ) {
+    return {
+      statusCode: 404,
+      message: `${presentProductDetailsToUpdate?.productDes} is missing`,
+      data: [],
+      success: true,
+    };
+  }
+
+  if (
+    presentProductDetailsToUpdate?.sellingPrice &&
+    productFieldsBasicCheck?.sellingPrice == 0
+  ) {
+    return {
+      statusCode: 404,
+      message: `${presentProductDetailsToUpdate?.sellingPrice} is missing`,
+      data: [],
+      success: true,
+    };
+  }
+
+  if (
+    presentProductDetailsToUpdate?.productCategory &&
+    productFieldsBasicCheck?.productCategory == null
+  ) {
+    return {
+      statusCode: 404,
+      message: `${presentProductDetailsToUpdate?.productCategory} is missing`,
+      data: [],
+      success: true,
+    };
+  }
+
+  if (
+    presentProductDetailsToUpdate?.productQuantity &&
+    productFieldsBasicCheck?.productQuantity == 0
+  ) {
+    return {
+      statusCode: 404,
+      message: `${presentProductDetailsToUpdate?.productQuantity} is missing`,
+      data: [],
+      success: true,
+    };
+  }
+
+  if (
+    presentProductDetailsToUpdate?.productStatus &&
+    productFieldsBasicCheck?.productStatus == ""
+  ) {
+    return {
+      statusCode: 404,
+      message: `${presentProductDetailsToUpdate?.productStatus} is missing`,
+      data: [],
+      success: true,
+    };
+  }
+
+  if (
+    presentProductDetailsToUpdate?.productSubDes &&
+    productFieldsBasicCheck?.productSubDes == ""
+  ) {
+    return {
+      statusCode: 404,
+      message: `${presentProductDetailsToUpdate?.productSubDes} is missing`,
+      data: [],
+      success: true,
+    };
+  }
+
+  if (
+    presentProductDetailsToUpdate?.productSubCategory &&
+    productFieldsBasicCheck?.productSubCategory == null
+  ) {
+    return {
+      statusCode: 404,
+      message: `${presentProductDetailsToUpdate?.productSubCategory} is missing`,
+      data: [],
+      success: true,
+    };
+  }
+
   return {
     statusCode: 200,
     message: "All fields are present",

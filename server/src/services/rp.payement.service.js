@@ -11,7 +11,7 @@ const razorpayCreateOrderService = async (amount, currency) => {
       key_secret,
     });
     const razorpayOptions = {
-      amount: amount * 100,
+      amount,
       currency,
     };
     const orderDetails = await razorpay.orders.create(razorpayOptions);
@@ -34,7 +34,7 @@ const razorpayCreateOrderService = async (amount, currency) => {
 const razorpayPaymentVerificationService = async (
   razorpay_order_id,
   razorpay_payment_id,
-  razorpay_signature
+  razorpay_signature,
 ) => {
   const secret = process.env.RP_LOCAL_TEST_SECRET;
   const generatedSignature = crypto

@@ -8,6 +8,8 @@ const productListing = async (req, res) => {
     const perPage = Number(limit) || 10;
     /*category -> Filter by category	Electronics , search -> Keyword search in name	iPhone */
     const query = {};
+    let sort = { createdAt: -1 }; // default: latest products
+
     if (search) {
       if (search.length <= 2) {
         // Short input like p , ph , pho
@@ -18,7 +20,10 @@ const productListing = async (req, res) => {
       } else {
         // for length inputs like iPhone 15 Pro Max
         query.$text = { $search: search };
-        sort = { score: { $meta: "textScore" } };
+        sort = {
+          score: { $meta: "textScore" },
+          createdAt: -1,
+        };
       }
     }
 
@@ -42,7 +47,7 @@ const productListing = async (req, res) => {
     const listOfProducts = await Product.find(query)
       .skip((page - 1) * perPage)
       .limit(perPage) // for limit
-      .sort({ createdAt: -1 }) // latest one
+      .sort(sort) // latest one
       .select("-_id");
 
     return res.status(200).json(

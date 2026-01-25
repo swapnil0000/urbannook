@@ -4,8 +4,8 @@ const wishListSchema = mongoose.Schema({
     type: String,
     required: true,
   },
-  products: { type: [String], unique: true, required: true },
+  products: { type: [String], required: true },
 });
-wishListSchema.index({ userId: 1 }, { unique: true });
+wishListSchema.index({ userId: 1, products: 1 }, { unique: true });
 const WishList = mongoose.model("WishList", wishListSchema);
 export default WishList;
