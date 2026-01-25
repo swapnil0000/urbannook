@@ -27,21 +27,21 @@ const productListing = async (req, res) => {
       }
     }
 
-    if (category) {
-      query.productCategory = {
-        $regex: String(category),
-        $options: "i", // makes it case - insensitive Eg - Chair , chair, CHAIR - all same
-      };
+    if (!query.$text) {
+      if (category) {
+        query.productCategory = { $regex: String(category), $options: "i" };
+      }
+      if (subCategory) {
+        query.productSubCategory = {
+          $regex: String(subCategory),
+          $options: "i",
+        };
+      }
+      if (status) {
+        query.productStatus = status;
+      }
     }
-    if (subCategory) {
-      query.productSubCategory = {
-        $regex: String(subCategory),
-        $options: "i", // makes it case - insensitive Eg - Chair , chair, CHAIR - all same
-      };
-    }
-    if (status) {
-      query.productStatus = status;
-    }
+
     const totalProducts = await Product.countDocuments(query);
 
     const listOfProducts = await Product.find(query)
