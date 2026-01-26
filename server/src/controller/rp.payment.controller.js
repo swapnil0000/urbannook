@@ -4,8 +4,8 @@ import {
 } from "../services/rp.payement.service.js";
 import ApiError from "../utlis/ApiError.js";
 import ApiRes from "../utlis/ApiRes.js";
-import User from "../model/user.model.js";
 import Order from "../model/order.model.js";
+import Cart from "../model/user.cart.model.js";
 import crypto from "crypto";
 import Product from "../model/product.model.js";
 import { v7 as uuidv7 } from "uuid";
@@ -46,12 +46,11 @@ const razorpayCreateOrderController = async (req, res) => {
 
     const orderItems = items.map((item) => {
       const product = products.find((p) => p.productId === item.productId);
-      const price = product.sellingPrice * item.quantity;
-      totalAmount += price;
+      totalAmount += product.sellingPrice * item.quantity;
       return {
         productId: product.productId,
         productSnapshot: {
-          quantity: item.quantity,
+          quantity: Number(item.quantity),
           productImg: product.productImg,
           productName: product.productName,
           productCategory: product.productCategory,
@@ -189,7 +188,7 @@ because it is a ser to ser call so checking this helps us to figure the verifica
 
       const order = await Order.findOne({
         "payment.razorpayOrderId": razorpayOrderId,
-      }).populate("items.productId");
+      });
 
       if (!order) break;
 
@@ -198,11 +197,18 @@ because it is a ser to ser call so checking this helps us to figure the verifica
         order.payment.razorpayPaymentId = payment.id;
         order.status = "PAID";
         await order.save();
-        await User.findByIdAndUpdate(
-          { _id: order.userId },
+        const findingUserId = await Order.findOne(
           {
-            $push: { userPreviousOrder: order._id },
-            $set: { addedToCart: [] },
+            orderId: order?.orderId,
+          },
+          {
+            userId: 1,
+          },
+        ).lean();
+        await Cart.findOneAndUpdate(
+          { userId: findingUserId?.userId },
+          {
+            $set: { products: {} },
           },
         );
       }
@@ -229,7 +235,7 @@ because it is a ser to ser call so checking this helps us to figure the verifica
        ORDER PAID (OPTIONAL)
     ======================== */
     case "order.paid": {
-      const orderEntity = req.body.payload.order.entity;
+      const orderEntity = payload.payload.order.entity;
       console.log("📦 Order Paid Event:", orderEntity.id);
       break;
     }
