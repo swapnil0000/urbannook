@@ -6,7 +6,7 @@ const PrivacyPolicy = () => {
   }, []);
 
   return (
-    <div className="bg-[#2e443c] min-h-screen text-gray-300 font-sans relative selection:bg-emerald-500 selection:text-white">
+    <div className="bg-[#2e443c] min-h-screen text-gray-300 font-sans relative selection:bg-[#F5DEB3] selection:text-white">
       
       {/* Background Elements */}
       <div className="fixed top-20 left-0 w-full overflow-hidden pointer-events-none opacity-[0.02]">
@@ -21,12 +21,12 @@ const PrivacyPolicy = () => {
         {/* Header */}
         <div className="mb-16 text-center md:text-left border-b border-white/10 pb-12">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 w-fit mb-6 backdrop-blur-md">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Security</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-[#F5DEB3]"></span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[#F5DEB3]">Security</span>
           </div>
           
           <h1 className="text-4xl md:text-6xl font-serif text-white mb-4 leading-tight">
-            Privacy <span className="italic text-emerald-500/80">Policy</span>
+            Privacy <span className="italic text-[#F5DEB3]/80">Policy</span>
           </h1>
           <p className="text-gray-400 text-sm md:text-base">
             Your trust is our most valuable asset.

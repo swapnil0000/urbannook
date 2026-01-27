@@ -96,8 +96,6 @@ const CheckoutPage = () => {
       const razorpayKey = razorpayKeyData?.data || 'rzp_test_RxTeOoN8KmHMGG';
       
       const orderData = {
-        amount: totalAmount,
-        currency: 'INR',
         items: cartItems.map(item => ({
           productId: item.id,
           quantity: item.quantity,

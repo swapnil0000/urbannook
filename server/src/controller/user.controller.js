@@ -11,7 +11,6 @@ import {
   profileFetchService,
   resetPasswordService,
 } from "../services/common.auth.service.js";
-import bcrypt from "bcrypt";
 const userLogin = async (req, res) => {
   try {
     const { email, password } = req.body;

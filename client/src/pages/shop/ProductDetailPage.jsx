@@ -88,21 +88,15 @@ const ProductDetailPage = () => {
     }
 
     try {
+      // Call API only - let cart sync handle Redux update
       await addToCartAPI({ productId: product?.productId, quantity: 1 }).unwrap();
-
-      dispatch(addItem({
-        id: product.productId,
-        mongoId: product.productId,
-        name: product.productName,
-        price: product.sellingPrice,
-        image: product.productImg,
-        quantity: 1
-      }));
       
+      // Invalidate cache to trigger fresh cart data fetch
       dispatch(userApi?.util?.invalidateTags(['User']));
       setFeedbackMessage("Added");
       setTimeout(() => setFeedbackMessage(""), 2000);
     } catch (err) {
+      console.error('Add to cart failed:', err);
       alert(err.data?.message || "Something went wrong");
     }
   };
@@ -110,12 +104,15 @@ const ProductDetailPage = () => {
   const handleUpdateQty = async (newQuantity) => {
     if (newQuantity < 1) return;
     try {
-      const action = newQuantity > currentCartQty ? 'add' : 'remove';
-      await updateCart({ productId: product.productId, quantity: newQuantity, action:action }).unwrap();
-      dispatch(updateQuantity({ id: product.productId, quantity: newQuantity }));
+      // Call API only - let cart sync handle Redux update
+      const action = newQuantity > currentCartQty ? 'add' : 'sub';
+      await updateCart({ productId: product.productId, quantity: 1, action }).unwrap();
+      
+      // Invalidate cache to trigger fresh cart data fetch
       dispatch(userApi.util.invalidateTags(['User']));
     } catch (err) {
       console.error('Update failed:', err);
+      window.location.reload();
     }
   };
 
@@ -143,7 +140,7 @@ const ProductDetailPage = () => {
         dispatch(userApi.util.invalidateTags(['User']));
         setFeedbackMessage("Removed from wishlist");
       } else {
-        await addToWishlist({ productId: product.productName }).unwrap();
+        await addToWishlist({ productId: product.productId }).unwrap();
         dispatch(addToWishlistLocal(product.productName));
         setFeedbackMessage("Added to wishlist");
       }

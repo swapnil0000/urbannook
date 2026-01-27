@@ -19,7 +19,7 @@ export const userApi = apiSlice.injectEndpoints({
     // Cart APIs
     addToCart: builder.mutation({
       query: (data) => ({
-        url: 'user/addtocart',
+        url: 'user/cart/add',
         method: 'POST',
         body: data,
       }),
@@ -41,7 +41,7 @@ export const userApi = apiSlice.injectEndpoints({
       invalidatesTags: ['User'],
     }),
     getCart: builder.query({
-      query: () => 'user/preview-addtocart',
+      query: () => 'user/cart/get',
       providesTags: ['User'],
     }),
     clearCart: builder.mutation({
@@ -55,14 +55,14 @@ export const userApi = apiSlice.injectEndpoints({
     // Wishlist APIs
     addToWishlist: builder.mutation({
       query: (data) => ({
-        url: 'user/addtowishlist',
+        url: 'user/wishlist/add',
         method: 'POST',
         body: data,
       }),
       invalidatesTags: ['User'],
     }),
     getWishlist: builder.query({
-      query: () => 'user/wishlist',
+      query: () => 'user/wishlist/get',
       providesTags: ['User'],
     }),
     removeFromWishlist: builder.mutation({
@@ -75,7 +75,7 @@ export const userApi = apiSlice.injectEndpoints({
 
     // Order APIs
     getOrderHistory: builder.query({
-      query: () => 'user/order-history',
+      query: () => 'user/order/history',
       providesTags: ['Order'],
     }),
 
