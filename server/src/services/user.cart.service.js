@@ -181,6 +181,7 @@ const previewCartService = async ({ userId }) => {
           summary: {
             subtotal: "$subtotal",
             totalQuantity: "$totalQuantity",
+            note: "GST included in MRP",
             shipping: { $literal: 249 },
             tax: {
               $round: [{ $multiply: ["$subtotal", 0.18] }, 0],

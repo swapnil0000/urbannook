@@ -1,6 +1,19 @@
 import axios from "axios";
 import { useEffect, useMemo, useState } from "react";
 
+/* ================= IST FORMATTER ================= */
+const formatIST = (date) => {
+  if (!date) return "";
+  return new Date(date).toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
 const JoinedWaitlistUser = () => {
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
 
@@ -13,10 +26,9 @@ const JoinedWaitlistUser = () => {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const res = await axios.get(
-          `${apiBaseUrl}/admin/joined/waitlist`,
-          { withCredentials: true }
-        );
+        const res = await axios.get(`${apiBaseUrl}/admin/joined/waitlist`, {
+          withCredentials: true,
+        });
         setUsers(res?.data?.data?.joinedUserWaitList || []);
       } catch (err) {
         setError("Failed to load waitlist users");
@@ -28,14 +40,26 @@ const JoinedWaitlistUser = () => {
     fetchUsers();
   }, [apiBaseUrl]);
 
-  /* ================= SEARCH ================= */
+  /* ================= SORT + SEARCH ================= */
   const filteredUsers = useMemo(() => {
-    if (!search.trim()) return users;
+    let list = [...users];
+
+    // 🔥 Latest joined first
+    list.sort((a, b) => {
+      const t1 = new Date(a.createdAt).getTime();
+      const t2 = new Date(b.createdAt).getTime();
+
+      if (t1 !== t2) return t2 - t1; // latest first
+      return b._id.localeCompare(a._id); // fallback (VERY IMPORTANT)
+    });
+
+    if (!search.trim()) return list;
+
     const q = search.toLowerCase();
-    return users.filter(
+    return list.filter(
       (u) =>
         u?.userName?.toLowerCase().includes(q) ||
-        u?.userEmail?.toLowerCase().includes(q)
+        u?.userEmail?.toLowerCase().includes(q),
     );
   }, [search, users]);
 
@@ -62,7 +86,7 @@ const JoinedWaitlistUser = () => {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
         <h1 className="text-3xl font-bold text-gray-900">
           Joined Waitlist Users{" "}
-          <span className="text-indigo-600">({users.length})</span>
+          <span className="text-indigo-600">({filteredUsers.length})</span>
         </h1>
 
         {users.length > 0 && (
@@ -76,7 +100,7 @@ const JoinedWaitlistUser = () => {
         )}
       </div>
 
-      {/* EMPTY */}
+      {/* EMPTY STATES */}
       {users.length === 0 && (
         <div className="bg-white rounded-xl shadow p-10 text-center text-gray-400">
           No users have joined the waitlist yet.
@@ -89,7 +113,7 @@ const JoinedWaitlistUser = () => {
         </div>
       )}
 
-      {/* USERS */}
+      {/* USERS GRID */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredUsers.map((user) => (
           <UserCard key={user._id} user={user} />
@@ -115,6 +139,11 @@ const UserCard = ({ user }) => {
           </h2>
           <p className="text-sm text-gray-500">
             {user?.userEmail || "No email"}
+          </p>
+
+          {/* 🕒 IST Timestamp */}
+          <p className="text-xs text-gray-400 mt-1">
+            Joined on {formatIST(user?.createdAt)}
           </p>
         </div>
       </div>

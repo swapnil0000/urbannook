@@ -11,6 +11,7 @@ import {
   userCartRouter,
   userCommunityListRouter,
   userWishListRouter,
+  nfcRouter,
 } from "./routes/index.js";
 import cookieParser from "cookie-parser";
 import healthRouter from "./routes/health.route.js";
@@ -70,5 +71,6 @@ app.use(
   userAddressRouter,
   userCartRouter,
   userCommunityListRouter,
+  nfcRouter,
 );
 export default app;

@@ -320,13 +320,13 @@ const validateUserInput = ({ email, name, mobileNumber }) => {
 };
 
 const validateUserAddress = ({
-  placeId,
   lat,
   long,
-  formattedAddress,
   city,
   state,
   pinCode,
+  placeId,
+  formattedAddress,
 }) => {
   const missing = [];
 
@@ -403,13 +403,14 @@ const validateUserAddress = ({
 };
 
 const validateUpdateUserAddress = ({
-  addressId,
   lat,
   long,
   city,
   state,
   pinCode,
-  formattedAdress,
+  formattedAddress,
+  addressId,
+  placeId,
 }) => {
   const missing = [];
 
@@ -417,7 +418,7 @@ const validateUpdateUserAddress = ({
   if (!placeId) missing.push("placeId");
   if (lat === undefined) missing.push("lat");
   if (long === undefined) missing.push("long");
-  if (!formattedAdress) missing.push("formattedAdress");
+  if (!formattedAddress) missing.push("formattedAddress");
 
   if (missing.length) {
     return {
@@ -446,14 +447,14 @@ const validateUpdateUserAddress = ({
 
   // formatted address
   if (
-    typeof formattedAdress !== "string" ||
-    formattedAdress.length < 5 ||
-    formattedAdress.length > 200
+    typeof formattedAddress !== "string" ||
+    formattedAddress.length < 5 ||
+    formattedAddress.length > 200
   ) {
     return {
       success: false,
       statusCode: 400,
-      message: "Invalid formattedAdress",
+      message: "Invalid formattedAddress",
     };
   }
 
