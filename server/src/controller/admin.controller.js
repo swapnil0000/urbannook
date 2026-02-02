@@ -194,7 +194,7 @@ const adminLogout = (req, res) => {
 const getJoinedUserWaitList = async (_, res) => {
   try {
     const joinedUserWaitList = await UserWaistList.find()
-      .select("-_id")
+      .select("userName userEmail createdAt updatedAt")
       .sort({ createdAt: -1 });
     if (!joinedUserWaitList) {
       return res
@@ -203,8 +203,7 @@ const getJoinedUserWaitList = async (_, res) => {
           new ApiError(404, `Failed to fetch joinedUserWaitList`, null, false),
         );
     }
-    const totalJoinedUserWaitList =
-      await UserWaistList.countDocuments(joinedUserWaitList);
+    const totalJoinedUserWaitList = await UserWaistList.countDocuments();
     return res.status(200).json(
       new ApiRes(
         200,

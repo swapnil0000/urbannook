@@ -7,15 +7,15 @@ import { v7 as uuidv7 } from "uuid";
 import Address from "../model/address.new.model.js";
 const createAddressService = async ({
   userId,
-  placeId,
   lat,
   long,
-  formattedAddress,
   city,
   state,
   pinCode,
+  placeId,
+  formattedAddress,
   landmark,
-  flatNumber,
+  flatOrFloorNumber,
   addressType,
   isDefault,
 }) => {
@@ -24,12 +24,12 @@ const createAddressService = async ({
       return { statusCode: 401, message: "Unauthorized", success: false };
     }
     const validateNewAddress = validateUserAddress({
-      placeId,
       lat,
       long,
       city,
       state,
       pinCode,
+      placeId,
       formattedAddress,
     });
 
@@ -78,19 +78,19 @@ const createAddressService = async ({
     }
     const newAddress = await Address.create({
       addressId: uuidv7(),
-      placeId,
-      formattedAddress,
-      city,
-      state,
-      pinCode,
-      landmark,
-      flatNumber,
-      addressType,
-      isDefault: Boolean(isDefault),
       location: {
         type: "Point",
         coordinates: [Number(long), Number(lat)],
       },
+      placeId,
+      formattedAddress,
+      addressType,
+      landmark,
+      flatOrFloorNumber,
+      isDefault: Boolean(isDefault),
+      city,
+      state,
+      pinCode,
     });
 
     // Map to user
@@ -116,13 +116,14 @@ const createAddressService = async ({
 
 const updatedAddressService = async ({
   userId,
-  addressId,
   lat,
   long,
   city,
   state,
   pinCode,
-  formattedAdress,
+  formattedAddress,
+  addressId,
+  placeId,
 }) => {
   if (!userId) {
     return {
@@ -132,14 +133,16 @@ const updatedAddressService = async ({
       success: false,
     };
   }
+
   const validateNewAddress = validateUpdateUserAddress({
-    addressId,
     lat,
     long,
     city,
     state,
     pinCode,
-    formattedAdress,
+    formattedAddress,
+    addressId,
+    placeId,
   });
 
   if (!validateNewAddress.success) {
@@ -159,6 +162,7 @@ const updatedAddressService = async ({
       success: false,
     };
   }
+
   // Duplicate check (excluding the editing current address)
   const duplicateAddress = await Address.findOne({
     addressId: { $ne: addressId },
@@ -186,7 +190,7 @@ const updatedAddressService = async ({
         city,
         state,
         pinCode,
-        formattedAddress: formattedAdress,
+        formattedAddress,
       },
     },
     {
@@ -194,7 +198,7 @@ const updatedAddressService = async ({
       lean: true,
     },
   );
-  
+
   if (!updated) {
     return {
       statusCode: 404,
