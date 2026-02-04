@@ -35,6 +35,11 @@ const AdminDashboard = () => {
       icon: <ShoppingBag size={18} />,
       route: "/admin/orders",
     },
+    {
+      label: "NFC",
+      icon: <ShoppingBag size={18} />,
+      route: "/admin/nfc",
+    },
   ];
 
   const NavButton = ({ item, onClick }) => (
@@ -120,6 +125,12 @@ const AdminDashboard = () => {
                 description="View and manage waitlist users"
                 icon={<Users />}
                 onClick={() => navigate("/admin/joined-waitlist")}
+              />
+              <ActionCard
+                title="NFC"
+                description="View and manage NFC UserId"
+                icon={<Users />}
+                onClick={() => navigate("/admin/nfc")}
               />
               <ActionCard
                 title="Products"

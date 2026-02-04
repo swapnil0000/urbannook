@@ -7,12 +7,18 @@ const nfcImageSchema = new mongoose.Schema({
   },
   uploadedImagesUrl: {
     type: [String],
-    require: true,
   },
   status: {
     type: String,
-    enum: ["empty", "uploaded"],
-    default: "empty",
+    enum: ["CREATED", "EMPTY", "UPLOADED"],
+    default: "CREATED",
+  },
+  isAssigned: {
+    type: Boolean,
+    default: false,
+  },
+  uploadedText: {
+    type: [String],
   },
 });
 

@@ -1,62 +1,99 @@
 import { ApiError, ApiRes } from "../utlis/index.js";
-import { nfcImageService, updateImagesService } from "../services/nfc.image.service.js";
+import {
+  nfcUpsertService,
+  nfcGetUploadedDataService,
+} from "../services/nfc.image.service.js";
 
-// FIRST-TIME IMAGE UPLOAD
-const nfcFirstTimeTakeImageFromUserController = async (req, res) => {
+const nfcUpsertController = async (req, res) => {
   try {
-    const userId = req.userIdForUpload;
-    const imgUrls = req.files;
+    const { userId } = req.params;
+    const files = req.files || []; // From multer
 
-    const result = await nfcImageService({ userId, imgUrls });
+    // FormData usually sends numbers as strings, so we parse indices if needed.
+    const { text1, text2, indices } = req.body;
+
+    // --- Critical: Parse Indices ---
+    let parsedIndices = [];
+    if (indices) {
+      if (Array.isArray(indices)) {
+        parsedIndices = indices.map((i) => parseInt(i));
+      } else {
+        parsedIndices = [parseInt(indices)];
+      }
+    }
+
+    const result = await nfcUpsertService({
+      userId,
+      files,
+      text1,
+      text2,
+      indices: parsedIndices,
+    });
 
     if (!result.success) {
-      return res.status(result.statusCode).json(
-        new ApiError(result.statusCode, result.message, result.data, result.success)
-      );
+      return res
+        .status(result.statusCode)
+        .json(
+          new ApiError(
+            result.statusCode,
+            result.message,
+            result.data,
+            result.success,
+          ),
+        );
     }
 
     return res.status(result.statusCode).json(
-      new ApiRes(result.statusCode, result.message, {
-        userId,
-        uploadedImages: result.data.uploadedImagesUrl,
-      }, result.success)
+      new ApiRes(
+        result.statusCode,
+        result.message,
+        result.data, 
+        result.success,
+      ),
     );
   } catch (error) {
-    console.error(error);
-    return res.status(500).json(new ApiError(500, "Image upload failed", null, false));
+    console.error("NFC Upsert Error:", error);
+    return res
+      .status(500)
+      .json(
+        new ApiError(
+          500,
+          error.message || "Internal Server Error",
+          null,
+          false,
+        ),
+      );
   }
 };
 
-// UPDATE SELECTIVE IMAGES
-const nfcUpdateImagesController = async (req, res) => {
+const nfcGetController = async (req, res) => {
   try {
-    const userId = req.userIdForUpload;
-    const files = req.files;
+    const { userId } = req.params;
 
-    if (!files || files.length === 0) throw new Error("No images uploaded");
+    const result = await nfcGetUploadedDataService({ userId });
 
-    const updates = files.map((file, idx) => ({ index: idx, file }));
-
-    const updatedDoc = await updateImagesService({ userId, updates });
-
-    if (!updatedDoc) {
-      return res.status(404).json({
-        message: "User not found. Please upload images first.",
-      });
+    if (!result.success && result.statusCode !== 200) {
+      return res
+        .status(result.statusCode)
+        .json(new ApiError(result.statusCode, result.message, null, false));
     }
 
-    return res.status(200).json(
-      new ApiRes(200, "Images updated successfully", {
-        userId,
-        uploadedImages: updatedDoc.uploadedImagesUrl,
-      }, true)
-    );
+    return res
+      .status(result.statusCode)
+      .json(
+        new ApiRes(
+          result.statusCode,
+          result.message,
+          result.data,
+          result.success,
+        ),
+      );
   } catch (error) {
-    console.error(error);
-    return res.status(500).json(
-      new ApiError(500, error.message || "Image update failed", null, false)
-    );
+    console.error("NFC Get Error:", error);
+    return res
+      .status(500)
+      .json(new ApiError(500, "Failed to fetch data", null, false));
   }
 };
 
-export { nfcFirstTimeTakeImageFromUserController, nfcUpdateImagesController };
+export { nfcUpsertController, nfcGetController };

@@ -4,13 +4,17 @@ import {
   adminProfile,
   createProduct,
   getJoinedUserWaitList,
+  nfcGenrateUserId,
   totalProducts,
   updateProduct,
+  nfcAssignGeneratedUserId,
+  nfcPauseGeneratedUserId,
 } from "../controller/admin.controller.js";
 import {
   authGuardService,
   logoutService,
 } from "../services/common.auth.service.js";
+
 const adminRouter = Router();
 adminRouter.route("/admin/login").post(adminLogin);
 adminRouter
@@ -33,4 +37,21 @@ adminRouter
   .route("/admin/joined/waitlist")
   .get(authGuardService("Admin"), getJoinedUserWaitList);
 
+adminRouter.get(
+  "/admin/nfc/generate-id",
+  authGuardService("Admin"),
+  nfcGenrateUserId,
+);
+
+adminRouter.post(
+  "/admin/nfc/assign",
+  authGuardService("Admin"),
+  nfcAssignGeneratedUserId,
+);
+
+adminRouter.post(
+  "/admin/nfc/pause",
+  authGuardService("Admin"),
+  nfcPauseGeneratedUserId,
+);
 export default adminRouter;
