@@ -8,7 +8,7 @@ const AdminNFC = () => {
   const [toast, setToast] = useState({ show: false, message: "", type: "" });
 
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
-
+  const domainBaseUrl = import.meta.env.VITE_DOMAIN_BASE_URL
   const showToast = (message, type = "success") => {
     setToast({ show: true, message, type });
     setTimeout(() => {
@@ -18,7 +18,7 @@ const AdminNFC = () => {
 
   const handleCopyLink = (userId) => {
     if (!userId) return;
-    const fullLink = `${apiBaseUrl}/${userId}`;
+    const fullLink = `${domainBaseUrl}/nfc/home/${userId}`;
     navigator.clipboard.writeText(fullLink);
     showToast("Full Link Copied! 🔗", "success");
   };
@@ -262,7 +262,7 @@ const AdminNFC = () => {
                             </div>
 
                             <span className="text-xs text-indigo-400 truncate max-w-[250px] font-mono opacity-80">
-                              {apiBaseUrl}/{item.userId}
+                              {domainBaseUrl}/nfc/home/{item.userId}
                             </span>
                           </div>
                         </td>
