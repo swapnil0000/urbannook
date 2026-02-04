@@ -22,15 +22,21 @@ import {
   AboutPage,
 } from "../pages/index.js";
 import WaitListMobile from "../pages/WaitListMobile.jsx";
-import {AdminLoginPage, AdminDashboardPage, JoinedWaitlistPage} from "../admin/components/index.js"
+import {
+  AdminLoginPage,
+  AdminDashboardPage,
+  JoinedWaitlistPage,
+} from "../admin/components/index.js";
 import AdminProductDetails from "../admin/components/AdminProductDetailsUpdate.jsx";
-import AdminLayout from "../admin/layout/AdminLayout.jsx"
+import AdminLayout from "../admin/layout/AdminLayout.jsx";
+import NfcHomePage from "../nfc/pages/nfcHomePage.jsx";
+import AdminNFCPage from "../admin/pages/AdminNFCPage.jsx";
 
 const AppRoutes = () => {
   return (
     <Routes>
       {/* <Route path="/" element={<HomePage />} /> */}
-       <Route path="/" element={<Navigate to="/wait-list" replace />} />
+      <Route path="/" element={<Navigate to="/wait-list" replace />} />
       <Route path="/about-us" element={<AboutPage />} />
       <Route path="/contact-us" element={<ContactPage />} />
       <Route path="/products" element={<AllProductsPage />} />
@@ -53,14 +59,19 @@ const AppRoutes = () => {
       <Route path="/wait-list" element={<WaitListMobile />} />
       <Route path="*" element={<Navigate to="/wait-list" replace />} />
 
+      {/* Admin panel routes */}
+      <Route path="/admin" element={<AdminLayout />}>
+        <Route path="dashboard" element={<AdminDashboardPage />} />
+        <Route path="total-products" element={<AdminProductDetails />} />
+        <Route path="joined-waitlist" element={<JoinedWaitlistPage />} />
+        <Route path="login" element={<AdminLoginPage />} />
+        <Route path="nfc" element={<AdminNFCPage />} />
+      </Route>
 
-       {/* Admin panel routes */}
-        <Route path="/admin"  element={<AdminLayout />}>
-          <Route path="dashboard" element={<AdminDashboardPage />} />
-          <Route path="total-products" element={<AdminProductDetails />} />
-          <Route path="joined-waitlist" element={<JoinedWaitlistPage />} />
-          <Route path="login" element={<AdminLoginPage />} />
-        </Route>
+
+      <Route path="/nfc">
+        <Route path="home/:userId" element={<NfcHomePage />} />
+      </Route>
     </Routes>
   );
 };

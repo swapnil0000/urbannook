@@ -12,6 +12,12 @@ import { fieldMissing } from "../utlis/ValidateRes.js";
 import cookieOptions from "../config/config.js";
 import { profileFetchService } from "../services/common.auth.service.js";
 import UserWaistList from "../model/user.waitlist.model.js";
+import {
+  nfcGenrateUserIdService,
+  nfcAssignGeneratedUserIdService,
+  nfcPauseGeneratedUserIdService,
+} from "../services/nfc.image.service.js";
+
 const adminLogin = async (req, res) => {
   try {
     const { email, password } = req.body || {};
@@ -245,6 +251,123 @@ const totalProducts = async (_, res) => {
   }
 };
 
+const nfcGenrateUserId = async (req, res) => {
+  try {
+    const { email: adminEmail } = req.user || {};
+    const nfcGenrateUserIdServiceValidation = await nfcGenrateUserIdService({
+      adminEmail,
+    });
+
+    if (!nfcGenrateUserIdServiceValidation.success) {
+      return res
+        .status(Number(nfcGenrateUserIdServiceValidation.statusCode))
+        .json(
+          new ApiError(
+            nfcGenrateUserIdServiceValidation.statusCode,
+            nfcGenrateUserIdServiceValidation.message,
+            nfcGenrateUserIdServiceValidation.data,
+            nfcGenrateUserIdServiceValidation.success,
+          ),
+        );
+    }
+
+    return res
+      .status(Number(nfcGenrateUserIdServiceValidation.statusCode))
+      .json(
+        new ApiRes(
+          nfcGenrateUserIdServiceValidation.statusCode,
+          nfcGenrateUserIdServiceValidation.message,
+          nfcGenrateUserIdServiceValidation.data,
+          nfcGenrateUserIdServiceValidation.success,
+        ),
+      );
+  } catch (error) {
+    return res
+      .status(Number(500))
+      .json(new ApiError(500, `Internal Server Error - ${error}`, null, false));
+  }
+};
+
+const nfcAssignGeneratedUserId = async (req, res) => {
+  try {
+    const { email: adminEmail } = req.user || {};
+    const { userId } = req.body;
+    const nfcAssignGeneratedUserIdServiceValidation =
+      await nfcAssignGeneratedUserIdService({
+        adminEmail,
+        userId,
+      });
+
+    if (!nfcAssignGeneratedUserIdServiceValidation.success) {
+      return res
+        .status(Number(nfcAssignGeneratedUserIdServiceValidation.statusCode))
+        .json(
+          new ApiError(
+            nfcAssignGeneratedUserIdServiceValidation.statusCode,
+            nfcAssignGeneratedUserIdServiceValidation.message,
+            nfcAssignGeneratedUserIdServiceValidation.data,
+            nfcAssignGeneratedUserIdServiceValidation.success,
+          ),
+        );
+    }
+
+    return res
+      .status(Number(nfcAssignGeneratedUserIdServiceValidation.statusCode))
+      .json(
+        new ApiRes(
+          nfcAssignGeneratedUserIdServiceValidation.statusCode,
+          nfcAssignGeneratedUserIdServiceValidation.message,
+          nfcAssignGeneratedUserIdServiceValidation.data,
+          nfcAssignGeneratedUserIdServiceValidation.success,
+        ),
+      );
+  } catch (error) {
+    return res
+      .status(Number(500))
+      .json(new ApiError(500, `Internal Server Error - ${error}`, null, false));
+  }
+};
+
+const nfcPauseGeneratedUserId = async (req, res) => {
+  try {
+    const { email: adminEmail } = req.user || {};
+    const { userId } = req.body;
+    const nfcPauseGeneratedUserIdServiceValidation =
+      await nfcPauseGeneratedUserIdService({
+        adminEmail,
+        userId,
+      });
+
+    if (!nfcPauseGeneratedUserIdServiceValidation.success) {
+      return res
+        .status(Number(nfcPauseGeneratedUserIdServiceValidation.statusCode))
+        .json(
+          new ApiError(
+            nfcPauseGeneratedUserIdServiceValidation.statusCode,
+            nfcPauseGeneratedUserIdServiceValidation.message,
+            nfcPauseGeneratedUserIdServiceValidation.data,
+            nfcPauseGeneratedUserIdServiceValidation.success,
+          ),
+        );
+    }
+
+    return res
+      .status(Number(nfcPauseGeneratedUserIdServiceValidation.statusCode))
+      .json(
+        new ApiRes(
+          nfcPauseGeneratedUserIdServiceValidation.statusCode,
+          nfcPauseGeneratedUserIdServiceValidation.message,
+          nfcPauseGeneratedUserIdServiceValidation.data,
+          nfcPauseGeneratedUserIdServiceValidation.success,
+        ),
+      );
+  } catch (error) {
+    return res
+      .status(Number(500))
+      .json(new ApiError(500, `Internal Server Error - ${error}`, null, false));
+  }
+};
+
 export {
   adminLogin,
   adminLogout,
@@ -253,4 +376,7 @@ export {
   updateProduct,
   getJoinedUserWaitList,
   totalProducts,
+  nfcGenrateUserId,
+  nfcAssignGeneratedUserId,
+  nfcPauseGeneratedUserId,
 };

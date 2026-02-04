@@ -7,7 +7,7 @@ import userAddressRouter from "./user.address.route.js";
 import userWishListRouter from "./user.wishlist.route.js";
 import userCartRouter from "./user.cart.route.js";
 import userCommunityListRouter from "./user.community.js";
-import nfcRouter from "./nfc.image.route.js";
+import nfcRouter from "./nfc.route.js";
 export {
   userRouter,
   adminRouter,

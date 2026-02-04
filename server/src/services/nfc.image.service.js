@@ -1,64 +1,281 @@
 import nfcImage from "../model/nfc.image.model.js";
+import { v7 as uuidv7 } from "uuid";
 
-// First-time image upload or add new images
-const nfcImageService = async ({ userId, imgUrls }) => {
-  if (!userId)
-    return { statusCode: 401, success: false, message: "Unauthorized", data: null };
+/* Admin NFC routes start */
 
-  if (!imgUrls || imgUrls.length === 0)
-    return { statusCode: 400, success: false, message: "No images received", data: null };
+const nfcGenrateUserIdService = async ({ adminEmail }) => {
+  if (!adminEmail) {
+    return {
+      statusCode: 401,
+      message: "Unauthorized",
+      data: null,
+      success: false,
+    };
+  }
 
-  if (imgUrls.length < 2 || imgUrls.length > 4)
+  // generate userUuid v7
+  const genratedUserUuidV7 = uuidv7();
+  if (!genratedUserUuidV7) {
+    return {
+      statusCode: 404,
+      message: `Failed to generate user uuid v7`,
+      data: null,
+      success: false,
+    };
+  }
+
+  // save to nfc Imgae Db
+
+  const nfcImageRes = await nfcImage.create({
+    userId: genratedUserUuidV7,
+    status: "CREATED",
+    isAssigned: false,
+  });
+  const updatedNfcImageList = await nfcImage
+    .find()
+    .select("-_id -__v -uploadedImagesUrl");
+
+  return {
+    statusCode: 200,
+    message: `New generated userId - ${nfcImageRes?.userId}, isAssigned - ${nfcImageRes?.isAssigned}`,
+    data: {
+      updatedList: updatedNfcImageList,
+    },
+    success: true,
+  };
+};
+
+const nfcAssignGeneratedUserIdService = async ({ adminEmail, userId }) => {
+  if (!adminEmail) {
+    return {
+      statusCode: 401,
+      message: "Unauthorized",
+      data: null,
+      success: false,
+    };
+  }
+
+  if (!userId) {
+    return {
+      statusCode: 401,
+      message: "no userId found to assign",
+      data: null,
+      success: false,
+    };
+  }
+
+  const genratedUserUuidV7 = await nfcImage.findOneAndUpdate(
+    { userId },
+    {
+      status: "EMPTY",
+      isAssigned: true,
+    },
+  );
+
+  if (!genratedUserUuidV7) {
+    return {
+      statusCode: 404,
+      message: `Failed to update user uuid v7 - ${genratedUserUuidV7}`,
+      data: null,
+      success: false,
+    };
+  }
+
+  return {
+    statusCode: 200,
+    message: `Result updated - ${genratedUserUuidV7} is good to go for use`,
+    data: {
+      userId,
+      isAssigned: genratedUserUuidV7?.isAssigned,
+    },
+    success: true,
+  };
+};
+
+const nfcPauseGeneratedUserIdService = async ({ adminEmail, userId }) => {
+  if (!adminEmail) {
+    return {
+      statusCode: 401,
+      message: "Unauthorized",
+      data: null,
+      success: false,
+    };
+  }
+
+  if (!userId) {
+    return {
+      statusCode: 401,
+      message: "no userId found to assign",
+      data: null,
+      success: false,
+    };
+  }
+
+  const genratedUserUuidV7 = await nfcImage.findOneAndUpdate(
+    { userId },
+    {
+      status: "CREATED",
+      isAssigned: false,
+    },
+  );
+
+  if (!genratedUserUuidV7) {
+    return {
+      statusCode: 404,
+      message: `Failed to update user uuid v7 - ${genratedUserUuidV7}`,
+      data: null,
+      success: false,
+    };
+  }
+
+  return {
+    statusCode: 200,
+    message: `Result updated - ${userId} is paused`,
+    data: {
+      userId,
+      isAssigned: genratedUserUuidV7?.isAssigned,
+    },
+    success: true,
+  };
+};
+
+/* Admin NFC routes end */
+
+/* Public NFC routes start */
+
+const nfcGetUploadedDataService = async ({ userId }) => {
+  if (!userId) {
+    return {
+      statusCode: 401,
+      message: "User ID is required to get data",
+      data: null,
+      success: false,
+    };
+  }
+
+  // Find User Data
+  const userDoc = await nfcImage.findOne({ userId });
+  const cdnBaseUrl = process.env.AWS_CDN_BASE_URL;
+
+  // If user doesn't exist (First time scan), then we return Empty Template
+  // for preventing 404 errors on the frontend for new users.
+  if (!userDoc) {
+    return {
+      statusCode: 200, // Success status because "No Data" is a valid state for new users
+      message: "New user found, return empty template",
+      data: {
+        userId,
+        uploadedImagesUrl: [null, null, null],
+        text1: "",
+        text2: "",
+      },
+      success: true,
+    };
+  }
+  const formattedImages = userDoc.uploadedImagesUrl.map((path) =>
+    path ? `${cdnBaseUrl}/${path}` : null,
+  );
+  return {
+    statusCode: 200,
+    message: "Data fetched successfully",
+    data: {
+      userId: userDoc?.userId,
+      uploadedImagesUrl: `${formattedImages}`,
+      uploadedText: userDoc?.uploadedText,
+    },
+    success: true,
+  };
+};
+
+const nfcUpsertService = async ({ userId, files, text1, text2, indices }) => {
+  if (!userId) {
+    return {
+      statusCode: 401,
+      success: false,
+      message: "Unauthorized: User ID is required",
+      data: null,
+    };
+  }
+
+  // Validation: Min 1 change required
+  const hasFiles = files && files.length > 0;
+  const hasTextUpdate = text1 !== undefined || text2 !== undefined;
+
+  if (!hasFiles && !hasTextUpdate) {
     return {
       statusCode: 400,
       success: false,
-      message: `Min 2 and Max 4 images allowed, received ${imgUrls.length}`,
+      message:
+        "No changes detected. Please upload at least 1 image or update text.",
       data: null,
     };
+  }
 
-  const cdnBaseUrl = process.env.AWS_CDN_BASE_URL;
-  const imgCdnUrls = imgUrls.map((file) => `${cdnBaseUrl}/${file.key}`);
-
-  // Upsert: first-time create or push new images
-  const uploadedImages = await nfcImage.findOneAndUpdate(
-    { userId },
-    {
-      userId,
-      $push: { uploadedImagesUrl: { $each: imgCdnUrls } },
-      status: "uploaded",
-    },
-    { upsert: true, new: true }
-  );
-
-  return { statusCode: 200, success: true, message: "Images uploaded successfully", data: uploadedImages };
-};
-
-// Update existing images
-const updateImagesService = async ({ userId, updates }) => {
   const cdnBaseUrl = process.env.AWS_CDN_BASE_URL;
 
   let userDoc = await nfcImage.findOne({ userId });
-  if (!userDoc) return null; // First-time upload handle nahi karta
 
-  let currentImages = userDoc.uploadedImagesUrl || [];
+  if (!userDoc && userDoc?.isAssigned) {
+    userDoc = new nfcImage({
+      userId,
+      uploadedImagesUrl: [null, null, null],
+      text1: "",
+      text2: "",
+    });
+  }
 
-  // ensure length = 4
-  while (currentImages.length < 4) currentImages.push(null);
+  let currentImages = userDoc?.uploadedImagesUrl || [null, null, null];
+  while (currentImages.length < 3) currentImages.push(null);
 
-  // replace only specified positions
-  updates.forEach(({ index, file }) => {
-    if (index >= 0 && index < 4) {
-      currentImages[index] = `${cdnBaseUrl}/${file.key}`;
+  if (hasFiles) {
+    if (indices && indices.length === files.length) {
+      files.forEach((file, i) => {
+        const targetIndex = parseInt(indices[i]);
+        if (!isNaN(targetIndex) && targetIndex >= 0 && targetIndex < 3) {
+          currentImages[targetIndex] = `${file.key}`;
+        }
+      });
     }
-  });
 
-  const updatedDoc = await nfcImage.findOneAndUpdate(
-    { userId },
-    { uploadedImagesUrl: currentImages, status: "uploaded" },
-    { new: true }
+    // Bulk Update / First Time (Sequential)
+    else {
+      files.forEach((file, i) => {
+        if (i < 3) currentImages[i] = `${file.key}`;
+      });
+    }
+  }
+
+  if (text1 !== undefined && text1 !== "undefined") userDoc.text1 = text1;
+  if (text2 !== undefined && text2 !== "undefined") userDoc.text2 = text2;
+
+  userDoc.uploadedImagesUrl = currentImages;
+  userDoc.uploadedText = [text1, text2];
+  userDoc.status = "UPLOADED";
+
+  const savedDoc = await userDoc.save();
+  const formattedImages = savedDoc.uploadedImagesUrl.map((path) =>
+    path ? `${cdnBaseUrl}/${path}` : null,
   );
 
-  return updatedDoc;
+  return {
+    statusCode: 200,
+    success: true,
+    message: "Scrapbook updated successfully",
+    data: {
+      userId: savedDoc.userId,
+      uploadedImagesUrl: `${formattedImages}`,
+      text1: savedDoc.text1,
+      text2: savedDoc.text2,
+    },
+  };
 };
 
-export { nfcImageService, updateImagesService };
+/* Public NFC routes end */
+
+export {
+  nfcGenrateUserIdService,
+  nfcAssignGeneratedUserIdService,
+  nfcPauseGeneratedUserIdService,
+  nfcGetUploadedDataService,
+  nfcUpsertService,
+};

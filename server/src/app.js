@@ -42,7 +42,7 @@ const corsOptions = {
 };
 
 /* Health Route */
-app.use("/api/v1/health", healthRouter);
+app.use("/health", healthRouter);
 
 // Use CORS for all normal requests
 app.use(cors(corsOptions));
