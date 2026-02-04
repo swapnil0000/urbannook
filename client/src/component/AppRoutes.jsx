@@ -29,7 +29,7 @@ import {
 } from "../admin/components/index.js";
 import AdminProductDetails from "../admin/components/AdminProductDetailsUpdate.jsx";
 import AdminLayout from "../admin/layout/AdminLayout.jsx";
-import NfcHomePage from "../nfc/pages/nfcHomePage.jsx";
+import NfcHomePage from "../nfc/pages/NfcHomePage.jsx";
 import AdminNFCPage from "../admin/pages/AdminNFCPage.jsx";
 
 const AppRoutes = () => {
