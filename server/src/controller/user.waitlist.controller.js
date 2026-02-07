@@ -65,8 +65,6 @@ const userWaitListController = async (req, res) => {
       userEmail: userEmail.toLowerCase(),
     });
 
-    console.log("CREATED USER 👉", joinedUser);
-
     if (!joinedUser) {
       return res
         .status(500)
