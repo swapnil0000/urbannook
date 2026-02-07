@@ -1,5 +1,12 @@
 import nfcImage from "../model/nfc.image.model.js";
 import { v7 as uuidv7 } from "uuid";
+import bcrypt from "bcrypt";
+
+const validatePassword = async (userDoc, inputPassword) => {
+  if (!userDoc) return false;
+  const isMatch = await bcrypt.compare(inputPassword, userDoc.password);
+  return isMatch;
+};
 
 /* Admin NFC routes start */
 
@@ -30,6 +37,7 @@ const nfcGenrateUserIdService = async ({ adminEmail }) => {
     userId: genratedUserUuidV7,
     status: "CREATED",
     isAssigned: false,
+    password: process.env.DEFAULT_NFC_USER_PASSWORD,
   });
   const updatedNfcImageList = await nfcImage
     .find()
@@ -138,7 +146,6 @@ const nfcPauseGeneratedUserIdService = async ({ adminEmail, userId }) => {
     success: true,
   };
 };
-
 /* Admin NFC routes end */
 
 /* Public NFC routes start */
@@ -153,7 +160,6 @@ const nfcGetUploadedDataService = async ({ userId }) => {
     };
   }
 
-  // Find User Data
   const userDoc = await nfcImage.findOne({ userId });
   const cdnBaseUrl = process.env.AWS_CDN_BASE_URL;
 
@@ -172,6 +178,19 @@ const nfcGetUploadedDataService = async ({ userId }) => {
       success: true,
     };
   }
+
+  if (userDoc && !userDoc?.isAssigned) {
+    return {
+      statusCode: 200,
+      message: `Can't display details - UserId - ${userId} is paused - Contact our Admin`,
+      data: {
+        userId: userDoc?.userId,
+        isAssigned: userDoc?.isAssigned,
+      },
+      success: true,
+    };
+  }
+
   const formattedImages = userDoc.uploadedImagesUrl.map((path) =>
     path ? `${cdnBaseUrl}/${path}` : null,
   );
@@ -187,7 +206,15 @@ const nfcGetUploadedDataService = async ({ userId }) => {
   };
 };
 
-const nfcUpsertService = async ({ userId, files, text1, text2, indices }) => {
+// --- UPDATED UPSERT SERVICE ---
+const nfcUpsertService = async ({
+  userId,
+  files,
+  text1,
+  text2,
+  indices,
+  password,
+}) => {
   if (!userId) {
     return {
       statusCode: 401,
@@ -195,6 +222,32 @@ const nfcUpsertService = async ({ userId, files, text1, text2, indices }) => {
       message: "Unauthorized: User ID is required",
       data: null,
     };
+  }
+
+  // 1. Find User Doc First
+  let userDoc = await nfcImage.findOne({ userId });
+
+  // 2. SECURITY CHECK: Verify Password
+  if (userDoc) {
+    if (!password) {
+      return {
+        statusCode: 401,
+        success: false,
+        message: "Password is required to save changes.",
+        data: null,
+      };
+    }
+
+    const isPasswordValid = await validatePassword(userDoc, password);
+
+    if (!isPasswordValid) {
+      return {
+        statusCode: 401, // Unauthorized
+        success: false,
+        message: "Incorrect Password. Please try again.",
+        data: null,
+      };
+    }
   }
 
   // Validation: Min 1 change required
@@ -213,8 +266,7 @@ const nfcUpsertService = async ({ userId, files, text1, text2, indices }) => {
 
   const cdnBaseUrl = process.env.AWS_CDN_BASE_URL;
 
-  let userDoc = await nfcImage.findOne({ userId });
-
+  // Initialize if new
   if (!userDoc && userDoc?.isAssigned) {
     userDoc = new nfcImage({
       userId,
@@ -235,10 +287,7 @@ const nfcUpsertService = async ({ userId, files, text1, text2, indices }) => {
           currentImages[targetIndex] = `${file.key}`;
         }
       });
-    }
-
-    // Bulk Update / First Time (Sequential)
-    else {
+    } else {
       files.forEach((file, i) => {
         if (i < 3) currentImages[i] = `${file.key}`;
       });
@@ -272,10 +321,66 @@ const nfcUpsertService = async ({ userId, files, text1, text2, indices }) => {
 
 /* Public NFC routes end */
 
+/* Change Password */
+const nfcChangeUserPasswordService = async ({ userId, password, newPass }) => {
+  if (!userId) {
+    return {
+      statusCode: 401,
+      success: false,
+      message: "Unauthorized: User ID is required",
+      data: null,
+    };
+  }
+
+  const userDoc = await nfcImage.findOne({ userId });
+  if (!userDoc) {
+    return {
+      statusCode: 404,
+      message: "User not found",
+      data: null,
+      success: true,
+    };
+  }
+
+  // REUSED: Common Password Validator
+  const isMatch = await validatePassword(userDoc, password);
+
+  if (!isMatch) {
+    return {
+      statusCode: 401,
+      message: "Incorrect current password",
+      data: null,
+      success: false,
+    };
+  }
+
+  // Prevent reusing the exact same password (optional but good practice)
+  const isSameAsOld = await bcrypt.compare(newPass, userDoc.password);
+  if (isSameAsOld) {
+    return {
+      statusCode: 400,
+      message: "New password cannot be the same as the old password",
+      data: null,
+      success: false,
+    };
+  }
+
+  userDoc.password = newPass;
+  await userDoc.save();
+
+  return {
+    statusCode: 200,
+    message: `Password updated successfully`,
+    data: userId,
+    success: true,
+  };
+};
+
 export {
   nfcGenrateUserIdService,
   nfcAssignGeneratedUserIdService,
   nfcPauseGeneratedUserIdService,
   nfcGetUploadedDataService,
   nfcUpsertService,
+  nfcChangeUserPasswordService,
 };

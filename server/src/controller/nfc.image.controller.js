@@ -2,17 +2,17 @@ import { ApiError, ApiRes } from "../utlis/index.js";
 import {
   nfcUpsertService,
   nfcGetUploadedDataService,
+  nfcChangeUserPasswordService,
 } from "../services/nfc.image.service.js";
 
 const nfcUpsertController = async (req, res) => {
   try {
     const { userId } = req.params;
-    const files = req.files || []; // From multer
+    const files = req.files || [];
 
-    // FormData usually sends numbers as strings, so we parse indices if needed.
-    const { text1, text2, indices } = req.body;
+    // Extract fields from FormData
+    const { text1, text2, indices, password } = req.body;
 
-    // --- Critical: Parse Indices ---
     let parsedIndices = [];
     if (indices) {
       if (Array.isArray(indices)) {
@@ -22,35 +22,38 @@ const nfcUpsertController = async (req, res) => {
       }
     }
 
-    const result = await nfcUpsertService({
+    const nfcUpsertServiceValidation = await nfcUpsertService({
       userId,
       files,
       text1,
       text2,
       indices: parsedIndices,
+      password, // Pass password to service
     });
 
-    if (!result.success) {
+    if (!nfcUpsertServiceValidation.success) {
       return res
-        .status(result.statusCode)
+        .status(nfcUpsertServiceValidation.statusCode)
         .json(
           new ApiError(
-            result.statusCode,
-            result.message,
-            result.data,
-            result.success,
+            nfcUpsertServiceValidation.statusCode,
+            nfcUpsertServiceValidation.message,
+            nfcUpsertServiceValidation.data,
+            nfcUpsertServiceValidation.success,
           ),
         );
     }
 
-    return res.status(result.statusCode).json(
-      new ApiRes(
-        result.statusCode,
-        result.message,
-        result.data, 
-        result.success,
-      ),
-    );
+    return res
+      .status(nfcUpsertServiceValidation.statusCode)
+      .json(
+        new ApiRes(
+          nfcUpsertServiceValidation.statusCode,
+          nfcUpsertServiceValidation.message,
+          nfcUpsertServiceValidation.data,
+          nfcUpsertServiceValidation.success,
+        ),
+      );
   } catch (error) {
     console.error("NFC Upsert Error:", error);
     return res
@@ -70,22 +73,22 @@ const nfcGetController = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    const result = await nfcGetUploadedDataService({ userId });
+    const nfcGetUploadedDataServiceValidation = await nfcGetUploadedDataService({ userId });
 
-    if (!result.success && result.statusCode !== 200) {
+    if (!nfcGetUploadedDataServiceValidation.success && nfcGetUploadedDataServiceValidation.statusCode !== 200) {
       return res
-        .status(result.statusCode)
-        .json(new ApiError(result.statusCode, result.message, null, false));
+        .status(nfcGetUploadedDataServiceValidation.statusCode)
+        .json(new ApiError(nfcGetUploadedDataServiceValidation.statusCode, nfcGetUploadedDataServiceValidation.message, null, false));
     }
 
     return res
-      .status(result.statusCode)
+      .status(nfcGetUploadedDataServiceValidation.statusCode)
       .json(
         new ApiRes(
-          result.statusCode,
-          result.message,
-          result.data,
-          result.success,
+          nfcGetUploadedDataServiceValidation.statusCode,
+          nfcGetUploadedDataServiceValidation.message,
+          nfcGetUploadedDataServiceValidation.data,
+          nfcGetUploadedDataServiceValidation.success,
         ),
       );
   } catch (error) {
@@ -96,4 +99,32 @@ const nfcGetController = async (req, res) => {
   }
 };
 
-export { nfcUpsertController, nfcGetController };
+const nfcChangeUserPassword = async (req, res) => {
+  const { userId, password, newPass } = req.body || {};
+  const nfcChangeUserPasswordServiceValidation =
+    await nfcChangeUserPasswordService({ userId, password, newPass });
+  if (!nfcChangeUserPasswordServiceValidation.success) {
+    return res
+      .status(nfcChangeUserPasswordServiceValidation.statusCode)
+      .json(
+        new ApiError(
+          nfcChangeUserPasswordServiceValidation.statusCode,
+          nfcChangeUserPasswordServiceValidation.message,
+          nfcChangeUserPasswordServiceValidation.data,
+          nfcChangeUserPasswordServiceValidation.success,
+        ),
+      );
+  }
+  return res
+    .status(nfcChangeUserPasswordServiceValidation.statusCode)
+    .json(
+      new ApiRes(
+        nfcChangeUserPasswordServiceValidation.statusCode,
+        nfcChangeUserPasswordServiceValidation.message,
+        nfcChangeUserPasswordServiceValidation.data,
+        nfcChangeUserPasswordServiceValidation.success,
+      ),
+    );
+};
+
+export { nfcUpsertController, nfcGetController, nfcChangeUserPassword };
