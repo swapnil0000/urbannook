@@ -1,10 +1,9 @@
 import {
-  existingProductUpdateService,
-  createNewProductService,
-} from "../services/admin.auth.service.js";
-import {
   adminLoginService,
   totalProductService,
+  existingProductUpdateService,
+  createNewProductService,
+  viewProductDetailsService,
 } from "../services/admin.auth.service.js";
 import { ApiError, ApiRes } from "../utlis/index.js";
 
@@ -126,8 +125,38 @@ const createProduct = async (req, res) => {
         );
 };
 
-const updateProduct = async (req, res) => {
+const viewProduct = async (req, res) => {
   const { productId } = req.params;
+  const { email: adminEmail } = req.user;
+  const viewProductDetailsServiceValidation = await viewProductDetailsService(
+    adminEmail,
+    productId,
+  );
+  return !viewProductDetailsServiceValidation?.success
+    ? res
+        .status(Number(viewProductDetailsServiceValidation?.statusCode))
+        .json(
+          new ApiError(
+            viewProductDetailsServiceValidation?.statusCode,
+            viewProductDetailsServiceValidation?.message,
+            viewProductDetailsServiceValidation?.data,
+            viewProductDetailsServiceValidation?.success,
+          ),
+        )
+    : res
+        .status(Number(viewProductDetailsServiceValidation?.statusCode))
+        .json(
+          new ApiRes(
+            viewProductDetailsServiceValidation?.statusCode,
+            viewProductDetailsServiceValidation?.message,
+            viewProductDetailsServiceValidation?.data,
+            viewProductDetailsServiceValidation?.success,
+          ),
+        );
+};
+
+const updateProduct = async (req, res) => {
+  const { productId } = req.body;
   const { email: adminEmail } = req.user;
   const {
     productName,
@@ -373,6 +402,7 @@ export {
   adminLogout,
   adminProfile,
   createProduct,
+  viewProduct,
   updateProduct,
   getJoinedUserWaitList,
   totalProducts,
