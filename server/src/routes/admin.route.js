@@ -3,6 +3,7 @@ import {
   adminLogin,
   adminProfile,
   createProduct,
+  viewProduct,
   getJoinedUserWaitList,
   nfcGenrateUserId,
   totalProducts,
@@ -29,6 +30,10 @@ adminRouter
 adminRouter
   .route("/admin/add/inventory")
   .post(authGuardService("Admin"), createProduct);
+
+adminRouter
+  .route("/admin/view/inventory/:productId")
+  .get(authGuardService("Admin"), viewProduct);
 
 adminRouter
   .route("/admin/update/inventory/:productId")

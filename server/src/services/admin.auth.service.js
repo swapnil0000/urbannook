@@ -89,6 +89,43 @@ const createNewProductService = async (
   };
 };
 
+const viewProductDetailsService = async (adminEmail, productId) => {
+  if (!adminEmail) {
+    return {
+      statusCode: 401,
+      message: "Unauthorized",
+      data: null,
+      success: false,
+    };
+  }
+  if (!productId) {
+    return {
+      statusCode: 404,
+      message: `${productId} is missing`,
+      data: null,
+      success: false,
+    };
+  }
+  const productDetails = await Product.find({
+    productId: productId,
+  }).select("-__v -_id");
+
+  if (productDetails?.length == 0 || !productDetails) {
+    return {
+      statusCode: 404,
+      message: `Can't find the product with id — ${productId}`,
+      data: null,
+      success: false,
+    };
+  }
+  return {
+    statusCode: 202,
+    message: `Product details with product id ${productDetails?.productId}`,
+    data: productDetails,
+    success: true,
+  };
+};
+
 const existingProductUpdateService = async (
   adminEmail,
   productId,
@@ -328,6 +365,7 @@ const totalProductService = async () => {
 };
 export {
   createNewProductService,
+  viewProductDetailsService,
   existingProductUpdateService,
   adminLoginService,
   totalProductService,
