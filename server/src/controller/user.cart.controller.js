@@ -1,6 +1,6 @@
 import {
   addToCartService,
-  previewCartService,
+  getCartService,
   cartQuantityService,
   clearCartService,
 } from "../services/user.cart.service.js";
@@ -45,10 +45,10 @@ const userAddToCart = async (req, res) => {
   }
 };
 
-const userPreviewCart = async (req, res) => {
+const userGetCart = async (req, res) => {
   try {
     const { userId } = req.user;
-    const cartDetails = await previewCartService({ userId });
+    const cartDetails = await getCartService({ userId });
     if (!cartDetails?.success) {
       return res
         .status(Number(cartDetails?.statusCode))
@@ -197,7 +197,7 @@ const userOrderPreviousHistory = async (req, res) => {
 
 export {
   userAddToCart,
-  userPreviewCart as userGetAddToCart,
+  userGetCart,
   userUpdateCartQuantity,
   userClearCart,
   userOrderPreviousHistory,

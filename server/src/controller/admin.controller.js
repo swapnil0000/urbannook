@@ -36,20 +36,33 @@ const adminLogin = async (req, res) => {
         );
     }
     // existing User and pass check
-    let result = await adminLoginService(email, password);
+    let adminLoginServiceValidation = await adminLoginService(email, password);
 
-    if (result?.statusCode >= 400) {
-      return res.status(Number(result?.statusCode)).json(result);
+    if (!adminLoginServiceValidation?.success) {
+      return res
+        .status(Number(adminLoginServiceValidation?.statusCode))
+        .json(
+          new ApiError(
+            Number(adminLoginServiceValidation?.statusCode),
+            adminLoginServiceValidation?.message,
+            adminLoginServiceValidation?.data,
+            adminLoginServiceValidation?.success,
+          ),
+        );
     }
     return res
-      .status(Number(result?.statusCode))
-      .cookie("adminAccessToken", result?.data?.adminAccessToken, cookieOptions)
+      .status(Number(adminLoginServiceValidation?.statusCode))
+      .cookie(
+        "adminAccessToken",
+        adminLoginServiceValidation?.data?.adminAccessToken,
+        cookieOptions,
+      )
       .json(
         new ApiRes(
-          Number(result?.statusCode),
-          result?.message,
-          result?.data,
-          result?.success,
+          Number(adminLoginServiceValidation?.statusCode),
+          adminLoginServiceValidation?.message,
+          adminLoginServiceValidation?.data,
+          adminLoginServiceValidation?.success,
         ),
       );
   } catch (error) {
@@ -60,16 +73,33 @@ const adminLogin = async (req, res) => {
 const adminProfile = async (req, res) => {
   try {
     const { userEmail } = req.body;
-    const userDetails = await profileFetchService({ userEmail, role: "Admin" });
-    if (!userDetails) {
+    const profileFetchServiceValidation = await profileFetchService({
+      userEmail,
+      role: "Admin",
+    });
+    if (!profileFetchServiceValidation.success) {
       return res
-        .status(404)
-        .json(new ApiError(404, "User not found", null, false));
+        .status(Number(profileFetchServiceValidation.statusCode))
+        .json(
+          new ApiError(
+            profileFetchServiceValidation.statusCode,
+            profileFetchServiceValidation.message,
+            profileFetchServiceValidation.data,
+            profileFetchServiceValidation.success,
+          ),
+        );
     }
 
     return res
-      .status(200)
-      .json(new ApiRes(200, `User Details`, userDetails, true));
+      .status(Number(profileFetchServiceValidation.statusCode))
+      .json(
+        new ApiRes(
+          profileFetchServiceValidation.statusCode,
+          profileFetchServiceValidation.message,
+          profileFetchServiceValidation.data,
+          profileFetchServiceValidation.success,
+        ),
+      );
   } catch (error) {
     return res.status(500).json(new ApiError(500, error.message, null, false));
   }
@@ -261,16 +291,27 @@ const getJoinedUserWaitList = async (_, res) => {
 
 const totalProducts = async (_, res) => {
   try {
-    const result = await totalProductService();
-
+    const totalProductServiceValidation = await totalProductService();
+    if (!totalProductServiceValidation.success) {
+      return res
+        .status(Number(totalProductServiceValidation.statusCode))
+        .json(
+          new ApiRes(
+            totalProductServiceValidation.statusCode,
+            totalProductServiceValidation.message,
+            totalProductServiceValidation.data,
+            totalProductServiceValidation.success,
+          ),
+        );
+    }
     return res
-      .status(result.statusCode)
+      .status(Number(totalProductServiceValidation.statusCode))
       .json(
         new ApiRes(
-          result.statusCode,
-          result.message,
-          result.data,
-          result.success,
+          totalProductServiceValidation.statusCode,
+          totalProductServiceValidation.message,
+          totalProductServiceValidation.data,
+          totalProductServiceValidation.success,
         ),
       );
   } catch (error) {
