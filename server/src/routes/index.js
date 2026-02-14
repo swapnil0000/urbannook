@@ -8,6 +8,7 @@ import userWishListRouter from "./user.wishlist.route.js";
 import userCartRouter from "./user.cart.route.js";
 import userCommunityListRouter from "./user.community.js";
 import nfcRouter from "./nfc.route.js";
+import couponCodeRouter from "./coupon.code.route.js";
 export {
   userRouter,
   adminRouter,
@@ -19,4 +20,5 @@ export {
   userWishListRouter,
   userCommunityListRouter,
   nfcRouter,
+  couponCodeRouter,
 };

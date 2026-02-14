@@ -91,7 +91,12 @@ const profileFetchService = async ({ userId, role }) => {
   const profile = await Model.findOne({ userId }).select(
     "-_id -password -createdAt -updatedAt -__v -userRefreshToken",
   );
-  return profile;
+  return {
+    statusCode: 200,
+    message: `Profile details for userId - ${userId} and role ${role}`,
+    data: profile,
+    success: true,
+  };
 };
 
 const regenerateTokenService = async ({ userId, userRole }) => {

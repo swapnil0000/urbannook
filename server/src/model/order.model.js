@@ -40,6 +40,27 @@ const orderSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+
+    // Coupon snapshot
+    coupon: {
+      couponCodeId: {
+        type: String,
+        default: null,
+      },
+      couponCodeName: {
+        type: String,
+        default: null,
+      },
+      discountAmount: {
+        type: Number,
+        default: 0,
+      },
+      isApplied: {
+        type: Boolean,
+        default: false,
+      },
+    },
+
     deliveryAddress: {
       addressId: String,
       formattedAddress: String,
