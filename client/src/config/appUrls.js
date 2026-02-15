@@ -3,8 +3,7 @@
 const API_URLS = {
   local: 'http://localhost:8000/api/v1',
   development: 'http://localhost:8000/api/v1',
-  production: 'https://urbannook.onrender.com/api/v1',
-  staging: 'https://urbannook.onrender.com/api/v1'
+  production: 'https://api.urbannook.in/api/v1',
 };
 
 // Environment detection
@@ -26,24 +25,20 @@ const getEnvironment = () => {
     return 'local';
   }
   
-  if (hostname.includes('vercel.app') || hostname.includes('netlify.app')) {
-    return 'staging';
-  }
-  
+  // For any production deployment (Vercel, Netlify, custom domain)
   return 'production';
 };
 
 // Get current API URL
 export const getApiUrl = () => {
   const env = getEnvironment();
-  return API_URLS[env] || API_URLS?.production;
+  return API_URLS[env] || API_URLS.production;
 };
 
 // Export individual URLs for direct access
 export const API_CONFIG = {
   LOCAL: API_URLS.local,
   PRODUCTION: API_URLS.production,
-  STAGING: API_URLS.staging,
   CURRENT: getApiUrl()
 };
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import WaitListBanner from "../../public/assets/WaitListBanner.png";
 import axios from "axios";
 import { abusiveWords } from "../data/constant";
+import { getApiUrl } from "../config/appUrls";
 
 const WaitListMobile = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -59,7 +60,7 @@ const WaitListMobile = () => {
 
     try {
       const { data } = await axios.post(
-        `https://api.urbannook.in/api/v1/join/waitlist`,
+        `${getApiUrl()}/join/waitlist`,
         { userName, userEmail }
       );
 
