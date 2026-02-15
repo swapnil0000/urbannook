@@ -28,8 +28,17 @@ const cartSchema = mongoose.Schema({
       type: Boolean,
       default: false,
     },
+    summary: {
+      subtotal: { type: Number, default: 0 },
+      gst: { type: Number, default: 0 },
+      shipping: { type: Number, default: 199 },
+      preTotal: { type: Number, default: 0 },
+      discount: { type: Number, default: 0 },
+      grandTotal: { type: Number, default: 0 },
+      note: { type: String, default: "" }
+    }
   },
-});
+}, { timestamps: true });
 
 cartSchema.index({ userId: 1 }, { unique: true });
 
