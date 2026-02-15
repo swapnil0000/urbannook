@@ -3,18 +3,60 @@ import { getCartService } from "../services/user.cart.service.js";
 import Cart from "../model/user.cart.model.js";
 const applyCouponCodeService = async ({ userId, couponCodeName }) => {
   try {
-    if (!userId || !couponCodeName) {
+    // 1. Get raw cart and current subtotal
+    const cartRes = await getCartService({ userId });
+    if (!cartRes.success || !cartRes.data.items.length) {
       return {
         statusCode: 400,
-        message: "userId & couponCodeName required",
-        data: null,
+        message: "Cannot apply coupon to empty cart",
         success: false,
       };
     }
 
-    // Check if it exists and is currently published/active
+    const { cartSubtotal, items } = cartRes.data;
+    let discountAmount = 0;
+    if (!couponCodeName || couponCodeName == "" || couponCodeName == null) {
+      const GST_RATE = 0.18;
+      const SHIPPING_CHARGES = 199;
+
+      const gstAmount = Math.round(cartSubtotal * GST_RATE);
+      const preTotal = cartSubtotal + gstAmount + SHIPPING_CHARGES;
+      const grandTotal = Math.max(preTotal - discountAmount, 0);
+
+      // 5. Structure Snapshot based on Updated Model
+      const calculationSnapshot = {
+        couponCodeId: null,
+        name: null,
+        discountValue: 0,
+        isApplied: false,
+        summary: {
+          subtotal: cartSubtotal,
+          gst: gstAmount,
+          shipping: SHIPPING_CHARGES,
+          preTotal: preTotal,
+          discount: 0,
+          grandTotal: grandTotal,
+          note: "GST (18%) and Shipping included in calculations",
+        },
+      };
+      // 6. DB Update
+      await Cart.updateOne(
+        { userId },
+        { $set: { appliedCoupon: calculationSnapshot } },
+      );
+      return {
+        statusCode: 200,
+        message: "No Coupon present",
+        success: true,
+        data: {
+          items,
+          summary: calculationSnapshot.summary,
+        },
+      };
+    }
+    // 2. Fetch Coupon from DB
     const coupon = await CouponCode.findOne({
-      name: couponCodeName.toUpperCase(), // uppercase to avoid case-sensitive errors
+      name: couponCodeName.toUpperCase(),
       isPublished: true,
     }).lean();
 
@@ -22,79 +64,59 @@ const applyCouponCodeService = async ({ userId, couponCodeName }) => {
       return {
         statusCode: 404,
         message: "Invalid or inactive coupon",
-        data: null,
         success: false,
       };
     }
 
-    // to ensures we are checking the coupon against the REAL current price.
-    const cartRes = await getCartService({
-      userId,
-    });
-
-    //cart fetch failed, stop here.
-    if (!cartRes.success)
-      return {
-        statusCode: 409,
-        message: "Failed to fetch cart details",
-        data: cartRes,
-        success: false,
-      };
-
-    const cartData = cartRes.data;
-    // Note: applying discount on 'preTotal' (which includes Tax + Shipping)
-    const subtotal = cartData.summary.preTotal;
-
-    // Example: Coupon only works if total > 500
-    if (subtotal < coupon.minCartValue) {
+    // 3. Min Cart Value Validation
+    if (cartSubtotal < coupon.minCartValue) {
       return {
         statusCode: 400,
-        message: `Minimum cart value ₹${coupon.minCartValue} required`,
-        data: {
-          minCartValue: coupon.minCartValue,
-          currentValue: subtotal,
-        },
+        message: `Minimum order of ₹${coupon.minCartValue} required for this coupon`,
         success: false,
       };
     }
 
-    let calculatedDiscount = 0;
-    let finalDiscount = 0;
+    // 4. PRICE ENGINE LOGIC
+    const GST_RATE = 0.18;
+    const SHIPPING_CHARGES = 199;
 
-    switch (coupon.discountType) {
-      // Percentage (e.g., 10% off)
-      case "PERCENTAGE":
-        calculatedDiscount = (subtotal * coupon.discountValue) / 100;
+    const gstAmount = Math.round(cartSubtotal * GST_RATE);
+    const preTotal = cartSubtotal + gstAmount + SHIPPING_CHARGES;
 
-        // Example: 10% off and it is coming 120, but maximum discount is ₹100.
-        finalDiscount = coupon.maxDiscount
-          ? Math.min(calculatedDiscount, coupon.maxDiscount)
-          : calculatedDiscount;
-        break;
-
-      case "FLAT": // Explicitly handle FLAT
-      default: // Fallback for any other case
-        calculatedDiscount = coupon.discountValue;
-        finalDiscount = coupon.discountValue;
-        break;
+    if (coupon.discountType === "PERCENTAGE") {
+      discountAmount = (preTotal * coupon.discountValue) / 100;
+      if (coupon.maxDiscount) {
+        discountAmount = Math.min(discountAmount, coupon.maxDiscount);
+      }
+    } else {
+      discountAmount = coupon.discountValue;
     }
 
-    finalDiscount = Math.round(finalDiscount); // to decimals in DB
+    discountAmount = Math.round(discountAmount);
+    const grandTotal = Math.max(preTotal - discountAmount, 0);
 
-    // We are NOT saving the grand total here. We only save "Which coupon" and "How much discount".
-    // The 'getCartService' calculates the final Grand Total dynamically every time the user loads the page.
+    // 5. Structure Snapshot based on Updated Model
+    const calculationSnapshot = {
+      couponCodeId: coupon.couponCodeId,
+      name: coupon.name,
+      discountValue: discountAmount,
+      isApplied: true,
+      summary: {
+        subtotal: cartSubtotal,
+        gst: gstAmount,
+        shipping: SHIPPING_CHARGES,
+        preTotal: preTotal,
+        discount: discountAmount,
+        grandTotal: grandTotal,
+        note: "GST (18%) and Shipping included in calculations",
+      },
+    };
+
+    // 6. DB Update
     await Cart.updateOne(
       { userId },
-      {
-        $set: {
-          appliedCoupon: {
-            couponCodeId: coupon.couponCodeId,
-            name: coupon.name,
-            discountValue: finalDiscount,
-            isApplied: true,
-          },
-        },
-      },
+      { $set: { appliedCoupon: calculationSnapshot } },
     );
 
     return {
@@ -102,23 +124,15 @@ const applyCouponCodeService = async ({ userId, couponCodeName }) => {
       message: "Coupon applied successfully",
       success: true,
       data: {
-        couponCode: coupon.name,
-        discountType: coupon.discountType,
-        discountValue: coupon.discountValue,
-        minCartValue: coupon.minCartValue,
-        maxDiscount: coupon.maxDiscount,
-        finalDiscount,
-        description:
-          coupon.discountType === "PERCENTAGE"
-            ? `${coupon.discountValue}% off up to ₹${coupon.maxDiscount}`
-            : `Flat ₹${coupon.discountValue} off`,
+        items,
+        summary: calculationSnapshot.summary,
       },
     };
   } catch (error) {
     console.error("ApplyCoupon Error:", error);
     return {
       statusCode: 500,
-      message: "Apply coupon failed",
+      message: "Calculation failed",
       data: error.message,
       success: false,
     };
