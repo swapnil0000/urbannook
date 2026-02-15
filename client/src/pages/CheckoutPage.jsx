@@ -2,7 +2,7 @@ import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { motion } from 'framer-motion';
-import { useGetUserProfileQuery, useGetRazorpayKeyQuery, useCreateOrderMutation } from '../store/api/userApi';
+import { useGetUserProfileQuery, useGetRazorpayKeyQuery, useCreateOrderMutation, useApplyCouponMutation } from '../store/api/userApi';
 import { useCartData } from '../hooks/useCartSync';
 import { clearCart } from '../store/slices/cartSlice';
 import CouponInput from '../component/CouponInput';
@@ -29,12 +29,20 @@ const CheckoutPage = () => {
     address: '',
     pincode: ''
   });
+  const [pricingDetails, setPricingDetails] = useState({
+    subtotal: 0,
+    gst: 0,
+    shipping: 0,
+    discount: 0,
+    grandTotal: 0
+  });
 
   // API Hooks
   const { data: userProfileData, isLoading: profileLoading, refetch: refetchProfile } = useGetUserProfileQuery();
   const { data: razorpayKeyData } = useGetRazorpayKeyQuery();
   const [createOrder, { isLoading: isOrdering }] = useCreateOrderMutation();
   const { refetch: refetchCart } = useCartData();
+  const [applyCouponMutation] = useApplyCouponMutation();
 
   useEffect(() => {
     const getCookie = (name) => {
@@ -74,6 +82,39 @@ const CheckoutPage = () => {
     }
   }, [isAuthenticated, cartItems.length, navigate, userProfileData, profileLoading, refetchCart, refetchProfile]);
 
+  // Fetch initial pricing details on page load
+  useEffect(() => {
+    const fetchInitialPricing = async () => {
+      if (cartItems.length > 0) {
+        try {
+          // Call apply coupon API without coupon code to get pricing details
+          const result = await applyCouponMutation(null).unwrap();
+          if (result.success && result.data?.summary) {
+            setPricingDetails({
+              subtotal: result.data.summary.subtotal || 0,
+              gst: result.data.summary.gst || 0,
+              shipping: result.data.summary.shipping || 0,
+              discount: result.data.summary.discount || 0,
+              grandTotal: result.data.summary.grandTotal || 0
+            });
+          }
+        } catch (error) {
+          console.error('Failed to fetch initial pricing:', error);
+          // Fallback to basic calculation if API fails
+          setPricingDetails({
+            subtotal: totalAmount,
+            gst: Math.round(totalAmount * 0.18),
+            shipping: 199,
+            discount: 0,
+            grandTotal: totalAmount + Math.round(totalAmount * 0.18) + 199
+          });
+        }
+      }
+    };
+
+    fetchInitialPricing();
+  }, [cartItems.length, totalAmount, applyCouponMutation]);
+
   // Auto-fill address and pincode from user profile
   useEffect(() => {
     if (userProfile) {
@@ -98,17 +139,58 @@ const CheckoutPage = () => {
     });
   };
 
-  const handleCouponApplied = (couponData) => {
-    setAppliedCoupon(couponData.code);
-    setDiscount(couponData.discount);
+  const handleCouponApplied = async (couponData) => {
+    try {
+      // Call API with coupon code
+      const result = await applyCouponMutation(couponData.code).unwrap();
+      if (result.success && result.data?.summary) {
+        setAppliedCoupon(couponData.code);
+        setDiscount(result.data.summary.discount || 0);
+        setPricingDetails({
+          subtotal: result.data.summary.subtotal || 0,
+          gst: result.data.summary.gst || 0,
+          shipping: result.data.summary.shipping || 0,
+          discount: result.data.summary.discount || 0,
+          grandTotal: result.data.summary.grandTotal || 0
+        });
+      }
+    } catch (error) {
+      console.error('Failed to apply coupon:', error);
+      // Keep existing pricing if coupon application fails
+    }
   };
 
-  const handleCouponRemoved = () => {
-    setAppliedCoupon(null);
-    setDiscount(0);
+  const handleCouponRemoved = async () => {
+    try {
+      // Call API without coupon code to reset pricing
+      const result = await applyCouponMutation(null).unwrap();
+      if (result.success && result.data?.summary) {
+        setAppliedCoupon(null);
+        setDiscount(0);
+        setPricingDetails({
+          subtotal: result.data.summary.subtotal || 0,
+          gst: result.data.summary.gst || 0,
+          shipping: result.data.summary.shipping || 0,
+          discount: result.data.summary.discount || 0,
+          grandTotal: result.data.summary.grandTotal || 0
+        });
+      }
+    } catch (error) {
+      console.error('Failed to remove coupon:', error);
+      // Fallback to basic calculation
+      setAppliedCoupon(null);
+      setDiscount(0);
+      setPricingDetails({
+        subtotal: totalAmount,
+        gst: Math.round(totalAmount * 0.18),
+        shipping: 199,
+        discount: 0,
+        grandTotal: totalAmount + Math.round(totalAmount * 0.18) + 199
+      });
+    }
   };
 
-  const finalTotal = totalAmount - discount;
+  const finalTotal = pricingDetails.grandTotal;
 
   const validateForm = () => {
     const errors = {
@@ -332,18 +414,22 @@ const CheckoutPage = () => {
               <div className="space-y-3 pt-4 border-t border-white/10 text-sm">
                 <div className="flex justify-between text-gray-400">
                   <span>Subtotal</span>
-                  <span>₹{totalAmount.toLocaleString()}</span>
+                  <span>₹{pricingDetails.subtotal.toLocaleString()}</span>
                 </div>
-                {appliedCoupon && discount > 0 && (
-                  <div className="flex justify-between text-green-400">
-                    <span>Discount ({appliedCoupon})</span>
-                    <span>-₹{discount.toLocaleString()}</span>
-                  </div>
-                )}
+                <div className="flex justify-between text-gray-400">
+                  <span>GST (18%)</span>
+                  <span>₹{pricingDetails.gst.toLocaleString()}</span>
+                </div>
                 <div className="flex justify-between text-gray-400">
                   <span>Shipping</span>
-                  <span className="text-[#F5DEB3]">Free</span>
+                  <span>₹{pricingDetails.shipping.toLocaleString()}</span>
                 </div>
+                {appliedCoupon && pricingDetails.discount > 0 && (
+                  <div className="flex justify-between text-green-400">
+                    <span>Discount ({appliedCoupon})</span>
+                    <span>-₹{pricingDetails.discount.toLocaleString()}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-lg font-bold text-white pt-4 border-t border-white/10 mt-2">
                   <span>Total To Pay</span>
                   <span>₹{finalTotal.toLocaleString()}</span>
@@ -521,8 +607,8 @@ const CheckoutPage = () => {
             <div className="flex flex-col">
                 <span className="text-[10px] text-gray-400 uppercase tracking-wider">Total</span>
                 <span className="text-xl font-serif text-white">₹{finalTotal.toLocaleString()}</span>
-                {discount > 0 && (
-                  <span className="text-xs text-green-400">Saved ₹{discount.toLocaleString()}</span>
+                {pricingDetails.discount > 0 && (
+                  <span className="text-xs text-green-400">Saved ₹{pricingDetails.discount.toLocaleString()}</span>
                 )}
             </div>
             <button 
