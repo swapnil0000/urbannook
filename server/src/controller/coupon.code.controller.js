@@ -3,7 +3,7 @@ import {
   getAllCouponCodeService,
 } from "../services/coupon.code.service.js";
 import { ApiError, ApiRes } from "../utlis/index.js";
-
+import Cart from "../model/user.cart.model.js";
 const applyCouponCodeController = async (req, res) => {
   try {
     const { userId } = req.user;

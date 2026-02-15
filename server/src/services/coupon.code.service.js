@@ -6,11 +6,54 @@ const applyCouponCodeService = async ({ userId, couponCodeName }) => {
     // 1. Get raw cart and current subtotal
     const cartRes = await getCartService({ userId });
     if (!cartRes.success || !cartRes.data.items.length) {
-      return { statusCode: 400, message: "Cannot apply coupon to empty cart", success: false };
+      return {
+        statusCode: 400,
+        message: "Cannot apply coupon to empty cart",
+        success: false,
+      };
     }
 
     const { cartSubtotal, items } = cartRes.data;
+    let discountAmount = 0;
+    if (!couponCodeName || couponCodeName == "" || couponCodeName == null) {
+      const GST_RATE = 0.18;
+      const SHIPPING_CHARGES = 199;
 
+      const gstAmount = Math.round(cartSubtotal * GST_RATE);
+      const preTotal = cartSubtotal + gstAmount + SHIPPING_CHARGES;
+      const grandTotal = Math.max(preTotal - discountAmount, 0);
+
+      // 5. Structure Snapshot based on Updated Model
+      const calculationSnapshot = {
+        couponCodeId: null,
+        name: null,
+        discountValue: 0,
+        isApplied: false,
+        summary: {
+          subtotal: cartSubtotal,
+          gst: gstAmount,
+          shipping: SHIPPING_CHARGES,
+          preTotal: preTotal,
+          discount: 0,
+          grandTotal: grandTotal,
+          note: "GST (18%) and Shipping included in calculations",
+        },
+      };
+      // 6. DB Update
+      await Cart.updateOne(
+        { userId },
+        { $set: { appliedCoupon: calculationSnapshot } },
+      );
+      return {
+        statusCode: 200,
+        message: "No Coupon present",
+        success: true,
+        data: {
+          items,
+          summary: calculationSnapshot.summary,
+        },
+      };
+    }
     // 2. Fetch Coupon from DB
     const coupon = await CouponCode.findOne({
       name: couponCodeName.toUpperCase(),
@@ -18,7 +61,11 @@ const applyCouponCodeService = async ({ userId, couponCodeName }) => {
     }).lean();
 
     if (!coupon) {
-      return { statusCode: 404, message: "Invalid or inactive coupon", success: false };
+      return {
+        statusCode: 404,
+        message: "Invalid or inactive coupon",
+        success: false,
+      };
     }
 
     // 3. Min Cart Value Validation
@@ -37,7 +84,6 @@ const applyCouponCodeService = async ({ userId, couponCodeName }) => {
     const gstAmount = Math.round(cartSubtotal * GST_RATE);
     const preTotal = cartSubtotal + gstAmount + SHIPPING_CHARGES;
 
-    let discountAmount = 0;
     if (coupon.discountType === "PERCENTAGE") {
       discountAmount = (preTotal * coupon.discountValue) / 100;
       if (coupon.maxDiscount) {
@@ -70,7 +116,7 @@ const applyCouponCodeService = async ({ userId, couponCodeName }) => {
     // 6. DB Update
     await Cart.updateOne(
       { userId },
-      { $set: { appliedCoupon: calculationSnapshot } }
+      { $set: { appliedCoupon: calculationSnapshot } },
     );
 
     return {
@@ -84,7 +130,12 @@ const applyCouponCodeService = async ({ userId, couponCodeName }) => {
     };
   } catch (error) {
     console.error("ApplyCoupon Error:", error);
-    return { statusCode: 500, message: "Calculation failed", data: error.message, success: false };
+    return {
+      statusCode: 500,
+      message: "Calculation failed",
+      data: error.message,
+      success: false,
+    };
   }
 };
 
