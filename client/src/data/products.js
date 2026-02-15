@@ -1,5 +1,11 @@
 export const productCategories = [
   {
+    id: 'lighting',
+    name: 'Lighting',
+    icon: 'fa-solid fa-lightbulb',
+    description: '3D printed lamps and lighting solutions'
+  },
+  {
     id: 'keychains',
     name: 'Keychains',
     icon: 'fa-solid fa-key',
@@ -43,9 +49,30 @@ export const colors = [
 ];
 
 export const products = [
-  // Keychains
+  // Featured Product - The Voronoi Glow
   {
     id: 1,
+    title: 'The Voronoi Glow',
+    slug: 'voronoi-glow',
+    category: 'lighting',
+    price: 1500,
+    originalPrice: 3299,
+    colors: ['black', 'white'],
+    image: '/assets/featuredproduct.webp',
+    images: [
+      '/assets/featuredproduct.webp'
+    ],
+    badge: 'BESTSELLER',
+    rating: 4.9,
+    reviews: 120,
+    description: 'Inspired by natural cellular structures. This biodegradable PLA lamp casts a warm, intricate web of shadows, transforming any room into a cozy sanctuary.',
+    features: ['3D Printed Design', 'Biodegradable PLA Material', 'Warm LED Lighting', 'Unique Shadow Patterns'],
+    inStock: true,
+    tags: ['3d-printed', 'lamp', 'lighting', 'voronoi', 'eco-friendly']
+  },
+  // Keychains
+  {
+    id: 2,
     title: 'Minimalist Metal Keychain',
     slug: 'minimalist-metal-keychain',
     category: 'keychains',
@@ -66,7 +93,7 @@ export const products = [
     tags: ['metal', 'minimalist', 'durable', 'gift']
   },
   {
-    id: 2,
+    id: 3,
     title: 'Wooden Aesthetic Keychain',
     slug: 'wooden-aesthetic-keychain',
     category: 'keychains',
@@ -84,7 +111,7 @@ export const products = [
     tags: ['wood', 'eco-friendly', 'handcrafted', 'natural']
   },
   {
-    id: 3,
+    id: 4,
     title: 'Acrylic Design Keychain',
     slug: 'acrylic-design-keychain',
     category: 'keychains',
@@ -103,7 +130,7 @@ export const products = [
     tags: ['acrylic', 'colorful', 'modern', 'lightweight']
   },
   {
-    id: 4,
+    id: 5,
     title: 'Leather Circle Keychain',
     slug: 'leather-circle-keychain',
     category: 'keychains',
@@ -123,7 +150,7 @@ export const products = [
 
   // Posters
   {
-    id: 5,
+    id: 6,
     title: 'Abstract Art Poster Set',
     slug: 'abstract-art-poster-set',
     category: 'posters',
@@ -143,7 +170,7 @@ export const products = [
     tags: ['abstract', 'art', 'set', 'modern']
   },
   {
-    id: 6,
+    id: 7,
     title: 'Minimalist Typography',
     slug: 'minimalist-typography',
     category: 'posters',
@@ -163,7 +190,7 @@ export const products = [
 
   // Desk Accessories
   {
-    id: 7,
+    id: 8,
     title: 'Bamboo Pen Stand',
     slug: 'bamboo-pen-stand',
     category: 'desk-accessories',
@@ -181,7 +208,7 @@ export const products = [
     tags: ['bamboo', 'eco-friendly', 'organizer', 'sustainable']
   },
   {
-    id: 8,
+    id: 9,
     title: 'Desk Organizer Set',
     slug: 'desk-organizer-set',
     category: 'desk-accessories',
@@ -203,7 +230,7 @@ export const products = [
 
   // Car Accessories
   {
-    id: 9,
+    id: 10,
     title: 'Car Air Freshener',
     slug: 'car-air-freshener',
     category: 'car-accessories',
@@ -223,7 +250,7 @@ export const products = [
 
   // Home Decor
   {
-    id: 10,
+    id: 11,
     title: 'Decorative Plant Pot',
     slug: 'decorative-plant-pot',
     category: 'home-decor',

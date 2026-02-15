@@ -129,7 +129,7 @@ const applyCouponCodeService = async ({ userId, couponCodeName }) => {
       },
     };
   } catch (error) {
-    console.error("ApplyCoupon Error:", error);
+    console.error(`[ERROR] ApplyCoupon Error:`, error.message, error.stack);
     return {
       statusCode: 500,
       message: "Calculation failed",
@@ -168,7 +168,7 @@ const getAllCouponCodeService = async () => {
       success: true,
     };
   } catch (error) {
-    console.error("Error from get all coupon code:", error);
+    console.error(`[ERROR] Error from get all coupon code:`, error.message, error.stack);
     return {
       statusCode: 500,
       message: "Internal server error",

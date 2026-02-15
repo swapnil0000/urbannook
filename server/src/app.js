@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import dotenv from "dotenv";
 import {
   userRouter,
   adminRouter,
@@ -12,32 +13,21 @@ import {
   userWishListRouter,
   nfcRouter,
   couponCodeRouter,
+  testimonialRouter,
 } from "./routes/index.js";
 import cookieParser from "cookie-parser";
 import healthRouter from "./routes/health.route.js";
+import { corsOptions, logCorsConfig } from "./config/cors.config.js";
+import { errorHandler } from "./middleware/errorHandler.middleware.js";
+
+dotenv.config({
+  path: "./.env",
+});
 
 const app = express();
-const whiteListClientUrl = process.env.WHITE_LIST_CLIENT_URI.split(",");
-const nodeEnv = process.env.NODE_ENV;
-// env prod
-const corsOptions = {
-  origin: function (origin, callback) {
-    if (
-      nodeEnv == "production" &&
-      origin &&
-      whiteListClientUrl.includes(origin.trim())
-    ) {
-      callback(null, true);
-    } else if (!origin || whiteListClientUrl.includes(origin.trim())) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-};
+
+// Log CORS configuration on startup
+logCorsConfig();
 
 /* Health Route */
 app.use("/health", healthRouter);
@@ -72,4 +62,11 @@ app.use(
   nfcRouter,
   couponCodeRouter,
 );
+
+// Testimonial routes
+app.use("/api/v1/testimonials", testimonialRouter);
+
+// Error handler middleware must be registered last
+app.use(errorHandler);
+
 export default app;

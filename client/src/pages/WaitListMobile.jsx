@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import WaitListBanner from "../../public/assets/WaitListBanner.png";
 import axios from "axios";
-import { abusiveWords } from "../data/contants.js";
+import { abusiveWords } from "../data/constant";
 
 const WaitListMobile = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -107,7 +107,7 @@ const WaitListMobile = () => {
               }`}
             >
               <div className="pt-[6dvh] lg:pt-0 text-center lg:text-left space-y-4 flex flex-col items-center">
-                <img className="w-20 h-20" src="/assets/blacklogo.png" alt="logo" />
+                <img className="w-20 h-20" src="/assets/blacklogo.webp" alt="logo" />
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 backdrop-blur-sm mb-2 lg:mb-4">
                   <span
                     className="w-1.5 h-1.5 rounded-full animate-pulse"

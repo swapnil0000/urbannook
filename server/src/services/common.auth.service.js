@@ -41,7 +41,7 @@ const authGuardService = (role) => {
       req.authRole = role;
       next();
     } catch (error) {
-      console.error("JWT Error:", error.message);
+      console.error(`[ERROR] JWT Error - Role: ${role}:`, error.message);
       return res
         .status(401)
         .json(

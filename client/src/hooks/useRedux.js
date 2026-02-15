@@ -38,7 +38,11 @@ export const useUI = () => {
     ...ui,
     toggleCart: () => dispatch(toggleCartModal()),
     toggleAuth: () => dispatch(toggleAuthModal()),
-    showNotification: (message) => dispatch(setNotification(message)),
+    showNotification: (message, type = 'info') => {
+      dispatch(setNotification({ message, type }));
+      // Auto clear after 3 seconds
+      setTimeout(() => dispatch(clearNotification()), 3000);
+    },
     clearNotification: () => dispatch(clearNotification()),
   };
 };

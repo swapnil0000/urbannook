@@ -49,6 +49,10 @@ const couponCodeSchema = mongoose.Schema(
   { timestamps: true },
 );
 
+// Indexes for performance optimization
+couponCodeSchema.index({ name: 1 }, { unique: true });
+couponCodeSchema.index({ isPublished: 1 });
+
 const CouponCode = mongoose.model("CouponCode", couponCodeSchema);
 
 export default CouponCode;

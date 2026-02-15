@@ -1,4 +1,5 @@
 import { apiSlice } from './apiSlice';
+import { setCredentials, logout as logoutAction } from '../slices/authSlice';
 
 export const authApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
@@ -8,6 +9,25 @@ export const authApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: userData,
       }),
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          // Auto-login: Set credentials in Redux and localStorage
+          if (data.success && data.data) {
+            dispatch(setCredentials({
+              user: {
+                email: data.data.email,
+                name: data.data.name,
+                userId: data.data.userId,
+                role: data.data.role,
+              },
+              token: data.data.userAccessToken,
+            }));
+          }
+        } catch (error) {
+          console.error('Registration failed:', error);
+        }
+      },
     }),
     login: builder.mutation({
       query: (credentials) => ({
@@ -15,6 +35,47 @@ export const authApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: credentials,
       }),
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          // Set credentials in Redux and localStorage
+          if (data.success && data.data) {
+            dispatch(setCredentials({
+              user: {
+                email: data.data.email,
+                name: data.data.name,
+                role: data.data.role,
+                userMobileNumber: data.data.userMobileNumber,
+              },
+              token: data.data.userAccessToken,
+            }));
+          }
+        } catch (error) {
+          console.error('Login failed:', error);
+        }
+      },
+    }),
+    logout: builder.mutation({
+      query: () => ({
+        url: 'user/logout',
+        method: 'POST',
+      }),
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          // Clear Redux state, localStorage, and cookies
+          dispatch(logoutAction());
+          
+          // Wait for the API call to complete (optional)
+          await queryFulfilled;
+          
+          // Redirect to home page
+          window.location.href = '/';
+        } catch (error) {
+          // Even if API call fails, still logout locally
+          dispatch(logoutAction());
+          window.location.href = '/';
+        }
+      },
     }),
     logout: builder.mutation({
       query: () => ({

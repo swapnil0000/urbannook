@@ -1,9 +1,21 @@
 import { createSlice } from '@reduxjs/toolkit';
 
+// Helper function to get cookie
+const getCookie = (name) => {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
+};
+
+const getInitialToken = () => {
+  return localStorage.getItem('token') || getCookie('userAccessToken');
+};
+
 const initialState = {
-  user: null,
-  token: localStorage.getItem('token'),
-  isAuthenticated: !!localStorage.getItem('token'),
+  user: JSON.parse(localStorage.getItem('user') || 'null'),
+  token: getInitialToken(),
+  isAuthenticated: !!getInitialToken(),
 };
 
 const authSlice = createSlice({
@@ -16,13 +28,22 @@ const authSlice = createSlice({
       state.token = token;
       state.isAuthenticated = true;
       localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
     },
     logout: (state) => {
       state.user = null;
       state.token = null;
       state.isAuthenticated = false;
       localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      // Clear cookie as well
+      document.cookie = 'userAccessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
     },
+  },
+  extraReducers: (builder) => {
+    builder.addCase('auth/logout', (state) => {
+      // This will be caught by wishlist slice to clear wishlist
+    });
   },
 });
 
