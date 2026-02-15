@@ -1,10 +1,9 @@
 import {
-  existingProductUpdateService,
-  createNewProductService,
-} from "../services/admin.auth.service.js";
-import {
   adminLoginService,
   totalProductService,
+  existingProductUpdateService,
+  createNewProductService,
+  viewProductDetailsService,
 } from "../services/admin.auth.service.js";
 import { ApiError, ApiRes } from "../utlis/index.js";
 
@@ -12,6 +11,12 @@ import { fieldMissing } from "../utlis/ValidateRes.js";
 import cookieOptions from "../config/config.js";
 import { profileFetchService } from "../services/common.auth.service.js";
 import UserWaistList from "../model/user.waitlist.model.js";
+import {
+  nfcGenrateUserIdService,
+  nfcAssignGeneratedUserIdService,
+  nfcPauseGeneratedUserIdService,
+} from "../services/nfc.image.service.js";
+
 const adminLogin = async (req, res) => {
   try {
     const { email, password } = req.body || {};
@@ -31,20 +36,33 @@ const adminLogin = async (req, res) => {
         );
     }
     // existing User and pass check
-    let result = await adminLoginService(email, password);
+    let adminLoginServiceValidation = await adminLoginService(email, password);
 
-    if (result?.statusCode >= 400) {
-      return res.status(Number(result?.statusCode)).json(result);
+    if (!adminLoginServiceValidation?.success) {
+      return res
+        .status(Number(adminLoginServiceValidation?.statusCode))
+        .json(
+          new ApiError(
+            Number(adminLoginServiceValidation?.statusCode),
+            adminLoginServiceValidation?.message,
+            adminLoginServiceValidation?.data,
+            adminLoginServiceValidation?.success,
+          ),
+        );
     }
     return res
-      .status(Number(result?.statusCode))
-      .cookie("adminAccessToken", result?.data?.adminAccessToken, cookieOptions)
+      .status(Number(adminLoginServiceValidation?.statusCode))
+      .cookie(
+        "adminAccessToken",
+        adminLoginServiceValidation?.data?.adminAccessToken,
+        cookieOptions,
+      )
       .json(
         new ApiRes(
-          Number(result?.statusCode),
-          result?.message,
-          result?.data,
-          result?.success,
+          Number(adminLoginServiceValidation?.statusCode),
+          adminLoginServiceValidation?.message,
+          adminLoginServiceValidation?.data,
+          adminLoginServiceValidation?.success,
         ),
       );
   } catch (error) {
@@ -55,16 +73,33 @@ const adminLogin = async (req, res) => {
 const adminProfile = async (req, res) => {
   try {
     const { userEmail } = req.body;
-    const userDetails = await profileFetchService({ userEmail, role: "Admin" });
-    if (!userDetails) {
+    const profileFetchServiceValidation = await profileFetchService({
+      userEmail,
+      role: "Admin",
+    });
+    if (!profileFetchServiceValidation.success) {
       return res
-        .status(404)
-        .json(new ApiError(404, "User not found", null, false));
+        .status(Number(profileFetchServiceValidation.statusCode))
+        .json(
+          new ApiError(
+            profileFetchServiceValidation.statusCode,
+            profileFetchServiceValidation.message,
+            profileFetchServiceValidation.data,
+            profileFetchServiceValidation.success,
+          ),
+        );
     }
 
     return res
-      .status(200)
-      .json(new ApiRes(200, `User Details`, userDetails, true));
+      .status(Number(profileFetchServiceValidation.statusCode))
+      .json(
+        new ApiRes(
+          profileFetchServiceValidation.statusCode,
+          profileFetchServiceValidation.message,
+          profileFetchServiceValidation.data,
+          profileFetchServiceValidation.success,
+        ),
+      );
   } catch (error) {
     return res.status(500).json(new ApiError(500, error.message, null, false));
   }
@@ -120,8 +155,38 @@ const createProduct = async (req, res) => {
         );
 };
 
-const updateProduct = async (req, res) => {
+const viewProduct = async (req, res) => {
   const { productId } = req.params;
+  const { email: adminEmail } = req.user;
+  const viewProductDetailsServiceValidation = await viewProductDetailsService(
+    adminEmail,
+    productId,
+  );
+  return !viewProductDetailsServiceValidation?.success
+    ? res
+        .status(Number(viewProductDetailsServiceValidation?.statusCode))
+        .json(
+          new ApiError(
+            viewProductDetailsServiceValidation?.statusCode,
+            viewProductDetailsServiceValidation?.message,
+            viewProductDetailsServiceValidation?.data,
+            viewProductDetailsServiceValidation?.success,
+          ),
+        )
+    : res
+        .status(Number(viewProductDetailsServiceValidation?.statusCode))
+        .json(
+          new ApiRes(
+            viewProductDetailsServiceValidation?.statusCode,
+            viewProductDetailsServiceValidation?.message,
+            viewProductDetailsServiceValidation?.data,
+            viewProductDetailsServiceValidation?.success,
+          ),
+        );
+};
+
+const updateProduct = async (req, res) => {
+  const { productId } = req.body;
   const { email: adminEmail } = req.user;
   const {
     productName,
@@ -194,7 +259,7 @@ const adminLogout = (req, res) => {
 const getJoinedUserWaitList = async (_, res) => {
   try {
     const joinedUserWaitList = await UserWaistList.find()
-      .select("-_id")
+      .select("userName userEmail createdAt updatedAt")
       .sort({ createdAt: -1 });
     if (!joinedUserWaitList) {
       return res
@@ -203,8 +268,7 @@ const getJoinedUserWaitList = async (_, res) => {
           new ApiError(404, `Failed to fetch joinedUserWaitList`, null, false),
         );
     }
-    const totalJoinedUserWaitList =
-      await UserWaistList.countDocuments(joinedUserWaitList);
+    const totalJoinedUserWaitList = await UserWaistList.countDocuments();
     return res.status(200).json(
       new ApiRes(
         200,
@@ -227,16 +291,27 @@ const getJoinedUserWaitList = async (_, res) => {
 
 const totalProducts = async (_, res) => {
   try {
-    const result = await totalProductService();
-
+    const totalProductServiceValidation = await totalProductService();
+    if (!totalProductServiceValidation.success) {
+      return res
+        .status(Number(totalProductServiceValidation.statusCode))
+        .json(
+          new ApiRes(
+            totalProductServiceValidation.statusCode,
+            totalProductServiceValidation.message,
+            totalProductServiceValidation.data,
+            totalProductServiceValidation.success,
+          ),
+        );
+    }
     return res
-      .status(result.statusCode)
+      .status(Number(totalProductServiceValidation.statusCode))
       .json(
         new ApiRes(
-          result.statusCode,
-          result.message,
-          result.data,
-          result.success,
+          totalProductServiceValidation.statusCode,
+          totalProductServiceValidation.message,
+          totalProductServiceValidation.data,
+          totalProductServiceValidation.success,
         ),
       );
   } catch (error) {
@@ -246,12 +321,133 @@ const totalProducts = async (_, res) => {
   }
 };
 
+const nfcGenrateUserId = async (req, res) => {
+  try {
+    const { email: adminEmail } = req.user || {};
+    const nfcGenrateUserIdServiceValidation = await nfcGenrateUserIdService({
+      adminEmail,
+    });
+
+    if (!nfcGenrateUserIdServiceValidation.success) {
+      return res
+        .status(Number(nfcGenrateUserIdServiceValidation.statusCode))
+        .json(
+          new ApiError(
+            nfcGenrateUserIdServiceValidation.statusCode,
+            nfcGenrateUserIdServiceValidation.message,
+            nfcGenrateUserIdServiceValidation.data,
+            nfcGenrateUserIdServiceValidation.success,
+          ),
+        );
+    }
+
+    return res
+      .status(Number(nfcGenrateUserIdServiceValidation.statusCode))
+      .json(
+        new ApiRes(
+          nfcGenrateUserIdServiceValidation.statusCode,
+          nfcGenrateUserIdServiceValidation.message,
+          nfcGenrateUserIdServiceValidation.data,
+          nfcGenrateUserIdServiceValidation.success,
+        ),
+      );
+  } catch (error) {
+    return res
+      .status(Number(500))
+      .json(new ApiError(500, `Internal Server Error - ${error}`, null, false));
+  }
+};
+
+const nfcAssignGeneratedUserId = async (req, res) => {
+  try {
+    const { email: adminEmail } = req.user || {};
+    const { userId } = req.body;
+    const nfcAssignGeneratedUserIdServiceValidation =
+      await nfcAssignGeneratedUserIdService({
+        adminEmail,
+        userId,
+      });
+
+    if (!nfcAssignGeneratedUserIdServiceValidation.success) {
+      return res
+        .status(Number(nfcAssignGeneratedUserIdServiceValidation.statusCode))
+        .json(
+          new ApiError(
+            nfcAssignGeneratedUserIdServiceValidation.statusCode,
+            nfcAssignGeneratedUserIdServiceValidation.message,
+            nfcAssignGeneratedUserIdServiceValidation.data,
+            nfcAssignGeneratedUserIdServiceValidation.success,
+          ),
+        );
+    }
+
+    return res
+      .status(Number(nfcAssignGeneratedUserIdServiceValidation.statusCode))
+      .json(
+        new ApiRes(
+          nfcAssignGeneratedUserIdServiceValidation.statusCode,
+          nfcAssignGeneratedUserIdServiceValidation.message,
+          nfcAssignGeneratedUserIdServiceValidation.data,
+          nfcAssignGeneratedUserIdServiceValidation.success,
+        ),
+      );
+  } catch (error) {
+    return res
+      .status(Number(500))
+      .json(new ApiError(500, `Internal Server Error - ${error}`, null, false));
+  }
+};
+
+const nfcPauseGeneratedUserId = async (req, res) => {
+  try {
+    const { email: adminEmail } = req.user || {};
+    const { userId } = req.body;
+    const nfcPauseGeneratedUserIdServiceValidation =
+      await nfcPauseGeneratedUserIdService({
+        adminEmail,
+        userId,
+      });
+
+    if (!nfcPauseGeneratedUserIdServiceValidation.success) {
+      return res
+        .status(Number(nfcPauseGeneratedUserIdServiceValidation.statusCode))
+        .json(
+          new ApiError(
+            nfcPauseGeneratedUserIdServiceValidation.statusCode,
+            nfcPauseGeneratedUserIdServiceValidation.message,
+            nfcPauseGeneratedUserIdServiceValidation.data,
+            nfcPauseGeneratedUserIdServiceValidation.success,
+          ),
+        );
+    }
+
+    return res
+      .status(Number(nfcPauseGeneratedUserIdServiceValidation.statusCode))
+      .json(
+        new ApiRes(
+          nfcPauseGeneratedUserIdServiceValidation.statusCode,
+          nfcPauseGeneratedUserIdServiceValidation.message,
+          nfcPauseGeneratedUserIdServiceValidation.data,
+          nfcPauseGeneratedUserIdServiceValidation.success,
+        ),
+      );
+  } catch (error) {
+    return res
+      .status(Number(500))
+      .json(new ApiError(500, `Internal Server Error - ${error}`, null, false));
+  }
+};
+
 export {
   adminLogin,
   adminLogout,
   adminProfile,
   createProduct,
+  viewProduct,
   updateProduct,
   getJoinedUserWaitList,
   totalProducts,
+  nfcGenrateUserId,
+  nfcAssignGeneratedUserId,
+  nfcPauseGeneratedUserId,
 };

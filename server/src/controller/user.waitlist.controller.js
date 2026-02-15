@@ -16,8 +16,8 @@ const userWaitListController = async (req, res) => {
               400,
               `Can't join the waitlist — ${key} is missing`,
               null,
-              false
-            )
+              false,
+            ),
           );
     }
     const reservedNames = [
@@ -38,8 +38,8 @@ const userWaitListController = async (req, res) => {
             403,
             `Oops 😅 ${userName} is a VIP name reserved for the system. Please pick something uniquely *you* — we promise we won’t steal it 😉`,
             { userEmail, userName },
-            false
-          )
+            false,
+          ),
         );
     }
 
@@ -55,8 +55,8 @@ const userWaitListController = async (req, res) => {
             200,
             "You're already on the UrbanNook waitlist 🎉",
             { userEmail, userName },
-            true
-          )
+            true,
+          ),
         );
     }
 
@@ -73,8 +73,8 @@ const userWaitListController = async (req, res) => {
             500,
             "Unable to join the waitlist at the moment. Please try again later.",
             { userEmail, userName },
-            false
-          )
+            false,
+          ),
         );
     }
 
@@ -118,8 +118,8 @@ const userWaitListController = async (req, res) => {
             200,
             "You've joined the waitlist 🎉. However, we couldn't send the confirmation email right now.",
             userEmail,
-            true
-          )
+            true,
+          ),
         );
     }
 
@@ -130,8 +130,8 @@ const userWaitListController = async (req, res) => {
           200,
           "Congrats 🎉 A confirmation email is on its way to your inbox While you wait, see what we are building",
           userEmail,
-          true
-        )
+          true,
+        ),
       );
   } catch (error) {
     console.error(error);

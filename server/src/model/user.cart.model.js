@@ -10,7 +10,27 @@ const cartSchema = mongoose.Schema({
     of: Number,
     default: {},
   },
+
+  appliedCoupon: {
+    couponCodeId: {
+      type: String,
+      default: null,
+    },
+    name: {
+      type: String,
+      default: null,
+    },
+    discountValue: {
+      type: Number,
+      default: 0,
+    },
+    isApplied: {
+      type: Boolean,
+      default: false,
+    },
+  },
 });
+
 cartSchema.index({ userId: 1 }, { unique: true });
 
 const Cart = mongoose.model("Cart", cartSchema);

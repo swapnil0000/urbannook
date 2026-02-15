@@ -1,3 +1,4 @@
+import CouponCode from "../model/coupon.code.model.js";
 import Product from "../model/product.model.js";
 import Cart from "../model/user.cart.model.js";
 import User from "../model/user.model.js";
@@ -91,7 +92,7 @@ const addToCartService = async ({ userId, productId }) => {
   }
 };
 
-const previewCartService = async ({ userId }) => {
+const getCartService = async ({ userId }) => {
   try {
     if (!userId) {
       return {
@@ -101,6 +102,7 @@ const previewCartService = async ({ userId }) => {
         success: false,
       };
     }
+
     const userDetails = await User.findOne({ userId }, { name: 1 }).lean();
     if (!userDetails) {
       return {
@@ -112,28 +114,21 @@ const previewCartService = async ({ userId }) => {
     }
 
     const cartPreview = await Cart.aggregate([
-      // Match user's cart
-      {
-        $match: {
-          userId,
-        },
-      },
+      { $match: { userId } },
 
-      // Convert products object → array
+      // Converting the 'products' object (map) into an array
+      // so we can loop through the items
       {
         $project: {
-          items: {
-            $objectToArray: "$products",
-          },
+          items: { $objectToArray: "$products" },
+          appliedCoupon: 1, // to keep the coupon info available for later stages
         },
       },
 
-      // 3Expand each product
-      {
-        $unwind: "$items",
-      },
+      // Breaking the array so we can process one product at a time
+      { $unwind: "$items" },
 
-      //  Join with Product collection
+      // Fetcingh product details (Name, Price, Image) from the 'products' collection
       {
         $lookup: {
           from: "products",
@@ -143,12 +138,11 @@ const previewCartService = async ({ userId }) => {
         },
       },
 
-      // Flatten product array
-      {
-        $unwind: "$product",
-      },
+      // Flatten the product array resulting from the lookup
+      { $unwind: "$product" },
 
-      //  Shape final item
+      // Calculate the subtotal for each individual line item
+      // (Selling Price * Quantity)
       {
         $project: {
           _id: 0,
@@ -157,42 +151,85 @@ const previewCartService = async ({ userId }) => {
           price: "$product.sellingPrice",
           image: "$product.productImg",
           quantity: "$items.v",
+          appliedCoupon: 1,
           subtotal: {
             $multiply: ["$product.sellingPrice", "$items.v"],
           },
         },
       },
 
-      // Group back to cart summary
+      // Group the items back together into a single cart object
       {
         $group: {
           _id: null,
-          items: { $push: "$$ROOT" },
+          //  We manually specify which fields to put in the 'items' array.
+          // This ensures that 'appliedCoupon' does NOT get mixed inside the items list.
+          items: {
+            $push: {
+              productId: "$productId",
+              name: "$name",
+              price: "$price",
+              image: "$image",
+              quantity: "$quantity",
+              subtotal: "$subtotal",
+            },
+          },
+          // Sum up the subtotal of all items to get the cart total
           subtotal: { $sum: "$subtotal" },
           totalQuantity: { $sum: "$quantity" },
+          // Retain the coupon information from the cart document
+          appliedCoupon: { $first: "$appliedCoupon" },
         },
       },
 
-      // Final response format
+      //  GST (Tax)  18% of the subtotal, rounded to the nearest integer
+      {
+        $addFields: {
+          gstAmount: { $round: [{ $multiply: ["$subtotal", 0.18] }, 0] },
+        },
+      },
+
+      // Calculate the Total before Discount (PreTotal)
+      // Subtotal + GST + Shipping Charges (Fixed 199)
+      {
+        $addFields: {
+          preTotalCalc: {
+            $round: [{ $add: ["$subtotal", "$gstAmount", 199] }, 0],
+          },
+        },
+      },
+
+      // We structure the JSON exactly how the frontend expects it
       {
         $project: {
           _id: 0,
           items: 1,
+
+          // We place the coupon details at the root level (outside summary)
+          // ensuring the structure is clean and easy to access
+          coupon: {
+            isApplied: "$appliedCoupon.isApplied",
+            code: "$appliedCoupon.name",
+            discount: { $ifNull: ["$appliedCoupon.discountValue", 0] },
+          },
+
           summary: {
             subtotal: "$subtotal",
             totalQuantity: "$totalQuantity",
-            shipping: { $literal: 249 },
-            tax: {
-              $round: [{ $multiply: ["$subtotal", 0.18] }, 0],
-            },
+            note: "GST included in MRP",
+            shipping: 199,
+            gst: "$gstAmount",
+            preTotal: "$preTotalCalc",
 
+            // Calculate the Grand Total
+            // PreTotal - Discount.
+            // We use max with 0 to ensure the total never becomes negative.
             grandTotal: {
-              $round: [
+              $max: [
                 {
-                  $add: [
-                    "$subtotal",
-                    { $literal: 249 },
-                    { $multiply: ["$subtotal", 0.18] },
+                  $subtract: [
+                    "$preTotalCalc",
+                    { $ifNull: ["$appliedCoupon.discountValue", 0] },
                   ],
                 },
                 0,
@@ -203,23 +240,78 @@ const previewCartService = async ({ userId }) => {
       },
     ]);
 
-    if (!cartPreview) {
+    // Handle the case where the cart is completely empty
+    if (!cartPreview || cartPreview.length === 0) {
       return {
-        statusCode: 404,
-        message: `Cart is empty for ${userId}`,
+        statusCode: 200,
+        message: `Cart is empty for ${userDetails?.name}`,
         data: null,
-        success: false,
+        success: true,
       };
+    }
+
+    // The database calculation is done, but we must check if the coupon
+    // is still valid for the current price (e.g., if price dropped)
+    let finalCartData = cartPreview[0];
+    const { summary, coupon } = finalCartData;
+    // Only proceed if a coupon is currently marked as applied
+    if (coupon && coupon.isApplied) {
+      const couponRules = await CouponCode.findOne({
+        name: coupon.code,
+        isPublished: true,
+      }).lean();
+
+      // Check if the coupon is invalid OR if the cart value is now too low
+      // Example: Coupon needs 500 minimum, but cart is now 300
+      if (!couponRules || summary.preTotal < couponRules.minCartValue) {
+        // Remove the coupon from the database immediately
+        await Cart.updateOne({ userId }, { $unset: { appliedCoupon: 1 } });
+        // Update the response object so the user sees the coupon is gone
+        finalCartData.coupon = {
+          isApplied: false,
+          code: null,
+          discount: 0,
+        };
+        // Reset the Grand Total to match the PreTotal (since discount is 0)
+        finalCartData.summary.grandTotal = summary.preTotal;
+        finalCartData.summary.note =
+          "Coupon removed: Minimum order value not met";
+        // Note: We don't need to clean the 'items' array here because
+        // we already handled that in the aggregation $group stage.
+      }
+      // If the coupon is still valid, check if it is a Percentage discount
+      // Percentage discounts change based on the total, so we might need to recalculate
+      else if (couponRules.discountType === "PERCENTAGE") {
+        // Calculate the new discount amount based on the current total
+        let newDiscount = (summary.preTotal * couponRules.discountValue) / 100;
+        // Apply the maximum discount limit if one exists
+        if (couponRules.maxDiscount) {
+          newDiscount = Math.min(newDiscount, couponRules.maxDiscount);
+        }
+        newDiscount = Math.round(newDiscount);
+        // If the calculated discount is different from what was stored
+        if (newDiscount !== coupon.discount) {
+          finalCartData.coupon.discount = newDiscount;
+          finalCartData.summary.grandTotal = Math.max(
+            summary.preTotal - newDiscount,
+            0,
+          );
+          await Cart.updateOne(
+            { userId },
+            { $set: { "appliedCoupon.discountValue": newDiscount } },
+          );
+        }
+      }
     }
 
     return {
       statusCode: 200,
       message: `Cart Details for ${userId}`,
-      data: cartPreview,
-      success: false,
+      data: finalCartData,
+      success: true,
     };
   } catch (error) {
-    console.error("PreviewCart Error:", error);
+    console.error("GetCart Error:", error);
     return {
       statusCode: 500,
       message: "Internal server error",
@@ -355,7 +447,7 @@ const clearCartService = async ({ userId }) => {
 
 export {
   addToCartService,
-  previewCartService,
+  getCartService,
   cartQuantityService,
   clearCartService,
 };

@@ -9,30 +9,30 @@ const userCreateAddress = async (req, res) => {
   try {
     const { userId } = req.user;
     const {
-      placeId,
       lat,
       long,
-      formattedAddress,
       city,
       state,
       pinCode,
+      placeId,
+      formattedAddress,
       landmark,
-      flatNumber,
+      flatOrFloorNumber,
       addressType,
       isDefault,
     } = req.body || {};
 
     const createAddressServiceValidation = await createAddressService({
       userId,
-      placeId,
       lat,
       long,
-      formattedAddress,
       city,
       state,
       pinCode,
+      placeId,
+      formattedAddress,
       landmark,
-      flatNumber,
+      flatOrFloorNumber,
       addressType,
       isDefault,
     });
@@ -73,25 +73,35 @@ const userCreateAddress = async (req, res) => {
       );
   }
 };
-const userAddressUpdate = async (req, res) => {
+const userUpdateAddress = async (req, res) => {
   try {
     const { userId } = req.user;
-    const { addressId, lat, long, city, state, pinCode, formattedAdress } =
-      req.body || {};
-    const userUpdatedAddressServiceValidation = updatedAddressService({
-      userId,
-      addressId,
+    const {
       lat,
       long,
       city,
       state,
       pinCode,
-      formattedAdress,
+      formattedAddress,
+      addressId,
+      placeId,
+    } = req.body || {};
+
+    const userUpdatedAddressServiceValidation = await updatedAddressService({
+      userId,
+      lat,
+      long,
+      city,
+      state,
+      pinCode,
+      formattedAddress,
+      addressId,
+      placeId,
     });
 
     if (!userUpdatedAddressServiceValidation.success) {
       return res
-        .status(userUpdatedAddressServiceValidation.statusCode)
+        .status(Number(userUpdatedAddressServiceValidation.statusCode))
         .json(
           new ApiError(
             userUpdatedAddressServiceValidation.statusCode,
@@ -103,7 +113,7 @@ const userAddressUpdate = async (req, res) => {
     }
 
     return res
-      .status(200)
+      .status(Number(userUpdatedAddressServiceValidation.statusCode))
       .json(
         new ApiRes(
           userUpdatedAddressServiceValidation.statusCode,
@@ -126,4 +136,4 @@ const userAddressUpdate = async (req, res) => {
   }
 };
 
-export { userAddressUpdate, userCreateAddress };
+export { userUpdateAddress as userAddressUpdate, userCreateAddress };
