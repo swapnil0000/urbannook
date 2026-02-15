@@ -129,12 +129,13 @@ const getAllCouponCodeService = async () => {
   try {
     const activeCouponCodeList = await CouponCode.find(
       {
-        couponCodePushlibed: true,
+        isPublished: true,
       },
       {
         _id: 0,
-        couponCodeName: 1,
-        couponCodeId: 1,
+        __v: 0,
+        createdAt: 0,
+        updatedAt: 0,
       },
     ).lean();
 

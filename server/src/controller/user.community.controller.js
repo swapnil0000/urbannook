@@ -1,9 +1,7 @@
 import UserCommunityList from "../model/user.community.js";
 import { ApiError, ApiRes } from "../utlis/index.js";
 import nodemailer from "nodemailer";
-import dotenv from "dotenv";
 import communityTemplate from "../template/community.template.js";
-dotenv.config({ path: "./.env" });
 
 const userCommunityController = async (req, res) => {
   try {
