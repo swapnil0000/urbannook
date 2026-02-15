@@ -1,7 +1,12 @@
 import multer from "multer";
 import multerS3 from "multer-s3";
 import { S3Client } from "@aws-sdk/client-s3";
-
+import dotenv from "dotenv";
+const envFile =
+  process.env.NODE_ENV === "production" ? "./.env.production" : "./.env";
+dotenv.config({
+  path: envFile,
+});
 const s3Obj = new S3Client({
   region: process.env.AWS_BUCKET_REGION,
   credentials: {
@@ -56,7 +61,7 @@ const uploadImgWithMulterToNfcBucket = multer({
   fileFilter: fileFilter,
 
   limits: {
-    files: 3, 
+    files: 3,
     fileSize: 5 * 1024 * 1024, // Max 5 MB per file
   },
 });

@@ -10,6 +10,10 @@ const userWaitListSchema = mongoose.Schema(
       required: [true, "userEmail is required"],
       unique: true,
     },
+    waitListEmailSent: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,
