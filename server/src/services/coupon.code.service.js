@@ -3,27 +3,29 @@ import { getCartService } from "../services/user.cart.service.js";
 import Cart from "../model/user.cart.model.js";
 const applyCouponCodeService = async ({ userId, couponCodeName }) => {
   try {
-    // 1. Get raw cart and current subtotal
     const cartRes = await getCartService({ userId });
-    if (!cartRes.success || !cartRes.data.items.length) {
+    if (
+      !cartRes.success ||
+      (cartRes.data.availableItems.length === 0 &&
+        cartRes.data.unavailableItems.length === 0)
+    ) {
       return {
         statusCode: 400,
-        message: "Cannot apply coupon to empty cart",
+        message: "Cannot calculate for empty cart",
         success: false,
       };
     }
 
-    const { cartSubtotal, items } = cartRes.data;
+    const { cartSubtotal, availableItems } = cartRes.data;
+    const GST_RATE = 0.18;
+    const SHIPPING_CHARGES = 199;
+
+    const gstAmount = Math.round(cartSubtotal * GST_RATE);
+    const preTotal = cartSubtotal + gstAmount + SHIPPING_CHARGES;
     let discountAmount = 0;
-    if (!couponCodeName || couponCodeName == "" || couponCodeName == null) {
-      const GST_RATE = 0.18;
-      const SHIPPING_CHARGES = 199;
 
-      const gstAmount = Math.round(cartSubtotal * GST_RATE);
-      const preTotal = cartSubtotal + gstAmount + SHIPPING_CHARGES;
-      const grandTotal = Math.max(preTotal - discountAmount, 0);
-
-      // 5. Structure Snapshot based on Updated Model
+    // --- CASE 1: No Coupon Code Provided ---
+    if (!couponCodeName || couponCodeName.trim() === "") {
       const calculationSnapshot = {
         couponCodeId: null,
         name: null,
@@ -35,26 +37,34 @@ const applyCouponCodeService = async ({ userId, couponCodeName }) => {
           shipping: SHIPPING_CHARGES,
           preTotal: preTotal,
           discount: 0,
-          grandTotal: grandTotal,
-          note: "GST (18%) and Shipping included in calculations",
+          grandTotal: Math.max(preTotal, 0),
+          note: "Standard calculation without coupon",
         },
       };
-      // 6. DB Update
+
       await Cart.updateOne(
         { userId },
         { $set: { appliedCoupon: calculationSnapshot } },
       );
+
       return {
         statusCode: 200,
         message: "No Coupon present",
         success: true,
-        data: {
-          items,
-          summary: calculationSnapshot.summary,
-        },
+        data: { items: availableItems, summary: calculationSnapshot?.summary },
       };
     }
-    // 2. Fetch Coupon from DB
+
+    // --- CASE 2: Global Rule Check (Subtotal <= 99) ---
+    if (cartSubtotal <= 99) {
+      return {
+        statusCode: 400,
+        message: "Coupons are not applicable on cart values of ₹99 or less",
+        success: false,
+      };
+    }
+
+    // --- CASE 3: Fetch and Validate Coupon ---
     const coupon = await CouponCode.findOne({
       name: couponCodeName.toUpperCase(),
       isPublished: true,
@@ -68,7 +78,6 @@ const applyCouponCodeService = async ({ userId, couponCodeName }) => {
       };
     }
 
-    // 3. Min Cart Value Validation
     if (cartSubtotal < coupon.minCartValue) {
       return {
         statusCode: 400,
@@ -77,18 +86,11 @@ const applyCouponCodeService = async ({ userId, couponCodeName }) => {
       };
     }
 
-    // 4. PRICE ENGINE LOGIC
-    const GST_RATE = 0.18;
-    const SHIPPING_CHARGES = 199;
-
-    const gstAmount = Math.round(cartSubtotal * GST_RATE);
-    const preTotal = cartSubtotal + gstAmount + SHIPPING_CHARGES;
-
+    // Discount Calculation Logic
     if (coupon.discountType === "PERCENTAGE") {
       discountAmount = (preTotal * coupon.discountValue) / 100;
-      if (coupon.maxDiscount) {
+      if (coupon.maxDiscount)
         discountAmount = Math.min(discountAmount, coupon.maxDiscount);
-      }
     } else {
       discountAmount = coupon.discountValue;
     }
@@ -96,7 +98,6 @@ const applyCouponCodeService = async ({ userId, couponCodeName }) => {
     discountAmount = Math.round(discountAmount);
     const grandTotal = Math.max(preTotal - discountAmount, 0);
 
-    // 5. Structure Snapshot based on Updated Model
     const calculationSnapshot = {
       couponCodeId: coupon.couponCodeId,
       name: coupon.name,
@@ -113,7 +114,6 @@ const applyCouponCodeService = async ({ userId, couponCodeName }) => {
       },
     };
 
-    // 6. DB Update
     await Cart.updateOne(
       { userId },
       { $set: { appliedCoupon: calculationSnapshot } },
@@ -124,7 +124,7 @@ const applyCouponCodeService = async ({ userId, couponCodeName }) => {
       message: "Coupon applied successfully",
       success: true,
       data: {
-        items,
+        items: availableItems,
         summary: calculationSnapshot.summary,
       },
     };
