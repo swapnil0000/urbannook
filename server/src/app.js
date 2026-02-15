@@ -1,6 +1,5 @@
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import {
   userRouter,
   adminRouter,
@@ -16,9 +15,7 @@ import {
 } from "./routes/index.js";
 import cookieParser from "cookie-parser";
 import healthRouter from "./routes/health.route.js";
-dotenv.config({
-  path: "./.env",
-});
+
 const app = express();
 const whiteListClientUrl = process.env.WHITE_LIST_CLIENT_URI.split(",");
 const nodeEnv = process.env.NODE_ENV;

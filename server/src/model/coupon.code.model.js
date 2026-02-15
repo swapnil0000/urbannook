@@ -40,6 +40,11 @@ const couponCodeSchema = mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    desc: {
+      type: String,
+      required: false,
+      trim: true,
+    },
   },
   { timestamps: true },
 );

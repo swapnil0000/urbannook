@@ -93,7 +93,7 @@ const profileFetchService = async ({ userId, role }) => {
   );
   return {
     statusCode: 200,
-    message: `Profile details for userId - ${userId} and role ${role}`,
+    message: `Profile details for userId - ${profile?.name} and role ${role}`,
     data: profile,
     success: true,
   };
