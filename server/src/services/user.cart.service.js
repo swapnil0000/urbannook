@@ -81,7 +81,7 @@ const addToCartService = async ({ userId, productId }) => {
       success: true,
     };
   } catch (error) {
-    console.error("AddToCart Error:", error);
+    console.error(`[ERROR] AddToCart Error:`, error.message, error.stack);
     return {
       statusCode: 500,
       message: "Internal server error",
@@ -155,7 +155,7 @@ const getCartService = async ({ userId }) => {
       success: true,
     };
   } catch (error) {
-    console.error("GetCart Error:", error);
+    console.error(`[ERROR] GetCart Error:`, error.message, error.stack);
     return {
       statusCode: 500,
       message: "Internal server error",

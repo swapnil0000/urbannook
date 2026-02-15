@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import ForgotPassword from './ForgotPassword';
 import { useLoginMutation } from '../../../store/api/authApi';
 import { useAuth, useUI } from '../../../hooks/useRedux';
+import OptimizedImage from '../../OptimizedImage';
 
 const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
   const [formData, setFormData] = useState({ identifier: '', password: '' });
@@ -155,7 +156,12 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
                     type="button"
                     className="h-12 flex items-center justify-center rounded-xl border border-slate-200 hover:bg-slate-50 hover:border-slate-400 transition-all active:scale-95"
                 >
-                    <img src={`/assets/onboardIcon-${provider === 'mobile' ? 'mail' : provider === 'google' ? 'gp' : 'fb'}.svg`} className="w-5 h-5" alt={provider} />
+                    <OptimizedImage
+                      src={`/assets/onboardIcon-${provider === 'mobile' ? 'mail' : provider === 'google' ? 'gp' : 'fb'}.svg`}
+                      alt={`${provider} login`}
+                      className="w-5 h-5"
+                      loading="lazy"
+                    />
                 </button>
                 ))}
             </div>

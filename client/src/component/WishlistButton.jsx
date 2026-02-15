@@ -1,20 +1,34 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useAddToWishlistMutation, useRemoveFromWishlistMutation, userApi } from '../store/api/userApi';
-import { addToWishlistLocal, removeFromWishlistLocal } from '../store/slices/wishlistSlice';
+import { useAddToWishlistMutation, useRemoveFromWishlistMutation, useGetWishlistQuery } from '../store/api/userApi';
+import { setWishlistItems } from '../store/slices/wishlistSlice';
 
 const WishlistButton = ({ productId, className = "", size = "md" }) => {
   const dispatch = useDispatch();
   const [addToWishlist] = useAddToWishlistMutation();
   const [removeFromWishlist] = useRemoveFromWishlistMutation();
+  const { data: wishlistData } = useGetWishlistQuery(undefined, { 
+    skip: !useSelector((state) => state.auth.isAuthenticated) 
+  });
   const wishlistItems = useSelector((state) => state.wishlist.items);
   const { isAuthenticated } = useSelector((state) => state.auth);
+  
+  // Sync wishlist from API to Redux on mount/update
+  useEffect(() => {
+    if (wishlistData?.data) {
+      console.log('Syncing wishlist to Redux:', wishlistData.data);
+      dispatch(setWishlistItems(wishlistData.data));
+    }
+  }, [wishlistData, dispatch]);
+
+
   const isInWishlist = wishlistItems.some(item => 
-    item.productName === productId || item.productId === productId
+    item.productId === productId
   );
 
   const handleWishlistToggle = async (e) => {
     e.stopPropagation();
+
     
     // Check authentication
     const getCookie = (name) => {
@@ -35,12 +49,8 @@ const WishlistButton = ({ productId, className = "", size = "md" }) => {
     try {
       if (isInWishlist) {
         await removeFromWishlist(productId).unwrap();
-        dispatch(removeFromWishlistLocal(productId));
-        // Invalidate cache to trigger refetch
-        dispatch(userApi.util.invalidateTags(['User']));
       } else {
         await addToWishlist({ productId }).unwrap();
-        dispatch(addToWishlistLocal(productId));
       }
     } catch (error) {
       console.error('Failed to toggle wishlist:', error);

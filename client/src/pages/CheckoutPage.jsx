@@ -1,12 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useSelector, useDispatch } from 'react-redux';
+import { motion } from 'framer-motion';
 import { useGetUserProfileQuery, useGetRazorpayKeyQuery, useCreateOrderMutation } from '../store/api/userApi';
 import { useCartData } from '../hooks/useCartSync';
+import { clearCart } from '../store/slices/cartSlice';
+import CouponInput from '../component/CouponInput';
+import { ComponentLoader } from '../component/layout/LoadingSpinner';
+
+// Lazy load heavy components
+const CouponList = lazy(() => import('../component/CouponList'));
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const { items: cartItems, totalAmount } = useSelector((state) => state.cart);
   const { isAuthenticated, user } = useSelector((state) => state.auth);
   
@@ -14,32 +21,20 @@ const CheckoutPage = () => {
   const [address, setAddress] = useState('');
   const [pincode, setPincode] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [discount, setDiscount] = useState(0);
+  const [paymentError, setPaymentError] = useState(null);
+  const [showRetry, setShowRetry] = useState(false);
+  const [validationErrors, setValidationErrors] = useState({
+    address: '',
+    pincode: ''
+  });
 
   // API Hooks
   const { data: userProfileData, isLoading: profileLoading, refetch: refetchProfile } = useGetUserProfileQuery();
   const { data: razorpayKeyData } = useGetRazorpayKeyQuery();
   const [createOrder, { isLoading: isOrdering }] = useCreateOrderMutation();
   const { refetch: refetchCart } = useCartData();
-
-  const fetchUserProfile = async () => {
-    try {
-      const localUser = JSON.parse(localStorage.getItem('user') || '{}');
-      const email = user?.email || user?.userEmail || localUser?.email || localStorage.getItem('userEmail');
-      
-      if (!email) {
-        alert('User email not found. Please login again.');
-        return;
-      }
-      
-      const result = await refetchProfile();
-      const profileData = result.data?.data || result.data;
-      setUserProfile(profileData);
-      setIsLoading(false);
-    } catch (error) {
-      console.error('Failed to fetch profile:', error);
-      setIsLoading(false);
-    }
-  };
 
   useEffect(() => {
     const getCookie = (name) => {
@@ -67,13 +62,31 @@ const CheckoutPage = () => {
       return;
     }
     
+    // Handle user profile data
     if (userProfileData?.data) {
-      setUserProfile(userProfileData?.data);
+      console.log('Setting user profile from API:', userProfileData.data);
+      setUserProfile(userProfileData?.data?.data);
       setIsLoading(false);
     } else if (!profileLoading) {
-      fetchUserProfile();
+      // Only fetch if we don't have profile data yet
+      console.log('Fetching user profile...');
+      refetchProfile();
     }
-  }, [isAuthenticated, cartItems, navigate, userProfileData, profileLoading, refetchCart]);
+  }, [isAuthenticated, cartItems.length, navigate, userProfileData, profileLoading, refetchCart, refetchProfile]);
+
+  // Auto-fill address and pincode from user profile
+  useEffect(() => {
+    if (userProfile) {
+      // Auto-fill address if available and not already filled
+      if (userProfile.userAddress && !address) {
+        setAddress(userProfile.userAddress);
+      }
+      // Auto-fill pincode if available and not already filled
+      if (userProfile.userPinCode && !pincode) {
+        setPincode(userProfile.userPinCode);
+      }
+    }
+  }, [userProfile]);
 
   const loadRazorpay = () => {
     return new Promise((resolve) => {
@@ -85,11 +98,67 @@ const CheckoutPage = () => {
     });
   };
 
+  const handleCouponApplied = (couponData) => {
+    setAppliedCoupon(couponData.code);
+    setDiscount(couponData.discount);
+  };
+
+  const handleCouponRemoved = () => {
+    setAppliedCoupon(null);
+    setDiscount(0);
+  };
+
+  const finalTotal = totalAmount - discount;
+
+  const validateForm = () => {
+    const errors = {
+      address: '',
+      pincode: ''
+    };
+    
+    let isValid = true;
+    
+    // Address validation
+    if (!address.trim()) {
+      errors.address = 'Address is required';
+      isValid = false;
+    } else if (address.trim().length < 10) {
+      errors.address = 'Address must be at least 10 characters';
+      isValid = false;
+    } else if (address.trim().length > 200) {
+      errors.address = 'Address must not exceed 200 characters';
+      isValid = false;
+    }
+    
+    // Pincode validation
+    if (!pincode.trim()) {
+      errors.pincode = 'Pincode is required';
+      isValid = false;
+    } else if (!/^\d{6}$/.test(pincode)) {
+      errors.pincode = 'Pincode must be exactly 6 digits';
+      isValid = false;
+    } else {
+      const pincodeNum = parseInt(pincode);
+      if (pincodeNum < 100000 || pincodeNum > 999999) {
+        errors.pincode = 'Please enter a valid Indian pincode';
+        isValid = false;
+      }
+    }
+    
+    setValidationErrors(errors);
+    return isValid;
+  };
+
   const handlePayment = async () => {
-    if (!address.trim() || !pincode.trim()) {
-      alert('Please enter your delivery address and pincode.');
+    // Validate form before proceeding
+    if (!validateForm()) {
+      alert('Please fix the errors in the form before proceeding.');
       return;
     }
+
+    // Clear any previous errors
+    setPaymentError(null);
+    setShowRetry(false);
 
     try {
       // Get Razorpay key from API response
@@ -108,7 +177,8 @@ const CheckoutPage = () => {
       const res = await loadRazorpay();
       
       if (!res) {
-        alert('Razorpay SDK failed to load. Please check your connection.');
+        setPaymentError('Razorpay SDK failed to load. Please check your connection and try again.');
+        setShowRetry(true);
         return;
       }
 
@@ -120,10 +190,27 @@ const CheckoutPage = () => {
         description: 'Purchase from Urban Nook',
         image: '/assets/logo.jpeg',
         order_id: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId || orderResult.id,
-        handler: function (response) {
+        handler: async function (response) {
           console.log('Payment Success:', response);
-          alert(`Payment successful! Payment ID: ${response.razorpay_payment_id}`);
-          navigate('/orders');
+          try {
+            // Verify payment on backend
+            // Note: The actual verification happens via webhook
+            // This handler is just for UI feedback
+            alert(`Payment successful! Payment ID: ${response.razorpay_payment_id}`);
+            
+            // CRITICAL FIX: Clear cart in Redux state
+            dispatch(clearCart());
+            
+            // Also refetch cart from backend to sync
+            await refetchCart();
+            
+            // Navigate to orders page
+            navigate('/orders');
+          } catch (verifyError) {
+            console.error('Payment verification error:', verifyError);
+            setPaymentError('Payment verification failed. Please contact support if amount was debited.');
+            setShowRetry(false);
+          }
         },
         prefill: {
           name: userProfile?.userName || userProfile?.name || '',
@@ -139,18 +226,49 @@ const CheckoutPage = () => {
         },
         modal: {
           ondismiss: function() {
-            console.log('Payment modal closed');
-          }
+            console.log('Payment modal closed by user');
+            // Cart is preserved - user can retry
+            setPaymentError('Payment was cancelled. Your cart has been preserved. You can retry when ready.');
+            setShowRetry(true);
+          },
+          escape: false,
+          confirm_close: true
         }
       };
 
       console.log('Razorpay Options:', options);
       const paymentObject = new window.Razorpay(options);
+      
+      // Handle payment errors from Razorpay
+      paymentObject.on('payment.failed', function (response) {
+        console.error('Payment failed:', response.error);
+        const errorCode = response.error.code;
+        const errorDescription = response.error.description;
+        
+        // Map error codes to user-friendly messages
+        let userMessage = errorDescription || 'Payment failed. Please try again.';
+        
+        if (errorCode === 'BAD_REQUEST_ERROR') {
+          userMessage = 'Payment failed due to invalid request. Please try again.';
+        } else if (errorCode === 'GATEWAY_ERROR') {
+          userMessage = 'Payment gateway error. Please try again or use a different payment method.';
+        } else if (errorCode === 'SERVER_ERROR') {
+          userMessage = 'Payment server error. Please try again later.';
+        }
+        
+        setPaymentError(userMessage);
+        setShowRetry(true);
+        
+        // Cart is automatically preserved - no need to do anything
+      });
+      
       paymentObject.open();
       
     } catch (error) {
       console.error('Payment initialization failed:', error);
-      alert('Failed to initialize payment. Please try again.');
+      const errorMessage = error.data?.message || error.message || 'Failed to initialize payment. Please try again.';
+      setPaymentError(errorMessage);
+      setShowRetry(true);
     }
   };
 
@@ -216,13 +334,19 @@ const CheckoutPage = () => {
                   <span>Subtotal</span>
                   <span>₹{totalAmount.toLocaleString()}</span>
                 </div>
+                {appliedCoupon && discount > 0 && (
+                  <div className="flex justify-between text-green-400">
+                    <span>Discount ({appliedCoupon})</span>
+                    <span>-₹{discount.toLocaleString()}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-gray-400">
                   <span>Shipping</span>
                   <span className="text-[#F5DEB3]">Free</span>
                 </div>
                 <div className="flex justify-between text-lg font-bold text-white pt-4 border-t border-white/10 mt-2">
                   <span>Total To Pay</span>
-                  <span>₹{totalAmount.toLocaleString()}</span>
+                  <span>₹{finalTotal.toLocaleString()}</span>
                 </div>
               </div>
 
@@ -232,7 +356,7 @@ const CheckoutPage = () => {
                 disabled={isOrdering || !address || !pincode}
                 className="hidden lg:block w-full mt-8 py-4 bg-[#F5DEB3] text-[#2e443c] rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
               >
-                {isOrdering ? 'Processing...' : `Pay ₹${totalAmount.toLocaleString()}`}
+                {isOrdering ? 'Processing...' : `Pay ₹${finalTotal.toLocaleString()}`}
               </button>
 
               <div className="mt-6 flex justify-center gap-4 opacity-50">
@@ -279,10 +403,26 @@ const CheckoutPage = () => {
                   <label className="block text-xs uppercase tracking-widest text-gray-400 mb-2">Street Address <span className="text-red-400">*</span></label>
                   <textarea 
                     value={address}
-                    onChange={(e) => setAddress(e.target.value)}
+                    onChange={(e) => {
+                      setAddress(e.target.value);
+                      // Clear error when user types
+                      if (validationErrors.address) {
+                        setValidationErrors(prev => ({ ...prev, address: '' }));
+                      }
+                    }}
                     placeholder="House No, Building, Street, Area..."
-                    className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-white placeholder-gray-600 focus:outline-none focus:border-[#F5DEB3] focus:ring-1 focus:ring-[#F5DEB3] transition-all resize-none h-24"
+                    className={`w-full bg-black/20 border rounded-xl p-4 text-white placeholder-gray-600 focus:outline-none focus:ring-1 transition-all resize-none h-24 ${
+                      validationErrors.address 
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
+                        : 'border-white/10 focus:border-[#F5DEB3] focus:ring-[#F5DEB3]'
+                    }`}
                   />
+                  {validationErrors.address && (
+                    <p className="text-red-400 text-xs mt-2 flex items-center gap-1">
+                      <i className="fa-solid fa-circle-exclamation"></i>
+                      {validationErrors.address}
+                    </p>
+                  )}
                 </div>
                 
                 <div>
@@ -290,14 +430,82 @@ const CheckoutPage = () => {
                   <input 
                     type="tel" 
                     value={pincode}
-                    onChange={(e) => setPincode(e.target.value)}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, ''); // Only allow digits
+                      setPincode(value);
+                      // Clear error when user types
+                      if (validationErrors.pincode) {
+                        setValidationErrors(prev => ({ ...prev, pincode: '' }));
+                      }
+                    }}
                     maxLength={6}
                     placeholder="e.g. 110001"
-                    className="w-full bg-black/20 border border-white/10 rounded-xl p-4 text-white placeholder-gray-600 focus:outline-none focus:border-[#F5DEB3] focus:ring-1 focus:ring-[#F5DEB3] transition-all tracking-widest"
+                    className={`w-full bg-black/20 border rounded-xl p-4 text-white placeholder-gray-600 focus:outline-none focus:ring-1 transition-all tracking-widest ${
+                      validationErrors.pincode 
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
+                        : 'border-white/10 focus:border-[#F5DEB3] focus:ring-[#F5DEB3]'
+                    }`}
                   />
+                  {validationErrors.pincode && (
+                    <p className="text-red-400 text-xs mt-2 flex items-center gap-1">
+                      <i className="fa-solid fa-circle-exclamation"></i>
+                      {validationErrors.pincode}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
+
+            {/* Section 3: Coupon Input */}
+            <CouponInput 
+              appliedCoupon={appliedCoupon}
+              discount={discount}
+              onCouponApplied={handleCouponApplied}
+              onCouponRemoved={handleCouponRemoved}
+            />
+
+            {/* Section 3.5: Payment Error Display */}
+            {paymentError && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-red-500/10 backdrop-blur-md rounded-2xl p-6 border border-red-500/30"
+              >
+                <div className="flex items-start gap-3">
+                  <i className="fa-solid fa-circle-exclamation text-red-400 text-xl mt-1"></i>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-serif text-red-400 mb-2">Payment Failed</h3>
+                    <p className="text-sm text-gray-300 mb-4">{paymentError}</p>
+                    {showRetry && (
+                      <button
+                        onClick={handlePayment}
+                        disabled={isOrdering}
+                        className="px-6 py-2 bg-red-500 text-white rounded-lg font-medium text-sm hover:bg-red-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        <i className="fa-solid fa-rotate-right"></i>
+                        Retry Payment
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => {
+                      setPaymentError(null);
+                      setShowRetry(false);
+                    }}
+                    className="text-gray-400 hover:text-white transition-colors"
+                  >
+                    <i className="fa-solid fa-xmark text-xl"></i>
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Section 4: Available Coupons */}
+            {!appliedCoupon && (
+              <Suspense fallback={<ComponentLoader type="card" />}>
+                <CouponList onCouponApplied={handleCouponApplied} />
+              </Suspense>
+            )}
           </div>
 
         </div>
@@ -312,7 +520,10 @@ const CheckoutPage = () => {
          <div className="flex items-center gap-4">
             <div className="flex flex-col">
                 <span className="text-[10px] text-gray-400 uppercase tracking-wider">Total</span>
-                <span className="text-xl font-serif text-white">₹{totalAmount.toLocaleString()}</span>
+                <span className="text-xl font-serif text-white">₹{finalTotal.toLocaleString()}</span>
+                {discount > 0 && (
+                  <span className="text-xs text-green-400">Saved ₹{discount.toLocaleString()}</span>
+                )}
             </div>
             <button 
                 onClick={handlePayment}

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { useUpdateCartMutation, userApi } from '../../store/api/userApi';
+import OptimizedImage from '../OptimizedImage';
 
 const CartDrawer = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
@@ -171,7 +172,12 @@ const CartDrawer = ({ isOpen, onClose }) => {
                     
                     {/* Image */}
                     <div className="w-24 h-28 bg-gray-50 rounded-lg overflow-hidden shrink-0 relative border border-gray-100">
-                      <img src={item.image || '/placeholder.jpg'} alt={item.name} className="w-full h-full object-cover" />
+                      <OptimizedImage
+                        src={item.image || '/placeholder.jpg'}
+                        alt={item.name}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
                     </div>
                     
                     {/* Details */}

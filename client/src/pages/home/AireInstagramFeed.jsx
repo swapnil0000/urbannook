@@ -1,4 +1,5 @@
 import React from 'react';
+import OptimizedImage from '../../component/OptimizedImage';
 
 const instagramPosts = [
     {
@@ -92,7 +93,12 @@ const AireInstagramFeed = () => {
                                 <div className="flex -space-x-3 shrink-0">
                                     {[1, 2, 3].map((_, i) => (
                                         <div key={i} className="w-8 h-8 rounded-full border-2 border-[#0a110e] relative z-0 hover:z-10 hover:scale-110 transition-transform duration-300">
-                                            <img src={`https://randomuser.me/api/portraits/thumb/women/${40 + i}.jpg`} alt="User" className="w-full h-full object-cover rounded-full shadow-lg" />
+                                            <OptimizedImage
+                                              src={`https://randomuser.me/api/portraits/thumb/women/${40 + i}.jpg`}
+                                              alt={`User ${i + 1}`}
+                                              className="w-full h-full object-cover rounded-full shadow-lg"
+                                              loading="lazy"
+                                            />
                                         </div>
                                     ))}
                                     <div className="w-8 h-8 rounded-full border-2 border-[#0a110e] bg-emerald-600 flex items-center justify-center text-[9px] text-white font-bold relative z-10 shadow-lg">25k+</div>

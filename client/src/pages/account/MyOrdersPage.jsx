@@ -1,6 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGetOrderHistoryQuery } from '../../store/api/userApi';
+import { ComponentLoader } from '../../component/layout/LoadingSpinner';
+
+// Lazy load heavy components
+const OrderTracker = lazy(() => import('../../component/OrderTracker'));
 
 const MyOrdersPage = () => {
   const { data: orderResponse, isLoading, error } = useGetOrderHistoryQuery();
@@ -158,6 +162,49 @@ const MyOrdersPage = () => {
 
                     {/* --- ITEMS LIST --- */}
                     <div className="p-6">
+                        {/* Order Tracker */}
+                        <div className="mb-6 pb-6 border-b border-white/5">
+                            <Suspense fallback={<ComponentLoader />}>
+                                <OrderTracker status={order.status} />
+                            </Suspense>
+                            
+                            {/* Tracking Information */}
+                            {order.trackingInfo && (order.trackingInfo.carrier || order.trackingInfo.trackingNumber) && (
+                                <div className="mt-4 p-4 bg-white/5 rounded-xl border border-white/5">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <i className="fa-solid fa-truck text-[#F5DEB3] text-sm"></i>
+                                        <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Tracking Details</span>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                                        {order.trackingInfo.carrier && (
+                                            <div>
+                                                <span className="text-gray-500 text-xs">Carrier:</span>
+                                                <p className="text-white font-medium">{order.trackingInfo.carrier}</p>
+                                            </div>
+                                        )}
+                                        {order.trackingInfo.trackingNumber && (
+                                            <div>
+                                                <span className="text-gray-500 text-xs">Tracking Number:</span>
+                                                <p className="text-white font-mono text-sm">{order.trackingInfo.trackingNumber}</p>
+                                            </div>
+                                        )}
+                                        {order.trackingInfo.estimatedDelivery && (
+                                            <div className="md:col-span-2">
+                                                <span className="text-gray-500 text-xs">Estimated Delivery:</span>
+                                                <p className="text-[#F5DEB3] font-medium">
+                                                    {new Date(order.trackingInfo.estimatedDelivery).toLocaleDateString('en-GB', { 
+                                                        day: 'numeric', 
+                                                        month: 'long', 
+                                                        year: 'numeric' 
+                                                    })}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
                         <div className="grid gap-4">
                             {order.items.map((item, i) => {
                                 const snapshot = item.productSnapshot || {};

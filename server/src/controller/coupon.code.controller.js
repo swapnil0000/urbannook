@@ -84,16 +84,22 @@ const getAllCouponCodeController = async (_, res) => {
 };
 
 const removeCouponController = async (req, res) => {
-  const { userId } = req.user;
+  try {
+    const { userId } = req.user;
 
-  await Cart.updateOne(
-    { userId },
-    {
-      $unset: { coupon: "" },
-    },
-  );
+    await Cart.updateOne(
+      { userId },
+      {
+        $unset: { coupon: "" },
+      },
+    );
 
-  return res.json(new ApiRes(200, "Coupon removed", null, true));
+    return res.json(new ApiRes(200, "Coupon removed", null, true));
+  } catch (error) {
+    return res
+      .status(500)
+      .json(new ApiError(500, `Internal Server Error - ${error}`, [], false));
+  }
 };
 
 export {

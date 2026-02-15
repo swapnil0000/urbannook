@@ -79,27 +79,28 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
         mobileNumber: formData.mobile,
       }).unwrap();
 
-      if (result.userAccessToken) {
-        document.cookie = `userAccessToken=${result.userAccessToken}; path=/; max-age=2592000`;
-        // Also store in localStorage for backup
-        localStorage.setItem('token', result.userAccessToken);
-      }
-
-      const userData = {
+      // CRITICAL FIX: DO NOT save token/user data until OTP is verified
+      // Store temporarily for OTP verification, but don't authenticate yet
+      const tempUserData = {
         name: result.user?.userName || formData.name,
         email: result.user?.userEmail || formData.email,
-        mobile: result.user?.userMobileNumber || formData.mobile
+        mobile: result.user?.userMobileNumber || formData.mobile,
+        token: result.userAccessToken // Store token temporarily
       };
-      localStorage.setItem('user', JSON.stringify(userData));
+      
+      // Store in sessionStorage (not localStorage) - will be cleared on browser close
+      sessionStorage.setItem('pendingVerification', JSON.stringify(tempUserData));
 
       try {
-        const response = await otpSent({ email: userData.email }).unwrap();
+        const response = await otpSent({ email: tempUserData.email }).unwrap();
         if (response.success) {
           showNotification('OTP sent to your email!');
           setShowOTP(true);
         }
       } catch (otpError) {
-        showNotification('Account created, but OTP failed. Please login.',otpError);
+        // If OTP sending fails, clear pending data and ask user to login
+        sessionStorage.removeItem('pendingVerification');
+        showNotification('Account created, but OTP failed. Please login.', otpError);
         onSwitchToLogin();
       }
 
@@ -114,9 +115,20 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
       <OTPVerification
         mobile={formData.mobile}
         email={formData.email}
-        onClose={onClose}
-        onBack={() => setShowOTP(false)}
-        onSuccess={() => { showNotification('Account verified!'); onClose(); }}
+        onClose={() => {
+          // CRITICAL FIX: Clear pending verification when modal is closed without verification
+          sessionStorage.removeItem('pendingVerification');
+          onClose();
+        }}
+        onBack={() => {
+          // Clear pending data when going back
+          sessionStorage.removeItem('pendingVerification');
+          setShowOTP(false);
+        }}
+        onSuccess={() => { 
+          showNotification('Account verified!'); 
+          onClose(); 
+        }}
       />
     );
   }

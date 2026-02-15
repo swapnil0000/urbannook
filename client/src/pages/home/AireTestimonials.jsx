@@ -1,41 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useGetTestimonialsQuery, useSubmitTestimonialMutation } from '../../store/api/testimonialsApi';
 
-const testimonials = [
-  { 
-    id: 1, 
-    name: "Aditi Rao", 
-    role: "Art Enthusiast", 
-    location: "Koramangala, Bangalore", 
-    content: "I ordered a custom lithophane lamp for my parents' anniversary. The detail when it lights up is magical! You can't even tell it's 3D printed; the finish is so smooth.", 
-    color: "bg-emerald-100 text-emerald-700"
-  },
-  { 
-    id: 2, 
-    name: "Rohan Das", 
-    role: "Bike Lover", 
-    location: "Pune, Maharashtra", 
-    content: "Got a custom keychain for my bike keys. The dual-color filament looks insane in sunlight. It's super sturdy and lightweight compared to metal ones. 10/10.", 
-    color: "bg-blue-100 text-blue-700"
-  },
-  { 
-    id: 3, 
-    name: "Priya Sethi", 
-    role: "Gift Shopper", 
-    location: "GK-2, Delhi", 
-    content: "I was skeptical about the 'marble finish' PLA, but the planter I bought looks exactly like real stone. Perfect sustainable décor for my work desk.", 
-    color: "bg-orange-100 text-orange-700"
-  }
-];
+
 
 const AireTestimonials = () => {
   const [activeIndex, setActiveIndex] = useState(0);
   const [mood, setMood] = useState(4); // 0-4 scale
   const [reviewText, setReviewText] = useState("");
-  const [formState, setFormState] = useState('idle'); 
+  const [userName, setUserName] = useState("");
+  const [userRole, setUserRole] = useState("");
+  const [userLocation, setUserLocation] = useState("");
+  const [formState, setFormState] = useState('idle');
+  const [errorMessage, setErrorMessage] = useState("");
   const [isMuted, setIsMuted] = useState(true);
 
   const clickSound = useRef(null);
   const successSound = useRef(null);
+
+  // Replace hardcoded testimonials with API data
+  const { data: testimonialsData, isLoading, error } = useGetTestimonialsQuery();
+  const [submitTestimonial, { isLoading: isSubmitting }] = useSubmitTestimonialMutation();
+  const testimonials = testimonialsData?.data?.testimonials || [];
 
   const moods = [
     { emoji: "😡", label: "Poor", color: "bg-red-400" },
@@ -71,20 +56,47 @@ const AireTestimonials = () => {
     setActiveIndex((prev) => (prev - 1 + testimonials.length) % testimonials.length);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setFormState('submitting');
     playSound('click');
     
-    setTimeout(() => {
+    try {
+      await submitTestimonial({
+        userName,
+        userRole: userRole || undefined,
+        userLocation: userLocation || undefined,
+        content: reviewText,
+        rating: mood,
+      }).unwrap();
+      
       setFormState('success');
       playSound('success');
+      
+      // Clear all form fields
       setReviewText("");
-    }, 1500);
-
-    setTimeout(() => {
-      setFormState('idle');
-    }, 4000);
+      setUserName("");
+      setUserRole("");
+      setUserLocation("");
+      setMood(4);
+      
+      setTimeout(() => setFormState('idle'), 4000);
+    } catch (err) {
+      setFormState('error');
+      
+      // Handle specific error codes
+      if (err.status === 429) {
+        const retryMinutes = Math.ceil(err.data?.data?.retryAfter / 60);
+        setErrorMessage(`Too many submissions. Please try again in ${retryMinutes} minutes.`);
+      } else if (err.status === 400) {
+        const errors = err.data?.data?.errors || ['Validation failed'];
+        setErrorMessage(errors.join(', '));
+      } else {
+        setErrorMessage('Something went wrong. Please try again.');
+      }
+      
+      setTimeout(() => setFormState('idle'), 4000);
+    }
   };
 
   const getInitials = (name) => {
@@ -125,58 +137,94 @@ const AireTestimonials = () => {
 
           {/* Testimonial Card Display - Height Adjusted for Mobile */}
           <div className="relative h-[280px] sm:h-[280px] md:h-[280px]">
-            {testimonials.map((t, idx) => (
-               <div 
-                key={t.id}
-                className={`absolute inset-0 transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)]
-                  ${idx === activeIndex 
-                    ? 'opacity-100 translate-y-0 scale-100 rotate-0 z-20' 
-                    : 'opacity-0 translate-y-8 scale-95 rotate-1 z-10 pointer-events-none'}`}
-               >
-                 <div className="bg-white/60 backdrop-blur-md border border-white/60 p-6 md:p-10 rounded-[2rem] md:rounded-[2.5rem] shadow-xl h-full flex flex-col group hover:border-emerald-200 transition-colors">
-                    <div>
-                      <div className="flex gap-1 mb-4 md:mb-6">
-                        {[1,2,3,4,5].map(star => <i key={star} className="fa-solid fa-star text-emerald-400 text-xs"></i>)}
-                      </div>
-                      <p className="text-lg md:text-xl lg:text-2xl font-serif text-slate-800 leading-relaxed">"{t.content}"</p>
+            {isLoading ? (
+              // Loading skeleton
+              <div className="absolute inset-0">
+                <div className="bg-white/60 backdrop-blur-md border border-white/60 p-6 md:p-10 rounded-[2rem] md:rounded-[2.5rem] shadow-xl h-full flex flex-col animate-pulse">
+                  <div className="flex gap-1 mb-4 md:mb-6">
+                    {[1,2,3,4,5].map(star => <div key={star} className="w-3 h-3 bg-slate-200 rounded"></div>)}
+                  </div>
+                  <div className="space-y-3 flex-1">
+                    <div className="h-4 bg-slate-200 rounded w-full"></div>
+                    <div className="h-4 bg-slate-200 rounded w-5/6"></div>
+                    <div className="h-4 bg-slate-200 rounded w-4/6"></div>
+                  </div>
+                  <div className="flex items-center gap-3 md:gap-4 mt-4 md:mt-6">
+                    <div className="w-10 h-10 md:w-12 md:h-12 bg-slate-200 rounded-full"></div>
+                    <div className="flex-1 space-y-2">
+                      <div className="h-3 bg-slate-200 rounded w-24"></div>
+                      <div className="h-2 bg-slate-200 rounded w-32"></div>
                     </div>
+                  </div>
+                </div>
+              </div>
+            ) : testimonials.length === 0 ? (
+              // Empty state
+              <div className="absolute inset-0">
+                <div className="bg-white/60 backdrop-blur-md border border-white/60 p-6 md:p-10 rounded-[2rem] md:rounded-[2.5rem] shadow-xl h-full flex flex-col items-center justify-center text-center">
+                  <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-6">
+                    <i className="fa-solid fa-comment text-2xl text-slate-400"></i>
+                  </div>
+                  <h3 className="text-xl font-serif text-slate-900 mb-2">No testimonials yet</h3>
+                  <p className="text-slate-500 text-sm">Be the first to share your experience!</p>
+                </div>
+              </div>
+            ) : (
+              testimonials?.map((t, idx) => (
+                 <div 
+                  key={t.id || idx}
+                  className={`absolute inset-0 transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)]
+                    ${idx === activeIndex 
+                      ? 'opacity-100 translate-y-0 scale-100 rotate-0 z-20' 
+                      : 'opacity-0 translate-y-8 scale-95 rotate-1 z-10 pointer-events-none'}`}
+                 >
+                   <div className="bg-white/60 backdrop-blur-md border border-white/60 p-6 md:p-10 rounded-[2rem] md:rounded-[2.5rem] shadow-xl h-full flex flex-col group hover:border-emerald-200 transition-colors">
+                      <div>
+                        <div className="flex gap-1 mb-4 md:mb-6">
+                          {[1,2,3,4,5].map(star => <i key={star} className="fa-solid fa-star text-emerald-400 text-xs"></i>)}
+                        </div>
+                        <p className="text-lg md:text-xl lg:text-2xl font-serif text-slate-800 leading-relaxed">"{t.content}"</p>
+                      </div>
 
-                    {/* Bottom Info Row */}
-                    <div className="flex items-center justify-between mt-4 md:mt-6">
-                      <div className="flex items-center gap-3 md:gap-4 overflow-hidden">
-                        {/* INITIALS AVATAR */}
-                        <div className={`shrink-0 w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center font-bold text-xs md:text-sm shadow-sm border-2 border-white ${t.color}`}>
-                            {getInitials(t.name)}
+                      {/* Bottom Info Row */}
+                      <div className="flex items-center justify-between mt-4 md:mt-6">
+                        <div className="flex items-center gap-3 md:gap-4 overflow-hidden">
+                          {/* INITIALS AVATAR */}
+                          <div className={`shrink-0 w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center font-bold text-xs md:text-sm shadow-sm border-2 border-white ${t.colorTheme || t.color || 'bg-emerald-100 text-emerald-700'}`}>
+                              {getInitials(t.userName || t.name)}
+                          </div>
+                          
+                          {/* Text Container with Truncation Fix */}
+                          <div className="min-w-0 flex-1">
+                            <h4 className="font-bold text-slate-900 text-sm truncate">{t.userName || t.name}</h4>
+                            <p className="text-[10px] md:text-xs text-slate-500 truncate">{t.userRole || t.role} • {t.userLocation || t.location}</p>
+                          </div>
                         </div>
                         
-                        {/* Text Container with Truncation Fix */}
-                        <div className="min-w-0 flex-1">
-                          <h4 className="font-bold text-slate-900 text-sm truncate">{t.name}</h4>
-                          <p className="text-[10px] md:text-xs text-slate-500 truncate">{t.role} • {t.location}</p>
-                        </div>
+                        {/* Brand Stamp - Hidden on very small screens if needed, or kept */}
+                        <i className="fa-solid fa-cube text-2xl md:text-3xl text-slate-100 group-hover:text-emerald-100 transition-colors shrink-0 ml-2"></i>
                       </div>
-                      
-                      {/* Brand Stamp - Hidden on very small screens if needed, or kept */}
-                      <i className="fa-solid fa-cube text-2xl md:text-3xl text-slate-100 group-hover:text-emerald-100 transition-colors shrink-0 ml-2"></i>
-                    </div>
+                   </div>
                  </div>
-               </div>
-            ))}
+              ))
+            )}
           </div>
 
-          {/* Controls - Adjusted for Mobile */}
-          <div className="flex items-center gap-3 md:gap-4">
-            <button onClick={handlePrev} className="w-12 h-12 md:w-14 md:h-14 rounded-full border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center transition-all hover:scale-105 active:scale-95 shadow-sm text-slate-600">
-              <i className="fa-solid fa-arrow-left text-sm md:text-base"></i>
-            </button>
-            <button onClick={handleNext} className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-slate-900 text-white flex items-center justify-center transition-all hover:bg-emerald-600 hover:shadow-lg hover:shadow-emerald-200 hover:scale-105 active:scale-95">
-              <i className="fa-solid fa-arrow-right text-sm md:text-base"></i>
-            </button>
-            <div className="h-px w-12 md:w-24 bg-slate-200 ml-2 md:ml-4"></div>
-            <span className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">
-              0{activeIndex + 1} / 0{testimonials.length}
-            </span>
-          </div>
+          {/* Controls - Adjusted for Mobile - Hidden when less than 2 testimonials */}
+          {testimonials.length >= 2 && (
+            <div className="flex items-center gap-3 md:gap-4">
+              <button onClick={handlePrev} className="w-12 h-12 md:w-14 md:h-14 rounded-full border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center transition-all hover:scale-105 active:scale-95 shadow-sm text-slate-600">
+                <i className="fa-solid fa-arrow-left text-sm md:text-base"></i>
+              </button>
+              <button onClick={handleNext} className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-slate-900 text-white flex items-center justify-center transition-all hover:bg-emerald-600 hover:shadow-lg hover:shadow-emerald-200 hover:scale-105 active:scale-95">
+                <i className="fa-solid fa-arrow-right text-sm md:text-base"></i>
+              </button>
+              <div className="h-px w-12 md:w-24 bg-slate-200 ml-2 md:ml-4"></div>
+              <span className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                0{activeIndex + 1} / 0{testimonials.length}
+              </span>
+            </div>
+          )}
 
         </div>
 
@@ -199,12 +247,60 @@ const AireTestimonials = () => {
               </div>
             )}
 
+            {/* Error Overlay */}
+            {formState === 'error' && (
+              <div className="absolute inset-0 z-50 bg-red-50/95 backdrop-blur-sm flex flex-col items-center justify-center text-center p-8 animate-in fade-in duration-300">
+                <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-6">
+                  <i className="fa-solid fa-exclamation text-3xl text-red-600"></i>
+                </div>
+                <h3 className="text-3xl font-serif text-slate-900 mb-2">Oops!</h3>
+                <p className="text-slate-500 text-sm">{errorMessage}</p>
+              </div>
+            )}
+
             <div className="mb-6 md:mb-8">
               <h3 className="text-xl md:text-2xl font-bold text-slate-900">Rate your Product</h3>
               <p className="text-slate-500 text-xs md:text-sm mt-1">Tell us about the print quality and design.</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6 md:space-y-8">
+              
+              {/* User Name Input */}
+              <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Your Name</label>
+                <input
+                  type="text"
+                  required
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                  placeholder="Your Name"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                />
+              </div>
+
+              {/* User Role Input */}
+              <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Your Role (Optional)</label>
+                <input
+                  type="text"
+                  value={userRole}
+                  onChange={(e) => setUserRole(e.target.value)}
+                  placeholder="e.g., Art Enthusiast"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                />
+              </div>
+
+              {/* User Location Input */}
+              <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Your Location (Optional)</label>
+                <input
+                  type="text"
+                  value={userLocation}
+                  onChange={(e) => setUserLocation(e.target.value)}
+                  placeholder="e.g., Bangalore"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                />
+              </div>
               
               {/* Visual Mood Selector */}
               <div className="space-y-3">
@@ -248,10 +344,10 @@ const AireTestimonials = () => {
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={formState === 'submitting' || !reviewText}
+                disabled={isSubmitting || !reviewText || !userName}
                 className="w-full py-3 md:py-4 bg-slate-900 text-white rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-emerald-600 transition-all shadow-lg shadow-slate-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
               >
-                {formState === 'submitting' ? (
+                {isSubmitting ? (
                   <>Processing...</>
                 ) : (
                   <>

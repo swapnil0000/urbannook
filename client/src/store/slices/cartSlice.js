@@ -72,8 +72,34 @@ const cartSlice = createSlice({
     },
     setCartItems: (state, action) => {
       const cartData = action.payload || [];
-      // Handle the new API response format
-      const cartItems = cartData[0]?.items || cartData;
+      
+      // CRITICAL FIX: Handle multiple possible data structures safely
+      let cartItems = [];
+      
+      if (Array.isArray(cartData)) {
+        // If cartData is already an array
+        if (cartData.length > 0 && cartData[0]?.items) {
+          // Format: [{ items: [...] }]
+          cartItems = cartData[0].items;
+        } else {
+          // Format: [item1, item2, ...]
+          cartItems = cartData;
+        }
+      } else if (cartData && typeof cartData === 'object') {
+        // If cartData is an object
+        if (cartData.items && Array.isArray(cartData.items)) {
+          // Format: { items: [...] }
+          cartItems = cartData.items;
+        } else if (cartData.data && Array.isArray(cartData.data)) {
+          // Format: { data: [...] }
+          cartItems = cartData.data;
+        }
+      }
+      
+      // Ensure cartItems is always an array before mapping
+      if (!Array.isArray(cartItems)) {
+        cartItems = [];
+      }
       
       state.items = cartItems.map(item => ({
         id: item.productId || item._id,

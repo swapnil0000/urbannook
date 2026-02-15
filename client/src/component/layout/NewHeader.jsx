@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import { useGetWishlistQuery } from '../../store/api/userApi';
 import SignupForm from './auth/SignupForm';
 import LoginForm from './auth/LoginForm';
 import CartDrawer from '../layout/CartDrawer';
@@ -12,6 +13,10 @@ const NewHeader = () => {
   // Get cart and auth state from Redux
   const { items: cartItems, totalQuantity } = useSelector((state) => state.cart);
   const { isAuthenticated, user: authUser } = useSelector((state) => state.auth);
+  
+  // Get wishlist count
+  const { data: wishlistData } = useGetWishlistQuery(undefined, { skip: !isAuthenticated });
+  const wishlistCount = wishlistData?.data?.wishlist?.length || 0;
   
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
@@ -230,6 +235,21 @@ const NewHeader = () => {
                   </span>
                 )}
               </button>
+
+              {/* Wishlist Icon */}
+              {user && (
+                <Link
+                  to="/wishlist"
+                  className="relative flex items-center justify-center w-11 h-11 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+                >
+                  <i className="fa-regular fa-heart text-lg text-white"></i>
+                  {wishlistCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold border-2 border-[#e8f8d7]">
+                      {wishlistCount}
+                    </span>
+                  )}
+                </Link>
+              )}
             </div>
              <div className="lg:hidden w-10"></div> 
           </div>
@@ -290,6 +310,19 @@ const NewHeader = () => {
                                 </span>
                             )}
                             <span className="text-[10px] font-bold text-emerald-900 uppercase tracking-wide">Cart</span>
+                        </button>
+
+                        {/* Wishlist */}
+                        <button onClick={() => handleMobileNav('/wishlist')} className="flex flex-col items-center gap-2 group/btn relative">
+                            <div className="w-12 h-12 rounded-2xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-700 shadow-sm group-hover/btn:scale-105 group-hover/btn:border-emerald-300 transition-all">
+                                <i className="fa-regular fa-heart text-lg"></i>
+                            </div>
+                            {wishlistCount > 0 && (
+                                <span className="absolute top-0 right-1 w-4 h-4 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold border-2 border-white shadow-sm">
+                                    {wishlistCount}
+                                </span>
+                            )}
+                            <span className="text-[10px] font-bold text-emerald-900 uppercase tracking-wide">Wishlist</span>
                         </button>
 
                     </div>

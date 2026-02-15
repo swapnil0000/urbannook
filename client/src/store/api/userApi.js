@@ -46,7 +46,7 @@ export const userApi = apiSlice.injectEndpoints({
     }),
     clearCart: builder.mutation({
       query: () => ({
-        url: 'user/clear-cart',
+        url: 'user/cart/clear',
         method: 'DELETE',
       }),
       invalidatesTags: ['User'],
@@ -59,24 +59,45 @@ export const userApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: data,
       }),
-      invalidatesTags: ['User'],
+      invalidatesTags: ['Wishlist'],
     }),
     getWishlist: builder.query({
       query: () => 'user/wishlist/get',
-      providesTags: ['User'],
+      providesTags: ['Wishlist'],
     }),
     removeFromWishlist: builder.mutation({
       query: (productId) => ({
         url: `user/wishlist/${productId}`,
         method: 'DELETE',
       }),
-      invalidatesTags: ['User'],
+      invalidatesTags: ['Wishlist'],
     }),
 
     // Order APIs
     getOrderHistory: builder.query({
       query: () => 'user/order/history',
       providesTags: ['Order'],
+    }),
+
+    // Coupon APIs
+    applyCoupon: builder.mutation({
+      query: (couponCode) => ({
+        url: 'coupon/apply',
+        method: 'POST',
+        body: { couponCodeName: couponCode },
+      }),
+      invalidatesTags: ['User'],
+    }),
+    removeCoupon: builder.mutation({
+      query: () => ({
+        url: 'coupon/remove',
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['User'],
+    }),
+    getAvailableCoupons: builder.query({
+      query: () => 'coupon/list',
+      providesTags: ['Coupon'],
     }),
 
     // Community APIs
@@ -112,6 +133,9 @@ export const {
   useGetWishlistQuery,
   useRemoveFromWishlistMutation,
   useGetOrderHistoryQuery,
+  useApplyCouponMutation,
+  useRemoveCouponMutation,
+  useGetAvailableCouponsQuery,
   useGetRazorpayKeyQuery,
   useCreateOrderMutation,
   useJoinCommunityMutation,

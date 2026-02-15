@@ -1,47 +1,92 @@
-import React, { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { useGetWishlistQuery, useRemoveFromWishlistMutation, useAddToCartMutation } from '../../store/api/userApi';
-import { setWishlistItems } from '../../store/slices/wishlistSlice';
+import { motion } from 'framer-motion';
 
 const WishlistPage = () => {
-   const dispatch = useDispatch();
-   useEffect(() => {
-      window.scrollTo(0, 0);
-    }, []);
-
   const navigate = useNavigate();
-  const { data: wishlistResponse, isLoading, refetch } = useGetWishlistQuery();
+  const { data: wishlistData, isLoading, refetch } = useGetWishlistQuery();
   const [removeFromWishlist] = useRemoveFromWishlistMutation();
-  const [addToCart] = useAddToCartMutation();
+  const [addToCart, { isLoading: isAddingToCart }] = useAddToCartMutation();
+  
+  // Track which items are being added to cart
+  const [addingItems, setAddingItems] = useState(new Set());
+  
+  // Get cart items from Redux to check if item is already in cart
+  const cartItems = useSelector((state) => state.cart.items);
 
-  const wishlistItems = wishlistResponse?.data || [];
-
-  // Load wishlist items into Redux store when component mounts
   useEffect(() => {
-    if (wishlistResponse?.data) {
-      dispatch(setWishlistItems(wishlistResponse.data));
-    }
-  }, [wishlistResponse, dispatch]);
+    window.scrollTo(0, 0);
+  }, []);
 
-  const handleRemoveFromWishlist = async (productId) => {
+  const wishlistItems = wishlistData?.data || [];
+
+  // Check if item is in cart
+  const isInCart = (productId) => {
+    return cartItems.some(item => item.id === productId || item.productId === productId);
+  };
+
+  const handleRemove = async (productId) => {
     try {
       await removeFromWishlist(productId).unwrap();
-      refetch(); // Refetch wishlist data from server
+      refetch();
     } catch (error) {
       console.error('Failed to remove from wishlist:', error);
+      alert('Failed to remove item from wishlist');
     }
   };
 
   const handleAddToCart = async (item) => {
+    // Prevent duplicate additions
+    if (addingItems.has(item.productId)) {
+      return;
+    }
+
+    // Check if already in cart
+    if (isInCart(item.productId)) {
+      navigate('/checkout');
+      return;
+    }
+
+    setAddingItems(prev => new Set(prev).add(item.productId));
+
     try {
-      await addToCart([{ productName: item.productName, quantity: 1 }]).unwrap();
-      alert('Added to cart successfully!');
+      await addToCart({
+        productId: item.productId || item._id,
+        quantity: 1
+      }).unwrap();
+      
+      // Remove from adding state after successful add
+      setAddingItems(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(item.productId);
+        return newSet;
+      });
     } catch (error) {
       console.error('Failed to add to cart:', error);
-      alert('Failed to add to cart');
+      alert(error?.data?.message || 'Failed to add to cart');
+      
+      // Remove from adding state on error
+      setAddingItems(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(item.productId);
+        return newSet;
+      });
     }
   };
+
+  const handleGoToCheckout = () => {
+    navigate('/checkout');
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#0a1a13]">
+        <div className="w-12 h-12 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-[#0a1a13] min-h-screen font-sans text-gray-300 selection:bg-emerald-500 selection:text-white">
@@ -91,17 +136,16 @@ const WishlistPage = () => {
                     Explore Products
                 </button>
             </div>
-          ) : isLoading ? (
-            // LOADING STATE
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mb-4"></div>
-                <p className="text-gray-400">Loading your wishlist...</p>
-            </div>
           ) : (
             // GRID STATE
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {wishlistItems.map((item) => (
-                <div key={item.productId} className="group relative bg-[#0f251b] rounded-[2rem] overflow-hidden border border-white/5 hover:border-emerald-500/30 transition-all duration-500">
+                <motion.div 
+                  key={item.productId} 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="group relative bg-[#0f251b] rounded-[2rem] overflow-hidden border border-white/5 hover:border-emerald-500/30 transition-all duration-500"
+                >
                   
                   {/* Image Container */}
                   <div className="relative aspect-[4/5] overflow-hidden">
@@ -123,7 +167,7 @@ const WishlistPage = () => {
 
                     {/* Remove Button (Top Right) */}
                     <button
-                      onClick={() => handleRemoveFromWishlist(item.productId)}
+                      onClick={() => handleRemove(item.productId)}
                       className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-black/40 hover:bg-red-500 backdrop-blur-md text-white transition-colors duration-300 z-20 group/btn"
                     >
                       <i className="fa-solid fa-xmark text-sm group-hover/btn:rotate-90 transition-transform"></i>
@@ -147,29 +191,44 @@ const WishlistPage = () => {
                             </div>
                         </div>
 
-                        {/* Add to Cart Button */}
-                        <button
+                        {/* Add to Cart / Go to Checkout Button */}
+                        {isInCart(item.productId) ? (
+                          <button
+                            onClick={handleGoToCheckout}
+                            className="w-full py-4 rounded-xl font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-3 transition-all duration-300 bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg"
+                          >
+                            <span>Go to Checkout</span>
+                            <i className="fa-solid fa-arrow-right"></i>
+                          </button>
+                        ) : (
+                          <button
                             onClick={() => handleAddToCart(item)}
-                            disabled={item.productStatus === 'out_of_stock'}
+                            disabled={item.productStatus === 'out_of_stock' || addingItems.has(item.productId) || isAddingToCart}
                             className={`w-full py-4 rounded-xl font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-3 transition-all duration-300 ${
-                                item.productStatus !== 'out_of_stock' 
+                              item.productStatus !== 'out_of_stock' && !addingItems.has(item.productId)
                                 ? 'bg-white text-[#0a1a13] hover:bg-emerald-500 hover:text-white shadow-lg' 
                                 : 'bg-white/10 text-gray-500 cursor-not-allowed'
                             }`}
-                        >
-                            {item.productStatus !== 'out_of_stock' ? (
-                                <>
-                                    <span>Add to Cart</span>
-                                    <i className="fa-solid fa-arrow-right"></i>
-                                </>
+                          >
+                            {addingItems.has(item.productId) ? (
+                              <>
+                                <i className="fa-solid fa-spinner fa-spin"></i>
+                                <span>Adding...</span>
+                              </>
+                            ) : item.productStatus !== 'out_of_stock' ? (
+                              <>
+                                <span>Add to Cart</span>
+                                <i className="fa-solid fa-arrow-right"></i>
+                              </>
                             ) : (
-                                <span>Restocking Soon</span>
+                              <span>Restocking Soon</span>
                             )}
-                        </button>
+                          </button>
+                        )}
                     </div>
                   </div>
 
-                </div>
+                </motion.div>
               ))}
             </div>
           )}

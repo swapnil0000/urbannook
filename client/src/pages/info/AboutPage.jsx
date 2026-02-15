@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
+import OptimizedImage from '../../component/OptimizedImage';
 
 const aboutValues = [
     {
@@ -191,7 +192,12 @@ const AboutPage = () => {
 
                 <div className="mt-16 flex items-center gap-6">
                     <div className="w-16 h-16 rounded-full overflow-hidden border border-[#F5DEB3]/30">
-                        <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&q=80" className="w-full h-full object-cover" alt="Founder" />
+                        <OptimizedImage
+                          src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&q=80"
+                          alt="Founder - Arjun S."
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
                     </div>
                     <div>
                         <p className="font-serif italic text-2xl text-[#F5DEB3]">Arjun S.</p>

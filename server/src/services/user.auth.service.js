@@ -1,6 +1,7 @@
 import User from "../model/user.model.js";
 import { fieldMissing } from "../utlis/ValidateRes.js";
 import { v7 as uuid7 } from "uuid";
+import { sendWelcomeEmail } from "./email.service.js";
 
 const loginService = async (email, password) => {
   //fieldMissing
@@ -172,7 +173,12 @@ const registerService = async (name, email, password, mobileNumber) => {
       success: false,
     };
   newRegisteringUser.save({ validateBeforeSave: false }).catch((err) => {
-    console.error("Refresh token save failed:", err);
+    console.error(`[ERROR] Refresh token save failed:`, err.message, err.stack);
+  });
+
+  // Send welcome email (async, don't wait for it)
+  sendWelcomeEmail(email.toLowerCase(), name).catch((err) => {
+    console.error(`[ERROR] Failed to send welcome email - Email: ${email}:`, err.message);
   });
 
   return {

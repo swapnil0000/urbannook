@@ -1,4 +1,12 @@
 node_modules/
 .env
 .env.*
-scripts/*
+logs/
+
+# Test coverage reports (if you generate them)
+coverage/
+.nyc_output/
+
+# Test results
+test-results/
+junit.xml
