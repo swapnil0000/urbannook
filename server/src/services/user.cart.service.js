@@ -2,6 +2,7 @@ import Product from "../model/product.model.js";
 import Cart from "../model/user.cart.model.js";
 import User from "../model/user.model.js";
 import { cartDetailsMissing } from "../utlis/ValidateRes.js";
+import { applyCouponCodeService } from "../services/coupon.code.service.js";
 const addToCartService = async ({ userId, productId }) => {
   try {
     const userAndProductIdValidation = cartDetailsMissing(userId, productId);
@@ -117,40 +118,74 @@ const getCartService = async ({ userId }) => {
           price: "$product.sellingPrice",
           image: "$product.productImg",
           quantity: "$items.v",
+          stock: "$product.stock",
+          isPublished: "$product.isPublished",
+          // Calculation eligibility: Stock check and Published check
+          isEligibleForCalc: {
+            $and: [
+              { $gt: ["$product.productQuantity", 0] },
+              { $eq: ["$product.isPublished", true] },
+            ],
+          },
         },
       },
       {
         $group: {
           _id: null,
-          items: { $push: "$$ROOT" },
-          totalQuantity: { $sum: "$quantity" },
+          allItems: { $push: "$$ROOT" },
           cartSubtotal: {
-            $sum: { $multiply: ["$price", "$quantity"] },
+            $sum: {
+              $cond: [
+                "$isEligibleForCalc",
+                { $multiply: ["$price", "$quantity"] },
+                0,
+              ],
+            },
+          },
+          totalQuantity: {
+            $sum: { $cond: ["$isEligibleForCalc", "$quantity", 0] },
           },
         },
       },
       {
         $project: {
           _id: 0,
-          items: 1,
-          totalQuantity: 1,
+          availableItems: {
+            $filter: {
+              input: "$allItems",
+              as: "item",
+              cond: { $eq: ["$$item.isEligibleForCalc", true] },
+            },
+          },
+          unavailableItems: {
+            $filter: {
+              input: "$allItems",
+              as: "item",
+              cond: { $eq: ["$$item.isEligibleForCalc", false] },
+            },
+          },
           cartSubtotal: 1,
+          totalQuantity: 1,
         },
       },
     ]);
-
     if (!cartData || cartData.length === 0) {
       return {
         statusCode: 200,
         message: "Cart is empty",
-        data: { items: [], totalQuantity: 0, cartSubtotal: 0 },
+        data: {
+          availableItems: [],
+          unavailableItems: [],
+          cartSubtotal: 0,
+          totalQuantity: 0,
+        },
         success: true,
       };
     }
 
     return {
       statusCode: 200,
-      message: "Cart preview fetched successfully",
+      message: "Cart preview fetched",
       data: cartData[0],
       success: true,
     };
@@ -159,7 +194,6 @@ const getCartService = async ({ userId }) => {
     return {
       statusCode: 500,
       message: "Internal server error",
-      data: error.message,
       success: false,
     };
   }

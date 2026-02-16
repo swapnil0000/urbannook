@@ -87,12 +87,12 @@ const removeCouponController = async (req, res) => {
   try {
     const { userId } = req.user;
 
-    await Cart.updateOne(
-      { userId },
-      {
-        $unset: { coupon: "" },
-      },
-    );
+  await Cart.updateOne(
+    { userId },
+    {
+      $unset: { appliedCoupon: 1 },
+    },
+  );
 
     return res.json(new ApiRes(200, "Coupon removed", null, true));
   } catch (error) {
