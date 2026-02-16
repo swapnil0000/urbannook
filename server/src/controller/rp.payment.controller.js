@@ -120,7 +120,7 @@ const razorpayCreateOrderController = async (req, res) => {
         {
           orderId: order.orderId,
           razorpayOrderId: razorpayOrder?.data?.id,
-          amount: finalAmount,
+          amount: finalAmount * 100, // Return amount in paise for Razorpay
           currency: "INR",
         },
         true,
