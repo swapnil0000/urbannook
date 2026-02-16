@@ -21,7 +21,9 @@ export const useCartSync = () => {
 
   const { data: cartResponse } = useGetCartQuery(undefined, {
     skip: !shouldFetchCart,
-    refetchOnMountOrArgChange: true
+    refetchOnMountOrArgChange: false, // Changed to false to prevent duplicate calls
+    refetchOnFocus: false, // Don't refetch when window regains focus
+    refetchOnReconnect: false // Don't refetch on network reconnect
   });
 
   useEffect(() => {
@@ -49,7 +51,9 @@ export const useCartData = () => {
 
   const { data: cartResponse, refetch } = useGetCartQuery(undefined, {
     skip: !shouldFetchCart,
-    refetchOnMountOrArgChange: true
+    refetchOnMountOrArgChange: false, // Changed to false
+    refetchOnFocus: false,
+    refetchOnReconnect: false
   });
 
   useEffect(() => {

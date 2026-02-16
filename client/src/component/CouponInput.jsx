@@ -1,13 +1,12 @@
-import React, { useState } from 'react';
-import { useApplyCouponMutation, useRemoveCouponMutation } from '../store/api/userApi';
+import { useState } from 'react';
+import { useApplyCouponMutation } from '../store/api/userApi';
 
 const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved }) => {
   const [couponCode, setCouponCode] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   
-  const [applyCoupon, { isLoading: isApplying }] = useApplyCouponMutation();
-  const [removeCoupon, { isLoading: isRemoving }] = useRemoveCouponMutation();
+  const [applyCoupon, { isLoading }] = useApplyCouponMutation();
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) {
@@ -47,7 +46,8 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
     setSuccess('');
 
     try {
-      const result = await removeCoupon().unwrap();
+      // Call applyCoupon with null to remove the coupon
+      const result = await applyCoupon(null).unwrap();
       
       if (result.success) {
         setSuccess('Coupon removed');
@@ -86,17 +86,17 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
               type="text"
               value={couponCode}
               onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyPress}
               placeholder="Enter coupon code"
-              disabled={isApplying}
+              disabled={isLoading}
               className="flex-1 bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-[#F5DEB3] focus:ring-1 focus:ring-[#F5DEB3] transition-all uppercase tracking-wider text-sm disabled:opacity-50"
             />
             <button
               onClick={handleApplyCoupon}
-              disabled={isApplying || !couponCode.trim()}
+              disabled={isLoading || !couponCode.trim()}
               className="px-6 py-3 bg-[#F5DEB3] text-[#2e443c] rounded-xl font-bold uppercase tracking-wider text-xs hover:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isApplying ? (
+              {isLoading ? (
                 <i className="fa-solid fa-spinner fa-spin"></i>
               ) : (
                 'Apply'
@@ -130,11 +130,11 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
             </div>
             <button
               onClick={handleRemoveCoupon}
-              disabled={isRemoving}
+              disabled={isLoading}
               className="text-red-400 hover:text-red-300 transition-colors disabled:opacity-50"
               title="Remove coupon"
             >
-              {isRemoving ? (
+              {isLoading ? (
                 <i className="fa-solid fa-spinner fa-spin"></i>
               ) : (
                 <i className="fa-solid fa-times text-lg"></i>

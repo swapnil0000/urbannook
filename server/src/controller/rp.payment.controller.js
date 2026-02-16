@@ -49,7 +49,21 @@ const razorpayCreateOrderController = async (req, res) => {
         .status(400)
         .json(new ApiError(400, "Items are required", null, false));
     }
-    // 1Fetch products
+    
+    // Fetch cart to get the calculated grand total from applyCoupon API
+    const cart = await Cart.findOne({ userId }).lean();
+    
+    if (!cart?.appliedCoupon?.summary?.grandTotal) {
+      return res
+        .status(400)
+        .json(
+          new ApiError(400, "Cart pricing not calculated. Please refresh the page.", null, false),
+        );
+    }
+    
+    const finalAmount = cart.appliedCoupon.summary.grandTotal;
+    
+    // Fetch products for order snapshot
     const productIds = items.map((i) => i.productId);
     const products = await Product.find({
       productId: { $in: productIds },
@@ -63,12 +77,10 @@ const razorpayCreateOrderController = async (req, res) => {
           new ApiError(400, "One or more products unavailable", null, false),
         );
     }
-    // order items snapshot
-    let totalAmount = 0;
-
+    
+    // Create order items snapshot
     const orderItems = items.map((item) => {
       const product = products.find((p) => p.productId === item.productId);
-      totalAmount += product.sellingPrice * item.quantity;
       return {
         productId: product.productId,
         productSnapshot: {
@@ -83,7 +95,7 @@ const razorpayCreateOrderController = async (req, res) => {
     });
 
     const razorpayOrder = await razorpayCreateOrderService(
-      totalAmount * 100,
+      finalAmount * 100, // Razorpay expects amount in paise
       "INR", //currency
     );
 
@@ -91,7 +103,7 @@ const razorpayCreateOrderController = async (req, res) => {
       orderId: uuidv7(),
       userId,
       items: orderItems,
-      amount: totalAmount,
+      amount: finalAmount,
       payment: {
         razorpayOrderId: razorpayOrder?.data?.id,
       },
@@ -99,7 +111,7 @@ const razorpayCreateOrderController = async (req, res) => {
       status: "CREATED",
     });
     
-    console.log(`[INFO] Order created successfully - OrderId: ${order.orderId}, UserId: ${userId}, Amount: ${totalAmount}, RazorpayOrderId: ${razorpayOrder?.data?.id}`);
+    console.log(`[INFO] Order created successfully - OrderId: ${order.orderId}, UserId: ${userId}, Amount: ${finalAmount} (from cart.appliedCoupon.summary), RazorpayOrderId: ${razorpayOrder?.data?.id}`);
     
     return res.status(200).json(
       new ApiRes(
@@ -108,7 +120,7 @@ const razorpayCreateOrderController = async (req, res) => {
         {
           orderId: order.orderId,
           razorpayOrderId: razorpayOrder?.data?.id,
-          amount: totalAmount,
+          amount: finalAmount,
           currency: "INR",
         },
         true,

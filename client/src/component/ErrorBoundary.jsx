@@ -26,10 +26,6 @@ class ErrorBoundary extends React.Component {
       errorInfo
     });
 
-    // In production, you might want to send this to an error reporting service
-    if (process.env.NODE_ENV === 'production') {
-      // Example: logErrorToService(error, errorInfo);
-    }
   }
 
   handleReset = () => {
@@ -70,7 +66,6 @@ const ErrorFallback = ({ error, errorInfo, onReset }) => {
     window.location.reload();
   };
 
-  const isDevelopment = process.env.NODE_ENV === 'development';
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
@@ -102,27 +97,6 @@ const ErrorFallback = ({ error, errorInfo, onReset }) => {
           <p className="text-gray-600 mb-6">
             We're sorry for the inconvenience. The page encountered an error and couldn't load properly.
           </p>
-
-          {/* Development Mode: Show Error Details */}
-          {isDevelopment && error && (
-            <div className="mb-6 text-left">
-              <details className="bg-gray-100 rounded p-4">
-                <summary className="cursor-pointer font-semibold text-sm text-gray-700 mb-2">
-                  Error Details (Development Only)
-                </summary>
-                <div className="mt-2 text-xs text-gray-600 overflow-auto max-h-40">
-                  <p className="font-semibold text-red-600 mb-1">
-                    {error.toString()}
-                  </p>
-                  {errorInfo && (
-                    <pre className="whitespace-pre-wrap break-words">
-                      {errorInfo.componentStack}
-                    </pre>
-                  )}
-                </div>
-              </details>
-            </div>
-          )}
 
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-3 justify-center">

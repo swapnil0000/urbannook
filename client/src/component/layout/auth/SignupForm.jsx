@@ -1,9 +1,11 @@
-import React, { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import OTPVerification from './OTPVerification';
 import { useOtpSentMutation, useRegisterMutation } from '../../../store/api/authApi';
 import { useUI } from '../../../hooks/useRedux';
 
 const SignupForm = ({ onClose, onSwitchToLogin }) => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '', 
     email: '', 
@@ -87,7 +89,6 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
         mobile: result.user?.userMobileNumber || formData.mobile,
         token: result.userAccessToken // Store token temporarily
       };
-      
       // Store in sessionStorage (not localStorage) - will be cleared on browser close
       sessionStorage.setItem('pendingVerification', JSON.stringify(tempUserData));
 
@@ -103,7 +104,6 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
         showNotification('Account created, but OTP failed. Please login.', otpError);
         onSwitchToLogin();
       }
-
     } catch (error) {
       showNotification(error.data?.message || 'Registration failed.');
       setErrors({ submit: error.data?.message || 'Registration failed' });
@@ -135,64 +135,83 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[100] p-4" onClick={onClose}>
-      
-      {/* CHANGED: w-[96%] to make it wider on mobile.
-      */}
       <div 
         className="bg-white rounded-[2rem] w-[96%] md:w-full md:max-w-4xl shadow-2xl relative overflow-hidden flex flex-col md:flex-row animate-in fade-in zoom-in duration-300 max-h-[90vh] md:h-[650px]"
         onClick={(e) => e.stopPropagation()}
       >
         
         {/* --- LEFT SIDE (Hidden on Mobile) --- */}
-        <div className="hidden md:flex w-5/12 bg-slate-900 p-10 flex-col justify-between relative overflow-hidden">
-            <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+        <div className="hidden md:flex w-5/12 bg-[#1c3026] p-10 flex-col justify-between relative overflow-hidden">
+          <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+          
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 mb-8">
+              {/* <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white">
+                <i className="fa-solid fa-leaf text-lg"></i>
+              </div> */}
+              <span className="text-white font-serif text-xl">UrbanNook</span>
+            </div>
             
-            <div className="relative z-10">
-                <div className="flex items-center gap-3 mb-8">
-                    <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white">
-                        <i className="fa-solid fa-leaf text-lg"></i>
-                    </div>
-                    <span className="text-white font-serif text-xl">UrbanNook</span>
-                </div>
-                
-                <h2 className="text-3xl font-serif text-white mb-6 leading-tight">
-                    Design your <br/>
-                    <span className="italic text-emerald-500">dream space.</span>
-                </h2>
+            <h2 className="text-3xl font-serif text-white mb-6 leading-tight">
+              Design your <br/>
+              <span className="italic text-[#F5DEB3]">dream space.</span>
+            </h2>
+            
+            <ul className="space-y-5">
+              {[
+                { icon: 'fa-truck-fast', text: 'Free Shipping on first order' },
+                { icon: 'fa-shield-heart', text: 'Secure checkout guaranteed' },
+                { icon: 'fa-star', text: 'Access exclusive collections' },
+              ].map((item, idx) => (
+                <li key={idx} className="flex items-center gap-4 text-gray-300 text-sm">
+                  <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+                    <i className={`fa-solid ${item.icon} text-[#F5DEB3] text-xs`}></i>
+                  </div>
+                  {item.text}
+                </li>
+              ))}
+            </ul>
+          </div>
 
-                <ul className="space-y-5">
-                    {[
-                        { icon: 'fa-truck-fast', text: 'Free Shipping on first order' },
-                        { icon: 'fa-shield-heart', text: 'Secure checkout guaranteed' },
-                        { icon: 'fa-star', text: 'Access exclusive collections' },
-                    ].map((item, idx) => (
-                        <li key={idx} className="flex items-center gap-4 text-slate-300 text-sm">
-                            <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center shrink-0">
-                                <i className={`fa-solid ${item.icon} text-emerald-400 text-xs`}></i>
-                            </div>
-                            {item.text}
-                        </li>
-                    ))}
-                </ul>
-            </div>
-
-            <div className="relative z-10">
-                <p className="text-xs text-slate-500 leading-relaxed">
-                    By creating an account, you agree to our <span className="text-slate-300 underline cursor-pointer">Terms</span> and <span className="text-slate-300 underline cursor-pointer">Privacy Policy</span>.
-                </p>
-            </div>
+          <div className="relative z-10">
+            <p className="text-xs text-gray-400 leading-relaxed">
+              By creating an account, you agree to our{' '}
+              <span 
+                onClick={() => {
+                  onClose();
+                  navigate('/terms-conditions');
+                }} 
+                className="text-gray-200 underline cursor-pointer hover:text-white transition-colors"
+              >
+                Terms
+              </span>{' '}
+              and{' '}
+              <span 
+                onClick={() => {
+                  onClose();
+                  navigate('/privacy-policy');
+                }} 
+                className="text-gray-200 underline cursor-pointer hover:text-white transition-colors"
+              >
+                Privacy Policy
+              </span>.
+            </p>
+          </div>
         </div>
 
         {/* --- RIGHT SIDE (Scrollable Form Area) --- */}
         <div ref={scrollContainerRef} className="w-full md:w-7/12 overflow-y-auto px-6 py-8 md:px-12 md:py-10 relative bg-white">
-          <button className="absolute top-4 right-4 md:top-6 md:right-6 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:text-slate-900 transition-colors z-20" onClick={onClose}>
+          <button 
+            className="absolute top-4 right-4 md:top-6 md:right-6 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:text-[#1c3026] transition-colors z-20" 
+            onClick={onClose}
+          >
             <i className="fa-solid fa-xmark"></i>
           </button>
 
           <div className="max-w-md mx-auto h-full flex flex-col justify-center">
             <div className="mb-2.5 md:mb-5 text-center md:text-left mt-2 md:mt-0">
-              <h2 className="text-2xl md:text-3xl font-serif text-slate-900 mb-1">Create Account</h2>
-              <p className="text-slate-500 text-xs md:text-sm">Join us for a curated shopping experience.</p>
+              <h2 className="text-2xl md:text-3xl font-serif text-[#1c3026] mb-1">Create Account</h2>
+              <p className="text-gray-500 text-xs md:text-sm">Join us for a curated shopping experience.</p>
             </div>
 
             <form className="space-y-3 md:space-y-4" onSubmit={handleSubmit}>
@@ -200,20 +219,32 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
               {/* Name & Email */}
               <div className="space-y-3">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Full Name</label>
+                  <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Full Name</label>
                   <input
-                    type="text" name="name" value={formData.name} onChange={handleInputChange} onFocus={handleAutoScroll}
-                    className={`w-full p-2.5 md:p-4 bg-white border rounded-2xl text-sm text-slate-900 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all ${errors.name ? 'border-red-400' : 'border-slate-200'}`}
+                    type="text" 
+                    name="name" 
+                    value={formData.name} 
+                    onChange={handleInputChange} 
+                    onFocus={handleAutoScroll}
+                    className={`w-full p-2.5 md:p-4 bg-white border rounded-2xl text-sm text-[#1c3026] focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10 outline-none transition-all ${
+                      errors.name ? 'border-red-400' : 'border-gray-200'
+                    }`}
                     placeholder="John Doe"
                   />
                   {errors.name && <p className="text-[10px] text-red-500 ml-2 font-bold">{errors.name}</p>}
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Email Address</label>
+                  <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Email Address</label>
                   <input
-                    type="email" name="email" value={formData.email} onChange={handleInputChange} onFocus={handleAutoScroll}
-                    className={`w-full p-2.5 md:p-4 bg-white border rounded-2xl text-sm text-slate-900 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all ${errors.email ? 'border-red-400' : 'border-slate-200'}`}
+                    type="email" 
+                    name="email" 
+                    value={formData.email} 
+                    onChange={handleInputChange} 
+                    onFocus={handleAutoScroll}
+                    className={`w-full p-2.5 md:p-4 bg-white border rounded-2xl text-sm text-[#1c3026] focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10 outline-none transition-all ${
+                      errors.email ? 'border-red-400' : 'border-gray-200'
+                    }`}
                     placeholder="john@example.com"
                   />
                   {errors.email && <p className="text-[10px] text-red-500 ml-2 font-bold">{errors.email}</p>}
@@ -222,65 +253,90 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
 
               {/* Mobile */}
               <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Mobile Number</label>
-                  <input
-                    type="tel" name="mobile" value={formData.mobile} onChange={handleInputChange} onFocus={handleAutoScroll} maxLength="10"
-                    className={`w-full p-2.5 md:p-4 bg-white border rounded-2xl text-sm text-slate-900 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all ${errors.mobile ? 'border-red-400' : 'border-slate-200'}`}
-                    placeholder="9876543210"
-                  />
-                  {errors.mobile && <p className="text-[10px] text-red-500 ml-2 font-bold">{errors.mobile}</p>}
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Mobile Number</label>
+                <input
+                  type="tel" 
+                  name="mobile" 
+                  value={formData.mobile} 
+                  onChange={handleInputChange} 
+                  onFocus={handleAutoScroll} 
+                  maxLength="10"
+                  className={`w-full p-2.5 md:p-4 bg-white border rounded-2xl text-sm text-[#1c3026] focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10 outline-none transition-all ${
+                    errors.mobile ? 'border-red-400' : 'border-gray-200'
+                  }`}
+                  placeholder="9876543210"
+                />
+                {errors.mobile && <p className="text-[10px] text-red-500 ml-2 font-bold">{errors.mobile}</p>}
               </div>
 
               {/* Passwords Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Password</label>
+                  <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Password</label>
                   <div className="relative">
                     <input
-                      type={showPwd ? "text" : "password"} name="password" value={formData.password} onChange={handleInputChange} onFocus={handleAutoScroll}
-                       placeholder='••••••••'
-                      className={`w-full p-2.5 md:p-4 bg-white border rounded-2xl text-sm text-slate-900 pr-10 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all ${errors.password ? 'border-red-400' : 'border-slate-200'}`}
+                      type={showPwd ? "text" : "password"} 
+                      name="password" 
+                      value={formData.password} 
+                      onChange={handleInputChange} 
+                      onFocus={handleAutoScroll}
+                      placeholder='••••••••'
+                      className={`w-full p-2.5 md:p-4 bg-white border rounded-2xl text-sm text-[#1c3026] pr-10 outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10 transition-all ${
+                        errors.password ? 'border-red-400' : 'border-gray-200'
+                      }`}
                     />
-                    <button type="button" onClick={() => setShowPwd(!showPwd)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-emerald-600 p-1">
+                    <button 
+                      type="button" 
+                      onClick={() => setShowPwd(!showPwd)} 
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-600 p-1"
+                    >
                       <i className={`fa-solid ${showPwd ? 'fa-eye-slash' : 'fa-eye'} text-xs`}></i>
                     </button>
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Confirm</label>
+                  <label className="text-[10px] font-black uppercase text-gray-400 ml-1">Confirm</label>
                   <div className="relative">
                     <input
-                      type={showConfirmPwd ? "text" : "password"} name="confirmPassword" value={formData.confirmPassword} onChange={handleInputChange} onFocus={handleAutoScroll}
+                      type={showConfirmPwd ? "text" : "password"} 
+                      name="confirmPassword" 
+                      value={formData.confirmPassword} 
+                      onChange={handleInputChange} 
+                      onFocus={handleAutoScroll}
                       placeholder='••••••••'
-                      className={`w-full p-2.5 md:p-4 bg-white border rounded-2xl text-sm text-slate-900 pr-10 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all ${errors.confirmPassword ? 'border-red-400' : 'border-slate-200'}`}
+                      className={`w-full p-2.5 md:p-4 bg-white border rounded-2xl text-sm text-[#1c3026] pr-10 outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10 transition-all ${
+                        errors.confirmPassword ? 'border-red-400' : 'border-gray-200'
+                      }`}
                     />
-                    <button type="button" onClick={() => setShowConfirmPwd(!showConfirmPwd)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-emerald-600 p-1">
+                    <button 
+                      type="button" 
+                      onClick={() => setShowConfirmPwd(!showConfirmPwd)} 
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-600 p-1"
+                    >
                       <i className={`fa-solid ${showConfirmPwd ? 'fa-eye-slash' : 'fa-eye'} text-xs`}></i>
                     </button>
                   </div>
                 </div>
               </div>
-              
+
               {(errors.password || errors.confirmPassword) && (
-                 <p className="text-[10px] text-red-500 font-bold text-center mt-1">
-                    {errors.password || errors.confirmPassword}
-                 </p>
+                <p className="text-[10px] text-red-500 font-bold text-center mt-1">
+                  {errors.password || errors.confirmPassword}
+                </p>
               )}
 
               <button
-                type="submit" disabled={isRegistering || isSendingOtp}
+                type="submit" 
+                disabled={isRegistering || isSendingOtp}
                 className="w-full py-3 md:py-4 bg-emerald-600 text-white rounded-2xl font-bold uppercase tracking-widest text-xs hover:bg-emerald-700 transition-all shadow-lg active:scale-[0.98] mt-4 md:mt-6 disabled:opacity-50"
               >
                 {isRegistering || isSendingOtp ? 'Processing...' : 'Sign Up'}
               </button>
 
-              {/* CHANGED: Combined onto one line with ml-1 */}
-              <div className="text-xs text-slate-500 mt-4 md:mt-6 pb-2">
+              <div className="text-xs text-gray-500 mt-4 md:mt-6 pb-2">
                 Already have an account?{' '}
-                <span onClick={onSwitchToLogin} className="text-emerald-700 font-bold cursor-pointer underline ">
-                    Login
-                </span>
+                <span onClick={onSwitchToLogin} className="text-emerald-600 font-bold cursor-pointer underline">Login</span>
               </div>
             </form>
           </div>

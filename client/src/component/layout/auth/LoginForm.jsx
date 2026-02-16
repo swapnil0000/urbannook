@@ -1,12 +1,9 @@
 import { useState } from 'react';
-import { useDispatch } from 'react-redux';
 import ForgotPassword from './ForgotPassword';
 import { useLoginMutation } from '../../../store/api/authApi';
 import { useAuth, useUI } from '../../../hooks/useRedux';
-import OptimizedImage from '../../OptimizedImage';
 
 const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
-  const dispatch = useDispatch();
   const [formData, setFormData] = useState({ identifier: '', password: '' });
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -98,24 +95,24 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
       >
         
         {/* --- LEFT SIDE (Visual) --- */}
-        <div className="hidden md:flex w-5/12 bg-slate-900 p-10 flex-col justify-between relative overflow-hidden">
+        <div className="hidden md:flex w-5/12 bg-[#1c3026] p-10 flex-col justify-between relative overflow-hidden">
             {/* Background Pattern */}
             <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
             
             <div className="relative z-10">
                 <div className="flex items-center gap-3 mb-10">
-                    <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white">
+                    {/* <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white">
                         <i className="fa-solid fa-leaf text-lg"></i>
-                    </div>
+                    </div> */}
                     <span className="text-white font-serif text-xl">UrbanNook</span>
                 </div>
                 
                 <h2 className="text-4xl font-serif text-white mb-6 leading-tight">
                     Welcome <br/>
-                    <span className="italic text-emerald-500">Back.</span>
+                    <span className="italic text-[#F5DEB3]">Back.</span>
                 </h2>
                 
-                <p className="text-slate-400 text-sm leading-relaxed max-w-xs">
+                <p className="text-gray-300 text-sm leading-relaxed max-w-xs">
                     "Design is not just what it looks like and feels like. Design is how it works."
                 </p>
             </div>
@@ -125,12 +122,12 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
                 <div className="flex items-center gap-4">
                     <div className="flex -space-x-3">
                         {[1,2,3].map(i => (
-                            <div key={i} className="w-8 h-8 rounded-full bg-slate-700 border-2 border-slate-900"></div>
+                            <div key={i} className="w-8 h-8 rounded-full bg-[#0a110e] border-2 border-[#1c3026]"></div>
                         ))}
                     </div>
                     <div>
-                        <p className="text-white text-xs font-bold">Join 10k+ Members</p>
-                        <p className="text-emerald-500 text-[10px] uppercase tracking-widest">Community</p>
+                        <p className="text-white text-xs font-bold">Join 80+ Members</p>
+                        <p className="text-[#F5DEB3] text-[10px] uppercase tracking-widest">Community</p>
                     </div>
                 </div>
             </div>
@@ -139,53 +136,30 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
         {/* --- RIGHT SIDE (Form) --- */}
         <div className="w-full md:w-7/12 overflow-y-auto px-8 py-10 md:p-12 relative flex flex-col justify-center">
           <button 
-            className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:text-slate-900 transition-colors z-20"
+            className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:text-[#1c3026] transition-colors z-20"
             onClick={onClose}
           >
             <i className="fa-solid fa-xmark"></i>
           </button>
 
           <div className="max-w-md mx-auto w-full">
-            <div className="mb-8">
-              <h2 className="text-3xl font-serif text-slate-900 mb-2">Sign In</h2>
-              <p className="text-slate-500 text-sm">Continue to your curated space.</p>
-            </div>
-
-            {/* Social Logins */}
-            <div className="grid grid-cols-3 gap-3 mb-8">
-                {['google', 'facebook', 'mobile'].map((provider) => (
-                <button 
-                    key={provider}
-                    type="button"
-                    className="h-12 flex items-center justify-center rounded-xl border border-slate-200 hover:bg-slate-50 hover:border-slate-400 transition-all active:scale-95"
-                >
-                    <OptimizedImage
-                      src={`/assets/onboardIcon-${provider === 'mobile' ? 'mail' : provider === 'google' ? 'gp' : 'fb'}.svg`}
-                      alt={`${provider} login`}
-                      className="w-5 h-5"
-                      loading="lazy"
-                    />
-                </button>
-                ))}
-            </div>
-
-            <div className="relative flex items-center justify-center mb-8">
-                <div className="w-full border-t border-slate-100"></div>
-                <span className="absolute bg-white px-4 text-[10px] uppercase font-bold text-slate-300 tracking-[0.2em]">Or using email</span>
+            <div className="mb-8 text-center md:text-left">
+              <h2 className="text-3xl font-serif text-[#1c3026] mb-2">Sign In</h2>
+              <p className="text-gray-500 text-sm">Continue to your curated space.</p>
             </div>
 
             <form className="space-y-5" onSubmit={handleSubmit}>
               
               {/* Identifier Input */}
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Email or Username</label>
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Email or Username</label>
                 <input
                   type="text"
                   name="identifier"
                   value={formData.identifier}
                   onChange={handleInputChange}
-                  className={`w-full p-4 bg-slate-50 border rounded-2xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all outline-none text-slate-900 text-sm ${
-                    errors.identifier ? 'border-red-500' : 'border-slate-200'
+                  className={`w-full p-4 bg-white border rounded-2xl focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10 transition-all outline-none text-[#1c3026] text-sm ${
+                    errors.identifier ? 'border-red-500' : 'border-gray-200'
                   }`}
                   placeholder="e.g. johndoe"
                 />
@@ -195,11 +169,11 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
               {/* Password Input */}
               <div className="space-y-1">
                 <div className="flex justify-between items-center px-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Password</label>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Password</label>
                   <button 
                     type="button" 
                     onClick={() => setShowForgotPassword(true)}
-                    className="text-[10px] font-bold text-emerald-700 hover:underline uppercase tracking-tighter"
+                    className="text-[10px] font-bold text-emerald-600 hover:underline uppercase tracking-tighter"
                   >
                     Forgot?
                   </button>
@@ -210,15 +184,15 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
                     name="password"
                     value={formData.password}
                     onChange={handleInputChange}
-                    className={`w-full p-4 bg-slate-50 border rounded-2xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all outline-none text-slate-900 text-sm pr-12 ${
-                      errors.password ? 'border-red-500' : 'border-slate-200'
+                    className={`w-full p-4 bg-white border rounded-2xl focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10 transition-all outline-none text-[#1c3026] text-sm pr-12 ${
+                      errors.password ? 'border-red-500' : 'border-gray-200'
                     }`}
                     placeholder="••••••••"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-emerald-700 transition-colors"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-600 transition-colors"
                   >
                     <i className={`fa-solid ${showPassword ? 'fa-eye-slash' : 'fa-eye'} text-xs`}></i>
                   </button>
@@ -229,7 +203,7 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
               <button 
                 type="submit" 
                 disabled={isLoading}
-                className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold tracking-widest uppercase hover:bg-emerald-700 transition-all shadow-xl active:scale-[0.98] mt-6 disabled:opacity-50 text-xs"
+                className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-bold tracking-widest uppercase hover:bg-emerald-700 transition-all shadow-xl active:scale-[0.98] mt-6 disabled:opacity-50 text-xs"
               >
                 {isLoading ? (
                   <div className="flex items-center justify-center gap-2">
@@ -246,9 +220,9 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
               )}
             </form>
 
-            <p className="text-sm text-center mt-8 text-slate-500">
+            <p className="text-sm text-center mt-8 text-gray-500">
               New here?{' '}
-              <span onClick={onSwitchToSignup} className="text-emerald-700 cursor-pointer font-bold hover:underline transition-all">
+              <span onClick={onSwitchToSignup} className="text-emerald-600 cursor-pointer font-bold hover:underline transition-all">
                 Create an account
               </span>
             </p>
