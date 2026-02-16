@@ -224,7 +224,7 @@ Implementation proceeds in layers: backend data model and API first, then fronte
     - Submit random testimonials, query for testimonials, verify new one is present
     - Use fast-check with 100 iterations
 
-  - [ ] 8.2 Write property test for required fields presence
+  - [x] 8.2 Write property test for required fields presence
     - **Property 1: Required Fields Presence**
     - **Validates: Requirements 1.1, 1.4**
     - Test that any stored testimonial contains userName, content, rating, isApproved, createdAt, updatedAt with correct types
