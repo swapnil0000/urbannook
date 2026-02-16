@@ -35,7 +35,13 @@ const ProductDetailPage = () => {
   const product = productResponse?.data;
 
   // 4. Derived State
-  const cartItem = cartItems.find(item => String(item.id) === String(product?.productId));
+  const cartItem = cartItems.find(item => 
+    String(item.id) === String(product?.productId) || 
+    String(item.mongoId) === String(product?.productId) ||
+    String(item.productId) === String(product?.productId)
+  );
+
+  console.log(cartItem,"cartItemcartItemcartItem")
   const isInCart = !!cartItem;
   const currentCartQty = cartItem?.quantity || 0;
   const wishlistItems = useSelector((state) => state.wishlist.items);

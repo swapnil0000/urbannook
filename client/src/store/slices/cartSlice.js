@@ -87,7 +87,10 @@ const cartSlice = createSlice({
         }
       } else if (cartData && typeof cartData === 'object') {
         // If cartData is an object
-        if (cartData.items && Array.isArray(cartData.items)) {
+        if (cartData.availableItems && Array.isArray(cartData.availableItems)) {
+          // Format: { availableItems: [...] } - Backend format
+          cartItems = cartData.availableItems;
+        } else if (cartData.items && Array.isArray(cartData.items)) {
           // Format: { items: [...] }
           cartItems = cartData.items;
         } else if (cartData.data && Array.isArray(cartData.data)) {
