@@ -3,7 +3,6 @@ import {
   getAllCouponCodeService,
 } from "../services/coupon.code.service.js";
 import { ApiError, ApiRes } from "../utlis/index.js";
-import Cart from "../model/user.cart.model.js";
 const applyCouponCodeController = async (req, res) => {
   try {
     const { userId } = req.user;
@@ -83,27 +82,7 @@ const getAllCouponCodeController = async (_, res) => {
   }
 };
 
-const removeCouponController = async (req, res) => {
-  try {
-    const { userId } = req.user;
-
-  await Cart.updateOne(
-    { userId },
-    {
-      $unset: { appliedCoupon: 1 },
-    },
-  );
-
-    return res.json(new ApiRes(200, "Coupon removed", null, true));
-  } catch (error) {
-    return res
-      .status(500)
-      .json(new ApiError(500, `Internal Server Error - ${error}`, [], false));
-  }
-};
-
 export {
   applyCouponCodeController,
   getAllCouponCodeController,
-  removeCouponController,
 };

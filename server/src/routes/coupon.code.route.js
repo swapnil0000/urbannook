@@ -3,7 +3,6 @@ import { authGuardService } from "../services/common.auth.service.js";
 import {
   applyCouponCodeController,
   getAllCouponCodeController,
-  removeCouponController,
 } from "../controller/coupon.code.controller.js";
 const couponCodeRouter = Router();
 couponCodeRouter.post(
@@ -12,10 +11,5 @@ couponCodeRouter.post(
   applyCouponCodeController,
 );
 couponCodeRouter.get("/coupon/list", getAllCouponCodeController);
-couponCodeRouter.delete(
-  "/coupon/remove",
-  authGuardService("USER"),
-  removeCouponController,
-);
 
 export default couponCodeRouter;
