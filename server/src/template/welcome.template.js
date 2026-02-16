@@ -84,7 +84,7 @@ const welcomeTemplate = ({ userName }) => {
               <!-- CTA BUTTON -->
               <tr>
                 <td align="center" style="padding:0 30px 30px 30px;">
-                  <a href="https://urbannook.in/shop" 
+                  <a href="https://urbannook.in/products" 
                      style="display:inline-block; background-color:#2E443C; color:#ffffff; text-decoration:none; padding:14px 32px; border-radius:8px; font-family:Arial, Helvetica, sans-serif; font-size:16px; font-weight:600;">
                     Start Shopping
                   </a>
