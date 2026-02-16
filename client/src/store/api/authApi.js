@@ -77,10 +77,18 @@ export const authApi = apiSlice.injectEndpoints({
         }
       },
     }),
-    logout: builder.mutation({
-      query: () => ({
-        url: 'user/logout',
+    forgotPasswordRequest: builder.mutation({
+      query: (data) => ({
+        url: 'user/forgot-password/request',
         method: 'POST',
+        body: data,
+      }),
+    }),
+    forgotPasswordReset: builder.mutation({
+      query: (data) => ({
+        url: 'user/forgot-password/reset',
+        method: 'POST',
+        body: data,
       }),
     }),
     otpSent: builder.mutation({
@@ -128,4 +136,6 @@ export const {
   useResendOtpMutation,
   useGetProfileQuery,
   useUpdateProfileMutation,
+  useForgotPasswordRequestMutation,
+  useForgotPasswordResetMutation,
 } = authApi;

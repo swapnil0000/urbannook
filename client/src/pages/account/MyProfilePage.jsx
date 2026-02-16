@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion'; // Added animations
-import { useAuth } from '../../hooks/useRedux';
+import { useAuth, useUI } from '../../hooks/useRedux';
 import { useGetUserProfileQuery, useUpdateUserProfileMutation } from '../../store/api/userApi';
 
 const MyProfilePage = () => {
   const { user } = useAuth();
+  const { showNotification } = useUI();
   const [isEditing, setIsEditing] = useState(false);
   const [vibe, setVibe] = useState('minimal');
   
@@ -72,7 +73,7 @@ const MyProfilePage = () => {
       // Optional: Add toast notification here
     } catch (error) {
       console.error('Failed to update profile:', error);
-      alert('Failed to update profile');
+      showNotification('Failed to update profile', 'error');
     }
   };
 

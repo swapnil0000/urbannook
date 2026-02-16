@@ -67,12 +67,12 @@ const AireHeroBanner = () => {
                 Shop Collection
               </button>
 
-              <button className="w-full sm:w-auto px-8 py-3 rounded-full font-bold text-white border border-white/30 hover:bg-white/10 hover:scale-105 transition-all flex items-center justify-center gap-3 text-xs uppercase tracking-widest backdrop-blur-sm">
+              {/* <button className="w-full sm:w-auto px-8 py-3 rounded-full font-bold text-white border border-white/30 hover:bg-white/10 hover:scale-105 transition-all flex items-center justify-center gap-3 text-xs uppercase tracking-widest backdrop-blur-sm">
                 <span className="w-6 h-6 rounded-full border border-white flex items-center justify-center">
                   <i className="fa-solid fa-play text-[8px] ml-0.5"></i>
                 </span>
                 Watch Film
-              </button>
+              </button> */}
             </div>
 
             {/* --- STATS SECTION --- */}

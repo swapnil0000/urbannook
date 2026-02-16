@@ -1,16 +1,16 @@
-import React, { useEffect, useState } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import { useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { useUpdateCartMutation, userApi } from '../../store/api/userApi';
+import { useUpdateCartMutation } from '../../store/api/userApi';
 import OptimizedImage from '../OptimizedImage';
 
 const CartDrawer = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
   const [mounted, setMounted] = useState(false);
   
   // Get cart items from Redux store
   const { items: cartItems, totalAmount } = useSelector((state) => state.cart);
+  const { isAuthenticated } = useSelector((state) => state.auth);
   
   const [updateCart] = useUpdateCartMutation();
 
@@ -31,7 +31,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
       handleRemoveItem(productId);
       return;
     }
-    
+
     try {
       // Find the item to get mongoId and current quantity for backend sync
       const item = cartItems.find(item => item.id === productId);
@@ -39,10 +39,11 @@ const CartDrawer = ({ isOpen, onClose }) => {
       const currentQty = item?.quantity || 0;
       
       // Determine action based on quantity change
-      const action = newQuantity > currentQty ? 'add' : 'remove';
+      const action = newQuantity > currentQty ? 'add' : 'sub';
       
-      // Call API - RTK Query will automatically invalidate and refetch
-      await updateCart({ productId: mongoId, quantity: newQuantity, action }).unwrap();
+      // Call API with quantity=1 (the amount to change, not the new total)
+      // RTK Query will automatically invalidate and refetch
+      await updateCart({ productId: mongoId, quantity: 1, action }).unwrap();
     } catch (error) {
       console.error('Failed to update cart:', error);
       // Revert local state on error
@@ -56,8 +57,9 @@ const CartDrawer = ({ isOpen, onClose }) => {
       const item = cartItems.find(item => item.id === productId);
       const mongoId = item?.mongoId || productId;
       
-      // Call API - RTK Query will automatically invalidate and refetch
-      await updateCart({ productId: mongoId, quantity: 0, action: 'remove' }).unwrap();
+      // Call API with action='remove' (quantity is ignored by backend for remove action)
+      // RTK Query will automatically invalidate and refetch
+      await updateCart({ productId: mongoId, quantity: 1, action: 'remove' }).unwrap();
     } catch (error) {
       console.error('Failed to remove item:', error);
       // Revert local state on error
@@ -127,7 +129,10 @@ const CartDrawer = ({ isOpen, onClose }) => {
                 </p>
               </div>
               <button 
-                onClick={onClose}
+                onClick={() => {
+                  onClose();
+                  navigate('/products');
+                }}
                 className="px-8 py-3.5 bg-[#0a110e] text-white text-xs font-bold uppercase tracking-[0.15em] rounded-full hover:bg-emerald-700 hover:shadow-lg hover:shadow-emerald-900/20 transition-all duration-300"
               >
                 Start Exploring

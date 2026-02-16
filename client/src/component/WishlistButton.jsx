@@ -1,10 +1,12 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useAddToWishlistMutation, useRemoveFromWishlistMutation, useGetWishlistQuery } from '../store/api/userApi';
 import { setWishlistItems } from '../store/slices/wishlistSlice';
+import { useUI } from '../hooks/useRedux';
 
 const WishlistButton = ({ productId, className = "", size = "md" }) => {
   const dispatch = useDispatch();
+  const { openLoginModal } = useUI();
   const [addToWishlist] = useAddToWishlistMutation();
   const [removeFromWishlist] = useRemoveFromWishlistMutation();
   const { data: wishlistData } = useGetWishlistQuery(undefined, { 
@@ -42,7 +44,7 @@ const WishlistButton = ({ productId, className = "", size = "md" }) => {
     const hasLocalUser = localStorage.getItem('user');
     
     if (!isAuthenticated && !token && !hasLocalUser) {
-      alert('Please login to add items to wishlist');
+      openLoginModal();
       return;
     }
 

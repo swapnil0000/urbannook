@@ -6,14 +6,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 // API & Redux imports
 import { useGetProductByIdQuery } from '../../store/api/productsApi';
-import { useAddToCartMutation, userApi, useUpdateCartMutation, useAddToWishlistMutation, useRemoveFromWishlistMutation } from '../../store/api/userApi';
+import { useAddToCartMutation, useUpdateCartMutation, useAddToWishlistMutation, useRemoveFromWishlistMutation } from '../../store/api/userApi';
 import { addToWishlistLocal, removeFromWishlistLocal } from '../../store/slices/wishlistSlice';
+import { useUI } from '../../hooks/useRedux';
 import OptimizedImage from '../../component/OptimizedImage';
+import LoginForm from '../../component/layout/auth/LoginForm';
+import SignupForm from '../../component/layout/auth/SignupForm';
 
 const ProductDetailPage = () => {
   const { productId } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { showNotification, showLoginModal, openLoginModal, closeLoginModal } = useUI();
 
   // 1. Auth & Cookies
   const [cookies] = useCookies(['userAccessToken']);
@@ -24,6 +28,7 @@ const ProductDetailPage = () => {
   const [activeAccordion, setActiveAccordion] = useState('description');
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [showSignup, setShowSignup] = useState(false);
 
   // 3. API Hooks
   const { data: productResponse, isLoading, error } = useGetProductByIdQuery(productId);
@@ -70,6 +75,8 @@ const ProductDetailPage = () => {
   // 6. Logic: Add to Cart / Update / Checkout
   const handleInitialAddToCart = async () => {
     if (!product) return;
+    
+    // Check if user is logged in
     const getCookie = (name) => {
       const value = `; ${document.cookie}`;
       const parts = value.split(`; ${name}=`);
@@ -79,25 +86,28 @@ const ProductDetailPage = () => {
 
     const token = getCookie('userAccessToken') || cookies.userAccessToken;
     const hasLocalUser = localStorage.getItem('user');
+    const isLoggedIn = isAuthenticated || token || hasLocalUser;
 
-    if (!isAuthenticated && !token && !hasLocalUser) {
-      alert('Please login to add items to cart');
+    if (!isLoggedIn) {
+      // User must login to add to cart
+      openLoginModal();
       return;
     }
 
+    // Logged in user - add to backend cart
     try {
-      // Call API - RTK Query will automatically invalidate and refetch
       await addToCartAPI({ productId: product?.productId, quantity: 1 }).unwrap();
       setFeedbackMessage("Added");
       setTimeout(() => setFeedbackMessage(""), 2000);
     } catch (err) {
       console.error('Add to cart failed:', err);
-      alert(err.data?.message || "Something went wrong");
+      showNotification(err.data?.message || "Something went wrong", 'error');
     }
   };
 
   const handleUpdateQty = async (newQuantity) => {
     if (newQuantity < 1) return;
+    
     try {
       // Call API - RTK Query will automatically invalidate and refetch
       const action = newQuantity > currentCartQty ? 'add' : 'sub';
@@ -120,7 +130,7 @@ const ProductDetailPage = () => {
     if (isAuthenticated || token || hasLocalUser) {
       navigate('/checkout');
     } else {
-      alert('Please login to proceed to checkout');
+      openLoginModal();
     }
   };
 
@@ -417,6 +427,24 @@ const ProductDetailPage = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Login Modal */}
+      {showLoginModal && (
+        <LoginForm 
+          onClose={closeLoginModal}
+          onLoginSuccess={() => closeLoginModal()}
+          onSwitchToSignup={() => { closeLoginModal(); setShowSignup(true); }}
+        />
+      )}
+
+      {/* Signup Modal */}
+      {showSignup && (
+        <SignupForm 
+          onClose={() => setShowSignup(false)}
+          onSignupSuccess={() => setShowSignup(false)}
+          onSwitchToLogin={() => { setShowSignup(false); openLoginModal(); }}
+        />
+      )}
 
     </div>
   );

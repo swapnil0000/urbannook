@@ -1,10 +1,11 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { motion } from 'framer-motion';
 import { useGetUserProfileQuery, useGetRazorpayKeyQuery, useCreateOrderMutation, useApplyCouponMutation } from '../store/api/userApi';
 import { useCartData } from '../hooks/useCartSync';
 import { clearCart } from '../store/slices/cartSlice';
+import { useUI } from '../hooks/useRedux';
 import CouponInput from '../component/CouponInput';
 import { ComponentLoader } from '../component/layout/LoadingSpinner';
 
@@ -14,8 +15,9 @@ const CouponList = lazy(() => import('../component/CouponList'));
 const CheckoutPage = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { showNotification, openLoginModal } = useUI();
   const { items: cartItems, totalAmount } = useSelector((state) => state.cart);
-  const { isAuthenticated, user } = useSelector((state) => state.auth);
+  const { isAuthenticated } = useSelector((state) => state.auth);
   
   const [userProfile, setUserProfile] = useState(null);
   const [address, setAddress] = useState('');
@@ -57,7 +59,8 @@ const CheckoutPage = () => {
     const isLoggedIn = isAuthenticated || userToken || hasLocalUser;
     
     if (!isLoggedIn) {
-      alert('Please login to access checkout');
+      showNotification('Please login to access checkout', 'error');
+      openLoginModal();
       navigate('/');
       return;
     }
@@ -234,7 +237,7 @@ const CheckoutPage = () => {
   const handlePayment = async () => {
     // Validate form before proceeding
     if (!validateForm()) {
-      alert('Please fix the errors in the form before proceeding.');
+      showNotification('Please fix the errors in the form before proceeding.', 'error');
       return;
     }
 
@@ -278,7 +281,10 @@ const CheckoutPage = () => {
             // Verify payment on backend
             // Note: The actual verification happens via webhook
             // This handler is just for UI feedback
-            alert(`Payment successful! Payment ID: ${response.razorpay_payment_id}`);
+            const orderId = response.razorpay_order_id;
+            const paymentId = response.razorpay_payment_id;
+            
+            showNotification(`Payment successful! Order ID: ${orderId}`, 'success');
             
             // CRITICAL FIX: Clear cart in Redux state
             dispatch(clearCart());
@@ -286,8 +292,10 @@ const CheckoutPage = () => {
             // Also refetch cart from backend to sync
             await refetchCart();
             
-            // Navigate to orders page
-            navigate('/orders');
+            // Navigate to orders page after a short delay
+            setTimeout(() => {
+              navigate('/orders');
+            }, 2000);
           } catch (verifyError) {
             console.error('Payment verification error:', verifyError);
             setPaymentError('Payment verification failed. Please contact support if amount was debited.');

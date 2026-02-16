@@ -18,11 +18,15 @@ const Footer = () => {
 
     setIsSubmitting(true);
     try {
-      await joinCommunity({ email }).unwrap();
-      showNotification('Welcome to the inner circle.', 'success');
+      const response = await joinCommunity({ email }).unwrap();
+      // Use the backend message directly
+      const message = response?.message || 'Welcome to the inner circle.';
+      showNotification(message, 'success');
       setEmail('');
     } catch (error) {
-      showNotification('Failed to join. Try again later.', 'error');
+      // Use backend error message if available
+      const errorMessage = error?.data?.message || 'Failed to join. Try again later.';
+      showNotification(errorMessage, 'error');
     } finally {
       setIsSubmitting(false);
     }

@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useGetWishlistQuery, useRemoveFromWishlistMutation, useAddToCartMutation } from '../../store/api/userApi';
+import { useUI } from '../../hooks/useRedux';
 import { motion } from 'framer-motion';
 
 const WishlistPage = () => {
   const navigate = useNavigate();
+  const { showNotification } = useUI();
   const { data: wishlistData, isLoading, refetch } = useGetWishlistQuery();
   const [removeFromWishlist] = useRemoveFromWishlistMutation();
   const [addToCart, { isLoading: isAddingToCart }] = useAddToCartMutation();
@@ -33,7 +35,7 @@ const WishlistPage = () => {
       refetch();
     } catch (error) {
       console.error('Failed to remove from wishlist:', error);
-      alert('Failed to remove item from wishlist');
+      showNotification('Failed to remove item from wishlist', 'error');
     }
   };
 
@@ -65,7 +67,7 @@ const WishlistPage = () => {
       });
     } catch (error) {
       console.error('Failed to add to cart:', error);
-      alert(error?.data?.message || 'Failed to add to cart');
+      showNotification(error?.data?.message || 'Failed to add to cart', 'error');
       
       // Remove from adding state on error
       setAddingItems(prev => {

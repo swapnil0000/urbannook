@@ -1,7 +1,7 @@
 import { useSelector, useDispatch } from 'react-redux';
 import { addItem, removeItem, updateQuantity, clearCart } from '../store/slices/cartSlice';
 import { setCredentials, logout } from '../store/slices/authSlice';
-import { toggleCartModal, toggleAuthModal, setNotification, clearNotification } from '../store/slices/uiSlice';
+import { toggleCartModal, toggleAuthModal, setShowLoginModal, setNotification, clearNotification } from '../store/slices/uiSlice';
 
 // Cart hooks
 export const useCart = () => {
@@ -38,6 +38,8 @@ export const useUI = () => {
     ...ui,
     toggleCart: () => dispatch(toggleCartModal()),
     toggleAuth: () => dispatch(toggleAuthModal()),
+    openLoginModal: () => dispatch(setShowLoginModal(true)),
+    closeLoginModal: () => dispatch(setShowLoginModal(false)),
     showNotification: (message, type = 'info') => {
       dispatch(setNotification({ message, type }));
       // Auto clear after 3 seconds
