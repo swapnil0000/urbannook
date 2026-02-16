@@ -80,11 +80,8 @@ const ProductDetailPage = () => {
     }
 
     try {
-      // Call API only - let cart sync handle Redux update
+      // Call API - RTK Query will automatically invalidate and refetch
       await addToCartAPI({ productId: product?.productId, quantity: 1 }).unwrap();
-
-      // Invalidate cache to trigger fresh cart data fetch
-      dispatch(userApi?.util?.invalidateTags(['User']));
       setFeedbackMessage("Added");
       setTimeout(() => setFeedbackMessage(""), 2000);
     } catch (err) {
@@ -96,12 +93,9 @@ const ProductDetailPage = () => {
   const handleUpdateQty = async (newQuantity) => {
     if (newQuantity < 1) return;
     try {
-      // Call API only - let cart sync handle Redux update
+      // Call API - RTK Query will automatically invalidate and refetch
       const action = newQuantity > currentCartQty ? 'add' : 'sub';
       await updateCart({ productId: product.productId, quantity: 1, action }).unwrap();
-
-      // Invalidate cache to trigger fresh cart data fetch
-      dispatch(userApi.util.invalidateTags(['User']));
     } catch (err) {
       console.error('Update failed:', err);
       window.location.reload();
@@ -129,7 +123,6 @@ const ProductDetailPage = () => {
       if (isInWishlist) {
         await removeFromWishlist(product.productName).unwrap();
         dispatch(removeFromWishlistLocal(product.productName));
-        dispatch(userApi.util.invalidateTags(['User']));
         setFeedbackMessage("Removed from wishlist");
       } else {
         await addToWishlist({ productId: product.productId }).unwrap();

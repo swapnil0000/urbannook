@@ -41,11 +41,8 @@ const CartDrawer = ({ isOpen, onClose }) => {
       // Determine action based on quantity change
       const action = newQuantity > currentQty ? 'add' : 'remove';
       
-      // Call API only - let cart sync handle Redux update
+      // Call API - RTK Query will automatically invalidate and refetch
       await updateCart({ productId: mongoId, quantity: newQuantity, action }).unwrap();
-      
-      // Invalidate cache to trigger fresh cart data fetch
-      dispatch(userApi.util.invalidateTags(['User']));
     } catch (error) {
       console.error('Failed to update cart:', error);
       // Revert local state on error
@@ -59,11 +56,8 @@ const CartDrawer = ({ isOpen, onClose }) => {
       const item = cartItems.find(item => item.id === productId);
       const mongoId = item?.mongoId || productId;
       
-      // Call API only - let cart sync handle Redux update
+      // Call API - RTK Query will automatically invalidate and refetch
       await updateCart({ productId: mongoId, quantity: 0, action: 'remove' }).unwrap();
-      
-      // Invalidate cache to trigger fresh cart data fetch
-      dispatch(userApi.util.invalidateTags(['User']));
     } catch (error) {
       console.error('Failed to remove item:', error);
       // Revert local state on error

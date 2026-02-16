@@ -23,7 +23,7 @@ export const userApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: data,
       }),
-      invalidatesTags: ['User'],
+      invalidatesTags: ['User', 'Cart'],
     }),
     updateCart: builder.mutation({
       query: (data) => ({
@@ -31,18 +31,18 @@ export const userApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: data,
       }),
-      invalidatesTags: ['User'],
+      invalidatesTags: ['User', 'Cart'],
     }),
     removeFromCart: builder.mutation({
       query: (productId) => ({
         url: `user/cart/${productId}`,
         method: 'DELETE',
       }),
-      invalidatesTags: ['User'],
+      invalidatesTags: ['User', 'Cart'],
     }),
     getCart: builder.query({
       query: () => 'user/cart/get',
-      providesTags: ['User'],
+      providesTags: ['User', 'Cart'],
     }),
     clearCart: builder.mutation({
       query: () => ({
@@ -59,18 +59,18 @@ export const userApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: data,
       }),
-      invalidatesTags: ['Wishlist'],
+      invalidatesTags: ['Wishlist', 'User'],
     }),
     getWishlist: builder.query({
       query: () => 'user/wishlist/get',
-      providesTags: ['Wishlist'],
+      providesTags: ['Wishlist', 'User'],
     }),
     removeFromWishlist: builder.mutation({
       query: (productId) => ({
         url: `user/wishlist/${productId}`,
         method: 'DELETE',
       }),
-      invalidatesTags: ['Wishlist'],
+      invalidatesTags: ['Wishlist', 'User'],
     }),
 
     // Order APIs
