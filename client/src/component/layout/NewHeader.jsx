@@ -1,14 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
-import { useGetWishlistQuery } from '../../store/api/userApi';
+import { useSelector, useDispatch } from 'react-redux';
+import { useGetWishlistQuery,  } from '../../store/api/userApi';
+import { logout as logoutAction } from '../../store/slices/authSlice';
 import SignupForm from './auth/SignupForm';
 import LoginForm from './auth/LoginForm';
-import CartDrawer from '../layout/CartDrawer';
+import { useLogoutMutation } from '../../store/api/authApi';
+import CartDrawer from './CartDrawer';
 
 const NewHeader = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   
   // Get cart and auth state from Redux
   const { items: cartItems, totalQuantity } = useSelector((state) => state.cart);
@@ -17,6 +20,9 @@ const NewHeader = () => {
   // Get wishlist count
   const { data: wishlistData } = useGetWishlistQuery(undefined, { skip: !isAuthenticated });
   const wishlistCount = wishlistData?.data?.wishlist?.length || 0;
+  
+  // Logout mutation
+  const [logoutAPI, { isLoading: isLoggingOut }] = useLogoutMutation();
   
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
@@ -69,13 +75,41 @@ const NewHeader = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [isMenuOpen]);
 
-  const handleLogout = () => {
-    setUser(null);
-    localStorage.removeItem('user');
-    window.dispatchEvent(new Event('storage'));
-    setShowUserDropdown(false);
-    setIsMenuOpen(false);
-    navigate('/');
+  const handleLogout = async () => {
+    try {
+      // Call logout API
+      await logoutAPI().unwrap();
+      
+      // Clear local state
+      setUser(null);
+      setShowUserDropdown(false);
+      setIsMenuOpen(false);
+      
+      // Dispatch logout action to clear Redux state
+      dispatch(logoutAction());
+      
+      // Clear localStorage
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+      
+      // Clear cookie
+      document.cookie = 'userAccessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      
+      // Trigger storage event for other tabs
+      window.dispatchEvent(new Event('storage'));
+      
+      // Navigate to home
+      navigate('/');
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // Even if API fails, clear local state
+      setUser(null);
+      dispatch(logoutAction());
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+      document.cookie = 'userAccessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      navigate('/');
+    }
   };
 
   // --- HELPER FUNCTIONS ---
@@ -205,8 +239,13 @@ const NewHeader = () => {
                           </Link>
                        </div>
                        <div className="p-2 border-t border-gray-100">
-                          <button onClick={handleLogout} className="flex items-center gap-3 w-full px-3 py-2.5 text-sm text-red-600 hover:bg-red-50 rounded-xl transition-colors text-left">
-                             <i className="fa-solid fa-arrow-right-from-bracket w-5"></i> Logout
+                          <button 
+                            onClick={handleLogout} 
+                            disabled={isLoggingOut}
+                            className="flex items-center gap-3 w-full px-3 py-2.5 text-sm text-red-600 hover:bg-red-50 rounded-xl transition-colors text-left disabled:opacity-50"
+                          >
+                             <i className="fa-solid fa-arrow-right-from-bracket w-5"></i> 
+                             {isLoggingOut ? 'Logging out...' : 'Logout'}
                           </button>
                        </div>
                      </div>
@@ -275,7 +314,7 @@ const NewHeader = () => {
                                 <span className="text-xs text-emerald-700 uppercase tracking-wider font-semibold">View Profile <i className="fa-solid fa-chevron-right text-[9px]"></i></span>
                             </div>
                         </div>
-                        <button onClick={(e) => { e.stopPropagation(); handleLogout(); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-red-50 text-red-500 hover:bg-red-100 transition-colors">
+                        <button onClick={(e) => { e.stopPropagation(); handleLogout(); }} disabled={isLoggingOut} className="w-8 h-8 flex items-center justify-center rounded-full bg-red-50 text-red-500 hover:bg-red-100 transition-colors disabled:opacity-50">
                             <i className="fa-solid fa-arrow-right-from-bracket text-sm"></i>
                         </button>
                     </div>

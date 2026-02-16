@@ -2,9 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useDispatch } from 'react-redux';
 import { useResendOtpMutation, useVerifyOtpMutation } from '../../../store/api/authApi';
 import { setCredentials } from '../../../store/slices/authSlice';
+import { useUI } from '../../../hooks/useRedux';
 
 const OTPVerification = ({ email, onClose, onSuccess, onBack }) => {
   const dispatch = useDispatch();
+  const { showNotification } = useUI();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [timer, setTimer] = useState(30);
   const [canResend, setCanResend] = useState(false);
@@ -59,6 +61,9 @@ const OTPVerification = ({ email, onClose, onSuccess, onBack }) => {
         emailOtp: otpString
       }).unwrap();
       
+      // Show success notification with backend message
+      showNotification(result?.message || 'Email verified successfully!', 'success');
+      
       // CRITICAL FIX: After successful OTP verification, NOW save credentials
       if (result.success) {
         // Get pending verification data from sessionStorage
@@ -92,7 +97,9 @@ const OTPVerification = ({ email, onClose, onSuccess, onBack }) => {
       
       onSuccess(result);
     } catch (err) {
-      setError(err.data?.message || 'Invalid OTP. Please try again.');
+      const errorMessage = err.data?.message || 'Invalid OTP. Please try again.';
+      setError(errorMessage);
+      showNotification(errorMessage, 'error');
       setOtp(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
     }
@@ -100,13 +107,17 @@ const OTPVerification = ({ email, onClose, onSuccess, onBack }) => {
 
   const handleResend = async () => {
     try {
-      await resendOtp({ userEmail:email }).unwrap();
+      const result = await resendOtp({ userEmail: email }).unwrap();
+      // Show success notification with backend message
+      showNotification(result?.message || 'OTP resent successfully!', 'success');
       setTimer(30);
       setCanResend(false);
       setOtp(['', '', '', '', '', '']);
       setError('');
     } catch (err) {
-      setError('Failed to resend code',err);
+      const errorMessage = err.data?.message || 'Failed to resend code';
+      setError(errorMessage);
+      showNotification(errorMessage, 'error');
     }
   };
 

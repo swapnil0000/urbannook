@@ -62,7 +62,7 @@ const AllProductsPage = () => {
 
           {/* RIGHT SIDE: Desktop-Only Control Panel */}
           <div className="hidden md:flex flex-col items-end gap-6 pb-2">
-            <div className="flex bg-white/5 backdrop-blur-xl p-1.5 rounded-full border border-white/10 shadow-2xl">
+            {/* <div className="flex bg-white/5 backdrop-blur-xl p-1.5 rounded-full border border-white/10 shadow-2xl">
               {[
                 { label: 'Featured', value: 'featured' },
                 { label: 'Price ↓', value: 'price-low' },
@@ -80,7 +80,7 @@ const AllProductsPage = () => {
                   {option.label}
                 </button>
               ))}
-            </div>
+            </div> */}
           </div>
         </div>
       </section>

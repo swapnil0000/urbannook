@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import { useDispatch } from 'react-redux';
 import ForgotPassword from './ForgotPassword';
 import { useLoginMutation } from '../../../store/api/authApi';
 import { useAuth, useUI } from '../../../hooks/useRedux';
 import OptimizedImage from '../../OptimizedImage';
 
 const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
+  const dispatch = useDispatch();
   const [formData, setFormData] = useState({ identifier: '', password: '' });
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -56,7 +58,7 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
         setAuthUser(result.user, result.userAccessToken);
       }
 
-      console.log(result,"resultresultresultresult")
+      console.log(result,"resultresultresultresult");
 
       
       const userData = {
@@ -65,9 +67,10 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
         mobile: result.data?.mobileNumber || result.user?.mobile || ''
       };
 
-      console.log(userData,"userDatauserDatauserDatauserData")
+      console.log(userData,"userDatauserDatauserDatauserData");
       
       localStorage.setItem('user', JSON.stringify(userData));
+      
       onLoginSuccess(userData);
       onClose();
     } catch (error) {

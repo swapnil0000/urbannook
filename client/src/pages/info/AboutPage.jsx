@@ -76,7 +76,7 @@ const AboutPage = () => {
                     <motion.div variants={fadeIn} className="flex items-center gap-4 mb-8">
                         <span className="h-[1px] w-12 bg-[#F5DEB3]/50"></span>
                         <span className="text-xs font-bold tracking-[0.3em] text-[#F5DEB3] uppercase">
-                            Est. 2023
+                            Est. 2026
                         </span>
                     </motion.div>
                     
@@ -190,7 +190,7 @@ const AboutPage = () => {
                     </p>
                 </div>
 
-                <div className="mt-16 flex items-center gap-6">
+                {/* <div className="mt-16 flex items-center gap-6">
                     <div className="w-16 h-16 rounded-full overflow-hidden border border-[#F5DEB3]/30">
                         <OptimizedImage
                           src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&q=80"
@@ -203,7 +203,7 @@ const AboutPage = () => {
                         <p className="font-serif italic text-2xl text-[#F5DEB3]">Arjun S.</p>
                         <p className="text-xs uppercase tracking-widest text-green-100/40">Founder, UrbanNook</p>
                     </div>
-                </div>
+                </div> */}
             </div>
         </div>
       </section>
