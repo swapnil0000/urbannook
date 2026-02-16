@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion'; // Added animations
 import { useAuth, useUI } from '../../hooks/useRedux';
 import { useGetUserProfileQuery, useUpdateUserProfileMutation } from '../../store/api/userApi';
@@ -23,7 +23,7 @@ const MyProfilePage = () => {
     };
   });
 
-  const loadProfile = React.useCallback(async () => {
+  const loadProfile = useCallback(async () => {
     try {
       const localUser = JSON.parse(localStorage.getItem('user') || '{}');
       const userEmail = user?.email || localUser?.email;
@@ -49,7 +49,7 @@ const MyProfilePage = () => {
       setFormData(prev => ({
         userName: profileData?.userName || prev.userName,
         userEmail: profileData?.userEmail || prev.userEmail,
-        userMobileNumber: profileData?.mobileNumber || prev.mobileNumber,
+        userMobileNumber: profileData?.userMobileNumber || prev.userMobileNumber,
         userAddress: profileData?.userAddress || prev.userAddress,
         userPinCode: profileData?.userPinCode || prev.userPinCode
       }));

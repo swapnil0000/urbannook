@@ -88,13 +88,6 @@ export const userApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['User'],
     }),
-    removeCoupon: builder.mutation({
-      query: () => ({
-        url: 'coupon/remove',
-        method: 'DELETE',
-      }),
-      invalidatesTags: ['User'],
-    }),
     getAvailableCoupons: builder.query({
       query: () => 'coupon/list',
       providesTags: ['Coupon'],
@@ -134,7 +127,6 @@ export const {
   useRemoveFromWishlistMutation,
   useGetOrderHistoryQuery,
   useApplyCouponMutation,
-  useRemoveCouponMutation,
   useGetAvailableCouponsQuery,
   useGetRazorpayKeyQuery,
   useCreateOrderMutation,

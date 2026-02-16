@@ -16,7 +16,7 @@ const CheckoutPage = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { showNotification, openLoginModal } = useUI();
-  const { items: cartItems, totalAmount } = useSelector((state) => state.cart);
+  const { items: cartItems } = useSelector((state) => state.cart);
   const { isAuthenticated } = useSelector((state) => state.auth);
   
   const [userProfile, setUserProfile] = useState(null);
@@ -43,7 +43,6 @@ const CheckoutPage = () => {
   const { data: userProfileData, isLoading: profileLoading, refetch: refetchProfile } = useGetUserProfileQuery();
   const { data: razorpayKeyData } = useGetRazorpayKeyQuery();
   const [createOrder, { isLoading: isOrdering }] = useCreateOrderMutation();
-  const { refetch: refetchCart } = useCartData();
   const [applyCouponMutation] = useApplyCouponMutation();
 
   useEffect(() => {
@@ -65,9 +64,6 @@ const CheckoutPage = () => {
       return;
     }
     
-    // Fetch cart data when checkout page loads
-    refetchCart();
-    
     if (cartItems.length === 0) {
       navigate('/products');
       return;
@@ -83,7 +79,7 @@ const CheckoutPage = () => {
       console.log('Fetching user profile...');
       refetchProfile();
     }
-  }, [isAuthenticated, cartItems.length, navigate, userProfileData, profileLoading, refetchCart, refetchProfile]);
+  }, [isAuthenticated, cartItems.length, navigate, userProfileData, profileLoading, refetchProfile, showNotification, openLoginModal]);
 
   // Fetch initial pricing details on page load
   useEffect(() => {
@@ -103,29 +99,21 @@ const CheckoutPage = () => {
           }
         } catch (error) {
           console.error('Failed to fetch initial pricing:', error);
-          // Fallback to basic calculation if API fails
-          setPricingDetails({
-            subtotal: totalAmount,
-            gst: Math.round(totalAmount * 0.18),
-            shipping: 199,
-            discount: 0,
-            grandTotal: totalAmount + Math.round(totalAmount * 0.18) + 199
-          });
+          showNotification('Failed to load pricing. Please refresh the page.', 'error');
         }
       }
     };
 
     fetchInitialPricing();
-  }, [cartItems.length, totalAmount, applyCouponMutation]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Auto-fill address and pincode from user profile
   useEffect(() => {
     if (userProfile) {
-      // Auto-fill address if available and not already filled
       if (userProfile.userAddress && !address) {
         setAddress(userProfile.userAddress);
       }
-      // Auto-fill pincode if available and not already filled
       if (userProfile.userPinCode && !pincode) {
         setPincode(userProfile.userPinCode);
       }
@@ -144,7 +132,6 @@ const CheckoutPage = () => {
 
   const handleCouponApplied = async (couponData) => {
     try {
-      // Call API with coupon code
       const result = await applyCouponMutation(couponData.code).unwrap();
       if (result.success && result.data?.summary) {
         setAppliedCoupon(couponData.code);
@@ -156,16 +143,17 @@ const CheckoutPage = () => {
           discount: result.data.summary.discount || 0,
           grandTotal: result.data.summary.grandTotal || 0
         });
+        showNotification('Coupon applied successfully!', 'success');
       }
     } catch (error) {
       console.error('Failed to apply coupon:', error);
-      // Keep existing pricing if coupon application fails
+      const errorMessage = error.data?.message || 'Failed to apply coupon';
+      showNotification(errorMessage, 'error');
     }
   };
 
   const handleCouponRemoved = async () => {
     try {
-      // Call API without coupon code to reset pricing
       const result = await applyCouponMutation(null).unwrap();
       if (result.success && result.data?.summary) {
         setAppliedCoupon(null);
@@ -177,33 +165,20 @@ const CheckoutPage = () => {
           discount: result.data.summary.discount || 0,
           grandTotal: result.data.summary.grandTotal || 0
         });
+        showNotification('Coupon removed', 'success');
       }
     } catch (error) {
       console.error('Failed to remove coupon:', error);
-      // Fallback to basic calculation
-      setAppliedCoupon(null);
-      setDiscount(0);
-      setPricingDetails({
-        subtotal: totalAmount,
-        gst: Math.round(totalAmount * 0.18),
-        shipping: 199,
-        discount: 0,
-        grandTotal: totalAmount + Math.round(totalAmount * 0.18) + 199
-      });
+      showNotification('Failed to remove coupon. Please refresh the page.', 'error');
     }
   };
 
   const finalTotal = pricingDetails.grandTotal;
 
   const validateForm = () => {
-    const errors = {
-      address: '',
-      pincode: ''
-    };
-    
+    const errors = { address: '', pincode: '' };
     let isValid = true;
     
-    // Address validation
     if (!address.trim()) {
       errors.address = 'Address is required';
       isValid = false;
@@ -215,7 +190,6 @@ const CheckoutPage = () => {
       isValid = false;
     }
     
-    // Pincode validation
     if (!pincode.trim()) {
       errors.pincode = 'Pincode is required';
       isValid = false;
@@ -235,18 +209,15 @@ const CheckoutPage = () => {
   };
 
   const handlePayment = async () => {
-    // Validate form before proceeding
     if (!validateForm()) {
       showNotification('Please fix the errors in the form before proceeding.', 'error');
       return;
     }
 
-    // Clear any previous errors
     setPaymentError(null);
     setShowRetry(false);
 
     try {
-      // Get Razorpay key from API response
       const razorpayKey = razorpayKeyData?.data || 'rzp_test_RxTeOoN8KmHMGG';
       
       const orderData = {
@@ -257,8 +228,6 @@ const CheckoutPage = () => {
       };
       
       const orderResult = await createOrder(orderData).unwrap();
-      console.log('Order Result:', orderResult);
-      
       const res = await loadRazorpay();
       
       if (!res) {
@@ -276,26 +245,11 @@ const CheckoutPage = () => {
         image: '/assets/logo.jpeg',
         order_id: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId || orderResult.id,
         handler: async function (response) {
-          console.log('Payment Success:', response);
           try {
-            // Verify payment on backend
-            // Note: The actual verification happens via webhook
-            // This handler is just for UI feedback
             const orderId = response.razorpay_order_id;
-            const paymentId = response.razorpay_payment_id;
-            
             showNotification(`Payment successful! Order ID: ${orderId}`, 'success');
-            
-            // CRITICAL FIX: Clear cart in Redux state
             dispatch(clearCart());
-            
-            // Also refetch cart from backend to sync
-            await refetchCart();
-            
-            // Navigate to orders page after a short delay
-            setTimeout(() => {
-              navigate('/orders');
-            }, 2000);
+            setTimeout(() => { navigate('/orders'); }, 2000);
           } catch (verifyError) {
             console.error('Payment verification error:', verifyError);
             setPaymentError('Payment verification failed. Please contact support if amount was debited.');
@@ -307,17 +261,10 @@ const CheckoutPage = () => {
           email: userProfile?.userEmail || userProfile?.email || '',
           contact: userProfile?.userMobileNumber || userProfile?.mobile || ''
         },
-        notes: {
-          address: address,
-          pincode: pincode
-        },
-        theme: {
-          color: '#2E443C'
-        },
+        notes: { address: address, pincode: pincode },
+        theme: { color: '#2E443C' },
         modal: {
           ondismiss: function() {
-            console.log('Payment modal closed by user');
-            // Cart is preserved - user can retry
             setPaymentError('Payment was cancelled. Your cart has been preserved. You can retry when ready.');
             setShowRetry(true);
           },
@@ -326,30 +273,19 @@ const CheckoutPage = () => {
         }
       };
 
-      console.log('Razorpay Options:', options);
       const paymentObject = new window.Razorpay(options);
       
-      // Handle payment errors from Razorpay
       paymentObject.on('payment.failed', function (response) {
-        console.error('Payment failed:', response.error);
         const errorCode = response.error.code;
         const errorDescription = response.error.description;
-        
-        // Map error codes to user-friendly messages
         let userMessage = errorDescription || 'Payment failed. Please try again.';
         
-        if (errorCode === 'BAD_REQUEST_ERROR') {
-          userMessage = 'Payment failed due to invalid request. Please try again.';
-        } else if (errorCode === 'GATEWAY_ERROR') {
-          userMessage = 'Payment gateway error. Please try again or use a different payment method.';
-        } else if (errorCode === 'SERVER_ERROR') {
-          userMessage = 'Payment server error. Please try again later.';
-        }
+        if (errorCode === 'BAD_REQUEST_ERROR') userMessage = 'Payment failed due to invalid request. Please try again.';
+        else if (errorCode === 'GATEWAY_ERROR') userMessage = 'Payment gateway error. Please try again or use a different payment method.';
+        else if (errorCode === 'SERVER_ERROR') userMessage = 'Payment server error. Please try again later.';
         
         setPaymentError(userMessage);
         setShowRetry(true);
-        
-        // Cart is automatically preserved - no need to do anything
       });
       
       paymentObject.open();
@@ -388,8 +324,10 @@ const CheckoutPage = () => {
           
           {/* --- RIGHT: Order Summary (MOVED TO TOP FOR MOBILE) --- */}
           <div className="lg:col-span-5 lg:sticky lg:top-32 order-1 lg:order-2">
-            <div className="bg-[#1c2b25] rounded-[2rem] p-6 lg:p-8 shadow-2xl border border-white/5">
-              <div className="flex justify-between items-center border-b border-white/10 pb-4 mb-6">
+            <div className="bg-[#1c2b25] rounded-[2rem] p-6 lg:p-8 shadow-2xl border border-white/5 flex flex-col gap-6">
+              
+              {/* Header */}
+              <div className="flex justify-between items-center border-b border-white/10 pb-4">
                 <h2 className="text-xl font-serif text-white">Order Summary</h2>
                 <span className="text-xs bg-[#F5DEB3]/10 text-[#F5DEB3] px-3 py-1 rounded-full border border-[#F5DEB3]/20">
                   {cartItems.length} Items
@@ -397,7 +335,7 @@ const CheckoutPage = () => {
               </div>
               
               {/* Cart Items List */}
-              <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar mb-6">
+              <div className="space-y-4 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
                 {cartItems.map((item) => (
                   <div key={item.id} className="flex gap-4 items-center bg-black/10 p-3 rounded-xl border border-white/5">
                     <div className="w-14 h-14 bg-[#e8e6e1] rounded-lg flex items-center justify-center p-1 shrink-0">
@@ -418,8 +356,35 @@ const CheckoutPage = () => {
                 ))}
               </div>
 
+              {/* --- HIGH VISIBILITY COUPON SECTION --- */}
+              {/* Wrapped in a glowing gradient border to instantly catch the user's eye */}
+              <div className="bg-gradient-to-br from-[#F5DEB3]/20 via-[#F5DEB3]/5 to-transparent p-[1px] rounded-2xl shadow-[0_0_20px_rgba(245,222,179,0.05)]">
+                 <div className="bg-[#1c2b25] rounded-2xl p-4 md:p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                        <i className="fa-solid fa-tags text-[#F5DEB3]"></i>
+                        <h3 className="font-serif text-[#F5DEB3] text-sm tracking-wide">Promotions & Offers</h3>
+                    </div>
+                    
+                    <CouponInput 
+                      appliedCoupon={appliedCoupon}
+                      discount={discount}
+                      onCouponApplied={handleCouponApplied}
+                      onCouponRemoved={handleCouponRemoved}
+                    />
+
+                    {/* Scrollable Coupon List inside the box */}
+                    {!appliedCoupon && (
+                      <div className="mt-4 pt-4 border-t border-white/5 max-h-[220px] overflow-y-auto custom-scrollbar pr-1">
+                          <Suspense fallback={<ComponentLoader type="card" />}>
+                            <CouponList onCouponApplied={handleCouponApplied} />
+                          </Suspense>
+                      </div>
+                    )}
+                 </div>
+              </div>
+
               {/* Totals */}
-              <div className="space-y-3 pt-4 border-t border-white/10 text-sm">
+              <div className="space-y-3 pt-2 text-sm">
                 <div className="flex justify-between text-gray-400">
                   <span>Subtotal</span>
                   <span>₹{pricingDetails.subtotal.toLocaleString()}</span>
@@ -433,14 +398,14 @@ const CheckoutPage = () => {
                   <span>₹{pricingDetails.shipping.toLocaleString()}</span>
                 </div>
                 {appliedCoupon && pricingDetails.discount > 0 && (
-                  <div className="flex justify-between text-green-400">
+                  <div className="flex justify-between text-green-400 font-medium">
                     <span>Discount ({appliedCoupon})</span>
                     <span>-₹{pricingDetails.discount.toLocaleString()}</span>
                   </div>
                 )}
-                <div className="flex justify-between text-lg font-bold text-white pt-4 border-t border-white/10 mt-2">
+                <div className="flex justify-between text-xl font-bold text-white pt-4 border-t border-white/10 mt-2">
                   <span>Total To Pay</span>
-                  <span>₹{finalTotal.toLocaleString()}</span>
+                  <span className="text-[#F5DEB3]">₹{finalTotal.toLocaleString()}</span>
                 </div>
               </div>
 
@@ -448,12 +413,12 @@ const CheckoutPage = () => {
               <button 
                 onClick={handlePayment}
                 disabled={isOrdering || !address || !pincode}
-                className="hidden lg:block w-full mt-8 py-4 bg-[#F5DEB3] text-[#2e443c] rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                className="hidden lg:block w-full mt-2 py-4 bg-[#F5DEB3] text-[#2e443c] rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
               >
                 {isOrdering ? 'Processing...' : `Pay ₹${finalTotal.toLocaleString()}`}
               </button>
 
-              <div className="mt-6 flex justify-center gap-4 opacity-50">
+              <div className="mt-2 flex justify-center gap-4 opacity-50">
                  <i className="fa-brands fa-cc-visa text-2xl"></i>
                  <i className="fa-brands fa-cc-mastercard text-2xl"></i>
                  <i className="fa-brands fa-google-pay text-2xl"></i>
@@ -499,10 +464,7 @@ const CheckoutPage = () => {
                     value={address}
                     onChange={(e) => {
                       setAddress(e.target.value);
-                      // Clear error when user types
-                      if (validationErrors.address) {
-                        setValidationErrors(prev => ({ ...prev, address: '' }));
-                      }
+                      if (validationErrors.address) setValidationErrors(prev => ({ ...prev, address: '' }));
                     }}
                     placeholder="House No, Building, Street, Area..."
                     className={`w-full bg-black/20 border rounded-xl p-4 text-white placeholder-gray-600 focus:outline-none focus:ring-1 transition-all resize-none h-24 ${
@@ -525,12 +487,9 @@ const CheckoutPage = () => {
                     type="tel" 
                     value={pincode}
                     onChange={(e) => {
-                      const value = e.target.value.replace(/\D/g, ''); // Only allow digits
+                      const value = e.target.value.replace(/\D/g, ''); 
                       setPincode(value);
-                      // Clear error when user types
-                      if (validationErrors.pincode) {
-                        setValidationErrors(prev => ({ ...prev, pincode: '' }));
-                      }
+                      if (validationErrors.pincode) setValidationErrors(prev => ({ ...prev, pincode: '' }));
                     }}
                     maxLength={6}
                     placeholder="e.g. 110001"
@@ -550,15 +509,7 @@ const CheckoutPage = () => {
               </div>
             </div>
 
-            {/* Section 3: Coupon Input */}
-            <CouponInput 
-              appliedCoupon={appliedCoupon}
-              discount={discount}
-              onCouponApplied={handleCouponApplied}
-              onCouponRemoved={handleCouponRemoved}
-            />
-
-            {/* Section 3.5: Payment Error Display */}
+            {/* Payment Error Display */}
             {paymentError && (
               <motion.div 
                 initial={{ opacity: 0, y: -10 }}
@@ -594,12 +545,6 @@ const CheckoutPage = () => {
               </motion.div>
             )}
 
-            {/* Section 4: Available Coupons */}
-            {!appliedCoupon && (
-              <Suspense fallback={<ComponentLoader type="card" />}>
-                <CouponList onCouponApplied={handleCouponApplied} />
-              </Suspense>
-            )}
           </div>
 
         </div>

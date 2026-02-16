@@ -17,13 +17,7 @@ const NewHeader = () => {
   const { items: cartItems, totalQuantity } = useSelector((state) => state.cart);
   const { isAuthenticated, user: authUser } = useSelector((state) => state.auth);
   
-  // Get wishlist count
-  const { data: wishlistData } = useGetWishlistQuery(undefined, { skip: !isAuthenticated });
-  const wishlistCount = wishlistData?.data?.wishlist?.length || 0;
-  
-  // Logout mutation
-  const [logoutAPI, { isLoading: isLoggingOut }] = useLogoutMutation();
-  
+  // State declarations
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showSignup, setShowSignup] = useState(false);
@@ -32,6 +26,16 @@ const NewHeader = () => {
   const lastScrollY = useRef(0);
   const [user, setUser] = useState(null);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
+  
+  // Get wishlist count - only fetch if authenticated
+  const { data: wishlistData } = useGetWishlistQuery(undefined, { 
+    skip: !isAuthenticated,
+    refetchOnMountOrArgChange: false // Don't refetch on every mount
+  });
+  const wishlistCount = wishlistData?.data?.wishlist?.length || 0;
+  
+  // Logout mutation
+  const [logoutAPI, { isLoading: isLoggingOut }] = useLogoutMutation();
 
   const getActiveRoute = () => {
     const path = location.pathname;
