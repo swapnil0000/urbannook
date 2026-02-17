@@ -99,7 +99,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
       >
         
         {/* --- HEADER --- */}
-        <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between bg-white z-10">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-white z-10">
           <div>
             <h2 className="text-2xl font-serif text-[#0a110e] tracking-tight">Your Nook</h2>
             <p className="text-xs font-medium text-gray-400 uppercase tracking-widest mt-1">
@@ -140,29 +140,6 @@ const CartDrawer = ({ isOpen, onClose }) => {
             </div>
           ) : (
             <>
-              {/* Free Shipping Progress */}
-              <div className="mb-10">
-                <div className="flex justify-between items-end mb-3">
-                   {progress < 100 ? (
-                        <div className="text-sm text-[#0a110e]">
-                            Add <span className="font-serif font-bold text-emerald-700">₹{remainingForFreeShip.toLocaleString()}</span> for <span className="font-bold">Free Shipping</span>
-                        </div>
-                   ) : (
-                        <div className="text-sm text-emerald-700 flex items-center gap-2 font-bold">
-                            <i className="fa-solid fa-gift"></i>
-                            <span>You've unlocked Free Shipping!</span>
-                        </div>
-                   )}
-                   <span className="text-xs font-bold text-gray-400">{Math.round(progress)}%</span>
-                </div>
-                
-                <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                    <div 
-                        className={`h-full transition-all duration-700 ease-out rounded-full ${progress === 100 ? 'bg-emerald-600' : 'bg-[#0a110e]'}`}
-                        style={{ width: `${progress}%` }}
-                    ></div>
-                </div>
-              </div>
 
               {/* Items List */}
               <div className="space-y-8">
@@ -227,20 +204,20 @@ const CartDrawer = ({ isOpen, onClose }) => {
 
         {/* --- FOOTER (CHECKOUT) --- */}
         {cartItems.length > 0 && (
-          <div className="p-8 bg-white border-t border-gray-100 z-10 shadow-[0_-5px_20px_rgba(0,0,0,0.02)]">
-            <div className="space-y-3 mb-6">
+          <div className="p-6 bg-white border-t border-gray-100 z-10 shadow-[0_-5px_20px_rgba(0,0,0,0.02)]">
+            <div className="space-y-2 mb-6">
                 <div className="flex justify-between items-center text-sm text-gray-500">
                     <span>Subtotal</span>
                     <span className="font-medium text-[#0a110e]">₹{subtotal.toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between items-center text-sm text-gray-500">
+                {/* <div className="flex justify-between items-center text-sm text-gray-500">
                     <span>Shipping</span>
                     {subtotal >= freeShippingThreshold ? (
                         <span className="text-emerald-600 font-bold uppercase text-xs tracking-wider">Free</span>
                     ) : (
                         <span className="text-xs">Calculated at checkout</span>
                     )}
-                </div>
+                </div> */}
                 <div className="pt-4 border-t border-gray-100 flex justify-between items-end">
                     <span className="text-base font-serif text-[#0a110e]">Total</span>
                     <span className="text-xl font-bold text-[#0a110e]">₹{subtotal.toLocaleString()}</span>

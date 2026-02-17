@@ -111,6 +111,15 @@ export const userApi = apiSlice.injectEndpoints({
         body: data,
       }),
     }),
+
+    // Contact APIs
+    submitContact: builder.mutation({
+      query: (contactData) => ({
+        url: 'contact/submit',
+        method: 'POST',
+        body: contactData,
+      }),
+    }),
   }),
 });
 
@@ -131,4 +140,5 @@ export const {
   useGetRazorpayKeyQuery,
   useCreateOrderMutation,
   useJoinCommunityMutation,
+  useSubmitContactMutation,
 } = userApi;

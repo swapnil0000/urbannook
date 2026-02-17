@@ -3,6 +3,7 @@ import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { useGetWishlistQuery,  } from '../../store/api/userApi';
 import { logout as logoutAction } from '../../store/slices/authSlice';
+import { setShowLoginModal } from '../../store/slices/uiSlice';
 import SignupForm from './auth/SignupForm';
 import LoginForm from './auth/LoginForm';
 import { useLogoutMutation } from '../../store/api/authApi';
@@ -16,6 +17,8 @@ const NewHeader = () => {
   // Get cart and auth state from Redux
   const { items: cartItems, totalQuantity } = useSelector((state) => state.cart);
   const { isAuthenticated, user: authUser } = useSelector((state) => state.auth);
+  const { showLoginModal } = useSelector((state) => state.ui);
+  const wishlistItems = useSelector((state) => state.wishlist.items);
   
   // State declarations
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -27,12 +30,14 @@ const NewHeader = () => {
   const [user, setUser] = useState(null);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   
-  // Get wishlist count - only fetch if authenticated
-  const { data: wishlistData } = useGetWishlistQuery(undefined, { 
+  // Get wishlist count from Redux
+  const wishlistCount = wishlistItems.length;
+  
+  // Fetch wishlist data - only when authenticated
+  useGetWishlistQuery(undefined, { 
     skip: !isAuthenticated,
-    refetchOnMountOrArgChange: false // Don't refetch on every mount
+    refetchOnMountOrArgChange: false
   });
-  const wishlistCount = wishlistData?.data?.wishlist?.length || 0;
   
   // Logout mutation
   const [logoutAPI, { isLoading: isLoggingOut }] = useLogoutMutation();
@@ -60,6 +65,13 @@ const NewHeader = () => {
     window.addEventListener('storage', syncUser);
     return () => window.removeEventListener('storage', syncUser);
   }, [isAuthenticated, authUser]);
+
+  // Sync showLogin with Redux showLoginModal state
+  useEffect(() => {
+    if (showLoginModal) {
+      setShowLogin(true);
+    }
+  }, [showLoginModal]);
 
   // Hide/Show Header on Scroll
   useEffect(() => {
@@ -283,11 +295,11 @@ const NewHeader = () => {
               {user && (
                 <Link
                   to="/wishlist"
-                  className="relative flex items-center justify-center w-11 h-11 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+                  className="relative flex items-center justify-center w-9 h-9 bg-emerald-800 text-white hover:bg-emerald-80 rounded-full transition-colors group"
                 >
-                  <i className="fa-regular fa-heart text-lg text-white"></i>
+                  <i className="fa-regular fa-heart text-lg text-white group-hover:scale-110 transition-transform"></i>
                   {wishlistCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold border-2 border-[#e8f8d7]">
+                    <span className="absolute -top-2 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[8px] rounded-full flex items-center justify-center font-bold border-2 border-[#e8f8d7] ">
                       {wishlistCount}
                     </span>
                   )}
@@ -299,11 +311,11 @@ const NewHeader = () => {
 
           {/* --- MOBILE MENU DROPDOWN --- */}
           {isMenuOpen && (
-            <div className="lg:hidden mt-4 pt-4 border-t border-emerald-900/10 animate-in fade-in slide-in-from-top-2 pb-2 h-[62vh]  no-scrollbar">
+            <div className="lg:hidden mt-4 pt-4 border-t border-emerald-900/10 animate-in fade-in slide-in-from-top-2 pb-2 max-h-[calc(100vh-120px)] overflow-y-auto no-scrollbar">
               
               {/* 1. MOBILE USER CONTROL CENTER */}
               {user ? (
-                <div className="bg-white/60 p-5 rounded-3xl border border-white/60 shadow-sm mb-6 relative overflow-hidden group">
+                <div className="bg-white/60 p-5 rounded-3xl border border-white/60 shadow-sm mb-6 relative overflow-hidden group flex-shrink-0">
                     {/* Decorative Background Blob */}
                     <div className="absolute -right-10 -top-10 w-32 h-32 bg-emerald-200/30 rounded-full blur-2xl group-hover:bg-emerald-300/40 transition-all"></div>
 
@@ -324,7 +336,7 @@ const NewHeader = () => {
                     </div>
 
                     {/* THE APP-STYLE GRID (Modified to 3 Cols since Orders is removed) */}
-                    <div className="grid grid-cols-3 gap-5 relative z-10">
+                    <div className="grid grid-cols-4 gap-5 relative z-10">
                         
                         {/* Settings */}
                         <button onClick={() => handleMobileNav('/settings')} className="flex flex-col items-center gap-2 group/btn">
@@ -361,7 +373,7 @@ const NewHeader = () => {
                                 <i className="fa-regular fa-heart text-lg"></i>
                             </div>
                             {wishlistCount > 0 && (
-                                <span className="absolute top-0 right-1 w-4 h-4 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold border-2 border-white shadow-sm">
+                                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold border-2 border-white shadow-lg">
                                     {wishlistCount}
                                 </span>
                             )}
@@ -384,7 +396,7 @@ const NewHeader = () => {
               )}
 
               {/* 2. MAIN NAVIGATION LIST */}
-              <nav className="flex flex-col gap-2">
+              <nav className="flex flex-col gap-2 flex-shrink-0">
                 {navLinks.map((item) => {
                   const isActive = getActiveRoute() === item.key;
                   // Map specific icons for each route
@@ -401,23 +413,23 @@ const NewHeader = () => {
                       key={item.key}
                       to={item.path}
                       onClick={() => setIsMenuOpen(false)}
-                      className={`flex items-center justify-between p-4 rounded-2xl transition-all duration-200 group ${
+                      className={`flex items-center justify-between p-3 sm:p-4 rounded-2xl transition-all duration-200 group ${
                         isActive 
                           ? 'bg-white shadow-md border border-emerald-100' 
                           : 'bg-transparent hover:bg-white/40 border border-transparent'
                       }`}
                     >
-                        <div className="flex items-center gap-4">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-colors ${
+                        <div className="flex items-center gap-3 sm:gap-4">
+                            <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm transition-colors ${
                                 isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-white/40 text-emerald-900'
                             }`}>
                                 <i className={`fa-solid ${icons[item.key] || 'fa-circle'}`}></i>
                             </div>
-                            <span className={`font-bold text-sm tracking-wide ${isActive ? 'text-emerald-900' : 'text-emerald-900/80'}`}>
+                            <span className={`font-bold text-xs sm:text-sm tracking-wide ${isActive ? 'text-emerald-900' : 'text-emerald-900/80'}`}>
                                 {item.name}
                             </span>
                         </div>
-                        <i className={`fa-solid fa-chevron-right text-xs transition-transform group-hover:translate-x-1 ${isActive ? 'text-emerald-500' : 'text-black/10'}`}></i>
+                        <i className={`fa-solid fa-chevron-right text-[10px] sm:text-xs transition-transform group-hover:translate-x-1 ${isActive ? 'text-emerald-500' : 'text-black/10'}`}></i>
                     </Link>
                   );
                 })}
@@ -431,9 +443,20 @@ const NewHeader = () => {
       {/* --- MODALS --- */}
       {showLogin && (
         <LoginForm 
-          onClose={() => setShowLogin(false)}
-          onLoginSuccess={(u) => { setUser(u); setShowLogin(false); }}
-          onSwitchToSignup={() => { setShowLogin(false); setShowSignup(true); }}
+          onClose={() => {
+            setShowLogin(false);
+            dispatch(setShowLoginModal(false));
+          }}
+          onLoginSuccess={(u) => { 
+            setUser(u); 
+            setShowLogin(false); 
+            dispatch(setShowLoginModal(false));
+          }}
+          onSwitchToSignup={() => { 
+            setShowLogin(false); 
+            setShowSignup(true); 
+            dispatch(setShowLoginModal(false));
+          }}
         />
       )}
 

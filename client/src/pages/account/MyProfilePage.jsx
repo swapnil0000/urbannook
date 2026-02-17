@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion'; // Added animations
 import { useAuth, useUI } from '../../hooks/useRedux';
 import { useGetUserProfileQuery, useUpdateUserProfileMutation } from '../../store/api/userApi';
