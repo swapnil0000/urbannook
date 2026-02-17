@@ -35,17 +35,17 @@ const SocialMediaFAB = () => {
   ];
 
   return (
-    <div className="fixed bottom-6 right-6 z-[9999] flex flex-col-reverse items-end gap-4 pointer-events-none">
+    <div className="fixed bottom-6  pb-20 right-6 z-[9999] flex flex-col-reverse items-end gap-4 pointer-events-none">
       
       {/* --- MAIN TOGGLE BUTTON --- */}
       {/* pointer-events-auto ensures this specific button is clickable */}
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-14 h-14 rounded-full flex items-center justify-center text-white shadow-2xl transition-all duration-500 relative pointer-events-auto ${
+        className={`w-10 h-10 rounded-full flex items-center justify-center text-white shadow-2xl transition-all duration-500 relative pointer-events-auto ${
             isOpen ? 'bg-slate-900 rotate-45' : 'bg-emerald-600 hover:scale-110'
         }`}
       >
-        <i className="fa-solid fa-plus text-2xl"></i>
+        <i className="fa-solid fa-plus text-1xl"></i>
         
         {/* Pulse Effect (Only when closed) */}
         {!isOpen && (

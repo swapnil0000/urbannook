@@ -14,6 +14,7 @@ import {
   nfcRouter,
   couponCodeRouter,
   testimonialRouter,
+  contactRouter,
 } from "./routes/index.js";
 import cookieParser from "cookie-parser";
 import healthRouter from "./routes/health.route.js";
@@ -65,6 +66,9 @@ app.use(
 
 // Testimonial routes
 app.use("/api/v1/testimonials", testimonialRouter);
+
+// Contact routes
+app.use("/api/v1/contact", contactRouter);
 
 // Error handler middleware must be registered last
 app.use(errorHandler);

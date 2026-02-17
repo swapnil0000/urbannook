@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PlaceholderImage from '../../component/PlaceholderImage';
 import WishlistButton from '../../component/WishlistButton';
@@ -113,10 +113,14 @@ const AllProductsPage = () => {
               {displayProducts?.map((product) => (
                 <div
                   key={product.productId}
-                  className="group relative cursor-pointer rounded-[2rem] overflow-hidden bg-[#f5f5f0] shadow-xl h-[380px] md:h-[380px] w-full border border-white/5"
-                  onClick={() => navigate(`/product/${product.productId}`)}
+                  className="group relative rounded-[2rem] overflow-hidden bg-[#f5f5f0] shadow-xl h-[380px] md:h-[380px] w-full border border-white/5"
                 >
-                  <div className="absolute inset-0 z-0 bg-stone-200">
+                  {/* Clickable layer for navigation */}
+                  <div 
+                    className="absolute inset-0 z-0 cursor-pointer"
+                    onClick={() => navigate(`/product/${product.productId}`)}
+                  >
+                    <div className="absolute inset-0 bg-stone-200">
                       {product.productImg ? (
                         <img 
                           src={product.productImg} 
@@ -133,26 +137,28 @@ const AllProductsPage = () => {
                         style={{ display: product.productImg ? 'none' : 'flex' }}
                       />
                       <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-90 transition-opacity duration-500"></div>
-                  </div>
+                    </div>
 
-                  <WishlistButton productId={product.productId} className="absolute top-4 right-4 z-10" />
-
-                  <div className="absolute bottom-6 left-6 right-6 z-10">
+                    <div className="absolute bottom-6 left-6 right-6">
                       <div className="flex flex-col gap-3">
-                          <div className="text-white">
-                              <h3 className="font-serif text-xl md:text-3xl leading-tight mb-1">{product.productName}</h3>
-                              <span className="text-[8px] md:text-[9px] font-bold uppercase tracking-[0.2em] text-emerald-300">
-                                {product.productCategory}
-                              </span>
+                        <div className="text-white">
+                          <h3 className="font-serif text-xl md:text-3xl leading-tight mb-1">{product.productName}</h3>
+                          <span className="text-[8px] md:text-[9px] font-bold uppercase tracking-[0.2em] text-emerald-300">
+                            {product.productCategory}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <div className="bg-white text-[#2e443c] px-4 py-2 md:px-6 md:py-3 rounded-full font-bold shadow-xl flex items-center gap-2 group-hover:bg-emerald-500 group-hover:text-white transition-all">
+                            <span className="text-xs md:text-sm">₹{product.sellingPrice?.toLocaleString()}</span>
+                            <i className="fa-solid fa-arrow-right -rotate-45 group-hover:rotate-0 transition-transform text-[10px]"></i>
                           </div>
-                          <div className="flex justify-between items-center">
-                              <div className="bg-white text-[#2e443c] px-4 py-2 md:px-6 md:py-3 rounded-full font-bold shadow-xl flex items-center gap-2 group-hover:bg-emerald-500 group-hover:text-white transition-all">
-                                  <span className="text-xs md:text-sm">₹{product.sellingPrice?.toLocaleString()}</span>
-                                  <i className="fa-solid fa-arrow-right -rotate-45 group-hover:rotate-0 transition-transform text-[10px]"></i>
-                              </div>
-                          </div>
+                        </div>
                       </div>
+                    </div>
                   </div>
+
+                  {/* Wishlist button - positioned above clickable layer */}
+                  <WishlistButton productId={product.productId} className="absolute top-4 right-4 z-20" />
                 </div>
               ))}
             </div>
@@ -161,7 +167,7 @@ const AllProductsPage = () => {
       </section>
 
       {/* Mobile Sticky Bottom Bar */}
-      <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-[400px]">
+      {/* <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-[400px]">
         <div className="bg-black/80 backdrop-blur-2xl border border-white/10 rounded-full flex items-center justify-between p-1.5 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
            <button 
              onClick={() => setShowSortModal(true)}
@@ -175,7 +181,7 @@ const AllProductsPage = () => {
               <span className="text-[10px] font-bold uppercase tracking-widest">Filter</span>
            </button>
         </div>
-      </div>
+      </div> */}
 
       {/* Mobile Sort Modal */}
       {showSortModal && (

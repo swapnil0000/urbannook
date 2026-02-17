@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { motion } from 'framer-motion';
 import { useGetUserProfileQuery, useGetRazorpayKeyQuery, useCreateOrderMutation, useApplyCouponMutation } from '../store/api/userApi';
-import { useCartData } from '../hooks/useCartSync';
 import { clearCart } from '../store/slices/cartSlice';
 import { useUI } from '../hooks/useRedux';
 import CouponInput from '../component/CouponInput';

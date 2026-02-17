@@ -6,7 +6,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 // API & Redux imports
 import { useGetProductByIdQuery } from '../../store/api/productsApi';
-import { useAddToCartMutation, useUpdateCartMutation, useAddToWishlistMutation, useRemoveFromWishlistMutation } from '../../store/api/userApi';
+import { 
+  useAddToCartMutation, 
+  useUpdateCartMutation, 
+  useAddToWishlistMutation, 
+  useRemoveFromWishlistMutation 
+} from '../../store/api/userApi';
 import { addToWishlistLocal, removeFromWishlistLocal } from '../../store/slices/wishlistSlice';
 import { useUI } from '../../hooks/useRedux';
 import OptimizedImage from '../../component/OptimizedImage';
@@ -45,8 +50,7 @@ const ProductDetailPage = () => {
     String(item.mongoId) === String(product?.productId) ||
     String(item.productId) === String(product?.productId)
   );
-
-  console.log(cartItem,"cartItemcartItemcartItem")
+  
   const isInCart = !!cartItem;
   const currentCartQty = cartItem?.quantity || 0;
   const wishlistItems = useSelector((state) => state.wishlist.items);
@@ -54,10 +58,7 @@ const ProductDetailPage = () => {
 
   // Build gallery from product images
   const galleryImages = product
-    ? [
-      product.productImg,
-      ...(product.secondaryImages || [])
-    ].filter(Boolean) // Remove any null/undefined values
+    ? [product.productImg, ...(product.secondaryImages || [])].filter(Boolean)
     : [];
 
   useEffect(() => {
@@ -68,6 +69,7 @@ const ProductDetailPage = () => {
   const nextImage = () => {
     setCurrentImageIndex((prev) => (prev + 1) % galleryImages.length);
   };
+
   const prevImage = () => {
     setCurrentImageIndex((prev) => (prev - 1 + galleryImages.length) % galleryImages.length);
   };
@@ -107,7 +109,7 @@ const ProductDetailPage = () => {
 
   const handleUpdateQty = async (newQuantity) => {
     if (newQuantity < 1) return;
-    
+
     try {
       // Call API - RTK Query will automatically invalidate and refetch
       const action = newQuantity > currentCartQty ? 'add' : 'sub';
@@ -125,8 +127,10 @@ const ProductDetailPage = () => {
       if (parts.length === 2) return parts.pop().split(';').shift();
       return null;
     };
+
     const token = getCookie('userAccessToken') || cookies.userAccessToken;
     const hasLocalUser = localStorage.getItem('user');
+
     if (isAuthenticated || token || hasLocalUser) {
       navigate('/checkout');
     } else {
@@ -135,6 +139,25 @@ const ProductDetailPage = () => {
   };
 
   const handleWishlistToggle = async () => {
+    // Check if user is logged in
+    const getCookie = (name) => {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(';').shift();
+      return null;
+    };
+
+    const token = getCookie('userAccessToken') || cookies.userAccessToken;
+    const hasLocalUser = localStorage.getItem('user');
+    const isLoggedIn = isAuthenticated || token || hasLocalUser;
+
+    if (!isLoggedIn) {
+      // User must login to add to wishlist
+      openLoginModal();
+      return;
+    }
+
+    // Logged in user - toggle wishlist
     try {
       if (isInWishlist) {
         await removeFromWishlist(product.productName).unwrap();
@@ -148,11 +171,15 @@ const ProductDetailPage = () => {
       setTimeout(() => setFeedbackMessage(""), 2000);
     } catch (error) {
       console.error('Failed to toggle wishlist:', error);
+      showNotification(error.data?.message || "Something went wrong", 'error');
     }
   };
 
   // Animation Variants
-  const fadeIn = { hidden: { opacity: 0, y: 30 }, visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: "easeOut" } } };
+  const fadeIn = { 
+    hidden: { opacity: 0, y: 30 }, 
+    visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: "easeOut" } } 
+  };
 
   if (isLoading) return (
     <div className="h-screen flex items-center justify-center bg-[#1c3026]">
@@ -163,25 +190,27 @@ const ProductDetailPage = () => {
   if (error || !product) return (
     <div className="h-screen flex flex-col items-center justify-center bg-[#1c3026] text-[#F5DEB3]">
       <h1 className="text-4xl font-serif">Product Not Found</h1>
-      <button onClick={() => navigate('/products')} className="mt-4 border-b border-[#F5DEB3] pb-1 hover:text-white transition-colors">Return to Shop</button>
+      <button 
+        onClick={() => navigate('/products')} 
+        className="mt-4 border-b border-[#F5DEB3] pb-1 hover:text-white transition-colors"
+      >
+        Return to Shop
+      </button>
     </div>
   );
 
   return (
     <div className="bg-[#2e443c] min-h-screen font-sans text-gray-200 selection:bg-[#F5DEB3] selection:text-[#1c3026] relative overflow-hidden">
-
       {/* Lighting Effect */}
       <div className="fixed top-0 left-0 w-[300px] h-[300px] bg-[#2e443c] rounded-full blur-[150px] pointer-events-none opacity-40"></div>
 
-      {/* Main Container 
-         - Mobile: pt-20 (Header space) pb-32 (Space for sticky bottom bar)
-         - Desktop: Standard padding
-      */}
-      <main className=" mx-auto pt-24 pb-32 lg:pt-36 lg:pb-20 px-4 lg:px-12 relative z-10">
-
-        {/* Breadcrumbs (Simple Back on Mobile) */}
+      {/* Main Container */}
+      <main className="mx-auto pt-24 pb-32 lg:pt-36 lg:pb-20 px-4 lg:px-12 relative z-10">
+        {/* Breadcrumbs */}
         <motion.nav
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
+          initial={{ opacity: 0 }} 
+          animate={{ opacity: 1 }} 
+          transition={{ delay: 0.2 }}
           className="flex items-center text-[10px] tracking-[0.2em] uppercase text-[#F5DEB3]/50 mb-6 lg:mb-12 cursor-pointer"
         >
           <span onClick={() => navigate('/products')} className="flex items-center gap-2 hover:text-[#F5DEB3] transition-colors">
@@ -189,11 +218,12 @@ const ProductDetailPage = () => {
             <span>Shop</span>
           </span>
           <span className="mx-3 text-[#F5DEB3]/20 hidden lg:inline">/</span>
-          <span className="text-[#F5DEB3] font-bold border-b border-[#F5DEB3]/30 pb-0.5 hidden lg:inline">{product.productName}</span>
+          <span className="text-[#F5DEB3] font-bold border-b border-[#F5DEB3]/30 pb-0.5 hidden lg:inline">
+            {product.productName}
+          </span>
         </motion.nav>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-20 items-start">
-
           {/* --- LEFT: IMAGE GALLERY --- */}
           <motion.div
             initial={{ opacity: 0, y: 40 }}
@@ -201,9 +231,8 @@ const ProductDetailPage = () => {
             transition={{ duration: 0.8 }}
             className="lg:col-span-7 w-full lg:sticky lg:top-36"
           >
-            {/* Main Image Card - FIXED: proper aspect ratio with max-height */}
+            {/* Main Image Card */}
             <div className="relative aspect-[4/5] max-h-[520px] lg:max-h-[600px] bg-[#e8e6e1] rounded-2xl overflow-hidden shadow-2xl shadow-black/30 group mx-auto w-full">
-
               {/* Product Image */}
               <div className="w-full h-full relative cursor-pointer flex items-center justify-center">
                 <AnimatePresence mode="wait">
@@ -244,16 +273,17 @@ const ProductDetailPage = () => {
               )}
             </div>
 
-            {/* Thumbnail Strip (Hidden on very small screens to save space, visible md+) */}
+            {/* Thumbnail Strip */}
             <div className="flex gap-3 mt-6 overflow-x-auto pb-2 justify-center lg:justify-start px-2">
               {galleryImages.map((img, idx) => (
                 <button
                   key={idx}
                   onClick={() => setCurrentImageIndex(idx)}
-                  className={`w-16 h-16 lg:w-20 lg:h-20 rounded-xl border bg-[#e8e6e1] overflow-hidden transition-all flex-shrink-0 ${currentImageIndex === idx
+                  className={`w-16 h-16 lg:w-20 lg:h-20 rounded-xl border bg-[#e8e6e1] overflow-hidden transition-all flex-shrink-0 ${
+                    currentImageIndex === idx
                       ? 'border-[#F5DEB3] ring-2 ring-[#F5DEB3]/30 scale-105'
                       : 'border-transparent opacity-60'
-                    }`}
+                  }`}
                 >
                   <OptimizedImage
                     src={img}
@@ -278,7 +308,6 @@ const ProductDetailPage = () => {
                 <span className="text-[#1c3026] text-[9px] lg:text-[10px] font-bold tracking-[0.2em] uppercase bg-[#F5DEB3] px-3 py-1.5 rounded-full shadow-lg shadow-[#F5DEB3]/10">
                   {product.productCategory || 'Featured'}
                 </span>
-
                 {/* Mobile Rating */}
                 <div className="flex text-[#F5DEB3] text-xs gap-1 items-center bg-white/5 px-3 py-1 rounded-full">
                   <i className="fa-solid fa-star text-[10px]"></i>
@@ -291,8 +320,12 @@ const ProductDetailPage = () => {
               </h1>
 
               <div className="flex items-baseline gap-4">
-                <p className="text-2xl lg:text-3xl font-light text-white">₹{product.sellingPrice?.toLocaleString()}</p>
-                <p className="text-sm text-gray-500 line-through">₹{(product.sellingPrice * 1.2).toFixed(0)}</p>
+                <p className="text-2xl lg:text-3xl font-light text-white">
+                  ₹{product.sellingPrice?.toLocaleString()}
+                </p>
+                <p className="text-sm text-gray-500 line-through">
+                  ₹{(product.sellingPrice * 1.2).toFixed(0)}
+                </p>
               </div>
             </div>
 
@@ -301,7 +334,7 @@ const ProductDetailPage = () => {
               {product.productDes}
             </p>
 
-            {/* --- DESKTOP ACTION BUTTONS (Hidden on Mobile) --- */}
+            {/* --- DESKTOP ACTION BUTTONS --- */}
             <div className="hidden lg:block bg-white/5 backdrop-blur-sm p-8 rounded-[2rem] border border-[#F5DEB3]/10 mb-10">
               <div className="flex flex-row gap-4">
                 {!isInCart ? (
@@ -315,21 +348,30 @@ const ProductDetailPage = () => {
                 ) : (
                   <>
                     <div className="flex items-center bg-[#1c3026] border border-[#F5DEB3]/20 rounded-full h-14 px-4 gap-4">
-                      <button onClick={() => handleUpdateQty(currentCartQty - 1)} className="text-[#F5DEB3] px-2"><i className="fa-solid fa-minus"></i></button>
+                      <button onClick={() => handleUpdateQty(currentCartQty - 1)} className="text-[#F5DEB3] px-2">
+                        <i className="fa-solid fa-minus"></i>
+                      </button>
                       <span className="font-serif text-[#F5DEB3] text-lg">{currentCartQty}</span>
-                      <button onClick={() => handleUpdateQty(currentCartQty + 1)} className="text-[#F5DEB3] px-2"><i className="fa-solid fa-plus"></i></button>
+                      <button onClick={() => handleUpdateQty(currentCartQty + 1)} className="text-[#F5DEB3] px-2">
+                        <i className="fa-solid fa-plus"></i>
+                      </button>
                     </div>
-                    <button onClick={handleCheckoutClick} className="flex-1 h-14 bg-[#F5DEB3] text-[#1c3026] rounded-full font-bold uppercase tracking-[0.2em] text-xs hover:bg-white transition-all">
+                    <button 
+                      onClick={handleCheckoutClick} 
+                      className="flex-1 h-14 bg-[#F5DEB3] text-[#1c3026] rounded-full font-bold uppercase tracking-[0.2em] text-xs hover:bg-white transition-all"
+                    >
                       Checkout
                     </button>
                   </>
                 )}
+
                 <button
                   onClick={handleWishlistToggle}
-                  className={`w-14 h-14 border rounded-full flex items-center justify-center transition-all ${isInWishlist
+                  className={`w-14 h-14 border rounded-full flex items-center justify-center transition-all ${
+                    isInWishlist
                       ? 'bg-red-500 border-red-500 text-white'
                       : 'border-[#F5DEB3]/20 text-[#F5DEB3] hover:bg-[#F5DEB3] hover:text-[#1c3026]'
-                    }`}
+                  }`}
                 >
                   <i className={`${isInWishlist ? 'fa-solid' : 'fa-regular'} fa-heart`}></i>
                 </button>
@@ -345,6 +387,7 @@ const ProductDetailPage = () => {
               >
                 {product.productDes}
               </AccordionItem>
+
               <AccordionItem
                 title="Shipping & Returns"
                 isOpen={activeAccordion === 'shipping'}
@@ -352,6 +395,7 @@ const ProductDetailPage = () => {
               >
                 Complimentary shipping on orders above ₹500. Securely dispatched within 24-48 hours.
               </AccordionItem>
+
               <AccordionItem
                 title="Materials & Care"
                 isOpen={activeAccordion === 'care'}
@@ -364,8 +408,7 @@ const ProductDetailPage = () => {
         </div>
       </main>
 
-      {/* --- MOBILE STICKY BOTTOM BAR (Visible only on Mobile) --- */}
-      {/* This ensures the "Add to Cart" button is always reachable with the thumb */}
+      {/* --- MOBILE STICKY BOTTOM BAR --- */}
       <motion.div
         initial={{ y: 100 }}
         animate={{ y: 0 }}
@@ -387,10 +430,15 @@ const ProductDetailPage = () => {
             <div className="flex gap-3 w-full">
               {/* Qty Control */}
               <div className="flex items-center justify-between bg-[#111f18] border border-[#F5DEB3]/20 rounded-full h-12 px-4 w-[120px]">
-                <button onClick={() => handleUpdateQty(currentCartQty - 1)} className="text-[#F5DEB3] p-1"><i className="fa-solid fa-minus text-[10px]"></i></button>
+                <button onClick={() => handleUpdateQty(currentCartQty - 1)} className="text-[#F5DEB3] p-1">
+                  <i className="fa-solid fa-minus text-[10px]"></i>
+                </button>
                 <span className="font-serif text-[#F5DEB3] text-sm">{currentCartQty}</span>
-                <button onClick={() => handleUpdateQty(currentCartQty + 1)} className="text-[#F5DEB3] p-1"><i className="fa-solid fa-plus text-[10px]"></i></button>
+                <button onClick={() => handleUpdateQty(currentCartQty + 1)} className="text-[#F5DEB3] p-1">
+                  <i className="fa-solid fa-plus text-[10px]"></i>
+                </button>
               </div>
+
               {/* Checkout Button */}
               <button
                 onClick={handleCheckoutClick}
@@ -405,10 +453,11 @@ const ProductDetailPage = () => {
         {/* Wishlist Button Mobile */}
         <button
           onClick={handleWishlistToggle}
-          className={`w-12 h-12 border rounded-full flex items-center justify-center transition-colors flex-shrink-0 ${isInWishlist
+          className={`w-12 h-12 border rounded-full flex items-center justify-center transition-colors flex-shrink-0 ${
+            isInWishlist
               ? 'bg-red-500 border-red-500 text-white'
               : 'border-[#F5DEB3]/20 text-[#F5DEB3] active:bg-[#F5DEB3] active:text-[#1c3026]'
-            }`}
+          }`}
         >
           <i className={`${isInWishlist ? 'fa-solid' : 'fa-regular'} fa-heart`}></i>
         </button>
@@ -445,17 +494,23 @@ const ProductDetailPage = () => {
           onSwitchToLogin={() => { setShowSignup(false); openLoginModal(); }}
         />
       )}
-
     </div>
   );
 };
 
-// Accordion Component (Unchanged)
+// Accordion Component
 const AccordionItem = ({ title, isOpen, onClick, children }) => (
   <div className="border-b border-[#F5DEB3]/10">
-    <button onClick={onClick} className="w-full py-5 flex justify-between items-center text-left hover:text-[#F5DEB3] text-[#F5DEB3]/70 transition-colors group">
-      <span className="text-xs font-bold uppercase tracking-[0.2em] group-hover:text-[#F5DEB3] transition-colors">{title}</span>
-      <span className={`flex items-center justify-center w-6 h-6 rounded-full border border-[#F5DEB3]/20 text-[#F5DEB3] text-[10px] transition-transform duration-300 ${isOpen ? 'rotate-180 bg-[#F5DEB3] text-[#1c3026]' : ''}`}>
+    <button 
+      onClick={onClick} 
+      className="w-full py-5 flex justify-between items-center text-left hover:text-[#F5DEB3] text-[#F5DEB3]/70 transition-colors group"
+    >
+      <span className="text-xs font-bold uppercase tracking-[0.2em] group-hover:text-[#F5DEB3] transition-colors">
+        {title}
+      </span>
+      <span className={`flex items-center justify-center w-6 h-6 rounded-full border border-[#F5DEB3]/20 text-[#F5DEB3] text-[10px] transition-transform duration-300 ${
+        isOpen ? 'rotate-180 bg-[#F5DEB3] text-[#1c3026]' : ''
+      }`}>
         <i className="fa-solid fa-chevron-down"></i>
       </span>
     </button>
@@ -467,7 +522,9 @@ const AccordionItem = ({ title, isOpen, onClick, children }) => (
           exit={{ height: 0, opacity: 0 }}
           className="overflow-hidden"
         >
-          <div className="pb-6 text-gray-300 text-sm leading-relaxed font-light">{children}</div>
+          <div className="pb-6 text-gray-300 text-sm leading-relaxed font-light">
+            {children}
+          </div>
         </motion.div>
       )}
     </AnimatePresence>

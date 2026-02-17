@@ -47,7 +47,7 @@ const instagramPosts = [
 
 const AireInstagramFeed = () => {
     return (
-        <section className="w-full flex justify-center items-center py-5">
+        <section className="w-full flex justify-center items-center py-2">
             <style>{`
         @keyframes scroll {
           0% { transform: translateX(0); }
