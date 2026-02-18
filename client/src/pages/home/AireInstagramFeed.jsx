@@ -66,7 +66,7 @@ const AireInstagramFeed = () => {
         2. Responsive height to prevent content cutting on 375px screens.
         3. isolation-isolate to keep glows inside rounded corners.
     */}
-    <div className="h-auto min-h-[85vh] md:h-[98vh] w-[94%] md:w-[96%] lg:w-[98%] max-w-[1650px] mx-auto bg-[#0a110e] rounded-[32px] md:rounded-[40px] overflow-hidden relative flex flex-col p-6 md:p-14 shadow-2xl border border-white/5 isolate">
+    <div className="h-auto min-h-[85vh] md:h-[98vh] w-[94%] md:w-[96%] lg:w-[98%] mx-auto bg-[#0a110e] rounded-[32px] md:rounded-[40px] overflow-hidden relative flex flex-col p-6 md:p-14 shadow-2xl border border-white/5 isolate">
 
       {/* Subtle Glows */}
       <div className="absolute top-0 right-0 w-[350px] h-[350px] bg-emerald-900/20 rounded-full blur-[100px] pointer-events-none -z-10"></div>
