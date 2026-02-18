@@ -107,7 +107,7 @@ const AireTestimonials = () => {
         - Mobile (375px+): w-[94%] consistent gutters.
         - Desktop: max-width 1650px for 15.6" screens.
     */}
-    <div className="w-[94%] md:w-[96%] lg:w-[98%] max-w-[1650px] mx-auto overflow-hidden rounded-[2.5rem] lg:rounded-[4rem] shadow-2xl isolation-isolate">
+    <div className="w-[94%] md:w-[96%] lg:w-[99%] max-w-[1650px] mx-auto overflow-hidden rounded-[2.5rem] lg:rounded-[4rem] shadow-2xl isolation-isolate">
       
       <section className="relative w-full py-12 md:py-20 lg:py-24 flex items-center justify-center bg-[#1c3026] px-5 sm:px-8 md:px-12 lg:px-16 selection:bg-[#F5DEB3] selection:text-[#1c3026]">
         
