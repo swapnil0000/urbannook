@@ -229,10 +229,11 @@ const ProductDetailPage = () => {
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
-            className="lg:col-span-7 w-full lg:sticky lg:top-36"
+            className="lg:col-span-6 w-full lg:sticky lg:top-24 lg:self-start"
+            style={{ maxHeight: 'calc(100vh - 6rem)' }}
           >
             {/* Main Image Card */}
-            <div className="relative aspect-[4/5] max-h-[520px] lg:max-h-[600px] bg-[#e8e6e1] rounded-2xl overflow-hidden shadow-2xl shadow-black/30 group mx-auto w-full">
+            <div className="relative max-w-[500px]  max-h-[520px] lg:max-h-[600px]  rounded-2xl overflow-hidden shadow-2xl  group mx-auto w-full">
               {/* Product Image */}
               <div className="w-full h-full relative cursor-pointer flex items-center justify-center">
                 <AnimatePresence mode="wait">
@@ -242,12 +243,12 @@ const ProductDetailPage = () => {
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.5 }}
-                    className="w-full h-full"
+                    // className="w-full h-full"
                   >
                     <OptimizedImage
                       src={galleryImages[currentImageIndex] || '/placeholder.jpg'}
                       alt={product.productName}
-                      className="w-full h-full object-contain p-6 md:p-10"
+                      className="object-contain "
                       loading="eager"
                     />
                   </motion.div>
@@ -274,7 +275,7 @@ const ProductDetailPage = () => {
             </div>
 
             {/* Thumbnail Strip */}
-            <div className="flex gap-3 mt-6 overflow-x-auto pb-2 justify-center lg:justify-start px-2">
+            <div className="flex gap-3 mt-6 overflow-x-auto pb-2 justify-center px-2">
               {galleryImages.map((img, idx) => (
                 <button
                   key={idx}
@@ -303,7 +304,7 @@ const ProductDetailPage = () => {
             animate="visible"
             className="lg:col-span-5 flex flex-col"
           >
-            <div className="mb-6 lg:mb-8 border-b border-[#F5DEB3]/10 pb-6 lg:pb-8">
+            <div className="mb-1 lg:mb-2 border-b border-[#F5DEB3]/10 pb-2 lg:pb-3">
               <div className="flex justify-between items-start mb-4">
                 <span className="text-[#1c3026] text-[9px] lg:text-[10px] font-bold tracking-[0.2em] uppercase bg-[#F5DEB3] px-3 py-1.5 rounded-full shadow-lg shadow-[#F5DEB3]/10">
                   {product.productCategory || 'Featured'}
@@ -330,7 +331,7 @@ const ProductDetailPage = () => {
             </div>
 
             {/* Description */}
-            <p className="text-gray-300 leading-relaxed mb-8 font-light text-sm lg:text-lg">
+            <p className="text-gray-300 leading-relaxed mb-8 font-light text-sm lg:text-md">
               {product.productDes}
             </p>
 
@@ -387,6 +388,31 @@ const ProductDetailPage = () => {
               >
                 {product.productDes}
               </AccordionItem>
+
+              {/* Specifications Accordion */}
+              {product.specifications && product.specifications.length > 0 && (
+                <AccordionItem
+                  title="Specifications"
+                  isOpen={activeAccordion === 'specifications'}
+                  onClick={() => setActiveAccordion(activeAccordion === 'specifications' ? '' : 'specifications')}
+                >
+                  <div className="space-y-3">
+                    {product.specifications.map((spec, index) => (
+                      <div 
+                        key={spec._id || index} 
+                        className="flex justify-between items-start py-2 border-b border-[#F5DEB3]/5 last:border-0"
+                      >
+                        <span className="text-[#F5DEB3]/60 text-xs uppercase tracking-wider font-medium">
+                          {spec.key}
+                        </span>
+                        <span className="text-gray-200 text-sm text-right max-w-[60%]">
+                          {spec.value}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </AccordionItem>
+              )}
 
               <AccordionItem
                 title="Shipping & Returns"

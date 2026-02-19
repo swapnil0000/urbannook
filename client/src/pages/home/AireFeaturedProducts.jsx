@@ -58,12 +58,12 @@ const AireFeaturedProducts = () => {
              </div>
 
              {/* Title */}
-             <h2 className="text-2xl md:text-8xl lg:text-7xl font-serif text-white leading-[0.9] mb-4">
+             <h2 className="text-2xl md:text-3xl lg:text-7xl font-serif text-white leading-[0.9] mb-4">
                 {featuredProduct.productName}
              </h2>
 
              {/* Subtitle */}
-             <p className="text-xl md:text-2xl text-[#F5DEB3]/80 italic font-light mb-8">
+             <p className="text-xl md:text-xl text-[#F5DEB3]/80 italic font-light mb-8">
                 {featuredProduct.productSubDes || "Designed to stand out."}
              </p>
 

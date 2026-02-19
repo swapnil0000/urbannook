@@ -73,8 +73,8 @@ const OptimizedImage = ({
   return (
     <div
       ref={imgRef}
-      className={`relative overflow-hidden ${className}`}
-      style={{ width, height }}
+      className={`relative overflow-hidden ${className} max-h-[510px]`}
+      // style={{ width, height }}
     >
       {/* Loading placeholder */}
       {!isLoaded && !hasError && (
@@ -111,12 +111,12 @@ const OptimizedImage = ({
         <img
           src={src}
           alt={alt}
-          className={`transition-opacity duration-300 ${
+          className={`transition-opacity duration-300 max-h-[520px] ${
             isLoaded ? 'opacity-100' : 'opacity-0'
           }`}
           loading={loading}
-          width={width}
-          height={height}
+          // width={width}
+          // height={height}
           onLoad={handleLoad}
           onError={handleError}
           {...props}
