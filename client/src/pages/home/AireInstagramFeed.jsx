@@ -105,7 +105,7 @@ const AireInstagramFeed = () => {
                     />
                   </div>
                 ))}
-                <div className="w-8 h-8 rounded-full border-2 border-[#0a110e] bg-emerald-600 flex items-center justify-center text-[9px] text-white font-bold relative z-10 shadow-lg">25k+</div>
+                {/* <div className="w-8 h-8 rounded-full border-2 border-[#0a110e] bg-emerald-600 flex items-center justify-center text-[9px] text-white font-bold relative z-10 shadow-lg">25k+</div> */}
               </div>
               <div className="flex flex-col">
                 <p className="text-white font-serif text-sm leading-tight">Join the <span className="italic text-[#F5DEB3]">Movement.</span></p>
@@ -159,8 +159,8 @@ const AireInstagramFeed = () => {
           <div className="bg-white/5 backdrop-blur-md border border-white/5 rounded-[2rem] p-4 md:p-5 pr-8 w-fit max-w-full">
             <div className="flex flex-wrap md:flex-nowrap gap-5 md:gap-12">
               {[
-                { label: "Community", val: "100+", icon: "fa-users" },
-                { label: "Products", val: "50+", icon: "fa-box-open" },
+                { label: "Community", val: "500+", icon: "fa-users" },
+                // { label: "Products", val: "50+", icon: "fa-box-open" },
                 { label: "Rating", val: "4.6", icon: "fa-star" },
                 { label: "Authentic", val: "100%", icon: "fa-shield-halved" }
               ].map((stat, i) => (

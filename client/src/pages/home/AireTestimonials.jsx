@@ -209,7 +209,7 @@ const AireTestimonials = () => {
 
               <div className="mb-6 md:mb-8">
                 <h3 className="text-xl sm:text-2xl md:text-3xl font-serif text-white tracking-tight">Rate your Product</h3>
-                <p className="text-gray-400 text-xs sm:text-sm mt-1 sm:mt-2 font-light">Tell us about the print quality and design.</p>
+                <p className="text-gray-400 text-xs sm:text-sm mt-1 sm:mt-2 font-light">We truly value your feedback.</p>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-5 md:space-y-6">
@@ -218,15 +218,10 @@ const AireTestimonials = () => {
                     <label className="text-[9px] font-bold text-[#F5DEB3]/60 uppercase tracking-widest ml-1">Name *</label>
                     <input type="text" required value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Full Name" className="w-full bg-black/30 border border-white/10 rounded-xl md:rounded-2xl px-4 md:px-5 py-3 md:py-4 text-sm text-white placeholder-gray-600 focus:border-[#F5DEB3] outline-none transition-all" />
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] font-bold text-[#F5DEB3]/60 uppercase tracking-widest ml-1">City</label>
-                    <input type="text" value={userLocation} onChange={(e) => setUserLocation(e.target.value)} placeholder="e.g. Mumbai" className="w-full bg-black/30 border border-white/10 rounded-xl md:rounded-2xl px-4 md:px-5 py-3 md:py-4 text-sm text-white placeholder-gray-600 focus:border-[#F5DEB3] outline-none transition-all" />
-                  </div>
                 </div>
-
                 <div className="space-y-3">
                   <div className="flex justify-between items-center px-1">
-                    <label className="text-[9px] font-bold uppercase tracking-widest text-[#F5DEB3]/60">Print Quality</label>
+                    <label className="text-[9px] font-bold uppercase tracking-widest text-[#F5DEB3]/60">Product Quality</label>
                     <span className="text-[10px] font-bold text-[#F5DEB3] uppercase">{moods[mood].label}</span>
                   </div>
                   <div className="flex justify-between bg-black/30 p-1.5 md:p-2 rounded-xl border border-white/5 shadow-inner">
