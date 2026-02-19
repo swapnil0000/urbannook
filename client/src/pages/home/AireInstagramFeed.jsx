@@ -46,7 +46,7 @@ const instagramPosts = [
 ];
 
 const AireInstagramFeed = () => {
-    return (
+   return (
   <section className="w-full flex justify-center items-center py-4 overflow-hidden">
     <style>{`
       @keyframes scroll {
@@ -61,12 +61,7 @@ const AireInstagramFeed = () => {
       }
     `}</style>
 
-    {/* Consistency Fixes:
-        1. Fluid width (w-[94%] to w-[98%]) for perfect side gutters.
-        2. Responsive height to prevent content cutting on 375px screens.
-        3. isolation-isolate to keep glows inside rounded corners.
-    */}
-    <div className="h-auto min-h-[85vh] md:h-[98vh] w-[94%] md:w-[96%] lg:w-[98%] mx-auto bg-[#0a110e] rounded-[32px] md:rounded-[40px] overflow-hidden relative flex flex-col p-6 md:p-14 shadow-2xl border border-white/5 isolate">
+    <div className="h-auto min-h-[85vh] md:h-[98vh] w-[96%] md:w-[96%] lg:w-[98%] mx-auto bg-[#0a110e] rounded-[32px] md:rounded-[40px] overflow-hidden relative flex flex-col p-6 md:p-14 shadow-2xl border border-white/5 isolate">
 
       {/* Subtle Glows */}
       <div className="absolute top-0 right-0 w-[350px] h-[350px] bg-emerald-900/20 rounded-full blur-[100px] pointer-events-none -z-10"></div>
@@ -93,7 +88,6 @@ const AireInstagramFeed = () => {
           </div>
 
           <div className="flex flex-col items-start lg:items-end gap-4">
-            {/* Community Pill */}
             <div className="flex items-center gap-4 bg-white/5 pr-5 pl-2 py-1.5 rounded-2xl border border-white/5 backdrop-blur-sm max-w-md">
               <div className="flex -space-x-3 shrink-0">
                 {[1, 2, 3].map((_, i) => (
@@ -105,7 +99,6 @@ const AireInstagramFeed = () => {
                     />
                   </div>
                 ))}
-                {/* <div className="w-8 h-8 rounded-full border-2 border-[#0a110e] bg-emerald-600 flex items-center justify-center text-[9px] text-white font-bold relative z-10 shadow-lg">25k+</div> */}
               </div>
               <div className="flex flex-col">
                 <p className="text-white font-serif text-sm leading-tight">Join the <span className="italic text-[#F5DEB3]">Movement.</span></p>
@@ -160,7 +153,6 @@ const AireInstagramFeed = () => {
             <div className="flex flex-wrap md:flex-nowrap gap-5 md:gap-12">
               {[
                 { label: "Community", val: "500+", icon: "fa-users" },
-                // { label: "Products", val: "50+", icon: "fa-box-open" },
                 { label: "Rating", val: "4.6", icon: "fa-star" },
                 { label: "Authentic", val: "100%", icon: "fa-shield-halved" }
               ].map((stat, i) => (

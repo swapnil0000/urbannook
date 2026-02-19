@@ -119,8 +119,7 @@ export default function WhyChooseUs() {
   style={{ height: '300vh' }}
 >
   <div
-    /* FIX: sm: hatakar direct rounded-class lagayi hai jo mobile par kaam karegi */
-    className="sticky top-0 md:top-[5vh] mx-auto w-[99%] h-[100vh] md:h-[98vh] rounded-[30px] md:rounded-[40px] overflow-hidden shadow-2xl border-0 md:border border-white/10"
+    className="sticky top-0 md:top-[5vh] mx-auto w-[97%] h-[100vh] md:h-[98vh] rounded-[30px] md:rounded-[40px] overflow-hidden shadow-2xl border-0 md:border border-white/10"
     style={{
       backgroundImage: `url(${desktopBgImage})`,
       backgroundSize: 'cover',
