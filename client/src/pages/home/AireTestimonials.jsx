@@ -101,13 +101,9 @@ const AireTestimonials = () => {
     return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
   }
 
- return (
+return (
   <section className="w-full bg-[#F5F7F8] py-4 overflow-hidden">
-    {/* Wrapper Strategy:
-        - Mobile (375px+): w-[94%] consistent gutters.
-        - Desktop: max-width 1650px for 15.6" screens.
-    */}
-    <div className="w-[94%] md:w-[96%] lg:w-[99%] mx-auto overflow-hidden rounded-[2.5rem] lg:rounded-[4rem] shadow-2xl isolation-isolate">
+    <div className="w-[95%] md:w-[96%] lg:w-[99%] mx-auto overflow-hidden rounded-[2.5rem] lg:rounded-[4rem] shadow-2xl isolation-isolate">
       
       <section className="relative w-full py-12 md:py-20 lg:py-24 flex items-center justify-center bg-[#1c3026] px-5 sm:px-8 md:px-12 lg:px-16 selection:bg-[#F5DEB3] selection:text-[#1c3026]">
         
@@ -127,12 +123,11 @@ const AireTestimonials = () => {
           <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}></div>
         </div>
 
-        {/* Adjusting Layout for stability across all screens */}
         <div className="relative z-10 w-full max-w-[1440px] mx-auto grid grid-cols-1 lg:grid-cols-2 gap-10 md:gap-16 lg:gap-20 items-center">
           
           {/* --- LEFT COLUMN: STORIES --- */}
           <div className="space-y-6 md:space-y-10 lg:space-y-12">
-            <div className="space-y-3 md:space-y-4">
+            <div className="space-y-3 md:space-y-4 text-center lg:text-left">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#F5DEB3]/10 border border-[#F5DEB3]/20">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#F5DEB3] animate-pulse"></span>
                 <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-[0.2em] text-[#F5DEB3]">Community Voices</span>
@@ -143,8 +138,7 @@ const AireTestimonials = () => {
               </h2>
             </div>
 
-            {/* Testimonial Card Display - Fluid width for narrow screens */}
-            <div className="relative h-[280px] sm:h-[260px] md:h-[300px] w-full max-w-[480px] mx-auto lg:mx-0">
+            <div className="hidden lg:block relative h-[280px] sm:h-[260px] md:h-[300px] w-full max-w-[480px] mx-auto lg:mx-0">
               {isLoading ? (
                 <div className="bg-white/5 border border-white/10 rounded-[2rem] md:rounded-[2.5rem] h-full animate-pulse shadow-xl"></div>
               ) : (
@@ -154,7 +148,7 @@ const AireTestimonials = () => {
                     className={`absolute inset-0 transition-all duration-700 ease-out
                       ${idx === activeIndex ? 'opacity-100 translate-y-0 scale-100 z-20' : 'opacity-0 translate-y-8 scale-95 z-10 pointer-events-none'}`}
                   >
-                    <div className="bg-[#e8e6e1]/5 backdrop-blur-md border border-white/10 p-6 sm:p-8 md:p-10 rounded-[2rem] md:rounded-[2.5rem] shadow-2xl h-full flex flex-col justify-between group hover:border-[#F5DEB3]/30 transition-all">
+                    <div className="bg-[#e8e6e1]/5 backdrop-blur-md border border-white/10 p-6 sm:p-8 md:p-10 rounded-[2.5rem] shadow-2xl h-full flex flex-col justify-between group hover:border-[#F5DEB3]/30 transition-all">
                         <div className="space-y-4">
                           <div className="flex gap-1">
                             {[...Array(5)].map((_, i) => <i key={i} className="fa-solid fa-star text-[#F5DEB3] text-[10px]"></i>)}
@@ -177,9 +171,8 @@ const AireTestimonials = () => {
               )}
             </div>
 
-            {/* Controls - Better touch targets for mobile */}
             {testimonials.length >= 2 && (
-              <div className="flex items-center justify-center lg:justify-start gap-4 pt-2">
+              <div className="hidden lg:flex items-center justify-center lg:justify-start gap-4 pt-2">
                 <button onClick={handlePrev} className="w-10 h-10 md:w-12 md:h-12 rounded-full border border-white/10 bg-white/5 text-white hover:bg-[#F5DEB3] hover:text-[#1c3026] transition-all flex items-center justify-center active:scale-90">
                   <i className="fa-solid fa-arrow-left text-xs md:text-sm"></i>
                 </button>
@@ -194,7 +187,6 @@ const AireTestimonials = () => {
             )}
           </div>
 
-          {/* --- RIGHT COLUMN: INTERACTIVE FORM --- */}
           <div className="relative w-full max-w-[550px] mx-auto lg:ml-auto">
             <div className="bg-[#2e443c]/40 backdrop-blur-xl rounded-[2.5rem] md:rounded-[3rem] p-6 sm:p-8 md:p-12 shadow-2xl border border-white/5 overflow-hidden">
               {formState === 'success' && (
@@ -207,17 +199,15 @@ const AireTestimonials = () => {
                 </div>
               )}
 
-              <div className="mb-6 md:mb-8">
+              <div className="mb-6 md:mb-8 text-center lg:text-left">
                 <h3 className="text-xl sm:text-2xl md:text-3xl font-serif text-white tracking-tight">Rate your Product</h3>
                 <p className="text-gray-400 text-xs sm:text-sm mt-1 sm:mt-2 font-light">We truly value your feedback.</p>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-5 md:space-y-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[9px] font-bold text-[#F5DEB3]/60 uppercase tracking-widest ml-1">Name *</label>
-                    <input type="text" required value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Full Name" className="w-full bg-black/30 border border-white/10 rounded-xl md:rounded-2xl px-4 md:px-5 py-3 md:py-4 text-sm text-white placeholder-gray-600 focus:border-[#F5DEB3] outline-none transition-all" />
-                  </div>
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-bold text-[#F5DEB3]/60 uppercase tracking-widest ml-1">Name *</label>
+                  <input type="text" required value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Full Name" className="w-full bg-black/30 border border-white/10 rounded-xl md:rounded-2xl px-4 md:px-5 py-3 md:py-4 text-sm text-white placeholder-gray-600 focus:border-[#F5DEB3] outline-none transition-all" />
                 </div>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center px-1">
