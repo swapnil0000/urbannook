@@ -89,7 +89,7 @@ const Footer = () => {
           </div>
 
           {/* --- SECTION 2: NAVIGATION GRID --- */}
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-12 mb-20">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-12 mb-4">
               <div className="md:col-span-6 lg:col-span-6">
                   <Link to="/" className="inline-block mb-8">
                      <span className="text-3xl font-serif text-[#1c3026] tracking-tight">Urban<span className="text-[#a89068] italic">Nook.</span></span>
@@ -142,20 +142,63 @@ const Footer = () => {
           </div>
 
           {/* --- SECTION 3: FOOTER BAR --- */}
-          <div className="flex flex-col md:flex-row justify-between items-center gap-8 pt-10 border-t border-black/5">
-              <div className="flex items-center gap-4 text-gray-400 text-[10px] uppercase tracking-widest font-medium">
-                 <span>© {new Date().getFullYear()} UrbanNook Inc.</span>
-                 <span className="h-4 w-[1px] bg-black/10 hidden md:block"></span>
-                 <span className="hidden md:block">Thoughtfully Made in India</span>
-              </div>
+<div className="flex flex-col lg:items-center md:flex-row justify-between items-center gap-8 pt-10 border-t border-black/5  w-full">
+  
+  {/* Left Side: Copyright Section */}
+  <div className="flex flex-col gap-4 self-center pb-4">
+    <div className="flex items-center gap-4 text-gray-400 text-[10px] uppercase tracking-widest font-medium">
+      <span>© {new Date().getFullYear()} UrbanNook Inc.</span>
+      <span className="h-4 w-[1px] bg-black/10 hidden md:block"></span>
+      <span className="hidden md:block">Thoughtfully Made in India</span>
+    </div>
+  </div>
 
-              <div className="flex items-center gap-6 opacity-30 grayscale hover:opacity-100 hover:grayscale-0 transition-all duration-500">
-                 <i className="fa-brands fa-cc-visa text-2xl text-[#1a1a1a]"></i>
-                 <i className="fa-brands fa-cc-mastercard text-2xl text-[#1a1a1a]"></i>
-                 <i className="fa-brands fa-google-pay text-3xl text-[#1a1a1a]"></i>
-                 <span className="text-[10px] font-bold tracking-tighter border border-black/20 px-2 py-1 rounded">RAZORPAY</span>
-              </div>
-          </div>
+  {/* Right Side: Payment Section (No extra wrapping divs that center it) */}
+  <div className="flex flex-col items-center md:items-end gap-6">
+    {/* Razorpay Section */}
+    <div className="flex flex-col items-center md:items-end gap-2">
+      <span className="text-[10px] font-bold tracking-[0.4em] text-slate-400 uppercase">
+        Secure Checkout Powered By
+      </span>
+      <img 
+        src="https://razorpay.com/assets/razorpay-glyph.svg" 
+        alt="Razorpay" 
+        className="h-8 w-auto object-contain hover:scale-105 transition-transform duration-300"
+      />
+    </div>
+
+    {/* Supported Methods Section */}
+    <div className="flex flex-col items-center md:items-end gap-3">
+      <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-[0.25em]">
+        Supported Payment Methods
+      </span>
+      
+      <div className="flex items-center justify-center gap-6 px-6 py-3 bg-slate-50/50 rounded-full border border-slate-100 grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition-all duration-700">
+        <img 
+          src="https://upload.wikimedia.org/wikipedia/commons/thumb/9/98/Visa_Inc._logo_%282005%E2%80%932014%29.svg/1920px-Visa_Inc._logo_%282005%E2%80%932014%29.svg.png" 
+          className="h-3 w-auto object-contain" 
+          alt="Visa" 
+        />
+        <img 
+          src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg" 
+          className="h-6 w-auto object-contain" 
+          alt="Mastercard" 
+        />
+        <div className="hidden md:block h-4 w-[1px] bg-slate-200"></div>
+        <img 
+          src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/UPI_logo.svg/1920px-UPI_logo.svg.png" 
+          className="h-4 w-auto object-contain" 
+          alt="UPI" 
+        />
+        <img 
+          src="https://upload.wikimedia.org/wikipedia/commons/c/cb/Rupay-Logo.png" 
+          className="h-3 w-auto object-contain" 
+          alt="RuPay" 
+        />
+      </div>
+    </div>
+  </div>
+</div>
 
         </div>
       </div>
