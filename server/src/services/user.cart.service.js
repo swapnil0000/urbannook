@@ -109,7 +109,12 @@ const getCartService = async ({ userId }) => {
           as: "product",
         },
       },
-      { $unwind: "$product" },
+      { 
+        $addFields: {
+          productFound: { $size: "$product" }
+        }
+      },
+      { $unwind: { path: "$product", preserveNullAndEmptyArrays: true } },
       {
         $project: {
           _id: 0,
@@ -118,14 +123,17 @@ const getCartService = async ({ userId }) => {
           price: "$product.sellingPrice",
           image: "$product.productImg",
           quantity: "$items.v",
-          stock: "$product.stock",
+          stock: "$product.productQuantity",
           isPublished: "$product.isPublished",
+          productFound: 1,
           // Calculation eligibility: Stock check and Published check
+          // TEMPORARY: Make eligibility more lenient for debugging
           isEligibleForCalc: {
-            $and: [
-              { $gt: ["$product.productQuantity", 0] },
-              { $eq: ["$product.isPublished", true] },
-            ],
+            $cond: {
+              if: { $ifNull: ["$product.productId", false] },
+              then: true, // If product exists, mark as eligible regardless of stock/published
+              else: false
+            }
           },
         },
       },

@@ -106,7 +106,7 @@ const AboutPage = () => {
       </section>
 
       {/* --- 2. INFINITE SCROLL MARQUEE --- */}
-      <section className="py-10 border-b border-white/5 bg-black/20 overflow-hidden relative">
+      {/* <section className="py-10 border-b border-white/5 bg-black/20 overflow-hidden relative">
         <div className="flex whitespace-nowrap animate-marquee">
             {[...Array(4)].map((_, i) => (
                 <div key={i} className="flex items-center mx-8">
@@ -129,7 +129,7 @@ const AboutPage = () => {
             }
             .animate-marquee { animation: marquee 25s linear infinite; }
         `}</style>
-      </section>
+      </section> */}
 
       {/* --- 3. THE MANIFESTO & METRICS (Builds Trust) --- */}
       {/* FIXED: Removed ref={targetRef} from this section */}
@@ -162,7 +162,7 @@ const AboutPage = () => {
                 <div className="bg-[#e8e6e1]/5 backdrop-blur-md p-8 md:p-10 rounded-[2rem] border border-white/10 hover:border-[#F5DEB3]/30 transition-colors">
                     <div className="flex items-center gap-4 mb-4">
                         <i className="fa-solid fa-box-open text-2xl text-[#F5DEB3]"></i>
-                        <p className="text-4xl font-serif text-white">10K+</p>
+                        <p className="text-4xl font-serif text-white">10+</p>
                     </div>
                     <p className="text-sm uppercase tracking-widest text-green-100/50 font-bold">Successful Deliveries</p>
                     <p className="text-xs text-green-100/40 mt-3 border-t border-white/5 pt-3">Trusted by thousands of homes across India.</p>

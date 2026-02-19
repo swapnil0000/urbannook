@@ -35,7 +35,7 @@ const SocialMediaFAB = () => {
   ];
 
   return (
-    <div className="fixed bottom-6  pb-20 right-6 z-[9999] flex flex-col-reverse items-end gap-4 pointer-events-none">
+    <div className="fixed bottom-6 right-6 z-[9999] flex flex-col-reverse items-end gap-4 pointer-events-none">
       
       {/* --- MAIN TOGGLE BUTTON --- */}
       {/* pointer-events-auto ensures this specific button is clickable */}

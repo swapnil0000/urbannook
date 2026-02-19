@@ -159,7 +159,7 @@ const AireInstagramFeed = () => {
                 <div key={i} className="flex flex-col items-start gap-1 group">
                   <div className="flex items-center gap-3">
                     <div className="w-6 h-6 md:w-7 md:h-7 rounded-full bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500 transition-colors">
-                      <i className={`fa-solid ${stat.icon} text-emerald-500 text-[9px] md:text-[10px] group-hover:text-white`}></i>
+                      <i className={`fa-solid ${stat.icon} text-[#F5DEB3] text-[9px] md:text-[10px] group-hover:text-white`}></i>
                     </div>
                     <span className="text-white font-serif text-xl md:text-2xl leading-none">{stat.val}</span>
                   </div>

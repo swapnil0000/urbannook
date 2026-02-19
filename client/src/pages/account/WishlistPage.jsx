@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useGetWishlistQuery, useRemoveFromWishlistMutation, useAddToCartMutation } from '../../store/api/userApi';
 import { useUI } from '../../hooks/useRedux';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const WishlistPage = () => {
   const navigate = useNavigate();
@@ -12,10 +12,7 @@ const WishlistPage = () => {
   const [removeFromWishlist] = useRemoveFromWishlistMutation();
   const [addToCart, { isLoading: isAddingToCart }] = useAddToCartMutation();
   
-  // Track which items are being added to cart
   const [addingItems, setAddingItems] = useState(new Set());
-  
-  // Get cart items from Redux to check if item is already in cart
   const cartItems = useSelector((state) => state.cart.items);
 
   useEffect(() => {
@@ -24,7 +21,6 @@ const WishlistPage = () => {
 
   const wishlistItems = wishlistData?.data || [];
 
-  // Check if item is in cart
   const isInCart = (productId) => {
     return cartItems.some(item => item.id === productId || item.productId === productId);
   };
@@ -33,19 +29,14 @@ const WishlistPage = () => {
     try {
       await removeFromWishlist(productId).unwrap();
       refetch();
+      showNotification('Item removed from wishlist', 'success');
     } catch (error) {
-      console.error('Failed to remove from wishlist:', error);
-      showNotification('Failed to remove item from wishlist', 'error');
+      showNotification('Failed to remove item', 'error');
     }
   };
 
   const handleAddToCart = async (item) => {
-    // Prevent duplicate additions
-    if (addingItems.has(item.productId)) {
-      return;
-    }
-
-    // Check if already in cart
+    if (addingItems.has(item.productId)) return;
     if (isInCart(item.productId)) {
       navigate('/checkout');
       return;
@@ -59,17 +50,14 @@ const WishlistPage = () => {
         quantity: 1
       }).unwrap();
       
-      // Remove from adding state after successful add
       setAddingItems(prev => {
         const newSet = new Set(prev);
         newSet.delete(item.productId);
         return newSet;
       });
+      showNotification('Added to cart', 'success');
     } catch (error) {
-      console.error('Failed to add to cart:', error);
       showNotification(error?.data?.message || 'Failed to add to cart', 'error');
-      
-      // Remove from adding state on error
       setAddingItems(prev => {
         const newSet = new Set(prev);
         newSet.delete(item.productId);
@@ -78,165 +66,163 @@ const WishlistPage = () => {
     }
   };
 
-  const handleGoToCheckout = () => {
-    navigate('/checkout');
-  };
-
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0a1a13]">
-        <div className="w-12 h-12 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+      <div className="h-screen flex items-center justify-center bg-[#1c3026]">
+        <div className="w-16 h-16 border border-[#F5DEB3] rounded-full animate-spin border-t-transparent"></div>
       </div>
     );
   }
 
   return (
-    <div className="bg-[#0a1a13] min-h-screen font-sans text-gray-300 selection:bg-emerald-500 selection:text-white">
+    <div className="bg-[#2e443c] min-h-screen font-sans text-gray-200 selection:bg-[#F5DEB3] selection:text-[#1c3026] relative overflow-hidden">
+      {/* Lighting Effect */}
+      <div className="fixed top-0 left-0 w-[300px] h-[300px] bg-[#1c3026] rounded-full blur-[150px] pointer-events-none opacity-40"></div>
 
       {/* --- HERO SECTION --- */}
-      <section className="pt-40 pb-16 px-6 relative overflow-hidden">
-        {/* Ambient Glows */}
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[120px] pointer-events-none"></div>
-        
-        <div className="max-w-7xl mx-auto border-b border-white/10 pb-12 relative z-10 flex flex-col md:flex-row items-end justify-between gap-8">
-            <div>
-                <span className="inline-block px-3 py-1 mb-6 text-[10px] font-bold tracking-[0.3em] text-emerald-400 uppercase bg-white/5 border border-white/10 rounded-full">
-                    Saved Items
+      <section className="pt-32 pb-12 px-6 lg:px-12 relative z-10">
+        <div className="max-w-7xl mx-auto border-b border-[#F5DEB3]/10 pb-12 flex flex-col md:flex-row items-end justify-between gap-8">
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }} 
+              animate={{ opacity: 1, x: 0 }}
+            >
+                <span className="inline-block px-3 py-1.5 mb-6 text-[10px] font-bold tracking-[0.3em] text-[#1c3026] uppercase bg-[#F5DEB3] rounded-full shadow-lg shadow-[#F5DEB3]/10">
+                    Your Selection
                 </span>
-                <h1 className="text-5xl md:text-7xl font-serif text-white leading-[0.9] mb-4">
-                    Your Curated <br />
-                    <span className="italic font-light text-emerald-500">Collection.</span>
+                <h1 className="text-5xl md:text-7xl font-serif text-[#F5DEB3] leading-tight mb-4">
+                    The Curated <br />
+                    <span className="italic font-light opacity-80">Wishlist.</span>
                 </h1>
-                <p className="text-gray-400 font-light max-w-md text-sm md:text-base">
-                    Pieces you love, saved for when the moment is right.
+                <p className="text-gray-300 font-light max-w-md text-sm md:text-base">
+                    Handpicked pieces waiting to transform your living space.
                 </p>
-            </div>
+            </motion.div>
             
-            <div className="flex items-center gap-4 text-sm font-bold uppercase tracking-widest text-white/50">
-                <i className="fa-solid fa-heart text-emerald-500"></i>
-                <span>{wishlistItems.length} Items</span>
+            <div className="flex items-center gap-4 text-xs font-bold uppercase tracking-[0.2em] text-[#F5DEB3]/60 bg-white/5 px-6 py-3 rounded-full border border-[#F5DEB3]/10">
+                <i className="fa-solid fa-heart text-[#F5DEB3]"></i>
+                <span>{wishlistItems.length} Saved Items</span>
             </div>
         </div>
       </section>
 
       {/* --- WISHLIST GRID --- */}
-      <section className="px-6 pb-32">
+      <section className="px-6 lg:px-12 pb-32 relative z-10">
         <div className="max-w-7xl mx-auto">
           
           {wishlistItems.length === 0 ? (
-            // EMPTY STATE
-            <div className="flex flex-col items-center justify-center py-20 text-center opacity-60">
-                <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mb-6">
-                    <i className="fa-regular fa-heart text-4xl text-emerald-500/50"></i>
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }}
+              className="flex flex-col items-center justify-center py-32 text-center"
+            >
+                <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mb-8 border border-[#F5DEB3]/10">
+                    <i className="fa-regular fa-heart text-4xl text-[#F5DEB3]/30"></i>
                 </div>
-                <h3 className="text-3xl font-serif text-white mb-2">Your collection is empty</h3>
-                <p className="text-gray-400 mb-8 max-w-sm">Start exploring our curated pieces to build your dream space.</p>
+                <h3 className="text-3xl font-serif text-[#F5DEB3] mb-4">Your collection is empty</h3>
+                <p className="text-gray-400 mb-10 max-w-sm font-light">Explore our handcrafted 3D printed lamps and stands to start your collection.</p>
                 <button 
                     onClick={() => navigate('/products')}
-                    className="px-8 py-3 bg-white text-[#0a1a13] rounded-full font-bold uppercase tracking-widest text-xs hover:bg-emerald-500 hover:text-white transition-all"
+                    className="px-10 py-4 bg-[#F5DEB3] text-[#1c3026] rounded-full font-bold uppercase tracking-widest text-xs hover:bg-white transition-all shadow-xl shadow-[#F5DEB3]/10"
                 >
-                    Explore Products
+                    Return to Shop
                 </button>
-            </div>
+            </motion.div>
           ) : (
-            // GRID STATE
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {wishlistItems.map((item) => (
-                <motion.div 
-                  key={item.productId} 
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="group relative bg-[#0f251b] rounded-[2rem] overflow-hidden border border-white/5 hover:border-emerald-500/30 transition-all duration-500"
-                >
-                  
-                  {/* Image Container */}
-                  <div className="relative aspect-[4/5] overflow-hidden">
-                    <img 
-                      src={item.productImg || '/placeholder.jpg'} 
-                      alt={item.productName}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-80 group-hover:opacity-100"
-                    />
-                    
-                    {/* Gradient Overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#0f251b] via-transparent to-transparent opacity-90"></div>
-
-                    {/* Stock Badge */}
-                    {item.productStatus === 'out_of_stock' && (
-                        <div className="absolute top-4 left-4 bg-red-500/90 backdrop-blur-sm text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+              <AnimatePresence>
+                {wishlistItems.map((item, index) => (
+                  <motion.div 
+                    key={item.productId} 
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    transition={{ delay: index * 0.1 }}
+                    className="group relative bg-[#1c3026]/40 rounded-[2.5rem] overflow-hidden border border-[#F5DEB3]/10 hover:border-[#F5DEB3]/30 transition-all duration-500 hover:shadow-2xl hover:shadow-black/20"
+                  >
+                    {/* Image Section */}
+                    <div className="relative aspect-[4/5] overflow-hidden bg-[#e8e6e1]/5">
+                      <img 
+                        src={item.productImg || '/placeholder.jpg'} 
+                        alt={item.productName}
+                        className="w-full h-full object-contain p-8 transition-transform duration-700 group-hover:scale-110"
+                      />
+                      
+                      {/* Badge and Remove Button */}
+                      <div className="absolute top-6 left-6 right-6 flex justify-between items-start">
+                        {item.productStatus === 'out_of_stock' ? (
+                          <span className="bg-red-500/90 text-white text-[9px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full">
                             Sold Out
-                        </div>
-                    )}
-
-                    {/* Remove Button (Top Right) */}
-                    <button
-                      onClick={() => handleRemove(item.productId)}
-                      className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-black/40 hover:bg-red-500 backdrop-blur-md text-white transition-colors duration-300 z-20 group/btn"
-                    >
-                      <i className="fa-solid fa-xmark text-sm group-hover/btn:rotate-90 transition-transform"></i>
-                    </button>
-                  </div>
-
-                  {/* Content Container (Floats over image bottom) */}
-                  <div className="absolute bottom-0 left-0 w-full p-6 md:p-8">
-                    <div className="transform translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
-                        
-                        {/* Title & Price */}
-                        <div className="flex justify-between items-end mb-6">
-                            <div>
-                                <h3 className="text-2xl font-serif text-white leading-tight mb-1">{item.productName}</h3>
-                                <p className="text-xs font-bold uppercase tracking-widest text-gray-500">
-                                    {item.productCategory}
-                                </p>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-xl font-light text-emerald-400">₹{item.sellingPrice?.toLocaleString()}</p>
-                            </div>
-                        </div>
-
-                        {/* Add to Cart / Go to Checkout Button */}
-                        {isInCart(item.productId) ? (
-                          <button
-                            onClick={handleGoToCheckout}
-                            className="w-full py-4 rounded-xl font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-3 transition-all duration-300 bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg"
-                          >
-                            <span>Go to Checkout</span>
-                            <i className="fa-solid fa-arrow-right"></i>
-                          </button>
+                          </span>
                         ) : (
-                          <button
-                            onClick={() => handleAddToCart(item)}
-                            disabled={item.productStatus === 'out_of_stock' || addingItems.has(item.productId) || isAddingToCart}
-                            className={`w-full py-4 rounded-xl font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-3 transition-all duration-300 ${
-                              item.productStatus !== 'out_of_stock' && !addingItems.has(item.productId)
-                                ? 'bg-white text-[#0a1a13] hover:bg-emerald-500 hover:text-white shadow-lg' 
-                                : 'bg-white/10 text-gray-500 cursor-not-allowed'
-                            }`}
-                          >
-                            {addingItems.has(item.productId) ? (
-                              <>
-                                <i className="fa-solid fa-spinner fa-spin"></i>
-                                <span>Adding...</span>
-                              </>
-                            ) : item.productStatus !== 'out_of_stock' ? (
-                              <>
-                                <span>Add to Cart</span>
-                                <i className="fa-solid fa-arrow-right"></i>
-                              </>
-                            ) : (
-                              <span>Restocking Soon</span>
-                            )}
-                          </button>
+                          <span className="bg-[#F5DEB3] text-[#1c3026] text-[9px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full">
+                            In Stock
+                          </span>
                         )}
-                    </div>
-                  </div>
 
-                </motion.div>
-              ))}
+                        <button
+                          onClick={() => handleRemove(item.productId)}
+                          className="w-10 h-10 flex items-center justify-center rounded-full bg-[#1c3026]/60 hover:bg-red-500 text-white backdrop-blur-md transition-all duration-300 border border-white/10"
+                        >
+                          <i className="fa-solid fa-xmark text-sm"></i>
+                        </button>
+                      </div>
+
+                      {/* Floating Price Tag */}
+                      <div className="absolute bottom-6 right-6">
+                        <div className="bg-[#1c3026] text-[#F5DEB3] px-4 py-2 rounded-2xl border border-[#F5DEB3]/20 font-light text-lg">
+                          ₹{item.sellingPrice?.toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Content Section */}
+                    <div className="p-8">
+                      <div className="mb-6">
+                        <h3 className="text-2xl font-serif text-[#F5DEB3] mb-1 group-hover:text-white transition-colors">
+                          {item.productName}
+                        </h3>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#F5DEB3]/40">
+                          {item.productCategory}
+                        </p>
+                      </div>
+
+                      {/* Action Button */}
+                      {isInCart(item.productId) ? (
+                        <button
+                          onClick={() => navigate('/checkout')}
+                          className="w-full h-14 rounded-2xl font-bold uppercase tracking-widest text-[10px] flex items-center justify-center gap-3 transition-all duration-300 bg-[#F5DEB3] text-[#1c3026] hover:bg-white shadow-xl shadow-[#F5DEB3]/5"
+                        >
+                          <span>Go to Checkout</span>
+                          <i className="fa-solid fa-arrow-right"></i>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleAddToCart(item)}
+                          disabled={item.productStatus === 'out_of_stock' || addingItems.has(item.productId) || isAddingToCart}
+                          className={`w-full h-14 rounded-2xl font-bold uppercase tracking-widest text-[10px] flex items-center justify-center gap-3 transition-all duration-300 ${
+                            item.productStatus !== 'out_of_stock' && !addingItems.has(item.productId)
+                              ? 'bg-white/5 text-[#F5DEB3] hover:bg-[#F5DEB3] hover:text-[#1c3026] border border-[#F5DEB3]/20' 
+                              : 'bg-white/5 text-gray-600 cursor-not-allowed border border-white/5'
+                          }`}
+                        >
+                          {addingItems.has(item.productId) ? (
+                            <i className="fa-solid fa-spinner fa-spin"></i>
+                          ) : (
+                            <>
+                              <span>{item.productStatus === 'out_of_stock' ? 'Sold Out' : 'Move to Cart'}</span>
+                              <i className="fa-solid fa-plus-circle text-xs"></i>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
           )}
         </div>
       </section>
-
     </div>
   );
 };

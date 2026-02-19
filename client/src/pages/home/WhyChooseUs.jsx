@@ -226,9 +226,9 @@ export default function WhyChooseUs() {
                <p className="text-xs md:text-sm font-light leading-relaxed opacity-80 max-w-[70%]">
                   {feature.description}
                </p>
-               <div className="flex w-10 h-10 rounded-full border border-current border-opacity-20 items-center justify-center opacity-70">
+               {/* <div className="flex w-10 h-10 rounded-full border border-current border-opacity-20 items-center justify-center opacity-70">
                   <i className="fa-solid fa-arrow-right -rotate-45 text-xs"></i>
-               </div>
+               </div> */}
             </div>
           </div>
         </div>
