@@ -40,6 +40,33 @@ const loginService = async (email, password) => {
     };
   }
 
+  // CRITICAL: Check if user has verified their email
+  if (!res.isVerified) {
+    // User exists but hasn't verified email - resend OTP
+    const { generateOtpResponseService } = await import("./common.auth.service.js");
+    const otpResponse = await generateOtpResponseService();
+    
+    if (otpResponse.success) {
+      const OTP_EXPIRY_TIME = 5 * 60 * 1000; // 5 minutes
+      res.verificationOtp = Number(otpResponse.data);
+      res.verificationOtpExpiresAt = new Date(Date.now() + OTP_EXPIRY_TIME);
+      await res.save({ validateBeforeSave: false });
+      
+      // Send OTP email
+      const { sendOTP } = await import("./email.service.js");
+      sendOTP(res.email, Number(otpResponse.data), res.name).catch((err) => {
+        console.error(`[ERROR] Failed to resend OTP email - Email: ${res.email}:`, err.message);
+      });
+    }
+    
+    return {
+      statusCode: 403,
+      message: "Please verify your email first. We've sent you a new OTP.",
+      data: { email: res.email, requiresVerification: true },
+      success: false,
+    };
+  }
+
   const userRefreshToken = await res?.genRefreshToken();
   const userAccessToken = await res?.genAccessToken();
 
@@ -142,6 +169,34 @@ const registerService = async (name, email, password, mobileNumber) => {
   });
 
   if (res) {
+    // Check if user exists but is not verified
+    if (!res.isVerified) {
+      // User exists but hasn't verified - resend OTP
+      const { generateOtpResponseService } = await import("./common.auth.service.js");
+      const otpResponse = await generateOtpResponseService();
+      
+      if (otpResponse.success) {
+        const OTP_EXPIRY_TIME = 5 * 60 * 1000; // 5 minutes
+        res.verificationOtp = Number(otpResponse.data);
+        res.verificationOtpExpiresAt = new Date(Date.now() + OTP_EXPIRY_TIME);
+        await res.save({ validateBeforeSave: false });
+        
+        // Send OTP email
+        const { sendOTP } = await import("./email.service.js");
+        sendOTP(res.email, Number(otpResponse.data), res.name).catch((err) => {
+          console.error(`[ERROR] Failed to resend OTP email - Email: ${res.email}:`, err.message);
+        });
+      }
+      
+      return {
+        statusCode: 200,
+        message: `Account exists but not verified. We've sent you a new OTP to ${email}`,
+        data: { email: res.email, requiresVerification: true },
+        success: true,
+      };
+    }
+    
+    // User exists and is verified - this is a conflict
     let matchedValue;
     if (res?.email == email) matchedValue = email;
     else if (res?.mobileNumber == mobileNumber) matchedValue = mobileNumber;
@@ -153,43 +208,61 @@ const registerService = async (name, email, password, mobileNumber) => {
       success: false,
     };
   }
+  
   const userId = uuid7();
+  
+  // Generate OTP for email verification
+  const { generateOtpResponseService } = await import("./common.auth.service.js");
+  const otpResponse = await generateOtpResponseService();
+  
+  if (!otpResponse.success) {
+    return {
+      statusCode: 500,
+      message: "Failed to generate OTP. Please try again.",
+      data: null,
+      success: false,
+    };
+  }
+  
+  const OTP_EXPIRY_TIME = 5 * 60 * 1000; // 5 minutes
+  
   const newRegisteringUser = await User.create({
     name: name.toLowerCase(),
     email: email.toLowerCase(),
     password,
     mobileNumber,
     userId,
+    isVerified: false, // CRITICAL: User is not verified yet
+    verificationOtp: Number(otpResponse.data),
+    verificationOtpExpiresAt: new Date(Date.now() + OTP_EXPIRY_TIME),
   });
-  // when user registers - for first time we are generating token so we can move them directly to home page
-  const userAccessToken = newRegisteringUser.genAccessToken();
-  const userRefreshToken = newRegisteringUser.genRefreshToken();
-  newRegisteringUser.userRefreshToken = userRefreshToken;
-  if (!newRegisteringUser)
+  
+  if (!newRegisteringUser) {
     return {
       statusCode: 400,
       message: `Failed to create user with ${email}`,
       data: email,
       success: false,
     };
-  newRegisteringUser.save({ validateBeforeSave: false }).catch((err) => {
-    console.error(`[ERROR] Refresh token save failed:`, err.message, err.stack);
+  }
+
+  await newRegisteringUser.save({ validateBeforeSave: false }).catch((err) => {
+    console.error(`[ERROR] User save failed:`, err.message, err.stack);
   });
 
-  // Send welcome email (async, don't wait for it)
-  sendWelcomeEmail(email.toLowerCase(), name).catch((err) => {
-    console.error(`[ERROR] Failed to send welcome email - Email: ${email}:`, err.message);
+  // Send OTP email
+  const { sendOTP } = await import("./email.service.js");
+  sendOTP(email.toLowerCase(), Number(otpResponse.data), name).catch((err) => {
+    console.error(`[ERROR] Failed to send OTP email - Email: ${email}:`, err.message);
   });
 
+  // CRITICAL: Do NOT return token - user must verify email first
   return {
-    statusCode: 200,
-    message: `Created user with - ${email}`,
+    statusCode: 201,
+    message: `Account created! Please check your email for the verification code.`,
     data: {
-      user: {
-        id: newRegisteringUser.userId,
-        email: newRegisteringUser.email,
-      },
-      userAccessToken,
+      email: newRegisteringUser.email,
+      requiresVerification: true,
     },
     success: true,
   };
