@@ -44,6 +44,10 @@ const CheckoutPage = () => {
   const [createOrder, { isLoading: isOrdering }] = useCreateOrderMutation();
   const [applyCouponMutation] = useApplyCouponMutation();
 
+  useEffect(()=>{
+     window.scrollTo(0, 0);
+  },[]);
+
   useEffect(() => {
     const getCookie = (name) => {
       const value = `; ${document.cookie}`;
@@ -356,7 +360,6 @@ const CheckoutPage = () => {
               </div>
 
               {/* --- HIGH VISIBILITY COUPON SECTION --- */}
-              {/* Wrapped in a glowing gradient border to instantly catch the user's eye */}
               <div className="bg-gradient-to-br from-[#F5DEB3]/20 via-[#F5DEB3]/5 to-transparent p-[1px] rounded-2xl shadow-[0_0_20px_rgba(245,222,179,0.05)]">
                  <div className="bg-[#1c2b25] rounded-2xl p-4 md:p-5">
                     <div className="flex items-center gap-2 mb-3">

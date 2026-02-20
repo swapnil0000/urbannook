@@ -174,7 +174,7 @@ const ContactPage = () => {
       id: 1,
       icon: "fa-solid fa-phone",
       title: "Contact Number",
-      info: "+91 63864 55982",
+      info: "+91 82996 38749",
       subInfo: "Mon-Sat, 9am - 7pm",
     },
     {

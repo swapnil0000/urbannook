@@ -137,7 +137,19 @@ const AireTestimonials = () => {
                       <div className="bg-white/5 backdrop-blur-md border border-white/10 p-6 md:p-6 rounded-[2rem] md:rounded-[2.5rem]  flex flex-col justify-between group">
                           <div className="space-y-1">
                             <div className="flex gap-1">
-                              {[...Array(5)].map((_, i) => <i key={i} className="fa-solid fa-star text-[#F5DEB3] text-[10px]"></i>)}
+                              {(() => {
+                                const rating = typeof t.rating === 'number' && t.rating >= 1 && t.rating <= 5 ? t.rating : 0;
+                                return (
+                                  <>
+                                    {[...Array(rating)].map((_, i) => (
+                                      <i key={`filled-${i}`} className="fa-solid fa-star text-[#F5DEB3] text-[10px]"></i>
+                                    ))}
+                                    {[...Array(5 - rating)].map((_, i) => (
+                                      <i key={`empty-${i}`} className="fa-regular fa-star text-[#F5DEB3] text-[10px]"></i>
+                                    ))}
+                                  </>
+                                );
+                              })()}
                             </div>
                             <p className="text-base md:text-xl font-serif text-gray-200 leading-relaxed italic line-clamp-4 md:line-clamp-3">"{t.content}"</p>
                           </div>

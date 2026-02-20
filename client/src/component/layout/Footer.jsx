@@ -35,7 +35,7 @@ const Footer = () => {
   return (
     <footer className="w-full bg-[#f5f7f8] py-4 selection:bg-[#F5DEB3] selection:text-[#1a1a1a]">
 
-  <div className="mx-auto w-[96%] md:w-[99%] relative overflow-hidden rounded-[2.5rem] lg:rounded-[4rem] bg-[#faf9f6] text-[#1a1a1a] pt-20 md:pt-24 pb-12 shadow-sm border border-black/5 isolate">
+  <div className="mx-auto  relative overflow-hidden  bg-[#faf9f6] text-[#1a1a1a] pt-20 md:pt-24 pb-12 shadow-sm isolate">
     
     <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full pointer-events-none opacity-[0.03] select-none z-0">
       <h1 className="text-[14vw] font-serif font-bold text-center leading-none text-black tracking-tighter uppercase whitespace-nowrap">
@@ -90,18 +90,29 @@ const Footer = () => {
               </Link>
               <div className="flex flex-col gap-6 items-center md:items-start">
                  <div className="space-y-3">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Connect with our studio</p>
-                    <div className="flex gap-4 justify-center md:justify-start">
-                       {['instagram', 'twitter', 'facebook-f'].map((icon) => (
-                          <a key={icon} href={`https://${icon}.com/urbannook.in`} className="w-10 h-10 rounded-full border border-black/10 flex items-center justify-center text-gray-400 hover:bg-[#1c3026] hover:text-white transition-all duration-300">
-                             <i className={`fa-brands fa-${icon} text-sm`}></i>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Connect with us</p>
+                    <div className="flex gap-3 justify-center md:justify-start">
+                       {[
+                         { icon: 'instagram', url: 'https://instagram.com/urbannook.store' },
+                         { icon: 'twitter', url: 'https://twitter.com/urbannook' },
+                         { icon: 'facebook-f', url: 'https://facebook.com/urbannook' }
+                       ].map((social) => (
+                          <a key={social.icon} href={social.url} target="_blank" rel="noopener noreferrer" className="w-9 h-9 rounded-full border border-black/10 flex items-center justify-center text-gray-400 hover:bg-[#1c3026] hover:text-white hover:border-[#1c3026] transition-all duration-300">
+                             <i className={`fa-brands fa-${social.icon} text-xs`}></i>
                           </a>
                        ))}
                     </div>
                  </div>
-                 <div className="space-y-1">
-                    <p className="text-[#1a1a1a] text-sm font-medium">support@urbannook.in</p>
-                    <p className="text-gray-500 text-sm">+91 63864 55982</p>
+                 <div className="space-y-2">
+                    <a href="mailto:support@urbannook.in" className="flex items-center gap-2 text-gray-500 hover:text-[#1c3026] transition-colors group">
+                      <i className="fa-solid fa-envelope text-xs text-gray-400 group-hover:text-[#1c3026]"></i>
+                      <span className="text-sm font-medium">support@urbannook.in</span>
+                    </a>
+                    <a href="tel:+918299638749" className="flex items-center gap-2 text-gray-500 hover:text-[#1c3026] transition-colors group">
+                      <i className="fa-solid fa-phone text-xs text-gray-400 group-hover:text-[#1c3026]"></i>
+                      <span className="text-sm">+91 82996 38749</span>
+                    </a>
+                    <span className="text-[10px] text-gray-400">Mon - Sat | 10AM - 7PM</span>
                  </div>
               </div>
           </div>
@@ -109,11 +120,16 @@ const Footer = () => {
           <div className="hidden md:block md:col-span-3 lg:col-span-3">
             <h4 className="text-[#1a1a1a] font-bold uppercase tracking-widest text-[10px] mb-8">Support</h4>
             <ul className="space-y-4">
-              {['Track Order', 'Returns & Exchange', 'Cancellation & Refund', 'FAQs'].map((name) => (
-                <li key={name}>
-                  <Link to="#" className="text-gray-500 text-sm hover:text-[#1c3026] transition-all duration-300 flex items-center group">
+              {[
+                { name: 'Track Order', path: '/orders' },
+                { name: 'Returns & Exchange', path: '/return-policy' },
+                { name: 'Cancellation & Refund', path: '/cancellation-refund' },
+                { name: 'FAQs', path: '/faqs' }
+              ].map((item) => (
+                <li key={item.name}>
+                  <Link to={item.path} className="text-gray-500 text-sm hover:text-[#1c3026] transition-all duration-300 flex items-center group">
                      <span className="h-[1px] w-0 bg-[#a89068] group-hover:w-4 transition-all duration-300 mr-0 group-hover:mr-2"></span>
-                     {name}
+                     {item.name}
                   </Link>
                 </li>
               ))}
@@ -123,11 +139,16 @@ const Footer = () => {
           <div className="hidden md:block md:col-span-3 lg:col-span-3">
             <h4 className="text-[#1a1a1a] font-bold uppercase tracking-widest text-[10px] mb-8">Company</h4>
             <ul className="space-y-4">
-              {['Our Story', 'Contact Us', 'Privacy Policy', 'Terms of Service'].map((name) => (
-                <li key={name}>
-                  <Link to="#" className="text-gray-500 text-sm hover:text-[#1c3026] transition-all duration-300 flex items-center group">
+              {[
+                { name: 'Our Story', path: '/about-us' },
+                { name: 'Contact Us', path: '/contact-us' },
+                { name: 'Privacy Policy', path: '/privacy-policy' },
+                { name: 'Terms of Service', path: '/terms-conditions' }
+              ].map((item) => (
+                <li key={item?.name}>
+                  <Link to={item?.path} className="text-gray-500 text-sm hover:text-[#1c3026] transition-all duration-300 flex items-center group">
                      <span className="h-[1px] w-0 bg-[#a89068] group-hover:w-4 transition-all duration-300 mr-0 group-hover:mr-2"></span>
-                     {name}
+                     {item?.name}
                   </Link>
                 </li>
               ))}
@@ -146,18 +167,20 @@ const Footer = () => {
         </div>
 
         <div className="flex flex-col items-center md:items-end gap-6 w-full md:w-auto">
-          <div className="flex flex-col items-center md:items-end gap-2">
-            <span className="text-[9px] md:text-[10px] font-bold tracking-[0.4em] text-slate-400 uppercase">
-              Secure Checkout Powered By
-            </span>
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-white/50 rounded-xl border border-black/5">
+            <div className="flex items-center gap-2">
+              <i className="fa-solid fa-shield-check text-emerald-600 text-sm"></i>
+              <span className="text-[9px] md:text-[10px] font-bold tracking-wider text-gray-600 uppercase">Secured by</span>
+            </div>
             <img 
               src="https://razorpay.com/assets/razorpay-glyph.svg" 
               alt="Razorpay" 
-              className="h-7 md:h-8 w-auto object-contain grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all"
+              className="h-5 md:h-6 w-auto object-contain opacity-70 hover:opacity-100 transition-all"
             />
+            <span className='text-[10px] md:text-[10px] font-bold tracking-wider text-gray-600 '>Razorpay</span>
           </div>
 
-          <div className="flex flex-col items-center md:items-end gap-3">
+          {/* <div className="flex flex-col items-center md:items-end gap-3">
             <span className="text-[8px] md:text-[9px] font-semibold text-slate-400 uppercase tracking-[0.25em]">
               Supported Payment Methods
             </span>
@@ -169,7 +192,7 @@ const Footer = () => {
               <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/UPI-Logo.png/1200px-UPI-Logo.png" className="h-3.5 md:h-4" alt="UPI" />
               <img src="https://upload.wikimedia.org/wikipedia/commons/c/cb/Rupay-Logo.png" className="h-2.5 md:h-3" alt="RuPay" />
             </div>
-          </div>
+          </div> */}
         </div>
       </div>
 

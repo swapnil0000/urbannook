@@ -12,18 +12,10 @@ export const authApi = apiSlice.injectEndpoints({
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          // Auto-login: Set credentials in Redux and localStorage
-          if (data.success && data.data) {
-            dispatch(setCredentials({
-              user: {
-                email: data.data.email,
-                name: data.data.name,
-                userId: data.data.userId,
-                role: data.data.role,
-              },
-              token: data.data.userAccessToken,
-            }));
-          }
+          // Registration now requires OTP verification - no token returned
+          // The response will have requiresVerification: true
+          // No need to store anything in sessionStorage
+          // User will verify OTP and then get authenticated
         } catch (error) {
           console.error('Registration failed:', error);
         }
@@ -104,10 +96,31 @@ export const authApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: data,
       }),
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          // After successful OTP verification, authenticate the user
+          if (data.success && data.data) {
+            dispatch(setCredentials({
+              user: {
+                email: data?.data?.user?.email || data?.data?.email,
+                name: data?.data?.user?.name,
+                userId: data?.data?.user?.id,
+                role: data?.data?.user?.role,
+              },
+              token: data?.data?.userAccessToken,
+            }));
+            // Clear pending verification data
+            sessionStorage.removeItem('pendingVerification');
+          }
+        } catch (error) {
+          console.error('OTP verification failed:', error);
+        }
+      },
     }),
     resendOtp: builder.mutation({
       query: (data) => ({
-        url: '/verify-otp',
+        url: '/send-otp',
         method: 'POST',
         body: data,
       }),

@@ -1,4 +1,5 @@
 import { ApiError, ApiRes } from "../utlis/index.js";
+import cookieOptions from "../config/config.js";
 import {
   sendOtpViaEmailService,
   verifyOtpEmailService,
@@ -60,13 +61,20 @@ const verifyEmailOtpController = async (req, res) => {
           ),
         );
     }
+    
+    // CRITICAL: Return token and user data after successful verification
     return res
       .status(200)
+      .cookie("userAccessToken", result?.data?.userAccessToken, cookieOptions)
       .json(
         new ApiRes(
           200,
-          `${result?.message} for ${result?.data}`,
-          `${result?.message} for ${result?.data}`,
+          result?.message,
+          {
+            email: result?.data?.email,
+            userAccessToken: result?.data?.userAccessToken,
+            user: result?.data?.user,
+          },
           true,
         ),
       );

@@ -286,10 +286,26 @@ const verifyOtpEmailService = async (email, emailOtp) => {
       };
     }
 
+    // CRITICAL: After successful verification, generate tokens for authentication
+    const userAccessToken = await verifiedUser.genAccessToken();
+    const userRefreshToken = await verifiedUser.genRefreshToken();
+    
+    verifiedUser.userRefreshToken = userRefreshToken;
+    await verifiedUser.save({ validateBeforeSave: false });
+
     return {
       statusCode: 200,
-      message: "OTP verified successfully",
-      data: email,
+      message: "Email verified successfully! You can now login.",
+      data: {
+        email: verifiedUser.email,
+        userAccessToken,
+        user: {
+          id: verifiedUser.userId,
+          email: verifiedUser.email,
+          name: verifiedUser.name,
+          role: verifiedUser.role,
+        },
+      },
       success: true,
     };
   } catch (error) {

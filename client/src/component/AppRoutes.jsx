@@ -55,7 +55,7 @@ const AppRoutes = () => {
         <Route path="/wishlist" element={<WishlistPage />} />
         <Route path="/customer-support" element={<CustomerSupportPage />} />
         <Route path="/rewards" element={<RewardsPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
+        {/* <Route path="/settings" element={<SettingsPage />} /> */}
         <Route path="/terms-conditions" element={<TermsConditions />} />
         <Route path="/cancellation-refund" element={<CancellationPolicy />} />
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
