@@ -12,9 +12,9 @@ export const authApi = apiSlice.injectEndpoints({
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          // Auto-login: Set credentials in Redux and localStorage
+          // Store credentials temporarily in sessionStorage pending OTP verification
           if (data.success && data.data) {
-            dispatch(setCredentials({
+            sessionStorage.setItem('pendingVerification', JSON.stringify({
               user: {
                 email: data.data.email,
                 name: data.data.name,
@@ -22,6 +22,7 @@ export const authApi = apiSlice.injectEndpoints({
                 role: data.data.role,
               },
               token: data.data.userAccessToken,
+              timestamp: Date.now(),
             }));
           }
         } catch (error) {
@@ -104,6 +105,27 @@ export const authApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: data,
       }),
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          // After successful OTP verification, authenticate the user
+          if (data.success && data.data) {
+            dispatch(setCredentials({
+              user: {
+                email: data?.data?.email,
+                name: data?.data?.name,
+                userId: data?.data?.userId,
+                role: data?.data?.role,
+              },
+              token: data?.data?.userAccessToken,
+            }));
+            // Clear pending verification data
+            sessionStorage.removeItem('pendingVerification');
+          }
+        } catch (error) {
+          console.error('OTP verification failed:', error);
+        }
+      },
     }),
     resendOtp: builder.mutation({
       query: (data) => ({

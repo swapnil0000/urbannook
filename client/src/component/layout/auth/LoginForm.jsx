@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import ForgotPassword from './ForgotPassword';
+import OTPVerification from './OTPVerification';
 import { useLoginMutation } from '../../../store/api/authApi';
 import { useAuth, useUI } from '../../../hooks/useRedux';
 
 const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
   const [formData, setFormData] = useState({ identifier: '', password: '' });
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [showOTPVerification, setShowOTPVerification] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
   
@@ -71,10 +73,37 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
       onLoginSuccess(userData);
       onClose();
     } catch (error) {
-      showNotification(error.data?.message || 'Login failed. Please check your credentials.');
-      setErrors({ submit: error.data?.message || 'Login failed' });
+      const errorData = error?.data?.data;
+      const errorMessage = error?.data?.message || 'Login failed. Please check your credentials.';
+      
+      // If user needs to verify email, show OTP verification
+      if (errorData?.requiresVerification) {
+        showNotification(errorMessage);
+        setShowOTPVerification(true);
+      } else {
+        showNotification(errorMessage);
+        setErrors({ submit: errorMessage });
+      }
     }
   };
+
+  // Show OTP verification if user is unverified
+  if (showOTPVerification) {
+    return (
+      <OTPVerification
+        email={formData.identifier}
+        onClose={() => {
+          setShowOTPVerification(false);
+          onClose();
+        }}
+        onBack={() => setShowOTPVerification(false)}
+        onSuccess={() => {
+          showNotification('Email verified! You are now logged in.');
+          onClose();
+        }}
+      />
+    );
+  }
 
   if (showForgotPassword) {
     return (
@@ -126,7 +155,7 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
                         ))}
                     </div>
                     <div>
-                        <p className="text-white text-xs font-bold">Join 80+ Members</p>
+                        <p className="text-white text-xs font-bold">Join 500+ Members</p>
                         <p className="text-[#F5DEB3] text-[10px] uppercase tracking-widest">Community</p>
                     </div>
                 </div>

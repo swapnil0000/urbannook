@@ -233,7 +233,7 @@ const CustomerSupportPage = () => {
                             </div>
                         </div>
 
-                        <a href="https://wa.me/916386455982" target="_blank" rel="noreferrer" className="block p-6 rounded-2xl bg-gradient-to-r from-emerald-900/40 to-emerald-800/40 border border-emerald-500/20 hover:border-emerald-500/50 transition-all group cursor-pointer">
+                        <a href="https://wa.me/918299638749" target="_blank" rel="noreferrer" className="block p-6 rounded-2xl bg-gradient-to-r from-emerald-900/40 to-emerald-800/40 border border-emerald-500/20 hover:border-emerald-500/50 transition-all group cursor-pointer">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-4">
                                     <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">

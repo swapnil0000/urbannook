@@ -81,32 +81,31 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
         mobileNumber: formData.mobile,
       }).unwrap();
 
-      // CRITICAL FIX: DO NOT save token/user data until OTP is verified
-      // Store temporarily for OTP verification, but don't authenticate yet
-      const tempUserData = {
-        name: result.user?.userName || formData.name,
-        email: result.user?.userEmail || formData.email,
-        mobile: result.user?.userMobileNumber || formData.mobile,
-        token: result.userAccessToken // Store token temporarily
-      };
-      // Store in sessionStorage (not localStorage) - will be cleared on browser close
-      sessionStorage.setItem('pendingVerification', JSON.stringify(tempUserData));
-
-      try {
-        const response = await otpSent({ email: tempUserData.email }).unwrap();
-        if (response.success) {
-          showNotification('OTP sent to your email!');
+      // Check if registration was successful
+      if (result?.success) {
+        // If user already exists but unverified, OTP was resent
+        if (result.data?.requiresVerification) {
+          showNotification(result?.message || 'OTP sent to your email!');
+          setShowOTP(true);
+        } else {
+          // Unexpected success without requiresVerification flag
+          showNotification('Registration successful! Please check your email for OTP.');
           setShowOTP(true);
         }
-      } catch (otpError) {
-        // If OTP sending fails, clear pending data and ask user to login
-        sessionStorage.removeItem('pendingVerification');
-        showNotification('Account created, but OTP failed. Please login.', otpError);
-        onSwitchToLogin();
       }
     } catch (error) {
-      showNotification(error.data?.message || 'Registration failed.');
-      setErrors({ submit: error.data?.message || 'Registration failed' });
+      // Handle different error scenarios
+      const errorMessage = error?.data?.message || 'Registration failed.';
+      const errorData = error.data?.data;
+
+      // If user already exists and is verified, suggest login
+      if (errorData?.shouldLogin) {
+        showNotification(errorMessage);
+        onSwitchToLogin();
+      } else {
+        showNotification(errorMessage);
+        setErrors({ submit: errorMessage });
+      }
     }
   };
 
@@ -159,7 +158,7 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
             
             <ul className="space-y-5">
               {[
-                { icon: 'fa-truck-fast', text: 'Free Shipping on first order' },
+                // { icon: 'fa-truck-fast', text: 'Free Shipping on first order' },
                 { icon: 'fa-shield-heart', text: 'Secure checkout guaranteed' },
                 { icon: 'fa-star', text: 'Access exclusive collections' },
               ].map((item, idx) => (

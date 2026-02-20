@@ -247,9 +247,7 @@ const NewHeader = () => {
                           <Link to="/profile" onClick={() => setShowUserDropdown(false)} className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-600 hover:bg-emerald-50 hover:text-emerald-900 rounded-xl transition-colors">
                              <i className="fa-regular fa-user w-5"></i> Profile
                           </Link>
-                          <Link to="/settings" onClick={() => setShowUserDropdown(false)} className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-600 hover:bg-emerald-50 hover:text-emerald-900 rounded-xl transition-colors">
-                             <i className="fa-solid fa-gear w-5"></i> Settings
-                          </Link>
+    
                            <Link to="/customer-support" onClick={() => setShowUserDropdown(false)} className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-600 hover:bg-emerald-50 hover:text-emerald-900 rounded-xl transition-colors">
                              <i className="fa-solid fa-headset text-lg"></i> Support
                           </Link>
@@ -336,15 +334,9 @@ const NewHeader = () => {
                     </div>
 
                     {/* THE APP-STYLE GRID (Modified to 3 Cols since Orders is removed) */}
-                    <div className="grid grid-cols-4 gap-5 relative z-10">
+                    <div className="grid grid-cols-3 gap-5 relative z-10">
                         
-                        {/* Settings */}
-                        <button onClick={() => handleMobileNav('/settings')} className="flex flex-col items-center gap-2 group/btn">
-                            <div className="w-12 h-12 rounded-2xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-700 shadow-sm group-hover/btn:scale-105 group-hover/btn:border-emerald-300 transition-all">
-                                <i className="fa-solid fa-gear text-lg"></i>
-                            </div>
-                            <span className="text-[10px] font-bold text-emerald-900 uppercase tracking-wide">Settings</span>
-                        </button>
+                    
 
                         {/* Support */}
                         <button onClick={() => handleMobileNav('/customer-support')} className="flex flex-col items-center gap-2 group/btn">

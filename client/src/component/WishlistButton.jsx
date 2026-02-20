@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useAddToWishlistMutation, useRemoveFromWishlistMutation, useGetWishlistQuery } from '../store/api/userApi';
 import { setWishlistItems } from '../store/slices/wishlistSlice';
+import { setNotification } from '../store/slices/uiSlice';
 import { useUI } from '../hooks/useRedux';
 
 const WishlistButton = ({ productId, className = "", size = "md" }) => {
@@ -50,12 +51,24 @@ const WishlistButton = ({ productId, className = "", size = "md" }) => {
 
     try {
       if (isInWishlist) {
-        await removeFromWishlist(productId).unwrap();
+        const response = await removeFromWishlist(productId).unwrap();
+        dispatch(setNotification({
+          message: response?.message || 'Removed from wishlist',
+          type: 'success'
+        }));
       } else {
-        await addToWishlist({ productId }).unwrap();
+        const response = await addToWishlist({ productId }).unwrap();
+        dispatch(setNotification({
+          message: response?.message || 'Added to wishlist',
+          type: 'success'
+        }));
       }
     } catch (error) {
       console.error('Failed to toggle wishlist:', error);
+      dispatch(setNotification({
+        message: error?.data?.message || 'Failed to update wishlist',
+        type: 'error'
+      }));
     }
   };
 

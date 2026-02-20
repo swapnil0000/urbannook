@@ -40,20 +40,20 @@ const AllProductsPage = () => {
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#F5DEB3]/5 rounded-full blur-[120px] pointer-events-none"></div>
 
       {/* Hero Section */}
-      <section className="pt-24 pb-8 md:pt-36 md:pb-16 px-6 relative z-10">
+      <section className="pt-32 pb-8 md:pt-34 md:pb-5 px-6 relative z-10">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-end gap-10">
           
           {/* LEFT SIDE: Heading & Description */}
           <div className="max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 backdrop-blur-md border border-white/10 mb-4 md:mb-6">
+            {/* <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 backdrop-blur-md border border-white/10 mb-4 md:mb-6">
               <span className="w-1.5 h-1.5 rounded-full bg-[#F5DEB3] animate-pulse"></span>
               <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-[0.25em] text-[#F5DEB3]">
                 Flagship Series
               </span>
-            </div>
-            <h1 className="text-4xl sm:text-6xl md:text-7xl font-serif text-white leading-[0.9] mb-4">
-              Curated <br/>
-              <span className="italic font-light text-[#F5DEB3]">Atmospheres.</span>
+            </div> */}
+            <h1 className="text-4xl sm:text-6xl md:text-7xl font-serif text-white leading-[0.9] mb-2">
+              Curated
+              <span className=" italic font-light text-[#F5DEB3]">Atmospheres.</span>
             </h1>
             <p className="text-sm md:text-base text-green-50/70 font-light leading-relaxed max-w-md">
               Explore our exclusive collection designed for modern indoor environments.
@@ -101,28 +101,20 @@ const AllProductsPage = () => {
 
                   {/* Clickable Card Area */}
                   <div 
-                    className="flex flex-col h-full cursor-pointer"
+                    className="flex flex-col max-h-[520px] cursor-pointer"
                     onClick={() => navigate(`/product/${product.productId}`)}
                   >
                     
-                    {/* 1. IMAGE SECTION (Perfect Square for 1000x1000) */}
                     <div className="relative w-full aspect-square bg-[#f8f8f5] overflow-hidden">
                       {product.productImg ? (
                         <img 
                           src={product.productImg} 
                           alt={product.productName} 
-                          // Mix-blend-multiply removes white backgrounds from product images cleanly
                           className="w-full h-full object-cover mix-blend-multiply transition-transform duration-[1.5s] group-hover:scale-110" 
-                          // onError={(e) => {
-                          //   e.target.style.display = 'none';
-                          //   e.target.nextSibling.style.display = 'flex';
-                          // }}
+                          
                         />
                       ) : null}
-                      {/* <PlaceholderImage 
-                        className="w-full h-full absolute inset-0 flex items-center justify-center bg-stone-100 text-stone-400" 
-                        style={{ display: product.productImg ? 'none' : 'flex' }}
-                      /> */}
+                   
                     </div>
 
                     {/* 2. TEXT & CTA SECTION */}

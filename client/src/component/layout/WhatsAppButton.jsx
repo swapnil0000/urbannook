@@ -9,7 +9,7 @@ const SocialMediaFAB = () => {
       name: 'Chat on WhatsApp',
       icon: 'fa-brands fa-whatsapp',
       color: 'bg-[#25D366]',
-      link: 'https://wa.me/+916386455982?text=Hi! I am interested in Urban Nook products.',
+      link: 'https://wa.me/+918299638749?text=Hi! I am interested in Urban Nook products.',
     },
     {
       id: 'instagram',
@@ -30,7 +30,7 @@ const SocialMediaFAB = () => {
       name: 'Call Concierge',
       icon: 'fa-solid fa-phone',
       color: 'bg-emerald-700',
-      link: 'tel:+916386455982',
+      link: 'tel:+918299638749',
     }
   ];
 

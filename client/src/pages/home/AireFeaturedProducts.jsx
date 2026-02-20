@@ -58,7 +58,7 @@ const AireFeaturedProducts = () => {
              </div>
 
              {/* Title */}
-             <h2 className="text-2xl md:text-3xl lg:text-7xl font-serif text-white leading-[0.9] mb-4">
+             <h2 className="text-2xl md:text-3xl lg:text-5xl xl:text-7xl font-serif text-white leading-[0.9] mb-4">
                 {featuredProduct.productName}
              </h2>
 
@@ -104,7 +104,7 @@ const AireFeaturedProducts = () => {
                 <div className="absolute inset-0 bg-[#F5DEB3]/20 rounded-[2.5rem] blur-2xl transform group-hover:scale-105 transition-transform duration-700"></div>
 
                 {/* Main Image Container */}
-                <div className="relative w-full h-full rounded-[2.5rem] overflow-hidden border border-white/10 bg-[#121212] shadow-2xl">
+                <div className="relative rounded-[2.5rem] overflow-hidden border border-white/10 bg-[#121212] shadow-2xl">
                     <OptimizedImage 
                         src={featuredProduct.productImg} 
                         alt={featuredProduct.productName}

@@ -64,34 +64,20 @@ const OTPVerification = ({ email, onClose, onSuccess, onBack }) => {
       // Show success notification with backend message
       showNotification(result?.message || 'Email verified successfully!', 'success');
       
-      // CRITICAL FIX: After successful OTP verification, NOW save credentials
+      // CRITICAL FIX: After successful OTP verification, NOW authenticate the user
       if (result.success) {
         // Get pending verification data from sessionStorage
         const pendingData = JSON.parse(sessionStorage.getItem('pendingVerification') || '{}');
         
-        if (pendingData.token) {
-          // NOW save the token and user data (OTP verified)
-          document.cookie = `userAccessToken=${pendingData.token}; path=/; max-age=2592000`;
-          localStorage.setItem('token', pendingData.token);
-          
-          const userData = {
-            name: pendingData.name,
-            email: pendingData.email,
-            mobile: pendingData.mobile
-          };
-          localStorage.setItem('user', JSON.stringify(userData));
-          
-          // Dispatch login action to Redux
+        if (pendingData.token && pendingData.user) {
+          // NOW call setCredentials to authenticate the user (after OTP verification)
           dispatch(setCredentials({
-            user: userData,
+            user: pendingData.user,
             token: pendingData.token
           }));
           
           // Clear pending verification data
           sessionStorage.removeItem('pendingVerification');
-          
-          // Trigger window storage event to sync across components
-          window.dispatchEvent(new Event('storage'));
         }
       }
       
