@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useDispatch } from 'react-redux';
+import { useState, useEffect, useRef } from 'react';
 import { useResendOtpMutation, useVerifyOtpMutation } from '../../../store/api/authApi';
-import { setCredentials } from '../../../store/slices/authSlice';
 import { useUI } from '../../../hooks/useRedux';
+import { useDispatch } from 'react-redux';
 
 const OTPVerification = ({ email, onClose, onSuccess, onBack }) => {
   const dispatch = useDispatch();
@@ -55,7 +54,7 @@ const OTPVerification = ({ email, onClose, onSuccess, onBack }) => {
     }
 
     try {
-      // Calling API with email
+      // Calling API with email - backend will return token after verification
       const result = await verifyOtp({
         email: email,
         emailOtp: otpString
@@ -64,22 +63,8 @@ const OTPVerification = ({ email, onClose, onSuccess, onBack }) => {
       // Show success notification with backend message
       showNotification(result?.message || 'Email verified successfully!', 'success');
       
-      // CRITICAL FIX: After successful OTP verification, NOW authenticate the user
-      if (result.success) {
-        // Get pending verification data from sessionStorage
-        const pendingData = JSON.parse(sessionStorage.getItem('pendingVerification') || '{}');
-        
-        if (pendingData.token && pendingData.user) {
-          // NOW call setCredentials to authenticate the user (after OTP verification)
-          dispatch(setCredentials({
-            user: pendingData.user,
-            token: pendingData.token
-          }));
-          
-          // Clear pending verification data
-          sessionStorage.removeItem('pendingVerification');
-        }
-      }
+      // The authApi onQueryStarted already handles setCredentials with the token
+      // No need for sessionStorage logic anymore
       
       onSuccess(result);
     } catch (err) {
@@ -93,7 +78,7 @@ const OTPVerification = ({ email, onClose, onSuccess, onBack }) => {
 
   const handleResend = async () => {
     try {
-      const result = await resendOtp({ userEmail: email }).unwrap();
+      const result = await resendOtp({ email: email }).unwrap();
       // Show success notification with backend message
       showNotification(result?.message || 'OTP resent successfully!', 'success');
       setTimer(30);

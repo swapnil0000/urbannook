@@ -12,19 +12,10 @@ export const authApi = apiSlice.injectEndpoints({
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          // Store credentials temporarily in sessionStorage pending OTP verification
-          if (data.success && data.data) {
-            sessionStorage.setItem('pendingVerification', JSON.stringify({
-              user: {
-                email: data.data.email,
-                name: data.data.name,
-                userId: data.data.userId,
-                role: data.data.role,
-              },
-              token: data.data.userAccessToken,
-              timestamp: Date.now(),
-            }));
-          }
+          // Registration now requires OTP verification - no token returned
+          // The response will have requiresVerification: true
+          // No need to store anything in sessionStorage
+          // User will verify OTP and then get authenticated
         } catch (error) {
           console.error('Registration failed:', error);
         }
@@ -112,10 +103,10 @@ export const authApi = apiSlice.injectEndpoints({
           if (data.success && data.data) {
             dispatch(setCredentials({
               user: {
-                email: data?.data?.email,
-                name: data?.data?.name,
-                userId: data?.data?.userId,
-                role: data?.data?.role,
+                email: data?.data?.user?.email || data?.data?.email,
+                name: data?.data?.user?.name,
+                userId: data?.data?.user?.id,
+                role: data?.data?.user?.role,
               },
               token: data?.data?.userAccessToken,
             }));
@@ -129,7 +120,7 @@ export const authApi = apiSlice.injectEndpoints({
     }),
     resendOtp: builder.mutation({
       query: (data) => ({
-        url: '/verify-otp',
+        url: '/send-otp',
         method: 'POST',
         body: data,
       }),

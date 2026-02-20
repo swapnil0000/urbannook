@@ -1,7 +1,5 @@
-import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useAddToWishlistMutation, useRemoveFromWishlistMutation, useGetWishlistQuery } from '../store/api/userApi';
-import { setWishlistItems } from '../store/slices/wishlistSlice';
+import { useAddToWishlistMutation, useRemoveFromWishlistMutation } from '../store/api/userApi';
 import { setNotification } from '../store/slices/uiSlice';
 import { useUI } from '../hooks/useRedux';
 
@@ -10,19 +8,8 @@ const WishlistButton = ({ productId, className = "", size = "md" }) => {
   const { openLoginModal } = useUI();
   const [addToWishlist] = useAddToWishlistMutation();
   const [removeFromWishlist] = useRemoveFromWishlistMutation();
-  const { data: wishlistData } = useGetWishlistQuery(undefined, { 
-    skip: !useSelector((state) => state.auth.isAuthenticated) 
-  });
   const wishlistItems = useSelector((state) => state.wishlist.items);
   const { isAuthenticated } = useSelector((state) => state.auth);
-  
-  // Sync wishlist from API to Redux on mount/update
-  useEffect(() => {
-    if (wishlistData?.data) {
-      console.log('Syncing wishlist to Redux:', wishlistData.data);
-      dispatch(setWishlistItems(wishlistData.data));
-    }
-  }, [wishlistData, dispatch]);
 
 
   const isInWishlist = wishlistItems.some(item => 
