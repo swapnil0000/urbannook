@@ -18,27 +18,19 @@ const getTestimonials = async (req, res) => {
       return res
         .status(result.statusCode)
         .json(
-          new ApiError(
-            result.statusCode,
-            result.message,
-            result.data,
-            false
-          )
+          new ApiError(result.statusCode, result.message, result.data, false),
         );
     }
 
     return res
       .status(result.statusCode)
-      .json(
-        new ApiRes(
-          result.statusCode,
-          result.message,
-          result.data,
-          true
-        )
-      );
+      .json(new ApiRes(result.statusCode, result.message, result.data, true));
   } catch (error) {
-    console.error("[ERROR] Get testimonials controller error:", error.message, error.stack);
+    console.error(
+      "[ERROR] Get testimonials controller error:",
+      error.message,
+      error.stack,
+    );
     return res
       .status(500)
       .json(
@@ -46,18 +38,12 @@ const getTestimonials = async (req, res) => {
           500,
           `Internal Server Error - ${error.message}`,
           null,
-          false
-        )
+          false,
+        ),
       );
   }
 };
 
-/**
- * Submit a new testimonial
- * POST /api/v1/testimonials
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- */
 const submitTestimonial = async (req, res) => {
   try {
     const {
@@ -86,27 +72,19 @@ const submitTestimonial = async (req, res) => {
       return res
         .status(result.statusCode)
         .json(
-          new ApiError(
-            result.statusCode,
-            result.message,
-            result.data,
-            false
-          )
+          new ApiError(result.statusCode, result.message, result.data, false),
         );
     }
 
     return res
       .status(result.statusCode)
-      .json(
-        new ApiRes(
-          result.statusCode,
-          result.message,
-          result.data,
-          true
-        )
-      );
+      .json(new ApiRes(result.statusCode, result.message, result.data, true));
   } catch (error) {
-    console.error("[ERROR] Submit testimonial controller error:", error.message, error.stack);
+    console.error(
+      "[ERROR] Submit testimonial controller error:",
+      error.message,
+      error.stack,
+    );
     return res
       .status(500)
       .json(
@@ -114,8 +92,8 @@ const submitTestimonial = async (req, res) => {
           500,
           `Internal Server Error - ${error.message}`,
           null,
-          false
-        )
+          false,
+        ),
       );
   }
 };

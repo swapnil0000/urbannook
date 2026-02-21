@@ -319,89 +319,6 @@ const validateUserInput = ({ email, name, mobileNumber }) => {
   };
 };
 
-const validateUserAddress = ({
-  lat,
-  long,
-  city,
-  state,
-  pinCode,
-  placeId,
-  formattedAddress,
-}) => {
-  const missing = [];
-
-  if (!placeId) missing.push("placeId");
-  if (lat === undefined) missing.push("lat");
-  if (long === undefined) missing.push("long");
-  if (!formattedAddress) missing.push("formattedAddress");
-
-  if (missing.length) {
-    return {
-      success: false,
-      statusCode: 400,
-      message: `Missing fields: ${missing.join(", ")}`,
-    };
-  }
-
-  // lat / long sanity check
-  if (typeof lat !== "number" || lat < -90 || lat > 90) {
-    return {
-      success: false,
-      statusCode: 400,
-      message: "Invalid latitude",
-    };
-  }
-
-  if (typeof long !== "number" || long < -180 || long > 180) {
-    return {
-      success: false,
-      statusCode: 400,
-      message: "Invalid longitude",
-    };
-  }
-
-  // formatted address
-  if (
-    typeof formattedAddress !== "string" ||
-    formattedAddress.length < 5 ||
-    formattedAddress.length > 200
-  ) {
-    return {
-      success: false,
-      statusCode: 400,
-      message: "Invalid formattedAddress",
-    };
-  }
-
-  if (city && typeof city !== "string") {
-    return {
-      success: false,
-      statusCode: 400,
-      message: "Invalid city",
-    };
-  }
-
-  if (state && typeof state !== "string") {
-    return {
-      success: false,
-      statusCode: 400,
-      message: "Invalid state",
-    };
-  }
-
-  if (pinCode && (!Number.isInteger(pinCode) || String(pinCode).length !== 6)) {
-    return {
-      success: false,
-      statusCode: 400,
-      message: "Invalid pinCode",
-    };
-  }
-
-  return {
-    success: true,
-  };
-};
-
 const validateUpdateUserAddress = ({
   lat,
   long,
@@ -493,6 +410,5 @@ export {
   finalProductName,
   cartDetailsMissing,
   productUpdateFieldMissing,
-  validateUserAddress,
   validateUpdateUserAddress,
 };
