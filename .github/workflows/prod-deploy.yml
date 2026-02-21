@@ -43,15 +43,16 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24 # <-- Node 24 Update kiya
 
       - name: Cache npm
         uses: actions/cache@v4
         with:
           path: ~/.npm
-          key: client-npm-${{ runner.os }}-${{ hashFiles('client/package-lock.json') }}
+          # Key mein 'v2' add kiya hai taaki purana cache ignore ho jaye
+          key: client-npm-v2-${{ runner.os }}-${{ hashFiles('client/package-lock.json') }}
           restore-keys: |
-            client-npm-${{ runner.os }}-
+            client-npm-v2-${{ runner.os }}-
 
       - name: Build Client
         working-directory: client
@@ -87,15 +88,16 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24 # <-- Node 24 Update kiya
 
       - name: Cache npm
         uses: actions/cache@v4
         with:
           path: ~/.npm
-          key: server-npm-${{ runner.os }}-${{ hashFiles('server/package-lock.json') }}
+          # Key mein 'v2' add kiya hai cache clear karne ke liye
+          key: server-npm-v2-${{ runner.os }}-${{ hashFiles('server/package-lock.json') }}
           restore-keys: |
-            server-npm-${{ runner.os }}-
+            server-npm-v2-${{ runner.os }}-
 
       - name: Install Server Dependencies
         working-directory: server
@@ -123,6 +125,7 @@ jobs:
           rsync -avz --delete \
           --exclude '.env' \
           --exclude '.env.production' \
+          --exclude 'node_modules' \
           server/ \
           ubuntu@${{ secrets.PROD_SSH_HOST }}:/home/ubuntu/urbannook-prod/server/
 
