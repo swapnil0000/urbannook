@@ -46,6 +46,7 @@ const CheckoutPage = () => {
     landmark: "",
     flatNo: "",
   });
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL
   const mapElement = useRef();
   const mapRef = useRef();
 
@@ -129,7 +130,7 @@ const CheckoutPage = () => {
     searchDebounceTimer.current = setTimeout(async () => {
       try {
         const res = await axios.post(
-          "http://localhost:8000/api/v1/user/address/search",
+          `${apiBaseUrl}/user/address/search`,
           { userSearchInput: val },
           { withCredentials: true },
         );
@@ -318,7 +319,7 @@ const CheckoutPage = () => {
   const fetchSuggestions = async (la, ln) => {
     try {
       const res = await axios.post(
-        "http://localhost:8000/api/v1/user/address/suggestion",
+        `${}/user/address/suggestion`,
         { lat: la, long: ln },
         { withCredentials: true },
       );
@@ -333,7 +334,7 @@ const CheckoutPage = () => {
     const [lon, lat] = toLonLat(center);
     try {
       const res = await axios.post(
-        "http://localhost:8000/api/v1/user/address/create",
+        `${apiBaseUrl}/user/address/create`,
         {
           lat: lat,
           long: lon,
