@@ -58,39 +58,35 @@ const CustomerSupportPage = () => {
   ];
 
   return (
-    <div className="bg-[#2e443c] min-h-screen font-sans text-[#e8e6e1] selection:bg-[#F5DEB3] selection:text-[#1c3026]">
+    <div className="bg-[#1c3026] min-h-screen font-sans text-[#e8e6e1] selection:bg-[#F5DEB3] selection:text-[#1c3026]">
 
-      {/* --- BACKGROUND AMBIENCE --- */}
+      {/* --- AMBIENT BACKGROUND --- */}
       <div className="fixed top-0 left-0 w-full h-[600px] bg-gradient-to-b from-[#2a4538] to-[#1c3026] pointer-events-none opacity-60"></div>
-      <div className="fixed -top-40 -right-40 w-[600px] h-[600px] bg-[#F5DEB3] rounded-full blur-[200px] opacity-[0.03] pointer-events-none"></div>
+      <div className="fixed -bottom-40 -left-40 w-[600px] h-[600px] bg-[#F5DEB3] rounded-full blur-[200px] opacity-[0.03] pointer-events-none"></div>
 
-      <main className="pt-32 pb-20 px-4 lg:px-12 relative z-10 max-w-6xl mx-auto">
+      <main className="max-w-5xl mx-auto pt-28 pb-20 px-4 md:px-8 relative z-10">
         
-        {/* --- HEADER SECTION --- */}
-        <div className="text-center mb-12">
-            <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-[#F5DEB3]/20 bg-[#F5DEB3]/5 mb-6"
-            >
-                <span className="w-1.5 h-1.5 rounded-full bg-[#F5DEB3] animate-pulse"></span>
-                <span className="text-[10px] font-bold tracking-[0.3em] uppercase text-[#F5DEB3]">Concierge Service</span>
-            </motion.div>
-            
-            <h1 className="text-4xl md:text-7xl font-serif text-white mb-6">
-                How can we <br className="md:hidden" />
-                <span className="italic text-[#F5DEB3]">assist you?</span>
-            </h1>
+        {/* --- HEADER --- */}
+        <div className="mb-10 md:mb-16 flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/5 pb-8 lg:pb-12">
+           <div>
+             <div className="flex items-center gap-3 mb-2">
+                 <span className="h-[1px] w-8 bg-[#F5DEB3]"></span>
+                 <span className="text-[#F5DEB3] font-bold tracking-[0.2em] uppercase text-[10px]">Support</span>
+             </div>
+             <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif text-white leading-tight">
+               How can we <span className="italic text-[#F5DEB3] opacity-90">assist you?</span>
+             </h1>
+           </div>
         </div>
 
-        {/* --- TAB SWITCHER (APP STYLE) --- */}
-        <div className="flex justify-center mb-12">
+        {/* --- TAB SWITCHER --- */}
+        <div className="flex justify-start mb-8">
             <div className="bg-black/20 p-1.5 rounded-full border border-white/5 backdrop-blur-md flex relative">
                 {['contact', 'faq'].map((tab) => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
-                        className={`relative px-8 py-3 rounded-full text-xs font-bold uppercase tracking-widest transition-all z-10 ${
+                        className={`relative px-6 md:px-8 py-2.5 md:py-3 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all z-10 ${
                             activeTab === tab ? 'text-[#1c3026]' : 'text-gray-400 hover:text-white'
                         }`}
                     >
@@ -116,10 +112,10 @@ const CustomerSupportPage = () => {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
                     transition={{ duration: 0.3 }}
-                    className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-start"
+                    className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start"
                 >
                     {/* Left: Interactive Form */}
-                    <div className="lg:col-span-7 bg-[#e8e6e1]/5 backdrop-blur-md border border-white/5 rounded-[2rem] p-6 md:p-10 shadow-2xl">
+                    <div className="lg:col-span-8 bg-[#e8e6e1]/5 backdrop-blur-md border border-white/5 rounded-[24px] p-6 md:p-8 shadow-2xl">
                         <div className="mb-8">
                             <h3 className="text-2xl font-serif text-white mb-2">Send a Request</h3>
                             <p className="text-sm text-gray-400 font-light">Our team typically responds within 2 hours.</p>
@@ -206,7 +202,7 @@ const CustomerSupportPage = () => {
                     </div>
 
                     {/* Right: Contact Cards */}
-                    <div className="lg:col-span-5 space-y-4">
+                    <div className="lg:col-span-4 space-y-4">
                         <div className="p-6 rounded-2xl bg-[#e8e6e1]/5 border border-white/10 hover:border-[#F5DEB3]/30 transition-all group">
                             <div className="flex items-start gap-4">
                                 <div className="w-12 h-12 rounded-full bg-[#F5DEB3]/10 flex items-center justify-center text-[#F5DEB3] group-hover:scale-110 transition-transform">
@@ -233,18 +229,16 @@ const CustomerSupportPage = () => {
                             </div>
                         </div>
 
-                        <a href="https://wa.me/918299638749" target="_blank" rel="noreferrer" className="block p-6 rounded-2xl bg-gradient-to-r from-emerald-900/40 to-emerald-800/40 border border-emerald-500/20 hover:border-emerald-500/50 transition-all group cursor-pointer">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
-                                        <i className="fa-brands fa-whatsapp text-xl"></i>
-                                    </div>
-                                    <div>
-                                        <h4 className="text-white font-serif text-lg">Chat on WhatsApp</h4>
-                                        <p className="text-emerald-400 text-xs mt-1">Available 24/7</p>
-                                    </div>
+                        <a href="https://wa.me/918299638749" target="_blank" rel="noreferrer" className="block p-6 rounded-2xl bg-[#e8e6e1]/5 border border-white/10 hover:border-[#F5DEB3]/30 transition-all group cursor-pointer">
+                            <div className="flex items-start gap-4">
+                                <div className="w-12 h-12 rounded-full bg-[#F5DEB3]/10 flex items-center justify-center text-[#F5DEB3] group-hover:scale-110 transition-transform">
+                                    <i className="fa-brands fa-whatsapp text-xl"></i>
                                 </div>
-                                <i className="fa-solid fa-arrow-right -rotate-45 text-emerald-500/50 group-hover:text-emerald-400 transition-colors"></i>
+                                <div>
+                                    <h4 className="text-white font-serif text-lg mb-1">Chat on WhatsApp</h4>
+                                    <p className="text-[#F5DEB3] font-mono text-sm mb-2">+91 82996 38749</p>
+                                    <p className="text-xs text-gray-500">Available 24/7</p>
+                                </div>
                             </div>
                         </a>
                     </div>
@@ -259,9 +253,8 @@ const CustomerSupportPage = () => {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
                     transition={{ duration: 0.3 }}
-                    className="max-w-3xl mx-auto"
                 >
-                    <div className="bg-[#e8e6e1]/5 backdrop-blur-md border border-white/5 rounded-[2rem] overflow-hidden">
+                    <div className="bg-[#e8e6e1]/5 backdrop-blur-md border border-white/5 rounded-[24px] overflow-hidden">
                         {faqs.map((faq, index) => (
                             <div key={faq.id} className="border-b border-white/5 last:border-0">
                                 <button 

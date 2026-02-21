@@ -116,7 +116,7 @@ const AireTestimonials = () => {
       `}</style>
 
       {/* Main Inner Box */}
-      <div className="w-full h-full relative overflow-hidden rounded-[2.5rem] lg:rounded-[3.5rem] shadow-2xl bg-[#2e443c] flex items-center py-10 lg:py-0">
+      <div className="w-full h-full relative overflow-hidden rounded-[2.5rem] lg:rounded-[3.5rem]  bg-[#2e443c] flex items-center py-6 lg:py-0">
         
         {/* Background Atmosphere */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
@@ -125,7 +125,7 @@ const AireTestimonials = () => {
         </div>
 
         {/* 2-Column Grid Layout */}
-        <div className="relative z-10 w-full max-w-[1440px] mx-auto px-5 sm:px-8 md:px-12 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
+        <div className="relative z-10 w-full max-w-[1440px] mx-auto px-5 sm:px-8 md:px-12 grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-16 items-center">
           
           {/* --- LEFT COLUMN: HEADER + SCROLLING REVIEWS --- */}
           <div className="lg:col-span-7 flex flex-col justify-center w-full min-w-0 overflow-hidden">

@@ -37,7 +37,7 @@ const AireFeaturedProducts = () => {
 
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] lg:w-[800px] h-[300px] lg:h-[800px] bg-[#F5DEB3] rounded-full blur-[150px] lg:blur-[200px] opacity-10 pointer-events-none"></div>
 
-      <div className="relative z-10 w-full h-full flex flex-col px-6 py-10 md:px-10 md:py-10">
+      <div className="relative z-10 w-full h-full flex flex-col px-6 py-0 md:px-10 md:py-10">
         
         <div className="flex justify-between items-start w-full border-b border-white/10 pb-6 mb-8 mt-8 lg:mb-auto">
              <div className="flex items-center gap-3">
@@ -46,29 +46,30 @@ const AireFeaturedProducts = () => {
              </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center flex-1">
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-8 lg:gap-12 w-full">
           
-          <div className="lg:col-span-5 flex flex-col justify-center order-2 lg:order-1">
+          {/* LEFT: Product Details */}
+          <div className="flex flex-col justify-center order-2 lg:order-1 w-full lg:w-[45%] lg:max-w-2xl">
              
              {/* Tag */}
-             <div className="mb-6">
+             <div className="mb-4 md:mb-6">
                 <span className="px-4 py-2 rounded-full border border-[#F5DEB3]/30 text-[#F5DEB3] text-[10px] font-bold uppercase tracking-widest bg-[#F5DEB3]/5">
                     {featuredProduct.productCategory || 'Signature Piece'}
                 </span>
              </div>
 
              {/* Title */}
-             <h2 className="text-2xl md:text-3xl lg:text-5xl xl:text-7xl font-serif text-white leading-[0.9] mb-4">
+             <h2 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-serif text-white leading-[0.9] mb-3 md:mb-4">
                 {featuredProduct.productName}
              </h2>
 
              {/* Subtitle */}
-             <p className="text-md md:text-xl text-[#F5DEB3]/80 italic font-light mb-8">
+             <p className="text-base md:text-lg lg:text-xl text-[#F5DEB3]/80 italic font-light mb-6 md:mb-8">
                 {featuredProduct.productSubDes || "Designed to stand out."}
              </p>
 
              {/* Divider */}
-             <div className="w-20 h-px bg-gradient-to-r from-[#F5DEB3] to-transparent mb-8"></div>
+             <div className="w-20 h-px bg-gradient-to-r from-[#F5DEB3] to-transparent mb-6 md:mb-8"></div>
 
              {/* Description */}
              {/* <p className="text-gray-400 text-sm md:text-base leading-relaxed max-w-lg mb-10">
@@ -76,17 +77,17 @@ const AireFeaturedProducts = () => {
              </p> */}
 
              {/* Actions */}
-             <div className="flex flex-wrap items-center gap-6">
+             <div className="flex flex-wrap items-center gap-4 md:gap-6">
                 <button 
                   onClick={() => navigate(`/product/${featuredProduct.productId}`)}
-                  className="group relative px-10 py-4 bg-white text-black rounded-full font-bold uppercase tracking-widest text-xs overflow-hidden transition-all hover:scale-105 hover:shadow-[0_0_30px_rgba(255,255,255,0.3)]"
+                  className="group relative px-8 md:px-10 py-3 md:py-4 bg-white text-black rounded-full font-bold uppercase tracking-widest text-xs overflow-hidden transition-all hover:scale-105 hover:shadow-[0_0_30px_rgba(255,255,255,0.3)]"
                 >
                   <span className="relative z-10">View Product</span>
                   <div className="absolute inset-0 bg-[#F5DEB3] translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
                 </button>
                 
                 <div className="flex flex-col">
-                    <span className="text-white text-lg font-serif">₹{featuredProduct.sellingPrice?.toLocaleString()}</span>
+                    <span className="text-white text-lg md:text-xl font-serif">₹{featuredProduct.sellingPrice?.toLocaleString()}</span>
                     <span className="text-[10px] text-[#F5DEB3]/80 uppercase tracking-widest font-bold">
                       {featuredProduct.productStatus === 'in_stock' ? 'In Stock' : 'Limited Stock'}
                     </span>
@@ -95,7 +96,7 @@ const AireFeaturedProducts = () => {
           </div>
 
           {/* RIGHT: Image Showcase */}
-          <div className="lg:col-span-7 relative flex items-center justify-center order-1 lg:order-2">
+          <div className="relative flex items-center justify-center order-1 lg:order-2 w-full lg:w-[45%]">
             
             {/* The Image Card */}
             <div className="relative w-full max-w-[350px] md:max-w-[450px]  group">
