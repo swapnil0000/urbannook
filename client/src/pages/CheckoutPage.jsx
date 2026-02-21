@@ -158,6 +158,7 @@ const CheckoutPage = () => {
     fetchSuggestions(lat, long);
   };
 
+  // initialize Map with null ( so user can select)
   const initializeMap = (lon, lat) => {
     setTimeout(() => {
       if (mapRef.current) {
