@@ -34,18 +34,17 @@ const CouponList = ({ onCouponApplied }) => {
 
   if (isLoading) {
     return (
-      <div className="bg-white/5 backdrop-blur-md rounded-2xl p-6 border border-white/10">
-        <div className="flex items-center justify-center py-8">
-          <div className="w-8 h-8 border-2 border-[#F5DEB3] border-t-transparent rounded-full animate-spin"></div>
-        </div>
+      <div className="flex items-center justify-center py-12">
+        <div className="w-10 h-10 border-2 border-[#F5DEB3] border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-white/5 backdrop-blur-md rounded-2xl p-6 border border-white/10">
-        <p className="text-red-400 text-sm text-center">Failed to load coupons</p>
+      <div className="bg-red-500/10 rounded-xl p-6 border border-red-500/30 text-center">
+        <i className="fa-solid fa-triangle-exclamation text-red-400 text-2xl mb-2"></i>
+        <p className="text-red-400 text-sm">Failed to load coupons</p>
       </div>
     );
   }
@@ -54,28 +53,25 @@ const CouponList = ({ onCouponApplied }) => {
 
   if (coupons.length === 0) {
     return (
-      <div className="bg-white/5 backdrop-blur-md rounded-2xl p-6 border border-white/10">
-        <p className="text-gray-400 text-sm text-center">No coupons available at the moment</p>
+      <div className="bg-white/5 rounded-xl p-8 border border-white/10 text-center">
+        <i className="fa-solid fa-ticket text-gray-500 text-3xl mb-3"></i>
+        <p className="text-gray-400 text-sm">No coupons available at the moment</p>
+        <p className="text-gray-500 text-xs mt-2">Check back later for exclusive offers!</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white/5 backdrop-blur-md rounded-2xl p-6 border border-white/10">
-      <h3 className="text-lg font-serif text-[#F5DEB3] mb-4 flex items-center gap-2">
-        <i className="fa-solid fa-tags text-sm"></i> Available Coupons
-      </h3>
-
-      <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-        {coupons.map((coupon) => {
-          const isExpanded = expandedCoupon === coupon._id;
-          const isApplying = applyingCoupon === coupon.name;
-          
-          return (
-            <div
-              key={coupon._id}
-              className="bg-black/20 rounded-xl border border-white/10 overflow-hidden transition-all hover:border-[#F5DEB3]/30"
-            >
+    <div className="space-y-3">
+      {coupons.map((coupon) => {
+        const isExpanded = expandedCoupon === coupon._id;
+        const isApplying = applyingCoupon === coupon.name;
+        
+        return (
+          <div
+            key={coupon._id}
+            className="bg-black/20 rounded-xl border border-white/10 overflow-hidden transition-all hover:border-[#F5DEB3]/30"
+          >
               <div
                 className="p-4 cursor-pointer"
                 onClick={() => toggleCoupon(coupon._id)}
@@ -173,7 +169,6 @@ const CouponList = ({ onCouponApplied }) => {
             </div>
           );
         })}
-      </div>
     </div>
   );
 };

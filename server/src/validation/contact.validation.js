@@ -24,10 +24,10 @@ const contactSubmissionSchema = Joi.object({
     }),
   
   subject: Joi.string()
-    .valid('Product Inquiry', 'Interior Design', 'Partnership', 'Support')
+    .valid('Product Inquiry','Support')
     .required()
     .messages({
-      'any.only': 'Subject must be one of: Product Inquiry, Interior Design, Partnership, Support',
+      'any.only': 'Subject must be one of: Product Inquiry,  Support',
       'any.required': 'Subject is required'
     }),
   

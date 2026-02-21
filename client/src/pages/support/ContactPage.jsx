@@ -379,7 +379,7 @@ const ContactPage = () => {
                         <div>
                             <p className="block uppercase tracking-widest text-[10px] font-bold text-green-100/50 mb-5">Inquiry Type</p>
                             <div className="flex flex-wrap gap-3">
-                                {['Product Inquiry', 'Interior Design', 'Partnership', 'Support'].map((option) => (
+                                {['Product Inquiry',  'Support'].map((option) => (
                                     <button
                                         key={option}
                                         type="button"
@@ -432,17 +432,16 @@ const ContactPage = () => {
                             <button
                                 type="submit"
                                 disabled={isLoading || !isFormValid}
-                                className={`group relative w-full sm:w-auto px-10 py-4 bg-transparent border overflow-hidden rounded-full font-bold uppercase tracking-widest text-[10px] transition-all duration-500 ${
+                                className={`group relative w-full sm:w-auto px-10 py-4 overflow-hidden rounded-full font-bold uppercase tracking-widest text-[10px] transition-all duration-300 shadow-lg ${
                                   isLoading || !isFormValid
-                                    ? 'border-[#F5DEB3]/30 text-[#F5DEB3]/30 cursor-not-allowed'
-                                    : 'border-[#F5DEB3] text-[#F5DEB3] hover:text-[#1c3026]'
+                                    ? 'bg-[#F5DEB3]/20 text-[#F5DEB3]/40 cursor-not-allowed border border-[#F5DEB3]/20'
+                                    : 'bg-[#F5DEB3] text-[#1c3026] hover:bg-white hover:shadow-[0_0_30px_rgba(245,222,179,0.4)] active:scale-95'
                                 }`}
                             >
-                                <div className={`absolute inset-0 w-0 bg-[#F5DEB3] transition-all duration-[400ms] ease-out ${!isLoading && isFormValid ? 'group-hover:w-full' : ''}`}></div>
                                 <span className="relative z-10 flex items-center justify-center gap-3">
                                     {isLoading ? (
                                       <>
-                                        <div className="w-4 h-4 border-2 border-[#F5DEB3]/30 border-t-[#F5DEB3] rounded-full animate-spin"></div>
+                                        <div className="w-4 h-4 border-2 border-[#1c3026]/30 border-t-[#1c3026] rounded-full animate-spin"></div>
                                         Sending...
                                       </>
                                     ) : (

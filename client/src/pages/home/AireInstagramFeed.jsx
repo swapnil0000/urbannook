@@ -47,7 +47,7 @@ const instagramPosts = [
 
 const AireInstagramFeed = () => {
    return (
-  <section className="w-full flex justify-center items-center overflow-hidden">
+  <section className="w-full box-border p-2 md:p-2 lg:h-screen lg:max-h-[900px] flex flex-col justify-center">
     <style>{`
       @keyframes scroll {
         0% { transform: translateX(0); }
@@ -61,7 +61,7 @@ const AireInstagramFeed = () => {
       }
     `}</style>
 
-    <div className="h-auto min-h-[85vh] md:h-[98vh] mx-2 my-2 md:mx-4 md:my-4 bg-[#2e443c] rounded-[2.5rem] md:rounded-[3.5rem] overflow-hidden relative flex flex-col p-6 md:p-14  isolate">
+    <div className="w-full h-full bg-[#2e443c] rounded-[2.5rem] md:rounded-[3.5rem] overflow-hidden relative flex flex-col p-6 md:p-14 top-0 ">
 
       {/* Subtle Glows */}
       <div className="absolute top-0 right-0 w-[350px] h-[350px] bg-emerald-900/20 rounded-full blur-[100px] pointer-events-none -z-10"></div>
