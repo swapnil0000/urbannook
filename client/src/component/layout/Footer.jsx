@@ -63,7 +63,7 @@ const Footer = () => {
 
         <div className="lg:col-span-5 flex items-center">
            <form className="w-full">
-              <div className="relative p-2 bg-white rounded-2xl shadow-sm border border-black/5 group focus-within:shadow-md transition-all duration-300">
+              <div className="relative bg-white rounded-2xl shadow-sm border border-black/5 group focus-within:shadow-md transition-all duration-300">
                 <input 
                   type="email" 
                   placeholder="yourname@email.com"

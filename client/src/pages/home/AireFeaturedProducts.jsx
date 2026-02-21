@@ -63,7 +63,7 @@ const AireFeaturedProducts = () => {
              </h2>
 
              {/* Subtitle */}
-             <p className="text-xl md:text-xl text-[#F5DEB3]/80 italic font-light mb-8">
+             <p className="text-md md:text-xl text-[#F5DEB3]/80 italic font-light mb-8">
                 {featuredProduct.productSubDes || "Designed to stand out."}
              </p>
 
@@ -98,7 +98,7 @@ const AireFeaturedProducts = () => {
           <div className="lg:col-span-7 relative flex items-center justify-center order-1 lg:order-2">
             
             {/* The Image Card */}
-            <div className="relative w-full max-w-[350px] md:max-w-[450px] aspect-[4/5] group">
+            <div className="relative w-full max-w-[350px] md:max-w-[450px]  group">
                 
                 {/* Glow behind image */}
                 <div className="absolute inset-0 bg-[#F5DEB3]/20 rounded-[2.5rem] blur-2xl transform group-hover:scale-105 transition-transform duration-700"></div>
@@ -126,7 +126,7 @@ const AireFeaturedProducts = () => {
                 </div>
 
                 {/* Floating Spec Card (Glassmorphism) - Show dimensions if available */}
-                {featuredProduct.dimensions && (
+                {/* {featuredProduct.dimensions && (
                   <div className="absolute -right-4 md:-right-10 bottom-10 bg-white/10 backdrop-blur-xl border border-white/20 p-5 rounded-2xl shadow-2xl animate-float hidden sm:block">
                       <div className="space-y-4">
                           <div className="flex items-center gap-3">
@@ -152,7 +152,7 @@ const AireFeaturedProducts = () => {
                           </div>
                       </div>
                   </div>
-                )}
+                )} */}
 
             </div>
           </div>

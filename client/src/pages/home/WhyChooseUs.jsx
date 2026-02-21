@@ -119,7 +119,7 @@ export default function WhyChooseUs() {
   style={{ height: '300vh' }}
 >
   <div
-    className="sticky top-0 md:top-[5vh] mx-auto w-[97%] h-[100vh] md:h-[98vh] rounded-[30px] md:rounded-[40px] overflow-hidden shadow-2xl border-0 md:border border-white/10"
+    className="sticky top-0 md:top-[5vh] mx-2 my-2 md:mx-4 md:my-4 h-[100vh] md:h-[98vh] rounded-[30px] md:rounded-[40px] overflow-hidden shadow-2xl"
     style={{
       backgroundImage: `url(${desktopBgImage})`,
       backgroundSize: 'cover',
@@ -127,7 +127,7 @@ export default function WhyChooseUs() {
     }}
   >
     {/* Gradient Overlay */}
-    <div className="absolute inset-0 bg-gradient-to-b from-stone-900/60 to-[#1a2822]/90 z-0"></div>
+    <div className="absolute inset-0 bg-gradient-to-b from-stone-900/60 to-[#2e443c]/90 z-0"></div>
 
     {/* --- TOP CONTENT CONTAINER --- */}
     <div className="absolute top-0 left-0 w-full z-20 px-6 flex flex-col 

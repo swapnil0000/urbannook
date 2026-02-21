@@ -93,7 +93,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
 
       {/* Drawer Panel */}
       <div 
-        className={`relative w-full max-w-[450px] bg-white h-full shadow-2xl flex flex-col transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] transform ${
+        className={`relative w-full max-w-[400px] bg-white h-full shadow-2xl flex flex-col transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] transform ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -203,24 +203,16 @@ const CartDrawer = ({ isOpen, onClose }) => {
         </div>
 
         {/* --- FOOTER (CHECKOUT) --- */}
-        {cartItems.length > 0 && (
+        {cartItems?.length > 0 && (
           <div className="p-6 bg-white border-t border-gray-100 z-10 shadow-[0_-5px_20px_rgba(0,0,0,0.02)]">
             <div className="space-y-2 mb-6">
                 <div className="flex justify-between items-center text-sm text-gray-500">
                     <span>Subtotal</span>
-                    <span className="font-medium text-[#0a110e]">₹{subtotal.toLocaleString()}</span>
+                    <span className="font-medium text-[#0a110e]">₹{subtotal?.toLocaleString()}</span>
                 </div>
-                {/* <div className="flex justify-between items-center text-sm text-gray-500">
-                    <span>Shipping</span>
-                    {subtotal >= freeShippingThreshold ? (
-                        <span className="text-emerald-600 font-bold uppercase text-xs tracking-wider">Free</span>
-                    ) : (
-                        <span className="text-xs">Calculated at checkout</span>
-                    )}
-                </div> */}
                 <div className="pt-4 border-t border-gray-100 flex justify-between items-end">
                     <span className="text-base font-serif text-[#0a110e]">Total</span>
-                    <span className="text-xl font-bold text-[#0a110e]">₹{subtotal.toLocaleString()}</span>
+                    <span className="text-xl font-bold text-[#0a110e]">₹{subtotal?.toLocaleString()}</span>
                 </div>
             </div>
 

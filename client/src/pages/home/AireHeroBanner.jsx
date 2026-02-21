@@ -9,7 +9,7 @@ const AireHeroBanner = () => {
   };
 
   return (
-    <section className="relative min-h-[97vh] lg:h-[calc(100vh-2rem)] lg:max-h-[900px] mx-2 my-2 md:mx-4 md:my-4 rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden shadow-2xl flex items-center group bg-[#1a2822]">
+    <section className="relative min-h-[97vh] lg:h-[calc(100vh-2rem)] lg:max-h-[900px] mx-2 my-2 md:mx-4 md:my-4 rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden shadow-2xl flex items-center group bg-[#2e443c]">
       
       {/* --- BACKGROUND IMAGE LAYER --- */}
       <div className="absolute inset-0 z-0">
@@ -25,11 +25,11 @@ const AireHeroBanner = () => {
         />
 
         {/* --- BRAND GRADIENT OVERLAY --- */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#2E443C]/20 via-[#2E443C]/60 to-[#1a2822] lg:bg-gradient-to-r lg:from-[#2E443C] lg:via-[#2E443C]/40 lg:to-transparent"></div>
+        <div className="absolute inset-0 bg-gradient-to-b from-[#2E443C]/20 via-[#2E443C]/60 to-[#2e443c] lg:bg-gradient-to-r lg:from-[#2E443C] lg:via-[#2E443C]/40 lg:to-transparent"></div>
       </div>
 
       {/* --- CONTENT LAYER --- */}
-      <div className="relative z-10 w-full px-6 md:px-12 lg:px-20 py-12">
+      <div className="relative z-10 w-full ">
         <div className="w-full max-w-7xl mx-auto">
 
           {/* LEFT SIDE CONTENT CONTAINER */}

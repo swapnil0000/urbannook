@@ -47,7 +47,7 @@ const instagramPosts = [
 
 const AireInstagramFeed = () => {
    return (
-  <section className="w-full flex justify-center items-center py-4 overflow-hidden">
+  <section className="w-full flex justify-center items-center overflow-hidden">
     <style>{`
       @keyframes scroll {
         0% { transform: translateX(0); }
@@ -61,7 +61,7 @@ const AireInstagramFeed = () => {
       }
     `}</style>
 
-    <div className="h-auto min-h-[85vh] md:h-[98vh] w-[96%] md:w-[96%] lg:w-[98%] mx-auto bg-[#0a110e] rounded-[32px] md:rounded-[40px] overflow-hidden relative flex flex-col p-6 md:p-14 shadow-2xl border border-white/5 isolate">
+    <div className="h-auto min-h-[85vh] md:h-[98vh] mx-2 my-2 md:mx-4 md:my-4 bg-[#2e443c] rounded-[32px] md:rounded-[40px] overflow-hidden relative flex flex-col p-6 md:p-14  isolate">
 
       {/* Subtle Glows */}
       <div className="absolute top-0 right-0 w-[350px] h-[350px] bg-emerald-900/20 rounded-full blur-[100px] pointer-events-none -z-10"></div>
@@ -118,8 +118,8 @@ const AireInstagramFeed = () => {
 
         {/* CAROUSEL TRACK */}
         <div className="relative w-full overflow-hidden">
-          <div className="absolute left-0 top-0 bottom-0 w-12 md:w-20 bg-gradient-to-r from-[#0a110e] to-transparent z-20 pointer-events-none"></div>
-          <div className="absolute right-0 top-0 bottom-0 w-12 md:w-20 bg-gradient-to-l from-[#0a110e] to-transparent z-20 pointer-events-none"></div>
+          <div className="absolute left-0 top-0 bottom-0 w-12 md:w-20 bg-gradient-to-r from-[#2e443c] to-transparent z-20 pointer-events-none"></div>
+          <div className="absolute right-0 top-0 bottom-0 w-12 md:w-20 bg-gradient-to-l from-[#2e443c] to-transparent z-20 pointer-events-none"></div>
 
           <div className="flex gap-4 md:gap-5 animate-scroll w-max py-2">
             {[...instagramPosts, ...instagramPosts].map((post, index) => (
