@@ -33,7 +33,7 @@ const Footer = () => {
   };
 
   return (
-    <footer className="w-full bg-[#f5f7f8] py-4 selection:bg-[#F5DEB3] selection:text-[#1a1a1a]">
+    <footer className="w-full bg-[#f5f7f8] selection:bg-[#F5DEB3] selection:text-[#1a1a1a]">
 
   <div className="mx-auto  relative overflow-hidden  bg-[#faf9f6] text-[#1a1a1a] pt-20 md:pt-24 pb-12 shadow-sm isolate">
     
@@ -63,7 +63,7 @@ const Footer = () => {
 
         <div className="lg:col-span-5 flex items-center">
            <form className="w-full">
-              <div className="relative p-2 bg-white rounded-2xl shadow-sm border border-black/5 group focus-within:shadow-md transition-all duration-300">
+              <div className="relative bg-white rounded-2xl shadow-sm border border-black/5 group focus-within:shadow-md transition-all duration-300">
                 <input 
                   type="email" 
                   placeholder="yourname@email.com"

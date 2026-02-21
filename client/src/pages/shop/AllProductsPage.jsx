@@ -52,8 +52,8 @@ const AllProductsPage = () => {
               </span>
             </div> */}
             <h1 className="text-4xl sm:text-6xl md:text-7xl font-serif text-white leading-[0.9] mb-2">
-              Curated
-              <span className=" italic font-light text-[#F5DEB3]">Atmospheres.</span>
+              Curated{' '}
+              <span className="italic font-light text-[#F5DEB3]">Atmospheres.</span>
             </h1>
             <p className="text-sm md:text-base text-green-50/70 font-light leading-relaxed max-w-md">
               Explore our exclusive collection designed for modern indoor environments.
