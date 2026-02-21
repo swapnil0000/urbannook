@@ -1,19 +1,43 @@
-import React, { useEffect, lazy, Suspense } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSelector } from 'react-redux';
 import { useGetOrderHistoryQuery } from '../../store/api/userApi';
 import { ComponentLoader } from '../../component/layout/LoadingSpinner';
+import { useUI } from '../../hooks/useRedux';
 
 // Lazy load heavy components
 const OrderTracker = lazy(() => import('../../component/OrderTracker'));
 
 const MyOrdersPage = () => {
+  const navigate = useNavigate();
+  const { isAuthenticated } = useSelector((state) => state.auth);
+  const { openLoginModal, showNotification } = useUI();
   const { data: orderResponse, isLoading, error } = useGetOrderHistoryQuery();
   // Safe navigation to get the orders array based on your data structure
   const orders = orderResponse?.data?.orders || [];
 
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, []);
+    
+    // Check authentication
+    const getCookie = (name) => {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(";").shift();
+      return null;
+    };
+
+    const userToken = getCookie('userAccessToken');
+    const hasLocalUser = localStorage.getItem('user');
+    const isLoggedIn = isAuthenticated || userToken || hasLocalUser;
+
+    if (!isLoggedIn) {
+      showNotification('Please login to view your orders', 'error');
+      openLoginModal();
+      navigate('/');
+    }
+  }, [isAuthenticated, navigate, openLoginModal, showNotification]);
 
   // --- HELPER: Copy ID ---
   const copyToClipboard = (text) => {
@@ -100,7 +124,10 @@ const MyOrdersPage = () => {
              </div>
              <h3 className="text-2xl font-serif text-white mb-2">Your collection is empty.</h3>
              <p className="text-gray-400 text-sm mb-8">Discover our latest artifacts and illuminated designs.</p>
-             <button className="px-8 py-3 bg-[#F5DEB3] text-[#1c3026] rounded-full font-bold uppercase tracking-widest text-[10px] hover:bg-white hover:scale-105 transition-all duration-300 shadow-lg">
+             <button 
+               onClick={() => navigate('/products')}
+               className="px-8 py-3 bg-[#F5DEB3] text-[#1c3026] rounded-full font-bold uppercase tracking-widest text-[10px] hover:bg-white hover:scale-105 transition-all duration-300 shadow-lg"
+             >
                Browse Collection
              </button>
           </motion.div>

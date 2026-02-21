@@ -1,13 +1,16 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { useJoinCommunityMutation } from '../../store/api/userApi';
 import { useUI } from '../../hooks/useRedux';
 
 const Footer = () => {
+  const navigate = useNavigate();
+  const { isAuthenticated } = useSelector((state) => state.auth);
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [joinCommunity] = useJoinCommunityMutation();
-  const { showNotification } = useUI();
+  const { showNotification, openLoginModal } = useUI();
 
   const handleCommunityJoin = async (e) => {
     e.preventDefault();
@@ -29,6 +32,30 @@ const Footer = () => {
       showNotification(errorMessage, 'error');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Check authentication before navigating to Track Order
+  const handleTrackOrderClick = (e) => {
+    e.preventDefault();
+    
+    // Check if user is authenticated
+    const getCookie = (name) => {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(";").shift();
+      return null;
+    };
+
+    const userToken = getCookie('userAccessToken');
+    const hasLocalUser = localStorage.getItem('user');
+    const isLoggedIn = isAuthenticated || userToken || hasLocalUser;
+
+    if (!isLoggedIn) {
+      showNotification('Please login to track your orders', 'error');
+      openLoginModal();
+    } else {
+      navigate('/orders');
     }
   };
 
@@ -117,36 +144,48 @@ const Footer = () => {
               </div>
           </div>
 
-          <div className="hidden md:block md:col-span-3 lg:col-span-3">
-            <h4 className="text-[#1a1a1a] font-bold uppercase tracking-widest text-[10px] mb-8">Support</h4>
-            <ul className="space-y-4">
+          {/* Support Section - Now visible on mobile */}
+          <div className='flex flex-row w-[100%] justify-around align-baseline '>
+            <div className="md:col-span-3 lg:col-span-3">
+            <h4 className="text-[#1a1a1a] font-bold uppercase tracking-widest text-[10px] mb-6 md:mb-8 text-center md:text-left">Support</h4>
+            <ul className="space-y-3 md:space-y-4">
               {[
-                { name: 'Track Order', path: '/orders' },
+                { name: 'Track Order', path: '/orders', requiresAuth: true },
                 { name: 'Returns & Exchange', path: '/return-policy' },
                 { name: 'Cancellation & Refund', path: '/cancellation-refund' },
                 { name: 'FAQs', path: '/faqs' }
               ].map((item) => (
-                <li key={item.name}>
-                  <Link to={item.path} className="text-gray-500 text-sm hover:text-[#1c3026] transition-all duration-300 flex items-center group">
-                     <span className="h-[1px] w-0 bg-[#a89068] group-hover:w-4 transition-all duration-300 mr-0 group-hover:mr-2"></span>
-                     {item.name}
-                  </Link>
+                <li key={item.name} className="text-center md:text-left">
+                  {item.requiresAuth ? (
+                    <a 
+                      href={item.path} 
+                      onClick={handleTrackOrderClick}
+                      className="text-gray-500 text-sm hover:text-[#1c3026] transition-all duration-300 inline-flex items-center group cursor-pointer"
+                    >
+                      <span className="h-[1px] w-0 bg-[#a89068] group-hover:w-4 transition-all duration-300 mr-0 group-hover:mr-2"></span>
+                      {item.name}
+                    </a>
+                  ) : (
+                    <Link to={item.path} className="text-gray-500 text-sm hover:text-[#1c3026] transition-all duration-300 inline-flex items-center group">
+                      <span className="h-[1px] w-0 bg-[#a89068] group-hover:w-4 transition-all duration-300 mr-0 group-hover:mr-2"></span>
+                      {item.name}
+                    </Link>
+                  )}
                 </li>
               ))}
             </ul>
-          </div>
-
-          <div className="hidden md:block md:col-span-3 lg:col-span-3">
-            <h4 className="text-[#1a1a1a] font-bold uppercase tracking-widest text-[10px] mb-8">Company</h4>
-            <ul className="space-y-4">
+            </div>
+              <div className="md:col-span-3 lg:col-span-3">
+            <h4 className="text-[#1a1a1a] font-bold uppercase tracking-widest text-[10px] mb-6 md:mb-8 text-center md:text-left">Company</h4>
+            <ul className="space-y-3 md:space-y-4">
               {[
                 { name: 'Our Story', path: '/about-us' },
                 { name: 'Contact Us', path: '/contact-us' },
                 { name: 'Privacy Policy', path: '/privacy-policy' },
                 { name: 'Terms of Service', path: '/terms-conditions' }
               ].map((item) => (
-                <li key={item?.name}>
-                  <Link to={item?.path} className="text-gray-500 text-sm hover:text-[#1c3026] transition-all duration-300 flex items-center group">
+                <li key={item?.name} className="text-center md:text-left">
+                  <Link to={item?.path} className="text-gray-500 text-sm hover:text-[#1c3026] transition-all duration-300 inline-flex items-center group">
                      <span className="h-[1px] w-0 bg-[#a89068] group-hover:w-4 transition-all duration-300 mr-0 group-hover:mr-2"></span>
                      {item?.name}
                   </Link>
@@ -154,6 +193,10 @@ const Footer = () => {
               ))}
             </ul>
           </div>
+          </div>
+
+          {/* Company Section - Now visible on mobile */}
+      
       </div>
 
       <div className="flex flex-col md:flex-row justify-between items-center gap-10 pt-10 border-t border-black/5 w-full">

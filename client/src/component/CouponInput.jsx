@@ -22,7 +22,8 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
       
       if (result.success) {
         const discountAmount = result.data?.summary?.discount || 0;
-        setSuccess(`Coupon applied! You saved ₹${discountAmount}`);
+        const successMessage = result.message || `Coupon applied! You saved ₹${discountAmount}`;
+        setSuccess(successMessage);
         setCouponCode('');
         
         // Notify parent component with full summary data
@@ -34,10 +35,13 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
           });
         }
       } else {
-        setError(result.message || 'Failed to apply coupon');
+        const errorMessage = result.message || 'Failed to apply coupon';
+        setError(errorMessage);
       }
     } catch (err) {
-      setError(err?.data?.message || 'Invalid or expired coupon code');
+      // Extract error message from backend response
+      const errorMessage = err?.data?.message || err?.message || 'Invalid or expired coupon code';
+      setError(errorMessage);
     }
   };
 
