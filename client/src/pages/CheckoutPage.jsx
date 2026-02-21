@@ -78,7 +78,7 @@ const CheckoutPage = () => {
   useEffect(() => {
     window.scrollTo(0, 0);
     handleSaveAdress();
-  }, [handleSaveAdress]);
+  }, []);
 
   const handleOpenMap = () => {
     setShowMapModal(true);
