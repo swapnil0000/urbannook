@@ -56,7 +56,7 @@ jobs:
       - name: Build Client
         working-directory: client
         run: |
-          npm ci
+          npm install
           npm run build
 
       - name: Configure AWS
