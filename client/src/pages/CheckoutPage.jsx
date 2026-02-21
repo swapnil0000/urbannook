@@ -319,7 +319,7 @@ const CheckoutPage = () => {
   const fetchSuggestions = async (la, ln) => {
     try {
       const res = await axios.post(
-        `${}/user/address/suggestion`,
+        `${apiBaseUrl}/user/address/suggestion`,
         { lat: la, long: ln },
         { withCredentials: true },
       );
