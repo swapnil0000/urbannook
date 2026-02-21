@@ -2,6 +2,7 @@ import { validateUserInput } from "../utlis/ValidateRes.js";
 import { ApiError, ApiRes } from "../utlis/index.js";
 import User from "../model/user.model.js";
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 import {
   loginService,
   registerService,
@@ -11,15 +12,23 @@ import {
   profileFetchService,
   resetPasswordService,
 } from "../services/common.auth.service.js";
-import bcrypt from "bcrypt";
+import otpService from "../services/otp.service.js";
+
 const userLogin = async (req, res) => {
   try {
     const { email, password } = req.body;
+    
+    console.log(`[INFO] User login attempt - Email: ${email}`);
+    
     // field Missing , existing User and pass check
     let result = await loginService(email, password);
     if (result?.statusCode >= 400) {
+      console.log(`[WARN] User login failed - Email: ${email}, Status: ${result?.statusCode}, Message: ${result?.message}`);
       return res.status(Number(result?.statusCode)).json(result);
     }
+    
+    console.log(`[INFO] User login successful - Email: ${email}, UserId: ${result?.data?.userId}`);
+    
     return res
       .status(Number(result?.statusCode))
       .cookie("userAccessToken", result?.data?.userAccessToken, cookieOptions)
@@ -34,6 +43,7 @@ const userLogin = async (req, res) => {
         true,
       );
   } catch (error) {
+    console.error(`[ERROR] User login error:`, error.message, error.stack);
     return res
       .status(500)
       .json(new ApiError(500, null, `Internal Server Error -${error}`, false));
@@ -43,25 +53,39 @@ const userLogin = async (req, res) => {
 const userRegister = async (req, res) => {
   try {
     const { name, email, password, mobileNumber } = req.body || {};
+    
+    console.log(`[INFO] User registration attempt - Email: ${email}, Name: ${name}`);
+    
     //fieldMissing and existing User check
     let result = await registerService(name, email, password, mobileNumber);
 
     if (result?.statusCode >= 400) {
+      console.log(`[WARN] User registration failed - Email: ${email}, Status: ${result?.statusCode}, Message: ${result?.message}`);
       return res.status(Number(result?.statusCode)).json(result);
     }
 
+    console.log(`[INFO] User registration successful - Email: ${email}, UserId: ${result?.data?.user?.id}`);
+
+    // Return complete user data with token for auto-login
     return res
       .status(201)
       .cookie("userAccessToken", result?.data?.userAccessToken, cookieOptions)
       .json(
         new ApiRes(
-          200,
-          `User created with ${email}`,
-          { email, userAccessToken: result?.data?.userAccessToken },
+          201,
+          `User created and logged in`,
+          {
+            email: result?.data?.user?.email,
+            name: name,
+            userId: result?.data?.user?.id,
+            role: 'USER',
+            userAccessToken: result?.data?.userAccessToken,
+          },
           true,
         ),
       );
   } catch (error) {
+    console.error(`[ERROR] User registration error:`, error.message, error.stack);
     return res
       .status(500)
       .json(new ApiError(500, `Internal Server Error - ${error}`, [], false));
@@ -85,6 +109,7 @@ const userProfile = async (req, res) => {
   }
 };
 
+// DEPRECATED: Old forgot password without OTP - kept for backward compatibility
 const userForgetpassword = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -364,6 +389,151 @@ const userAccountDeleteConfirm = async (req, res) => {
   }
 };
 
+/**
+ * Request OTP for password reset
+ * POST /user/forgot-password/request
+ */
+const userForgotPasswordRequest = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res
+        .status(400)
+        .json(new ApiError(400, "Email is required", null, false));
+    }
+
+    // Check if user exists
+    const user = await User.findOne({ email });
+    if (!user) {
+      // Don't reveal if user exists or not for security
+      return res
+        .status(200)
+        .json(
+          new ApiRes(
+            200,
+            "If the email exists, an OTP has been sent",
+            null,
+            true
+          )
+        );
+    }
+
+    // Generate and send OTP
+    const result = await otpService.generateOTP(email);
+
+    return res.status(result.statusCode).json(
+      result.success
+        ? new ApiRes(result.statusCode, result.message, result.data, true)
+        : new ApiError(result.statusCode, result.message, result.data, false)
+    );
+  } catch (error) {
+    return res
+      .status(500)
+      .json(
+        new ApiError(500, `Internal Server Error - ${error.message}`, null, false)
+      );
+  }
+};
+
+/**
+ * Reset password with OTP verification
+ * POST /user/forgot-password/reset
+ */
+const userForgotPasswordReset = async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    // Validate input
+    if (!email || !otp || !newPassword) {
+      return res
+        .status(400)
+        .json(
+          new ApiError(
+            400,
+            "Email, OTP, and new password are required",
+            null,
+            false
+          )
+        );
+    }
+
+    // Validate password length
+    if (newPassword.length < 8) {
+      return res
+        .status(400)
+        .json(
+          new ApiError(
+            400,
+            "Password must be at least 8 characters long",
+            null,
+            false
+          )
+        );
+    }
+
+    // Verify OTP
+    const otpResult = await otpService.verifyOTP(email, otp);
+
+    if (!otpResult.success) {
+      return res
+        .status(otpResult.statusCode)
+        .json(
+          new ApiError(
+            otpResult.statusCode,
+            otpResult.message,
+            otpResult.data,
+            false
+          )
+        );
+    }
+
+    // Find user
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res
+        .status(404)
+        .json(new ApiError(404, "User not found", null, false));
+    }
+
+    // Check if new password is same as old password
+    const isSamePassword = await user.passCheck(newPassword);
+    if (isSamePassword) {
+      return res
+        .status(400)
+        .json(
+          new ApiError(
+            400,
+            "New password cannot be the same as the old password",
+            null,
+            false
+          )
+        );
+    }
+
+    // Update password
+    user.password = newPassword;
+    await user.save(); // This triggers the pre-save hook to hash the password
+
+    return res
+      .status(200)
+      .json(
+        new ApiRes(
+          200,
+          "Password reset successfully. You can now login with your new password.",
+          { email },
+          true
+        )
+      );
+  } catch (error) {
+    return res
+      .status(500)
+      .json(
+        new ApiError(500, `Internal Server Error - ${error.message}`, null, false)
+      );
+  }
+};
+
 export {
   userLogin,
   userRegister,
@@ -373,4 +543,6 @@ export {
   userResetPassword,
   userUpdateProfile,
   userForgetpassword,
+  userForgotPasswordRequest,
+  userForgotPasswordReset,
 };

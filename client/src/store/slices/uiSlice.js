@@ -4,6 +4,7 @@ const initialState = {
   isLoading: false,
   showCartModal: false,
   showAuthModal: false,
+  showLoginModal: false,
   notification: null,
 };
 
@@ -20,6 +21,9 @@ const uiSlice = createSlice({
     toggleAuthModal: (state) => {
       state.showAuthModal = !state.showAuthModal;
     },
+    setShowLoginModal: (state, action) => {
+      state.showLoginModal = action.payload;
+    },
     setNotification: (state, action) => {
       state.notification = action.payload;
     },
@@ -33,6 +37,7 @@ export const {
   setLoading, 
   toggleCartModal, 
   toggleAuthModal, 
+  setShowLoginModal,
   setNotification, 
   clearNotification 
 } = uiSlice.actions;

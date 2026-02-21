@@ -4,7 +4,6 @@ const orderSchema = new mongoose.Schema(
     userId: {
       type: String,
       required: true,
-      index: true,
     },
     orderId: {
       type: String,
@@ -40,6 +39,27 @@ const orderSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+
+    // Coupon snapshot
+    coupon: {
+      couponCodeId: {
+        type: String,
+        default: null,
+      },
+      couponCodeName: {
+        type: String,
+        default: null,
+      },
+      discountAmount: {
+        type: Number,
+        default: 0,
+      },
+      isApplied: {
+        type: Boolean,
+        default: false,
+      },
+    },
+
     deliveryAddress: {
       addressId: String,
       formattedAddress: String,
@@ -51,18 +71,59 @@ const orderSchema = new mongoose.Schema(
       razorpayOrderId: String,
       razorpayPaymentId: String,
       razorpaySignature: String,
+      errorCode: String,
+      errorDescription: String,
     },
 
     status: {
       type: String,
-      enum: ["CREATED", "PAID", "FAILED"],
+      enum: ["CREATED", "PAID", "CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED", "FAILED"],
       default: "CREATED",
+    },
+
+    statusHistory: [
+      {
+        _id: false,
+        status: {
+          type: String,
+          required: true,
+        },
+        timestamp: {
+          type: Date,
+          default: Date.now,
+        },
+        note: {
+          type: String,
+          default: "",
+        },
+      },
+    ],
+
+    trackingInfo: {
+      carrier: {
+        type: String,
+        default: null,
+      },
+      trackingNumber: {
+        type: String,
+        default: null,
+      },
+      estimatedDelivery: {
+        type: Date,
+        default: null,
+      },
     },
   },
   { timestamps: true },
 );
-orderSchema.index({ userId: 1, status: 1 });
+// Indexes for performance optimization
+orderSchema.index({ orderId: 1 }, { unique: true });
+orderSchema.index({ userId: 1 });
+orderSchema.index({ status: 1 });
+orderSchema.index({ userId: 1, createdAt: -1 }); // Compound index for user order history
 orderSchema.index({ "payment.razorpayOrderId": 1 });
+orderSchema.index({ "payment.razorpayPaymentId": 1 });
 orderSchema.index({ createdAt: -1 });
+
 const Order = mongoose.model("Order", orderSchema);
 export default Order;

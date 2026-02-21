@@ -13,8 +13,8 @@ const HomePage = () => {
     }, []);
   return (
     <div className="min-h-screen">
+      {/* <NewsTicker/>   */}
       <AireHeroBanner />
-      <NewsTicker/>  
       <AireFeaturedProducts />
       <WhyChooseUs />
       <AireTestimonials />

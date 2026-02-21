@@ -1,6 +1,5 @@
 import { lazy } from 'react';
 
-// Lazy load all pages for better performance
 export const HomePage = lazy(() => import("./home/HomePage.jsx"));
 export const CheckoutPage = lazy(() => import("../pages/CheckoutPage"));
 export const MyOrdersPage = lazy(() => import("./account/MyOrdersPage.jsx"));

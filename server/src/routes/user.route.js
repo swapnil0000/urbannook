@@ -21,6 +21,8 @@ import {
   userResetPassword,
   userUpdateProfile,
   userForgetpassword,
+  userForgotPasswordRequest,
+  userForgotPasswordReset,
 } from "../controller/user.controller.js";
 
 import { userOrderPreviousHistory } from "../controller/user.cart.controller.js";
@@ -41,6 +43,21 @@ import {
   authGuardService,
   logoutService,
 } from "../services/common.auth.service.js";
+
+/* ===============================================================
+   VALIDATION MIDDLEWARE
+   ---------------------------------------------------------------
+   Input validation using Joi schemas
+================================================================ */
+import { validateRequest } from "../middleware/validation.middleware.js";
+import {
+  registerSchema,
+  loginSchema,
+  updateProfileSchema,
+  forgotPasswordRequestSchema,
+  forgotPasswordResetSchema,
+  resetPasswordSchema,
+} from "../validation/user.validation.js";
 
 /* ===============================================================
    RAZORPAY PAYMENT CONTROLLERS
@@ -67,9 +84,17 @@ const authLimiter = rateLimit({
    ---------------------------------------------------------------
    These routes do NOT require authentication
 ================================================================ */
-userRouter.post("/user/login", authLimiter, userLogin);
-userRouter.post("/user/register", authLimiter, userRegister);
+userRouter.post("/user/login", authLimiter, validateRequest(loginSchema), userLogin);
+userRouter.post("/user/register", authLimiter, validateRequest(registerSchema), userRegister);
 userRouter.post("/user/forgot-password", userForgetpassword);
+
+/* ===============================================================
+   FORGOT PASSWORD WITH OTP (PUBLIC)
+   ---------------------------------------------------------------
+   Two-step password reset flow with OTP verification
+================================================================ */
+userRouter.post("/user/forgot-password/request", authLimiter, validateRequest(forgotPasswordRequestSchema), userForgotPasswordRequest);
+userRouter.post("/user/forgot-password/reset", authLimiter, validateRequest(forgotPasswordResetSchema), userForgotPasswordReset);
 
 /* ===============================================================
    PROFILE & ACCOUNT (PROTECTED)
@@ -81,12 +106,14 @@ userRouter.get("/user/profile", authGuardService("USER"), userProfile);
 userRouter.patch(
   "/user/profile/update",
   authGuardService("USER"),
+  validateRequest(updateProfileSchema),
   userUpdateProfile,
 );
 
 userRouter.post(
   "/user/reset-password",
   authGuardService("USER"),
+  validateRequest(resetPasswordSchema),
   userResetPassword,
 );
 

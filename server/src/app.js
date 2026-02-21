@@ -11,37 +11,28 @@ import {
   userCartRouter,
   userCommunityListRouter,
   userWishListRouter,
+  nfcRouter,
+  couponCodeRouter,
+  testimonialRouter,
+  contactRouter,
 } from "./routes/index.js";
 import cookieParser from "cookie-parser";
 import healthRouter from "./routes/health.route.js";
+import { corsOptions, logCorsConfig } from "./config/cors.config.js";
+import { errorHandler } from "./middleware/errorHandler.middleware.js";
+
 dotenv.config({
   path: "./.env",
 });
+
 const app = express();
-const whiteListClientUrl = process.env.WHITE_LIST_CLIENT_URI.split(",");
-const nodeEnv = process.env.NODE_ENV;
-// env prod
-const corsOptions = {
-  origin: function (origin, callback) {
-    if (
-      nodeEnv == "production" &&
-      origin &&
-      whiteListClientUrl.includes(origin.trim())
-    ) {
-      callback(null, true);
-    } else if (!origin || whiteListClientUrl.includes(origin.trim())) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-};
+app.set("trust proxy", 1);
+
+// Log CORS configuration on startup
+logCorsConfig();
 
 /* Health Route */
-app.use("/api/v1/health", healthRouter);
+app.use("/health", healthRouter);
 
 // Use CORS for all normal requests
 app.use(cors(corsOptions));
@@ -70,5 +61,17 @@ app.use(
   userAddressRouter,
   userCartRouter,
   userCommunityListRouter,
+  nfcRouter,
+  couponCodeRouter,
 );
+
+// Testimonial routes
+app.use("/api/v1/testimonials", testimonialRouter);
+
+// Contact routes
+app.use("/api/v1/contact", contactRouter);
+
+// Error handler middleware must be registered last
+app.use(errorHandler);
+
 export default app;

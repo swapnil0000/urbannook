@@ -1,20 +1,24 @@
-import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useAddToWishlistMutation, useRemoveFromWishlistMutation, userApi } from '../store/api/userApi';
-import { addToWishlistLocal, removeFromWishlistLocal } from '../store/slices/wishlistSlice';
+import { useAddToWishlistMutation, useRemoveFromWishlistMutation } from '../store/api/userApi';
+import { setNotification } from '../store/slices/uiSlice';
+import { useUI } from '../hooks/useRedux';
 
 const WishlistButton = ({ productId, className = "", size = "md" }) => {
   const dispatch = useDispatch();
+  const { openLoginModal } = useUI();
   const [addToWishlist] = useAddToWishlistMutation();
   const [removeFromWishlist] = useRemoveFromWishlistMutation();
   const wishlistItems = useSelector((state) => state.wishlist.items);
   const { isAuthenticated } = useSelector((state) => state.auth);
+
+
   const isInWishlist = wishlistItems.some(item => 
-    item.productName === productId || item.productId === productId
+    item.productId === productId
   );
 
   const handleWishlistToggle = async (e) => {
     e.stopPropagation();
+
     
     // Check authentication
     const getCookie = (name) => {
@@ -28,22 +32,30 @@ const WishlistButton = ({ productId, className = "", size = "md" }) => {
     const hasLocalUser = localStorage.getItem('user');
     
     if (!isAuthenticated && !token && !hasLocalUser) {
-      alert('Please login to add items to wishlist');
+      openLoginModal();
       return;
     }
 
     try {
       if (isInWishlist) {
-        await removeFromWishlist(productId).unwrap();
-        dispatch(removeFromWishlistLocal(productId));
-        // Invalidate cache to trigger refetch
-        dispatch(userApi.util.invalidateTags(['User']));
+        const response = await removeFromWishlist(productId).unwrap();
+        dispatch(setNotification({
+          message: response?.message || 'Removed from wishlist',
+          type: 'success'
+        }));
       } else {
-        await addToWishlist({ productId }).unwrap();
-        dispatch(addToWishlistLocal(productId));
+        const response = await addToWishlist({ productId }).unwrap();
+        dispatch(setNotification({
+          message: response?.message || 'Added to wishlist',
+          type: 'success'
+        }));
       }
     } catch (error) {
       console.error('Failed to toggle wishlist:', error);
+      dispatch(setNotification({
+        message: error?.data?.message || 'Failed to update wishlist',
+        type: 'error'
+      }));
     }
   };
 

@@ -66,7 +66,7 @@ const addToWishListService = async (userId, productId) => {
       success: true,
     };
   } catch (error) {
-    console.error("Wishlist Error:", error);
+    console.error(`[ERROR] Wishlist Error:`, error.message, error.stack);
     return {
       statusCode: 500,
       message: "Internal server error",
@@ -100,7 +100,7 @@ const getWishListService = async (userId) => {
   const productDetails = await Product.find({
     productId: { $in: wishList.products },
   }).select(
-    "productId productName productImg productCategory sellingPrice -_id",
+    "productId productName productImg productCategory sellingPrice productStatus -_id",
   );
 
   return {

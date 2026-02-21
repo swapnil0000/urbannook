@@ -19,11 +19,11 @@ export const userApi = apiSlice.injectEndpoints({
     // Cart APIs
     addToCart: builder.mutation({
       query: (data) => ({
-        url: 'user/addtocart',
+        url: 'user/cart/add',
         method: 'POST',
         body: data,
       }),
-      invalidatesTags: ['User'],
+      invalidatesTags: ['User', 'Cart'],
     }),
     updateCart: builder.mutation({
       query: (data) => ({
@@ -31,22 +31,22 @@ export const userApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: data,
       }),
-      invalidatesTags: ['User'],
+      invalidatesTags: ['User', 'Cart'],
     }),
     removeFromCart: builder.mutation({
       query: (productId) => ({
         url: `user/cart/${productId}`,
         method: 'DELETE',
       }),
-      invalidatesTags: ['User'],
+      invalidatesTags: ['User', 'Cart'],
     }),
     getCart: builder.query({
-      query: () => 'user/preview-addtocart',
-      providesTags: ['User'],
+      query: () => 'user/cart/get',
+      providesTags: ['User', 'Cart'],
     }),
     clearCart: builder.mutation({
       query: () => ({
-        url: 'user/clear-cart',
+        url: 'user/cart/clear',
         method: 'DELETE',
       }),
       invalidatesTags: ['User'],
@@ -55,28 +55,42 @@ export const userApi = apiSlice.injectEndpoints({
     // Wishlist APIs
     addToWishlist: builder.mutation({
       query: (data) => ({
-        url: 'user/addtowishlist',
+        url: 'user/wishlist/add',
         method: 'POST',
         body: data,
       }),
-      invalidatesTags: ['User'],
+      invalidatesTags: ['Wishlist', 'User'],
     }),
     getWishlist: builder.query({
-      query: () => 'user/wishlist',
-      providesTags: ['User'],
+      query: () => 'user/wishlist/get',
+      providesTags: ['Wishlist', 'User'],
     }),
     removeFromWishlist: builder.mutation({
       query: (productId) => ({
         url: `user/wishlist/${productId}`,
         method: 'DELETE',
       }),
-      invalidatesTags: ['User'],
+      invalidatesTags: ['Wishlist', 'User'],
     }),
 
     // Order APIs
     getOrderHistory: builder.query({
-      query: () => 'user/order-history',
+      query: () => 'user/order/history',
       providesTags: ['Order'],
+    }),
+
+    // Coupon APIs
+    applyCoupon: builder.mutation({
+      query: (couponCode) => ({
+        url: 'coupon/apply',
+        method: 'POST',
+        body: { couponCodeName: couponCode },
+      }),
+      invalidatesTags: ['User'],
+    }),
+    getAvailableCoupons: builder.query({
+      query: () => 'coupon/list',
+      providesTags: ['Coupon'],
     }),
 
     // Community APIs
@@ -97,6 +111,15 @@ export const userApi = apiSlice.injectEndpoints({
         body: data,
       }),
     }),
+
+    // Contact APIs
+    submitContact: builder.mutation({
+      query: (contactData) => ({
+        url: 'contact/submit',
+        method: 'POST',
+        body: contactData,
+      }),
+    }),
   }),
 });
 
@@ -112,7 +135,10 @@ export const {
   useGetWishlistQuery,
   useRemoveFromWishlistMutation,
   useGetOrderHistoryQuery,
+  useApplyCouponMutation,
+  useGetAvailableCouponsQuery,
   useGetRazorpayKeyQuery,
   useCreateOrderMutation,
   useJoinCommunityMutation,
+  useSubmitContactMutation,
 } = userApi;

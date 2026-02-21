@@ -1,38 +1,136 @@
-import NewAddress from "../model/address.new.model.js";
 import { ApiError, ApiRes } from "../utlis/index.js";
 import {
   createAddressService,
   updatedAddressService,
+  getAddressSuggestionsService,
+  getSearchSuggestionsService,
 } from "../services/address.service.js";
+
+const userAddressSearchFromInputController = async (req, res) => {
+  try {
+    const { userId } = req.user;
+    const { userSearchInput } = req.body || {};
+
+    const getSearchSuggestionsServiceValidation =
+      await getSearchSuggestionsService({
+        userId,
+        userSearchInput,
+      });
+
+    if (!getSearchSuggestionsServiceValidation.success) {
+      return res
+        .status(Number(getSearchSuggestionsServiceValidation.statusCode))
+        .json(
+          new ApiError(
+            getSearchSuggestionsServiceValidation.statusCode,
+            getSearchSuggestionsServiceValidation.message,
+            getSearchSuggestionsServiceValidation.data,
+            getSearchSuggestionsServiceValidation.success,
+          ),
+        );
+    }
+
+    return res
+      .status(200)
+      .json(
+        new ApiRes(
+          getSearchSuggestionsServiceValidation.statusCode,
+          getSearchSuggestionsServiceValidation.message,
+          getSearchSuggestionsServiceValidation.data,
+          getSearchSuggestionsServiceValidation.success,
+        ),
+      );
+  } catch (error) {
+    return res
+      .status(500)
+      .json(
+        new ApiError(
+          500,
+          `Internal Server Error from get address controller - ${error.message}`,
+          null,
+          false,
+        ),
+      );
+  }
+};
+
+const userAddressSuggestionFromLatLngController = async (req, res) => {
+  try {
+    const { userId } = req.user;
+    const { lat, long } = req.body || {};
+
+    const getAddressSuggestionsServiceValidation =
+      await getAddressSuggestionsService({
+        userId,
+        lat,
+        long,
+      });
+
+    if (!getAddressSuggestionsServiceValidation.success) {
+      return res
+        .status(Number(getAddressSuggestionsServiceValidation.statusCode))
+        .json(
+          new ApiError(
+            getAddressSuggestionsServiceValidation.statusCode,
+            getAddressSuggestionsServiceValidation.message,
+            getAddressSuggestionsServiceValidation.data,
+            getAddressSuggestionsServiceValidation.success,
+          ),
+        );
+    }
+
+    return res
+      .status(200)
+      .json(
+        new ApiRes(
+          getAddressSuggestionsServiceValidation.statusCode,
+          getAddressSuggestionsServiceValidation.message,
+          getAddressSuggestionsServiceValidation.data,
+          getAddressSuggestionsServiceValidation.success,
+        ),
+      );
+  } catch (error) {
+    return res
+      .status(500)
+      .json(
+        new ApiError(
+          500,
+          `Internal Server Error from get address controller - ${error.message}`,
+          null,
+          false,
+        ),
+      );
+  }
+};
 
 const userCreateAddress = async (req, res) => {
   try {
     const { userId } = req.user;
     const {
-      placeId,
       lat,
       long,
+      placeId,
       formattedAddress,
       city,
       state,
       pinCode,
       landmark,
-      flatNumber,
+      flatOrFloorNumber,
       addressType,
       isDefault,
     } = req.body || {};
 
     const createAddressServiceValidation = await createAddressService({
       userId,
-      placeId,
       lat,
       long,
+      placeId,
       formattedAddress,
       city,
       state,
       pinCode,
       landmark,
-      flatNumber,
+      flatOrFloorNumber,
       addressType,
       isDefault,
     });
@@ -73,25 +171,36 @@ const userCreateAddress = async (req, res) => {
       );
   }
 };
-const userAddressUpdate = async (req, res) => {
+
+const userUpdateAddress = async (req, res) => {
   try {
     const { userId } = req.user;
-    const { addressId, lat, long, city, state, pinCode, formattedAdress } =
-      req.body || {};
-    const userUpdatedAddressServiceValidation = updatedAddressService({
-      userId,
-      addressId,
+    const {
       lat,
       long,
       city,
       state,
       pinCode,
-      formattedAdress,
+      formattedAddress,
+      addressId,
+      placeId,
+    } = req.body || {};
+
+    const userUpdatedAddressServiceValidation = await updatedAddressService({
+      userId,
+      lat,
+      long,
+      city,
+      state,
+      pinCode,
+      formattedAddress,
+      addressId,
+      placeId,
     });
 
     if (!userUpdatedAddressServiceValidation.success) {
       return res
-        .status(userUpdatedAddressServiceValidation.statusCode)
+        .status(Number(userUpdatedAddressServiceValidation.statusCode))
         .json(
           new ApiError(
             userUpdatedAddressServiceValidation.statusCode,
@@ -103,7 +212,7 @@ const userAddressUpdate = async (req, res) => {
     }
 
     return res
-      .status(200)
+      .status(Number(userUpdatedAddressServiceValidation.statusCode))
       .json(
         new ApiRes(
           userUpdatedAddressServiceValidation.statusCode,
@@ -126,4 +235,9 @@ const userAddressUpdate = async (req, res) => {
   }
 };
 
-export { userAddressUpdate, userCreateAddress };
+export {
+  userUpdateAddress as userAddressUpdate,
+  userCreateAddress,
+  userAddressSuggestionFromLatLngController,
+  userAddressSearchFromInputController,
+};

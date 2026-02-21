@@ -21,6 +21,10 @@ const productSchema = mongoose.Schema(
       required: [true, "productImg is required"],
       unique: true,
     },
+    secondaryImages: {
+      type: [String],
+      default: [],
+    },
     productDes: {
       type: String,
       required: [true, "productDes is required"],
@@ -37,6 +41,11 @@ const productSchema = mongoose.Schema(
     productQuantity: {
       type: Number,
     },
+    dimensions: {
+      length: Number,
+      breadth: Number,
+      height: Number,
+    },
     productStatus: {
       type: String,
       enum: ["in_stock", "out_of_stock", "discontinued"],
@@ -52,10 +61,14 @@ const productSchema = mongoose.Schema(
     timestamps: true,
   },
 );
-productSchema.index({ productName: "text", productDes: "text" });
-productSchema.index({ productStatus: 1, createdAt: -1 });
+// Indexes for performance optimization
+// Note: productId, productName, uiProductId, productImg already have unique indexes from schema
 productSchema.index({ productCategory: 1 });
-productSchema.index({ productSubCategory: 1 });
-productSchema.index({ productStatus: 1, productCategory: 1 });
+productSchema.index({ productStatus: 1 });
+productSchema.index({ productCategory: 1, productStatus: 1 }); // Compound index for filtering
+productSchema.index({ productName: "text", productDes: "text" }); // Text search
+productSchema.index({ tags: 1 }); // For filtering by tags
+productSchema.index({ isPublished: 1 });
+
 const Product = new mongoose.model("Product", productSchema);
 export default Product;

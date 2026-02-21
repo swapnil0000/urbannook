@@ -9,7 +9,7 @@ const SocialMediaFAB = () => {
       name: 'Chat on WhatsApp',
       icon: 'fa-brands fa-whatsapp',
       color: 'bg-[#25D366]',
-      link: 'https://wa.me/+916386455982?text=Hi! I am interested in Urban Nook products.',
+      link: 'https://wa.me/+918299638749?text=Hi! I am interested in Urban Nook products.',
     },
     {
       id: 'instagram',
@@ -30,7 +30,7 @@ const SocialMediaFAB = () => {
       name: 'Call Concierge',
       icon: 'fa-solid fa-phone',
       color: 'bg-emerald-700',
-      link: 'tel:+916386455982',
+      link: 'tel:+918299638749',
     }
   ];
 
@@ -41,11 +41,11 @@ const SocialMediaFAB = () => {
       {/* pointer-events-auto ensures this specific button is clickable */}
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-14 h-14 rounded-full flex items-center justify-center text-white shadow-2xl transition-all duration-500 relative pointer-events-auto ${
+        className={`w-10 h-10 rounded-full flex items-center justify-center text-white shadow-2xl transition-all duration-500 relative pointer-events-auto ${
             isOpen ? 'bg-slate-900 rotate-45' : 'bg-emerald-600 hover:scale-110'
         }`}
       >
-        <i className="fa-solid fa-plus text-2xl"></i>
+        <i className="fa-solid fa-plus text-1xl"></i>
         
         {/* Pulse Effect (Only when closed) */}
         {!isOpen && (

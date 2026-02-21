@@ -319,17 +319,19 @@ const validateUserInput = ({ email, name, mobileNumber }) => {
   };
 };
 
-const validateUserAddress = ({
-  placeId,
+const validateUpdateUserAddress = ({
   lat,
   long,
-  formattedAddress,
   city,
   state,
   pinCode,
+  formattedAddress,
+  addressId,
+  placeId,
 }) => {
   const missing = [];
 
+  if (!addressId) missing.push("addressId");
   if (!placeId) missing.push("placeId");
   if (lat === undefined) missing.push("lat");
   if (long === undefined) missing.push("long");
@@ -402,96 +404,11 @@ const validateUserAddress = ({
   };
 };
 
-const validateUpdateUserAddress = ({
-  addressId,
-  lat,
-  long,
-  city,
-  state,
-  pinCode,
-  formattedAdress,
-}) => {
-  const missing = [];
-
-  if (!addressId) missing.push("addressId");
-  if (!placeId) missing.push("placeId");
-  if (lat === undefined) missing.push("lat");
-  if (long === undefined) missing.push("long");
-  if (!formattedAdress) missing.push("formattedAdress");
-
-  if (missing.length) {
-    return {
-      success: false,
-      statusCode: 400,
-      message: `Missing fields: ${missing.join(", ")}`,
-    };
-  }
-
-  // lat / long sanity check
-  if (typeof lat !== "number" || lat < -90 || lat > 90) {
-    return {
-      success: false,
-      statusCode: 400,
-      message: "Invalid latitude",
-    };
-  }
-
-  if (typeof long !== "number" || long < -180 || long > 180) {
-    return {
-      success: false,
-      statusCode: 400,
-      message: "Invalid longitude",
-    };
-  }
-
-  // formatted address
-  if (
-    typeof formattedAdress !== "string" ||
-    formattedAdress.length < 5 ||
-    formattedAdress.length > 200
-  ) {
-    return {
-      success: false,
-      statusCode: 400,
-      message: "Invalid formattedAdress",
-    };
-  }
-
-  if (city && typeof city !== "string") {
-    return {
-      success: false,
-      statusCode: 400,
-      message: "Invalid city",
-    };
-  }
-
-  if (state && typeof state !== "string") {
-    return {
-      success: false,
-      statusCode: 400,
-      message: "Invalid state",
-    };
-  }
-
-  if (pinCode && (!Number.isInteger(pinCode) || String(pinCode).length !== 6)) {
-    return {
-      success: false,
-      statusCode: 400,
-      message: "Invalid pinCode",
-    };
-  }
-
-  return {
-    success: true,
-  };
-};
-
 export {
   fieldMissing,
   validateUserInput,
   finalProductName,
   cartDetailsMissing,
   productUpdateFieldMissing,
-  validateUserAddress,
   validateUpdateUserAddress,
 };

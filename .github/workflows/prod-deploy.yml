@@ -43,20 +43,20 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24 #
 
       - name: Cache npm
         uses: actions/cache@v4
         with:
           path: ~/.npm
-          key: client-npm-${{ runner.os }}-${{ hashFiles('client/package-lock.json') }}
+          key: client-npm-v2-${{ runner.os }}-${{ hashFiles('client/package-lock.json') }}
           restore-keys: |
-            client-npm-${{ runner.os }}-
+            client-npm-v2-${{ runner.os }}-
 
       - name: Build Client
         working-directory: client
         run: |
-          npm ci
+          npm install
           npm run build
 
       - name: Configure AWS
@@ -87,19 +87,19 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Cache npm
         uses: actions/cache@v4
         with:
           path: ~/.npm
-          key: server-npm-${{ runner.os }}-${{ hashFiles('server/package-lock.json') }}
+          key: server-npm-v2-${{ runner.os }}-${{ hashFiles('server/package-lock.json') }}
           restore-keys: |
-            server-npm-${{ runner.os }}-
+            server-npm-v2-${{ runner.os }}-
 
       - name: Install Server Dependencies
         working-directory: server
-        run: npm ci
+        run: npm install
 
       - name: Setup SSH
         run: |
@@ -123,6 +123,7 @@ jobs:
           rsync -avz --delete \
           --exclude '.env' \
           --exclude '.env.production' \
+          --exclude 'node_modules' \
           server/ \
           ubuntu@${{ secrets.PROD_SSH_HOST }}:/home/ubuntu/urbannook-prod/server/
 
@@ -131,6 +132,8 @@ jobs:
         run: |
           ssh ubuntu@${{ secrets.PROD_SSH_HOST }} << 'EOF'
             cd /home/ubuntu/urbannook-prod/server
+            # to make sure server has zero down time in case if json and lock-json got version mismatch
+            npm ci --omit=dev || npm install --omit=dev 
             pm2 restart urbannook-server || pm2 start .ecosystem.config.cjs --env production
             pm2 save
           EOF

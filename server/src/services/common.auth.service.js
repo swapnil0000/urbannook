@@ -41,7 +41,7 @@ const authGuardService = (role) => {
       req.authRole = role;
       next();
     } catch (error) {
-      console.error("JWT Error:", error.message);
+      console.error(`[ERROR] JWT Error - Role: ${role}:`, error.message);
       return res
         .status(401)
         .json(
@@ -91,7 +91,12 @@ const profileFetchService = async ({ userId, role }) => {
   const profile = await Model.findOne({ userId }).select(
     "-_id -password -createdAt -updatedAt -__v -userRefreshToken",
   );
-  return profile;
+  return {
+    statusCode: 200,
+    message: `Profile details for userId - ${profile?.name} and role ${role}`,
+    data: profile,
+    success: true,
+  };
 };
 
 const regenerateTokenService = async ({ userId, userRole }) => {
@@ -281,10 +286,26 @@ const verifyOtpEmailService = async (email, emailOtp) => {
       };
     }
 
+    // CRITICAL: After successful verification, generate tokens for authentication
+    const userAccessToken = await verifiedUser.genAccessToken();
+    const userRefreshToken = await verifiedUser.genRefreshToken();
+    
+    verifiedUser.userRefreshToken = userRefreshToken;
+    await verifiedUser.save({ validateBeforeSave: false });
+
     return {
       statusCode: 200,
-      message: "OTP verified successfully",
-      data: email,
+      message: "Email verified successfully! You can now login.",
+      data: {
+        email: verifiedUser.email,
+        userAccessToken,
+        user: {
+          id: verifiedUser.userId,
+          email: verifiedUser.email,
+          name: verifiedUser.name,
+          role: verifiedUser.role,
+        },
+      },
       success: true,
     };
   } catch (error) {

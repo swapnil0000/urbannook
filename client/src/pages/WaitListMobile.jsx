@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import WaitListBanner from "../../public/assets/WaitListBanner.png";
 import axios from "axios";
 import { abusiveWords } from "../data/constant";
+import { getApiUrl } from "../config/appUrls";
 
 const WaitListMobile = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -55,24 +56,11 @@ const WaitListMobile = () => {
     e.preventDefault();
     setFormState((prev) => ({ ...prev, loading: true }));
 
-    const { userName, userEmail } = inputs;
-
-    if (containsAbusiveWords(userName) || containsAbusiveWords(userEmail)) {
-      setFormState({
-        msg: "Your input contains inappropriate words. Please use proper text.",
-        loading: false,
-        isSuccess: false,
-      });
-      setInputError({
-        userName: containsAbusiveWords(userName),
-        userEmail: containsAbusiveWords(userEmail),
-      });
-      return;
-    }
+    const { userName,userEmail } = inputs;
 
     try {
       const { data } = await axios.post(
-        `https://api.urbannook.in/api/v1/join/waitlist`,
+        `${getApiUrl()}/join/waitlist`,
         { userName, userEmail }
       );
 

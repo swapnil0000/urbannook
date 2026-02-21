@@ -1,15 +1,24 @@
 import mongoose from "mongoose";
-const userWaitListSchema = mongoose.Schema({
-  userName: {
-    type: String,
-    required: [true, "userName is required"],
+const userWaitListSchema = mongoose.Schema(
+  {
+    userName: {
+      type: String,
+      required: [true, "userName is required"],
+    },
+    userEmail: {
+      type: String,
+      required: [true, "userEmail is required"],
+      unique: true,
+    },
+    waitListEmailSent: {
+      type: Boolean,
+      default: false,
+    },
   },
-  userEmail: {
-    type: String,
-    required: [true, "userEmail is required"],
-    unique: true,
+  {
+    timestamps: true,
   },
-});
+);
 
 const UserWaistList = new mongoose.model("UserWaistList", userWaitListSchema);
 export default UserWaistList;

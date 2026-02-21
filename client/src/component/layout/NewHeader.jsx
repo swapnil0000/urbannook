@@ -1,18 +1,26 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
+import { useGetWishlistQuery,  } from '../../store/api/userApi';
+import { logout as logoutAction } from '../../store/slices/authSlice';
+import { setShowLoginModal } from '../../store/slices/uiSlice';
 import SignupForm from './auth/SignupForm';
 import LoginForm from './auth/LoginForm';
-import CartDrawer from '../layout/CartDrawer';
+import { useLogoutMutation } from '../../store/api/authApi';
+import CartDrawer from './CartDrawer';
 
 const NewHeader = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   
   // Get cart and auth state from Redux
   const { items: cartItems, totalQuantity } = useSelector((state) => state.cart);
   const { isAuthenticated, user: authUser } = useSelector((state) => state.auth);
+  const { showLoginModal } = useSelector((state) => state.ui);
+  const wishlistItems = useSelector((state) => state.wishlist.items);
   
+  // State declarations
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showSignup, setShowSignup] = useState(false);
@@ -21,6 +29,18 @@ const NewHeader = () => {
   const lastScrollY = useRef(0);
   const [user, setUser] = useState(null);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
+  
+  // Get wishlist count from Redux
+  const wishlistCount = wishlistItems.length;
+  
+  // Fetch wishlist data - only when authenticated
+  useGetWishlistQuery(undefined, { 
+    skip: !isAuthenticated,
+    refetchOnMountOrArgChange: false
+  });
+  
+  // Logout mutation
+  const [logoutAPI, { isLoading: isLoggingOut }] = useLogoutMutation();
 
   const getActiveRoute = () => {
     const path = location.pathname;
@@ -46,6 +66,13 @@ const NewHeader = () => {
     return () => window.removeEventListener('storage', syncUser);
   }, [isAuthenticated, authUser]);
 
+  // Sync showLogin with Redux showLoginModal state
+  useEffect(() => {
+    if (showLoginModal) {
+      setShowLogin(true);
+    }
+  }, [showLoginModal]);
+
   // Hide/Show Header on Scroll
   useEffect(() => {
     const handleScroll = () => {
@@ -64,13 +91,41 @@ const NewHeader = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [isMenuOpen]);
 
-  const handleLogout = () => {
-    setUser(null);
-    localStorage.removeItem('user');
-    window.dispatchEvent(new Event('storage'));
-    setShowUserDropdown(false);
-    setIsMenuOpen(false);
-    navigate('/');
+  const handleLogout = async () => {
+    try {
+      // Call logout API
+      await logoutAPI().unwrap();
+      
+      // Clear local state
+      setUser(null);
+      setShowUserDropdown(false);
+      setIsMenuOpen(false);
+      
+      // Dispatch logout action to clear Redux state
+      dispatch(logoutAction());
+      
+      // Clear localStorage
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+      
+      // Clear cookie
+      document.cookie = 'userAccessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      
+      // Trigger storage event for other tabs
+      window.dispatchEvent(new Event('storage'));
+      
+      // Navigate to home
+      navigate('/');
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // Even if API fails, clear local state
+      setUser(null);
+      dispatch(logoutAction());
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+      document.cookie = 'userAccessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      navigate('/');
+    }
   };
 
   // --- HELPER FUNCTIONS ---
@@ -192,16 +247,19 @@ const NewHeader = () => {
                           <Link to="/profile" onClick={() => setShowUserDropdown(false)} className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-600 hover:bg-emerald-50 hover:text-emerald-900 rounded-xl transition-colors">
                              <i className="fa-regular fa-user w-5"></i> Profile
                           </Link>
-                          <Link to="/settings" onClick={() => setShowUserDropdown(false)} className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-600 hover:bg-emerald-50 hover:text-emerald-900 rounded-xl transition-colors">
-                             <i className="fa-solid fa-gear w-5"></i> Settings
-                          </Link>
+    
                            <Link to="/customer-support" onClick={() => setShowUserDropdown(false)} className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-600 hover:bg-emerald-50 hover:text-emerald-900 rounded-xl transition-colors">
                              <i className="fa-solid fa-headset text-lg"></i> Support
                           </Link>
                        </div>
                        <div className="p-2 border-t border-gray-100">
-                          <button onClick={handleLogout} className="flex items-center gap-3 w-full px-3 py-2.5 text-sm text-red-600 hover:bg-red-50 rounded-xl transition-colors text-left">
-                             <i className="fa-solid fa-arrow-right-from-bracket w-5"></i> Logout
+                          <button 
+                            onClick={handleLogout} 
+                            disabled={isLoggingOut}
+                            className="flex items-center gap-3 w-full px-3 py-2.5 text-sm text-red-600 hover:bg-red-50 rounded-xl transition-colors text-left disabled:opacity-50"
+                          >
+                             <i className="fa-solid fa-arrow-right-from-bracket w-5"></i> 
+                             {isLoggingOut ? 'Logging out...' : 'Logout'}
                           </button>
                        </div>
                      </div>
@@ -230,17 +288,32 @@ const NewHeader = () => {
                   </span>
                 )}
               </button>
+
+              {/* Wishlist Icon */}
+              {user && (
+                <Link
+                  to="/wishlist"
+                  className="relative flex items-center justify-center w-9 h-9 bg-emerald-800 text-white hover:bg-emerald-80 rounded-full transition-colors group"
+                >
+                  <i className="fa-regular fa-heart text-lg text-white group-hover:scale-110 transition-transform"></i>
+                  {wishlistCount > 0 && (
+                    <span className="absolute -top-2 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[8px] rounded-full flex items-center justify-center font-bold border-2 border-[#e8f8d7] ">
+                      {wishlistCount}
+                    </span>
+                  )}
+                </Link>
+              )}
             </div>
              <div className="lg:hidden w-10"></div> 
           </div>
 
           {/* --- MOBILE MENU DROPDOWN --- */}
           {isMenuOpen && (
-            <div className="lg:hidden mt-4 pt-4 border-t border-emerald-900/10 animate-in fade-in slide-in-from-top-2 pb-2 h-[62vh]  no-scrollbar">
+            <div className="lg:hidden mt-4 pt-4 border-t border-emerald-900/10 animate-in fade-in slide-in-from-top-2 pb-2 max-h-[calc(100vh-120px)] overflow-y-auto no-scrollbar">
               
               {/* 1. MOBILE USER CONTROL CENTER */}
               {user ? (
-                <div className="bg-white/60 p-5 rounded-3xl border border-white/60 shadow-sm mb-6 relative overflow-hidden group">
+                <div className="bg-white/60 p-5 rounded-3xl border border-white/60 shadow-sm mb-6 relative overflow-hidden group flex-shrink-0">
                     {/* Decorative Background Blob */}
                     <div className="absolute -right-10 -top-10 w-32 h-32 bg-emerald-200/30 rounded-full blur-2xl group-hover:bg-emerald-300/40 transition-all"></div>
 
@@ -255,7 +328,7 @@ const NewHeader = () => {
                                 <span className="text-xs text-emerald-700 uppercase tracking-wider font-semibold">View Profile <i className="fa-solid fa-chevron-right text-[9px]"></i></span>
                             </div>
                         </div>
-                        <button onClick={(e) => { e.stopPropagation(); handleLogout(); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-red-50 text-red-500 hover:bg-red-100 transition-colors">
+                        <button onClick={(e) => { e.stopPropagation(); handleLogout(); }} disabled={isLoggingOut} className="w-8 h-8 flex items-center justify-center rounded-full bg-red-50 text-red-500 hover:bg-red-100 transition-colors disabled:opacity-50">
                             <i className="fa-solid fa-arrow-right-from-bracket text-sm"></i>
                         </button>
                     </div>
@@ -263,13 +336,7 @@ const NewHeader = () => {
                     {/* THE APP-STYLE GRID (Modified to 3 Cols since Orders is removed) */}
                     <div className="grid grid-cols-3 gap-5 relative z-10">
                         
-                        {/* Settings */}
-                        <button onClick={() => handleMobileNav('/settings')} className="flex flex-col items-center gap-2 group/btn">
-                            <div className="w-12 h-12 rounded-2xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-700 shadow-sm group-hover/btn:scale-105 group-hover/btn:border-emerald-300 transition-all">
-                                <i className="fa-solid fa-gear text-lg"></i>
-                            </div>
-                            <span className="text-[10px] font-bold text-emerald-900 uppercase tracking-wide">Settings</span>
-                        </button>
+                    
 
                         {/* Support */}
                         <button onClick={() => handleMobileNav('/customer-support')} className="flex flex-col items-center gap-2 group/btn">
@@ -292,6 +359,19 @@ const NewHeader = () => {
                             <span className="text-[10px] font-bold text-emerald-900 uppercase tracking-wide">Cart</span>
                         </button>
 
+                        {/* Wishlist */}
+                        <button onClick={() => handleMobileNav('/wishlist')} className="flex flex-col items-center gap-2 group/btn relative">
+                            <div className="w-12 h-12 rounded-2xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-700 shadow-sm group-hover/btn:scale-105 group-hover/btn:border-emerald-300 transition-all">
+                                <i className="fa-regular fa-heart text-lg"></i>
+                            </div>
+                            {wishlistCount > 0 && (
+                                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold border-2 border-white shadow-lg">
+                                    {wishlistCount}
+                                </span>
+                            )}
+                            <span className="text-[10px] font-bold text-emerald-900 uppercase tracking-wide">Wishlist</span>
+                        </button>
+
                     </div>
                 </div>
               ) : (
@@ -308,7 +388,7 @@ const NewHeader = () => {
               )}
 
               {/* 2. MAIN NAVIGATION LIST */}
-              <nav className="flex flex-col gap-2">
+              <nav className="flex flex-col gap-2 flex-shrink-0">
                 {navLinks.map((item) => {
                   const isActive = getActiveRoute() === item.key;
                   // Map specific icons for each route
@@ -325,23 +405,23 @@ const NewHeader = () => {
                       key={item.key}
                       to={item.path}
                       onClick={() => setIsMenuOpen(false)}
-                      className={`flex items-center justify-between p-4 rounded-2xl transition-all duration-200 group ${
+                      className={`flex items-center justify-between p-3 sm:p-4 rounded-2xl transition-all duration-200 group ${
                         isActive 
                           ? 'bg-white shadow-md border border-emerald-100' 
                           : 'bg-transparent hover:bg-white/40 border border-transparent'
                       }`}
                     >
-                        <div className="flex items-center gap-4">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-colors ${
+                        <div className="flex items-center gap-3 sm:gap-4">
+                            <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm transition-colors ${
                                 isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-white/40 text-emerald-900'
                             }`}>
                                 <i className={`fa-solid ${icons[item.key] || 'fa-circle'}`}></i>
                             </div>
-                            <span className={`font-bold text-sm tracking-wide ${isActive ? 'text-emerald-900' : 'text-emerald-900/80'}`}>
+                            <span className={`font-bold text-xs sm:text-sm tracking-wide ${isActive ? 'text-emerald-900' : 'text-emerald-900/80'}`}>
                                 {item.name}
                             </span>
                         </div>
-                        <i className={`fa-solid fa-chevron-right text-xs transition-transform group-hover:translate-x-1 ${isActive ? 'text-emerald-500' : 'text-black/10'}`}></i>
+                        <i className={`fa-solid fa-chevron-right text-[10px] sm:text-xs transition-transform group-hover:translate-x-1 ${isActive ? 'text-emerald-500' : 'text-black/10'}`}></i>
                     </Link>
                   );
                 })}
@@ -355,9 +435,20 @@ const NewHeader = () => {
       {/* --- MODALS --- */}
       {showLogin && (
         <LoginForm 
-          onClose={() => setShowLogin(false)}
-          onLoginSuccess={(u) => { setUser(u); setShowLogin(false); }}
-          onSwitchToSignup={() => { setShowLogin(false); setShowSignup(true); }}
+          onClose={() => {
+            setShowLogin(false);
+            dispatch(setShowLoginModal(false));
+          }}
+          onLoginSuccess={(u) => { 
+            setUser(u); 
+            setShowLogin(false); 
+            dispatch(setShowLoginModal(false));
+          }}
+          onSwitchToSignup={() => { 
+            setShowLogin(false); 
+            setShowSignup(true); 
+            dispatch(setShowLoginModal(false));
+          }}
         />
       )}
 

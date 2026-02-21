@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useDispatch } from 'react-redux';
+import { useState, useEffect, useRef } from 'react';
 import { useResendOtpMutation, useVerifyOtpMutation } from '../../../store/api/authApi';
-import { setCredentials } from '../../../store/slices/authSlice';
+import { useUI } from '../../../hooks/useRedux';
+import { useDispatch } from 'react-redux';
 
 const OTPVerification = ({ email, onClose, onSuccess, onBack }) => {
   const dispatch = useDispatch();
+  const { showNotification } = useUI();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [timer, setTimer] = useState(30);
   const [canResend, setCanResend] = useState(false);
@@ -53,42 +54,23 @@ const OTPVerification = ({ email, onClose, onSuccess, onBack }) => {
     }
 
     try {
-      // Calling API with email
+      // Calling API with email - backend will return token after verification
       const result = await verifyOtp({
         email: email,
         emailOtp: otpString
       }).unwrap();
       
-      // After successful OTP verification, log in the user
-      if (result.success) {
-        // Get user data from localStorage (saved during registration)
-        const userData = JSON.parse(localStorage.getItem('user') || '{}');
-        
-        // Get token from cookies (saved during registration)
-        const getCookie = (name) => {
-          const value = `; ${document.cookie}`;
-          const parts = value.split(`; ${name}=`);
-          if (parts.length === 2) return parts.pop().split(';').shift();
-          return null;
-        };
-        
-        const token = getCookie('userAccessToken');
-        
-        if (token && userData) {
-          // Dispatch login action to Redux
-          dispatch(setCredentials({
-            user: userData,
-            token: token
-          }));
-          
-          // Trigger window storage event to sync across components
-          window.dispatchEvent(new Event('storage'));
-        }
-      }
+      // Show success notification with backend message
+      showNotification(result?.message || 'Email verified successfully!', 'success');
+      
+      // The authApi onQueryStarted already handles setCredentials with the token
+      // No need for sessionStorage logic anymore
       
       onSuccess(result);
     } catch (err) {
-      setError(err.data?.message || 'Invalid OTP. Please try again.');
+      const errorMessage = err.data?.message || 'Invalid OTP. Please try again.';
+      setError(errorMessage);
+      showNotification(errorMessage, 'error');
       setOtp(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
     }
@@ -96,13 +78,17 @@ const OTPVerification = ({ email, onClose, onSuccess, onBack }) => {
 
   const handleResend = async () => {
     try {
-      await resendOtp({ userEmail:email }).unwrap();
+      const result = await resendOtp({ email: email }).unwrap();
+      // Show success notification with backend message
+      showNotification(result?.message || 'OTP resent successfully!', 'success');
       setTimer(30);
       setCanResend(false);
       setOtp(['', '', '', '', '', '']);
       setError('');
     } catch (err) {
-      setError('Failed to resend code',err);
+      const errorMessage = err.data?.message || 'Failed to resend code';
+      setError(errorMessage);
+      showNotification(errorMessage, 'error');
     }
   };
 

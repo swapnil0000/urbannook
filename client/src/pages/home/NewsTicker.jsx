@@ -4,43 +4,62 @@ const NewsTicker = () => {
   const [isPaused, setIsPaused] = useState(false);
 
   const headlines = [
-    "🎉 New Collection Launch - 50% OFF on all keychains!",
-    "🚚 Free shipping on orders above ₹999 - Limited time offer",
-    "⭐ 10,000+ Happy customers and counting!",
-    "🎁 Special discount for first-time buyers - Use code WELCOME20",
-    "🔥 Trending now: Minimalist desk accessories collection"
+    "✨ FREE SHIPPING ON ALL ORDERS ABOVE ₹300",
+    "🏮 NEW DROP: 3D PRINTED AESTHETIC LAMPS - SHOP NOW",
+    "🔑 HANDCRAFTED KEYCHAINS: ELEVATE YOUR EVERYDAY CARRY",
+    "🌿 JOIN THE INNER CIRCLE FOR 10% OFF YOUR FIRST ORDER",
+    "🎨 LIMITED EDITION ART PRINTS: REIMAGINE YOUR NOOK",
+    "⭐ TRUSTED BY 10,000+ AESTHETIC ENTHUSIASTS"
   ];
 
   return (
-    <div className="bg-gradient-to-r from-primary via-accent to-cyan-400 text-white  overflow-hidden relative shadow-lg">
-      <div className="flex items-center">
-        {/* <div className="bg-white/25 backdrop-blur-sm px-6 py-3 rounded-r-full flex items-center gap-3 flex-shrink-0 border border-white/30 shadow-lg">
-          <i className="fa-solid fa-bullhorn text-xl animate-pulse"></i>
-          <span className="font-bold text-base">BREAKING NEWS</span>
-        </div> */}
-        
+    <div className="bg-[#1c3026] border-b border-white/5 overflow-hidden relative py-2.5">
+      
+      {/* Custom Marquee Keyframes (In case not in tailwind.config) */}
+      <style>{`
+        @keyframes marquee {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        .animate-ticker {
+          animation: marquee 35s linear infinite;
+        }
+      `}</style>
+
+      <div 
+        className="relative flex items-center"
+        onMouseEnter={() => setIsPaused(true)}
+        onMouseLeave={() => setIsPaused(false)}
+      >
+        {/* The Ticker Content */}
         <div 
-          className="flex-1 overflow-hidden"
-          onMouseEnter={() => setIsPaused(true)}
-          onMouseLeave={() => setIsPaused(false)}
+          className={`flex whitespace-nowrap animate-ticker ${
+            isPaused ? '[animation-play-state:paused]' : ''
+          }`}
         >
-          <div 
-            className={`flex gap-8 whitespace-nowrap ${
-              isPaused ? '' : 'animate-marquee'
-            }`}
-          >
-            {headlines.concat(headlines).map((headline, index) => (
-              <span 
-                key={index}
-                className="text-base font-semibold flex items-center gap-3 px-6"
-              >
+          {/* Duplicating array for seamless loop */}
+          {[...headlines, ...headlines].map((headline, index) => (
+            <div 
+              key={index}
+              className="flex items-center px-10"
+            >
+              <span className="text-[#F5DEB3] text-[10px] md:text-xs font-bold tracking-[0.2em] uppercase">
                 {headline}
-                <span className="text-white/70 text-xl">•</span>
               </span>
-            ))}
-          </div>
+              {/* Premium Separator Icon */}
+              <span className="ml-10 text-white/20">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z" />
+                </svg>
+              </span>
+            </div>
+          ))}
         </div>
       </div>
+
+      {/* Subtle Gradient Overlays for smooth entry/exit */}
+      <div className="absolute inset-y-0 left-0 w-20 bg-gradient-to-r from-[#1c3026] to-transparent z-10 pointer-events-none"></div>
+      <div className="absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-[#1c3026] to-transparent z-10 pointer-events-none"></div>
     </div>
   );
 };

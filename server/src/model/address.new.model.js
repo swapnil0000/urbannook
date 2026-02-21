@@ -33,16 +33,16 @@ const addressSchema = mongoose.Schema(
 
     addressType: {
       type: String,
-      enum: ["HOME", "WORK", "OTHER"],
-      default: "HOME",
+      enum: ["Home", "Work", "Other"],
+      default: "Home",
     },
 
     landmark: String,
-    flatNumber: String,
+    flatOrFloorNumber: String,
 
     isDefault: {
       type: Boolean,
-      default: false,
+      default: true,
     },
 
     city: String,

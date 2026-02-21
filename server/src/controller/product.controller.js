@@ -2,7 +2,7 @@ import { ApiError, ApiRes } from "../utlis/index.js";
 import Product from "../model/product.model.js";
 const productListing = async (req, res) => {
   try {
-    const { limit, currentPage, search, status, category, subCategory } =
+    const { limit, currentPage, search, status, category, subCategory, featured } =
       req.query;
     const page = Number(currentPage) || 1;
     const perPage = Number(limit) || 10;
@@ -27,21 +27,25 @@ const productListing = async (req, res) => {
       }
     }
 
-    if (category) {
-      query.productCategory = {
-        $regex: String(category),
-        $options: "i", // makes it case - insensitive Eg - Chair , chair, CHAIR - all same
-      };
+    if (!query.$text) {
+      if (category) {
+        query.productCategory = { $regex: String(category), $options: "i" };
+      }
+      if (subCategory) {
+        query.productSubCategory = {
+          $regex: String(subCategory),
+          $options: "i",
+        };
+      }
+      if (status) {
+        query.productStatus = status;
+      }
+      // Filter by featured tag
+      if (featured === 'true') {
+        query.tags = 'featured';
+      }
     }
-    if (subCategory) {
-      query.productSubCategory = {
-        $regex: String(subCategory),
-        $options: "i", // makes it case - insensitive Eg - Chair , chair, CHAIR - all same
-      };
-    }
-    if (status) {
-      query.productStatus = status;
-    }
+
     const totalProducts = await Product.countDocuments(query);
 
     const listOfProducts = await Product.find(query)
@@ -73,6 +77,7 @@ const productListing = async (req, res) => {
       ),
     );
   } catch (error) {
+    console.error('[ERROR] Product listing failed:', error.message);
     return res.status(500).json(new ApiError(500, error.message, null, false));
   }
 };

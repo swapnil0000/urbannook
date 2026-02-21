@@ -10,10 +10,8 @@ import {
   X,
   ArrowRight,
 } from "lucide-react";
-import { useCookies } from "react-cookie";
 const AdminDashboard = () => {
   const [open, setOpen] = useState(false);
-  const [, , removeCookie] = useCookies(["cookie-name"]);
   const navigate = useNavigate();
 
   const navItems = [
@@ -37,6 +35,11 @@ const AdminDashboard = () => {
       icon: <ShoppingBag size={18} />,
       route: "/admin/orders",
     },
+    {
+      label: "NFC",
+      icon: <ShoppingBag size={18} />,
+      route: "/admin/nfc",
+    },
   ];
 
   const NavButton = ({ item, onClick }) => (
@@ -49,10 +52,10 @@ const AdminDashboard = () => {
     </button>
   );
 
-  const handleLogout = () => {
-  removeCookie("adminAccessToken", { path: "/" });
-  navigate("/admin/login");
-};
+//   const handleLogout = () => {
+//   removeCookie("adminAccessToken", { path: "/" });
+//   navigate("/admin/login");
+// };
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800">
@@ -93,7 +96,7 @@ const AdminDashboard = () => {
             </nav>
 
             <button
-              onClick={handleLogout}
+              // onClick={handleLogout}
               className="mt-10 flex items-center gap-3 px-4 py-3 text-red-500 hover:bg-red-50 rounded-xl font-semibold w-full"
             >
               <LogOut size={18} />
@@ -122,6 +125,12 @@ const AdminDashboard = () => {
                 description="View and manage waitlist users"
                 icon={<Users />}
                 onClick={() => navigate("/admin/joined-waitlist")}
+              />
+              <ActionCard
+                title="NFC"
+                description="View and manage NFC UserId"
+                icon={<Users />}
+                onClick={() => navigate("/admin/nfc")}
               />
               <ActionCard
                 title="Products"
