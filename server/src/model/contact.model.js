@@ -20,7 +20,7 @@ const contactSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Subject is required'],
       enum: {
-        values: ['Product Inquiry', 'Interior Design', 'Partnership', 'Support'],
+        values: ['Product Inquiry',  'Support'],
         message: '{VALUE} is not a valid inquiry type'
       }
     },
