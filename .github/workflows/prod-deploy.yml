@@ -43,13 +43,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 24 # <-- Node 24 Update kiya
+          node-version: 24 #
 
       - name: Cache npm
         uses: actions/cache@v4
         with:
           path: ~/.npm
-          # Key mein 'v2' add kiya hai taaki purana cache ignore ho jaye
           key: client-npm-v2-${{ runner.os }}-${{ hashFiles('client/package-lock.json') }}
           restore-keys: |
             client-npm-v2-${{ runner.os }}-
@@ -88,13 +87,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 24 # <-- Node 24 Update kiya
+          node-version: 24
 
       - name: Cache npm
         uses: actions/cache@v4
         with:
           path: ~/.npm
-          # Key mein 'v2' add kiya hai cache clear karne ke liye
           key: server-npm-v2-${{ runner.os }}-${{ hashFiles('server/package-lock.json') }}
           restore-keys: |
             server-npm-v2-${{ runner.os }}-
