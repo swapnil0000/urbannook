@@ -87,7 +87,7 @@ const MyProfilePage = () => {
       <main className="max-w-5xl mx-auto pt-28 pb-20 px-4 md:px-8 relative z-10">
         
         {/* --- HEADER --- */}
-        <div className="mb-10 md:mb-16 flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/5 pb-8 lg:pb-12">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/5 pb-8 lg:pb-12">
            <div>
              <div className="flex items-center gap-3 mb-2">
                  <span className="h-[1px] w-8 bg-[#F5DEB3]"></span>

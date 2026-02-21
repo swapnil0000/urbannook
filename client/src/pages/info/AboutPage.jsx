@@ -54,7 +54,7 @@ const AboutPage = () => {
       </div>
 
       {/* --- 1. HERO SECTION (Typographic & Abstract) --- */}
-      <section className="relative pt-32 pb-20 px-6 lg:px-12 overflow-hidden min-h-[85vh] flex items-center border-b border-white/5">
+      <section className="relative lg:pt-32 pt-20  px-6 lg:px-12 overflow-hidden flex items-center border-b border-white/5">
         {/* Abstract Ambient Glow */}
         <div className="absolute top-[-20%] right-[-10%] w-[800px] h-[800px] bg-gradient-to-b from-[#2a4538] to-transparent rounded-full blur-[120px] pointer-events-none opacity-60"></div>
         
@@ -63,7 +63,7 @@ const AboutPage = () => {
               initial="hidden"
               animate="visible"
               variants={stagger}
-              className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center"
+              className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center mb-2"
             >
                 
                 {/* LEFT: Text Content */}
@@ -76,17 +76,17 @@ const AboutPage = () => {
                     </motion.div>
                     
                     <motion.h1 variants={fadeIn} className="text-4xl md:text-6xl lg:text-7xl font-serif text-white leading-[1.05] mb-8">
-                        Elevate Your Desk <br />
-                        <span className="italic text-[#F5DEB3] font-light">Brighten Your Nook.</span>
+                        Designing calm corners <br />
+                        <span className="italic text-[#F5DEB3] font-light">for chaotic lives.</span>
                     </motion.h1>
                     
                     <motion.p variants={fadeIn} className="text-lg md:text-xl text-green-100/70 font-light leading-relaxed max-w-lg">
-                        UrbanNook exists to bridge the gap between pure utility and architectural beauty. We believe your space is an investment in your peace of mind.
+                        Your Home Should Tell The Story Of Who You Are, And Be A Collection Of What You Love.
                     </motion.p>
                 </div>
 
                 {/* RIGHT: Visual Element (Replaces Image with an Authority Badge) */}
-                <motion.div variants={fadeIn} className="lg:col-span-5 relative">
+                <motion.div variants={fadeIn} className="hidden md:flex lg:col-span-5 relative">
                     <div className="relative w-full aspect-square max-w-md mx-auto rounded-full border border-white/10 flex items-center justify-center p-8 bg-gradient-to-br from-white/5 to-transparent backdrop-blur-sm shadow-2xl">
                         {/* Spinning Dashed Ring */}
                         <div className="absolute inset-4 rounded-full border border-dashed border-[#F5DEB3]/30 animate-[spin_40s_linear_infinite]"></div>
@@ -165,7 +165,7 @@ const AboutPage = () => {
                         <p className="text-4xl font-serif text-white">10+</p>
                     </div>
                     <p className="text-sm uppercase tracking-widest text-green-100/50 font-bold">Successful Deliveries</p>
-                    <p className="text-xs text-green-100/40 mt-3 border-t border-white/5 pt-3">Trusted by thousands of homes across India.</p>
+                    <p className="text-xs text-green-100/40 mt-3 border-t border-white/5 pt-3">Trusted by Many homes across India.</p>
                 </div>
 
                 <div className="bg-[#e8e6e1]/5 backdrop-blur-md p-8 md:p-10 rounded-[2rem] border border-white/10 hover:border-[#F5DEB3]/30 transition-colors">

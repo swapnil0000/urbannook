@@ -40,13 +40,14 @@ const CheckoutPage = () => {
   const [paymentError, setPaymentError] = useState(null);
   const [showRetry, setShowRetry] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
+  const [showCouponModal, setShowCouponModal] = useState(false);
   const [mapSuggestions, setMapSuggestions] = useState([]);
   const [isLocating, setIsLocating] = useState(false);
   const [preciseDetails, setPreciseDetails] = useState({
     landmark: "",
     flatNo: "",
   });
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
   const mapElement = useRef();
   const mapRef = useRef();
 
@@ -158,7 +159,6 @@ const CheckoutPage = () => {
     fetchSuggestions(lat, long);
   };
 
-  // initialize Map with null ( so user can select)
   const initializeMap = (lon, lat) => {
     setTimeout(() => {
       if (mapRef.current) {
@@ -216,22 +216,12 @@ const CheckoutPage = () => {
     }
 
     if (userProfileData?.data) {
-      console.log('Setting user profile from API:', userProfileData.data);
       setUserProfile(userProfileData?.data?.data);
       setIsLoading(false);
     } else if (!profileLoading) {
       refetchProfile();
     }
-  }, [
-    isAuthenticated,
-    cartItems.length,
-    navigate,
-    userProfileData,
-    profileLoading,
-    refetchProfile,
-    showNotification,
-    openLoginModal,
-  ]);
+  }, [isAuthenticated, cartItems.length, navigate, userProfileData, profileLoading, refetchProfile, showNotification, openLoginModal]);
 
   useEffect(() => {
     const fetchInitialPricing = async () => {
@@ -249,14 +239,10 @@ const CheckoutPage = () => {
           }
         } catch (error) {
           console.error("Failed to fetch initial pricing:", error);
-          showNotification(
-            "Failed to load pricing. Please refresh the page.",
-            "error",
-          );
+          showNotification("Failed to load pricing. Please refresh the page.", "error");
         }
       }
     };
-
     fetchInitialPricing();
   }, []);
 
@@ -287,7 +273,6 @@ const CheckoutPage = () => {
         showNotification("Coupon applied successfully!", "success");
       }
     } catch (error) {
-      console.error("Failed to apply coupon:", error);
       const errorMessage = error.data?.message || "Failed to apply coupon";
       showNotification(errorMessage, "error");
     }
@@ -309,14 +294,12 @@ const CheckoutPage = () => {
         showNotification("Coupon removed", "success");
       }
     } catch (error) {
-      console.error("Failed to remove coupon:", error);
-      showNotification(
-        "Failed to remove coupon. Please refresh the page.",
-        "error",
-      );
+      showNotification("Failed to remove coupon. Please refresh the page.", "error");
     }
   };
+
   const finalTotal = pricingDetails.grandTotal;
+
   const fetchSuggestions = async (la, ln) => {
     try {
       const res = await axios.post(
@@ -358,9 +341,7 @@ const CheckoutPage = () => {
         showNotification("Address confirmed for delivery!", "success");
       }
     } catch (err) {
-      // console.log(err?.response);
-      const errorMessage =
-        err.response?.data?.message || "Failed to save address";
+      const errorMessage = err.response?.data?.message || "Failed to save address";
       showNotification(errorMessage, "error");
     }
   };
@@ -407,19 +388,11 @@ const CheckoutPage = () => {
         handler: async function (response) {
           try {
             const orderId = response.razorpay_order_id;
-            showNotification(
-              `Payment successful! Order ID: ${orderId}`,
-              "success",
-            );
+            showNotification(`Payment successful! Order ID: ${orderId}`, "success");
             dispatch(clearCart());
-            setTimeout(() => {
-              navigate("/orders");
-            }, 2000);
+            setTimeout(() => { navigate("/orders"); }, 2000);
           } catch (verifyError) {
-            console.error("Payment verification error:", verifyError);
-            setPaymentError(
-              "Payment verification failed. Please contact support if amount was debited.",
-            );
+            setPaymentError("Payment verification failed. Please contact support if amount was debited.");
             setShowRetry(false);
           }
         },
@@ -432,9 +405,7 @@ const CheckoutPage = () => {
         theme: { color: "#2E443C" },
         modal: {
           ondismiss: function () {
-            setPaymentError(
-              "Payment was cancelled. Your cart has been preserved. You can retry when ready.",
-            );
+            setPaymentError("Payment was cancelled. Your cart has been preserved. You can retry when ready.");
             setShowRetry(true);
           },
           escape: false,
@@ -447,17 +418,11 @@ const CheckoutPage = () => {
       paymentObject.on("payment.failed", function (response) {
         const errorCode = response.error.code;
         const errorDescription = response.error.description;
-        let userMessage =
-          errorDescription || "Payment failed. Please try again.";
+        let userMessage = errorDescription || "Payment failed. Please try again.";
 
-        if (errorCode === "BAD_REQUEST_ERROR")
-          userMessage =
-            "Payment failed due to invalid request. Please try again.";
-        else if (errorCode === "GATEWAY_ERROR")
-          userMessage =
-            "Payment gateway error. Please try again or use a different payment method.";
-        else if (errorCode === "SERVER_ERROR")
-          userMessage = "Payment server error. Please try again later.";
+        if (errorCode === "BAD_REQUEST_ERROR") userMessage = "Payment failed due to invalid request. Please try again.";
+        else if (errorCode === "GATEWAY_ERROR") userMessage = "Payment gateway error. Please try again or use a different payment method.";
+        else if (errorCode === "SERVER_ERROR") userMessage = "Payment server error. Please try again later.";
 
         setPaymentError(userMessage);
         setShowRetry(true);
@@ -465,11 +430,7 @@ const CheckoutPage = () => {
 
       paymentObject.open();
     } catch (error) {
-      console.error("Payment initialization failed:", error);
-      const errorMessage =
-        error.data?.message ||
-        error.message ||
-        "Failed to initialize payment. Please try again.";
+      const errorMessage = error.data?.message || error.message || "Failed to initialize payment. Please try again.";
       setPaymentError(errorMessage);
       setShowRetry(true);
     }
@@ -485,79 +446,83 @@ const CheckoutPage = () => {
 
   return (
     <div className="bg-[#2e443c] min-h-screen font-sans text-[#e8e6e1] selection:bg-[#F5DEB3] selection:text-[#2e443c] pb-24 lg:pb-0">
-      <div className="fixed top-0 left-0 w-full h-[300px] bg-gradient-to-b from-[#3a554a] to-[#2e443c] pointer-events-none opacity-50"></div>
+      
+      {/* Custom Scrollbar specifically for this page's inner lists */}
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(245, 222, 179, 0.2); border-radius: 4px; }
+        .custom-scrollbar:hover::-webkit-scrollbar-thumb { background: rgba(245, 222, 179, 0.5); }
+      `}</style>
+
+      {/* Ambient Background Glow */}
+      <div className="fixed top-0 left-0 w-full h-[400px] bg-gradient-to-b from-[#1a2822] to-transparent pointer-events-none opacity-80 z-0"></div>
+      
       <main className="max-w-[1200px] mx-auto pt-24 lg:pt-36 px-4 lg:px-8 relative z-10">
-        <div className="mb-6 lg:mb-8 text-center lg:text-left">
-          <span className="text-[10px] uppercase tracking-[0.2em] text-[#F5DEB3]/60 font-bold">
-            Secure Checkout
-          </span>
-          <h1 className="text-3xl lg:text-5xl font-serif text-white mt-2">
-            Finalize Your Order
-          </h1>
+        
+        {/* Title Section */}
+        <div className="mb-8 lg:mb-12 text-center lg:text-left">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#F5DEB3]/10 border border-[#F5DEB3]/20 mb-3">
+             <span className="w-1.5 h-1.5 rounded-full bg-[#F5DEB3] animate-pulse"></span>
+             <span className="text-[9px] uppercase tracking-[0.25em] text-[#F5DEB3] font-bold">Secure Checkout</span>
+          </div>
+          <h1 className="text-4xl md:text-5xl font-serif text-white">Complete your order.</h1>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-12 items-start">
-          <div className="lg:col-span-5 lg:sticky lg:top-32 order-1 lg:order-2">
-            <div className="bg-[#1c2b25] rounded-[2rem] p-6 lg:p-8 shadow-2xl border border-white/5 flex flex-col gap-6">
-              <div className="flex justify-between items-center border-b border-white/10 pb-4">
-                <h2 className="text-xl font-serif text-white">Order Summary</h2>
-                <span className="text-xs bg-[#F5DEB3]/10 text-[#F5DEB3] px-3 py-1 rounded-full border border-[#F5DEB3]/20">
-                  {cartItems.length} Items
-                </span>
-              </div>
-              <div className="space-y-4 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
-                {cartItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex gap-4 items-center bg-black/10 p-3 rounded-xl border border-white/5"
-                  >
-                    <div className="w-14 h-14 bg-[#e8e6e1] rounded-lg flex items-center justify-center p-1 shrink-0">
-                      <img
-                        src={item.image || "/placeholder.jpg"}
-                        alt={item.name}
-                        className="w-full h-full object-contain mix-blend-multiply"
-                      />
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+          
+          {/* ========================================================= */}
+          {/* RIGHT COLUMN: ORDER SUMMARY (Top on mobile, Right on Desktop) */}
+          {/* ========================================================= */}
+          <div className="lg:col-span-5 lg:sticky lg:top-32 order-1 lg:order-2 flex flex-col gap-6">
+            
+            {/* 1. THE COUPON HIGHLIGHT BOX (Massive UX Upgrade) */}
+            <div className="relative group">
+               {/* Glowing border effect */}
+               <div className="absolute -inset-[1px] bg-gradient-to-r from-[#F5DEB3]/50 to-[#F5DEB3]/10 rounded-[2rem] blur-[2px] opacity-70 group-hover:opacity-100 transition-opacity duration-500"></div>
+               
+               <div className="relative bg-[#15251e] border border-[#F5DEB3]/30 rounded-[2rem] p-6 md:p-7 shadow-2xl overflow-hidden">
+                  {/* Subtle corner light */}
+                  <div className="absolute -top-10 -right-10 w-32 h-32 bg-[#F5DEB3]/10 blur-3xl rounded-full"></div>
+                  
+                  <div className="flex items-center gap-4 mb-5">
+                    <div className="w-12 h-12 rounded-full bg-[#F5DEB3]/10 border border-[#F5DEB3]/20 flex items-center justify-center shrink-0">
+                        <i className="fa-solid fa-ticket text-[#F5DEB3] text-xl"></i>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-sm text-[#F5DEB3] truncate">
-                        {item.name}
-                      </h3>
-                      <div className="flex justify-between items-center mt-1">
-                        <p className="text-xs text-gray-400">
-                          Qty: {item.quantity}
-                        </p>
-                        <p className="font-mono text-sm">
-                          ₹{(item.price * item.quantity).toLocaleString()}
-                        </p>
-                      </div>
+                    <div>
+                      <h3 className="font-serif text-[#F5DEB3] text-xl tracking-wide leading-tight">Apply Promo Code</h3>
+                      <p className="text-[10px] text-green-50/60 uppercase tracking-widest mt-1">Unlock exclusive discounts</p>
                     </div>
                   </div>
-                ))}
-              </div>
-              <div className="bg-gradient-to-br from-[#F5DEB3]/20 via-[#F5DEB3]/5 to-transparent p-[1px] rounded-2xl shadow-[0_0_20px_rgba(245,222,179,0.05)]">
-                <div className="bg-[#1c2b25] rounded-2xl p-4 md:p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <i className="fa-solid fa-tags text-[#F5DEB3]"></i>
-                    <h3 className="font-serif text-[#F5DEB3] text-sm tracking-wide">
-                      Promotions & Offers
-                    </h3>
+                  
+                  <div className="relative z-10">
+                    <CouponInput
+                      appliedCoupon={appliedCoupon}
+                      discount={discount}
+                      onCouponApplied={handleCouponApplied}
+                      onCouponRemoved={handleCouponRemoved}
+                    />
                   </div>
-                  <CouponInput
-                    appliedCoupon={appliedCoupon}
-                    discount={discount}
-                    onCouponApplied={handleCouponApplied}
-                    onCouponRemoved={handleCouponRemoved}
-                  />
+
                   {!appliedCoupon && (
-                    <div className="mt-4 pt-4 border-t border-white/5 max-h-[220px] overflow-y-auto custom-scrollbar pr-1">
-                      <Suspense fallback={<ComponentLoader type="card" />}>
-                        <CouponList onCouponApplied={handleCouponApplied} />
-                      </Suspense>
+                    <div className="mt-5 pt-5 border-t border-[#F5DEB3]/10 relative z-10">
+                      <button
+                        onClick={() => setShowCouponModal(true)}
+                        className="w-full py-3 px-4 bg-[#F5DEB3]/10 hover:bg-[#F5DEB3]/20 border border-[#F5DEB3]/30 rounded-xl text-[#F5DEB3] font-bold text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                      >
+                        <i className="fa-solid fa-tags"></i>
+                        View All Available Coupons
+                      </button>
                     </div>
                   )}
-                </div>
-              </div>
-              <div className="space-y-3 pt-2 text-sm">
+               </div>
+            </div>
+
+            {/* 2. PAYMENT SUMMARY & CTA */}
+            <div className="bg-[#1c2b25] rounded-[2rem] p-6 md:p-8 shadow-xl border border-white/5 relative z-10">
+              <h3 className="font-serif text-white text-xl mb-5">Payment Summary</h3>
+              
+              <div className="space-y-4 text-sm">
                 <div className="flex justify-between text-gray-400">
                   <span>Subtotal</span>
                   <span>₹{pricingDetails.subtotal.toLocaleString()}</span>
@@ -570,143 +535,193 @@ const CheckoutPage = () => {
                   <span>Shipping</span>
                   <span>₹{pricingDetails.shipping.toLocaleString()}</span>
                 </div>
-                {appliedCoupon && pricingDetails.discount > 0 && (
-                  <div className="flex justify-between text-green-400 font-medium">
-                    <span>Discount ({appliedCoupon})</span>
-                    <span>-₹{pricingDetails.discount.toLocaleString()}</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-xl font-bold text-white pt-4 border-t border-white/10 mt-2">
-                  <span>Total To Pay</span>
-                  <span className="text-[#F5DEB3]">
-                    ₹{finalTotal.toLocaleString()}
-                  </span>
+                
+                {/* Active Discount Row */}
+                <AnimatePresence>
+                  {appliedCoupon && pricingDetails.discount > 0 && (
+                    <motion.div 
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="flex justify-between text-emerald-400 font-medium bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20"
+                    >
+                      <span className="flex items-center gap-2">
+                          <i className="fa-solid fa-circle-check text-xs"></i> 
+                          Discount ({appliedCoupon})
+                      </span>
+                      <span>-₹{pricingDetails.discount.toLocaleString()}</span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                
+                <div className="flex justify-between items-end pt-5 border-t border-white/10 mt-2">
+                  <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Total To Pay</span>
+                  <span className="text-3xl font-serif text-[#F5DEB3]">₹{finalTotal.toLocaleString()}</span>
                 </div>
               </div>
+
+              {/* Desktop Pay Button */}
               <button
                 onClick={handlePayment}
-                disabled={isOrdering || !address || !pincode}
-                className="hidden lg:block w-full mt-2 py-4 bg-[#F5DEB3] text-[#2e443c] rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                disabled={isOrdering || !address}
+                className="hidden lg:flex w-full mt-8 py-4 bg-[#F5DEB3] text-[#1c2b25] rounded-xl font-bold uppercase tracking-widest text-[11px] hover:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_10px_20px_rgba(245,222,179,0.15)] items-center justify-center gap-3"
               >
-                {isOrdering
-                  ? "Processing..."
-                  : `Pay ₹${finalTotal.toLocaleString()}`}
+                {isOrdering ? (
+                   <><div className="w-4 h-4 border-2 border-[#1c2b25] border-t-transparent rounded-full animate-spin"></div> Processing...</>
+                ) : (
+                   <>Proceed to Pay <i className="fa-solid fa-lock"></i></>
+                )}
               </button>
 
-              <div className="mt-2 flex justify-center gap-4 opacity-50">
+              <div className="mt-6 flex justify-center gap-4 opacity-40">
                  <i className="fa-brands fa-cc-visa text-2xl"></i>
                  <i className="fa-brands fa-cc-mastercard text-2xl"></i>
                  <i className="fa-brands fa-google-pay text-2xl"></i>
                  <i className="fa-solid fa-building-columns text-2xl"></i>
               </div>
             </div>
+
+            {/* 3. ORDER ITEMS (Moved to bottom) */}
+            <div className="bg-white/5 rounded-[2rem] p-6 border border-white/5">
+              <div className="flex justify-between items-center mb-5">
+                  <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400">Your Items</h3>
+                  <span className="text-xs bg-white/10 text-white px-2.5 py-1 rounded-md">{cartItems.length}</span>
+              </div>
+              
+              <div className="space-y-3 max-h-[220px] overflow-y-auto pr-2 custom-scrollbar">
+                {cartItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex gap-4 items-center bg-black/20 p-3 rounded-xl border border-white/5 hover:border-white/10 transition-colors"
+                  >
+                    <div className="w-14 h-14 bg-[#e8e6e1] rounded-lg flex items-center justify-center p-1.5 shrink-0">
+                      <img
+                        src={item.image || "/placeholder.jpg"}
+                        alt={item.name}
+                        className="w-full h-full object-contain mix-blend-multiply"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-sm text-white truncate mb-1">
+                        {item.name}
+                      </h3>
+                      <div className="flex justify-between items-center">
+                        <p className="text-[10px] text-gray-400 uppercase tracking-widest">
+                          Qty: {item.quantity}
+                        </p>
+                        <p className="font-mono text-sm text-[#F5DEB3]">
+                          ₹{(item.price * item.quantity).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
           </div>
 
+          {/* ========================================================= */}
+          {/* LEFT COLUMN: SHIPPING & CONTACT FORM (Bottom on mobile) */}
+          {/* ========================================================= */}
           <div className="lg:col-span-7 space-y-6 order-2 lg:order-1">
-            <div className="bg-white/5 backdrop-blur-md rounded-2xl p-6 border border-white/10">
-              <h2 className="text-lg font-serif text-[#F5DEB3] mb-4 flex items-center gap-2">
-                <i className="fa-regular fa-user text-sm"></i> Contact Info
+            
+            {/* Section 1: Contact Details */}
+            <div className="bg-white/5 backdrop-blur-md rounded-[2rem] p-6 md:p-8 border border-white/10">
+              <h2 className="text-lg font-serif text-white mb-6 border-b border-white/10 pb-4 flex items-center gap-3">
+                <span className="w-6 h-6 rounded-full bg-[#F5DEB3]/20 text-[#F5DEB3] flex items-center justify-center text-xs">1</span> 
+                Contact Information
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-300">
-                <div className="bg-black/20 p-3 rounded-lg border border-white/5">
-                  <span className="block text-xs text-gray-500 uppercase tracking-wider mb-1">
-                    Name
-                  </span>
-                  {userProfile?.userName || userProfile?.name || "N/A"}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-1.5">
+                  <label className="text-[9px] uppercase tracking-widest text-gray-500 font-bold ml-1">Full Name</label>
+                  <div className="w-full bg-black/30 border border-white/5 rounded-xl p-4 text-white text-sm">
+                      {userProfile?.userName || userProfile?.name || "N/A"}
+                  </div>
                 </div>
-                <div className="bg-black/20 p-3 rounded-lg border border-white/5">
-                  <span className="block text-xs text-gray-500 uppercase tracking-wider mb-1">
-                    Email
-                  </span>
-                  {userProfile?.userEmail || userProfile?.email || "N/A"}
+                <div className="space-y-1.5">
+                  <label className="text-[9px] uppercase tracking-widest text-gray-500 font-bold ml-1">Phone Number</label>
+                  <div className="w-full bg-black/30 border border-white/5 rounded-xl p-4 text-white text-sm">
+                      {userProfile?.mobileNumber || userProfile?.mobile || "N/A"}
+                  </div>
                 </div>
-                <div className="bg-black/20 p-3 rounded-lg border border-white/5 md:col-span-2">
-                  <span className="block text-xs text-gray-500 uppercase tracking-wider mb-1">
-                    Phone
-                  </span>
-                  {userProfile?.mobileNumber || userProfile?.mobile || "N/A"}
+                <div className="space-y-1.5 md:col-span-2">
+                  <label className="text-[9px] uppercase tracking-widest text-gray-500 font-bold ml-1">Email Address</label>
+                  <div className="w-full bg-black/30 border border-white/5 rounded-xl p-4 text-white text-sm">
+                      {userProfile?.userEmail || userProfile?.email || "N/A"}
+                  </div>
                 </div>
               </div>
             </div>
 
+            {/* Section 2: Delivery Address */}
             <div
-              className={`bg-white/5 backdrop-blur-md rounded-2xl p-6 border transition-all ${!address ? "border-[#F5DEB3]/50 shadow-[0_0_20px_rgba(245,222,179,0.1)]" : "border-white/10"}`}
+              className={`bg-white/5 backdrop-blur-md rounded-[2rem] p-6 md:p-8 border transition-all duration-500 ${!address ? "border-[#F5DEB3]/40 shadow-[0_0_30px_rgba(245,222,179,0.08)]" : "border-white/10"}`}
             >
-              <h2 className="text-lg font-serif text-[#F5DEB3] mb-4 flex items-center gap-2">
-                <i className="fa-solid fa-truck-fast text-sm" /> Shipping
-                Details
+              <h2 className="text-lg font-serif text-white mb-6 border-b border-white/10 pb-4 flex items-center gap-3">
+                <span className="w-6 h-6 rounded-full bg-[#F5DEB3]/20 text-[#F5DEB3] flex items-center justify-center text-xs">2</span> 
+                Delivery Details
               </h2>
+              
               {!address ? (
+                // Empty Address State -> Big CTA to open map
                 <button
                   onClick={handleOpenMap}
                   disabled={isLocating}
-                  className="w-full py-12 border-2 border-dashed border-[#F5DEB3]/30 rounded-2xl flex flex-col items-center gap-3 hover:bg-[#F5DEB3]/5 transition-all"
+                  className="w-full py-16 border-2 border-dashed border-[#F5DEB3]/30 rounded-2xl flex flex-col items-center justify-center gap-4 hover:bg-[#F5DEB3]/5 hover:border-[#F5DEB3]/60 transition-all group"
                 >
-                  <i
-                    className={`fa-solid ${isLocating ? "fa-spinner animate-spin" : "fa-map-location-dot"} text-2xl text-[#F5DEB3]`}
-                  />
-                  <span className="text-xs font-bold uppercase text-[#F5DEB3]">
-                    {isLocating ? "Detecting..." : "Select Location on Map"}
+                  <div className="w-16 h-16 rounded-full bg-[#F5DEB3]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <i className={`fa-solid ${isLocating ? "fa-spinner animate-spin" : "fa-map-location-dot"} text-2xl text-[#F5DEB3]`} />
+                  </div>
+                  <span className="text-xs font-bold uppercase tracking-widest text-[#F5DEB3]">
+                    {isLocating ? "Detecting Location..." : "Pinpoint Delivery Location"}
                   </span>
                 </button>
               ) : (
-                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
-                  <div className="bg-black/30 p-4 rounded-xl border border-[#F5DEB3]/30 flex justify-between items-start">
+                // Filled Address State
+                <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <div className="bg-black/40 p-5 rounded-2xl border border-[#F5DEB3]/30 flex justify-between items-start gap-4">
                     <div className="flex-1">
-                      <h3 className="font-bold text-[#F5DEB3] text-sm">
-                        Delivery To:
+                      <h3 className="font-bold text-[#F5DEB3] text-xs uppercase tracking-widest mb-1">
+                        Delivering To:
                       </h3>
-                      <p className="text-xs text-gray-400 mt-1">{address}</p>
+                      <p className="text-sm text-gray-300 leading-relaxed">{address}</p>
                     </div>
-                    <div className="flex flex-col gap-2">
-                      <button
-                        onClick={handleOpenMap}
-                        className="text-[10px] text-[#F5DEB3] underline uppercase font-bold text-right"
-                      >
+                    <div className="flex flex-col gap-3 shrink-0">
+                      <button onClick={handleOpenMap} className="text-[10px] text-[#F5DEB3] uppercase font-bold tracking-widest hover:text-white transition-colors bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">
                         Change
                       </button>
-                      <button
-                        onClick={handleResetAddress}
-                        className="text-[10px] text-red-400 underline uppercase font-bold text-right"
-                      >
+                      <button onClick={handleResetAddress} className="text-[10px] text-red-400 uppercase font-bold tracking-widest hover:text-red-300 transition-colors px-3 py-1.5">
                         Reset
                       </button>
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input
-                      value={preciseDetails.flatNo}
-                      placeholder="Flat / Floor No."
-                      className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-sm text-white"
-                      onChange={(e) =>
-                        setPreciseDetails((p) => ({
-                          ...p,
-                          flatNo: e.target.value,
-                        }))
-                      }
-                    />
-                    <input
-                      value={preciseDetails.landmark}
-                      placeholder="Landmark"
-                      className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-sm text-white"
-                      onChange={(e) =>
-                        setPreciseDetails((p) => ({
-                          ...p,
-                          landmark: e.target.value,
-                        }))
-                      }
-                    />
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div className="space-y-1.5">
+                        <label className="text-[9px] uppercase tracking-widest text-gray-500 font-bold ml-1">Flat / Floor No. (Optional)</label>
+                        <input
+                            value={preciseDetails.flatNo}
+                            placeholder="e.g. Apt 4B, 2nd Floor"
+                            className="w-full bg-black/30 border border-white/10 rounded-xl p-4 text-sm text-white focus:outline-none focus:border-[#F5DEB3] transition-all"
+                            onChange={(e) => setPreciseDetails((p) => ({ ...p, flatNo: e.target.value }))}
+                        />
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-[9px] uppercase tracking-widest text-gray-500 font-bold ml-1">Landmark (Optional)</label>
+                        <input
+                            value={preciseDetails.landmark}
+                            placeholder="e.g. Near Metro Station"
+                            className="w-full bg-black/30 border border-white/10 rounded-xl p-4 text-sm text-white focus:outline-none focus:border-[#F5DEB3] transition-all"
+                            onChange={(e) => setPreciseDetails((p) => ({ ...p, landmark: e.target.value }))}
+                        />
+                    </div>
                   </div>
                 </div>
               )}
-              <AnimatePresence
-                onExitComplete={() => {
-                  if (mapRef.current) {
-                    mapRef.current.setTarget(null);
-                    mapRef.current = null;
-                  }
-                }}
-              >
+              
+              {/* === THE MAP MODAL === */}
+              <AnimatePresence onExitComplete={() => { if (mapRef.current) { mapRef.current.setTarget(null); mapRef.current = null; } }}>
                 {showMapModal && (
                   <motion.div
                     initial={{ opacity: 0 }}
@@ -715,134 +730,130 @@ const CheckoutPage = () => {
                     className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm"
                   >
                     <motion.div
-                      initial={{ y: "100%" }}
-                      animate={{ y: 0 }}
-                      exit={{ y: "100%" }}
-                      transition={{
-                        type: "spring",
-                        damping: 25,
-                        stiffness: 200,
-                      }}
-                      className="bg-[#1c2b25] w-full max-w-2xl h-[90vh] sm:h-auto sm:rounded-[2rem] overflow-hidden border-t sm:border border-white/10 shadow-2xl flex flex-col"
+                      initial={{ y: "100%", scale: 0.95 }}
+                      animate={{ y: 0, scale: 1 }}
+                      exit={{ y: "100%", scale: 0.95 }}
+                      transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                      className="bg-[#1c2b25] w-full max-w-3xl h-[95vh] sm:h-[85vh] sm:rounded-[2rem] overflow-hidden border-t sm:border border-white/10 shadow-2xl flex flex-col"
                     >
-                      <div className="p-4 border-b border-white/10 flex justify-between items-center bg-[#2e443c] shrink-0">
-                        <h3 className="font-serif text-[#F5DEB3]">
-                          Adjust Delivery Pin
-                        </h3>
-                        <button
-                          onClick={() => setShowMapModal(false)}
-                          className="text-white/60 hover:text-white text-xl"
-                        >
-                          <i className="fa-solid fa-xmark"></i>
+                      {/* Modal Header */}
+                      <div className="p-5 border-b border-white/10 flex justify-between items-center bg-[#2e443c] shrink-0">
+                        <div>
+                            <h3 className="font-serif text-[#F5DEB3] text-xl">Set Delivery Location</h3>
+                            <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-0.5">Move pin to exact location</p>
+                        </div>
+                        <button onClick={() => setShowMapModal(false)} className="w-10 h-10 rounded-full bg-black/20 flex items-center justify-center text-white/60 hover:text-white hover:bg-black/40 transition-colors">
+                          <i className="fa-solid fa-xmark text-lg"></i>
                         </button>
                       </div>
 
-                      <div className="p-4 bg-[#1c2b25] shrink-0 relative z-[110]">
+                      {/* Modal Controls */}
+                      <div className="p-5 bg-[#1c2b25] shrink-0 relative z-[110] border-b border-white/5">
                         <button
                           onClick={getUserCurrentLocation}
                           disabled={isLocating}
-                          className="w-full py-3 mb-4 rounded-xl bg-[#F5DEB3]/10 border border-[#F5DEB3]/30 text-[#F5DEB3] font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-[#F5DEB3]/20 transition-all disabled:opacity-50"
+                          className="w-full py-3.5 mb-4 rounded-xl bg-[#F5DEB3]/10 border border-[#F5DEB3]/30 text-[#F5DEB3] font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-[#F5DEB3]/20 transition-all disabled:opacity-50"
                         >
-                          <i
-                            className={`fa-solid ${isLocating ? "fa-spinner animate-spin" : "fa-location-crosshairs"}`}
-                          ></i>
-                          {isLocating ? "Locating..." : "Use Current Location"}
+                          <i className={`fa-solid ${isLocating ? "fa-spinner animate-spin" : "fa-location-crosshairs"} text-sm`}></i>
+                          {isLocating ? "Locating device..." : "Use Current Location"}
                         </button>
 
-                        <div className="relative mb-2">
+                        <div className="relative">
                           <input
                             type="text"
                             value={searchQuery}
                             onChange={(e) => handleSearchPlaces(e.target.value)}
                             placeholder="Search area, street, landmark..."
-                            className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-sm text-white focus:border-[#F5DEB3] outline-none pl-11"
+                            className="w-full bg-black/40 border border-white/10 rounded-xl p-4 pl-12 text-sm text-white focus:border-[#F5DEB3] outline-none"
                           />
                           <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
                         </div>
 
+                        {/* Search Results Dropdown */}
                         {(searchQuery.length > 0 || isSearching) && (
-                          <div className="absolute left-0 right-0 mt-1 bg-[#2e443c] border border-white/10 rounded-xl shadow-2xl z-[120] max-h-[350px] overflow-y-auto custom-scrollbar">
+                          <div className="absolute left-5 right-5 mt-2 bg-[#2e443c] border border-white/10 rounded-2xl shadow-2xl z-[120] max-h-[300px] overflow-y-auto custom-scrollbar">
                             {isSearching ? (
-                              <div className="w-full p-6 flex flex-col items-center justify-center gap-3">
-                                <div className="w-5 h-5 border-2 border-[#F5DEB3] border-t-transparent rounded-full animate-spin"></div>
-                                <p className="text-xs text-gray-400 font-medium uppercase tracking-widest">
-                                  Searching results...
-                                </p>
+                              <div className="w-full p-8 flex flex-col items-center justify-center gap-3">
+                                <div className="w-6 h-6 border-2 border-[#F5DEB3] border-t-transparent rounded-full animate-spin"></div>
+                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Searching...</p>
                               </div>
-                            ) : (
+                            ) : searchResults.length > 0 ? (
                               searchResults.map((item, i) => (
                                 <button
                                   key={i}
                                   onClick={() => handleSelectSearchResult(item)}
-                                  className="w-full text-left p-4 hover:bg-white/5 border-b border-white/5 last:border-0 flex items-start gap-3 transition-colors group"
+                                  className="w-full text-left p-4 hover:bg-white/5 border-b border-white/5 last:border-0 flex items-start gap-4 transition-colors group"
                                 >
-                                  <i className="fa-solid fa-location-dot mt-1 text-gray-500 group-hover:text-[#F5DEB3]"></i>
+                                  <div className="w-8 h-8 rounded-full bg-black/20 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-[#F5DEB3]/10">
+                                     <i className="fa-solid fa-location-dot text-gray-500 group-hover:text-[#F5DEB3] transition-colors"></i>
+                                  </div>
                                   <div>
-                                    <p className="text-sm text-white font-medium group-hover:text-[#F5DEB3]">
+                                    <p className="text-sm text-white font-medium group-hover:text-[#F5DEB3] transition-colors">
                                       {item.structured_formatting.main_text}
                                     </p>
-                                    <p className="text-[11px] text-gray-400 line-clamp-1">
-                                      {
-                                        item.structured_formatting
-                                          .secondary_text
-                                      }
+                                    <p className="text-[11px] text-gray-400 line-clamp-1 mt-0.5">
+                                      {item.structured_formatting.secondary_text}
                                     </p>
                                   </div>
                                 </button>
                               ))
+                            ) : (
+                               <div className="p-6 text-center text-sm text-gray-400">No results found for "{searchQuery}"</div>
                             )}
                           </div>
                         )}
                       </div>
 
-                      <div className="relative h-[400px] md:h-[450px] w-full bg-black shrink-0">
+                      {/* Map Viewport */}
+                      <div className="relative flex-1 min-h-[300px] w-full bg-[#15251e]">
                         <div ref={mapElement} className="w-full h-full" />
 
-                        {/* Overlay Instruction Message stays until Suggestions or Search/Locate happens */}
-                        {mapSuggestions.length === 0 &&
-                          !isSearching &&
-                          !isLocating && (
-                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 px-10">
-                              <div className="bg-black/60 backdrop-blur-md p-5 rounded-2xl border border-white/10 text-center shadow-2xl">
-                                <p className="text-[11px] text-[#F5DEB3] font-serif tracking-widest uppercase mb-1">
-                                  Navigation Required
-                                </p>
-                                <p className="text-xs text-white/80 leading-relaxed font-light">
-                                  Use current location to set it <br /> or type
-                                  in the input above
-                                </p>
+                        {mapSuggestions.length === 0 && !isSearching && !isLocating && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 px-8">
+                              <div className="bg-black/60 backdrop-blur-md p-6 rounded-2xl border border-white/10 text-center shadow-2xl">
+                                <i className="fa-solid fa-hand-pointer text-2xl text-[#F5DEB3] mb-3 animate-bounce"></i>
+                                <p className="text-[11px] text-[#F5DEB3] uppercase tracking-[0.2em] font-bold mb-1">Navigation Required</p>
+                                <p className="text-sm text-white/80 leading-relaxed font-light">Drag the map to pinpoint<br/>your exact location</p>
                               </div>
                             </div>
-                          )}
+                        )}
 
+                        {/* Center Target Pin */}
                         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full pointer-events-none z-10">
-                          <i className="fa-solid fa-location-dot text-4xl text-red-500 drop-shadow-lg"></i>
+                          <i className="fa-solid fa-location-dot text-4xl text-[#F5DEB3] drop-shadow-[0_10px_10px_rgba(0,0,0,0.8)]"></i>
+                          <div className="w-2 h-1 bg-black/50 rounded-full absolute -bottom-1 left-1/2 -translate-x-1/2 blur-[2px]"></div>
                         </div>
                       </div>
 
-                      <div className="p-4 bg-[#1c2b25] flex-1 overflow-y-auto border-t border-white/5">
-                        <p className="text-[10px] uppercase tracking-widest text-gray-500 mb-2 text-center">
-                          Nearby Suggestions
+                      {/* Map Suggestions Bottom Bar */}
+                      <div className="p-5 bg-[#1c2b25] h-[200px] flex flex-col shrink-0 border-t border-white/5 relative z-[110]">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3 flex items-center gap-2">
+                           <i className="fa-solid fa-list-ul"></i> Select Nearest Match
                         </p>
-                        <div className="space-y-2">
+                        <div className="space-y-3 overflow-y-auto custom-scrollbar pr-2 flex-1">
                           {mapSuggestions.length > 0 ? (
                             mapSuggestions.map((s, idx) => (
                               <button
                                 key={idx}
                                 onClick={() => handleConfirmAddress(s)}
-                                className="w-full text-left p-3 rounded-xl bg-white/5 border border-white/5 hover:border-[#F5DEB3]/50 transition-all group"
+                                className="w-full text-left p-4 rounded-xl bg-black/30 border border-white/5 hover:border-[#F5DEB3]/50 hover:bg-black/50 transition-all group flex items-center justify-between"
                               >
-                                <p className="text-sm text-white group-hover:text-[#F5DEB3] line-clamp-1">
-                                  {s.formattedAddress}
-                                </p>
-                                <p className="text-[10px] text-gray-500 mt-1">
-                                  {s.city}, {s.state} - {s.pinCode}
-                                </p>
+                                <div className="pr-4">
+                                    <p className="text-sm text-white group-hover:text-[#F5DEB3] line-clamp-1 transition-colors">
+                                    {s.formattedAddress}
+                                    </p>
+                                    <p className="text-[10px] text-gray-500 mt-1 uppercase tracking-wider">
+                                    {s.city}, {s.state} - <span className="text-white font-mono">{s.pinCode}</span>
+                                    </p>
+                                </div>
+                                <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-[#F5DEB3] group-hover:text-[#1c3026] text-white/50 transition-colors shrink-0">
+                                    <i className="fa-solid fa-check text-xs"></i>
+                                </div>
                               </button>
                             ))
                           ) : (
-                            <div className="text-center py-4 text-gray-500 text-sm italic">
-                              Drag the map or use search to find location
+                            <div className="h-full flex items-center justify-center text-gray-500 text-xs italic">
+                              Searching for nearby addresses...
                             </div>
                           )}
                         </div>
@@ -852,35 +863,152 @@ const CheckoutPage = () => {
                 )}
               </AnimatePresence>
             </div>
-            {paymentError && (
-              <div className="bg-red-500/10 p-6 rounded-2xl border border-red-500/30 text-red-400 text-sm">
-                {paymentError}
-              </div>
-            )}
+
+            {/* Error Message Display */}
+            <AnimatePresence>
+                {paymentError && (
+                <motion.div 
+                    initial={{ opacity: 0, height: 0, y: -20 }}
+                    animate={{ opacity: 1, height: 'auto', y: 0 }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="bg-red-500/10 backdrop-blur-md rounded-[2rem] p-6 md:p-8 border border-red-500/30 overflow-hidden"
+                >
+                    <div className="flex items-start gap-4">
+                        <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center text-red-400 shrink-0">
+                            <i className="fa-solid fa-triangle-exclamation"></i>
+                        </div>
+                        <div className="flex-1 pt-1">
+                            <h3 className="text-lg font-serif text-red-400 mb-1">Transaction Failed</h3>
+                            <p className="text-sm text-gray-300 mb-5 leading-relaxed">{paymentError}</p>
+                            {showRetry && (
+                            <button
+                                onClick={handlePayment}
+                                disabled={isOrdering}
+                                className="px-6 py-3 bg-red-500/20 border border-red-500/30 text-red-300 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 w-fit"
+                            >
+                                <i className="fa-solid fa-rotate-right"></i>
+                                Retry Payment
+                            </button>
+                            )}
+                        </div>
+                        <button
+                            onClick={() => { setPaymentError(null); setShowRetry(false); }}
+                            className="text-red-400/50 hover:text-red-400 transition-colors p-1"
+                        >
+                            <i className="fa-solid fa-xmark text-xl"></i>
+                        </button>
+                    </div>
+                </motion.div>
+                )}
+            </AnimatePresence>
+
           </div>
+
         </div>
       </main>
 
-      <motion.div
+      {/* === COUPON MODAL === */}
+      <AnimatePresence>
+        {showCouponModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm"
+            onClick={() => setShowCouponModal(false)}
+          >
+            <motion.div
+              initial={{ y: "100%", scale: 0.95 }}
+              animate={{ y: 0, scale: 1 }}
+              exit={{ y: "100%", scale: 0.95 }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-[#1c2b25] w-full max-w-2xl max-h-[85vh] sm:rounded-[2rem] overflow-hidden border-t sm:border border-white/10 shadow-2xl flex flex-col"
+            >
+              {/* Modal Header */}
+              <div className="p-5 md:p-6 border-b border-white/10 flex justify-between items-center bg-[#2e443c] shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#F5DEB3]/10 border border-[#F5DEB3]/20 flex items-center justify-center">
+                    <i className="fa-solid fa-tags text-[#F5DEB3]"></i>
+                  </div>
+                  <div>
+                    <h3 className="font-serif text-[#F5DEB3] text-xl">Available Coupons</h3>
+                    <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-0.5">
+                      Select to apply discount
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowCouponModal(false)}
+                  className="w-10 h-10 rounded-full bg-black/20 flex items-center justify-center text-white/60 hover:text-white hover:bg-black/40 transition-colors"
+                >
+                  <i className="fa-solid fa-xmark text-lg"></i>
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="flex-1 overflow-y-auto p-5 md:p-6 custom-scrollbar">
+                <Suspense 
+                  fallback={
+                    <div className="flex items-center justify-center py-12">
+                      <div className="w-10 h-10 border-2 border-[#F5DEB3] border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                  }
+                >
+                  <CouponList 
+                    onCouponApplied={(couponData) => {
+                      handleCouponApplied(couponData);
+                      setShowCouponModal(false);
+                    }} 
+                  />
+                </Suspense>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-5 md:p-6 border-t border-white/10 bg-[#15251e] shrink-0">
+                <button
+                  onClick={() => setShowCouponModal(false)}
+                  className="w-full py-3 px-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-white font-bold text-xs uppercase tracking-widest transition-all"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* --- MOBILE STICKY BOTTOM BAR --- */}
+      <motion.div 
         initial={{ y: 100 }}
         animate={{ y: 0 }}
-        className="fixed bottom-0 left-0 right-0 bg-[#1c2b25]/95 backdrop-blur-xl border-t border-[#F5DEB3]/20 p-4 px-6 z-50 lg:hidden shadow-[0_-10px_40px_rgba(0,0,0,0.5)]"
+        className="fixed bottom-0 left-0 right-0 bg-[#15251e]/95 backdrop-blur-xl border-t border-[#F5DEB3]/20 p-4 px-6 z-50 lg:hidden shadow-[0_-20px_40px_rgba(0,0,0,0.6)]"
       >
-        <div className="flex items-center gap-4">
-          <div className="flex flex-col">
-            <span className="text-xl font-serif text-white">
-              ₹{finalTotal.toLocaleString()}
-            </span>
-          </div>
-          <button
-            onClick={handlePayment}
-            disabled={isOrdering || !address}
-            className={`flex-1 h-12 rounded-full font-bold uppercase text-[10px] ${!address ? "bg-gray-600" : "bg-[#F5DEB3] text-[#2e443c]"}`}
-          >
-            Pay Now
-          </button>
-        </div>
+         <div className="flex items-center gap-5 max-w-[1200px] mx-auto">
+            <div className="flex flex-col">
+                <span className="text-[9px] text-[#F5DEB3]/70 uppercase tracking-widest font-bold">Total Payable</span>
+                <span className="text-2xl font-serif text-white">₹{finalTotal.toLocaleString()}</span>
+            </div>
+            <button 
+                onClick={handlePayment}
+                disabled={isOrdering || !address}
+                className={`flex-1 h-14 rounded-xl font-bold uppercase tracking-widest text-[11px] shadow-lg active:scale-95 transition-all flex items-center justify-center gap-3 ${
+                    !address 
+                    ? 'bg-white/5 text-gray-500 border border-white/10' 
+                    : 'bg-[#F5DEB3] text-[#1c3026]'
+                }`}
+            >
+                {isOrdering ? (
+                    <><div className="w-4 h-4 border-2 border-[#1c3026] border-t-transparent rounded-full animate-spin"></div> Proc...</>
+                ) : (!address ? (
+                    'Set Address'
+                ) : (
+                    <>Pay Now <i className="fa-solid fa-lock text-[10px]"></i></>
+                ))}
+            </button>
+         </div>
       </motion.div>
+
     </div>
   );
 };
