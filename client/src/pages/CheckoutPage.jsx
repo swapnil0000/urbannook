@@ -47,6 +47,7 @@ const CheckoutPage = () => {
     landmark: "",
     flatNo: "",
   });
+  const [savedAddress, setSavedAddress] = useState([]);
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
   const mapElement = useRef();
   const mapRef = useRef();
@@ -76,7 +77,8 @@ const CheckoutPage = () => {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, []);
+    handleSaveAdress();
+  }, [handleSaveAdress]);
 
   const handleOpenMap = () => {
     setShowMapModal(true);
@@ -113,7 +115,7 @@ const CheckoutPage = () => {
           showNotification("Location access denied", "error");
           setIsLocating(false);
         },
-        { enableHighAccuracy: true },
+        { enableHighAccuracy: true }
       );
     }
   };
@@ -133,7 +135,7 @@ const CheckoutPage = () => {
         const res = await axios.post(
           `${apiBaseUrl}/user/address/search`,
           { userSearchInput: val },
-          { withCredentials: true },
+          { withCredentials: true }
         );
         if (res.data.success) setSearchResults(res.data.data);
       } catch (err) {
@@ -338,12 +340,34 @@ const CheckoutPage = () => {
         setAddress(suggestion.formattedAddress);
         setPincode(suggestion.pinCode.toString());
         setShowMapModal(false);
-        showNotification("Address confirmed for delivery!", "success");
+        showNotification(res?.data?.message, "success");
+        handleSaveAdress();
       }
     } catch (err) {
       const errorMessage = err.response?.data?.message || "Failed to save address";
       showNotification(errorMessage, "error");
     }
+  };
+
+  const handleSaveAdress = async () => {
+    try {
+      const res = await axios.get(`${apiBaseUrl}/user/address/saved`, {
+        withCredentials: true,
+      });
+      if (res.data.success) setSavedAddress(res.data.data);
+    } catch (err) {
+      console.error("API Error:", err);
+    }
+  };
+
+  const selectSavedAddress = (addr) => {
+    setAddress(addr.formattedAddress);
+    setPincode(addr.pinCode.toString());
+    setPreciseDetails({
+        landmark: addr.landmark || "", 
+        flatNo: addr.flatOrFloorNumber || ""
+    });
+    showNotification("Saved address selected", "success");
   };
 
   const loadRazorpay = () => {
@@ -447,7 +471,6 @@ const CheckoutPage = () => {
   return (
     <div className="bg-[#2e443c] min-h-screen font-sans text-[#e8e6e1] selection:bg-[#F5DEB3] selection:text-[#2e443c] pb-24 lg:pb-0">
       
-      {/* Custom Scrollbar specifically for this page's inner lists */}
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -455,12 +478,10 @@ const CheckoutPage = () => {
         .custom-scrollbar:hover::-webkit-scrollbar-thumb { background: rgba(245, 222, 179, 0.5); }
       `}</style>
 
-      {/* Ambient Background Glow */}
       <div className="fixed top-0 left-0 w-full h-[400px] bg-gradient-to-b from-[#1a2822] to-transparent pointer-events-none opacity-80 z-0"></div>
       
       <main className="max-w-[1200px] mx-auto pt-24 lg:pt-36 px-4 lg:px-8 relative z-10">
         
-        {/* Title Section */}
         <div className="mb-8 lg:mb-12 text-center lg:text-left">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#F5DEB3]/10 border border-[#F5DEB3]/20 mb-3">
              <span className="w-1.5 h-1.5 rounded-full bg-[#F5DEB3] animate-pulse"></span>
@@ -471,117 +492,8 @@ const CheckoutPage = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
           
-          {/* ========================================================= */}
-          {/* RIGHT COLUMN: ORDER SUMMARY (Top on mobile, Right on Desktop) */}
-          {/* ========================================================= */}
           <div className="lg:col-span-5 lg:sticky lg:top-32 order-1 lg:order-2 flex flex-col gap-6">
             
-            {/* 1. THE COUPON HIGHLIGHT BOX (Massive UX Upgrade) */}
-            <div className="relative group">
-               {/* Glowing border effect */}
-               <div className="absolute -inset-[1px] bg-gradient-to-r from-[#F5DEB3]/50 to-[#F5DEB3]/10 rounded-[2rem] blur-[2px] opacity-70 group-hover:opacity-100 transition-opacity duration-500"></div>
-               
-               <div className="relative bg-[#15251e] border border-[#F5DEB3]/30 rounded-[2rem] p-6 md:p-7 shadow-2xl overflow-hidden">
-                  {/* Subtle corner light */}
-                  <div className="absolute -top-10 -right-10 w-32 h-32 bg-[#F5DEB3]/10 blur-3xl rounded-full"></div>
-                  
-                  <div className="flex items-center gap-4 mb-5">
-                    <div className="w-12 h-12 rounded-full bg-[#F5DEB3]/10 border border-[#F5DEB3]/20 flex items-center justify-center shrink-0">
-                        <i className="fa-solid fa-ticket text-[#F5DEB3] text-xl"></i>
-                    </div>
-                    <div>
-                      <h3 className="font-serif text-[#F5DEB3] text-xl tracking-wide leading-tight">Apply Promo Code</h3>
-                      <p className="text-[10px] text-green-50/60 uppercase tracking-widest mt-1">Unlock exclusive discounts</p>
-                    </div>
-                  </div>
-                  
-                  <div className="relative z-10">
-                    <CouponInput
-                      appliedCoupon={appliedCoupon}
-                      discount={discount}
-                      onCouponApplied={handleCouponApplied}
-                      onCouponRemoved={handleCouponRemoved}
-                    />
-                  </div>
-
-                  {!appliedCoupon && (
-                    <div className="mt-5 pt-5 border-t border-[#F5DEB3]/10 relative z-10">
-                      <button
-                        onClick={() => setShowCouponModal(true)}
-                        className="w-full py-3 px-4 bg-[#F5DEB3]/10 hover:bg-[#F5DEB3]/20 border border-[#F5DEB3]/30 rounded-xl text-[#F5DEB3] font-bold text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2"
-                      >
-                        <i className="fa-solid fa-tags"></i>
-                        View All Available Coupons
-                      </button>
-                    </div>
-                  )}
-               </div>
-            </div>
-
-            {/* 2. PAYMENT SUMMARY & CTA */}
-            <div className="bg-[#1c2b25] rounded-[2rem] p-6 md:p-8 shadow-xl border border-white/5 relative z-10">
-              <h3 className="font-serif text-white text-xl mb-5">Payment Summary</h3>
-              
-              <div className="space-y-4 text-sm">
-                <div className="flex justify-between text-gray-400">
-                  <span>Subtotal</span>
-                  <span>₹{pricingDetails.subtotal.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-gray-400">
-                  <span>GST (18%)</span>
-                  <span>₹{pricingDetails.gst.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-gray-400">
-                  <span>Shipping</span>
-                  <span>₹{pricingDetails.shipping.toLocaleString()}</span>
-                </div>
-                
-                {/* Active Discount Row */}
-                <AnimatePresence>
-                  {appliedCoupon && pricingDetails.discount > 0 && (
-                    <motion.div 
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="flex justify-between text-emerald-400 font-medium bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20"
-                    >
-                      <span className="flex items-center gap-2">
-                          <i className="fa-solid fa-circle-check text-xs"></i> 
-                          Discount ({appliedCoupon})
-                      </span>
-                      <span>-₹{pricingDetails.discount.toLocaleString()}</span>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-                
-                <div className="flex justify-between items-end pt-5 border-t border-white/10 mt-2">
-                  <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Total To Pay</span>
-                  <span className="text-3xl font-serif text-[#F5DEB3]">₹{finalTotal.toLocaleString()}</span>
-                </div>
-              </div>
-
-              {/* Desktop Pay Button */}
-              <button
-                onClick={handlePayment}
-                disabled={isOrdering || !address}
-                className="hidden lg:flex w-full mt-8 py-4 bg-[#F5DEB3] text-[#1c2b25] rounded-xl font-bold uppercase tracking-widest text-[11px] hover:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_10px_20px_rgba(245,222,179,0.15)] items-center justify-center gap-3"
-              >
-                {isOrdering ? (
-                   <><div className="w-4 h-4 border-2 border-[#1c2b25] border-t-transparent rounded-full animate-spin"></div> Processing...</>
-                ) : (
-                   <>Proceed to Pay <i className="fa-solid fa-lock"></i></>
-                )}
-              </button>
-
-              <div className="mt-6 flex justify-center gap-4 opacity-40">
-                 <i className="fa-brands fa-cc-visa text-2xl"></i>
-                 <i className="fa-brands fa-cc-mastercard text-2xl"></i>
-                 <i className="fa-brands fa-google-pay text-2xl"></i>
-                 <i className="fa-solid fa-building-columns text-2xl"></i>
-              </div>
-            </div>
-
-            {/* 3. ORDER ITEMS (Moved to bottom) */}
             <div className="bg-white/5 rounded-[2rem] p-6 border border-white/5">
               <div className="flex justify-between items-center mb-5">
                   <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400">Your Items</h3>
@@ -618,15 +530,112 @@ const CheckoutPage = () => {
                 ))}
               </div>
             </div>
+            <div className="relative group">
+
+               <div className="absolute -inset-[1px] bg-gradient-to-r from-[#F5DEB3]/50 to-[#F5DEB3]/10 rounded-[2rem] blur-[2px] opacity-70 group-hover:opacity-100 transition-opacity duration-500"></div>
+               
+               <div className="relative bg-[#15251e] border border-[#F5DEB3]/30 rounded-[2rem] p-6 md:p-7 shadow-2xl overflow-hidden">
+                  <div className="absolute -top-10 -right-10 w-32 h-32 bg-[#F5DEB3]/10 blur-3xl rounded-full"></div>
+                  
+                  <div className="flex items-center gap-4 mb-5">
+                    <div className="w-12 h-12 rounded-full bg-[#F5DEB3]/10 border border-[#F5DEB3]/20 flex items-center justify-center shrink-0">
+                        <i className="fa-solid fa-ticket text-[#F5DEB3] text-xl"></i>
+                    </div>
+                    <div>
+                      <h3 className="font-serif text-[#F5DEB3] text-xl tracking-wide leading-tight">Apply Promo Code</h3>
+                      <p className="text-[10px] text-green-50/60 uppercase tracking-widest mt-1">Unlock exclusive discounts</p>
+                    </div>
+                  </div>
+                  
+                  <div className="relative z-10">
+                    <CouponInput
+                      appliedCoupon={appliedCoupon}
+                      discount={discount}
+                      onCouponApplied={handleCouponApplied}
+                      onCouponRemoved={handleCouponRemoved}
+                    />
+                  </div>
+
+                  {!appliedCoupon && (
+                    <div className="mt-5 pt-5 border-t border-[#F5DEB3]/10 relative z-10">
+                      <button
+                        onClick={() => setShowCouponModal(true)}
+                        className="w-full py-3 px-4 bg-[#F5DEB3]/10 hover:bg-[#F5DEB3]/20 border border-[#F5DEB3]/30 rounded-xl text-[#F5DEB3] font-bold text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                      >
+                        <i className="fa-solid fa-tags"></i>
+                        View All Available Coupons
+                      </button>
+                    </div>
+                  )}
+               </div>
+            </div>
+
+            <div className="bg-[#1c2b25] rounded-[2rem] p-6 md:p-8 md:mb-4 shadow-xl border border-white/5 relative z-10">
+              <h3 className="font-serif text-white text-xl mb-5">Payment Summary</h3>
+              
+              <div className="space-y-4 text-sm">
+                <div className="flex justify-between text-gray-400">
+                  <span>Subtotal</span>
+                  <span>₹{pricingDetails.subtotal.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-gray-400">
+                  <span>GST (18%)</span>
+                  <span>₹{pricingDetails.gst.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-gray-400">
+                  <span>Shipping</span>
+                  <span>₹{pricingDetails.shipping.toLocaleString()}</span>
+                </div>
+                
+                <AnimatePresence>
+                  {appliedCoupon && pricingDetails.discount > 0 && (
+                    <motion.div 
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="flex justify-between text-emerald-400 font-medium bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20"
+                    >
+                      <span className="flex items-center gap-2">
+                          <i className="fa-solid fa-circle-check text-xs"></i> 
+                          Discount ({appliedCoupon})
+                      </span>
+                      <span>-₹{pricingDetails.discount.toLocaleString()}</span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                
+                <div className="flex justify-between items-end pt-5 border-t border-white/10 mt-2">
+                  <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Total To Pay</span>
+                  <span className="text-3xl font-serif text-[#F5DEB3]">₹{finalTotal.toLocaleString()}</span>
+                </div>
+              </div>
+
+              <button
+                onClick={handlePayment}
+                disabled={isOrdering || !address}
+                className="hidden lg:flex w-full mt-8 py-4 bg-[#F5DEB3] text-[#1c2b25] rounded-xl font-bold uppercase tracking-widest text-[11px] hover:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_10px_20px_rgba(245,222,179,0.15)] items-center justify-center gap-3"
+              >
+                {isOrdering ? (
+                   <><div className="w-4 h-4 border-2 border-[#1c2b25] border-t-transparent rounded-full animate-spin"></div> Processing...</>
+                ) : (
+                   <>Proceed to Pay <i className="fa-solid fa-lock"></i></>
+                )}
+              </button>
+
+              <div className="mt-6 flex justify-center gap-4 opacity-40">
+                 <i className="fa-brands fa-cc-visa text-2xl"></i>
+                 <i className="fa-brands fa-cc-mastercard text-2xl"></i>
+                 <i className="fa-brands fa-google-pay text-2xl"></i>
+                 <i className="fa-solid fa-building-columns text-2xl"></i>
+              </div>
+            </div>
+
+            
 
           </div>
 
-          {/* ========================================================= */}
-          {/* LEFT COLUMN: SHIPPING & CONTACT FORM (Bottom on mobile) */}
-          {/* ========================================================= */}
           <div className="lg:col-span-7 space-y-6 order-2 lg:order-1">
             
-            {/* Section 1: Contact Details */}
             <div className="bg-white/5 backdrop-blur-md rounded-[2rem] p-6 md:p-8 border border-white/10">
               <h2 className="text-lg font-serif text-white mb-6 border-b border-white/10 pb-4 flex items-center gap-3">
                 <span className="w-6 h-6 rounded-full bg-[#F5DEB3]/20 text-[#F5DEB3] flex items-center justify-center text-xs">1</span> 
@@ -654,7 +663,6 @@ const CheckoutPage = () => {
               </div>
             </div>
 
-            {/* Section 2: Delivery Address */}
             <div
               className={`bg-white/5 backdrop-blur-md rounded-[2rem] p-6 md:p-8 border transition-all duration-500 ${!address ? "border-[#F5DEB3]/40 shadow-[0_0_30px_rgba(245,222,179,0.08)]" : "border-white/10"}`}
             >
@@ -664,21 +672,52 @@ const CheckoutPage = () => {
               </h2>
               
               {!address ? (
-                // Empty Address State -> Big CTA to open map
-                <button
-                  onClick={handleOpenMap}
-                  disabled={isLocating}
-                  className="w-full py-16 border-2 border-dashed border-[#F5DEB3]/30 rounded-2xl flex flex-col items-center justify-center gap-4 hover:bg-[#F5DEB3]/5 hover:border-[#F5DEB3]/60 transition-all group"
-                >
-                  <div className="w-16 h-16 rounded-full bg-[#F5DEB3]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <i className={`fa-solid ${isLocating ? "fa-spinner animate-spin" : "fa-map-location-dot"} text-2xl text-[#F5DEB3]`} />
-                  </div>
-                  <span className="text-xs font-bold uppercase tracking-widest text-[#F5DEB3]">
-                    {isLocating ? "Detecting Location..." : "Pinpoint Delivery Location"}
-                  </span>
-                </button>
+                <div className="space-y-8">
+                  <button
+                    onClick={handleOpenMap}
+                    disabled={isLocating}
+                    className="w-full py-16 border-2 border-dashed border-[#F5DEB3]/30 rounded-2xl flex flex-col items-center justify-center gap-4 hover:bg-[#F5DEB3]/5 hover:border-[#F5DEB3]/60 transition-all group"
+                  >
+                    <div className="w-16 h-16 rounded-full bg-[#F5DEB3]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <i className={`fa-solid ${isLocating ? "fa-spinner animate-spin" : "fa-map-location-dot"} text-2xl text-[#F5DEB3]`} />
+                    </div>
+                    <span className="text-xs font-bold uppercase tracking-widest text-[#F5DEB3]">
+                      {isLocating ? "Detecting Location..." : "Pinpoint Delivery Location"}
+                    </span>
+                  </button>
+
+                  {savedAddress.length > 0 && (
+                    <div className="space-y-4 animate-in fade-in duration-700">
+                      <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500 flex items-center gap-2">
+                         <i className="fa-solid fa-bookmark text-[8px]"></i> Saved Addresses
+                      </h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {savedAddress.map((addr, index) => (
+                          <button
+                            key={index}
+                            onClick={() => selectSavedAddress(addr)}
+                            className="w-full text-left bg-black/20 border border-white/5 hover:border-[#F5DEB3]/40 p-4 rounded-2xl transition-all group"
+                          >
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="text-[8px] bg-[#F5DEB3]/10 text-[#F5DEB3] px-2 py-0.5 rounded-md border border-[#F5DEB3]/20 font-bold uppercase tracking-tighter">
+                                    {addr.addressType}
+                                </span>
+                                <i className="fa-solid fa-chevron-right text-[10px] text-gray-700 group-hover:text-[#F5DEB3] transition-colors"></i>
+                            </div>
+                            <p className="text-[11px] text-gray-300 line-clamp-2 leading-relaxed h-8">
+                                {addr.formattedAddress}
+                            </p>
+                            <div className="mt-3 pt-3 border-t border-white/5 text-[9px] text-gray-500 flex items-center justify-between">
+                                <span>{addr.city}, {addr.state}</span>
+                                <span className="font-mono">{addr.pinCode}</span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               ) : (
-                // Filled Address State
                 <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
                   <div className="bg-black/40 p-5 rounded-2xl border border-[#F5DEB3]/30 flex justify-between items-start gap-4">
                     <div className="flex-1">
@@ -720,8 +759,14 @@ const CheckoutPage = () => {
                 </div>
               )}
               
-              {/* === THE MAP MODAL === */}
-              <AnimatePresence onExitComplete={() => { if (mapRef.current) { mapRef.current.setTarget(null); mapRef.current = null; } }}>
+              <AnimatePresence
+                onExitComplete={() => {
+                  if (mapRef.current) {
+                    mapRef.current.setTarget(null);
+                    mapRef.current = null;
+                  }
+                }}
+              >
                 {showMapModal && (
                   <motion.div
                     initial={{ opacity: 0 }}
@@ -736,7 +781,6 @@ const CheckoutPage = () => {
                       transition={{ type: "spring", damping: 25, stiffness: 200 }}
                       className="bg-[#1c2b25] w-full max-w-3xl h-[95vh] sm:h-[85vh] sm:rounded-[2rem] overflow-hidden border-t sm:border border-white/10 shadow-2xl flex flex-col"
                     >
-                      {/* Modal Header */}
                       <div className="p-5 border-b border-white/10 flex justify-between items-center bg-[#2e443c] shrink-0">
                         <div>
                             <h3 className="font-serif text-[#F5DEB3] text-xl">Set Delivery Location</h3>
@@ -747,7 +791,6 @@ const CheckoutPage = () => {
                         </button>
                       </div>
 
-                      {/* Modal Controls */}
                       <div className="p-5 bg-[#1c2b25] shrink-0 relative z-[110] border-b border-white/5">
                         <button
                           onClick={getUserCurrentLocation}
@@ -769,7 +812,6 @@ const CheckoutPage = () => {
                           <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
                         </div>
 
-                        {/* Search Results Dropdown */}
                         {(searchQuery.length > 0 || isSearching) && (
                           <div className="absolute left-5 right-5 mt-2 bg-[#2e443c] border border-white/10 rounded-2xl shadow-2xl z-[120] max-h-[300px] overflow-y-auto custom-scrollbar">
                             {isSearching ? (
@@ -804,7 +846,6 @@ const CheckoutPage = () => {
                         )}
                       </div>
 
-                      {/* Map Viewport */}
                       <div className="relative flex-1 min-h-[300px] w-full bg-[#15251e]">
                         <div ref={mapElement} className="w-full h-full" />
 
@@ -818,14 +859,12 @@ const CheckoutPage = () => {
                             </div>
                         )}
 
-                        {/* Center Target Pin */}
                         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full pointer-events-none z-10">
                           <i className="fa-solid fa-location-dot text-4xl text-[#F5DEB3] drop-shadow-[0_10px_10px_rgba(0,0,0,0.8)]"></i>
                           <div className="w-2 h-1 bg-black/50 rounded-full absolute -bottom-1 left-1/2 -translate-x-1/2 blur-[2px]"></div>
                         </div>
                       </div>
 
-                      {/* Map Suggestions Bottom Bar */}
                       <div className="p-5 bg-[#1c2b25] h-[200px] flex flex-col shrink-0 border-t border-white/5 relative z-[110]">
                         <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3 flex items-center gap-2">
                            <i className="fa-solid fa-list-ul"></i> Select Nearest Match
@@ -864,7 +903,6 @@ const CheckoutPage = () => {
               </AnimatePresence>
             </div>
 
-            {/* Error Message Display */}
             <AnimatePresence>
                 {paymentError && (
                 <motion.div 
@@ -907,7 +945,6 @@ const CheckoutPage = () => {
         </div>
       </main>
 
-      {/* === COUPON MODAL === */}
       <AnimatePresence>
         {showCouponModal && (
           <motion.div
@@ -925,7 +962,6 @@ const CheckoutPage = () => {
               onClick={(e) => e.stopPropagation()}
               className="bg-[#1c2b25] w-full max-w-2xl max-h-[85vh] sm:rounded-[2rem] overflow-hidden border-t sm:border border-white/10 shadow-2xl flex flex-col"
             >
-              {/* Modal Header */}
               <div className="p-5 md:p-6 border-b border-white/10 flex justify-between items-center bg-[#2e443c] shrink-0">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-[#F5DEB3]/10 border border-[#F5DEB3]/20 flex items-center justify-center">
@@ -946,7 +982,6 @@ const CheckoutPage = () => {
                 </button>
               </div>
 
-              {/* Modal Content */}
               <div className="flex-1 overflow-y-auto p-5 md:p-6 custom-scrollbar">
                 <Suspense 
                   fallback={
@@ -964,7 +999,6 @@ const CheckoutPage = () => {
                 </Suspense>
               </div>
 
-              {/* Modal Footer */}
               <div className="p-5 md:p-6 border-t border-white/10 bg-[#15251e] shrink-0">
                 <button
                   onClick={() => setShowCouponModal(false)}
@@ -978,13 +1012,12 @@ const CheckoutPage = () => {
         )}
       </AnimatePresence>
 
-      {/* --- MOBILE STICKY BOTTOM BAR --- */}
       <motion.div 
         initial={{ y: 100 }}
         animate={{ y: 0 }}
         className="fixed bottom-0 left-0 right-0 bg-[#15251e]/95 backdrop-blur-xl border-t border-[#F5DEB3]/20 p-4 px-6 z-50 lg:hidden shadow-[0_-20px_40px_rgba(0,0,0,0.6)]"
       >
-         <div className="flex items-center gap-5 max-w-[1200px] mx-auto">
+          <div className="flex items-center gap-5 max-w-[1200px] mx-auto">
             <div className="flex flex-col">
                 <span className="text-[9px] text-[#F5DEB3]/70 uppercase tracking-widest font-bold">Total Payable</span>
                 <span className="text-2xl font-serif text-white">₹{finalTotal.toLocaleString()}</span>
@@ -1006,7 +1039,7 @@ const CheckoutPage = () => {
                     <>Pay Now <i className="fa-solid fa-lock text-[10px]"></i></>
                 ))}
             </button>
-         </div>
+          </div>
       </motion.div>
 
     </div>

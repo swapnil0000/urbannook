@@ -145,6 +145,45 @@ const getAddressSuggestionsService = async ({ userId, lat, long }) => {
   }
 };
 
+const getSavedAddressService = async ({ userId }) => {
+  try {
+    if (!userId)
+      return { statusCode: 401, message: "Unauthorized", success: false };
+
+    // user - address mappings with address id - uuid v7
+    const userSavedAddressIds = await UserAddress.findOne({ userId });
+    const extractingAddressFromAddressIds = await Address.find(
+      {
+        addressId: userSavedAddressIds?.addresses,
+      },
+      {
+        location: 1,
+        formattedAddress: 1,
+        addressType: 1,
+        flatOrFloorNumber: 1,
+        city: 1,
+        state: 1,
+        pinCode: 1,
+        landmark:1,
+        _id: 0,
+      },
+    ).lean();
+    return {
+      statusCode: 200,
+      message: "Saved Address Ids",
+      data: extractingAddressFromAddressIds,
+      success: true,
+    };
+  } catch (error) {
+    return {
+      statusCode: 500,
+      message: `Internal Server Error from address get service: ${error.message}`,
+      data: null,
+      success: false,
+    };
+  }
+};
+
 const createAddressService = async ({
   userId,
   lat,
@@ -358,4 +397,5 @@ export {
   createAddressService,
   updatedAddressService,
   getSearchSuggestionsService,
+  getSavedAddressService,
 };

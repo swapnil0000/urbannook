@@ -4,6 +4,7 @@ import {
   updatedAddressService,
   getAddressSuggestionsService,
   getSearchSuggestionsService,
+  getSavedAddressService,
 } from "../services/address.service.js";
 
 const userAddressSearchFromInputController = async (req, res) => {
@@ -235,9 +236,40 @@ const userUpdateAddress = async (req, res) => {
   }
 };
 
+const userSavedAddressController = async (req, res) => {
+  const { userId } = req.user;
+  const getSavedAddressServiceValidation = await getSavedAddressService({
+    userId,
+  });
+  if (!getSavedAddressServiceValidation?.success) {
+    return res
+      .status(Number(getSavedAddressServiceValidation.statusCode))
+      .json(
+        new ApiError(
+          getSavedAddressServiceValidation.statusCode,
+          getSavedAddressServiceValidation.message,
+          getSavedAddressServiceValidation.data,
+          getSavedAddressServiceValidation.success,
+        ),
+      );
+  }
+
+  return res
+    .status(Number(getSavedAddressServiceValidation.statusCode))
+    .json(
+      new ApiRes(
+        getSavedAddressServiceValidation.statusCode,
+        getSavedAddressServiceValidation.message,
+        getSavedAddressServiceValidation.data,
+        getSavedAddressServiceValidation.success,
+      ),
+    );
+};
+
 export {
   userUpdateAddress as userAddressUpdate,
   userCreateAddress,
   userAddressSuggestionFromLatLngController,
   userAddressSearchFromInputController,
+  userSavedAddressController,
 };

@@ -2,8 +2,15 @@ import { ApiError, ApiRes } from "../utlis/index.js";
 import Product from "../model/product.model.js";
 const productListing = async (req, res) => {
   try {
-    const { limit, currentPage, search, status, category, subCategory, featured } =
-      req.query;
+    const {
+      limit,
+      currentPage,
+      search,
+      status,
+      category,
+      subCategory,
+      featured,
+    } = req.query;
     const page = Number(currentPage) || 1;
     const perPage = Number(limit) || 10;
     /*category -> Filter by category	Electronics , search -> Keyword search in name	iPhone */
@@ -41,38 +48,38 @@ const productListing = async (req, res) => {
         query.productStatus = status;
       }
       // Filter by featured tag
-      if (featured === 'true') {
-        query.tags = 'featured';
+      if (featured === "true") {
+        query.tags = "featured";
       }
     }
-
-    const totalProducts = await Product.countDocuments(query);
 
     const listOfProducts = await Product.find(query)
       .skip((page - 1) * perPage)
       .limit(perPage) // for limit
       .sort(sort) // latest one
-      .select("-_id");
-
+      .select("-_id -createdAt -updatedAt -__v");
+    const listofPublishedProducts = listOfProducts.filter(
+      (i) => i.isPublished == true,
+    );
     return res.status(200).json(
       new ApiRes(
         200,
-        listOfProducts?.length == 0
-          ? `No Product found for your search`
+        listofPublishedProducts?.length == 0
+          ? `No Published Product found for your search`
           : `Product List`,
-        {
-          listOfProducts:
-            listOfProducts?.length == 0
-              ? null
-              : {
-                  listOfProducts,
-                  pagination: {
-                    totalProducts,
-                    currentPage: page,
-                    totalPages: Math.ceil(totalProducts / perPage),
-                  },
-                },
-        },
+        listofPublishedProducts?.length == 0
+          ? null
+          : {
+              listofPublishedProducts,
+              pagination: {
+                NolistofPublishedProducts: listofPublishedProducts?.length,
+                currentPage: page,
+                totalPages: Math.ceil(
+                  listofPublishedProducts?.length / perPage,
+                ),
+              },
+            },
+
         true,
       ),
     );
