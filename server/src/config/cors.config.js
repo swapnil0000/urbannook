@@ -39,6 +39,7 @@ export const corsOptions = {
     } else {
       // Log rejected origin for debugging
       console.warn(`⚠️  CORS: Rejected request from origin: ${origin}`);
+      console.warn(`   Allowed origins: ${allowedOrigins.join(', ')}`);
 
       if (env === "production") {
         callback(new Error("Not allowed by CORS"));
@@ -51,7 +52,7 @@ export const corsOptions = {
   },
   credentials: true, // Allow cookies and authentication headers
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Accept-Language", "Origin"],
   exposedHeaders: ["Set-Cookie"],
   optionsSuccessStatus: 200, // Some legacy browsers choke on 204
   maxAge: 86400, // Cache preflight requests for 24 hours

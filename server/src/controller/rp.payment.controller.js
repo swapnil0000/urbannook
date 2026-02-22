@@ -9,8 +9,7 @@ import Order from "../model/order.model.js";
 import crypto from "crypto";
 import Product from "../model/product.model.js";
 import { v7 as uuidv7 } from "uuid";
-import { sendOrderConfirmation, sendPaymentReceipt } from "../services/email.service.js";
-import User from "../model/user.model.js";
+import { sendOrderConfirmation, sendPaymentReceipt } from "../services/email.service.js"; 
 
 // Payment error code mapping
 const PAYMENT_ERROR_MESSAGES = {
