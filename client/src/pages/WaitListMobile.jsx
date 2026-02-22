@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import WaitListBanner from "../../public/assets/WaitListBanner.png";
 import axios from "axios";
 import { abusiveWords } from "../data/constant";
 import { getApiUrl } from "../config/appUrls";
@@ -83,7 +82,7 @@ const WaitListMobile = () => {
       {/* --- BACKGROUND --- */}
       <div className="absolute inset-0 z-0 pointer-events-none">
         <img
-          src={WaitListBanner}
+          src="/assets/WaitListBanner.png"
           onError={(e) => {
             e.target.onerror = null;
             e.target.src =

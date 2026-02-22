@@ -121,8 +121,8 @@ const Footer = () => {
                     <div className="flex gap-3 justify-center md:justify-start">
                        {[
                          { icon: 'instagram', url: 'https://instagram.com/urbannook.store' },
-                         { icon: 'twitter', url: 'https://twitter.com/urbannook' },
-                         { icon: 'facebook-f', url: 'https://facebook.com/urbannook' }
+                        //  { icon: 'twitter', url: 'https://twitter.com/urbannook' },
+                        //  { icon: 'facebook-f', url: 'https://facebook.com/urbannook' }
                        ].map((social) => (
                           <a key={social.icon} href={social.url} target="_blank" rel="noopener noreferrer" className="w-9 h-9 rounded-full border border-black/10 flex items-center justify-center text-gray-400 hover:bg-[#1c3026] hover:text-white hover:border-[#1c3026] transition-all duration-300">
                              <i className={`fa-brands fa-${social.icon} text-xs`}></i>
@@ -145,7 +145,7 @@ const Footer = () => {
           </div>
 
           {/* Support Section - Now visible on mobile */}
-          <div className='flex flex-row w-[100%] justify-around align-baseline '>
+          <div className='flex md:min-w-[380px] min-w-[200px] justify-between flex-row '>
             <div className="md:col-span-3 lg:col-span-3">
             <h4 className="text-[#1a1a1a] font-bold uppercase tracking-widest text-[10px] mb-6 md:mb-8 text-center md:text-left">Support</h4>
             <ul className="space-y-3 md:space-y-4">
