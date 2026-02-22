@@ -1,29 +1,16 @@
-/**
- * Custom Error Classes
- * Provides specific error types with appropriate HTTP status codes
- */
-
-/**
- * Base API Error class
- */
-class APIError extends Error {
-  constructor(message, statusCode, data = null) {
-    super(message);
-    this.statusCode = statusCode;
-    this.data = data;
-    this.name = this.constructor.name;
-    Error.captureStackTrace(this, this.constructor);
-  }
-}
 
 /**
  * Validation Error (400)
  * Used when request data fails validation
  */
-export class ValidationError extends APIError {
-  constructor(message = 'Validation failed', fields = null) {
-    super(message, 400, fields);
-    this.fields = fields;
+export class ValidationError extends Error {
+  constructor(message = 'Validation failed', data = null) {
+    super(message);
+    this.name = 'ValidationError';
+    this.statusCode = 400;
+    this.data = data;
+    this.success = false;
+    Error.captureStackTrace(this, this.constructor);
   }
 }
 
@@ -31,9 +18,14 @@ export class ValidationError extends APIError {
  * Authentication Error (401)
  * Used when authentication fails or token is invalid
  */
-export class AuthenticationError extends APIError {
-  constructor(message = 'Authentication failed') {
-    super(message, 401);
+export class AuthenticationError extends Error {
+  constructor(message = 'Authentication failed', data = null) {
+    super(message);
+    this.name = 'AuthenticationError';
+    this.statusCode = 401;
+    this.data = data;
+    this.success = false;
+    Error.captureStackTrace(this, this.constructor);
   }
 }
 
@@ -41,9 +33,14 @@ export class AuthenticationError extends APIError {
  * Authorization Error (403)
  * Used when user lacks permission to access resource
  */
-export class AuthorizationError extends APIError {
-  constructor(message = 'Access denied') {
-    super(message, 403);
+export class AuthorizationError extends Error {
+  constructor(message = 'Access denied', data = null) {
+    super(message);
+    this.name = 'AuthorizationError';
+    this.statusCode = 403;
+    this.data = data;
+    this.success = false;
+    Error.captureStackTrace(this, this.constructor);
   }
 }
 
@@ -51,9 +48,14 @@ export class AuthorizationError extends APIError {
  * Not Found Error (404)
  * Used when requested resource doesn't exist
  */
-export class NotFoundError extends APIError {
-  constructor(resource = 'Resource') {
-    super(`${resource} not found`, 404);
+export class NotFoundError extends Error {
+  constructor(message = 'Resource not found', data = null) {
+    super(message);
+    this.name = 'NotFoundError';
+    this.statusCode = 404;
+    this.data = data;
+    this.success = false;
+    Error.captureStackTrace(this, this.constructor);
   }
 }
 
@@ -61,9 +63,14 @@ export class NotFoundError extends APIError {
  * Conflict Error (409)
  * Used when request conflicts with current state
  */
-export class ConflictError extends APIError {
-  constructor(message = 'Resource conflict') {
-    super(message, 409);
+export class ConflictError extends Error {
+  constructor(message = 'Resource conflict', data = null) {
+    super(message);
+    this.name = 'ConflictError';
+    this.statusCode = 409;
+    this.data = data;
+    this.success = false;
+    Error.captureStackTrace(this, this.constructor);
   }
 }
 
@@ -71,9 +78,14 @@ export class ConflictError extends APIError {
  * Internal Server Error (500)
  * Used for unexpected server errors
  */
-export class InternalServerError extends APIError {
-  constructor(message = 'Internal server error') {
-    super(message, 500);
+export class InternalServerError extends Error {
+  constructor(message = 'Internal server error', data = null) {
+    super(message);
+    this.name = 'InternalServerError';
+    this.statusCode = 500;
+    this.data = data;
+    this.success = false;
+    Error.captureStackTrace(this, this.constructor);
   }
 }
 
@@ -81,9 +93,14 @@ export class InternalServerError extends APIError {
  * Bad Request Error (400)
  * Used for general bad request errors
  */
-export class BadRequestError extends APIError {
-  constructor(message = 'Bad request') {
-    super(message, 400);
+export class BadRequestError extends Error {
+  constructor(message = 'Bad request', data = null) {
+    super(message);
+    this.name = 'BadRequestError';
+    this.statusCode = 400;
+    this.data = data;
+    this.success = false;
+    Error.captureStackTrace(this, this.constructor);
   }
 }
 
@@ -91,8 +108,13 @@ export class BadRequestError extends APIError {
  * Service Unavailable Error (503)
  * Used when external service is unavailable
  */
-export class ServiceUnavailableError extends APIError {
-  constructor(message = 'Service temporarily unavailable') {
-    super(message, 503);
+export class ServiceUnavailableError extends Error {
+  constructor(message = 'Service temporarily unavailable', data = null) {
+    super(message);
+    this.name = 'ServiceUnavailableError';
+    this.statusCode = 503;
+    this.data = data;
+    this.success = false;
+    Error.captureStackTrace(this, this.constructor);
   }
 }

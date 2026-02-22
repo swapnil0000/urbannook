@@ -1,89 +1,64 @@
 import Product from "../model/product.model.js";
 import WishList from "../model/user.wishlist.model.js";
-import { cartDetailsMissing } from "../utlis/ValidateRes.js";
+import { cartDetailsMissing } from "../utils/ValidateRes.js";
+import { ValidationError, NotFoundError, InternalServerError } from "../utils/errors.js";
+
 const addToWishListService = async (userId, productId) => {
-  try {
-    let missing = cartDetailsMissing(userId, productId);
+  let missing = cartDetailsMissing(userId, productId);
 
-    if (!missing?.success) {
-      return {
-        statusCode: Number(missing?.statusCode),
-        message: missing?.message,
-        data: missing?.data || null,
-        success: missing?.success,
-      };
-    }
-    // Check product
-    const productDetails = await Product.findOne(
-      { productId },
-      { productName: 1 },
-    ).lean();
-    if (!productDetails) {
-      return {
-        statusCode: 404,
-        message: `Product not found with name : ${productDetails?.productName}`,
-        data: [],
-        success: false,
-      };
-    }
-    const alreadyExists = await WishList.findOne({
-      userId,
-      products: productId,
-    }).select("-__v -_id");
+  if (!missing?.success) {
+    throw new ValidationError(missing?.message, missing?.data);
+  }
+  
+  // Check product
+  const productDetails = await Product.findOne(
+    { productId },
+    { productName: 1 },
+  ).lean();
+  
+  if (!productDetails) {
+    throw new NotFoundError(`Product not found with id: ${productId}`);
+  }
+  
+  const alreadyExists = await WishList.findOne({
+    userId,
+    products: productId,
+  }).select("-__v -_id");
 
-    if (alreadyExists) {
-      return {
-        statusCode: 200,
-        message: "Product already in wishlist",
-        data: {
-          userId: alreadyExists?.userId,
-          productId,
-        },
-        success: true,
-      };
-    }
-
-    // update wishlist
-    const updatedWishList = await WishList.findOneAndUpdate(
-      { userId },
-      { $addToSet: { products: productId } },
-      { new: true, upsert: true },
-    ).select("-__v -_id");
-
-    if (!updatedWishList) {
-      return {
-        statusCode: 400,
-        message: "Failed to add to wishlist",
-        data: [],
-        success: false,
-      };
-    }
-
+  if (alreadyExists) {
     return {
       statusCode: 200,
-      message: `Added to wishlist: ${productDetails?.productName}`,
-      data: `${productDetails?.productName}`,
+      message: "Product already in wishlist",
+      data: {
+        userId: alreadyExists?.userId,
+        productId,
+      },
       success: true,
     };
-  } catch (error) {
-    console.error(`[ERROR] Wishlist Error:`, error.message, error.stack);
-    return {
-      statusCode: 500,
-      message: "Internal server error",
-      data: error.message,
-      success: false,
-    };
   }
+
+  // update wishlist
+  const updatedWishList = await WishList.findOneAndUpdate(
+    { userId },
+    { $addToSet: { products: productId } },
+    { new: true, upsert: true },
+  ).select("-__v -_id");
+
+  if (!updatedWishList) {
+    throw new InternalServerError("Failed to add to wishlist");
+  }
+
+  return {
+    statusCode: 200,
+    message: `Added to wishlist: ${productDetails?.productName}`,
+    data: `${productDetails?.productName}`,
+    success: true,
+  };
 };
 
 const getWishListService = async (userId) => {
   if (!userId) {
-    return {
-      statusCode: 401,
-      message: "Unauthorized",
-      data: null,
-      success: false,
-    };
+    throw new ValidationError("Unauthorized");
   }
 
   const wishList = await WishList.findOne({ userId });
@@ -112,50 +87,38 @@ const getWishListService = async (userId) => {
 };
 
 const deleteFromWishListService = async (userId, productId) => {
-  try {
-    const productDetails = await Product.findOne({ productId });
-    if (!productDetails) {
-      return {
-        statusCode: 404,
-        message: `Product not found with id : ${productId}`,
-        data: [],
-        success: false,
-      };
-    }
-    const updatedWishList = await WishList.findOneAndUpdate(
-      { userId },
-      {
-        $pull: {
-          products: productId,
-        },
-      },
-      {
-        new: true,
-      },
-    );
-
-    await updatedWishList.save();
-    if (!updatedWishList)
-      return {
-        statusCode: 404,
-        message: `Failed to remove from wishlist`,
-        data: [],
-        success: false,
-      };
-
-    return {
-      statusCode: 200,
-      message: `${productDetails?.productName} deleted from wishlist`,
-      data: `${productDetails?.productName}`,
-      success: true,
-    };
-  } catch (error) {
-    return {
-      statusCode: 500,
-      message: "Internal server error",
-      data: error.message,
-      success: false,
-    };
+  const productDetails = await Product.findOne({ productId });
+  
+  if (!productDetails) {
+    throw new NotFoundError(`Product not found with id: ${productId}`);
   }
+  
+  const updatedWishList = await WishList.findOneAndUpdate(
+    { userId },
+    {
+      $pull: {
+        products: productId,
+      },
+    },
+    {
+      new: true,
+    },
+  );
+
+  if (updatedWishList) {
+    await updatedWishList.save();
+  }
+  
+  if (!updatedWishList) {
+    throw new NotFoundError("Failed to remove from wishlist");
+  }
+
+  return {
+    statusCode: 200,
+    message: `${productDetails?.productName} deleted from wishlist`,
+    data: `${productDetails?.productName}`,
+    success: true,
+  };
 };
+
 export { addToWishListService, deleteFromWishListService, getWishListService };

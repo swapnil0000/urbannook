@@ -636,7 +636,9 @@ const CheckoutPage = () => {
 
           <div className="lg:col-span-7 space-y-6 order-2 lg:order-1">
             
-            <div className="bg-white/5 backdrop-blur-md rounded-[2rem] p-6 md:p-8 border border-white/10">
+            <div className="bg-white/5 backdrop-blur-md rounded-[2rem] p-6 md:p-8 border border-white/10" style={{
+                  'margin-bottom': "1rem"
+            }}>
               <h2 className="text-lg font-serif text-white mb-6 border-b border-white/10 pb-4 flex items-center gap-3">
                 <span className="w-6 h-6 rounded-full bg-[#F5DEB3]/20 text-[#F5DEB3] flex items-center justify-center text-xs">1</span> 
                 Contact Information

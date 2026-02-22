@@ -1,4 +1,4 @@
-import { ApiError, ApiRes } from "../utlis/index.js";
+import { ApiError, ApiRes, ValidationError, NotFoundError, AuthenticationError, InternalServerError } from "../utils/index.js";
 import Admin from "../model/admin.model.js";
 import User from "../model/user.model.js";
 import jwt from "jsonwebtoken";
@@ -80,17 +80,19 @@ const logoutService = async (req, res) => {
 };
 
 const profileFetchService = async ({ userId, role }) => {
-  if (!userId)
-    return {
-      statusCode: 400,
-      message: `userId not avaialable`,
-      data: null,
-      success: false,
-    };
+  if (!userId) {
+    throw new ValidationError("userId not available");
+  }
+  
   const Model = role === "Admin" ? Admin : User;
   const profile = await Model.findOne({ userId }).select(
     "-_id -password -createdAt -updatedAt -__v -userRefreshToken",
   );
+  
+  if (!profile) {
+    throw new NotFoundError("Profile not found");
+  }
+  
   return {
     statusCode: 200,
     message: `Profile details for userId - ${profile?.name} and role ${role}`,
@@ -366,67 +368,53 @@ const verifyOtpEmailForgotPasswordService = async (email, emailOtp) => {
 };
 
 const resetPasswordService = async (userId, currentPassword, newPassword) => {
-  if (!userId)
-    return {
-      statusCode: 401,
-      message: "Unauthorized",
-      success: false,
-    };
-  if (!newPassword || !currentPassword) {
-    return {
-      statusCode: 400,
-      message: `Both current password and new password is required`,
-      data: null,
-      success: false,
-    };
+  if (!userId) {
+    throw new AuthenticationError("Unauthorized");
   }
+  
+  if (!newPassword || !currentPassword) {
+    throw new ValidationError("Both current password and new password is required");
+  }
+  
   const passwordRegex =
     /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,15}$/;
+    
   if (!passwordRegex.test(newPassword)) {
-    return {
-      statusCode: 400,
-      message:
-        "New Password must be at least 8 characters with uppercase, lowercase, number & special character",
-      data: null,
-      success: false,
-    };
+    throw new ValidationError(
+      "New Password must be at least 8 characters with uppercase, lowercase, number & special character"
+    );
   }
+  
   const userDetails = await User.findOne({ userId });
+  
+  if (!userDetails) {
+    throw new NotFoundError("User not found");
+  }
+  
   const isPasswordValid = await bcrypt.compare(
     currentPassword,
     userDetails.password,
   );
 
   if (!isPasswordValid) {
-    return {
-      statusCode: 401,
-      message: "Current password is incorrect",
-      success: false,
-    };
+    throw new AuthenticationError("Current password is incorrect");
   }
+  
   //new pass and curr pass comparison
   const oldPassAndNewPassCompare = await bcrypt.compare(
     newPassword,
     userDetails?.password,
   );
 
-  if (oldPassAndNewPassCompare)
-    return {
-      statusCode: 400,
-      message: `Current password and New password is same for user - ${userDetails?.name}`,
-      data: null,
-      success: false,
-    };
-  if (!userDetails?._id) {
-    return {
-      statusCode: 400,
-      message: `Unable to reset password for - ${userDetails?.name}`,
-      data: null,
-      success: false,
-    };
+  if (oldPassAndNewPassCompare) {
+    throw new ValidationError(
+      `Current password and New password is same for user - ${userDetails?.name}`
+    );
   }
+  
   userDetails.password = newPassword;
   await userDetails.save(); // using this because while using findOne it doesn't trigger pre middleware and hence plain text saved
+  
   return {
     statusCode: 200,
     message: `password updated successfully for user ${userDetails?.name}`,

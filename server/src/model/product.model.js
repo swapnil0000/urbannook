@@ -37,6 +37,10 @@ const productSchema = mongoose.Schema(
       type: Number,
       required: [true, "sellingPrice is required"],
     },
+    listedPrice: {
+      type: Number,
+      required: [true, "listedPrice is required"],
+    },
     productCategory: {
       type: String,
       required: [true, "productCategory is required"],
@@ -60,6 +64,10 @@ const productSchema = mongoose.Schema(
     isPublished: Boolean,
     productSubDes: String,
     productSubCategory: String,
+    isPublished: {
+      type: Boolean,
+      require: true,
+    },
   },
   {
     timestamps: true,

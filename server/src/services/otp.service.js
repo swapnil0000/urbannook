@@ -1,6 +1,7 @@
 import OTP from "../model/otp.model.js";
 import bcrypt from "bcrypt";
 import { sendOTP as sendOTPEmail } from "./email.service.js";
+import { ValidationError, ServiceUnavailableError } from "../utils/errors.js";
 
 class OTPService {
   /**
@@ -9,56 +10,44 @@ class OTPService {
    * @returns {Object} - Result object with status and message
    */
   async generateOTP(email) {
-    try {
-      // Check if account is locked
-      const isLocked = await this.isLocked(email);
-      if (isLocked) {
-        return {
-          statusCode: 429,
-          message: "Account is temporarily locked due to too many failed attempts. Please try again later.",
-          data: null,
-          success: false,
-        };
-      }
-
-      // Generate 6-digit OTP
-      const otpValue = Math.floor(100000 + Math.random() * 900000).toString();
-
-      // Hash OTP before storing
-      const hashedOTP = await bcrypt.hash(otpValue, 10);
-
-      // Set expiration time (10 minutes from now)
-      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-
-      // Delete any existing OTP for this email
-      await OTP.deleteMany({ email });
-
-      // Store OTP in database
-      await OTP.create({
-        email,
-        otp: hashedOTP,
-        expiresAt,
-        attempts: 0,
-        lockedUntil: null,
-      });
-
-      // Send OTP via email using new template
-      const emailResult = await sendOTPEmail(email, otpValue);
-
-      return {
-        statusCode: 200,
-        message: `OTP sent to ${email}`,
-        data: { email },
-        success: true,
-      };
-    } catch (error) {
-      return {
-        statusCode: 500,
-        message: `Failed to generate OTP: ${error.message}`,
-        data: null,
-        success: false,
-      };
+    // Check if account is locked
+    const isLocked = await this.isLocked(email);
+    if (isLocked) {
+      throw new ServiceUnavailableError(
+        "Account is temporarily locked due to too many failed attempts. Please try again later."
+      );
     }
+
+    // Generate 6-digit OTP
+    const otpValue = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Hash OTP before storing
+    const hashedOTP = await bcrypt.hash(otpValue, 10);
+
+    // Set expiration time (10 minutes from now)
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    // Delete any existing OTP for this email
+    await OTP.deleteMany({ email });
+
+    // Store OTP in database
+    await OTP.create({
+      email,
+      otp: hashedOTP,
+      expiresAt,
+      attempts: 0,
+      lockedUntil: null,
+    });
+
+    // Send OTP via email using new template
+    await sendOTPEmail(email, otpValue);
+
+    return {
+      statusCode: 200,
+      message: `OTP sent to ${email}`,
+      data: { email },
+      success: true,
+    };
   }
 
   /**
@@ -68,86 +57,58 @@ class OTPService {
    * @returns {Object} - Result object with verification status
    */
   async verifyOTP(email, otp) {
-    try {
-      // Check if account is locked
-      const isLocked = await this.isLocked(email);
-      if (isLocked) {
-        return {
-          statusCode: 429,
-          message: "Account is temporarily locked due to too many failed attempts. Please try again later.",
-          data: null,
-          success: false,
-        };
-      }
-
-      // Find OTP record
-      const otpRecord = await OTP.findOne({ email });
-
-      if (!otpRecord) {
-        return {
-          statusCode: 400,
-          message: "No OTP found. Please request a new OTP.",
-          data: null,
-          success: false,
-        };
-      }
-
-      // Check if OTP has expired
-      if (new Date() > otpRecord.expiresAt) {
-        await OTP.deleteOne({ email });
-        return {
-          statusCode: 400,
-          message: "OTP has expired. Please request a new OTP.",
-          data: null,
-          success: false,
-        };
-      }
-
-      // Verify OTP
-      const isValid = await bcrypt.compare(otp, otpRecord.otp);
-
-      if (!isValid) {
-        // Increment attempt count
-        otpRecord.attempts += 1;
-
-        // Lock account after 3 failed attempts
-        if (otpRecord.attempts >= 3) {
-          await this.lockAccount(email, 30); // Lock for 30 minutes
-          return {
-            statusCode: 429,
-            message: "Too many failed attempts. Account locked for 30 minutes.",
-            data: null,
-            success: false,
-          };
-        }
-
-        await otpRecord.save();
-
-        return {
-          statusCode: 400,
-          message: `Invalid OTP. ${3 - otpRecord.attempts} attempts remaining.`,
-          data: null,
-          success: false,
-        };
-      }
-
-      // OTP is valid - delete it to prevent reuse
-      await OTP.deleteOne({ email });
-
-      return {
-        statusCode: 200,
-        message: "OTP verified successfully",
-        data: { email },
-        success: true,
-      };
-    } catch (error) {
-      return {
-        statusCode: 500,
-        message: `Failed to verify OTP: ${error.message}`,
-        data: null,
-        success: false,
-      };
+    // Check if account is locked
+    const isLocked = await this.isLocked(email);
+    if (isLocked) {
+      throw new ServiceUnavailableError(
+        "Account is temporarily locked due to too many failed attempts. Please try again later."
+      );
     }
+
+    // Find OTP record
+    const otpRecord = await OTP.findOne({ email });
+
+    if (!otpRecord) {
+      throw new ValidationError("No OTP found. Please request a new OTP.");
+    }
+
+    // Check if OTP has expired
+    if (new Date() > otpRecord.expiresAt) {
+      await OTP.deleteOne({ email });
+      throw new ValidationError("OTP has expired. Please request a new OTP.");
+    }
+
+    // Verify OTP
+    const isValid = await bcrypt.compare(otp, otpRecord.otp);
+
+    if (!isValid) {
+      // Increment attempt count
+      otpRecord.attempts += 1;
+
+      // Lock account after 3 failed attempts
+      if (otpRecord.attempts >= 3) {
+        await this.lockAccount(email, 30); // Lock for 30 minutes
+        throw new ServiceUnavailableError(
+          "Too many failed attempts. Account locked for 30 minutes."
+        );
+      }
+
+      await otpRecord.save();
+
+      throw new ValidationError(
+        `Invalid OTP. ${3 - otpRecord.attempts} attempts remaining.`
+      );
+    }
+
+    // OTP is valid - delete it to prevent reuse
+    await OTP.deleteOne({ email });
+
+    return {
+      statusCode: 200,
+      message: "OTP verified successfully",
+      data: { email },
+      success: true,
+    };
   }
 
   /**

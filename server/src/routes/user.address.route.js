@@ -19,7 +19,11 @@ userAddressRouter.post(
   authGuardService("USER"),
   userAddressSearchFromInputController,
 );
-
+userAddressRouter.get(
+  "/user/address/saved",
+  authGuardService("USER"),
+  userSavedAddressController,
+);
 userAddressRouter.post(
   "/user/address/suggestion",
   authGuardService("USER"),

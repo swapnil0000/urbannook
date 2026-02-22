@@ -2,243 +2,211 @@ import {
   razorpayCreateOrderService,
   razorpayPaymentVerificationService,
 } from "../services/rp.payement.service.js";
-import ApiError from "../utlis/ApiError.js";
-import ApiRes from "../utlis/ApiRes.js";
+import { ApiRes } from "../utils/index.js";
+import User from "../model/user.model.js";
 import Order from "../model/order.model.js";
 import Cart from "../model/user.cart.model.js";
 import crypto from "crypto";
 import Product from "../model/product.model.js";
 import { v7 as uuidv7 } from "uuid";
-import { sendOrderConfirmation, sendPaymentReceipt } from "../services/email.service.js";
-import User from "../model/user.model.js";
+import {
+  sendOrderConfirmation,
+  sendPaymentReceipt,
+} from "../services/email.service.js";
+import { asyncHandler } from "../middleware/errorHandler.middleware.js";
+import { ValidationError, NotFoundError } from "../utils/errors.js";
 
 // Payment error code mapping
 const PAYMENT_ERROR_MESSAGES = {
-  'BAD_REQUEST_ERROR': 'Payment failed due to invalid request. Please try again.',
-  'GATEWAY_ERROR': 'Payment gateway error. Please try again or use a different payment method.',
-  'SERVER_ERROR': 'Payment server error. Please try again later.',
-  'payment_failed': 'Payment failed. Please try again or use a different payment method.',
-  'payment_timeout': 'Payment timed out. Your cart has been preserved. Please try again.',
-  'insufficient_funds': 'Insufficient funds. Please check your account balance.',
-  'card_declined': 'Card declined. Please contact your bank or try another card.',
-  'network_error': 'Network error. Please check your connection and try again.',
-  'invalid_card': 'Invalid card details. Please check and try again.',
-  'authentication_failed': '3D Secure authentication failed. Please try again.',
-  'signature_verification_failed': 'Payment verification failed. Please contact support if amount was debited.',
-  'default': 'Payment could not be processed. Please try again later.'
+  BAD_REQUEST_ERROR: "Payment failed due to invalid request. Please try again.",
+  GATEWAY_ERROR:
+    "Payment gateway error. Please try again or use a different payment method.",
+  SERVER_ERROR: "Payment server error. Please try again later.",
+  payment_failed:
+    "Payment failed. Please try again or use a different payment method.",
+  payment_timeout:
+    "Payment timed out. Your cart has been preserved. Please try again.",
+  insufficient_funds: "Insufficient funds. Please check your account balance.",
+  card_declined: "Card declined. Please contact your bank or try another card.",
+  network_error: "Network error. Please check your connection and try again.",
+  invalid_card: "Invalid card details. Please check and try again.",
+  authentication_failed: "3D Secure authentication failed. Please try again.",
+  signature_verification_failed:
+    "Payment verification failed. Please contact support if amount was debited.",
+  default: "Payment could not be processed. Please try again later.",
 };
 
 const getErrorMessage = (errorCode) => {
   return PAYMENT_ERROR_MESSAGES[errorCode] || PAYMENT_ERROR_MESSAGES.default;
 };
-const razorpayKeyGetController = async (_, res) => {
-  if (!process.env.RP_LOCAL_TEST_KEY_ID)
-    return res.status(404).json(new ApiError(404, `Rp - Key`, null, false));
+const razorpayKeyGetController = asyncHandler(async (_, res) => {
+  if (!process.env.RP_LOCAL_TEST_KEY_ID) {
+    throw new NotFoundError("Rp - Key");
+  }
   return res
     .status(200)
     .json(new ApiRes(200, `Rp - Key`, process.env.RP_LOCAL_TEST_KEY_ID, true));
-};
+});
 
-const razorpayCreateOrderController = async (req, res) => {
-  try {
-    /* Not Handling the amount because it could be manipulate at client side like 0 as amount */
-    const { items } = req.body;
-    const { userId } = req.user;
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return res
-        .status(400)
-        .json(new ApiError(400, "Items are required", null, false));
-    }
-    
-    // Fetch cart to get the calculated grand total from applyCoupon API
-    const cart = await Cart.findOne({ userId }).lean();
-    
-    if (!cart?.appliedCoupon?.summary?.grandTotal) {
-      return res
-        .status(400)
-        .json(
-          new ApiError(400, "Cart pricing not calculated. Please refresh the page.", null, false),
-        );
-    }
-    
-    const finalAmount = cart.appliedCoupon.summary.grandTotal;
-    
-    // Fetch products for order snapshot
-    const productIds = items.map((i) => i.productId);
-    const products = await Product.find({
-      productId: { $in: productIds },
-      productStatus: "in_stock",
-    });
+const razorpayCreateOrderController = asyncHandler(async (req, res) => {
+  /* Not Handling the amount because it could be manipulate at client side like 0 as amount */
+  const { items } = req.body;
+  const { userId } = req.user;
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    throw new ValidationError("Items are required");
+  }
 
-    if (products.length !== productIds.length) {
-      return res
-        .status(400)
-        .json(
-          new ApiError(400, "One or more products unavailable", null, false),
-        );
-    }
-    
-    // Create order items snapshot
-    const orderItems = items.map((item) => {
-      const product = products.find((p) => p.productId === item.productId);
-      return {
-        productId: product.productId,
-        productSnapshot: {
-          quantity: Number(item.quantity),
-          productImg: product.productImg,
-          productName: product.productName,
-          productCategory: product.productCategory,
-          productSubCategory: product.productSubCategory,
-          priceAtPurchase: product.sellingPrice,
-        },
-      };
-    });
+  // Fetch cart to get the calculated grand total from applyCoupon API
+  const cart = await Cart.findOne({ userId }).lean();
 
-    const razorpayOrder = await razorpayCreateOrderService(
-      finalAmount * 100, // Razorpay expects amount in paise
-      "INR", //currency
+  if (!cart?.appliedCoupon?.summary?.grandTotal) {
+    throw new ValidationError("Cart pricing not calculated. Please refresh the page.");
+  }
+
+  const finalAmount = cart.appliedCoupon.summary.grandTotal;
+
+  // Fetch products for order snapshot
+  const productIds = items.map((i) => i.productId);
+  const products = await Product.find({
+    productId: { $in: productIds },
+    productStatus: "in_stock",
+  });
+
+  if (products.length !== productIds.length) {
+    throw new ValidationError("One or more products unavailable");
+  }
+
+  // Create order items snapshot
+  const orderItems = items.map((item) => {
+    const product = products.find((p) => p.productId === item.productId);
+    return {
+      productId: product.productId,
+      productSnapshot: {
+        quantity: item.quantity,
+        productImg: product.productImg,
+        productName: product.productName,
+        productCategory: product.productCategory,
+        productSubCategory: product.productSubCategory,
+        priceAtPurchase: product.sellingPrice,
+      },
+    };
+  });
+
+  const razorpayOrder = await razorpayCreateOrderService(
+    finalAmount * 100, // Razorpay expects amount in paise
+    "INR", //currency
+  );
+
+  const order = await Order.create({
+    orderId: uuidv7(),
+    userId,
+    items: orderItems,
+    amount: finalAmount,
+    payment: {
+      razorpayOrderId: razorpayOrder?.data?.id,
+    },
+    qunatity: items?.qunatity || 1,
+    status: "CREATED",
+  });
+
+  return res.status(200).json(
+    new ApiRes(
+      200,
+      "Order created",
+      {
+        orderId: order.orderId,
+        razorpayOrderId: razorpayOrder?.data?.id,
+        amount: finalAmount * 100, // Return amount in paise for Razorpay
+        currency: "INR",
+      },
+      true,
+    ),
+  );
+});
+
+const razorpayPaymentVerificationController = asyncHandler(async (req, res) => {
+  const { userId } = req.user;
+  if (!userId) {
+    throw new NotFoundError("User not found for payment");
+  }
+  const {
+    razorpay_payment_id,
+    razorpay_order_id,
+    razorpay_signature,
+    error,
+  } = req.body;
+
+  console.log(
+    `[INFO] Payment verification started - UserId: ${userId}, RazorpayOrderId: ${razorpay_order_id}, RazorpayPaymentId: ${razorpay_payment_id}`,
+  );
+
+  // Handle payment failure from Razorpay
+  if (error) {
+    const errorCode = error.code || "payment_failed";
+    const errorDescription = getErrorMessage(errorCode);
+
+    console.log(
+      `[WARN] Payment failed from Razorpay - UserId: ${userId}, RazorpayOrderId: ${razorpay_order_id}, ErrorCode: ${errorCode}, ErrorDescription: ${errorDescription}`,
     );
 
-    const order = await Order.create({
-      orderId: uuidv7(),
-      userId,
-      items: orderItems,
-      amount: finalAmount,
-      payment: {
-        razorpayOrderId: razorpayOrder?.data?.id,
-      },
-      qunatity: items?.qunatity || 1,
-      status: "CREATED",
-    });
-    
-    console.log(`[INFO] Order created successfully - OrderId: ${order.orderId}, UserId: ${userId}, Amount: ${finalAmount} (from cart.appliedCoupon.summary), RazorpayOrderId: ${razorpayOrder?.data?.id}`);
-    
-    return res.status(200).json(
-      new ApiRes(
-        200,
-        "Order created",
-        {
-          orderId: order.orderId,
-          razorpayOrderId: razorpayOrder?.data?.id,
-          amount: finalAmount * 100, // Return amount in paise for Razorpay
-          currency: "INR",
+    // Update order with error details
+    await Order.updateOne(
+      { "payment.razorpayOrderId": razorpay_order_id },
+      {
+        $set: {
+          status: "FAILED",
+          "payment.errorCode": errorCode,
+          "payment.errorDescription": errorDescription,
         },
-        true,
+      },
+    );
+
+    throw new ValidationError(errorDescription, { errorCode, preserveCart: true });
+  }
+
+  const isPaymentVerifiedOrNot = await razorpayPaymentVerificationService(
+    razorpay_order_id,
+    razorpay_payment_id,
+    razorpay_signature,
+  );
+  if (!isPaymentVerifiedOrNot) {
+    // Signature verification failed
+    const errorCode = "signature_verification_failed";
+    const errorDescription = getErrorMessage(errorCode);
+
+    console.error(
+      `[ERROR] Payment signature verification failed - UserId: ${userId}, RazorpayOrderId: ${razorpay_order_id}, RazorpayPaymentId: ${razorpay_payment_id}`,
+    );
+
+    await Order.updateOne(
+      { "payment.razorpayOrderId": razorpay_order_id },
+      {
+        $set: {
+          status: "FAILED",
+          "payment.errorCode": errorCode,
+          "payment.errorDescription": errorDescription,
+        },
+      },
+    );
+
+    throw new ValidationError(errorDescription, { errorCode, preserveCart: true });
+  }
+
+  console.log(
+    `[INFO] Payment verification successful - UserId: ${userId}, RazorpayOrderId: ${razorpay_order_id}, RazorpayPaymentId: ${razorpay_payment_id}`,
+  );
+
+  return res
+    .status(Number(isPaymentVerifiedOrNot?.statusCode))
+    .json(
+      new ApiRes(
+        Number(isPaymentVerifiedOrNot?.statusCode),
+        isPaymentVerifiedOrNot?.message,
+        isPaymentVerifiedOrNot?.data,
+        isPaymentVerifiedOrNot?.success,
       ),
     );
-  } catch (error) {
-    console.error(`[ERROR] Order creation error:`, error.message, error.stack);
-    return res
-      .status(500)
-      .json(
-        new ApiError(
-          500,
-          `Internal Server Error - ${error.message}`,
-          null,
-          false,
-        ),
-      );
-  }
-};
-
-const razorpayPaymentVerificationController = async (req, res) => {
-  try {
-    const { userId } = req.user;
-    if (!userId) {
-      return res
-        .status(404)
-        .json(new ApiError(404, `User not found for payment`, null, false));
-    }
-    const { razorpay_payment_id, razorpay_order_id, razorpay_signature, error } =
-      req.body;
-
-    console.log(`[INFO] Payment verification started - UserId: ${userId}, RazorpayOrderId: ${razorpay_order_id}, RazorpayPaymentId: ${razorpay_payment_id}`);
-
-    // Handle payment failure from Razorpay
-    if (error) {
-      const errorCode = error.code || 'payment_failed';
-      const errorDescription = getErrorMessage(errorCode);
-      
-      console.log(`[WARN] Payment failed from Razorpay - UserId: ${userId}, RazorpayOrderId: ${razorpay_order_id}, ErrorCode: ${errorCode}, ErrorDescription: ${errorDescription}`);
-      
-      // Update order with error details
-      await Order.updateOne(
-        { "payment.razorpayOrderId": razorpay_order_id },
-        { 
-          $set: { 
-            status: "FAILED",
-            "payment.errorCode": errorCode,
-            "payment.errorDescription": errorDescription
-          } 
-        }
-      );
-      
-      return res
-        .status(400)
-        .json(
-          new ApiError(
-            400,
-            errorDescription,
-            { errorCode, preserveCart: true },
-            false
-          )
-        );
-    }
-
-    const isPaymentVerifiedOrNot = await razorpayPaymentVerificationService(
-      razorpay_order_id,
-      razorpay_payment_id,
-      razorpay_signature,
-    );
-    if (!isPaymentVerifiedOrNot) {
-      // Signature verification failed
-      const errorCode = 'signature_verification_failed';
-      const errorDescription = getErrorMessage(errorCode);
-      
-      console.error(`[ERROR] Payment signature verification failed - UserId: ${userId}, RazorpayOrderId: ${razorpay_order_id}, RazorpayPaymentId: ${razorpay_payment_id}`);
-      
-      await Order.updateOne(
-        { "payment.razorpayOrderId": razorpay_order_id },
-        { 
-          $set: { 
-            status: "FAILED",
-            "payment.errorCode": errorCode,
-            "payment.errorDescription": errorDescription
-          } 
-        }
-      );
-      
-      return res
-        .status(Number(isPaymentVerifiedOrNot?.statusCode))
-        .json(
-          new ApiError(
-            Number(isPaymentVerifiedOrNot?.statusCode),
-            errorDescription,
-            { errorCode, preserveCart: true },
-            false
-          )
-        );
-    }
-    
-    console.log(`[INFO] Payment verification successful - UserId: ${userId}, RazorpayOrderId: ${razorpay_order_id}, RazorpayPaymentId: ${razorpay_payment_id}`);
-    
-    return res
-      .status(Number(isPaymentVerifiedOrNot?.statusCode))
-      .json(
-        new ApiRes(
-          Number(isPaymentVerifiedOrNot?.statusCode),
-          isPaymentVerifiedOrNot?.message,
-          isPaymentVerifiedOrNot?.data,
-          isPaymentVerifiedOrNot?.success,
-        ),
-      );
-  } catch (error) {
-    console.error(`[ERROR] Payment verification error:`, error.message, error.stack);
-    return res
-      .status(500)
-      .json(new ApiError(500, `Internal Server Error - ${error}`, [], false));
-  }
-};
+});
 
 const razorpayWebHookController = async (req, res) => {
   const secret = process.env.RP_WEBHOOK_TEST_SECRET;
@@ -253,7 +221,7 @@ const razorpayWebHookController = async (req, res) => {
   }
   // Signature verification
   const shasum = crypto.createHmac("sha256", secret);
-  shasum.update(req.body);  // req.body is already a Buffer from bodyParser.raw()
+  shasum.update(req.body); // req.body is already a Buffer from bodyParser.raw()
   const expectedSignature = shasum.digest("hex");
 
   /* Checking specifically because the webhook url is public we cant use any guard service
@@ -290,16 +258,21 @@ const razorpayWebHookController = async (req, res) => {
               userId: 1,
             },
           ).lean();
-          
+
           // Clear user's cart after successful payment
           try {
             await Cart.updateOne(
               { userId: findingUserId?.userId },
-              { $set: { items: [] } }
+              { $set: { items: [] } },
             );
-            console.log(`[INFO] Cart cleared after successful payment - UserId: ${findingUserId?.userId}, OrderId: ${order.orderId}`);
+            console.log(
+              `[INFO] Cart cleared after successful payment - UserId: ${findingUserId?.userId}, OrderId: ${order.orderId}`,
+            );
           } catch (cartError) {
-            console.error(`[ERROR] Failed to clear cart after payment - UserId: ${findingUserId?.userId}, OrderId: ${order.orderId}:`, cartError.message);
+            console.error(
+              `[ERROR] Failed to clear cart after payment - UserId: ${findingUserId?.userId}, OrderId: ${order.orderId}:`,
+              cartError.message,
+            );
             // Don't fail the payment if cart clearing fails
           }
 
@@ -310,7 +283,7 @@ const razorpayWebHookController = async (req, res) => {
               // Prepare order details for email
               const orderDetails = {
                 orderId: order.orderId,
-                items: order.items.map(item => ({
+                items: order.items.map((item) => ({
                   productName: item.productSnapshot.productName,
                   quantity: item.productSnapshot.quantity,
                   price: item.productSnapshot.priceAtPurchase,
@@ -320,7 +293,7 @@ const razorpayWebHookController = async (req, res) => {
               };
 
               // Send order confirmation email
-              sendOrderConfirmation(user.email, orderDetails).catch(err => {
+              sendOrderConfirmation(user.email, orderDetails).catch((err) => {
                 console.error("Failed to send order confirmation email:", err);
               });
 
@@ -331,7 +304,7 @@ const razorpayWebHookController = async (req, res) => {
                 orderId: order.orderId,
                 date: new Date(),
               };
-              sendPaymentReceipt(user.email, paymentDetails).catch(err => {
+              sendPaymentReceipt(user.email, paymentDetails).catch((err) => {
                 console.error("Failed to send payment receipt email:", err);
               });
             }
@@ -349,17 +322,18 @@ const razorpayWebHookController = async (req, res) => {
       ======================== */
       case "payment.failed": {
         const payment = payload.payload.payment.entity;
-        const errorCode = payment.error_code || 'payment_failed';
-        const errorDescription = payment.error_description || getErrorMessage(errorCode);
-        
+        const errorCode = payment.error_code || "payment_failed";
+        const errorDescription =
+          payment.error_description || getErrorMessage(errorCode);
+
         await Order.updateOne(
           { "payment.razorpayOrderId": payment.order_id },
-          { 
-            $set: { 
+          {
+            $set: {
               status: "FAILED",
               "payment.errorCode": errorCode,
-              "payment.errorDescription": errorDescription
-            } 
+              "payment.errorDescription": errorDescription,
+            },
           },
         );
 

@@ -20,7 +20,7 @@ const AllProductsPage = () => {
   }, []);
 
   // Extract products from response
-  const products = productsResponse?.data?.listOfProducts?.listOfProducts || [];
+  const products = productsResponse?.data?.listofPublishedProducts || [];
 
   const displayProducts = useMemo(() => {
     let sorted = [...products];
