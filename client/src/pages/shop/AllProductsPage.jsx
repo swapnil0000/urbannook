@@ -118,27 +118,27 @@ const AllProductsPage = () => {
                     </div>
 
                     {/* 2. TEXT & CTA SECTION */}
-                    <div className="p-4 md:p-4 flex flex-col flex-grow justify-between bg-gradient-to-b from-white/5 to-transparent backdrop-blur-md">
+                    <div className="p-4 md:p-4 flex flex-col flex-grow justify-between bg-[#f5f7f8] to-transparent backdrop-blur-md">
                       
                       <div className="mb-6">
-                        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#F5DEB3] mb-2 block opacity-80">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a89068]  mb-2 block opacity-80">
                           {product.productCategory}
                         </span>
-                        <h3 className="font-serif text-xl md:text-2xl text-white leading-snug line-clamp-2">
+                        <h3 className="font-serif text-xl md:text-2xl text-gray-500  leading-snug line-clamp-2">
                           {product.productName}
                         </h3>
                       </div>
                       
-                      <div className="flex justify-between items-end pt-4 border-t border-white/10 mt-auto">
+                      <div className="flex justify-between items-end pt-4 border-t border-[#F5DEB3]/10] mt-auto">
                         <div className="flex flex-col">
-                           <span className="text-[10px] uppercase tracking-widest text-green-50/50 mb-1">Investment</span>
-                           <span className="text-lg md:text-xl font-bold text-white">
+                           <span className="text-[10px] uppercase tracking-widest text-gray-500 mb-1">Investment</span>
+                           <span className="text-lg md:text-xl font-semibold text-[#a89068] ">
                              ₹{product.sellingPrice?.toLocaleString()}
                            </span>
                         </div>
                         
                         {/* Interactive Arrow CTA */}
-                        <div className="w-12 h-12 rounded-full bg-[#F5DEB3]/10 text-[#F5DEB3] flex items-center justify-center group-hover:bg-[#F5DEB3] group-hover:text-[#2e443c] transition-all duration-300">
+                        <div className="w-12 h-12 rounded-full bg-[#F5DEB3]/10 text-gray-500  flex items-center justify-center group-hover:bg-[#F5DEB3] group-hover:text-[#2e443c] transition-all duration-300">
                           <i className="fa-solid fa-arrow-right -rotate-45 group-hover:rotate-0 transition-transform duration-500"></i>
                         </div>
                       </div>

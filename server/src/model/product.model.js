@@ -61,7 +61,6 @@ const productSchema = mongoose.Schema(
       type: [String],
       enum: ["featured", "new_arrival", "best_seller", "trending"],
     },
-    isPublished: Boolean,
     productSubDes: String,
     productSubCategory: String,
     isPublished: {

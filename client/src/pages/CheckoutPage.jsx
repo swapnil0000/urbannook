@@ -272,10 +272,11 @@ const CheckoutPage = () => {
           discount: result.data.summary.discount || 0,
           grandTotal: result.data.summary.grandTotal || 0,
         });
-        showNotification("Coupon applied successfully!", "success");
+        const successMessage = result.message || "Coupon applied successfully!";
+        showNotification(successMessage, "success");
       }
     } catch (error) {
-      const errorMessage = error.data?.message || "Failed to apply coupon";
+      const errorMessage = error?.data?.message || error?.message || "Failed to apply coupon";
       showNotification(errorMessage, "error");
     }
   };
@@ -293,10 +294,12 @@ const CheckoutPage = () => {
           discount: result.data.summary.discount || 0,
           grandTotal: result.data.summary.grandTotal || 0,
         });
-        showNotification("Coupon removed", "success");
+        const successMessage = result.message || "Coupon removed";
+        showNotification(successMessage, "success");
       }
     } catch (error) {
-      showNotification("Failed to remove coupon. Please refresh the page.", "error");
+      const errorMessage = error?.data?.message || error?.message || "Failed to remove coupon. Please refresh the page.";
+      showNotification(errorMessage, "error");
     }
   };
 

@@ -5,7 +5,6 @@ import {
 import { ApiRes } from "../utils/index.js";
 import User from "../model/user.model.js";
 import Order from "../model/order.model.js";
-import Cart from "../model/user.cart.model.js";
 import crypto from "crypto";
 import Product from "../model/product.model.js";
 import { v7 as uuidv7 } from "uuid";
