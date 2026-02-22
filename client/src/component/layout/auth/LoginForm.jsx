@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ForgotPassword from './ForgotPassword';
 import OTPVerification from './OTPVerification';
 import { useLoginMutation } from '../../../store/api/authApi';
 import { useAuth, useUI } from '../../../hooks/useRedux';
 
 const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({ identifier: '', password: '' });
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showOTPVerification, setShowOTPVerification] = useState(false);
@@ -100,6 +102,7 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
         onSuccess={() => {
           showNotification('Email verified! You are now logged in.');
           onClose();
+          navigate('/');
         }}
       />
     );

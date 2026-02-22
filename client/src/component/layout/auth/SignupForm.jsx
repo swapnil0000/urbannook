@@ -126,7 +126,8 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
         }}
         onSuccess={() => { 
           showNotification('Account verified!'); 
-          onClose(); 
+          onClose();
+          navigate('/');
         }}
       />
     );

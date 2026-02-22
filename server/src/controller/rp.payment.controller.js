@@ -4,8 +4,8 @@ import {
 } from "../services/rp.payement.service.js";
 import ApiError from "../utlis/ApiError.js";
 import ApiRes from "../utlis/ApiRes.js";
+import User from "../model/user.model.js";
 import Order from "../model/order.model.js";
-import Cart from "../model/user.cart.model.js";
 import crypto from "crypto";
 import Product from "../model/product.model.js";
 import { v7 as uuidv7 } from "uuid";
@@ -84,7 +84,7 @@ const razorpayCreateOrderController = async (req, res) => {
       return {
         productId: product.productId,
         productSnapshot: {
-          quantity: Number(item.quantity),
+          quantity: item.quantity,
           productImg: product.productImg,
           productName: product.productName,
           productCategory: product.productCategory,
