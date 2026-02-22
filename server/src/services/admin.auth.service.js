@@ -1,7 +1,15 @@
 import Admin from "../model/admin.model.js";
 import Product from "../model/product.model.js";
 import { v7 as uuidv7 } from "uuid";
-import { productUpdateFieldMissing } from "../utlis/ValidateRes.js";
+import { productUpdateFieldMissing } from "../utils/ValidateRes.js";
+import { 
+  ValidationError, 
+  NotFoundError, 
+  AuthenticationError,
+  ConflictError,
+  InternalServerError 
+} from "../utils/errors.js";
+
 const createNewProductService = async (
   adminEmail,
   productName,
@@ -16,12 +24,7 @@ const createNewProductService = async (
   productSubCategory,
 ) => {
   if (!adminEmail) {
-    return {
-      statusCode: 401,
-      message: "Unauthorized",
-      data: null,
-      success: false,
-    };
+    throw new AuthenticationError("Unauthorized");
   }
 
   const updatedProductQunatity = {
@@ -36,36 +39,30 @@ const createNewProductService = async (
     productSubCategory:
       productSubCategory?.length > 0 ? productSubCategory : null,
   };
+  
   for (let [key, val] of Object.entries(updatedProductQunatity)) {
-    if (!val)
-      return {
-        statusCode: 400,
-        message: `Can't create the product — ${key} is missing`,
-        data: null,
-        success: false,
-      };
+    if (!val) {
+      throw new ValidationError(`Can't create the product — ${key} is missing`);
+    }
   }
+  
   const createdUiProdNameAndIds = await Product.find(
     {},
     { productName: 1, _id: 0 },
   ).lean();
+  
   const productWithSameExist = createdUiProdNameAndIds.filter(
     (el) => el?.productName == productName,
   );
 
   if (productWithSameExist?.length > 0) {
-    return {
-      statusCode: 409,
-      message: `Can't create the product with name — ${productName} already exist`,
-      data: null,
-      success: false,
-    };
+    throw new ConflictError(`Can't create the product with name — ${productName} already exist`);
   }
 
   const lastCreatedUiProdId =
-    createdUiProdNameAndIds[createdUiProdNameAndIds.length - 1]; // accessing the last one // UN-PROD-130
-  // console.log(lastCreatedUiProdId.uiProductId.split("-")[2]); // accessing the num value eg 130 from UN-PROD
+    createdUiProdNameAndIds[createdUiProdNameAndIds.length - 1];
   let newCreatedUiProdId = lastCreatedUiProdId?.uiProductId?.split("-")[2];
+  
   const createdProduct = await Product.create({
     productName,
     productId: uuidv7(),
@@ -81,6 +78,7 @@ const createNewProductService = async (
     productSubDes,
     productSubCategory,
   });
+  
   return {
     statusCode: 201,
     message: `Product created with product id ${createdProduct?.productId}`,
@@ -91,33 +89,21 @@ const createNewProductService = async (
 
 const viewProductDetailsService = async (adminEmail, productId) => {
   if (!adminEmail) {
-    return {
-      statusCode: 401,
-      message: "Unauthorized",
-      data: null,
-      success: false,
-    };
+    throw new AuthenticationError("Unauthorized");
   }
+  
   if (!productId) {
-    return {
-      statusCode: 404,
-      message: `${productId} is missing`,
-      data: null,
-      success: false,
-    };
+    throw new ValidationError("Product ID is missing");
   }
+  
   const productDetails = await Product.find({
     productId: productId,
   }).select("-__v -_id");
 
   if (productDetails?.length == 0 || !productDetails) {
-    return {
-      statusCode: 404,
-      message: `Can't find the product with id — ${productId}`,
-      data: null,
-      success: false,
-    };
+    throw new NotFoundError(`Can't find the product with id — ${productId}`);
   }
+  
   return {
     statusCode: 202,
     message: `Product details with product id ${productDetails?.productId}`,
@@ -142,195 +128,157 @@ const existingProductUpdateService = async (
   productSubCategory,
   action,
 ) => {
-  try {
-    if (!adminEmail) {
-      return {
-        statusCode: 401,
-        message: "Unauthorized",
-        data: null,
-        success: false,
-      };
-    }
-    if (!productId) {
-      return {
-        statusCode: 401,
-        message:
-          "Product Id is required to fetch and update the product details",
-        data: null,
-        success: false,
-      };
-    }
-
-    const productFields = {
-      productName,
-      uiProductId,
-      productImg,
-      productDes,
-      sellingPrice,
-      productCategory,
-      productQuantity,
-      productStatus,
-      tags,
-      productSubDes,
-      productSubCategory,
-    };
-    const notPresentProductDetailsToUpdate = {};
-    const presentProductDetailsToUpdate = {};
-    for (let [key, val] of Object.entries(productFields)) {
-      !val && val == null
-        ? (notPresentProductDetailsToUpdate[key] = val)
-        : (presentProductDetailsToUpdate[key] = val);
-    }
-
-    //Validate the presentProductDetailsToUpdate
-    const exisitingProductName = await Product.find(
-      {},
-      { productName: 1, uiProductId: 1 },
-    ).lean();
-
-    const productExistWithSameNameOrUiProductId = exisitingProductName.find(
-      (el) => {
-        return (
-          el.productId !== productId &&
-          el.uiProductId !== uiProductId &&
-          (el.productName === productName || el.uiProductId === uiProductId)
-        );
-      },
-    );
-
-    if (productExistWithSameNameOrUiProductId) {
-      let conflictFields = [];
-
-      if (productExistWithSameNameOrUiProductId.productName === productName) {
-        conflictFields.push("Product Name");
-      }
-
-      if (productExistWithSameNameOrUiProductId.uiProductId === uiProductId) {
-        conflictFields.push("UI Product ID");
-      }
-
-      return {
-        statusCode: 409,
-        message: `${conflictFields.join(" & ")} already exists`,
-        data: null,
-        success: false,
-      };
-    }
-
-    const presentProductDetailsToUpdateValidation = productUpdateFieldMissing(
-      presentProductDetailsToUpdate,
-    );
-    if (!presentProductDetailsToUpdateValidation) {
-      return {
-        statusCode: presentProductDetailsToUpdateValidation?.statusCode,
-        message: presentProductDetailsToUpdateValidation?.message,
-        data: presentProductDetailsToUpdateValidation?.data,
-        success: presentProductDetailsToUpdateValidation?.success,
-      };
-    }
-
-    const existingProductDetails = await Product.findOne({
-      productId,
-    });
-
-    if (!existingProductDetails) {
-      return {
-        statusCode: 409,
-        message: `Product with Product Id is ${productId} doesn't exist`,
-        data: null,
-        success: false,
-      };
-    }
-
-    const setObj = {};
-    const setObjWithQuantiy = {};
-    const updatingQuery = {};
-    for (const [key, val] of Object.entries(presentProductDetailsToUpdate)) {
-      if (key === "productQuantity") {
-        setObjWithQuantiy.productQuantity = val;
-      } else {
-        setObj[key] = val;
-      }
-    }
-
-    if (action && ["add", "sub"].includes(action)) {
-      const value = Number(presentProductDetailsToUpdate.productQuantity) || 1;
-      setObjWithQuantiy.productQuantity = action === "add" ? value : -value;
-    }
-
-    if (Object.keys(setObj).length > 0) {
-      updatingQuery.$set = setObj;
-    }
-    if (Object.keys(setObjWithQuantiy).length > 0) {
-      updatingQuery.$inc = setObjWithQuantiy;
-    }
-    const product = await Product.findOneAndUpdate(
-      { productId },
-      updatingQuery,
-      {
-        new: true,
-      },
-    ).select("-_id -__v -createdAt -updatedAt");
-
-    if (!product) {
-      return {
-        statusCode: 400,
-        message: `Fail to update the Product with ${productId}`,
-        data: null,
-        success: false,
-      };
-    }
-
-    return {
-      statusCode: 200,
-      message: `Product Details Update: ${product?.productName}`,
-      data: {
-        productName: product?.productName,
-        productQuantity: product?.productQuantity,
-        productId: product?.productId,
-        uiProductId: product?.uiProductId,
-        productImg: product?.productImg,
-        productDes: product?.productDes,
-        sellingPrice: product?.sellingPrice,
-        productCategory: product?.productCategory,
-        productStatus: product?.productStatus,
-        tags: product?.tags,
-        productSubDes: product?.productSubDes,
-        productSubCategory: product?.productSubCategory,
-      },
-      success: true,
-    };
-  } catch (error) {
-    return {
-      statusCode: 500,
-      message: `Error - ${error}`,
-      data: null,
-      success: false,
-    };
+  if (!adminEmail) {
+    throw new AuthenticationError("Unauthorized");
   }
+  
+  if (!productId) {
+    throw new ValidationError("Product Id is required to fetch and update the product details");
+  }
+
+  const productFields = {
+    productName,
+    uiProductId,
+    productImg,
+    productDes,
+    sellingPrice,
+    productCategory,
+    productQuantity,
+    productStatus,
+    tags,
+    productSubDes,
+    productSubCategory,
+  };
+  
+  const notPresentProductDetailsToUpdate = {};
+  const presentProductDetailsToUpdate = {};
+  
+  for (let [key, val] of Object.entries(productFields)) {
+    !val && val == null
+      ? (notPresentProductDetailsToUpdate[key] = val)
+      : (presentProductDetailsToUpdate[key] = val);
+  }
+
+  //Validate the presentProductDetailsToUpdate
+  const exisitingProductName = await Product.find(
+    {},
+    { productName: 1, uiProductId: 1 },
+  ).lean();
+
+  const productExistWithSameNameOrUiProductId = exisitingProductName.find(
+    (el) => {
+      return (
+        el.productId !== productId &&
+        el.uiProductId !== uiProductId &&
+        (el.productName === productName || el.uiProductId === uiProductId)
+      );
+    },
+  );
+
+  if (productExistWithSameNameOrUiProductId) {
+    let conflictFields = [];
+
+    if (productExistWithSameNameOrUiProductId.productName === productName) {
+      conflictFields.push("Product Name");
+    }
+
+    if (productExistWithSameNameOrUiProductId.uiProductId === uiProductId) {
+      conflictFields.push("UI Product ID");
+    }
+
+    throw new ConflictError(`${conflictFields.join(" & ")} already exists`);
+  }
+
+  const presentProductDetailsToUpdateValidation = productUpdateFieldMissing(
+    presentProductDetailsToUpdate,
+  );
+  
+  if (!presentProductDetailsToUpdateValidation) {
+    throw new ValidationError(
+      presentProductDetailsToUpdateValidation?.message,
+      presentProductDetailsToUpdateValidation?.data
+    );
+  }
+
+  const existingProductDetails = await Product.findOne({
+    productId,
+  });
+
+  if (!existingProductDetails) {
+    throw new NotFoundError(`Product with Product Id ${productId} doesn't exist`);
+  }
+
+  const setObj = {};
+  const setObjWithQuantiy = {};
+  const updatingQuery = {};
+  
+  for (const [key, val] of Object.entries(presentProductDetailsToUpdate)) {
+    if (key === "productQuantity") {
+      setObjWithQuantiy.productQuantity = val;
+    } else {
+      setObj[key] = val;
+    }
+  }
+
+  if (action && ["add", "sub"].includes(action)) {
+    const value = Number(presentProductDetailsToUpdate.productQuantity) || 1;
+    setObjWithQuantiy.productQuantity = action === "add" ? value : -value;
+  }
+
+  if (Object.keys(setObj).length > 0) {
+    updatingQuery.$set = setObj;
+  }
+  if (Object.keys(setObjWithQuantiy).length > 0) {
+    updatingQuery.$inc = setObjWithQuantiy;
+  }
+  
+  const product = await Product.findOneAndUpdate(
+    { productId },
+    updatingQuery,
+    {
+      new: true,
+    },
+  ).select("-_id -__v -createdAt -updatedAt");
+
+  if (!product) {
+    throw new InternalServerError(`Fail to update the Product with ${productId}`);
+  }
+
+  return {
+    statusCode: 200,
+    message: `Product Details Update: ${product?.productName}`,
+    data: {
+      productName: product?.productName,
+      productQuantity: product?.productQuantity,
+      productId: product?.productId,
+      uiProductId: product?.uiProductId,
+      productImg: product?.productImg,
+      productDes: product?.productDes,
+      sellingPrice: product?.sellingPrice,
+      productCategory: product?.productCategory,
+      productStatus: product?.productStatus,
+      tags: product?.tags,
+      productSubDes: product?.productSubDes,
+      productSubCategory: product?.productSubCategory,
+    },
+    success: true,
+  };
 };
 
 const adminLoginService = async (email, password) => {
   const res = await Admin.findOne({ email });
+  
   if (!res) {
-    return {
-      statusCode: 404,
-      message: "User doesn't exist",
-      data: null,
-      success: false,
-    };
+    throw new NotFoundError("User doesn't exist");
   }
+  
   //pass check
   const passCheck = (await res.passCheck(password)) ? true : false;
 
   if (!passCheck) {
-    return {
-      statusCode: 401,
-      message: "password is wronng",
-      data: email,
-      success: false,
-    };
+    throw new AuthenticationError("Password is wrong");
   }
+  
   const adminAccessToken = await res.genAccessToken();
 
   return {
@@ -348,12 +296,7 @@ const totalProductService = async () => {
   const products = await Product.find().select("-_id").sort({ createdAt: -1 });
 
   if (!products.length) {
-    return {
-      statusCode: 404,
-      message: "No Product in inventory",
-      data: null,
-      success: false,
-    };
+    throw new NotFoundError("No Product in inventory");
   }
 
   return {
@@ -363,6 +306,7 @@ const totalProductService = async () => {
     success: true,
   };
 };
+
 export {
   createNewProductService,
   viewProductDetailsService,

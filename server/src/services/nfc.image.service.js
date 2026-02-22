@@ -1,6 +1,12 @@
 import nfcImage from "../model/nfc.image.model.js";
 import { v7 as uuidv7 } from "uuid";
 import bcrypt from "bcrypt";
+import { 
+  ValidationError, 
+  NotFoundError, 
+  AuthenticationError,
+  InternalServerError 
+} from "../utils/errors.js";
 
 const validatePassword = async (userDoc, inputPassword) => {
   if (!userDoc) return false;
@@ -12,33 +18,23 @@ const validatePassword = async (userDoc, inputPassword) => {
 
 const nfcGenrateUserIdService = async ({ adminEmail }) => {
   if (!adminEmail) {
-    return {
-      statusCode: 401,
-      message: "Unauthorized",
-      data: null,
-      success: false,
-    };
+    throw new AuthenticationError("Unauthorized");
   }
 
   // generate userUuid v7
   const genratedUserUuidV7 = uuidv7();
   if (!genratedUserUuidV7) {
-    return {
-      statusCode: 404,
-      message: `Failed to generate user uuid v7`,
-      data: null,
-      success: false,
-    };
+    throw new InternalServerError("Failed to generate user uuid v7");
   }
 
   // save to nfc Imgae Db
-
   const nfcImageRes = await nfcImage.create({
     userId: genratedUserUuidV7,
     status: "CREATED",
     isAssigned: false,
     password: process.env.DEFAULT_NFC_USER_PASSWORD,
   });
+  
   const updatedNfcImageList = await nfcImage
     .find()
     .select("-_id -__v -uploadedImagesUrl");
@@ -55,21 +51,11 @@ const nfcGenrateUserIdService = async ({ adminEmail }) => {
 
 const nfcAssignGeneratedUserIdService = async ({ adminEmail, userId }) => {
   if (!adminEmail) {
-    return {
-      statusCode: 401,
-      message: "Unauthorized",
-      data: null,
-      success: false,
-    };
+    throw new AuthenticationError("Unauthorized");
   }
 
   if (!userId) {
-    return {
-      statusCode: 401,
-      message: "no userId found to assign",
-      data: null,
-      success: false,
-    };
+    throw new ValidationError("no userId found to assign");
   }
 
   const genratedUserUuidV7 = await nfcImage.findOneAndUpdate(
@@ -81,12 +67,7 @@ const nfcAssignGeneratedUserIdService = async ({ adminEmail, userId }) => {
   );
 
   if (!genratedUserUuidV7) {
-    return {
-      statusCode: 404,
-      message: `Failed to update user uuid v7 - ${genratedUserUuidV7}`,
-      data: null,
-      success: false,
-    };
+    throw new NotFoundError(`Failed to update user uuid v7 - ${genratedUserUuidV7}`);
   }
 
   return {
@@ -102,21 +83,11 @@ const nfcAssignGeneratedUserIdService = async ({ adminEmail, userId }) => {
 
 const nfcPauseGeneratedUserIdService = async ({ adminEmail, userId }) => {
   if (!adminEmail) {
-    return {
-      statusCode: 401,
-      message: "Unauthorized",
-      data: null,
-      success: false,
-    };
+    throw new AuthenticationError("Unauthorized");
   }
 
   if (!userId) {
-    return {
-      statusCode: 401,
-      message: "no userId found to assign",
-      data: null,
-      success: false,
-    };
+    throw new ValidationError("no userId found to assign");
   }
 
   const genratedUserUuidV7 = await nfcImage.findOneAndUpdate(
@@ -128,12 +99,7 @@ const nfcPauseGeneratedUserIdService = async ({ adminEmail, userId }) => {
   );
 
   if (!genratedUserUuidV7) {
-    return {
-      statusCode: 404,
-      message: `Failed to update user uuid v7 - ${genratedUserUuidV7}`,
-      data: null,
-      success: false,
-    };
+    throw new NotFoundError(`Failed to update user uuid v7 - ${genratedUserUuidV7}`);
   }
 
   return {
@@ -152,12 +118,7 @@ const nfcPauseGeneratedUserIdService = async ({ adminEmail, userId }) => {
 
 const nfcGetUploadedDataService = async ({ userId }) => {
   if (!userId) {
-    return {
-      statusCode: 401,
-      message: "User ID is required to get data",
-      data: null,
-      success: false,
-    };
+    throw new ValidationError("User ID is required to get data");
   }
 
   const userDoc = await nfcImage.findOne({ userId });
@@ -194,6 +155,7 @@ const nfcGetUploadedDataService = async ({ userId }) => {
   const formattedImages = userDoc.uploadedImagesUrl.map((path) =>
     path ? `${cdnBaseUrl}/${path}` : null,
   );
+  
   return {
     statusCode: 200,
     message: "Data fetched successfully",
@@ -216,12 +178,7 @@ const nfcUpsertService = async ({
   password,
 }) => {
   if (!userId) {
-    return {
-      statusCode: 401,
-      success: false,
-      message: "Unauthorized: User ID is required",
-      data: null,
-    };
+    throw new AuthenticationError("Unauthorized: User ID is required");
   }
 
   // 1. Find User Doc First
@@ -230,23 +187,13 @@ const nfcUpsertService = async ({
   // 2. SECURITY CHECK: Verify Password
   if (userDoc) {
     if (!password) {
-      return {
-        statusCode: 401,
-        success: false,
-        message: "Password is required to save changes.",
-        data: null,
-      };
+      throw new AuthenticationError("Password is required to save changes.");
     }
 
     const isPasswordValid = await validatePassword(userDoc, password);
 
     if (!isPasswordValid) {
-      return {
-        statusCode: 401, // Unauthorized
-        success: false,
-        message: "Incorrect Password. Please try again.",
-        data: null,
-      };
+      throw new AuthenticationError("Incorrect Password. Please try again.");
     }
   }
 
@@ -255,13 +202,9 @@ const nfcUpsertService = async ({
   const hasTextUpdate = text1 !== undefined || text2 !== undefined;
 
   if (!hasFiles && !hasTextUpdate) {
-    return {
-      statusCode: 400,
-      success: false,
-      message:
-        "No changes detected. Please upload at least 1 image or update text.",
-      data: null,
-    };
+    throw new ValidationError(
+      "No changes detected. Please upload at least 1 image or update text."
+    );
   }
 
   const cdnBaseUrl = process.env.AWS_CDN_BASE_URL;
@@ -324,45 +267,25 @@ const nfcUpsertService = async ({
 /* Change Password */
 const nfcChangeUserPasswordService = async ({ userId, password, newPass }) => {
   if (!userId) {
-    return {
-      statusCode: 401,
-      success: false,
-      message: "Unauthorized: User ID is required",
-      data: null,
-    };
+    throw new AuthenticationError("Unauthorized: User ID is required");
   }
 
   const userDoc = await nfcImage.findOne({ userId });
   if (!userDoc) {
-    return {
-      statusCode: 404,
-      message: "User not found",
-      data: null,
-      success: true,
-    };
+    throw new NotFoundError("User not found");
   }
 
   // REUSED: Common Password Validator
   const isMatch = await validatePassword(userDoc, password);
 
   if (!isMatch) {
-    return {
-      statusCode: 401,
-      message: "Incorrect current password",
-      data: null,
-      success: false,
-    };
+    throw new AuthenticationError("Incorrect current password");
   }
 
   // Prevent reusing the exact same password (optional but good practice)
   const isSameAsOld = await bcrypt.compare(newPass, userDoc.password);
   if (isSameAsOld) {
-    return {
-      statusCode: 400,
-      message: "New password cannot be the same as the old password",
-      data: null,
-      success: false,
-    };
+    throw new ValidationError("New password cannot be the same as the old password");
   }
 
   userDoc.password = newPass;

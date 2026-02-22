@@ -1,5 +1,5 @@
-import { validateUserInput } from "../utlis/ValidateRes.js";
-import { ApiError, ApiRes } from "../utlis/index.js";
+import { validateUserInput } from "../utils/ValidateRes.js";
+import { ApiRes } from "../utils/index.js";
 import User from "../model/user.model.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
@@ -13,526 +13,366 @@ import {
   resetPasswordService,
 } from "../services/common.auth.service.js";
 import otpService from "../services/otp.service.js";
+import { asyncHandler } from "../middleware/errorHandler.middleware.js";
+import { 
+  NotFoundError, 
+  AuthenticationError, 
+  ValidationError
+} from "../utils/errors.js";
 
-const userLogin = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    
-    console.log(`[INFO] User login attempt - Email: ${email}`);
-    
-    // field Missing , existing User and pass check
-    let result = await loginService(email, password);
-    if (result?.statusCode >= 400) {
-      console.log(`[WARN] User login failed - Email: ${email}, Status: ${result?.statusCode}, Message: ${result?.message}`);
-      return res.status(Number(result?.statusCode)).json(result);
-    }
-    
-    console.log(`[INFO] User login successful - Email: ${email}, UserId: ${result?.data?.userId}`);
-    
-    return res
-      .status(Number(result?.statusCode))
-      .cookie("userAccessToken", result?.data?.userAccessToken, cookieOptions)
-      .json(
-        new ApiRes(Number(result?.statusCode), `User Details`, {
-          role: result?.data?.role,
-          name: result?.data?.name,
-          email: result?.data?.email,
-          userMobileNumber: result?.data?.mobileNumber,
+const userLogin = asyncHandler(async (req, res) => {
+  const { email, password } = req.body;    
+  
+  // field Missing , existing User and pass check
+  const result = await loginService(email, password);
+      
+  return res
+    .status(result.statusCode)
+    .cookie("userAccessToken", result.data.userAccessToken, cookieOptions)
+    .json(
+      new ApiRes(result.statusCode, result.message, {
+        role: result.data.role,
+        name: result.data.name,
+        email: result.data.email,
+        userMobileNumber: result.data.mobileNumber,
+        userAccessToken: result.data.userAccessToken,
+      }, true)
+    );
+});
+
+const userRegister = asyncHandler(async (req, res) => {
+  const { name, email, password, mobileNumber } = req.body || {};
+  
+  console.log(`[INFO] User registration attempt - Email: ${email}, Name: ${name}`);
+  
+  //fieldMissing and existing User check
+  let result = await registerService(name, email, password, mobileNumber);
+
+  console.log(`[INFO] User registration successful - Email: ${email}, UserId: ${result?.data?.user?.id}`);
+
+  // Return complete user data with token for auto-login
+  return res
+    .status(201)
+    .cookie("userAccessToken", result?.data?.userAccessToken, cookieOptions)
+    .json(
+      new ApiRes(
+        201,
+        `User created and logged in`,
+        {
+          email: result?.data?.user?.email,
+          name: name,
+          userId: result?.data?.user?.id,
+          role: 'USER',
           userAccessToken: result?.data?.userAccessToken,
-        }),
+        },
         true,
-      );
-  } catch (error) {
-    console.error(`[ERROR] User login error:`, error.message, error.stack);
-    return res
-      .status(500)
-      .json(new ApiError(500, null, `Internal Server Error -${error}`, false));
+      ),
+    );
+});
+
+const userProfile = asyncHandler(async (req, res) => {
+  const { userId } = req.user;
+  const userDetails = await profileFetchService({ userId, role: "USER" });
+  
+  if (!userDetails) {
+    throw new NotFoundError("User not found");
   }
-};
-
-const userRegister = async (req, res) => {
-  try {
-    const { name, email, password, mobileNumber } = req.body || {};
-    
-    console.log(`[INFO] User registration attempt - Email: ${email}, Name: ${name}`);
-    
-    //fieldMissing and existing User check
-    let result = await registerService(name, email, password, mobileNumber);
-
-    if (result?.statusCode >= 400) {
-      console.log(`[WARN] User registration failed - Email: ${email}, Status: ${result?.statusCode}, Message: ${result?.message}`);
-      return res.status(Number(result?.statusCode)).json(result);
-    }
-
-    console.log(`[INFO] User registration successful - Email: ${email}, UserId: ${result?.data?.user?.id}`);
-
-    // Return complete user data with token for auto-login
-    return res
-      .status(201)
-      .cookie("userAccessToken", result?.data?.userAccessToken, cookieOptions)
-      .json(
-        new ApiRes(
-          201,
-          `User created and logged in`,
-          {
-            email: result?.data?.user?.email,
-            name: name,
-            userId: result?.data?.user?.id,
-            role: 'USER',
-            userAccessToken: result?.data?.userAccessToken,
-          },
-          true,
-        ),
-      );
-  } catch (error) {
-    console.error(`[ERROR] User registration error:`, error.message, error.stack);
-    return res
-      .status(500)
-      .json(new ApiError(500, `Internal Server Error - ${error}`, [], false));
-  }
-};
-
-const userProfile = async (req, res) => {
-  try {
-    const { userId } = req.user;
-    const userDetails = await profileFetchService({ userId, role: "USER" });
-    if (!userDetails) {
-      return res
-        .status(404)
-        .json(new ApiError(404, "User not found", null, false));
-    }
-    return res
-      .status(200)
-      .json(new ApiRes(200, `User Details`, userDetails, true));
-  } catch (error) {
-    return res.status(500).json(new ApiError(500, error.message, null, false));
-  }
-};
+  
+  return res
+    .status(200)
+    .json(new ApiRes(200, `User Details`, userDetails, true));
+});
 
 // DEPRECATED: Old forgot password without OTP - kept for backward compatibility
-const userForgetpassword = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    if (!password) {
-      return {
-        statusCode: 400,
-        message: `Password can't be empty`,
-        data: null,
-        success: false,
-      };
+const userForgetpassword = asyncHandler(async (req, res) => {
+  const { email, password } = req.body;
+  
+  if (!password) {
+    throw new ValidationError("Password can't be empty");
+  }
+  
+  const userDetails = await User.findOne({ email });
+  
+  if (!userDetails?._id) {
+    throw new NotFoundError("Unable to reset password - user not found");
+  }
+  
+  const passCheck = (await userDetails.passCheck(password)) ? true : false;
+  const oldPassAndNewPassCompare = await bcrypt.compare(
+    password,
+    userDetails?.password,
+  );
+  
+  if (passCheck) {
+    if (oldPassAndNewPassCompare) {
+      throw new ValidationError(
+        `Current password and New password is same for user - ${email}`,
+        email
+      );
     }
-    const userDetails = await User.findOne({
-      email,
-    });
-    const passCheck = (await userDetails.passCheck(password)) ? true : false;
-    const oldPassAndNewPassCompare = await bcrypt.compare(
-      password,
-      userDetails?.password,
-    );
-    if (passCheck) {
-      if (oldPassAndNewPassCompare)
-        return res
-          .status(400)
-          .json(
-            new ApiRes(
-              400,
-              `Current password and New password is same for user - ${email}`,
-              email,
-              false,
-            ),
-          );
-    }
+  }
 
-    if (!userDetails?._id) {
-      return res
-        .status(Number(400))
-        .json(new ApiError(400, `Unable to reset password`, null, false));
-    }
-    userDetails.password = password;
-    await userDetails.save(); // using this because while using findOne it doesn't trigger pre middleware and hence plain text saved
+  userDetails.password = password;
+  await userDetails.save(); // using this because while using findOne it doesn't trigger pre middleware and hence plain text saved
+  
+  return res
+    .status(Number(200))
+    .json(
+      new ApiRes(
+        200,
+        `password updated successfully for user ${email}`,
+        email,
+        true,
+      ),
+    );
+});
+
+const userResetPassword = asyncHandler(async (req, res) => {
+  const { userId } = req.user;
+  const { currentPassword, newPassword } = req.body || {};
+  
+  const result = await resetPasswordService(userId, currentPassword, newPassword);
+  
+  return res
+    .status(result.statusCode)
+    .json(
+      new ApiRes(
+        result.statusCode,
+        result.message,
+        result.data,
+        result.success
+      )
+    );
+});
+
+const userUpdateProfile = asyncHandler(async (req, res) => {
+  const { userId } = req.user;
+  
+  if (!userId) {
+    throw new AuthenticationError("Unauthorized");
+  }
+
+  const { email, name, mobileNumber } = req.body || {};
+  
+  if (
+    name === undefined &&
+    mobileNumber == undefined &&
+    email === undefined
+  ) {
+    throw new ValidationError("No fields provided for update");
+  }
+
+  const validate = validateUserInput({
+    name,
+    mobileNumber,
+  });
+
+  if (!validate.success) {
+    throw new ValidationError(validate.message, validate.data);
+  }
+
+  const updateFields = {};
+  if (email !== undefined) updateFields.email = email;
+  if (name !== undefined) updateFields.name = name;
+  if (mobileNumber !== undefined) updateFields.mobileNumber = mobileNumber;
+  
+  const updatedUser = await User.findOneAndUpdate(
+    {
+      userId,
+      $or: [
+        email !== undefined ? { email: { $ne: email } } : null,
+        name != undefined ? { name: { $ne: name } } : null,
+        mobileNumber != undefined
+          ? { mobileNumber: { $ne: mobileNumber } }
+          : null,
+      ],
+    },
+    {
+      $set: updateFields,
+    },
+    {
+      new: true,
+    },
+  );
+
+  if (!updatedUser) {
     return res
-      .status(Number(200))
+      .status(200)
       .json(
         new ApiRes(
           200,
-          `password updated successfully for user ${email}`,
-          email,
+          "No changes done. Same values already saved.",
+          null,
           true,
         ),
       );
-  } catch (error) {
-    return res
-      .status(500)
-      .json(new ApiError(500, `Internal Server Error - ${error}`, [], false));
   }
-};
-
-const userResetPassword = async (req, res) => {
-  try {
-    const { userId } = req.user;
-    const { currentPassword, newPassword } = req.body || {};
-    const resetPasswordSeviceValidation = await resetPasswordService(
-      userId,
-      currentPassword,
-      newPassword,
-    );
-    if (!resetPasswordSeviceValidation?.success) {
-      return res
-        .status(Number(resetPasswordSeviceValidation?.statusCode))
-        .json(
-          new ApiError(
-            resetPasswordSeviceValidation?.statusCode,
-            resetPasswordSeviceValidation?.message,
-            resetPasswordSeviceValidation?.data,
-            resetPasswordSeviceValidation?.success,
-          ),
-        );
-    }
-    return res
-      .status(Number(resetPasswordSeviceValidation?.statusCode))
-      .json(
-        new ApiRes(
-          resetPasswordSeviceValidation?.statusCode,
-          resetPasswordSeviceValidation?.message,
-          resetPasswordSeviceValidation?.data,
-          resetPasswordSeviceValidation?.success,
-        ),
-      );
-  } catch (error) {
-    return res
-      .status(500)
-      .json(new ApiError(500, `Internal Server Error - ${error}`, [], false));
-  }
-};
-
-const userUpdateProfile = async (req, res) => {
-  try {
-    const { userId } = req.user;
-    if (!userId) {
-      return res
-        .status(401)
-        .json(new ApiError(401, "Unauthorized", null, false));
-    }
-
-    const { email, name, mobileNumber } = req.body || {};
-    if (
-      name === undefined &&
-      mobileNumber == undefined &&
-      email === undefined
-    ) {
-      return res
-        .status(400)
-        .json(new ApiError(400, "No fields provided for update", null, false));
-    }
-
-    const validate = validateUserInput({
-      name,
-      mobileNumber,
-    });
-
-    if (!validate.success) {
-      return res
-        .status(validate.statusCode)
-        .json(
-          new ApiError(
-            validate.statusCode,
-            validate.message,
-            validate.data,
-            false,
-          ),
-        );
-    }
-
-    const updateFields = {};
-    if (email !== undefined) updateFields.email = email;
-
-    if (name !== undefined) updateFields.name = name;
-    if (mobileNumber !== undefined) updateFields.mobileNumber = mobileNumber;
-    const updatedUser = await User.findOneAndUpdate(
+  
+  return res.status(200).json(
+    new ApiRes(
+      200,
+      "Profile updated successfully",
       {
-        userId,
-        $or: [
-          email !== undefined ? { email: { $ne: email } } : null,
-          name != undefined ? { name: { $ne: name } } : null,
-          mobileNumber != undefined
-            ? { mobileNumber: { $ne: mobileNumber } }
-            : null,
-        ],
+        email: updatedUser.email,
+        name: updatedUser.name,
+        mobileNumber: updatedUser.mobileNumber,
       },
-      {
-        $set: updateFields,
-      },
-      {
-        new: true,
-      },
-    );
+      true,
+    ),
+  );
+});
 
-    if (!updatedUser) {
-      return res
-        .status(200)
-        .json(
-          new ApiRes(
-            200,
-            "No changes done. Same values already saved.",
-            null,
-            true,
-          ),
-        );
-    }
-    return res.status(200).json(
-      new ApiRes(
-        200,
-        "Profile updated successfully",
-        {
-          email: updatedUser.email,
-          name: updatedUser.name,
-          mobileNumber: updatedUser.mobileNumber,
-        },
-        true,
-      ),
-    );
-  } catch (error) {
-    return res
-      .status(500)
-      .json(
-        new ApiError(
-          500,
-          `Internal Server Error - ${error.message}`,
-          null,
-          false,
-        ),
-      );
+const userAccountDeletePreview = asyncHandler(async (req, res) => {
+  const { userId } = req.user;
+  
+  if (!userId) {
+    throw new ValidationError("Unauthorized");
   }
-};
 
-const userAccountDeletePreview = async (req, res) => {
-  try {
-    const { userId } = req.user;
-    if (!userId) {
-      return res
-        .status(400)
-        .json(new ApiError(400, `Unauthorized`, null, false));
-    }
-
-    const userDetails = await User.findOne({ userId });
-    if (!userDetails) {
-      return res
-        .status(404)
-        .json(new ApiError(404, "User not found", null, false));
-    }
-
-    // Updated to jwt from Base64
-    const confirmToken = jwt.sign(
-      { email, purpose: "account_deletion", timestamp: Date.now() },
-      process.env.DELETION_TOKEN_SECRET,
-      { expiresIn: "15m" },
-    );
-
-    return res.status(200).json(
-      new ApiRes(
-        200,
-        "Are you sure you want to delete your account?",
-        {
-          email,
-          confirmToken,
-          confirmDelete: true,
-          note: "Send this token with confirmDelete=true to delete account",
-        },
-        true,
-      ),
-    );
-  } catch (error) {
-    return res
-      .status(500)
-      .json(new ApiError(500, `Internal Server Error - ${error}`, [], false));
+  const userDetails = await User.findOne({ userId });
+  
+  if (!userDetails) {
+    throw new NotFoundError("User not found");
   }
-};
 
-const userAccountDeleteConfirm = async (req, res) => {
+  // Updated to jwt from Base64
+  const confirmToken = jwt.sign(
+    { email: userDetails.email, purpose: "account_deletion", timestamp: Date.now() },
+    process.env.DELETION_TOKEN_SECRET,
+    { expiresIn: "15m" },
+  );
+
+  return res.status(200).json(
+    new ApiRes(
+      200,
+      "Are you sure you want to delete your account?",
+      {
+        email: userDetails.email,
+        confirmToken,
+        confirmDelete: true,
+        note: "Send this token with confirmDelete=true to delete account",
+      },
+      true,
+    ),
+  );
+});
+
+const userAccountDeleteConfirm = asyncHandler(async (req, res) => {
   const { confirmToken, confirmDelete } = req.body;
 
   if (!confirmToken || confirmDelete !== true) {
-    return res
-      .status(400)
-      .json(
-        new ApiError(
-          400,
-          `confirmToken and confirmDelete=true are required for deleting`,
-          null,
-          false,
-        ),
-      );
+    throw new ValidationError(
+      "confirmToken and confirmDelete=true are required for deleting"
+    );
   }
 
-  try {
-    // Decode token to get email
-    const email = Buffer.from(confirmToken, "base64").toString("utf-8");
+  // Decode token to get email
+  const email = Buffer.from(confirmToken, "base64").toString("utf-8");
 
-    // Find user
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res
-        .status(404)
-        .json(new ApiError(404, "User not found", null, false));
-    }
-
-    // Delete user
-    await User.deleteOne({ email });
-
-    return res
-      .status(200)
-      .json(new ApiRes(200, "User account deleted successfully", null, true));
-  } catch (err) {
-    return res
-      .status(500)
-      .json(new ApiError(500, "Internal server error", err, false));
+  // Find user
+  const user = await User.findOne({ email });
+  
+  if (!user) {
+    throw new NotFoundError("User not found");
   }
-};
+
+  // Delete user
+  await User.deleteOne({ email });
+
+  return res
+    .status(200)
+    .json(new ApiRes(200, "User account deleted successfully", null, true));
+});
 
 /**
  * Request OTP for password reset
  * POST /user/forgot-password/request
  */
-const userForgotPasswordRequest = async (req, res) => {
-  try {
-    const { email } = req.body;
+const userForgotPasswordRequest = asyncHandler(async (req, res) => {
+  const { email } = req.body;
 
-    if (!email) {
-      return res
-        .status(400)
-        .json(new ApiError(400, "Email is required", null, false));
-    }
-
-    // Check if user exists
-    const user = await User.findOne({ email });
-    if (!user) {
-      // Don't reveal if user exists or not for security
-      return res
-        .status(200)
-        .json(
-          new ApiRes(
-            200,
-            "If the email exists, an OTP has been sent",
-            null,
-            true
-          )
-        );
-    }
-
-    // Generate and send OTP
-    const result = await otpService.generateOTP(email);
-
-    return res.status(result.statusCode).json(
-      result.success
-        ? new ApiRes(result.statusCode, result.message, result.data, true)
-        : new ApiError(result.statusCode, result.message, result.data, false)
-    );
-  } catch (error) {
-    return res
-      .status(500)
-      .json(
-        new ApiError(500, `Internal Server Error - ${error.message}`, null, false)
-      );
+  if (!email) {
+    throw new ValidationError("Email is required");
   }
-};
 
-/**
- * Reset password with OTP verification
- * POST /user/forgot-password/reset
- */
-const userForgotPasswordReset = async (req, res) => {
-  try {
-    const { email, otp, newPassword } = req.body;
-
-    // Validate input
-    if (!email || !otp || !newPassword) {
-      return res
-        .status(400)
-        .json(
-          new ApiError(
-            400,
-            "Email, OTP, and new password are required",
-            null,
-            false
-          )
-        );
-    }
-
-    // Validate password length
-    if (newPassword.length < 8) {
-      return res
-        .status(400)
-        .json(
-          new ApiError(
-            400,
-            "Password must be at least 8 characters long",
-            null,
-            false
-          )
-        );
-    }
-
-    // Verify OTP
-    const otpResult = await otpService.verifyOTP(email, otp);
-
-    if (!otpResult.success) {
-      return res
-        .status(otpResult.statusCode)
-        .json(
-          new ApiError(
-            otpResult.statusCode,
-            otpResult.message,
-            otpResult.data,
-            false
-          )
-        );
-    }
-
-    // Find user
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res
-        .status(404)
-        .json(new ApiError(404, "User not found", null, false));
-    }
-
-    // Check if new password is same as old password
-    const isSamePassword = await user.passCheck(newPassword);
-    if (isSamePassword) {
-      return res
-        .status(400)
-        .json(
-          new ApiError(
-            400,
-            "New password cannot be the same as the old password",
-            null,
-            false
-          )
-        );
-    }
-
-    // Update password
-    user.password = newPassword;
-    await user.save(); // This triggers the pre-save hook to hash the password
-
+  // Check if user exists
+  const user = await User.findOne({ email });
+  
+  if (!user) {
+    // Don't reveal if user exists or not for security
     return res
       .status(200)
       .json(
         new ApiRes(
           200,
-          "Password reset successfully. You can now login with your new password.",
-          { email },
+          "If the email exists, an OTP has been sent",
+          null,
           true
         )
       );
-  } catch (error) {
-    return res
-      .status(500)
-      .json(
-        new ApiError(500, `Internal Server Error - ${error.message}`, null, false)
-      );
   }
-};
+
+  // Generate and send OTP
+  const result = await otpService.generateOTP(email);
+
+  return res.status(result.statusCode).json(
+    new ApiRes(result.statusCode, result.message, result.data, true)
+  );
+});
+
+/**
+ * Reset password with OTP verification
+ * POST /user/forgot-password/reset
+ */
+const userForgotPasswordReset = asyncHandler(async (req, res) => {
+  const { email, otp, newPassword } = req.body;
+
+  // Validate input
+  if (!email || !otp || !newPassword) {
+    throw new ValidationError("Email, OTP, and new password are required");
+  }
+
+  // Validate password length
+  if (newPassword.length < 8) {
+    throw new ValidationError("Password must be at least 8 characters long");
+  }
+
+  // Verify OTP
+  const otpResult = await otpService.verifyOTP(email, otp);
+
+  if (!otpResult.success) {
+    throw new ValidationError(otpResult.message, otpResult.data);
+  }
+
+  // Find user
+  const user = await User.findOne({ email });
+  
+  if (!user) {
+    throw new NotFoundError("User not found");
+  }
+
+  // Check if new password is same as old password
+  const isSamePassword = await user.passCheck(newPassword);
+  
+  if (isSamePassword) {
+    throw new ValidationError("New password cannot be the same as the old password");
+  }
+
+  // Update password
+  user.password = newPassword;
+  await user.save(); // This triggers the pre-save hook to hash the password
+
+  return res
+    .status(200)
+    .json(
+      new ApiRes(
+        200,
+        "Password reset successfully. You can now login with your new password.",
+        { email },
+        true
+      )
+    );
+});
 
 export {
   userLogin,

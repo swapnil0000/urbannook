@@ -27,7 +27,7 @@ const SocialMediaFAB = () => {
     },
     {
       id: 'call',
-      name: 'Call Concierge',
+      name: 'Call',
       icon: 'fa-solid fa-phone',
       color: 'bg-emerald-700',
       link: 'tel:+918299638749',
