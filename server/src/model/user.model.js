@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-
+import env from "../config/envConfigSetup.js";
 const userSchema = mongoose.Schema(
   {
     userId: {
@@ -71,7 +71,7 @@ userSchema.methods.passCheck = async function (password) {
 };
 
 userSchema.methods.genAccessToken = function () {
-  if (!process.env.USER_ACCESS_TOKEN_SECRET) {
+  if (!env.USER_ACCESS_TOKEN_SECRET) {
     throw new Error("USER_ACCESS_TOKEN_SECRET is missing in .env file");
   }
   return jwt.sign(
@@ -81,7 +81,7 @@ userSchema.methods.genAccessToken = function () {
       userName: this.name,
       userRole: this.role,
     },
-    process.env.USER_ACCESS_TOKEN_SECRET,
+    env.USER_ACCESS_TOKEN_SECRET,
     {
       expiresIn: "1d",
     },
@@ -93,7 +93,7 @@ userSchema.methods.genRefreshToken = function () {
     {
       _id: this._id,
     },
-    process.env.REFRESH_TOKEN_SECRET,
+    env.REFRESH_TOKEN_SECRET,
     {
       expiresIn: "10d",
     },

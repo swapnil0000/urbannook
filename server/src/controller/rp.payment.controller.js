@@ -9,7 +9,7 @@ import crypto from "crypto";
 import Product from "../model/product.model.js";
 import { v7 as uuidv7 } from "uuid";
 import Cart from "../model/user.cart.model.js";
-
+import env from "../config/envConfigSetup.js";
 import {
   sendOrderConfirmation,
   sendPaymentReceipt,
@@ -40,10 +40,10 @@ const getErrorMessage = (errorCode) => {
   return PAYMENT_ERROR_MESSAGES[errorCode] || PAYMENT_ERROR_MESSAGES.default;
 };
 const razorpayKeyGetController = asyncHandler(async (_, res) => {
-  const isProduction = process.env.NODE_ENV === 'production';
+  const isProduction = env.NODE_ENV === 'production';
   const key_id = isProduction
-    ? process.env.RP_PROD_KEY_ID
-    : process.env.RP_LOCAL_TEST_KEY_ID;
+    ? env.RP_PROD_KEY_ID
+    : env.RP_LOCAL_TEST_KEY_ID;
   if (!key_id) {
     throw new NotFoundError("Rp - Key");
   }
@@ -218,7 +218,8 @@ const razorpayPaymentVerificationController = asyncHandler(async (req, res) => {
 });
 
 const razorpayWebHookController = async (req, res) => {
-  const secret = process.env.RP_WEBHOOK_TEST_SECRET;
+  const secret = env.RP_WEBHOOK_TEST_SECRET;
+  
   const signature = req.headers["x-razorpay-signature"];
   if (!signature) {
     return res.status(400).json({

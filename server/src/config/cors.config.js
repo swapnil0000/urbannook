@@ -1,6 +1,6 @@
+import env from "./envConfigSetup.js";
 function getAllowedOrigins() {
-  const env = process.env.NODE_ENV || "development";
-  const whitelistFromEnv = process.env.WHITE_LIST_CLIENT_URI || "";
+  const whitelistFromEnv = env.WHITE_LIST_CLIENT_URI || "";
 
   const origins = whitelistFromEnv
     .split(",")
@@ -26,8 +26,6 @@ function getAllowedOrigins() {
 export const corsOptions = {
   origin: function (origin, callback) {
     const allowedOrigins = getAllowedOrigins();
-    const env = process.env.NODE_ENV || "development";
-
     // Allow requests with no origin (mobile apps, Postman, server-to-server)
     if (!origin) {
       return callback(null, true);
@@ -63,10 +61,9 @@ export const corsOptions = {
  */
 export function logCorsConfig() {
   const allowedOrigins = getAllowedOrigins();
-  const env = process.env.NODE_ENV || "development";
 
   console.log("\n🔒 CORS Configuration:");
-  console.log(`   Environment: ${env}`);
+  console.log(`   Environment: ${env.NODE_ENV}`);
   console.log(`   Allowed Origins (${allowedOrigins.length}):`);
   allowedOrigins.forEach((origin) => console.log(`     - ${origin}`));
   console.log("");

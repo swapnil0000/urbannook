@@ -4,7 +4,8 @@ import {
   updatedAddressService,
   getAddressSuggestionsService,
   getSearchSuggestionsService,
-  getSavedAddressService
+  getSavedAddressService,
+  deleteSavedAddressService,
 } from "../services/address.service.js";
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
 
@@ -107,6 +108,8 @@ const userUpdateAddress = asyncHandler(async (req, res) => {
     formattedAddress,
     addressId,
     placeId,
+    landmark, 
+    flatOrFloorNumber,
   } = req.body || {};
 
   const result = await updatedAddressService({
@@ -119,6 +122,8 @@ const userUpdateAddress = asyncHandler(async (req, res) => {
     formattedAddress,
     addressId,
     placeId,
+    landmark, 
+    flatOrFloorNumber,
   });
 
   return res
@@ -151,10 +156,32 @@ const userSavedAddressController = asyncHandler(async (req, res) => {
     );
 });
 
+const userDeleteSavedAddressController = asyncHandler(async (req, res) => {
+  const { userId } = req.user;
+  const { addressId } = req.body;
+
+  const deleteServiceResponse = await deleteSavedAddressService({
+    userId,
+    addressId,
+  });
+
+  return res
+    .status(Number(deleteServiceResponse.statusCode || 200))
+    .json(
+      new ApiRes(
+        deleteServiceResponse.statusCode || 200,
+        deleteServiceResponse.message,
+        deleteServiceResponse.data || {},
+        deleteServiceResponse.success,
+      ),
+    );
+});
+
 export {
   userUpdateAddress as userAddressUpdate,
   userCreateAddress,
   userAddressSuggestionFromLatLngController,
   userAddressSearchFromInputController,
   userSavedAddressController,
+  userDeleteSavedAddressController,
 };

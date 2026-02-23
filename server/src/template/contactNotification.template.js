@@ -1,3 +1,4 @@
+import env from "../config/envConfigSetup.js";
 const contactNotificationTemplate = ({ name, email, subject, message, timestamp }) => {
   const formattedDate = new Date(timestamp).toLocaleString('en-US', {
     dateStyle: 'full',
@@ -102,7 +103,7 @@ ${message}
 
                   <!-- Action Button -->
                   <div style="text-align: center; margin-top: 30px;">
-                    <a href="${process.env.ADMIN_DASHBOARD_URL || 'http://localhost:3000/admin'}/contacts" 
+                    <a href="${env.ADMIN_DASHBOARD_URL || 'http://localhost:3000/admin'}/contacts" 
                        style="display: inline-block; background-color: #2e443c; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; letter-spacing: 0.5px;">
                       View in Dashboard →
                     </a>

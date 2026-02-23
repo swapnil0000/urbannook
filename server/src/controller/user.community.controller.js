@@ -4,7 +4,7 @@ import { ValidationError, InternalServerError } from "../utils/errors.js";
 import nodemailer from "nodemailer";
 import communityTemplate from "../template/community.template.js";
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
-
+import env from "../config/envConfigSetup.js";
 const userCommunityController = asyncHandler(async (req, res) => {
   const { email } = req.body;
 
@@ -44,8 +44,8 @@ const userCommunityController = asyncHandler(async (req, res) => {
     port: 465,
     secure: true,
     auth: {
-      user: process.env.ZOHO_ADMIN_EMAIL,
-      pass: process.env.ZOHO_SMTP_SECRET,
+      user: env.ZOHO_ADMIN_EMAIL,
+      pass: env.ZOHO_SMTP_SECRET,
     },
   });
 

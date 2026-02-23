@@ -3,29 +3,30 @@ import UserAddress from "../model/userAddress.model.js";
 import { v7 as uuidv7 } from "uuid";
 import Address from "../model/address.new.model.js";
 import axios from "axios";
-import { 
-  ValidationError, 
-  NotFoundError, 
+import env from "../config/envConfigSetup.js";
+import {
+  ValidationError,
+  NotFoundError,
   AuthenticationError,
   ConflictError,
-  InternalServerError 
+  InternalServerError,
 } from "../utils/errors.js";
 
 const getSearchSuggestionsService = async ({ userId, userSearchInput }) => {
   if (!userId) {
     throw new AuthenticationError("Unauthorized");
   }
-  
+
   if (!userSearchInput) {
     throw new ValidationError("userSearchInput are required");
   }
 
   const inputSearchAutoCompleteRes = await axios.get(
-    process.env.OLA_MAP_AUTO_COMPLETE_URL,
+    env.OLA_MAP_AUTO_COMPLETE_URL,
     {
       params: {
         input: userSearchInput,
-        api_key: process.env.OLA_MAP_API_KEY,
+        api_key: env.OLA_MAP_API_KEY,
       },
       headers: {
         "X-Request-Id": "urbannook-request",
@@ -33,13 +34,13 @@ const getSearchSuggestionsService = async ({ userId, userSearchInput }) => {
       },
     },
   );
-  
+
   const predictions = inputSearchAutoCompleteRes?.data?.predictions || [];
-  
+
   if (predictions.length === 0) {
     throw new NotFoundError("No addresses found for these coordinates");
   }
-  
+
   return {
     statusCode: 200,
     message: "addresses found for these coordinates",
@@ -52,17 +53,17 @@ const getAddressSuggestionsService = async ({ userId, lat, long }) => {
   if (!userId) {
     throw new AuthenticationError("Unauthorized");
   }
-  
+
   if (!lat || !long) {
     throw new ValidationError("Coordinates are required");
   }
 
   const mapReverseGeoLocationApiRes = await axios.get(
-    process.env.OLA_MAP_ADDRESS_SUGGESTION_URL,
+    env.OLA_MAP_ADDRESS_SUGGESTION_URL,
     {
       params: {
         latlng: `${lat},${long}`,
-        api_key: process.env.OLA_MAP_API_KEY,
+        api_key: env.OLA_MAP_API_KEY,
       },
       headers: {
         "X-Request-Id": "urbannook-request",
@@ -72,7 +73,7 @@ const getAddressSuggestionsService = async ({ userId, lat, long }) => {
   );
 
   const results = mapReverseGeoLocationApiRes?.data?.results || [];
-  
+
   if (results.length === 0) {
     throw new NotFoundError("No addresses found for these coordinates");
   }
@@ -205,7 +206,7 @@ const createAddressService = async ({
     { userId },
     { $addToSet: { addresses: newAddress.addressId } },
   );
-  
+
   return {
     statusCode: 201,
     data: { addressId: newAddress.addressId },
@@ -224,6 +225,8 @@ const updatedAddressService = async ({
   formattedAddress,
   addressId,
   placeId,
+  landmark,           
+  flatOrFloorNumber,  
 }) => {
   if (!userId) {
     throw new AuthenticationError("Unauthorized");
@@ -241,28 +244,18 @@ const updatedAddressService = async ({
   });
 
   if (!validateNewAddress.success) {
-    throw new ValidationError(validateNewAddress.message, validateNewAddress.data);
+    throw new ValidationError(
+      validateNewAddress.message,
+      validateNewAddress.data,
+    );
   }
-  
+
   let userAddress = await UserAddress.findOne({ userId, addresses: addressId });
-  
+
   if (!userAddress) {
     throw new NotFoundError("Address not found for this user");
   }
 
-  // Duplicate check (excluding the editing current address)
-  const duplicateAddress = await Address.findOne({
-    addressId: { $ne: addressId },
-    "location.coordinates": [Number(long), Number(lat)],
-  }).lean();
-
-  if (duplicateAddress) {
-    throw new ConflictError(
-      "Another address with same location already exists",
-      { duplicateAddressId: duplicateAddress.addressId }
-    );
-  }
-  
   const updated = await Address.findOneAndUpdate(
     { addressId },
     {
@@ -275,6 +268,8 @@ const updatedAddressService = async ({
         state,
         pinCode,
         formattedAddress,
+        landmark,            // Update mein add kiya
+        flatOrFloorNumber,    // Update mein add kiya
       },
     },
     {
@@ -296,6 +291,7 @@ const updatedAddressService = async ({
     success: true,
   };
 };
+
 const getSavedAddressService = async ({ userId }) => {
   if (!userId) {
     throw new AuthenticationError("Unauthorized");
@@ -308,22 +304,51 @@ const getSavedAddressService = async ({ userId }) => {
       addressId: userSavedAddressIds?.addresses,
     },
     {
-      location: 1,
       formattedAddress: 1,
       addressType: 1,
       flatOrFloorNumber: 1,
       city: 1,
       state: 1,
       pinCode: 1,
-      landmark:1,
+      landmark: 1,
       _id: 0,
     },
   ).lean();
-  
+
   return {
     statusCode: 200,
     message: "Saved Address Ids",
-    data: extractingAddressFromAddressIds,
+    data: {
+      extractingAddressFromAddressIds,
+      addressId: userSavedAddressIds?.addresses,
+    },
+    success: true,
+  };
+};
+
+const deleteSavedAddressService = async ({ userId, addressId }) => {
+  if (!userId) {
+    throw new AuthenticationError("Unauthorized");
+  }
+
+  const deletedAddress = await Address.findOneAndDelete({
+    addressId,
+  });
+
+  if (!deletedAddress) {
+    throw new NotFoundError("Address not found");
+  }
+
+  const updatedMapping = await UserAddress.findOneAndUpdate(
+    { userId },
+    { $pull: { addresses: addressId } },
+    { new: true },
+  );
+
+  return {
+    statusCode: 200,
+    message: "Address deleted successfully from",
+    data: null,
     success: true,
   };
 };
@@ -333,5 +358,6 @@ export {
   createAddressService,
   updatedAddressService,
   getSearchSuggestionsService,
-  getSavedAddressService
+  getSavedAddressService,
+  deleteSavedAddressService,
 };
