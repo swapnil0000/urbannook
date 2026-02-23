@@ -54,7 +54,7 @@ const AireTestimonials = () => {
         userRole: userRole || undefined,
         userLocation: userLocation || undefined,
         content: reviewText,
-        rating: mood,
+       rating: mood + 1,
       }).unwrap();
       
       setFormState('success');

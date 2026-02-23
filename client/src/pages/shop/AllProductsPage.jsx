@@ -120,8 +120,8 @@ const AllProductsPage = () => {
                     {/* 2. TEXT & CTA SECTION */}
                     <div className="p-4 md:p-4 flex flex-col flex-grow justify-between bg-[#f5f7f8] to-transparent backdrop-blur-md">
                       
-                      <div className="mb-6">
-                        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a89068]  mb-2 block opacity-80">
+                      <div className="mb-2">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a89068] block opacity-80">
                           {product.productCategory}
                         </span>
                         <h3 className="font-serif text-xl md:text-2xl text-gray-500  leading-snug line-clamp-2">
@@ -129,9 +129,9 @@ const AllProductsPage = () => {
                         </h3>
                       </div>
                       
-                      <div className="flex justify-between items-end pt-4 border-t border-[#F5DEB3]/10] mt-auto">
+                      <div className="flex justify-between items-end pt-2 border-t border-[#F5DEB3]/10] mt-auto">
                         <div className="flex flex-col">
-                           <span className="text-[10px] uppercase tracking-widest text-gray-500 mb-1">Investment</span>
+                           <span className="text-[10px] uppercase tracking-widest text-gray-500 mb-1">Pricing</span>
                            <span className="text-lg md:text-xl font-semibold text-[#a89068] ">
                              ₹{product.sellingPrice?.toLocaleString()}
                            </span>

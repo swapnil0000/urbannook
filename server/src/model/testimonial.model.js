@@ -30,7 +30,7 @@ const testimonialSchema = mongoose.Schema(
       type: Number,
       required: [true, "rating is required"],
       min: [0, "rating must be at least 0"],
-      max: [4, "rating cannot exceed 4"],
+      max: [5, "rating cannot exceed 5"],
       validate: {
         validator: Number.isInteger,
         message: "rating must be an integer",
