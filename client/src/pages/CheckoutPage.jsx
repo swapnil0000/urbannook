@@ -390,7 +390,7 @@ const CheckoutPage = () => {
     }
     setPaymentError(null);
     try {
-      const razorpayKey = razorpayKeyData?.data || "rzp_test_RxTeOoN8KmHMGG";
+      const razorpayKey = razorpayKeyData?.data
       const orderData = {
         items: cartItems.map((i) => ({
           productId: i.id,

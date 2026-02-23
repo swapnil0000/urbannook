@@ -50,7 +50,7 @@ const razorpayKeyGetController = asyncHandler(async (_, res) => {
   
   return res
     .status(200)
-    .json(new ApiRes(200, `Rp - Key`, process.env.key_id, true));
+    .json(new ApiRes(200, `Rp - Key`, key_id, true));
 });
 
 const razorpayCreateOrderController = asyncHandler(async (req, res) => {
