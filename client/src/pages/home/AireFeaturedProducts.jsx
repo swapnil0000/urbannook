@@ -12,6 +12,8 @@ const AireFeaturedProducts = () => {
   // Extract the first featured product
   const featuredProduct = featuredResponse?.data?.listOfProducts?.listOfProducts?.[0];
 
+  console.log("sidvni")
+
   // Loading state
   if (isLoading) {
     return (
