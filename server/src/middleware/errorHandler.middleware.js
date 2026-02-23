@@ -1,5 +1,5 @@
 import sendAlert from "../utils/alertSystem.js";
-
+import env from "../config/envConfigSetup.js";
 /**
  * Global Error Handler Middleware
  * This is the final error handler - it catches all errors and sends response
@@ -63,14 +63,14 @@ export const errorHandler = async (err, req, res, next) => {
     // Create detailed alert message with Zoho Cliq formatting
     const alertMessage = `🚨 **500 INTERNAL SERVER ERROR**
 
-**Env:** ${process.env.NODE_ENV || "development"} | **Time:** ${timestamp}
+**Env:** ${env.NODE_ENV || "development"} | **Time:** ${timestamp}
 
 **Request:** ${req.method} \`${req.url}\` | **IP:** ${ipAddress}
 
 **User:** ${userId} | **Email:** ${userEmail} | **Name:** ${userName}
 
 **Error:** ${err.name || "Error"} - ${err.message}
-${process.env.NODE_ENV !== "production" ? `
+${env.NODE_ENV !== "production" ? `
 **Stack:**
 \`\`\`
 ${err.stack?.split("\n").slice(0, 5).join("\n") || "N/A"}
@@ -105,7 +105,7 @@ ${JSON.stringify(req.body, null, 2)}
   // Determine error message
   // In production, hide internal server error details
   const message =
-    process.env.NODE_ENV === "production" && statusCode === 500
+    env.NODE_ENV === "production" && statusCode === 500
       ? "Internal server error"
       : err.message;
 
@@ -113,7 +113,7 @@ ${JSON.stringify(req.body, null, 2)}
   // Only send stack trace for 500 errors in development
   const data =
     statusCode === 500
-      ? process.env.NODE_ENV === "production"
+      ? env.NODE_ENV === "production"
         ? null
         : err.stack
       : err.data || null;

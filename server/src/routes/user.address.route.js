@@ -5,6 +5,7 @@ import {
   userAddressSuggestionFromLatLngController,
   userAddressSearchFromInputController,
   userSavedAddressController,
+  userDeleteSavedAddressController,
 } from "../controller/user.address.controller.js";
 import { authGuardService } from "../services/common.auth.service.js";
 const userAddressRouter = Router();
@@ -19,10 +20,10 @@ userAddressRouter.post(
   authGuardService("USER"),
   userAddressSearchFromInputController,
 );
-userAddressRouter.get(
-  "/user/address/saved",
+userAddressRouter.post(
+  "/user/address/delete",
   authGuardService("USER"),
-  userSavedAddressController,
+  userDeleteSavedAddressController,
 );
 userAddressRouter.post(
   "/user/address/suggestion",

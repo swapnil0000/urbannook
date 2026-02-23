@@ -13,3 +13,4 @@ const envPath = path.resolve(__dirname, `../${envFile}`);
 console.log(`⏳ Loading Environment from: ${envFile}`);
 
 dotenv.config({ path: envPath });
+export default process.env

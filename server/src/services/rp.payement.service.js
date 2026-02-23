@@ -2,16 +2,16 @@ import Razorpay from "razorpay";
 import crypto from "crypto";
 import Order from "../model/order.model.js";
 import { InternalServerError, ValidationError } from "../utils/errors.js";
-
+import env from "../config/envConfigSetup.js";
 const razorpayCreateOrderService = async (amount, currency) => {
   // Use production credentials if NODE_ENV is production, otherwise use test credentials
-  const isProduction = process.env.NODE_ENV === 'production';
+  const isProduction = env.NODE_ENV === 'production';
   const key_id = isProduction 
-    ? process.env.RP_PROD_KEY_ID 
-    : process.env.RP_LOCAL_TEST_KEY_ID;
+    ? env.RP_PROD_KEY_ID 
+    : env.RP_LOCAL_TEST_KEY_ID;
   const key_secret = isProduction 
-    ? process.env.RP_PROD_SECRET 
-    : process.env.RP_LOCAL_TEST_SECRET;
+    ? env.RP_PROD_SECRET 
+    : env.RP_LOCAL_TEST_SECRET;
 
   // Validate credentials exist
   if (!key_id || !key_secret) {
@@ -48,10 +48,10 @@ const razorpayPaymentVerificationService = async (
   razorpay_signature,
 ) => {
   // Use production secret if NODE_ENV is production, otherwise use test secret
-  const isProduction = process.env.NODE_ENV === 'production';
+  const isProduction = env.NODE_ENV === 'production';
   const secret = isProduction 
-    ? process.env.RP_PROD_SECRET 
-    : process.env.RP_LOCAL_TEST_SECRET;
+    ? env.RP_PROD_SECRET 
+    : env.RP_LOCAL_TEST_SECRET;
 
   // Validate secret exists
   if (!secret) {

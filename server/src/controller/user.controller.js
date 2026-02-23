@@ -19,7 +19,7 @@ import {
   AuthenticationError, 
   ValidationError
 } from "../utils/errors.js";
-
+import env from "../config/envConfigSetup.js";
 const userLogin = asyncHandler(async (req, res) => {
   const { email, password } = req.body;    
   
@@ -238,7 +238,7 @@ const userAccountDeletePreview = asyncHandler(async (req, res) => {
   // Updated to jwt from Base64
   const confirmToken = jwt.sign(
     { email: userDetails.email, purpose: "account_deletion", timestamp: Date.now() },
-    process.env.DELETION_TOKEN_SECRET,
+    env.DELETION_TOKEN_SECRET,
     { expiresIn: "15m" },
   );
 

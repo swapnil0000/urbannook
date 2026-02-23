@@ -6,6 +6,7 @@ import cookieOptions from "../config/config.js";
 import crypto from "crypto";
 import { sendEmail } from "./email.service.js";
 import bcrypt from "bcrypt";
+import env from "../config/envConfigSetup.js";
 const authGuardService = (role) => {
   /* The return is placed outside the try–catch because jwt.verify() runs
      during request execution, while a try–catch outside the middleware
@@ -27,8 +28,8 @@ const authGuardService = (role) => {
       }
       const secret =
         role === "Admin"
-          ? process.env.ADMIN_ACCESS_TOKEN_SECRET
-          : process.env.USER_ACCESS_TOKEN_SECRET;
+          ? env.ADMIN_ACCESS_TOKEN_SECRET
+          : env.USER_ACCESS_TOKEN_SECRET;
       if (!secret) {
         throw new Error("JWT secret missing in env");
       }

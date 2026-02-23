@@ -1,7 +1,7 @@
 import nodemailer from "nodemailer";
 import UserWaistList from "../model/user.waitlist.model.js";
 import bulkEmailWaitlistTemplate from "../template/bulk.email.waitlist.template.js";
-
+import env from "../config/envConfigSetup.js";
 let transporter = null;
 
 // Standard transporter for single emails
@@ -12,8 +12,8 @@ const getNodeMailerTransporter = () => {
       host: "smtp.zoho.in",
       port: 465,
       auth: {
-        user: process.env.ZOHO_ADMIN_EMAIL,
-        pass: process.env.ZOHO_SMTP_SECRET,
+        user: env.ZOHO_ADMIN_EMAIL,
+        pass: env.ZOHO_SMTP_SECRET,
       },
     });
   }
@@ -28,8 +28,8 @@ const getBulkWaitListMailerTransporter = () => {
       host: "smtp.zoho.in",
       port: 465,
       auth: {
-        user: process.env.ZOHO_ADMIN_EMAIL,
-        pass: process.env.ZOHO_SMTP_SECRET,
+        user: env.ZOHO_ADMIN_EMAIL,
+        pass: env.ZOHO_SMTP_SECRET,
       },
       pool: true,
       maxConnections: 3,
@@ -44,7 +44,7 @@ const sendEmail = (to, subject, html) => {
   const transporter = getNodeMailerTransporter();
   try {
     transporter.sendMail({
-      from: process.env.ZOHO_ADMIN_EMAIL,
+      from: env.ZOHO_ADMIN_EMAIL,
       to,
       subject,
       html,
@@ -71,7 +71,7 @@ const sendEmailCommunityService = (to, subject, html) => {
   const transporter = getNodeMailerTransporter();
   try {
     transporter.sendMail({
-      from: `${process.env.ZOHO_ADMIN_EMAIL}`,
+      from: `${env.ZOHO_ADMIN_EMAIL}`,
       to,
       subject,
       html,
@@ -94,7 +94,7 @@ const sendEmailWithRetry = async (to, subject, html, retries = 3) => {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const info = await transporter.sendMail({
-        from: `"UrbanNook" <${process.env.ZOHO_ADMIN_EMAIL}>`,
+        from: `"UrbanNook" <${env.ZOHO_ADMIN_EMAIL}>`,
         to,
         subject,
         html,
@@ -229,8 +229,8 @@ const sendBulkEmailWaitlistService = async () => {
     }
 
     const BATCH_SIZE = 20;
-    const WAITLIST_COUPON_CODE = process.env.WAITLIST_COUPON_CODE;
-    const SENDER_IDENTITY = `"UrbanNook Team" <${process.env.ZOHO_ADMIN_EMAIL}>`;
+    const WAITLIST_COUPON_CODE = env.WAITLIST_COUPON_CODE;
+    const SENDER_IDENTITY = `"UrbanNook Team" <${env.ZOHO_ADMIN_EMAIL}>`;
 
     // Start Batch Processing
     for (let i = 0; i < usersList.length; i += BATCH_SIZE) {

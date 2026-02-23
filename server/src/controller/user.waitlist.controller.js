@@ -4,7 +4,7 @@ import { ApiRes } from "../utils/index.js";
 import { ValidationError, AuthorizationError, InternalServerError } from "../utils/errors.js";
 import nodemailer from "nodemailer";
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
-
+import env from "../config/envConfigSetup.js";
 const userWaitListController = asyncHandler(async (req, res) => {
   const { userName, userEmail } = req.body || {};
   
@@ -69,8 +69,8 @@ const userWaitListController = asyncHandler(async (req, res) => {
     port: 465,
     secure: true,
     auth: {
-      user: process.env.ZOHO_ADMIN_EMAIL,
-      pass: process.env.ZOHO_SMTP_SECRET,
+      user: env.ZOHO_ADMIN_EMAIL,
+      pass: env.ZOHO_SMTP_SECRET,
     },
   });
 
