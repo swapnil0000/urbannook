@@ -40,12 +40,16 @@ const getErrorMessage = (errorCode) => {
   return PAYMENT_ERROR_MESSAGES[errorCode] || PAYMENT_ERROR_MESSAGES.default;
 };
 const razorpayKeyGetController = asyncHandler(async (_, res) => {
-  if (!process.env.RP_LOCAL_TEST_KEY_ID) {
+  const key_id = isProduction
+    ? process.env.RP_PROD_KEY_ID
+    : process.env.RP_LOCAL_TEST_KEY_ID;
+  if (!key_id) {
     throw new NotFoundError("Rp - Key");
   }
+  
   return res
     .status(200)
-    .json(new ApiRes(200, `Rp - Key`, process.env.RP_LOCAL_TEST_KEY_ID, true));
+    .json(new ApiRes(200, `Rp - Key`, process.env.key_id, true));
 });
 
 const razorpayCreateOrderController = asyncHandler(async (req, res) => {
@@ -60,7 +64,9 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   const cart = await Cart.findOne({ userId }).lean();
 
   if (!cart?.appliedCoupon?.summary?.grandTotal) {
-    throw new ValidationError("Cart pricing not calculated. Please refresh the page.");
+    throw new ValidationError(
+      "Cart pricing not calculated. Please refresh the page.",
+    );
   }
 
   const finalAmount = cart.appliedCoupon.summary.grandTotal;
@@ -129,12 +135,8 @@ const razorpayPaymentVerificationController = asyncHandler(async (req, res) => {
   if (!userId) {
     throw new NotFoundError("User not found for payment");
   }
-  const {
-    razorpay_payment_id,
-    razorpay_order_id,
-    razorpay_signature,
-    error,
-  } = req.body;
+  const { razorpay_payment_id, razorpay_order_id, razorpay_signature, error } =
+    req.body;
 
   console.log(
     `[INFO] Payment verification started - UserId: ${userId}, RazorpayOrderId: ${razorpay_order_id}, RazorpayPaymentId: ${razorpay_payment_id}`,
@@ -161,7 +163,10 @@ const razorpayPaymentVerificationController = asyncHandler(async (req, res) => {
       },
     );
 
-    throw new ValidationError(errorDescription, { errorCode, preserveCart: true });
+    throw new ValidationError(errorDescription, {
+      errorCode,
+      preserveCart: true,
+    });
   }
 
   const isPaymentVerifiedOrNot = await razorpayPaymentVerificationService(
@@ -189,7 +194,10 @@ const razorpayPaymentVerificationController = asyncHandler(async (req, res) => {
       },
     );
 
-    throw new ValidationError(errorDescription, { errorCode, preserveCart: true });
+    throw new ValidationError(errorDescription, {
+      errorCode,
+      preserveCart: true,
+    });
   }
 
   console.log(
