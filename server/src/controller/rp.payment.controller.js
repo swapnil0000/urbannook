@@ -40,6 +40,7 @@ const getErrorMessage = (errorCode) => {
   return PAYMENT_ERROR_MESSAGES[errorCode] || PAYMENT_ERROR_MESSAGES.default;
 };
 const razorpayKeyGetController = asyncHandler(async (_, res) => {
+  const isProduction = process.env.NODE_ENV === 'production';
   const key_id = isProduction
     ? process.env.RP_PROD_KEY_ID
     : process.env.RP_LOCAL_TEST_KEY_ID;
