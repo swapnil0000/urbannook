@@ -17,7 +17,6 @@ import {
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
 import { ValidationError, NotFoundError } from "../utils/errors.js";
 
-// Payment error code mapping
 const PAYMENT_ERROR_MESSAGES = {
   BAD_REQUEST_ERROR: "Payment failed due to invalid request. Please try again.",
   GATEWAY_ERROR:
