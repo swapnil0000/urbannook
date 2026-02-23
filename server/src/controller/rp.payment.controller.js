@@ -8,6 +8,8 @@ import Order from "../model/order.model.js";
 import crypto from "crypto";
 import Product from "../model/product.model.js";
 import { v7 as uuidv7 } from "uuid";
+import Cart from "../model/user.cart.model.js";
+
 import {
   sendOrderConfirmation,
   sendPaymentReceipt,

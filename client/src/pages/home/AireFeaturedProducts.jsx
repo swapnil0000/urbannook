@@ -10,7 +10,8 @@ const AireFeaturedProducts = () => {
   const { data: featuredResponse, isLoading, error } = useGetFeaturedProductsQuery({ limit: 1 });
   
   // Extract the first featured product
-  const featuredProduct = featuredResponse?.data?.listOfProducts?.listOfProducts?.[0];
+    const featuredProduct = featuredResponse?.data?.listofPublishedProducts?.[0];
+
 
   // Loading state
   if (isLoading) {
