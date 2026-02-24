@@ -78,10 +78,7 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
   };
 
   return (
-    <div className="bg-white/5 backdrop-blur-md rounded-2xl p-6 border border-white/10">
-      <h2 className="text-lg font-serif text-[#F5DEB3] mb-4 flex items-center gap-2">
-        <i className="fa-solid fa-ticket text-sm"></i> Apply Coupon
-      </h2>
+    <div className="bg-white/5 backdrop-blur-md rounded-2xl mt-3  border border-white/10">
 
       {!appliedCoupon ? (
         <div className="space-y-3">
@@ -91,14 +88,14 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
               value={couponCode}
               onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
               onKeyDown={handleKeyPress}
-              placeholder="Enter coupon code"
+              placeholder="Enter coupon code..."
               disabled={isLoading}
-              className="flex-1 bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-[#F5DEB3] focus:ring-1 focus:ring-[#F5DEB3] transition-all uppercase tracking-wider text-sm disabled:opacity-50"
+              className="flex-1 bg-black/10 border border-white/10 rounded-xl px-4 py-3 text-white  focus:outline-none focus:border-[#F5DEB3] focus:ring-1 focus:ring-[#F5DEB3] transition-all uppercase tracking-wider text-sm disabled:opacity-50"
             />
             <button
               onClick={handleApplyCoupon}
               disabled={isLoading || !couponCode.trim()}
-              className="px-6 py-3 bg-[#F5DEB3] text-[#2e443c] rounded-xl font-bold uppercase tracking-wider text-xs hover:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-3 bg-[#a89068] text-[#fff] rounded-xl font-bold uppercase tracking-wider text-xs hover:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (
                 <i className="fa-solid fa-spinner fa-spin"></i>

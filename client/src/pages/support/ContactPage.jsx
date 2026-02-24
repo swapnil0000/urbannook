@@ -2,21 +2,19 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSubmitContactMutation } from '../../store/api/userApi';
 import { useUI } from '../../hooks/useRedux';
-// import Footer from '../../component/layout/Footer';
-// import NewHeader from '../../component/layout/NewHeader';
 
-// --- Reusable Accordion Component for FAQs ---
+// --- Reusable Accordion Component for FAQs (Updated for Light Theme) ---
 const AccordionItem = ({ question, answer, isOpen, onClick }) => (
-  <div className="border-b border-[#F5DEB3]/10">
+  <div className="border-b border-gray-200">
     <button 
       onClick={onClick} 
-      className="w-full py-5 flex justify-between items-center text-left hover:text-[#F5DEB3] transition-colors group"
+      className="w-full py-5 flex justify-between items-center text-left hover:text-[#a89068] transition-colors group"
       type="button"
     >
-      <span className={`text-sm md:text-base font-serif transition-colors ${isOpen ? 'text-[#F5DEB3]' : 'text-white'}`}>
+      <span className={`text-sm md:text-base font-serif transition-colors ${isOpen ? 'text-[#a89068]' : 'text-[#2e443c]'}`}>
         {question}
       </span>
-      <span className={`flex items-center justify-center w-6 h-6 rounded-full border transition-all duration-300 ${isOpen ? 'rotate-180 border-[#F5DEB3] bg-[#F5DEB3] text-[#1c3026]' : 'border-white/20 text-[#F5DEB3] group-hover:border-[#F5DEB3]'}`}>
+      <span className={`flex items-center justify-center w-6 h-6 rounded-full border transition-all duration-300 ${isOpen ? 'rotate-180 border-[#a89068] bg-[#a89068] text-white' : 'border-gray-300 text-gray-400 group-hover:border-[#a89068] group-hover:text-[#a89068]'}`}>
         <i className="fa-solid fa-chevron-down text-[10px]"></i>
       </span>
     </button>
@@ -28,7 +26,7 @@ const AccordionItem = ({ question, answer, isOpen, onClick }) => (
           exit={{ height: 0, opacity: 0 }}
           className="overflow-hidden"
         >
-          <div className="pb-6 text-green-100/60 text-sm leading-relaxed font-light pl-2 border-l border-[#F5DEB3]/20 ml-2 mt-2">
+          <div className="pb-6 text-gray-500 text-sm leading-relaxed font-light pl-2 border-l-2 border-[#a89068]/20 ml-2 mt-2">
             {answer}
           </div>
         </motion.div>
@@ -213,24 +211,7 @@ const ContactPage = () => {
   ];
 
   return (
-    <div className="bg-[#2e443c] min-h-screen text-[#E2E8F0] font-sans relative selection:bg-[#F5DEB3] selection:text-[#0F261F] overflow-x-hidden">
-      {/* <NewHeader /> */}
-      
-      {/* --- CSS OVERRIDE FOR CHROME AUTOFILL WHITE BACKGROUND FIX --- */}
-      <style>{`
-        input:-webkit-autofill,
-        input:-webkit-autofill:hover, 
-        input:-webkit-autofill:focus, 
-        input:-webkit-autofill:active,
-        textarea:-webkit-autofill,
-        textarea:-webkit-autofill:hover,
-        textarea:-webkit-autofill:focus,
-        textarea:-webkit-autofill:active {
-            -webkit-box-shadow: 0 0 0 50px #253832 inset !important;
-            -webkit-text-fill-color: #F5DEB3 !important;
-            transition: background-color 5000s ease-in-out 0s;
-        }
-      `}</style>
+    <div className="bg-[#2e443c] min-h-screen text-gray-200 font-sans relative selection:bg-[#a89068] selection:text-white overflow-x-hidden">
       
       {/* 1. BACKGROUND ATMOSPHERE */}
       <div className="fixed inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-[#3a554a] via-[#2e443c] to-[#1a2822] pointer-events-none z-0 opacity-50"></div>
@@ -241,31 +222,26 @@ const ContactPage = () => {
       </div>
 
       {/* --- HERO SECTION --- */}
-      <section className="relative pt-36 pb-1 lg:pb-1 px-6 lg:px-12 z-10 ">
+      <section className="relative lg:pt-32 pt-24 px-6 lg:px-12 overflow-hidden flex items-center border-b border-[#a89068]/20 ">
         <div className="max-w-4xl mx-auto text-center">
              <motion.div 
                initial="hidden"
                animate="visible"
                variants={stagger}
-               className="flex flex-col items-center"
+               className="flex flex-col items-start"
              >
                 <motion.div variants={fadeIn} className="flex items-center gap-4 mb-8">
-                    <span className="h-[1px] w-12 md:w-16 bg-[#F5DEB3]/40"></span>
+                    <span className="h-[1px] w-12 md:w-16 bg-[#F5DEB3]"></span>
                     <span className="text-[10px] font-bold tracking-[0.3em] text-[#F5DEB3] uppercase">
                         Support & Inquiries
                     </span>
-                    <span className="h-[1px] w-12 md:w-16 bg-[#F5DEB3]/40"></span>
+                    <span className="h-[1px] w-12 md:w-16 bg-[#F5DEB3]"></span>
                 </motion.div>
-                
-                {/* <motion.h1 variants={fadeIn} className="text-5xl md:text-6xl lg:text-8xl font-serif text-white leading-[1.1] mb-6">
-                    Start a <br className="hidden md:block" />
-                    <span className="text-[#F5DEB3] opacity-90 italic font-light">Conversation.</span>
-                </motion.h1> */}
              </motion.div>
         </div>
       </section>
 
-      {/* --- CONTACT INFO GRID --- */}
+      {/* --- CONTACT INFO GRID (LIGHT BOXES) --- */}
       <section className="py-4 px-6 relative z-10">
         <div className="max-w-7xl mx-auto">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -276,27 +252,27 @@ const ContactPage = () => {
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
                         transition={{ delay: index * 0.1 }}
-                        className="group bg-[#233630] p-8 lg:p-10 rounded-[2rem] border border-white/5 hover:border-[#F5DEB3]/30 hover:bg-[#1A3C32] transition-all duration-500 shadow-xl"
+                        className="group bg-[#f5f7f8] p-8 lg:p-10 rounded-[2rem] border border-transparent hover:border-[#a89068]/30 hover:shadow-xl hover:-translate-y-1 transition-all duration-500 shadow-lg"
                     >
                         <div className="flex justify-between items-start mb-8">
-                            <div className="w-12 h-12 rounded-full border border-white/10 flex items-center justify-center text-[#F5DEB3] group-hover:bg-[#F5DEB3] group-hover:text-[#1c3026] transition-colors duration-500">
+                            <div className="w-12 h-12 rounded-full border border-gray-200 flex items-center justify-center text-[#a89068] group-hover:bg-[#a89068] group-hover:text-white transition-colors duration-500">
                                 <i className={item.icon}></i>
                             </div>
-                            <span className="text-4xl font-serif text-[#F5DEB3]/10 group-hover:text-[#F5DEB3]/20 transition-colors">
+                            <span className="text-4xl font-serif text-[#2e443c]/10 group-hover:text-[#a89068]/20 transition-colors">
                                 0{item.id}
                             </span>
                         </div>
-                        <h3 className="text-[10px] font-bold uppercase tracking-widest text-[#F5DEB3] mb-2">{item.title}</h3>
-                        <p className="text-xl font-serif text-white">{item.info}</p>
-                        <p className="text-xs text-green-100/40 mt-1">{item.subInfo}</p>
+                        <h3 className="text-[10px] font-bold uppercase tracking-widest text-[#a89068] mb-2">{item.title}</h3>
+                        <p className="text-xl font-serif text-[#2e443c]">{item.info}</p>
+                        <p className="text-xs text-gray-400 mt-1">{item.subInfo}</p>
                     </motion.div>
                 ))}
             </div>
         </div>
       </section>
 
-      {/* --- FORM & FAQ SECTION (TWO COLUMNS) --- */}
-      <section className=" m-5 px-6 py-16 lg:py-24  relative z-10 bg-[#253832] rounded-t-[3rem] border-t border-white/5 mt-8 shadow-2xl">
+      {/* --- FORM & FAQ SECTION (LIGHT BOX) --- */}
+      <section className="m-5 px-6 py-16 lg:py-24 relative z-10 bg-[#f5f7f8] rounded-[3rem] border-t border-white/5 mt-8 shadow-2xl">
         <div className="max-w-7xl mx-auto">
             
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 lg:gap-24 items-start">
@@ -304,17 +280,18 @@ const ContactPage = () => {
                 {/* LEFT: THE FORM (Takes up 7 columns on Desktop) */}
                 <div className="lg:col-span-7">
                     <div className="mb-10">
-                        <h2 className="text-3xl md:text-4xl font-serif text-[#F5DEB3] mb-4">Send a Message</h2>
-                        <p className="text-green-100/60 font-light text-sm md:text-base leading-relaxed">
+                        <h2 className="text-3xl md:text-4xl font-serif text-[#2e443c] mb-4">Send a Message</h2>
+                        <p className="text-gray-500 font-light text-sm md:text-base leading-relaxed">
                             Have a specific question or custom request? Fill out the form below and our studio team will get back to you promptly.
                         </p>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-12">
+                    <form onSubmit={handleSubmit} className="space-y-8">
                         
                         {/* Row 1: Name & Email */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="relative group">
+                                <label className="text-[10px] font-bold uppercase tracking-widest text-[#a89068] mb-1.5 block ml-1">Your Name</label>
                                 <input
                                     type="text"
                                     name="name"
@@ -323,28 +300,19 @@ const ContactPage = () => {
                                     onFocus={() => setActiveInput('name')}
                                     onBlur={handleBlur}
                                     required
-                                    className={`w-full bg-transparent border-b py-4 text-lg text-[#F5DEB3] focus:outline-none transition-all duration-500 placeholder-transparent ${
-                                      errors.name ? 'border-red-500' : 'border-[#F5DEB3]/20 focus:border-[#F5DEB3]'
+                                    className={`w-full bg-white border rounded-xl px-5 py-4 text-[#2e443c] focus:outline-none transition-all duration-300 placeholder-gray-300 shadow-sm ${
+                                      errors.name ? 'border-red-500' : 'border-gray-200 focus:border-[#a89068]'
                                     }`}
-                                    placeholder="Name"
+                                    placeholder="John Doe"
                                     id="name"
                                 />
-                                <label 
-                                    htmlFor="name" 
-                                    className={`absolute left-0 transition-all duration-300 pointer-events-none uppercase tracking-widest text-[10px] font-bold ${
-                                        activeInput === 'name' || formData.name 
-                                        ? '-top-4 text-[#F5DEB3]' 
-                                        : 'top-5 text-green-100/50'
-                                    }`}
-                                >
-                                    Your Name
-                                </label>
                                 {errors.name && (
-                                  <p className="text-red-400 text-xs mt-2">{errors.name}</p>
+                                  <p className="text-red-500 text-xs mt-2 ml-1">{errors.name}</p>
                                 )}
                             </div>
 
                             <div className="relative group">
+                                <label className="text-[10px] font-bold uppercase tracking-widest text-[#a89068] mb-1.5 block ml-1">Email Address</label>
                                 <input
                                     type="email"
                                     name="email"
@@ -353,41 +321,31 @@ const ContactPage = () => {
                                     onFocus={() => setActiveInput('email')}
                                     onBlur={handleBlur}
                                     required
-                                    className={`w-full bg-transparent border-b py-4 text-lg text-[#F5DEB3] focus:outline-none transition-all duration-500 placeholder-transparent ${
-                                      errors.email ? 'border-red-500' : 'border-[#F5DEB3]/20 focus:border-[#F5DEB3]'
+                                    className={`w-full bg-white border rounded-xl px-5 py-4 text-[#2e443c] focus:outline-none transition-all duration-300 placeholder-gray-300 shadow-sm ${
+                                      errors.email ? 'border-red-500' : 'border-gray-200 focus:border-[#a89068]'
                                     }`}
-                                    placeholder="Email"
+                                    placeholder="john@example.com"
                                     id="email"
                                 />
-                                <label 
-                                    htmlFor="email" 
-                                    className={`absolute left-0 transition-all duration-300 pointer-events-none uppercase tracking-widest text-[10px] font-bold ${
-                                        activeInput === 'email' || formData.email 
-                                        ? '-top-4 text-[#F5DEB3]' 
-                                        : 'top-5 text-green-100/50'
-                                    }`}
-                                >
-                                    Email Address
-                                </label>
                                 {errors.email && (
-                                  <p className="text-red-400 text-xs mt-2">{errors.email}</p>
+                                  <p className="text-red-500 text-xs mt-2 ml-1">{errors.email}</p>
                                 )}
                             </div>
                         </div>
 
                         {/* Subject Pills */}
                         <div>
-                            <p className="block uppercase tracking-widest text-[10px] font-bold text-green-100/50 mb-5">Inquiry Type</p>
+                            <p className="block uppercase tracking-widest text-[10px] font-bold text-[#a89068] mb-3 ml-1">Inquiry Type</p>
                             <div className="flex flex-wrap gap-3">
-                                {['Product Inquiry',  'Support'].map((option) => (
+                                {['Product Inquiry', 'Support'].map((option) => (
                                     <button
                                         key={option}
                                         type="button"
                                         onClick={() => setFormData({...formData, subject: option})}
-                                        className={`px-5 py-2.5 rounded-full text-xs transition-all duration-300 border ${
+                                        className={`px-6 py-3 rounded-full text-xs font-bold transition-all duration-300 border shadow-sm ${
                                             formData.subject === option 
-                                            ? 'bg-[#F5DEB3] text-[#1c3026] border-[#F5DEB3] font-bold shadow-lg shadow-[#F5DEB3]/20' 
-                                            : 'bg-transparent text-green-100/60 border-[#F5DEB3]/20 hover:border-[#F5DEB3] hover:text-[#F5DEB3]'
+                                            ? 'bg-[#a89068] text-white border-[#a89068]' 
+                                            : 'bg-white text-gray-500 border-gray-200 hover:border-[#a89068] hover:text-[#a89068]'
                                         }`}
                                     >
                                         {option}
@@ -398,6 +356,7 @@ const ContactPage = () => {
 
                         {/* Message */}
                         <div className="relative group">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-[#a89068] mb-1.5 block ml-1">Message</label>
                             <textarea
                                 name="message"
                                 value={formData.message}
@@ -405,43 +364,33 @@ const ContactPage = () => {
                                 onFocus={() => setActiveInput('message')}
                                 onBlur={handleBlur}
                                 required
-                                rows="1"
-                                className={`w-full bg-transparent border-b py-4 text-lg text-[#F5DEB3] focus:outline-none transition-all duration-500 placeholder-transparent resize-none min-h-[80px] ${
-                                  errors.message ? 'border-red-500' : 'border-[#F5DEB3]/20 focus:border-[#F5DEB3]'
+                                rows="4"
+                                className={`w-full bg-white border rounded-xl px-5 py-4 text-[#2e443c] focus:outline-none transition-all duration-300 placeholder-gray-300 resize-none shadow-sm ${
+                                  errors.message ? 'border-red-500' : 'border-gray-200 focus:border-[#a89068]'
                                 }`}
-                                placeholder="Message"
+                                placeholder="How can we help?"
                                 id="message"
                             ></textarea>
-                            <label 
-                                htmlFor="message" 
-                                className={`absolute left-0 transition-all duration-300 pointer-events-none uppercase tracking-widest text-[10px] font-bold ${
-                                    activeInput === 'message' || formData.message 
-                                    ? 'top-0 text-[#F5DEB3]' 
-                                    : 'top-8 text-green-100/50'
-                                }`}
-                            >
-                                How can we help?
-                            </label>
                             {errors.message && (
-                              <p className="text-red-400 text-xs mt-2">{errors.message}</p>
+                              <p className="text-red-500 text-xs mt-2 ml-1">{errors.message}</p>
                             )}
                         </div>
 
                         {/* Submit Button */}
-                        <div className="flex justify-start pt-4">
+                        <div className="flex justify-start pt-2">
                             <button
                                 type="submit"
                                 disabled={isLoading || !isFormValid}
                                 className={`group relative w-full sm:w-auto px-10 py-4 overflow-hidden rounded-full font-bold uppercase tracking-widest text-[10px] transition-all duration-300 shadow-lg ${
                                   isLoading || !isFormValid
-                                    ? 'bg-[#F5DEB3]/20 text-[#F5DEB3]/40 cursor-not-allowed border border-[#F5DEB3]/20'
-                                    : 'bg-[#F5DEB3] text-[#1c3026] hover:bg-white hover:shadow-[0_0_30px_rgba(245,222,179,0.4)] active:scale-95'
+                                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed border border-gray-200'
+                                    : 'bg-[#a89068] text-white hover:bg-[#2e443c] hover:shadow-[0_0_30px_rgba(46,68,60,0.4)] active:scale-95'
                                 }`}
                             >
                                 <span className="relative z-10 flex items-center justify-center gap-3">
                                     {isLoading ? (
                                       <>
-                                        <div className="w-4 h-4 border-2 border-[#1c3026]/30 border-t-[#1c3026] rounded-full animate-spin"></div>
+                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                                         Sending...
                                       </>
                                     ) : (
@@ -457,29 +406,29 @@ const ContactPage = () => {
                 </div>
 
                 {/* RIGHT: FAQs & SERVICE PROMISE (Takes up 5 columns on Desktop) */}
-                <div className="lg:col-span-5 lg:pl-8 border-t lg:border-t-0 lg:border-l border-white/10 pt-16 lg:pt-0">
+                <div className="lg:col-span-5 lg:pl-8 border-t lg:border-t-0 lg:border-l border-gray-200 pt-16 lg:pt-0">
                     
                     {/* Premium Service Badge */}
-                    <div className="bg-[#1a2822] border border-[#F5DEB3]/10 p-6 rounded-2xl mb-10 shadow-lg relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-[#F5DEB3]/5 rounded-full blur-2xl"></div>
+                    <div className="bg-white border border-gray-100 p-6 rounded-2xl mb-10 shadow-lg relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-[#a89068]/5 rounded-full blur-2xl transition-all group-hover:bg-[#a89068]/10"></div>
                         <div className="flex items-center gap-4 mb-3">
-                            <div className="w-10 h-10 rounded-full bg-[#F5DEB3]/10 flex items-center justify-center text-[#F5DEB3]">
+                            <div className="w-10 h-10 rounded-full bg-[#a89068]/10 flex items-center justify-center text-[#a89068]">
                                 <i className="fa-solid fa-clock-rotate-left"></i>
                             </div>
                             <div>
-                                <h4 className="text-white font-serif text-lg">Fast Response Guarantee</h4>
-                                <p className="text-[10px] text-[#F5DEB3] uppercase tracking-widest font-bold">Standard SLA</p>
+                                <h4 className="text-[#2e443c] font-serif text-lg">Fast Response Guarantee</h4>
+                                <p className="text-[10px] text-[#a89068] uppercase tracking-widest font-bold">Standard SLA</p>
                             </div>
                         </div>
-                        <p className="text-sm text-green-100/60 font-light leading-relaxed">
-                            We aim to respond to all inquiries within <span className="text-white font-medium">2-4 business hours</span> during standard working days. Your space matters to us.
+                        <p className="text-sm text-gray-500 font-light leading-relaxed">
+                            We aim to respond to all inquiries within <span className="text-[#2e443c] font-medium">2-4 business hours</span> during standard working days. Your space matters to us.
                         </p>
                     </div>
 
                     {/* FAQ Accordion */}
                     <div>
-                        <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-white mb-6">Frequently Asked</h3>
-                        <div className="border-t border-[#F5DEB3]/10">
+                        <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#2e443c] mb-6">Frequently Asked</h3>
+                        <div className="border-t border-gray-200">
                             {faqs.map((faq, index) => (
                                 <AccordionItem 
                                     key={index}
@@ -498,23 +447,6 @@ const ContactPage = () => {
         </div>
       </section>
 
-      {/* --- MAP BANNER --- */}
-      {/* <section className="h-[250px] w-full relative z-10 border-t border-[#F5DEB3]/10 overflow-hidden">
-         <img 
-            src="https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=1200&auto=format&fit=crop" 
-            className="w-full h-full object-cover grayscale opacity-30 hover:grayscale-0 hover:opacity-60 transition-all duration-[2s]"
-            alt="Location"
-         />
-         <div className="absolute inset-0 flex items-center justify-center p-4">
-             <div className="bg-[#1c3026]/90 backdrop-blur-xl px-10 py-6 border border-[#F5DEB3]/20 rounded-2xl text-center shadow-2xl">
-                 <i className="fa-solid fa-map-pin text-[#F5DEB3] text-xl mb-3"></i>
-                 <p className="text-[#F5DEB3] font-serif text-xl italic mb-1">Our Workshop</p>
-                 <p className="text-green-100/60 text-[10px] uppercase tracking-widest">Sector 44, Gurgaon</p>
-             </div>
-         </div>
-      </section> */}
-
-      {/* <Footer /> */}
     </div>
   );
 };

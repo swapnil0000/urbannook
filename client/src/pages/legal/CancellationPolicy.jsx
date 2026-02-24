@@ -21,7 +21,7 @@ const CancellationPolicy = () => {
       <div className="relative z-10 max-w-4xl mx-auto px-6 py-20 md:py-28">
         
         {/* Header */}
-        <div className="mb-16 text-center md:text-left border-b border-white/10 pb-12">
+        <div className="mb-2 text-left  border-b border-white/10 pb-4">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 w-fit mb-6 backdrop-blur-md">
             <span className="w-1.5 h-1.5 rounded-full bg-[#F5DEB3]"></span>
             <span className="text-[10px] font-bold uppercase tracking-widest text-[#F5DEB3]">Support</span>
@@ -39,19 +39,20 @@ const CancellationPolicy = () => {
         <div className="space-y-12">
           
           <section>
-            <h2 className="text-xl md:text-2xl font-serif text-white mb-4">01. Order Cancellation</h2>
+            <h2 className="text-xl md:text-2xl font-serif text-white mb-4">
+              <span className='text-[#F5DEB3]'> 01.</span> Order Cancellation</h2>
             <p className="leading-relaxed text-gray-400 mb-4">
               You may cancel your order at any time <strong>before it has been dispatched</strong> from our warehouse. Once the shipping label is generated and the product leaves our facility, the order cannot be cancelled.
             </p>
-            <div className="bg-white/5 border-l-2 border-[#F5DEB3] p-6 rounded-r-xl">
-              <p className="text-sm text-[#F5DEB3]">
-                To cancel, please email <strong className="text-white select-all">{SUPPORT_EMAIL}</strong> with your Order ID immediately.
+            <div className="bg-white  p-6 rounded-[1rem]">
+              <p className="text-sm text-gray-400">
+                To cancel, please email <strong className="text-[#a89068] select-all">{SUPPORT_EMAIL}</strong> with your Order ID immediately.
               </p>
             </div>
           </section>
 
           <section>
-            <h2 className="text-xl md:text-2xl font-serif text-white mb-4">02. Returns & Replacements</h2>
+            <h2 className="text-xl md:text-2xl font-serif text-white mb-4"><span className='text-[#F5DEB3]'> 02.</span> Returns & Replacements</h2>
             <p className="leading-relaxed text-gray-400 mb-4">
               We have a strict <strong>7-day replacement policy</strong> applicable only for damaged, defective, or incorrect items. Since our products are made-to-order or limited batch, we do not accept returns for "change of mind."
             </p>
@@ -62,7 +63,7 @@ const CancellationPolicy = () => {
           </section>
 
           <section>
-            <h2 className="text-xl md:text-2xl font-serif text-white mb-4">03. Refund Timeline</h2>
+            <h2 className="text-xl md:text-2xl font-serif text-white mb-4"><span className='text-[#F5DEB3]'> 03.</span> Refund Timeline</h2>
             <p className="leading-relaxed text-gray-400">
               If a refund is approved (for cancelled orders or unfulfillable items), it will be processed to your original payment method within <strong>5-7 business days</strong>. Banks may take an additional 3-5 days to reflect the amount in your account.
             </p>

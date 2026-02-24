@@ -1,53 +1,11 @@
 import React from 'react';
 import OptimizedImage from '../../component/OptimizedImage';
+import { instagramPosts } from '../../data/constant';
 
-const instagramPosts = [
-    {
-        id: 1,
-        // Replace this image with screenshot of Reel 1
-        image: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=800&fit=crop", 
-        likes: "2.3k",
-        comments: "42",
-        caption: "New Arrival: 3D Printed Magic ✨",
-        link: "https://www.instagram.com/reel/DTumPdjAdNt/?igsh=MW8xdmJpamZ2bGh0ZA=="
-    },
-    {
-        id: 2,
-        image: "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&fit=crop",
-        likes: "1.8k",
-        comments: "15",
-        caption: "UrbanNook Aesthetics 🌿",
-        link: "https://www.instagram.com/reel/DTcCR9LgdhS/?igsh=MWF3ZnczZmhrZjl2bw=="
-    },
-    {
-        id: 3,
-        image: "https://images.unsplash.com/photo-1586717791821-3f44a563fa4c?w=400&fit=crop",
-        likes: "3.1k",
-        comments: "89",
-        caption: "Illuminating spaces 💡",
-        link: "https://www.instagram.com/reel/DTMezUqgbhy/?igsh=MWdmaW5lYzk3ZXJ4NA=="
-    },
-    {
-        id: 4,
-        image: "https://images.unsplash.com/photo-1581833971358-2c8b550f87b3?w=800&fit=crop",
-        likes: "1.7k",
-        comments: "22",
-        caption: "Crafted for you 🔑",
-        link: "https://www.instagram.com/reel/DTkE46tAf0G/?igsh=dDJ4Y3J1anl1NGhu"
-    },
-    {
-        id: 5,
-        image: "https://images.unsplash.com/photo-1615873968403-89e068629265?w=400&fit=crop",
-        likes: "1.9k",
-        comments: "31",
-        caption: "The Urban Standard 💕",
-        link: "https://www.instagram.com/reel/DT5gZ80ASaS/?igsh=bXpuM3pmcHY2aW4z"
-    }
-];
 
 const AireInstagramFeed = () => {
    return (
-  <section className="w-full box-border p-2 md:p-2 lg:h-screen lg:max-h-[900px] flex flex-col justify-center">
+  <section className="relative min-h-[97vh] lg:h-[calc(100vh-2rem)] lg:max-h-[900px] mx-2 my-2 md:mx-4 md:my-4 rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden flex items-center group bg-[#1a2822]">
     <style>{`
       @keyframes scroll {
         0% { transform: translateX(0); }
@@ -61,11 +19,9 @@ const AireInstagramFeed = () => {
       }
     `}</style>
 
-    <div className="w-full h-full bg-[#2e443c] rounded-[2.5rem] md:rounded-[3.5rem] overflow-hidden relative flex flex-col p-6 md:p-14 top-0 ">
+    <div className="w-full h-full bg-[#2e443c] overflow-hidden relative flex flex-col p-6 md:p-14 top-0 ">
 
       {/* Subtle Glows */}
-      <div className="absolute top-0 right-0 w-[350px] h-[350px] bg-emerald-900/20 rounded-full blur-[100px] pointer-events-none -z-10"></div>
-      <div className="absolute bottom-0 left-0 w-[350px] h-[350px] bg-black rounded-full blur-[100px] pointer-events-none -z-10"></div>
 
       <div className="relative z-10 flex flex-col justify-between h-full gap-8">
 
@@ -94,16 +50,7 @@ const AireInstagramFeed = () => {
                   <path d="M0 5 L 100 5" stroke="currentColor" strokeWidth="8" fill="none" />
                 </svg>
               </span>
-            </h2>
-            {/* <a href="https://www.instagram.com/urbannook.store/" target="_blank" rel="noopener noreferrer" className="group relative h-10 px-8 bg-white rounded-full overflow-hidden flex items-center gap-3 transition-all duration-300 hover:scale-[1.02]">
-              <div className="absolute inset-0 bg-gradient-to-r from-[#F5DEB3] to-[#F5DEB3] translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out"></div>
-              <div className="relative z-10 flex items-center gap-2.5">
-                <i className="fa-brands fa-instagram text-base text-emerald-900"></i>
-                <span className="text-[9px] font-black tracking-[0.2em] uppercase text-emerald-950">Follow UrbanNook</span>
-              </div>
-            </a> */}
-            {/* </div> */}
-            
+            </h2>      
           </div>
 
           <div className="flex flex-col items-start lg:items-end gap-4">
@@ -152,9 +99,9 @@ const AireInstagramFeed = () => {
                 <img
                   src={post.image}
                   alt={post.caption}
-                  className="w-full h-full object-cover transition-transform duration-[1.5s] group-hover:scale-110 grayscale group-hover:grayscale-0"
+                  className="w-full h-full object-cover transition-transform duration-[1.5s] group-hover:scale-110 "
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-4 md:p-5">
+                <div className="absolute inset-0  opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-4 md:p-5">
                   <p className="text-white text-sm md:text-base font-serif mb-2 line-clamp-1">"{post.caption}"</p>
                   <div className="flex justify-between items-center text-emerald-400 text-[10px] font-bold uppercase tracking-widest border-t border-white/10 pt-3">
                     <span><i className="fa-solid fa-heart mr-1"></i>{post.likes}</span>
@@ -168,7 +115,7 @@ const AireInstagramFeed = () => {
 
         {/* STATS BOX */}
         <div className="pt-4 md:pt-6 border-t border-white/10 w-full flex justify-start">
-          <div className="bg-white/5 backdrop-blur-md border border-white/5 rounded-2xl md:rounded-[2rem] p-3 md:p-5 w-full md:w-fit">
+          <div className="bg-white/5  border border-white/5 rounded-2xl md:rounded-[2rem] p-3 md:p-5 w-full md:w-fit">
             <div className="grid grid-cols-3 md:flex md:flex-nowrap gap-3 md:gap-12">
               {[
                 { label: "Community", val: "500+", icon: "fa-users" },
@@ -177,8 +124,8 @@ const AireInstagramFeed = () => {
               ].map((stat, i) => (
                 <div key={i} className="flex flex-col items-center md:items-start gap-1 group">
                   <div className="flex flex-col md:flex-row items-center gap-1 md:gap-3">
-                    <div className="w-6 h-6 md:w-7 md:h-7 rounded-full bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500 transition-colors">
-                      <i className={`fa-solid ${stat.icon} text-[#F5DEB3] text-[9px] md:text-[10px] group-hover:text-white`}></i>
+                    <div className="w-6 h-6 md:w-7 md:h-7 rounded-full bg-emerald-500/10 flex items-center justify-center  transition-colors">
+                      <i className={`fa-solid ${stat.icon} text-[#F5DEB3] text-[9px] md:text-[10px] group-hover:text-[#F5DEB3]`}></i>
                     </div>
                     <span className="text-white font-serif text-lg md:text-2xl leading-none">{stat.val}</span>
                   </div>

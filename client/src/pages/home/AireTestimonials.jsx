@@ -87,7 +87,7 @@ const AireTestimonials = () => {
 
   return (
     // Outer container restricted to viewport height on desktop
-    <section className="w-full box-border p-2 md:p-2 lg:h-screen lg:max-h-[900px] flex flex-col justify-center">
+    <section className="relative min-h-[97vh] lg:h-[calc(100vh-2rem)] lg:max-h-[900px] mx-2 my-2 md:mx-4 md:my-4 rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden shadow-2xl flex items-center group bg-[#1a2822]">
       
       {/* --- CORE CSS FOR MARQUEE & CUSTOM SCROLLBAR --- */}
       <style>{`
@@ -116,7 +116,7 @@ const AireTestimonials = () => {
       `}</style>
 
       {/* Main Inner Box */}
-      <div className="w-full h-full relative overflow-hidden rounded-[2.5rem] lg:rounded-[3.5rem]  bg-[#2e443c] flex items-center ">
+      <div className="w-full h-full relative overflow-hidden  bg-[#2e443c] flex items-center ">
         
         {/* Background Atmosphere */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">

@@ -119,7 +119,7 @@ export default function WhyChooseUs() {
   style={{ height: '300vh' }}
 >
   <div
-    className="sticky top-0 md:top-[5vh] mx-2 my-2 md:mx-4 md:my-4 h-[100vh] md:h-[98vh] rounded-[30px] md:rounded-[40px] overflow-hidden shadow-2xl"
+    className="sticky top-0 md:top-[5vh] mx-2  md:mx-4  h-[100vh] md:h-[98vh] rounded-[30px] md:rounded-[40px] overflow-hidden shadow-2xl"
     style={{
       backgroundImage: `url(${desktopBgImage})`,
       backgroundSize: 'cover',

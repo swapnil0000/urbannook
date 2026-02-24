@@ -35,9 +35,6 @@ const AireFeaturedProducts = () => {
          FEATURED 
         </span>
       </div>
-
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] lg:w-[800px] h-[300px] lg:h-[800px] bg-[#F5DEB3] rounded-full blur-[150px] lg:blur-[200px] opacity-10 pointer-events-none"></div>
-
       <div className="relative z-10 w-full h-full flex flex-col px-6 py-0 md:px-10 md:py-10">
         
         <div className="flex justify-between items-start w-full border-b border-white/10 pb-6 mb-8 mt-8 lg:mb-auto">
