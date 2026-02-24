@@ -325,6 +325,7 @@ const CheckoutPage = () => {
         });
         const successMessage = result.message || "Coupon applied successfully!";
         showNotification(successMessage, "success");
+        setShowCouponModal(false);
       }
     } catch (error) {
       const errorMessage =
@@ -674,6 +675,7 @@ const CheckoutPage = () => {
                   
                   <div className="relative z-10 ">
                     <CouponInput
+                      key={appliedCoupon || 'no-coupon'}
                       appliedCoupon={appliedCoupon}
                       discount={discount}
                       onCouponApplied={handleCouponApplied}

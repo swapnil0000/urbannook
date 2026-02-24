@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useApplyCouponMutation } from '../store/api/userApi';
+import { useUI } from '../hooks/useRedux';
 
 const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved }) => {
   const [couponCode, setCouponCode] = useState('');
@@ -7,6 +8,7 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
   const [success, setSuccess] = useState('');
   
   const [applyCoupon, { isLoading }] = useApplyCouponMutation();
+  const { showNotification } = useUI();
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) {
@@ -19,13 +21,12 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
 
     try {
       const result = await applyCoupon(couponCode?.trim()?.toUpperCase()).unwrap();
-
-      console.log(result,"resultresultresult")
       
       if (result?.success) {
         const discountAmount = result.data?.summary?.discount || 0;
         const successMessage = result.message || `Coupon applied! You saved ₹${discountAmount}`;
         setSuccess(successMessage);
+        setError('');
         setCouponCode('');
         
         // Notify parent component with full summary data
@@ -36,18 +37,17 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
             summary: result.data?.summary
           });
         }
+        
+        setTimeout(() => setSuccess(''), 2000);
       } else {
-        debugger
         const errorMessage = result.message || 'Failed to apply coupon';
         showNotification(errorMessage, "error");
         setError(errorMessage);
-
       }
     } catch (err) {
-      debugger
       // Extract error message from backend response
       const errorMessage = err?.data?.message || err?.message || 'Invalid or expired coupon code';
-       showNotification(errorMessage, "error");
+      showNotification(errorMessage, "error");
       setError(errorMessage);
     }
   };
