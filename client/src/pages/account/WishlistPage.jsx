@@ -67,74 +67,61 @@ const WishlistPage = () => {
   };
 
   return (
-    <div className="bg-[#2e443c] min-h-screen font-sans text-gray-200 selection:bg-[#F5DEB3] selection:text-[#1c3026] relative overflow-hidden pb-20">
+    <div className="min-h-screen bg-[#2e443c] relative font-sans selection:bg-[#F5DEB3] selection:text-[#2e443c] pb-10">
       
-      {/* Ambient Lighting Effect */}
-      <div className="fixed top-0 right-0 w-[400px] h-[400px] bg-[#F5DEB3]/5 rounded-full blur-[100px] pointer-events-none"></div>
+      {/* --- Ambient Background Glow --- */}
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#F5DEB3]/5 rounded-full blur-[120px] pointer-events-none"></div>
 
-      {/* --- COMPACT HERO SECTION --- */}
-      <section className="pt-28 pb-6 px-4 md:px-8 max-w-[1400px] mx-auto relative z-10">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/10 pb-4">
-            <div>
-                <div className="inline-flex items-center gap-2 mb-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#F5DEB3] animate-pulse"></span>
-                    <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-[0.25em] text-[#F5DEB3]">
-                        Your Selection
-                    </span>
-                </div>
-                <h1 className="text-3xl md:text-5xl font-serif text-white leading-none">
-                    Curated <span className="italic font-light text-[#F5DEB3]">Wishlist.</span>
-                </h1>
+      {/* Hero Section */}
+      <section className="pt-32 pb-8 md:pt-34 md:pb-5 px-6 relative z-10">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-end gap-10">
+          
+          {/* LEFT SIDE: Heading & Description */}
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 backdrop-blur-md border border-white/10 mb-4 md:mb-6">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#F5DEB3] animate-pulse"></span>
+              <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-[0.25em] text-[#F5DEB3]">
+                Your Selection
+              </span>
             </div>
-            
-            <div className="text-xs text-green-50/60 font-medium uppercase tracking-widest hidden md:flex items-center gap-2">
-                <i className="fa-solid fa-heart text-[#F5DEB3]/50"></i>
-                {isLoading ? 'Loading...' : `${wishlistItems.length} Saved Items`}
-            </div>
+            <h1 className="text-4xl sm:text-6xl md:text-7xl font-serif text-white leading-[0.9] mb-2">
+              Curated{' '}
+              <span className="italic font-light text-[#F5DEB3]">Wishlist.</span>
+            </h1>
+            <p className="text-sm md:text-base text-green-50/70 font-light leading-relaxed max-w-md">
+              Your handpicked collection of atmospheric pieces.
+            </p>
+          </div>
+          
+          {/* <div className="text-xs text-gray-400 font-medium uppercase tracking-widest hidden md:flex items-center gap-2">
+            <i className="fa-solid fa-heart text-[#F5DEB3]/50"></i>
+            {isLoading ? 'Loading...' : `${wishlistItems.length} Saved Items`}
+          </div> */}
         </div>
       </section>
 
-      {/* --- MAIN CONTENT GRID --- */}
-      <section className="px-4 md:px-8 relative z-10">
-        <div className="max-w-[1400px] mx-auto">
+      {/* Product Grid */}
+      <section className="pb-24 px-4 md:px-6 relative z-10">
+        <div className="max-w-7xl mx-auto">
           
           {isLoading ? (
-            // Premium Loading Skeleton Grid
-            <div className="grid grid-cols- md:grid-cols-1 lg:grid-cols-4 gap-3 md:gap-6 pt-6">
-                {[...Array(8)].map((_, i) => (
-                    <div key={i} className="bg-[#1c2b25] rounded-2xl md:rounded-[2rem] border border-white/5 overflow-hidden animate-pulse">
-                        <div className="aspect-square bg-white/5"></div>
-                        <div className="p-4 space-y-3">
-                            <div className="h-2 bg-white/10 rounded w-1/3"></div>
-                            <div className="h-4 bg-white/10 rounded w-3/4"></div>
-                            <div className="h-4 bg-white/10 rounded w-1/2 mt-4"></div>
-                            <div className="h-10 bg-white/5 rounded-xl w-full mt-4"></div>
-                        </div>
-                    </div>
-                ))}
+            <div className="flex justify-center py-32">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#F5DEB3]"></div>
             </div>
           ) : wishlistItems.length === 0 ? (
-            // Empty State
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }} 
-              animate={{ opacity: 1, y: 0 }}
-              className="flex flex-col items-center justify-center py-24 text-center bg-black/10 rounded-3xl border border-white/5 backdrop-blur-sm mt-6"
-            >
-                <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mb-6 border border-white/10 shadow-inner">
-                    <i className="fa-regular fa-heart text-3xl text-[#F5DEB3]/50"></i>
-                </div>
-                <h3 className="text-2xl font-serif text-white mb-2">Your collection is empty</h3>
-                <p className="text-green-50/50 mb-8 max-w-sm font-light text-sm">Save your favorite atmospheric pieces here to easily find them later.</p>
-                <button 
-                    onClick={() => navigate('/products')}
-                    className="px-8 py-3.5 bg-[#F5DEB3] text-[#1c3026] rounded-full font-bold uppercase tracking-widest text-[10px] hover:bg-white transition-all shadow-lg active:scale-95"
-                >
-                    Explore Collection
-                </button>
-            </motion.div>
+            <div className="flex flex-col items-center justify-center py-32 bg-black/10 rounded-[2rem] border border-white/5 backdrop-blur-sm">
+              <i className="fa-regular fa-heart text-4xl text-[#F5DEB3]/50 mb-4"></i>
+              <h2 className="text-2xl font-serif text-white mb-2">Your collection is empty</h2>
+              <p className="text-green-50/60 mb-6 font-light">Save your favorite pieces to easily find them later.</p>
+              <button 
+                onClick={() => navigate('/products')}
+                className="bg-[#F5DEB3] text-[#2e443c] px-8 py-3 rounded-full font-bold uppercase tracking-widest text-xs hover:bg-white transition-colors"
+              >
+                Explore Collection
+              </button>
+            </div>
           ) : (
-            // High Density Product Grid
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 pt-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
               <AnimatePresence>
                 {wishlistItems?.map((item) => (
                   <motion.div 
@@ -143,88 +130,83 @@ const WishlistPage = () => {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.9 }}
                     layout
-                    className="group flex flex-col bg-[#1c2b25] rounded-2xl md:rounded-[2rem] overflow-hidden border border-white/5 shadow-lg hover:shadow-2xl hover:border-[#F5DEB3]/30 transition-all duration-300"
+                    className="group relative rounded-[2rem] overflow-hidden bg-black/20 border border-white/5 shadow-lg hover:shadow-2xl hover:border-[#F5DEB3]/30 transition-all duration-500 flex flex-col"
                   >
-                    
-                    {/* 1. IMAGE CONTAINER (Perfect 1:1 Square) */}
-                    <div className="relative w-full aspect-square bg-[#f8f8f5] overflow-hidden">
-                      
-                      {/* Top Badges / Actions */}
-                      <div className="absolute top-2 left-2 right-2 md:top-3 md:left-3 md:right-3 flex justify-between items-start z-20">
-                        {item.productStatus === 'out_of_stock' ? (
-                          <span className="bg-red-500 text-white text-[8px] md:text-[9px] font-bold uppercase tracking-widest px-2 py-1 md:px-3 md:py-1.5 rounded-md shadow-sm">
-                            Sold Out
-                          </span>
-                        ) : (
-                          <span></span> // Spacer to push X to the right
-                        )}
-
-                        <button
-                          onClick={() => handleRemove(item.productId)}
-                          className="w-7 h-7 md:w-8 md:h-8 flex items-center justify-center rounded-full bg-white/80 hover:bg-red-500 text-gray-600 hover:text-white backdrop-blur-md transition-all duration-300 shadow-md"
-                        >
-                          <i className="fa-solid fa-xmark text-xs md:text-sm"></i>
-                        </button>
-                      </div>
-
-                      {/* Product Image */}
-                      <div className="absolute inset-0 cursor-pointer" onClick={() => navigate(`/product/${item.productId}`)}>
-                        <img 
-                            src={item.productImg || '/placeholder.jpg'} 
-                            alt={item.productName}
-                            className="w-full h-full object-contain mix-blend-multiply transition-transform duration-700 group-hover:scale-105"
-                        />
-                      </div>
+                    {/* Remove Button (Floating Top Right) */}
+                    <div className="absolute top-4 right-4 z-20">
+                      <button
+                        onClick={() => handleRemove(item.productId)}
+                        className="w-9 h-9 backdrop-blur-md rounded-full flex items-center justify-center shadow-xl transition-colors bg-white/90 text-gray-700 hover:bg-red-500 hover:text-white"
+                      >
+                        <i className="fa-solid fa-xmark text-xs"></i>
+                      </button>
                     </div>
 
-                    {/* 2. COMPACT DETAILS & CTA */}
-                    <div className="p-3 md:p-5 flex flex-col flex-grow bg-gradient-to-t from-black/20 to-transparent">
+                    {/* Clickable Card Area */}
+                    <div 
+                      className="flex flex-col max-h-[520px] cursor-pointer"
+                      onClick={() => navigate(`/product/${item.productId}`)}
+                    >
                       
-                      <div className="mb-2 cursor-pointer" onClick={() => navigate(`/product/${item.productId}`)}>
-                        <span className="text-[8px] md:text-[9px] font-bold uppercase tracking-widest text-[#F5DEB3] mb-1 block line-clamp-1 opacity-80">
-                          {item.productCategory}
-                        </span>
-                        <h3 className="font-serif text-sm md:text-lg text-white truncate">
-                          {item.productName}
-                        </h3>
+                      <div className="relative w-full aspect-square bg-[#f8f8f5] overflow-hidden">
+                        {item.productStatus === 'out_of_stock' && (
+                          <div className="absolute top-4 left-4 z-10">
+                            <span className="bg-red-500 text-white text-[9px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-md shadow-sm">
+                              Sold Out
+                            </span>
+                          </div>
+                        )}
+                        <img 
+                          src={item.productImg || '/placeholder.jpg'} 
+                          alt={item.productName}
+                          className="w-full h-full object-cover mix-blend-multiply transition-transform duration-[1.5s] group-hover:scale-110"
+                        />
                       </div>
 
-                      <div className="text-sm md:text-lg font-bold text-white mb-3 md:mb-4">
-                          ₹{item.sellingPrice?.toLocaleString()}
-                      </div>
+                      {/* TEXT & CTA SECTION */}
+                      <div className="p-4 md:p-4 flex flex-col flex-grow justify-between bg-[#f5f7f8]">
+                        
+                        <div className="mb-2">
+                          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a89068] block opacity-80">
+                            {item.productCategory}
+                          </span>
+                          <h3 className="font-serif text-xl md:text-2xl text-gray-500 leading-snug line-clamp-2">
+                            {item.productName}
+                          </h3>
+                        </div>
+                        
+                        <div className="flex justify-between items-end pt-2 border-t border-[#F5DEB3]/10 mt-auto">
+                          <div className="flex flex-col">
+                            <span className="text-[10px] uppercase tracking-widest text-gray-500 mb-1">Pricing</span>
+                            <span className="text-lg md:text-xl font-semibold text-[#a89068]">
+                              ₹{item.sellingPrice?.toLocaleString()}
+                            </span>
+                          </div>
+                          
+                          {/* Interactive Arrow CTA */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAddToCart(item);
+                            }}
+                            disabled={item.productStatus === 'out_of_stock' || addingItems.has(item.productId)}
+                            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${
+                              item.productStatus !== 'out_of_stock' && !addingItems.has(item.productId)
+                                ? 'bg-[#F5DEB3]/10 text-gray-500 group-hover:bg-[#F5DEB3] group-hover:text-[#2e443c]'
+                                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            }`}
+                          >
+                            {addingItems.has(item.productId) ? (
+                              <div className="w-3 h-3 border-2 border-[#a89068] border-t-transparent rounded-full animate-spin"></div>
+                            ) : isInCart(item.productId) ? (
+                              <i className="fa-solid fa-check text-xs"></i>
+                            ) : (
+                              <i className="fa-solid fa-bag-shopping text-xs"></i>
+                            )}
+                          </button>
+                        </div>
 
-                      {/* Full-Width Action Button */}
-                      <div className="mt-auto">
-                          {isInCart(item?.productId) ? (
-                            <button
-                                onClick={() => navigate('/checkout')}
-                                className="w-full py-2.5 md:py-3.5 rounded-xl font-bold uppercase tracking-widest text-[9px] md:text-[10px] flex items-center justify-center gap-2 transition-all duration-300 bg-[#F5DEB3] text-[#1c3026] hover:bg-white shadow-lg"
-                            >
-                                <span>Checkout</span>
-                                <i className="fa-solid fa-arrow-right"></i>
-                            </button>
-                          ) : (
-                            <button
-                                onClick={() => handleAddToCart(item)}
-                                disabled={item?.productStatus === 'out_of_stock' || addingItems.has(item?.productId) || isAddingToCart}
-                                className={`w-full py-2.5 md:py-3.5 rounded-xl font-bold uppercase tracking-widest text-[9px] md:text-[10px] flex items-center justify-center gap-2 transition-all duration-300 ${
-                                    item?.productStatus !== 'out_of_stock' && !addingItems.has(item?.productId)
-                                    ? 'bg-white/5 text-[#F5DEB3] hover:bg-[#F5DEB3] hover:text-[#1c3026] border border-white/10 hover:border-[#F5DEB3]' 
-                                    : 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/5'
-                                }`}
-                            >
-                                {addingItems.has(item?.productId) ? (
-                                    <div className="w-3 h-3 border-2 border-[#F5DEB3] border-t-transparent rounded-full animate-spin"></div>
-                                ) : (
-                                    <>
-                                        <span>{item.productStatus === 'out_of_stock' ? 'Sold Out' : 'Move to Cart'}</span>
-                                        {item.productStatus !== 'out_of_stock' && <i className="fa-solid fa-bag-shopping text-[10px]"></i>}
-                                    </>
-                                )}
-                            </button>
-                          )}
                       </div>
-
                     </div>
                   </motion.div>
                 ))}
@@ -232,7 +214,8 @@ const WishlistPage = () => {
             </div>
           )}
         </div>
-      </section>
+      </section>     
+   
 
     </div>
   );

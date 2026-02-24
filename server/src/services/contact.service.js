@@ -2,6 +2,7 @@ import Contact from '../model/contact.model.js';
 import contactNotificationTemplate from '../template/contactNotification.template.js';
 import { ValidationError, NotFoundError, InternalServerError } from '../utils/errors.js';
 import env from '../config/envConfigSetup.js';
+import { sendEmail } from './email.service.js';
 class ContactService {
   async createSubmission({ name, email, subject, message }) {
     // Create and save contact submission
@@ -45,7 +46,6 @@ class ContactService {
   }
 
   async sendAdminNotification(contact) {
-    const adminEmail = env.ADMIN_EMAIL || 'admin@urbannook.com';
     const emailContent = contactNotificationTemplate({
       name: contact.name,
       email: contact.email,
@@ -54,11 +54,11 @@ class ContactService {
       timestamp: contact.createdAt
     });
 
-    await emailService.sendEmail({
-      to: adminEmail,
-      subject: `New Contact Form Submission: ${contact.subject}`,
-      html: emailContent
-    });
+    await sendEmail(
+      'support@urbannook.in',
+      `New Contact Form Submission: ${contact.subject}`,
+      emailContent
+    );
 
     console.log(`Admin notification sent for contact ${contact._id}`);
   }

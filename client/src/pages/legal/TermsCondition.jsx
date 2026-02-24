@@ -29,17 +29,17 @@ const TermsConditions = () => {
       <div className="relative z-10 max-w-4xl mx-auto px-6 py-20 md:py-28">
         
         {/* Header */}
-        <div className="mb-16 text-center md:text-left border-b border-white/10 pb-12">
+        <div className="mb-2 text-left  border-b border-white/10 pb-4">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 w-fit mb-6 backdrop-blur-md">
             <span className="w-1.5 h-1.5 rounded-full bg-[#F5DEB3]"></span>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-[#F5DEB3]">Legal</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[#F5DEB3]">Conditions</span>
           </div>
           
           <h1 className="text-4xl md:text-6xl font-serif text-white mb-4 leading-tight">
-            Terms & <span className="italic text-[#F5DEB3]/80">Conditions</span>
+            Terms & <span className="italic text-[#F5DEB3]">Conditions</span>
           </h1>
           <p className="text-gray-400 text-sm md:text-base">
-            Last Updated: <span className="text-white">{lastUpdated}</span>
+            Last Updated: <span className="text-[#F5DEB3]">{lastUpdated}</span>
           </p>
         </div>
 
@@ -106,8 +106,8 @@ const TermsConditions = () => {
               Our shipping, return, and cancellation policies are an integral part of these Terms. Please review our specific policies for detailed information:
             </p>
             <div className="flex flex-wrap gap-4 mt-6">
-              <Link to="/shipping-policy" className="text-sm border border-white/20 px-4 py-2 rounded hover:bg-white hover:text-[#0a1a13] transition-colors">Shipping Policy</Link>
-              <Link to="/cancellation-refund" className="text-sm border border-white/20 px-4 py-2 rounded hover:bg-white hover:text-[#0a1a13] transition-colors">Cancellation & Refund</Link>
+              <Link to="/shipping-policy" className="text-sm border border-white px-4 py-2 rounded bg-white text-gray-500">Shipping Policy</Link>
+              <Link to="/cancellation-refund" className="text-sm border border-white px-4 py-2 rounded bg-white text-gray-500 ">Cancellation & Refund</Link>
             </div>
           </section>
 

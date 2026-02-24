@@ -89,18 +89,22 @@ const Footer = () => {
         </div>
 
         <div className="lg:col-span-5 flex items-center">
-           <form className="w-full">
+           <form className="w-full" onSubmit={handleCommunityJoin}>
               <div className="relative bg-white rounded-2xl shadow-sm border border-black/5 group focus-within:shadow-md transition-all duration-300">
                 <input 
                   type="email" 
                   placeholder="yourname@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={isSubmitting}
                   className="w-full bg-transparent py-4 pl-4 pr-32 text-base md:text-lg text-[#1a1a1a] placeholder-gray-400 focus:outline-none font-serif"
                 />
                 <button 
                   type="submit" 
-                  className="absolute right-2 top-2 bottom-2 px-4 md:px-8 flex items-center justify-center rounded-xl bg-[#1c3026] text-white hover:bg-[#F5DEB3] hover:text-[#050c08] transition-all duration-300 font-bold uppercase tracking-widest text-[9px] md:text-[10px]"
+                  disabled={isSubmitting}
+                  className="absolute right-2 top-2 bottom-2 px-4 md:px-8 flex items-center justify-center rounded-xl bg-[#1c3026] text-white hover:bg-[#F5DEB3] hover:text-[#050c08] transition-all duration-300 font-bold uppercase tracking-widest text-[9px] md:text-[10px] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Join Now
+                  {isSubmitting ? 'Joining...' : 'Join Now'}
                 </button>
               </div>
               <p className="mt-4 text-[9px] md:text-[10px] text-center lg:text-left uppercase tracking-widest text-gray-400">

@@ -277,7 +277,7 @@ const CheckoutPage = () => {
     const fetchInitialPricing = async () => {
       if (cartItems.length > 0) {
         try {
-          const result = await applyCouponMutation(null).unwrap();
+          const result = await applyCouponMutation(appliedCoupon || null).unwrap();
           if (result.success && result.data?.summary) {
             setPricingDetails({
               subtotal: result.data.summary.subtotal || 0,
@@ -297,7 +297,7 @@ const CheckoutPage = () => {
       }
     };
     fetchInitialPricing();
-  }, []);
+  }, [cartItems, applyCouponMutation, appliedCoupon]);
 
   useEffect(() => {
     if (userProfile) {
@@ -434,7 +434,8 @@ const CheckoutPage = () => {
 
   const handleDeleteAddress = async (addressId) => {
     if (!addressId) return;
-
+    console.log(addressId,"==addressId");
+    
     try {
       const res = await axios.post(
         `${apiBaseUrl}/user/address/delete`,
@@ -580,29 +581,31 @@ const CheckoutPage = () => {
   if (isLoading) {
     return (
       <div className="h-screen flex items-center justify-center bg-[#2e443c]">
-        <div className="w-12 h-12 border-2 border-[#F5DEB3] border-t-transparent rounded-full animate-spin"></div>
+        <div className="w-12 h-12 border-2 border-[#a89068] border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
   return (
-    <div className="bg-[#2e443c] min-h-screen font-sans text-[#e8e6e1] selection:bg-[#F5DEB3] selection:text-[#2e443c] pb-24 lg:pb-0">
+    <div className="bg-[#2e443c] min-h-screen font-sans text-gray-800 selection:bg-[#a89068] selection:text-white pb-24 lg:pb-0">
+      
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(245, 222, 179, 0.2); border-radius: 4px; }
-        .custom-scrollbar:hover::-webkit-scrollbar-thumb { background: rgba(245, 222, 179, 0.5); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(168, 144, 104, 0.3); border-radius: 4px; }
+        .custom-scrollbar:hover::-webkit-scrollbar-thumb { background: rgba(168, 144, 104, 0.6); }
       `}</style>
 
-      <div className="fixed top-0 left-0 w-full h-[400px] bg-gradient-to-b from-[#1a2822] to-transparent pointer-events-none opacity-80 z-0"></div>
-
+      {/* Background Gradient Overlay */}
+      <div className="fixed top-0 left-0 w-full h-[400px] bg-gradient-to-b from-[#1a2822] to-transparent pointer-events-none opacity-60 z-0"></div>
+      
       <main className="max-w-[1200px] mx-auto pt-24 lg:pt-36 px-4 lg:px-8 relative z-10">
+        
+        {/* Header Section */}
         <div className="mb-8 lg:mb-12 text-center lg:text-left">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#F5DEB3]/10 border border-[#F5DEB3]/20 mb-3">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#F5DEB3] animate-pulse"></span>
-            <span className="text-[9px] uppercase tracking-[0.25em] text-[#F5DEB3] font-bold">
-              Secure Checkout
-            </span>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#a89068]/20 border border-[#a89068]/30 mb-3">
+             <span className="w-1.5 h-1.5 rounded-full bg-[#a89068] animate-pulse"></span>
+             <span className="text-[9px] uppercase tracking-[0.25em] text-[#a89068] font-bold">Secure Checkout</span>
           </div>
           <h1 className="text-4xl md:text-5xl font-serif text-white">
             Complete your order.
@@ -610,24 +613,24 @@ const CheckoutPage = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+          
+          {/* Left Column: Items, Coupon, Payment Summary */}
           <div className="lg:col-span-5 lg:sticky lg:top-32 order-1 lg:order-2 flex flex-col gap-6">
-            <div className="bg-white/5 rounded-[2rem] p-6 border border-white/5">
+            
+            {/* Items Card (Box Color: #f5f7f8) */}
+            <div className="bg-[#f5f7f8] rounded-[2rem] p-6 border border-white/10 shadow-lg">
               <div className="flex justify-between items-center mb-5">
-                <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400">
-                  Your Items
-                </h3>
-                <span className="text-xs bg-white/10 text-white px-2.5 py-1 rounded-md">
-                  {cartItems.length}
-                </span>
+                  <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a89068]">Your Items</h3>
+                  <span className="text-xs bg-[#2e443c] text-white px-2.5 py-1 rounded-md font-medium">{cartItems.length}</span>
               </div>
 
               <div className="space-y-3 max-h-[220px] overflow-y-auto pr-2 custom-scrollbar">
                 {cartItems.map((item) => (
                   <div
                     key={item.id}
-                    className="flex gap-4 items-center bg-black/20 p-3 rounded-xl border border-white/5 hover:border-white/10 transition-colors"
+                    className="flex gap-4 items-center bg-white p-3 rounded-xl border border-gray-200 hover:border-[#a89068]/40 transition-colors"
                   >
-                    <div className="w-14 h-14 bg-[#e8e6e1] rounded-lg flex items-center justify-center p-1.5 shrink-0">
+                    <div className="w-14 h-14 bg-gray-100 rounded-lg flex items-center justify-center p-1.5 shrink-0">
                       <img
                         src={item.image || "/placeholder.jpg"}
                         alt={item.name}
@@ -635,14 +638,14 @@ const CheckoutPage = () => {
                       />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-sm text-white truncate mb-1">
+                      <h3 className="font-medium text-sm text-[#2e443c] truncate mb-1">
                         {item.name}
                       </h3>
                       <div className="flex justify-between items-center">
-                        <p className="text-[10px] text-gray-400 uppercase tracking-widest">
+                        <p className="text-[10px] text-gray-500 uppercase tracking-widest">
                           Qty: {item.quantity}
                         </p>
-                        <p className="font-mono text-sm text-[#F5DEB3]">
+                        <p className="font-mono text-sm text-[#a89068] font-bold">
                           ₹{(item.price * item.quantity).toLocaleString()}
                         </p>
                       </div>
@@ -651,66 +654,63 @@ const CheckoutPage = () => {
                 ))}
               </div>
             </div>
+
+            {/* Coupon Card (Box Color: #f5f7f8) */}
             <div className="relative group">
-              <div className="absolute -inset-[1px] bg-gradient-to-r from-[#F5DEB3]/50 to-[#F5DEB3]/10 rounded-[2rem] blur-[2px] opacity-70 group-hover:opacity-100 transition-opacity duration-500"></div>
-
-              <div className="relative bg-[#15251e] border border-[#F5DEB3]/30 rounded-[2rem] p-6 md:p-7 shadow-2xl overflow-hidden">
-                <div className="absolute -top-10 -right-10 w-32 h-32 bg-[#F5DEB3]/10 blur-3xl rounded-full"></div>
-
-                <div className="flex items-center gap-4 mb-5">
-                  <div className="w-12 h-12 rounded-full bg-[#F5DEB3]/10 border border-[#F5DEB3]/20 flex items-center justify-center shrink-0">
-                    <i className="fa-solid fa-ticket text-[#F5DEB3] text-xl"></i>
+               <div className="absolute -inset-[1px] bg-gradient-to-r from-[#a89068]/40 to-[#a89068]/10 rounded-[2rem] blur-[2px] opacity-70 group-hover:opacity-100 transition-opacity duration-500"></div>
+               
+               <div className="relative bg-[#f5f7f8] border border-white/50 rounded-[2rem] p-6 md:p-7 shadow-2xl overflow-hidden">
+                  {/* <div className="absolute -top-10 -right-10 w-32 h-32 bg-[#a89068]/10 blur-3xl rounded-full"></div> */}
+                  
+                  <div className="flex items-center gap-4 ">
+                    <div className="w-12 h-12 rounded-full bg-[#a89068]/10 border border-[#a89068]/20 flex items-center justify-center shrink-0">
+                        <i className="fa-solid fa-ticket text-[#a89068] text-xl"></i>
+                    </div>
+                    <div>
+                      <h3 className="font-serif text-[#2e443c] text-xl tracking-wide leading-tight">Apply Promo Code</h3>
+                      <p className="text-[10px] text-[#a89068] uppercase tracking-widest mt-1 font-bold">Unlock exclusive discounts</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-serif text-[#F5DEB3] text-xl tracking-wide leading-tight">
-                      Apply Promo Code
-                    </h3>
-                    <p className="text-[10px] text-green-50/60 uppercase tracking-widest mt-1">
-                      Unlock exclusive discounts
-                    </p>
+                  
+                  <div className="relative z-10 ">
+                    <CouponInput
+                      appliedCoupon={appliedCoupon}
+                      discount={discount}
+                      onCouponApplied={handleCouponApplied}
+                      onCouponRemoved={handleCouponRemoved}
+                    />
                   </div>
-                </div>
 
-                <div className="relative z-10">
-                  <CouponInput
-                    appliedCoupon={appliedCoupon}
-                    discount={discount}
-                    onCouponApplied={handleCouponApplied}
-                    onCouponRemoved={handleCouponRemoved}
-                  />
-                </div>
-
-                {!appliedCoupon && (
-                  <div className="mt-5 pt-5 border-t border-[#F5DEB3]/10 relative z-10">
-                    <button
-                      onClick={() => setShowCouponModal(true)}
-                      className="w-full py-3 px-4 bg-[#F5DEB3]/10 hover:bg-[#F5DEB3]/20 border border-[#F5DEB3]/30 rounded-xl text-[#F5DEB3] font-bold text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2"
-                    >
-                      <i className="fa-solid fa-tags"></i>
-                      View All Available Coupons
-                    </button>
-                  </div>
-                )}
-              </div>
+                  {!appliedCoupon && (
+                    <div className="mt-2 pt-3  relative z-10">
+                      <button
+                        onClick={() => setShowCouponModal(true)}
+                        className="w-full py-3 px-4 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl text-[#a89068] font-bold text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 hover:border-[#a89068]/30"
+                      >
+                        <i className="fa-solid fa-tags"></i>
+                        View All Available Coupons
+                      </button>
+                    </div>
+                  )}
+               </div>
             </div>
 
-            <div className="bg-[#1c2b25] rounded-[2rem] p-6 md:p-8 md:mb-4 shadow-xl border border-white/5 relative z-10">
-              <h3 className="font-serif text-white text-xl mb-5">
-                Payment Summary
-              </h3>
-
+            {/* Payment Summary (Box Color: #f5f7f8) */}
+            <div className="bg-[#f5f7f8] rounded-[2rem] p-6 md:p-8 md:mb-4 shadow-xl border border-white/10 relative z-10">
+              <h3 className="font-serif text-[#2e443c] text-xl mb-5">Payment Summary</h3>
+              
               <div className="space-y-4 text-sm">
-                <div className="flex justify-between text-gray-400">
+                <div className="flex justify-between text-gray-500">
                   <span>Subtotal</span>
-                  <span>₹{pricingDetails.subtotal.toLocaleString()}</span>
+                  <span className="text-gray-800 font-medium">₹{pricingDetails.subtotal.toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between text-gray-400">
+                <div className="flex justify-between text-gray-500">
                   <span>GST (18%)</span>
-                  <span>₹{pricingDetails.gst.toLocaleString()}</span>
+                  <span className="text-gray-800 font-medium">₹{pricingDetails.gst.toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between text-gray-400">
+                <div className="flex justify-between text-gray-500">
                   <span>Shipping</span>
-                  <span>₹{pricingDetails.shipping.toLocaleString()}</span>
+                  <span className="text-gray-800 font-medium">₹{pricingDetails.shipping.toLocaleString()}</span>
                 </div>
 
                 <AnimatePresence>
@@ -719,37 +719,30 @@ const CheckoutPage = () => {
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
                       exit={{ opacity: 0, height: 0 }}
-                      className="flex justify-between text-emerald-400 font-medium bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20"
+                      className="flex justify-between text-[#2e443c] font-medium bg-[#a89068]/20 p-3 rounded-xl border border-[#a89068]/30"
                     >
                       <span className="flex items-center gap-2">
-                        <i className="fa-solid fa-circle-check text-xs"></i>
-                        Discount ({appliedCoupon})
+                          <i className="fa-solid fa-circle-check text-xs text-[#a89068]"></i> 
+                          Discount ({appliedCoupon})
                       </span>
                       <span>-₹{pricingDetails.discount.toLocaleString()}</span>
                     </motion.div>
                   )}
                 </AnimatePresence>
-
-                <div className="flex justify-between items-end pt-5 border-t border-white/10 mt-2">
-                  <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">
-                    Total To Pay
-                  </span>
-                  <span className="text-3xl font-serif text-[#F5DEB3]">
-                    ₹{finalTotal.toLocaleString()}
-                  </span>
+                
+                <div className="flex justify-between items-end pt-5 border-t border-gray-200 mt-2">
+                  <span className="text-xs uppercase tracking-widest text-[#a89068] font-bold">Total To Pay</span>
+                  <span className="text-3xl font-serif text-[#2e443c]">₹{finalTotal.toLocaleString()}</span>
                 </div>
               </div>
 
               <button
                 onClick={handlePayment}
                 disabled={isOrdering || !address}
-                className="hidden lg:flex w-full mt-8 py-4 bg-[#F5DEB3] text-[#1c2b25] rounded-xl font-bold uppercase tracking-widest text-[11px] hover:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_10px_20px_rgba(245,222,179,0.15)] items-center justify-center gap-3"
+                className="hidden lg:flex w-full mt-8 py-4 bg-[#a89068] text-white rounded-xl font-bold uppercase tracking-widest text-[11px] hover:bg-[#2e443c] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg items-center justify-center gap-3"
               >
                 {isOrdering ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-[#1c2b25] border-t-transparent rounded-full animate-spin"></div>{" "}
-                    Processing...
-                  </>
+                   <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Processing...</>
                 ) : (
                   <>
                     Proceed to Pay <i className="fa-solid fa-lock"></i>
@@ -757,66 +750,53 @@ const CheckoutPage = () => {
                 )}
               </button>
 
-              <div className="mt-6 flex justify-center gap-4 opacity-40">
-                <i className="fa-brands fa-cc-visa text-2xl"></i>
-                <i className="fa-brands fa-cc-mastercard text-2xl"></i>
-                <i className="fa-brands fa-google-pay text-2xl"></i>
-                <i className="fa-solid fa-building-columns text-2xl"></i>
+              <div className="mt-3 flex justify-center gap-4 opacity-40 text-[#2e443c]">
+                 <i className="fa-brands fa-cc-visa text-lg"></i>
+                 <i className="fa-brands fa-cc-mastercard text-lg"></i>
+                 <i className="fa-brands fa-google-pay text-lg"></i>
+                 <i className="fa-solid fa-building-columns text-lg"></i>
               </div>
             </div>
+
           </div>
 
-          <div className="lg:col-span-7 space-y-6 order-2 lg:order-1">
-            <div
-              style={{
-                marginBottom: "20px",
-              }}
-              className="bg-white/5 backdrop-blur-md rounded-[2rem] p-6 md:p-8 border border-white/10"
-            >
-              <h2 className="text-lg font-serif text-white mb-6 border-b border-white/10 pb-4 flex items-center gap-3">
-                <span className="w-6 h-6 rounded-full bg-[#F5DEB3]/20 text-[#F5DEB3] flex items-center justify-center text-xs">
-                  1
-                </span>
+          {/* Right Column: Contact & Delivery */}
+          <div className="lg:col-span-7 space-y-6 order-2 lg:order-1 mb-4">
+            
+            {/* Contact Info (Box Color: #f5f7f8) */}
+            <div className="bg-[#f5f7f8] rounded-[2rem] p-6 md:p-8 border border-white/10 shadow-lg" style={{ marginBottom: "1rem" }}>
+              <h2 className="text-lg font-serif text-[#2e443c] mb-6 border-b border-gray-200 pb-4 flex items-center gap-3">
+                <span className="w-6 h-6 rounded-full bg-[#a89068] text-white flex items-center justify-center text-xs font-bold">1</span> 
                 Contact Information
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-1.5">
-                  <label className="text-[9px] uppercase tracking-widest text-gray-500 font-bold ml-1">
-                    Full Name
-                  </label>
-                  <div className="w-full bg-black/30 border border-white/5 rounded-xl p-4 text-white text-sm">
-                    {userProfile?.userName || userProfile?.name || "N/A"}
+                  <label className="text-[9px] uppercase tracking-widest text-[#a89068] font-bold ml-1">Full Name</label>
+                  <div className="w-full bg-white border border-gray-200 rounded-xl p-4 text-[#2e443c] text-sm font-medium">
+                      {userProfile?.userName || userProfile?.name || "N/A"}
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[9px] uppercase tracking-widest text-gray-500 font-bold ml-1">
-                    Phone Number
-                  </label>
-                  <div className="w-full bg-black/30 border border-white/5 rounded-xl p-4 text-white text-sm">
-                    {userProfile?.mobileNumber || userProfile?.mobile || "N/A"}
+                  <label className="text-[9px] uppercase tracking-widest text-[#a89068] font-bold ml-1">Phone Number</label>
+                  <div className="w-full bg-white border border-gray-200 rounded-xl p-4 text-[#2e443c] text-sm font-medium">
+                      {userProfile?.mobileNumber || userProfile?.mobile || "N/A"}
                   </div>
                 </div>
                 <div className="space-y-1.5 md:col-span-2">
-                  <label className="text-[9px] uppercase tracking-widest text-gray-500 font-bold ml-1">
-                    Email Address
-                  </label>
-                  <div className="w-full bg-black/30 border border-white/5 rounded-xl p-4 text-white text-sm">
-                    {userProfile?.userEmail || userProfile?.email || "N/A"}
+                  <label className="text-[9px] uppercase tracking-widest text-[#a89068] font-bold ml-1">Email Address</label>
+                  <div className="w-full bg-white border border-gray-200 rounded-xl p-4 text-[#2e443c] text-sm font-medium">
+                      {userProfile?.userEmail || userProfile?.email || "N/A"}
                   </div>
                 </div>
               </div>
             </div>
 
+            {/* Delivery Details (Box Color: #f5f7f8) */}
             <div
-              style={{
-                marginBottom: "20px",
-              }}
-              className={`bg-white/5 backdrop-blur-md rounded-[2rem] p-6 md:p-8 border transition-all duration-500 ${!address ? "border-[#F5DEB3]/40 shadow-[0_0_30px_rgba(245,222,179,0.08)]" : "border-white/10"}`}
+              className={`bg-[#f5f7f8] rounded-[2rem] p-6 md:p-8 border transition-all duration-500 shadow-lg ${!address ? "border-[#a89068]/40" : "border-white/10"}`}
             >
-              <h2 className="text-lg font-serif text-white mb-6 border-b border-white/10 pb-4 flex items-center gap-3">
-                <span className="w-6 h-6 rounded-full bg-[#F5DEB3]/20 text-[#F5DEB3] flex items-center justify-center text-xs">
-                  2
-                </span>
+              <h2 className="text-lg font-serif text-[#2e443c] mb-6 border-b border-gray-200 pb-4 flex items-center gap-3">
+                <span className="w-6 h-6 rounded-full bg-[#a89068] text-white flex items-center justify-center text-xs font-bold">2</span> 
                 Delivery Details
               </h2>
 
@@ -825,56 +805,41 @@ const CheckoutPage = () => {
                   <button
                     onClick={handleOpenMap}
                     disabled={isLocating}
-                    className="w-full py-16 border-2 border-dashed border-[#F5DEB3]/30 rounded-2xl flex flex-col items-center justify-center gap-4 hover:bg-[#F5DEB3]/5 hover:border-[#F5DEB3]/60 transition-all group"
+                    className="w-full py-16 border-2 border-dashed border-[#a89068]/30 rounded-2xl flex flex-col items-center justify-center gap-4 hover:bg-[#a89068]/5 hover:border-[#a89068]/60 transition-all group bg-white"
                   >
-                    <div className="w-16 h-16 rounded-full bg-[#F5DEB3]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <i
-                        className={`fa-solid ${isLocating ? "fa-spinner animate-spin" : "fa-map-location-dot"} text-2xl text-[#F5DEB3]`}
-                      />
+                    <div className="w-16 h-16 rounded-full bg-[#a89068]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <i className={`fa-solid ${isLocating ? "fa-spinner animate-spin" : "fa-map-location-dot"} text-2xl text-[#a89068]`} />
                     </div>
-                    <span className="text-xs font-bold uppercase tracking-widest text-[#F5DEB3]">
-                      {isLocating
-                        ? "Detecting Location..."
-                        : "Pinpoint Delivery Location"}
+                    <span className="text-xs font-bold uppercase tracking-widest text-[#a89068]">
+                      {isLocating ? "Detecting Location..." : "Pinpoint Delivery Location"}
                     </span>
                   </button>
 
                   {savedAddress.length > 0 && (
                     <div className="space-y-4 animate-in fade-in duration-700">
-                      <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500 flex items-center gap-2">
-                        <i className="fa-solid fa-bookmark text-[8px]"></i>{" "}
-                        Saved Addresses
+                      <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a89068] flex items-center gap-2">
+                         <i className="fa-solid fa-bookmark text-[8px]"></i> Saved Addresses
                       </h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {savedAddress.map((addr, index) => (
                           <div
                             key={index}
                             onClick={() => selectSavedAddress(addr)}
-                            className="w-full text-left bg-black/20 border border-white/5 
-      hover:border-[#F5DEB3]/40 
-      p-4 rounded-2xl transition-all duration-300 
-      group cursor-pointer"
+                            className="w-full text-left bg-white border border-gray-200 hover:border-[#a89068]/40 hover:shadow-md p-4 rounded-2xl transition-all group"
                           >
                             {/* Top Section */}
                             <div className="flex justify-between items-center mb-2">
-                              <span className="text-[8px] bg-[#F5DEB3]/10 text-[#F5DEB3] px-2 py-0.5 rounded-md border border-[#F5DEB3]/20 font-bold uppercase tracking-tighter">
-                                {addr.addressType}
-                              </span>
-
-                              <i className="fa-solid fa-chevron-right text-[10px] text-gray-700 group-hover:text-[#F5DEB3] transition-colors"></i>
+                                <span className="text-[8px] bg-[#a89068]/10 text-[#a89068] px-2 py-0.5 rounded-md border border-[#a89068]/20 font-bold uppercase tracking-tighter">
+                                    {addr.addressType}
+                                </span>
+                                <i className="fa-solid fa-chevron-right text-[10px] text-gray-400 group-hover:text-[#a89068] transition-colors"></i>
                             </div>
-
-                            {/* Address */}
-                            <p className="text-[11px] text-gray-300 line-clamp-2 leading-relaxed min-h-[32px]">
-                              {addr.formattedAddress}
+                            <p className="text-[11px] text-gray-600 line-clamp-2 leading-relaxed h-8">
+                                {addr.formattedAddress}
                             </p>
-
-                            {/* City / State / Pincode */}
-                            <div className="mt-3 pt-3 border-t border-white/5 text-[9px] text-gray-500 flex items-center justify-between">
-                              <span>
-                                {addr.city}, {addr.state}
-                              </span>
-                              <span className="font-mono">{addr.pinCode}</span>
+                            <div className="mt-3 pt-3 border-t border-gray-100 text-[9px] text-gray-400 flex items-center justify-between">
+                                <span>{addr.city}, {addr.state}</span>
+                                <span className="font-mono text-gray-600">{addr.pinCode}</span>
                             </div>
 
                             <button
@@ -900,26 +865,18 @@ const CheckoutPage = () => {
                 </div>
               ) : (
                 <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                  <div className="bg-black/40 p-5 rounded-2xl border border-[#F5DEB3]/30 flex justify-between items-start gap-4">
+                  <div className="bg-white p-5 rounded-2xl border border-gray-200 flex justify-between items-start gap-4 shadow-sm">
                     <div className="flex-1">
-                      <h3 className="font-bold text-[#F5DEB3] text-xs uppercase tracking-widest mb-1">
+                      <h3 className="font-bold text-[#a89068] text-xs uppercase tracking-widest mb-1">
                         Delivering To:
                       </h3>
-                      <p className="text-sm text-gray-300 leading-relaxed">
-                        {address}
-                      </p>
+                      <p className="text-sm text-[#2e443c] leading-relaxed">{address}</p>
                     </div>
                     <div className="flex flex-col gap-3 shrink-0">
-                      <button
-                        onClick={handleOpenMap}
-                        className="text-[10px] text-[#F5DEB3] uppercase font-bold tracking-widest hover:text-white transition-colors bg-white/5 px-3 py-1.5 rounded-lg border border-white/10"
-                      >
+                      <button onClick={handleOpenMap} className="text-[10px] text-white uppercase font-bold tracking-widest hover:bg-[#a89068]/90 transition-colors bg-[#a89068] px-3 py-1.5 rounded-lg">
                         Change
                       </button>
-                      <button
-                        onClick={handleResetAddress}
-                        className="text-[10px] text-red-400 uppercase font-bold tracking-widest hover:text-red-300 transition-colors px-3 py-1.5"
-                      >
+                      <button onClick={handleResetAddress} className="text-[10px] text-red-500 uppercase font-bold tracking-widest hover:text-red-600 transition-colors px-3 py-1.5">
                         Reset
                       </button>
                     </div>
@@ -927,44 +884,28 @@ const CheckoutPage = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div className="space-y-1.5">
-                      <label className="text-[9px] uppercase tracking-widest text-gray-500 font-bold ml-1">
-                        Flat / Floor No. (Optional)
-                      </label>
-                      <input
-                        value={preciseDetails.flatNo}
-                        placeholder="e.g. Apt 4B, 2nd Floor"
-                        disabled={!isEditingMode && (preciseDetails.flatNo || preciseDetails.landmark)}
-                        className="w-full bg-black/30 border border-white/10 rounded-xl p-4 text-sm text-white focus:outline-none focus:border-[#F5DEB3] transition-all disabled:opacity-50"
-                        onChange={(e) =>
-                          setPreciseDetails((p) => ({
-                            ...p,
-                            flatNo: e.target.value,
-                          }))
-                        }
-                      />
+                        <label className="text-[9px] uppercase tracking-widest text-[#a89068] font-bold ml-1">Flat / Floor No. (Optional)</label>
+                        <input
+                            value={preciseDetails.flatNo}
+                            placeholder="e.g. Apt 4B, 2nd Floor"
+                            className="w-full bg-white border border-gray-200 rounded-xl p-4 text-sm text-[#2e443c] focus:outline-none focus:border-[#a89068] transition-all placeholder:text-gray-400"
+                            onChange={(e) => setPreciseDetails((p) => ({ ...p, flatNo: e.target.value }))}
+                        />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-[9px] uppercase tracking-widest text-gray-500 font-bold ml-1">
-                        Landmark (Optional)
-                      </label>
-                      <input
-                        value={preciseDetails.landmark}
-                        placeholder="e.g. Near Metro Station"
-                        disabled={!isEditingMode && (preciseDetails.flatNo || preciseDetails.landmark)}
-                        className="w-full bg-black/30 border border-white/10 rounded-xl p-4 text-sm text-white focus:outline-none focus:border-[#F5DEB3] transition-all disabled:opacity-50"
-                        onChange={(e) =>
-                          setPreciseDetails((p) => ({
-                            ...p,
-                            landmark: e.target.value,
-                          }))
-                        }
-                      />
+                        <label className="text-[9px] uppercase tracking-widest text-[#a89068] font-bold ml-1">Landmark (Optional)</label>
+                        <input
+                            value={preciseDetails.landmark}
+                            placeholder="e.g. Near Metro Station"
+                            className="w-full bg-white border border-gray-200 rounded-xl p-4 text-sm text-[#2e443c] focus:outline-none focus:border-[#a89068] transition-all placeholder:text-gray-400"
+                            onChange={(e) => setPreciseDetails((p) => ({ ...p, landmark: e.target.value }))}
+                        />
                     </div>
                   </div>
 
                   <button
                     onClick={isEditingMode || (!preciseDetails.landmark && !preciseDetails.flatNo) ? handleUpdateAddressDetails : () => setIsEditingMode(true)}
-                    className="w-full py-3 bg-[#F5DEB3]/10 hover:bg-[#F5DEB3]/20 border border-[#F5DEB3]/30 rounded-xl text-[#F5DEB3] font-bold text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2"
+                    className="w-full py-3 bg-[#F5DEB3]/10 hover:bg-[#F5DEB3]/20 border border-[#F5DEB3]/30 rounded-xl text-[#a89068] font-bold text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2"
                   >
                     <i className={`fa-solid ${(isEditingMode || (!preciseDetails.landmark && !preciseDetails.flatNo)) ? 'fa-save' : 'fa-pen-to-square'}`}></i>
                     {(isEditingMode || (!preciseDetails.landmark && !preciseDetails.flatNo)) ? 'Save Address Details' : 'Edit Address Details'}
@@ -985,41 +926,30 @@ const CheckoutPage = () => {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center"
+                    className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm"
                   >
                     <motion.div
                       initial={{ y: "100%", scale: 0.95 }}
                       animate={{ y: 0, scale: 1 }}
                       exit={{ y: "100%", scale: 0.95 }}
-                      transition={{
-                        type: "spring",
-                        damping: 25,
-                        stiffness: 200,
-                      }}
-                      className="bg-[#1c2b25] w-full max-w-3xl h-[95vh] sm:h-[88vh] sm:rounded-[2rem] overflow-hidden border-t sm:border border-white/10 shadow-2xl flex flex-col"
+                      transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                      className="bg-[#f5f7f8] w-full max-w-3xl h-[95vh] sm:h-[85vh] sm:rounded-[2rem] overflow-hidden border-t sm:border border-white/20 shadow-2xl flex flex-col"
                     >
-                      <div className="p-5 border-b border-white/10 flex justify-between items-center bg-[#2e443c] shrink-0">
+                      <div className="p-5 border-b border-gray-200 flex justify-between items-center bg-white shrink-0">
                         <div>
-                          <h3 className="font-serif text-[#F5DEB3] text-xl">
-                            Set Delivery Location
-                          </h3>
-                          <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-0.5">
-                            Move pin to exact location
-                          </p>
+                            <h3 className="font-serif text-[#2e443c] text-xl">Set Delivery Location</h3>
+                            <p className="text-[10px] text-[#a89068] uppercase tracking-widest mt-0.5 font-bold">Move pin to exact location</p>
                         </div>
-                        <button
-                          onClick={() => setShowMapModal(false)}
-                          className="w-10 h-10 rounded-full bg-black/20 flex items-center justify-center text-white/60 hover:text-white hover:bg-black/40 transition-colors"
-                        >
+                        <button onClick={() => setShowMapModal(false)} className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:text-red-500 hover:bg-red-50 transition-colors">
                           <i className="fa-solid fa-xmark text-lg"></i>
                         </button>
                       </div>
 
-                      <div className="p-5 bg-[#1c2b25] shrink-0 relative z-[110] border-b border-white/5">
+                      <div className="p-5 bg-[#f5f7f8] shrink-0 relative z-[110] border-b border-gray-200">
                         <button
                           onClick={getUserCurrentLocation}
                           disabled={isLocating}
-                          className="w-full py-3.5 mb-4 rounded-xl bg-[#F5DEB3]/10 border border-[#F5DEB3]/30 text-[#F5DEB3] font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-[#F5DEB3]/20 transition-all disabled:opacity-50"
+                          className="w-full py-3.5 mb-4 rounded-xl bg-[#a89068]/10 border border-[#a89068]/30 text-[#a89068] font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-[#a89068]/20 transition-all disabled:opacity-50"
                         >
                           <i
                             className={`fa-solid ${isLocating ? "fa-spinner animate-spin" : "fa-location-crosshairs"} text-sm`}
@@ -1035,32 +965,30 @@ const CheckoutPage = () => {
                             value={searchQuery}
                             onChange={(e) => handleSearchPlaces(e.target.value)}
                             placeholder="Search area, street, landmark..."
-                            className="w-full bg-black/40 border border-white/10 rounded-xl p-4 pl-12 text-sm text-white focus:border-[#F5DEB3] outline-none"
+                            className="w-full bg-white border border-gray-300 rounded-xl p-4 pl-12 text-sm text-[#2e443c] focus:border-[#a89068] outline-none placeholder:text-gray-400 shadow-sm"
                           />
-                          <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                          <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
                         </div>
 
                         {(searchQuery.length > 0 || isSearching) && (
-                          <div className="absolute left-5 right-5 mt-2 bg-[#2e443c] border border-white/10 rounded-2xl shadow-2xl z-[120] max-h-[300px] overflow-y-auto custom-scrollbar">
+                          <div className="absolute left-5 right-5 mt-2 bg-white border border-gray-200 rounded-2xl shadow-xl z-[120] max-h-[300px] overflow-y-auto custom-scrollbar">
                             {isSearching ? (
                               <div className="w-full p-8 flex flex-col items-center justify-center gap-3">
-                                <div className="w-6 h-6 border-2 border-[#F5DEB3] border-t-transparent rounded-full animate-spin"></div>
-                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
-                                  Searching...
-                                </p>
+                                <div className="w-6 h-6 border-2 border-[#a89068] border-t-transparent rounded-full animate-spin"></div>
+                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Searching...</p>
                               </div>
                             ) : searchResults.length > 0 ? (
                               searchResults.map((item, i) => (
                                 <button
                                   key={i}
                                   onClick={() => handleSelectSearchResult(item)}
-                                  className="w-full text-left p-4 hover:bg-white/5 border-b border-white/5 last:border-0 flex items-start gap-4 transition-colors group"
+                                  className="w-full text-left p-4 hover:bg-gray-50 border-b border-gray-100 last:border-0 flex items-start gap-4 transition-colors group"
                                 >
-                                  <div className="w-8 h-8 rounded-full bg-black/20 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-[#F5DEB3]/10">
-                                    <i className="fa-solid fa-location-dot text-gray-500 group-hover:text-[#F5DEB3] transition-colors"></i>
+                                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-[#a89068]/10">
+                                     <i className="fa-solid fa-location-dot text-gray-400 group-hover:text-[#a89068] transition-colors"></i>
                                   </div>
                                   <div>
-                                    <p className="text-sm text-white font-medium group-hover:text-[#F5DEB3] transition-colors">
+                                    <p className="text-sm text-[#2e443c] font-medium group-hover:text-[#a89068] transition-colors">
                                       {item.structured_formatting.main_text}
                                     </p>
                                     <p className="text-[11px] text-gray-400 line-clamp-1 mt-0.5">
@@ -1081,37 +1009,30 @@ const CheckoutPage = () => {
                         )}
                       </div>
 
-                      <div className="relative flex-1 min-h-[300px] w-full bg-[#15251e]">
+                      <div className="relative flex-1 min-h-[300px] w-full bg-gray-100">
                         <div ref={mapElement} className="w-full h-full" />
 
                         {mapSuggestions.length === 0 &&
                           !isSearching &&
                           !isLocating && (
                             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 px-8">
-                              <div className="bg-black/60 backdrop-blur-md p-6 rounded-2xl border border-white/10 text-center shadow-2xl">
-                                <i className="fa-solid fa-hand-pointer text-2xl text-[#F5DEB3] mb-3 animate-bounce"></i>
-                                <p className="text-[11px] text-[#F5DEB3] uppercase tracking-[0.2em] font-bold mb-1">
-                                  Navigation Required
-                                </p>
-                                <p className="text-sm text-white/80 leading-relaxed font-light">
-                                  Drag the map to pinpoint
-                                  <br />
-                                  your exact location
-                                </p>
+                              <div className="bg-white/90 backdrop-blur-md p-6 rounded-2xl border border-white/20 text-center shadow-xl">
+                                <i className="fa-solid fa-hand-pointer text-2xl text-[#a89068] mb-3 animate-bounce"></i>
+                                <p className="text-[11px] text-[#a89068] uppercase tracking-[0.2em] font-bold mb-1">Navigation Required</p>
+                                <p className="text-sm text-gray-600 leading-relaxed font-light">Drag the map to pinpoint<br/>your exact location</p>
                               </div>
                             </div>
                           )}
 
                         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full pointer-events-none z-10">
-                          <i className="fa-solid fa-location-dot text-4xl text-[#F5DEB3] drop-shadow-[0_10px_10px_rgba(0,0,0,0.8)]"></i>
+                          <i className="fa-solid fa-location-dot text-4xl text-[#a89068] drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)]"></i>
                           <div className="w-2 h-1 bg-black/50 rounded-full absolute -bottom-1 left-1/2 -translate-x-1/2 blur-[2px]"></div>
                         </div>
                       </div>
 
-                      <div className="p-5 bg-[#1c2b25] h-[200px] flex flex-col shrink-0 border-t border-white/5 relative z-[110]">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3 flex items-center gap-2">
-                          <i className="fa-solid fa-list-ul"></i> Select Nearest
-                          Match
+                      <div className="p-5 bg-white h-[200px] flex flex-col shrink-0 border-t border-gray-200 relative z-[110]">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-[#a89068] mb-3 flex items-center gap-2">
+                           <i className="fa-solid fa-list-ul"></i> Select Nearest Match
                         </p>
                         <div className="space-y-3 overflow-y-auto custom-scrollbar pr-2 flex-1">
                           {mapSuggestions.length > 0 ? (
@@ -1119,26 +1040,23 @@ const CheckoutPage = () => {
                               <button
                                 key={idx}
                                 onClick={() => handleConfirmAddress(s)}
-                                className="w-full text-left p-4 rounded-xl bg-black/30 border border-white/5 hover:border-[#F5DEB3]/50 hover:bg-black/50 transition-all group flex items-center justify-between"
+                                className="w-full text-left p-4 rounded-xl bg-gray-50 border border-gray-100 hover:border-[#a89068]/50 hover:bg-[#a89068]/5 transition-all group flex items-center justify-between"
                               >
                                 <div className="pr-4">
-                                  <p className="text-sm text-white group-hover:text-[#F5DEB3] line-clamp-1 transition-colors">
+                                    <p className="text-sm text-[#2e443c] group-hover:text-[#a89068] line-clamp-1 transition-colors font-medium">
                                     {s.formattedAddress}
-                                  </p>
-                                  <p className="text-[10px] text-gray-500 mt-1 uppercase tracking-wider">
-                                    {s.city}, {s.state} -{" "}
-                                    <span className="text-white font-mono">
-                                      {s.pinCode}
-                                    </span>
-                                  </p>
+                                    </p>
+                                    <p className="text-[10px] text-gray-500 mt-1 uppercase tracking-wider">
+                                    {s.city}, {s.state} - <span className="text-gray-800 font-mono">{s.pinCode}</span>
+                                    </p>
                                 </div>
-                                <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-[#F5DEB3] group-hover:text-[#1c3026] text-white/50 transition-colors shrink-0">
-                                  <i className="fa-solid fa-check text-xs"></i>
+                                <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center group-hover:bg-[#a89068] group-hover:text-white text-gray-300 border border-gray-200 transition-colors shrink-0">
+                                    <i className="fa-solid fa-check text-xs"></i>
                                 </div>
                               </button>
                             ))
                           ) : (
-                            <div className="h-full flex items-center justify-center text-gray-500 text-xs italic">
+                            <div className="h-full flex items-center justify-center text-gray-400 text-xs italic">
                               Searching for nearby addresses...
                             </div>
                           )}
@@ -1151,18 +1069,39 @@ const CheckoutPage = () => {
             </div>
 
             <AnimatePresence>
-              {paymentError && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0, y: -20 }}
-                  animate={{ opacity: 1, height: "auto", y: 0 }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="bg-red-500/10 backdrop-blur-md rounded-[2rem] p-6 md:p-8 border border-red-500/30 overflow-hidden"
+                {paymentError && (
+                <motion.div 
+                    initial={{ opacity: 0, height: 0, y: -20 }}
+                    animate={{ opacity: 1, height: 'auto', y: 0 }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="bg-red-50 rounded-[2rem] p-6 md:p-8 border border-red-100 overflow-hidden shadow-lg"
                 >
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center text-red-400 shrink-0">
-                      <i className="fa-solid fa-triangle-exclamation"></i>
+                    <div className="flex items-start gap-4">
+                        <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-500 shrink-0">
+                            <i className="fa-solid fa-triangle-exclamation"></i>
+                        </div>
+                        <div className="flex-1 pt-1">
+                            <h3 className="text-lg font-serif text-red-800 mb-1">Transaction Failed</h3>
+                            <p className="text-sm text-red-600 mb-5 leading-relaxed">{paymentError}</p>
+                            {showRetry && (
+                            <button
+                                onClick={handlePayment}
+                                disabled={isOrdering}
+                                className="px-6 py-3 bg-red-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-red-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 w-fit shadow-md"
+                            >
+                                <i className="fa-solid fa-rotate-right"></i>
+                                Retry Payment
+                            </button>
+                            )}
+                        </div>
+                        <button
+                            onClick={() => { setPaymentError(null); setShowRetry(false); }}
+                            className="text-red-400 hover:text-red-600 transition-colors p-1"
+                        >
+                            <i className="fa-solid fa-xmark text-xl"></i>
+                        </button>
                     </div>
-                    <div className="flex-1 pt-1">
+                    {/* <div className="flex-1 pt-1">
                       <h3 className="text-lg font-serif text-red-400 mb-1">
                         Transaction Failed
                       </h3>
@@ -1179,8 +1118,8 @@ const CheckoutPage = () => {
                           Retry Payment
                         </button>
                       )}
-                    </div>
-                    <button
+                    </div> */}
+                    {/* <button
                       onClick={() => {
                         setPaymentError(null);
                         setShowRetry(false);
@@ -1188,8 +1127,8 @@ const CheckoutPage = () => {
                       className="text-red-400/50 hover:text-red-400 transition-colors p-1"
                     >
                       <i className="fa-solid fa-xmark text-xl"></i>
-                    </button>
-                  </div>
+                    </button> */}
+                  {/* </div> */}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -1203,7 +1142,7 @@ const CheckoutPage = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm"
+            className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm"
             onClick={() => setShowCouponModal(false)}
           >
             <motion.div
@@ -1212,35 +1151,33 @@ const CheckoutPage = () => {
               exit={{ y: "100%", scale: 0.95 }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-[#1c2b25] w-full max-w-2xl max-h-[85vh] sm:rounded-[2rem] overflow-hidden border-t sm:border border-white/10 shadow-2xl flex flex-col"
+              className="bg-[#f5f7f8] w-full max-w-2xl max-h-[85vh] sm:rounded-[2rem] overflow-hidden border-t sm:border border-white/20 shadow-2xl flex flex-col"
             >
-              <div className="p-5 md:p-6 border-b border-white/10 flex justify-between items-center bg-[#2e443c] shrink-0">
+              <div className="p-5 md:p-6 border-b border-gray-200 flex justify-between items-center bg-white shrink-0">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-[#F5DEB3]/10 border border-[#F5DEB3]/20 flex items-center justify-center">
-                    <i className="fa-solid fa-tags text-[#F5DEB3]"></i>
+                  <div className="w-10 h-10 rounded-full bg-[#a89068]/10 border border-[#a89068]/20 flex items-center justify-center">
+                    <i className="fa-solid fa-tags text-[#a89068]"></i>
                   </div>
                   <div>
-                    <h3 className="font-serif text-[#F5DEB3] text-xl">
-                      Available Coupons
-                    </h3>
-                    <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-0.5">
+                    <h3 className="font-serif text-[#2e443c] text-xl">Available Coupons</h3>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-0.5 font-bold">
                       Select to apply discount
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => setShowCouponModal(false)}
-                  className="w-10 h-10 rounded-full bg-black/20 flex items-center justify-center text-white/60 hover:text-white hover:bg-black/40 transition-colors"
+                  className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:text-red-500 hover:bg-red-50 transition-colors"
                 >
                   <i className="fa-solid fa-xmark text-lg"></i>
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-5 md:p-6 custom-scrollbar">
-                <Suspense
+              <div className="flex-1 overflow-y-auto p-5 md:p-6 custom-scrollbar bg-[#f5f7f8]">
+                <Suspense 
                   fallback={
                     <div className="flex items-center justify-center py-12">
-                      <div className="w-10 h-10 border-2 border-[#F5DEB3] border-t-transparent rounded-full animate-spin"></div>
+                      <div className="w-10 h-10 border-2 border-[#a89068] border-t-transparent rounded-full animate-spin"></div>
                     </div>
                   }
                 >
@@ -1253,10 +1190,10 @@ const CheckoutPage = () => {
                 </Suspense>
               </div>
 
-              <div className="p-5 md:p-6 border-t border-white/10 bg-[#15251e] shrink-0">
+              <div className="p-5 md:p-6 border-t border-gray-200 bg-white shrink-0">
                 <button
                   onClick={() => setShowCouponModal(false)}
-                  className="w-full py-3 px-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-white font-bold text-xs uppercase tracking-widest transition-all"
+                  className="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-gray-600 font-bold text-xs uppercase tracking-widest transition-all"
                 >
                   Close
                 </button>
@@ -1266,43 +1203,36 @@ const CheckoutPage = () => {
         )}
       </AnimatePresence>
 
-      <motion.div
+      {/* Mobile Sticky Footer */}
+      <motion.div 
         initial={{ y: 100 }}
         animate={{ y: 0 }}
-        className="fixed bottom-0 left-0 right-0 bg-[#15251e]/95 backdrop-blur-xl border-t border-[#F5DEB3]/20 p-4 px-6 z-50 lg:hidden shadow-[0_-20px_40px_rgba(0,0,0,0.6)]"
+        className="fixed bottom-0 left-0 right-0 bg-[#2e443c] border-t border-white/10 p-4 px-6 z-50 lg:hidden shadow-[0_-10px_30px_rgba(0,0,0,0.4)]"
       >
-        <div className="flex items-center gap-5 max-w-[1200px] mx-auto">
-          <div className="flex flex-col">
-            <span className="text-[9px] text-[#F5DEB3]/70 uppercase tracking-widest font-bold">
-              Total Payable
-            </span>
-            <span className="text-2xl font-serif text-white">
-              ₹{finalTotal.toLocaleString()}
-            </span>
+          <div className="flex items-center gap-5 max-w-[1200px] mx-auto">
+            <div className="flex flex-col">
+                <span className="text-[9px] text-[#a89068] uppercase tracking-widest font-bold">Total Payable</span>
+                <span className="text-2xl font-serif text-white">₹{finalTotal.toLocaleString()}</span>
+            </div>
+            <button 
+                onClick={handlePayment}
+                disabled={isOrdering || !address}
+                className={`flex-1 h-14 rounded-xl font-bold uppercase tracking-widest text-[11px] shadow-lg active:scale-95 transition-all flex items-center justify-center gap-3 ${
+                    !address 
+                    ? 'bg-white/10 text-gray-400 border border-white/10' 
+                    : 'bg-[#a89068] text-white'
+                }`}
+            >
+                {isOrdering ? (
+                    <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Proc...</>
+                ) : (!address ? (
+                    'Set Address'
+                ) : (
+                    <>Pay Now <i className="fa-solid fa-lock text-[10px]"></i></>
+                ))}
+            </button>
           </div>
-          <button
-            onClick={handlePayment}
-            disabled={isOrdering || !address}
-            className={`flex-1 h-14 rounded-xl font-bold uppercase tracking-widest text-[11px] shadow-lg active:scale-95 transition-all flex items-center justify-center gap-3 ${
-              !address
-                ? "bg-white/5 text-gray-500 border border-white/10"
-                : "bg-[#F5DEB3] text-[#1c3026]"
-            }`}
-          >
-            {isOrdering ? (
-              <>
-                <div className="w-4 h-4 border-2 border-[#1c3026] border-t-transparent rounded-full animate-spin"></div>{" "}
-                Proc...
-              </>
-            ) : !address ? (
-              "Set Address"
-            ) : (
-              <>
-                Pay Now <i className="fa-solid fa-lock text-[10px]"></i>
-              </>
-            )}
-          </button>
-        </div>
+         
       </motion.div>
     </div>
   );

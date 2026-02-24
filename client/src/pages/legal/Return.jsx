@@ -28,7 +28,7 @@ const Return = () => {
       <div className="relative z-10 max-w-4xl mx-auto px-6 py-20 md:py-28">
         
         {/* Header */}
-        <div className="mb-16 text-center md:text-left border-b border-white/10 pb-12">
+        <div className="mb-2 text-left  border-b border-white/10 pb-4">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 w-fit mb-6 backdrop-blur-md">
             <span className="w-1.5 h-1.5 rounded-full bg-[#F5DEB3]"></span>
             <span className="text-[10px] font-bold uppercase tracking-widest text-[#F5DEB3]">Policy</span>
@@ -72,9 +72,9 @@ const Return = () => {
           </section>
 
           {/* Section 3: Distinct Box for Damaged Goods */}
-          <section className="bg-white/5 border-l-2 border-[#F5DEB3] p-6 rounded-r-xl">
-            <h2 className="text-lg md:text-xl font-serif text-white mb-2 flex items-center gap-3">
-              <span className="text-[#F5DEB3] text-sm font-sans font-bold">03.</span> Damaged or Defective Items
+          <section className="bg-white  border-[#F5DEB3] p-6 rounded-[1rem]">
+            <h2 className="text-lg md:text-xl font-serif text-[#a89068] mb-2 flex items-center gap-3">
+              <span className="text-[#a89068] text-sm font-sans font-bold">03.</span> Damaged or Defective Items
             </h2>
             <p className="leading-relaxed text-gray-400 text-sm">
               Please inspect your order upon reception. If the item is defective, damaged, or if you receive the wrong item, contact us immediately within <strong>48 hours</strong> with unboxing photos/videos so that we can evaluate the issue and make it right.
@@ -90,12 +90,12 @@ const Return = () => {
               Certain types of items cannot be returned due to their nature:
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               <div className="bg-white/5 p-4 rounded-lg border border-white/5">
-                  <h3 className="text-white font-bold text-sm mb-1">Custom Orders</h3>
+               <div className="bg-white p-4 rounded-lg border border-white/5">
+                  <h3 className="text-[#a89068] font-bold text-sm mb-1">Custom Orders</h3>
                   <p className="text-xs text-gray-400">Personalized or 3D printed-to-order items.</p>
                </div>
-               <div className="bg-white/5 p-4 rounded-lg border border-white/5">
-                  <h3 className="text-white font-bold text-sm mb-1">Gift Cards</h3>
+               <div className="bg-white p-4 rounded-lg border border-white/5">
+                  <h3 className="text-[#a89068] font-bold text-sm mb-1">Gift Cards</h3>
                   <p className="text-xs text-gray-400">Digital or physical gift vouchers.</p>
                </div>
             </div>

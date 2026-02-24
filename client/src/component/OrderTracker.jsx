@@ -28,7 +28,7 @@ const OrderTracker = ({ status }) => {
   if (status === 'CREATED' || status === 'PAID') {
     return (
       <div className="flex items-center justify-center py-4">
-        <div className="flex flex-col items-center text-yellow-500">
+        <div className="flex flex-col items-center text-[#a89068]">
           <Package className="w-12 h-12 mb-2 animate-pulse" />
           <span className="text-sm font-medium">
             {status === 'CREATED' ? 'Order Created' : 'Payment Received'}

@@ -18,9 +18,11 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
     setSuccess('');
 
     try {
-      const result = await applyCoupon(couponCode.trim().toUpperCase()).unwrap();
+      const result = await applyCoupon(couponCode?.trim()?.toUpperCase()).unwrap();
+
+      console.log(result,"resultresultresult")
       
-      if (result.success) {
+      if (result?.success) {
         const discountAmount = result.data?.summary?.discount || 0;
         const successMessage = result.message || `Coupon applied! You saved ₹${discountAmount}`;
         setSuccess(successMessage);
@@ -35,12 +37,17 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
           });
         }
       } else {
+        debugger
         const errorMessage = result.message || 'Failed to apply coupon';
+        showNotification(errorMessage, "error");
         setError(errorMessage);
+
       }
     } catch (err) {
+      debugger
       // Extract error message from backend response
       const errorMessage = err?.data?.message || err?.message || 'Invalid or expired coupon code';
+       showNotification(errorMessage, "error");
       setError(errorMessage);
     }
   };
@@ -78,10 +85,7 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
   };
 
   return (
-    <div className="bg-white/5 backdrop-blur-md rounded-2xl p-6 border border-white/10">
-      <h2 className="text-lg font-serif text-[#F5DEB3] mb-4 flex items-center gap-2">
-        <i className="fa-solid fa-ticket text-sm"></i> Apply Coupon
-      </h2>
+    <div className="bg-white/5 backdrop-blur-md rounded-2xl mt-3  border border-white/10">
 
       {!appliedCoupon ? (
         <div className="space-y-3">
@@ -91,14 +95,14 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
               value={couponCode}
               onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
               onKeyDown={handleKeyPress}
-              placeholder="Enter coupon code"
+              placeholder="Enter coupon code..."
               disabled={isLoading}
-              className="flex-1 bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-[#F5DEB3] focus:ring-1 focus:ring-[#F5DEB3] transition-all uppercase tracking-wider text-sm disabled:opacity-50"
+              className="flex-1 bg-black/10 border border-white/10 rounded-xl px-4 py-3 text-white  focus:outline-none focus:border-[#F5DEB3] focus:ring-1 focus:ring-[#F5DEB3] transition-all uppercase tracking-wider text-sm disabled:opacity-50"
             />
             <button
               onClick={handleApplyCoupon}
               disabled={isLoading || !couponCode.trim()}
-              className="px-6 py-3 bg-[#F5DEB3] text-[#2e443c] rounded-xl font-bold uppercase tracking-wider text-xs hover:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-3 bg-[#a89068] text-[#fff] rounded-xl font-bold uppercase tracking-wider text-xs hover:bg-[#a89068] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (
                 <i className="fa-solid fa-spinner fa-spin"></i>
@@ -116,7 +120,7 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
           )}
 
           {success && (
-            <div className="flex items-center gap-2 text-green-400 text-sm bg-green-400/10 px-4 py-2 rounded-lg border border-green-400/20">
+            <div className="flex items-center gap-2 text-gray-500 text-sm bg-white px-4 py-2 rounded-lg border border-green-400/20">
               <i className="fa-solid fa-circle-check"></i>
               <span>{success}</span>
             </div>
@@ -124,12 +128,12 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
         </div>
       ) : (
         <div className="space-y-3">
-          <div className="flex items-center justify-between bg-green-400/10 px-4 py-3 rounded-xl border border-green-400/20">
+          <div className="flex items-center justify-between bg-white px-4 py-3 rounded-xl border border-gray">
             <div className="flex items-center gap-3">
-              <i className="fa-solid fa-circle-check text-green-400"></i>
+              <i className="fa-solid fa-circle-check text-[#a89068]"></i>
               <div>
-                <p className="text-sm font-bold text-white uppercase tracking-wider">{appliedCoupon}</p>
-                <p className="text-xs text-green-400">You saved ₹{discount?.toLocaleString() || 0}</p>
+                <p className="text-sm font-bold text-gray-500 uppercase tracking-wider">{appliedCoupon}</p>
+                <p className="text-xs text-[#a89068]">You saved ₹{discount?.toLocaleString() || 0}</p>
               </div>
             </div>
             <button

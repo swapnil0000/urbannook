@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const RewardsPage = () => {
   const [userPoints] = useState(2450);
@@ -8,6 +8,10 @@ const RewardsPage = () => {
     { date: '2024-01-10', action: 'Review', points: 50, description: 'Product review bonus' },
     { date: '2024-01-05', action: 'Signup', points: 100, description: 'Welcome bonus' }
   ]);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   const rewards = [
     { id: 1, title: '₹100 Off', points: 500, description: 'On orders above ₹2000', type: 'discount' },

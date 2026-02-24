@@ -57,14 +57,14 @@ const productListing = asyncHandler(async (req, res) => {
 
   const totalProducts = await Product.countDocuments(query);
 
-  const listOfProducts = await Product.find(query)
-    .skip((page - 1) * perPage)
-    .limit(perPage) // for limit
-    .sort(sort) // latest one
-    .select("-_id -createdAt -updatedAt -__v");
-  const listofPublishedProducts = listOfProducts.filter(
-    (i) => i.isPublished == true,
-  );
+const listOfProducts = await Product.find(query)
+  .skip((page - 1) * perPage)
+  .limit(perPage)
+  .sort(sort)
+  .select("-_id -createdAt -updatedAt -__v");
+
+// No need to filter anymore since query already includes isPublished: true
+const listofPublishedProducts = listOfProducts;
 
   return res.status(200).json(
     new ApiRes(

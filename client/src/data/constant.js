@@ -48,3 +48,47 @@
   "saali","bhen","chutiyega","chutiya","chutiye","bhosdiwala","randiwaale"
 ];
 
+
+ export const instagramPosts = [
+    {
+        id: 1,
+        // Replace this image with screenshot of Reel 1
+        image: "/insta_templates/template1.webp", 
+        likes: "2.3k",
+        comments: "42",
+        caption: "New Arrival: 3D Printed Magic ✨",
+        link: "https://www.instagram.com/reel/DTumPdjAdNt/?igsh=MW8xdmJpamZ2bGh0ZA=="
+    },
+    {
+        id: 2,
+        image: "/insta_templates/template2.webp",
+        likes: "1.8k",
+        comments: "15",
+        caption: "UrbanNook Aesthetics 🌿",
+        link: "https://www.instagram.com/reel/DTcCR9LgdhS/?igsh=MWF3ZnczZmhrZjl2bw=="
+    },
+    {
+        id: 3,
+        image: "/insta_templates/template3.webp",
+        likes: "3.1k",
+        comments: "89",
+        caption: "Illuminating spaces 💡",
+        link: "https://www.instagram.com/reel/DTMezUqgbhy/?igsh=MWdmaW5lYzk3ZXJ4NA=="
+    },
+    {
+        id: 4,
+        image: "https://images.unsplash.com/photo-1581833971358-2c8b550f87b3?w=800&fit=crop",
+        likes: "1.7k",
+        comments: "22",
+        caption: "Crafted for you 🔑",
+        link: "https://www.instagram.com/reel/DTkE46tAf0G/?igsh=dDJ4Y3J1anl1NGhu"
+    },
+    {
+        id: 5,
+        image: "https://images.unsplash.com/photo-1615873968403-89e068629265?w=400&fit=crop",
+        likes: "1.9k",
+        comments: "31",
+        caption: "The Urban Standard 💕",
+        link: "https://www.instagram.com/reel/DT5gZ80ASaS/?igsh=bXpuM3pmcHY2aW4z"
+    }
+];

@@ -11,7 +11,6 @@ export const CancellationPolicy = lazy(() => import("./legal/CancellationPolicy.
 export const PrivacyPolicy = lazy(() => import("./legal/PrivacyPolicy.jsx"));
 export const Faq = lazy(() => import("./support/Faqs.jsx"));
 export const Return = lazy(() => import("./legal/Return.jsx"));
-export const WaitList = lazy(() => import("./info/WaitList.jsx"));
 export const ContactPage = lazy(() => import("./support/ContactPage.jsx"));
 export const AllProductsPage = lazy(() => import("./shop/AllProductsPage.jsx"));
 export const CategoryProductsPage = lazy(() => import("./shop/CategoryProductsPage.jsx"));
