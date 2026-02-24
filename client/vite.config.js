@@ -112,20 +112,6 @@ export default defineConfig({
           'react-vendor': ['react', 'react-dom', 'react-router-dom'],
           'redux-vendor': ['@reduxjs/toolkit', 'react-redux'],
           'ui-vendor': ['framer-motion', 'lucide-react'],
-          // Admin pages in separate chunk
-          'admin': [
-            './src/admin/pages/AdminLoginPage.jsx',
-            './src/admin/pages/AdminDashboardPage.jsx',
-            './src/admin/pages/JoinedWaitlistPage.jsx',
-            './src/admin/pages/AdminNFCPage.jsx',
-            './src/admin/components/AdminProductDetailsUpdate.jsx',
-            './src/admin/layout/AdminLayout.jsx'
-          ],
-          // NFC pages in separate chunk
-          'nfc': [
-            './src/nfc/pages/NfcHomePage.jsx',
-            './src/nfc/comp/NfcHomeComponent.jsx'
-          ]
         },
         // Optimize asset file names
         assetFileNames: (assetInfo) => {
