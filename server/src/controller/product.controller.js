@@ -54,7 +54,6 @@ const productListing = asyncHandler(async (req, res) => {
       query.tags = "featured";
     }
   }
-  query.isPublished = true;
 
   const totalProducts = await Product.countDocuments(query);
 

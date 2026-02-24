@@ -60,8 +60,18 @@ const MyProfilePage = () => {
   }, [user, loadProfile, userProfileData, profileLoading]);
 
   const handleInputChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+    const { name, value } = e.target;
+    
+    // Validation for pin code - only allow 6 digits
+    if (name === 'userPinCode') {
+      const numericValue = value.replace(/\D/g, '');
+      if (numericValue.length <= 6) {
+        setFormData({ ...formData, [name]: numericValue });
+      }
+      return;
+    }
+    
+    setFormData({ ...formData, [name]: value });  };
 
   const handleSave = async () => {
   try {

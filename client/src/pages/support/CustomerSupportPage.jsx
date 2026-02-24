@@ -1,11 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const CustomerSupportPage = () => {
-    useEffect(() => {
-        window.scrollTo(0, 0);
-    }, []);
-
     const [activeTab, setActiveTab] = useState('contact');
     const [expandedFaq, setExpandedFaq] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);

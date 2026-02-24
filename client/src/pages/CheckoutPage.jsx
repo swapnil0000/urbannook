@@ -761,7 +761,7 @@ const CheckoutPage = () => {
           </div>
 
           {/* Right Column: Contact & Delivery */}
-          <div className="lg:col-span-7 space-y-6 order-2 lg:order-1">
+          <div className="lg:col-span-7 space-y-6 order-2 lg:order-1 mb-4">
             
             {/* Contact Info (Box Color: #f5f7f8) */}
             <div className="bg-[#f5f7f8] rounded-[2rem] p-6 md:p-8 border border-white/10 shadow-lg" style={{ marginBottom: "1rem" }}>
@@ -905,7 +905,7 @@ const CheckoutPage = () => {
 
                   <button
                     onClick={isEditingMode || (!preciseDetails.landmark && !preciseDetails.flatNo) ? handleUpdateAddressDetails : () => setIsEditingMode(true)}
-                    className="w-full py-3 bg-[#F5DEB3]/10 hover:bg-[#F5DEB3]/20 border border-[#F5DEB3]/30 rounded-xl text-[#F5DEB3] font-bold text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2"
+                    className="w-full py-3 bg-[#F5DEB3]/10 hover:bg-[#F5DEB3]/20 border border-[#F5DEB3]/30 rounded-xl text-[#a89068] font-bold text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2"
                   >
                     <i className={`fa-solid ${(isEditingMode || (!preciseDetails.landmark && !preciseDetails.flatNo)) ? 'fa-save' : 'fa-pen-to-square'}`}></i>
                     {(isEditingMode || (!preciseDetails.landmark && !preciseDetails.flatNo)) ? 'Save Address Details' : 'Edit Address Details'}
@@ -1101,7 +1101,7 @@ const CheckoutPage = () => {
                             <i className="fa-solid fa-xmark text-xl"></i>
                         </button>
                     </div>
-                    <div className="flex-1 pt-1">
+                    {/* <div className="flex-1 pt-1">
                       <h3 className="text-lg font-serif text-red-400 mb-1">
                         Transaction Failed
                       </h3>
@@ -1118,8 +1118,8 @@ const CheckoutPage = () => {
                           Retry Payment
                         </button>
                       )}
-                    </div>
-                    <button
+                    </div> */}
+                    {/* <button
                       onClick={() => {
                         setPaymentError(null);
                         setShowRetry(false);
@@ -1127,7 +1127,7 @@ const CheckoutPage = () => {
                       className="text-red-400/50 hover:text-red-400 transition-colors p-1"
                     >
                       <i className="fa-solid fa-xmark text-xl"></i>
-                    </button>
+                    </button> */}
                   {/* </div> */}
                 </motion.div>
               )}

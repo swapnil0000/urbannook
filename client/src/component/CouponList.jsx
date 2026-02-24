@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useGetAvailableCouponsQuery, useApplyCouponMutation } from '../store/api/userApi';
+import { useUI } from '../hooks/useRedux';
 
 const CouponList = ({ onCouponApplied }) => {
   const [expandedCoupon, setExpandedCoupon] = useState(null);
@@ -7,6 +8,11 @@ const CouponList = ({ onCouponApplied }) => {
   
   const { data: couponsData, isLoading, error } = useGetAvailableCouponsQuery();
   const [applyCoupon] = useApplyCouponMutation();
+  const { showNotification } = useUI();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   const handleApplyCoupon = async (couponCode) => {
     setApplyingCoupon(couponCode);
@@ -22,6 +28,7 @@ const CouponList = ({ onCouponApplied }) => {
         });
       }
     } catch (err) {
+      showNotification(err?.data?.message,"error")
       console.error('Failed to apply coupon:', err);
     } finally {
       setApplyingCoupon(null);

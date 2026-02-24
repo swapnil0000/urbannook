@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { productCategories, priceRanges, sortOptions } from '../../data/products';
 import { useGetProductsByCategoryQuery } from '../../store/api/productsApi';
@@ -11,6 +11,10 @@ const CategoryProductsPage = () => {
   const [selectedRating, setSelectedRating] = useState(null);
   const [sortBy, setSortBy] = useState('featured');
   const [showFilters, setShowFilters] = useState(false);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [category]);
 
   // API call for category products
   const { data: productsResponse, isLoading, error } = useGetProductsByCategoryQuery({
