@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useGetAvailableCouponsQuery, useApplyCouponMutation } from '../store/api/userApi';
 import { useUI } from '../hooks/useRedux';
 
@@ -71,17 +71,17 @@ const CouponList = ({ onCouponApplied }) => {
   return (
     <div className="space-y-3">
       {coupons.map((coupon) => {
-        const isExpanded = expandedCoupon === coupon._id;
+        const isExpanded = expandedCoupon === coupon.couponCodeId;
         const isApplying = applyingCoupon === coupon.name;
         
         return (
           <div
-            key={coupon._id}
+            key={coupon.couponCodeId}
             className="bg-white rounded-xl border border-gray-200 overflow-hidden transition-all hover:border-[#a89068]/50 shadow-sm"
           >
               <div
                 className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-                onClick={() => toggleCoupon(coupon._id)}
+                onClick={() => toggleCoupon(coupon.couponCodeId)}
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex-1">
