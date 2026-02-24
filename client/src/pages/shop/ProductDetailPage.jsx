@@ -108,10 +108,22 @@ const ProductDetailPage = () => {
   };
 
   const handleUpdateQty = async (newQuantity) => {
-    if (newQuantity < 1) return;
+    // using remove because sub handles till quamt = 1and quant < 1 means removing 
+    if (newQuantity < 1) {
+      try {
+        await updateCart({
+          productId: product.productId,
+          quantity: 1,
+          action: 'remove',
+        }).unwrap();
+      } catch (err) {
+        console.error('Remove from cart failed:', err);
+        showNotification('Failed to update cart', 'error');
+      }
+      return;
+    }
 
     try {
-      // Call API - RTK Query will automatically invalidate and refetch
       const action = newQuantity > currentCartQty ? 'add' : 'sub';
       await updateCart({ productId: product.productId, quantity: 1, action }).unwrap();
     } catch (err) {
