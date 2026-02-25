@@ -12,6 +12,9 @@ const Footer = () => {
   const [joinCommunity] = useJoinCommunityMutation();
   const { showNotification, openLoginModal } = useUI();
 
+
+  console.log("Checking")
+
   const handleCommunityJoin = async (e) => {
     e.preventDefault();
     if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -114,7 +117,7 @@ const Footer = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-12 mb-12">
+      <div className="grid grid-cols-1 md:grid-cols-12  gap-12 mb-12">
           <div className="md:col-span-6 lg:col-span-6 text-center md:text-left">
               <Link to="/" className="inline-block mb-8">
                  <span className="text-3xl font-serif text-[#1c3026] tracking-tight">Urban<span className="text-[#a89068] italic">Nook.</span></span>

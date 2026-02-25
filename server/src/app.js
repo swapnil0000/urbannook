@@ -70,6 +70,8 @@ app.use("/api/v1/testimonials", testimonialRouter);
 
 // Contact routes
 app.use("/api/v1/contact", contactRouter);
+  console.log("Checking")
+
 
 // Error handler middleware must be registered last
 app.use(errorHandler);
