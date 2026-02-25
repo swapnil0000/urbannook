@@ -1,11 +1,11 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom'; // 1. Import the hook
+import { useNavigate } from 'react-router-dom';
 
 const AireHeroBanner = () => {
-  const navigate = useNavigate(); // 2. Initialize the hook
+  const navigate = useNavigate();
 
   const handleShopCollection = () => {
-    navigate('/products'); // 3. Navigate to your products page
+    navigate('/products'); 
   };
 
   return (
@@ -24,18 +24,12 @@ const AireHeroBanner = () => {
           className="w-full h-full object-cover opacity-80 lg:opacity-70 transition-transform duration-[20s] ease-in-out group-hover:scale-105"
         />
 
-        {/* --- BRAND GRADIENT OVERLAY --- */}
         <div className="absolute inset-0 bg-gradient-to-b from-[#2E443C]/20 via-[#2E443C]/60 to-[#1a2822] lg:bg-gradient-to-r lg:from-[#2E443C] lg:via-[#2E443C]/40 lg:to-transparent"></div>
       </div>
 
-      {/* --- CONTENT LAYER --- */}
       <div className="relative z-10 w-full px-6 md:px-12 lg:px-20 py-12">
         <div className="w-full max-w-7xl mx-auto">
-
-          {/* LEFT SIDE CONTENT CONTAINER */}
-          <div className="max-w-3xl space-y-4 flex flex-col items-center sm:items-start text-center sm:text-left">
-
-            {/* Badge */}
+          <div cla-ssName="max-w-3xl space-y-4 flex flex-col items-center sm:items-start text-center sm:text-left">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 backdrop-blur-md border border-white/10 shadow-sm w-fit">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#F5DEB3] opacity-75"></span>

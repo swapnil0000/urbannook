@@ -125,13 +125,13 @@ const AireTestimonials = () => {
         </div>
 
         {/* 2-Column Grid Layout */}
-        <div className="relative z-10 w-full max-w-[1440px] mx-auto px-5 sm:px-8 md:px-12 grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-16 items-center">
+        <div className="relative z-10 w-full max-w-[1440px] mx-auto px-5 sm:px-8 md:px-12 grid my-3 grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-16 items-center">
           
           {/* --- LEFT COLUMN: HEADER + SCROLLING REVIEWS --- */}
           <div className="lg:col-span-7 flex flex-col justify-center w-full min-w-0 overflow-hidden">
             
             {/* Header Text */}
-            <div className="space-y-4 text-center lg:text-left mb-8 md:mb-10">
+            <div className="space-y-4 left mb-8 md:mb-10">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#F5DEB3]/10 border border-[#F5DEB3]/20">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#F5DEB3] animate-pulse"></span>
                 <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#F5DEB3]">Community Voices</span>

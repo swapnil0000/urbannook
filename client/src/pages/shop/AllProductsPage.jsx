@@ -96,7 +96,7 @@ const AllProductsPage = () => {
                 >
                   {/* Wishlist Button (Floating Top Right) */}
                   <div className="absolute top-4 right-4 z-20">
-                     <WishlistButton productId={product.productId} />
+                     {/* <WishlistButton productId={product.productId} /> */}
                   </div>
 
                   {/* Clickable Card Area */}
