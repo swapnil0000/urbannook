@@ -53,20 +53,16 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
       }).unwrap();
         
       showNotification('Login successful!');
-      
-      if (result?.data?.userAccessToken) {
-        document.cookie = `userAccessToken=${result.userAccessToken}; path=/; max-age=2592000`;
-        setAuthUser(result.user, result.userAccessToken);
-      }
-
-      console.log(result,"resultresultresultresult");
-
-      
+      const token = result.data?.userAccessToken || result.userAccessToken;
       const userData = {
         name: result.data?.name || result.user?.name || 'User',
         email: result.data?.email || result.user?.email || '',
-        mobile: result.data?.mobileNumber || result.user?.mobile || ''
+        mobile: result.data?.userMobileNumber || result.user?.mobile || ''
       };
+      if (token) {
+        document.cookie = `userAccessToken=${token}; path=/; max-age=2592000`;
+        setAuthUser(userData, token);
+      }
       
       localStorage.setItem('user', JSON.stringify(userData));
       
