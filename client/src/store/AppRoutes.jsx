@@ -5,7 +5,6 @@ import {
   HomePage,
   ContactPage,
   AllProductsPage,
-  CategoryProductsPage,
   ProductDetailPage,
   CheckoutPage,
   MyProfilePage,

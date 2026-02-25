@@ -13,7 +13,6 @@ export const Faq = lazy(() => import("./support/Faqs.jsx"));
 export const Return = lazy(() => import("./legal/Return.jsx"));
 export const ContactPage = lazy(() => import("./support/ContactPage.jsx"));
 export const AllProductsPage = lazy(() => import("./shop/AllProductsPage.jsx"));
-export const CategoryProductsPage = lazy(() => import("./shop/CategoryProductsPage.jsx"));
 export const ProductDetailPage = lazy(() => import("./shop/ProductDetailPage.jsx"));
 export const MyProfilePage = lazy(() => import("./account/MyProfilePage.jsx"));
 export const CustomerSupportPage = lazy(() => import("./support/CustomerSupportPage.jsx"));

@@ -6,7 +6,6 @@ import { PageLoader } from "./layout/LoadingSpinner.jsx";
 const HomePage = lazy(() => import("../pages/home/HomePage.jsx"));
 const ContactPage = lazy(() => import("../pages/support/ContactPage.jsx"));
 const AllProductsPage = lazy(() => import("../pages/shop/AllProductsPage.jsx"));
-const CategoryProductsPage = lazy(() => import("../pages/shop/CategoryProductsPage.jsx"));
 const ProductDetailPage = lazy(() => import("../pages/shop/ProductDetailPage.jsx"));
 const CheckoutPage = lazy(() => import("../pages/CheckoutPage.jsx"));
 const ProductDetails = lazy(() => import("../pages/shop/ProductDetails.jsx"));
@@ -31,7 +30,6 @@ const AppRoutes = () => {
         <Route path="/about-us" element={<AboutPage />} />
         <Route path="/contact-us" element={<ContactPage />} />
         <Route path="/products" element={<AllProductsPage />} />
-        {/* <Route path="/product/:category" element={<CategoryProductsPage />} /> */}
         <Route path="/product/:category/:slug" element={<ProductDetailPage />} />
         <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/register" element={<RegisterPage />} />
