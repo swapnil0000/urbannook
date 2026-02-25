@@ -1,44 +1,18 @@
 import React, { useState } from 'react';
+import { useLocation } from 'react-router-dom';
+import { socialLinks } from '../../data/constant';
 
 const SocialMediaFAB = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const location = useLocation();
 
-  const socialLinks = [
-    {
-      id: 'whatsapp',
-      name: 'Chat on WhatsApp',
-      icon: 'fa-brands fa-whatsapp',
-      color: 'bg-[#25D366]',
-      link: 'https://wa.me/+918299638749?text=Hi! I am interested in Urban Nook products.',
-    },
-    {
-      id: 'instagram',
-      name: 'Follow on Instagram',
-      icon: 'fa-brands fa-instagram',
-      color: 'bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888]', 
-      link: 'https://instagram.com/urbannook.store',
-    },
-    {
-      id: 'email',
-      name: 'Email Support',
-      icon: 'fa-solid fa-envelope',
-      color: 'bg-blue-600',
-      link: 'mailto:support@urbannook.in',
-    },
-    {
-      id: 'call',
-      name: 'Call',
-      icon: 'fa-solid fa-phone',
-      color: 'bg-emerald-700',
-      link: 'tel:+918299638749',
-    }
-  ];
+  // Only show on home page
+  if (location.pathname !== '/') {
+    return null;
+  }
 
   return (
     <div className="fixed bottom-6 right-6 z-[9999] flex flex-col-reverse items-end gap-4 pointer-events-none">
-      
-      {/* --- MAIN TOGGLE BUTTON --- */}
-      {/* pointer-events-auto ensures this specific button is clickable */}
       <button 
         onClick={() => setIsOpen(!isOpen)}
         className={`w-10 h-10 rounded-full flex items-center justify-center text-white shadow-2xl transition-all duration-500 relative pointer-events-auto ${
@@ -47,13 +21,11 @@ const SocialMediaFAB = () => {
       >
         <i className="fa-solid fa-plus text-1xl"></i>
         
-        {/* Pulse Effect (Only when closed) */}
         {!isOpen && (
             <span className="absolute -inset-1 rounded-full bg-emerald-500/50 animate-ping pointer-events-none"></span>
         )}
       </button>
 
-      {/* --- EXPANDABLE MENU ITEMS --- */}
       <div className="flex flex-col-reverse items-end gap-3 pb-2">
         {socialLinks.map((social, index) => (
           <a

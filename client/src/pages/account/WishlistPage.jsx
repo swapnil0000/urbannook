@@ -92,11 +92,6 @@ const WishlistPage = () => {
               Your handpicked collection of atmospheric pieces.
             </p>
           </div>
-          
-          {/* <div className="text-xs text-gray-400 font-medium uppercase tracking-widest hidden md:flex items-center gap-2">
-            <i className="fa-solid fa-heart text-[#F5DEB3]/50"></i>
-            {isLoading ? 'Loading...' : `${wishlistItems.length} Saved Items`}
-          </div> */}
         </div>
       </section>
 

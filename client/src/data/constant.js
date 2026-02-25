@@ -92,3 +92,35 @@
         link: "https://www.instagram.com/reel/DT5gZ80ASaS/?igsh=bXpuM3pmcHY2aW4z"
     }
 ];
+
+
+export  const socialLinks = [
+    {
+      id: 'whatsapp',
+      name: 'Chat on WhatsApp',
+      icon: 'fa-brands fa-whatsapp',
+      color: 'bg-[#25D366]',
+      link: 'https://wa.me/+918299638749?text=Hi! I am interested in Urban Nook products.',
+    },
+    {
+      id: 'instagram',
+      name: 'Follow on Instagram',
+      icon: 'fa-brands fa-instagram',
+      color: 'bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888]', 
+      link: 'https://instagram.com/urbannook.store',
+    },
+    {
+      id: 'email',
+      name: 'Email Support',
+      icon: 'fa-solid fa-envelope',
+      color: 'bg-blue-600',
+      link: 'mailto:support@urbannook.in',
+    },
+    {
+      id: 'call',
+      name: 'Call',
+      icon: 'fa-solid fa-phone',
+      color: 'bg-emerald-700',
+      link: 'tel:+918299638749',
+    }
+  ];

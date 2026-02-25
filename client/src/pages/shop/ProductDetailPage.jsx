@@ -44,6 +44,8 @@ const ProductDetailPage = () => {
 
   const product = productResponse?.data;
 
+  console.log(product,"productproductproduct")
+
   // 4. Derived State
   const cartItem = cartItems.find(item => 
     String(item.id) === String(product?.productId) || 
@@ -172,8 +174,8 @@ const ProductDetailPage = () => {
     // Logged in user - toggle wishlist
     try {
       if (isInWishlist) {
-        await removeFromWishlist(product.productName).unwrap();
-        dispatch(removeFromWishlistLocal(product.productName));
+        await removeFromWishlist(product.productId).unwrap();
+        dispatch(removeFromWishlistLocal(product.productId));
         setFeedbackMessage("Removed from wishlist");
       } else {
         await addToWishlist({ productId: product.productId }).unwrap();
@@ -547,7 +549,7 @@ const AccordionItem = ({ title, isOpen, onClick, children }) => (
         {title}
       </span>
       <span className={`flex items-center justify-center w-6 h-6 rounded-full border border-[#F5DEB3]/20 text-[#F5DEB3] text-[10px] transition-transform duration-300 ${
-        isOpen ? 'rotate-180 bg-[#F5DEB3] text-[#1c3026]' : ''
+        isOpen ? 'rotate-180 text-[#1c3026]' : ''
       }`}>
         <i className="fa-solid fa-chevron-down"></i>
       </span>

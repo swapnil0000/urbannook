@@ -5,7 +5,7 @@ import { instagramPosts } from '../../data/constant';
 
 const AireInstagramFeed = () => {
    return (
-  <section className="relative min-h-[97vh] lg:h-[calc(100vh-2rem)] lg:max-h-[900px] mx-2 my-2 md:mx-4 md:my-4 rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden flex items-center group bg-[#1a2822]">
+  <section className="relative min-h-[70vh] lg:h-[calc(100vh-2rem)] lg:max-h-[900px] mx-2 my-2 md:mx-4 md:my-4 rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden flex items-center group bg-[#1a2822]">
     <style>{`
       @keyframes scroll {
         0% { transform: translateX(0); }
@@ -19,41 +19,42 @@ const AireInstagramFeed = () => {
       }
     `}</style>
 
-    <div className="w-full h-full bg-[#2e443c] overflow-hidden relative flex flex-col p-6 md:p-14 top-0 ">
+    <div className="w-full h-full bg-[#2e443c] overflow-hidden relative flex flex-col p-6 md:p-10 top-0 ">
 
       {/* Subtle Glows */}
 
       <div className="relative z-10 flex flex-col justify-between h-full gap-8">
 
         {/* HEADER */}
-        <div className="flex flex-col lg:flex-row justify-between gap-6">
-          <div>
-            <div className='flex flex-row w-[100%] justify-between'>
-            <div className="flex items-center gap-3 mb-2">
-              <span className="h-[1px] w-4 bg-[#F5DEB3]"></span>
-              <span className="text-[#F5DEB3] font-bold tracking-[0.2em] uppercase text-[10px]">Instagram Gallery</span>
-            </div>
-             <a href="https://www.instagram.com/urbannook.store/" target="_blank" rel="noopener noreferrer" className="md:hidden group relative flex text-center h-10 px-8 bg-white rounded-full overflow-hidden items-center gap-3 transition-all duration-300 hover:scale-[1.02]">
-              <div className="absolute inset-0 bg-gradient-to-r from-[#F5DEB3] to-[#F5DEB3] translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out"></div>
-              <div className="relative z-10 flex items-center gap-2.5">
-                <i className="fa-brands fa-instagram text-base text-emerald-900"></i>
-                <span className="text-[9px] font-black tracking-[0.2em] uppercase text-emerald-950">Follow </span>
-              </div>
-            </a>
-            </div>
-            {/* <div className='flex flex-row items-start w-[100%] justify-around '> */}
-              <h2 className="text-3xl md:text-5xl font-serif text-white leading-[0.95]">
-              Your Nook, <br />
-              <span className="relative inline-block">
-                <span className="italic font-light text-[#F5DEB3] relative z-10">Reimagined</span>
-                <svg className="absolute w-full h-1 -bottom-1 left-0 text-[#F5DEB3] -z-0" viewBox="0 0 100 10" preserveAspectRatio="none">
-                  <path d="M0 5 L 100 5" stroke="currentColor" strokeWidth="8" fill="none" />
-                </svg>
-              </span>
-            </h2>      
+        <div className="flex flex-col justify-between gap-6">
+          {/* Label */}
+          <div className="flex items-center gap-3 mb-2">
+            <span className="h-[1px] w-4 bg-[#F5DEB3]"></span>
+            <span className="text-[#F5DEB3] font-bold tracking-[0.2em] uppercase text-[10px]">Instagram Gallery</span>
           </div>
 
-          <div className="flex flex-col items-start lg:items-end gap-4">
+          {/* Mobile Layout */}
+          <div className="lg:hidden">
+            <div className="flex flex-row items-start justify-between gap-4 mb-6">
+              <h2 className="text-2xl font-serif text-white leading-[0.95]">
+                Your Nook, <br />
+                <span className="relative inline-block">
+                  <span className="italic font-light text-[#F5DEB3] relative z-10">Reimagined</span>
+                  <svg className="absolute w-full h-1 -bottom-1 left-0 text-[#F5DEB3] -z-0" viewBox="0 0 100 10" preserveAspectRatio="none">
+                    <path d="M0 5 L 100 5" stroke="currentColor" strokeWidth="8" fill="none" />
+                  </svg>
+                </span>
+              </h2>
+              
+              <a href="https://www.instagram.com/urbannook.store/" target="_blank" rel="noopener noreferrer" className="group relative flex text-center h-10 px-6 bg-white rounded-full overflow-hidden items-center gap-2 transition-all duration-300 hover:scale-[1.02] shrink-0">
+                <div className="absolute inset-0 bg-gradient-to-r from-[#F5DEB3] to-[#F5DEB3] translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out"></div>
+                <div className="relative z-10 flex items-center gap-2">
+                  <i className="fa-brands fa-instagram text-base text-emerald-900"></i>
+                  <span className="text-[9px] font-black tracking-[0.2em] uppercase text-emerald-950">Follow</span>
+                </div>
+              </a>
+            </div>
+
             <div className="flex items-center gap-4 bg-white/5 pr-5 pl-2 py-1.5 rounded-2xl border border-white/5 backdrop-blur-sm max-w-md">
               <div className="flex -space-x-3 shrink-0">
                 {[1, 2, 3].map((_, i) => (
@@ -71,14 +72,49 @@ const AireInstagramFeed = () => {
                 <p className="text-gray-400 text-[9px] font-medium leading-relaxed mt-0.5 line-clamp-2 max-w-[150px] sm:max-w-[200px]">Tag <span className="text-white border-b border-emerald-500/50 cursor-pointer">@urbannook.store</span></p>
               </div>
             </div>
+          </div>
 
-            <a href="https://www.instagram.com/urbannook.store/" target="_blank" rel="noopener noreferrer" className="hidden md:flex group relative h-10 px-8 bg-white rounded-full overflow-hidden  items-center gap-3 transition-all duration-300 hover:scale-[1.02]">
-              <div className="absolute inset-0 bg-gradient-to-r from-[#F5DEB3] to-[#F5DEB3] translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out"></div>
-              <div className="relative z-10 flex items-center gap-2.5">
-                <i className="fa-brands fa-instagram text-base text-emerald-900"></i>
-                <span className="text-[9px] font-black tracking-[0.2em] uppercase text-emerald-950">Follow UrbanNook</span>
+          {/* Desktop Layout */}
+          <div className="hidden lg:flex lg:flex-row lg:justify-between lg:items-start">
+            <div>
+              <h2 className="text-5xl font-serif text-white leading-[0.95]">
+                Your Nook, <br />
+                <span className="relative inline-block">
+                  <span className="italic font-light text-[#F5DEB3] relative z-10">Reimagined</span>
+                  <svg className="absolute w-full h-1 -bottom-1 left-0 text-[#F5DEB3] -z-0" viewBox="0 0 100 10" preserveAspectRatio="none">
+                    <path d="M0 5 L 100 5" stroke="currentColor" strokeWidth="8" fill="none" />
+                  </svg>
+                </span>
+              </h2>
+            </div>
+
+            <div className="flex flex-col items-end gap-4">
+              <div className="flex items-center gap-4 bg-white/5 pr-5 pl-2 py-1.5 rounded-2xl border border-white/5 backdrop-blur-sm max-w-md">
+                <div className="flex -space-x-3 shrink-0">
+                  {[1, 2, 3].map((_, i) => (
+                    <div key={i} className="w-8 h-8 rounded-full border-2 border-[#0a110e] relative z-0 hover:z-10 hover:scale-110 transition-transform duration-300">
+                      <img
+                        src={`https://randomuser.me/api/portraits/thumb/women/${40 + i}.jpg`}
+                        alt={`User ${i + 1}`}
+                        className="w-full h-full object-cover rounded-full shadow-lg"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className="flex flex-col">
+                  <p className="text-white font-serif text-sm leading-tight">Join the <span className="italic text-[#F5DEB3]">Movement.</span></p>
+                  <p className="text-gray-400 text-[9px] font-medium leading-relaxed mt-0.5 line-clamp-2 max-w-[200px]">Tag <span className="text-white border-b border-emerald-500/50 cursor-pointer">@urbannook.store</span></p>
+                </div>
               </div>
-            </a>
+
+              <a href="https://www.instagram.com/urbannook.store/" target="_blank" rel="noopener noreferrer" className="group relative h-10 px-8 bg-white rounded-full overflow-hidden flex items-center gap-3 transition-all duration-300 hover:scale-[1.02]">
+                <div className="absolute inset-0 bg-gradient-to-r from-[#F5DEB3] to-[#F5DEB3] translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out"></div>
+                <div className="relative z-10 flex items-center gap-2.5">
+                  <i className="fa-brands fa-instagram text-base text-emerald-900"></i>
+                  <span className="text-[9px] font-black tracking-[0.2em] uppercase text-emerald-950">Follow UrbanNook</span>
+                </div>
+              </a>
+            </div>
           </div>
         </div>
 

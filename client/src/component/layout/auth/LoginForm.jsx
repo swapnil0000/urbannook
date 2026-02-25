@@ -54,7 +54,7 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
         
       showNotification('Login successful!');
       
-      if (result.userAccessToken) {
+      if (result?.data?.userAccessToken) {
         document.cookie = `userAccessToken=${result.userAccessToken}; path=/; max-age=2592000`;
         setAuthUser(result.user, result.userAccessToken);
       }
@@ -67,13 +67,16 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
         email: result.data?.email || result.user?.email || '',
         mobile: result.data?.mobileNumber || result.user?.mobile || ''
       };
-
-      console.log(userData,"userDatauserDatauserDatauserData");
       
       localStorage.setItem('user', JSON.stringify(userData));
       
-      onLoginSuccess(userData);
-      onClose();
+      if (onLoginSuccess) {
+        onLoginSuccess(userData);
+      }
+      
+      if (onClose) {
+        onClose();
+      }
     } catch (error) {
       const errorData = error?.data?.data;
       const errorMessage = error?.data?.message || 'Login failed. Please check your credentials.';
