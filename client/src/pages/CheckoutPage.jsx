@@ -288,11 +288,35 @@ const CheckoutPage = () => {
             });
           }
         } catch (error) {
-          console.error("Failed to fetch initial pricing:", error);
-          showNotification(
+          // If coupon validation fails (e.g., min cart value), remove coupon and recalculate
+          if (error?.data?.statusCode === 400 && appliedCoupon) {
+            setAppliedCoupon(null);
+            setDiscount(0);
+            try {
+              const result = await applyCouponMutation(null).unwrap();
+              if (result.success && result.data?.summary) {
+                setPricingDetails({
+                  subtotal: result.data.summary.subtotal || 0,
+                  gst: result.data.summary.gst || 0,
+                  shipping: result.data.summary.shipping || 0,
+                  discount: result.data.summary.discount || 0,
+                  grandTotal: result.data.summary.grandTotal || 0,
+                });
+              }
+            } catch (retryError) {
+              console.error("Failed to recalculate pricing:", retryError);
+              showNotification(
+            "Failed to recalculate pricing:",
+            "error",
+          );
+            }
+          } else {
+            console.error("Failed to fetch initial pricing:", error);
+            showNotification(
             "Failed to load pricing. Please refresh the page.",
             "error",
           );
+          }
         }
       }
     };
