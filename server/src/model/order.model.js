@@ -67,6 +67,28 @@ const orderSchema = new mongoose.Schema(
       long: Number,
     },
 
+    senderMobile: {
+      type: String,
+      required: false,
+      validate: {
+        validator: function(v) {
+          return !v || /^[0-9]{10}$/.test(v);
+        },
+        message: 'Sender mobile must be exactly 10 digits'
+      }
+    },
+
+    receiverMobile: {
+      type: String,
+      required: false,
+      validate: {
+        validator: function(v) {
+          return !v || /^[0-9]{10}$/.test(v);
+        },
+        message: 'Receiver mobile must be exactly 10 digits'
+      }
+    },
+
     payment: {
       razorpayOrderId: String,
       razorpayPaymentId: String,

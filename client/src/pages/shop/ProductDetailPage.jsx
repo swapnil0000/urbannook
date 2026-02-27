@@ -10,10 +10,12 @@ import {
   useAddToCartMutation, 
   useUpdateCartMutation, 
   useAddToWishlistMutation, 
-  useRemoveFromWishlistMutation 
+  useRemoveFromWishlistMutation,
+  useGetCartQuery 
 } from '../../store/api/userApi';
 import { addToWishlistLocal, removeFromWishlistLocal } from '../../store/slices/wishlistSlice';
 import { useUI } from '../../hooks/useRedux';
+import { useCartData } from '../../hooks/useCartSync';
 import OptimizedImage from '../../component/OptimizedImage';
 import LoginForm from '../../component/layout/auth/LoginForm';
 import SignupForm from '../../component/layout/auth/SignupForm';
@@ -41,6 +43,7 @@ const ProductDetailPage = () => {
   const [updateCart] = useUpdateCartMutation();
   const [addToWishlist] = useAddToWishlistMutation();
   const [removeFromWishlist] = useRemoveFromWishlistMutation();
+  const { refetch: refetchCart } = useCartData();
 
   const product = productResponse?.data;
 
@@ -101,6 +104,10 @@ const ProductDetailPage = () => {
     // Logged in user - add to backend cart
     try {
       await addToCartAPI({ productId: product?.productId, quantity: 1 }).unwrap();
+      
+      // Refresh cart data to ensure synchronization
+      await refetchCart();
+      
       setFeedbackMessage("Added");
       setTimeout(() => setFeedbackMessage(""), 2000);
     } catch (err) {
@@ -118,6 +125,9 @@ const ProductDetailPage = () => {
           quantity: 1,
           action: 'remove',
         }).unwrap();
+        
+        // Refresh cart data after removal
+        await refetchCart();
       } catch (err) {
         console.error('Remove from cart failed:', err);
         showNotification('Failed to update cart', 'error');
@@ -128,6 +138,9 @@ const ProductDetailPage = () => {
     try {
       const action = newQuantity > currentCartQty ? 'add' : 'sub';
       await updateCart({ productId: product.productId, quantity: 1, action }).unwrap();
+      
+      // Refresh cart data after update
+      await refetchCart();
     } catch (err) {
       console.error('Update failed:', err);
       window.location.reload();

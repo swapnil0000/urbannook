@@ -17,6 +17,7 @@ import {
   useCreateOrderMutation,
   useApplyCouponMutation,
 } from "../store/api/userApi";
+import { clearCartCompletely } from "../utils/cartUtils";
 import { clearCart } from "../store/slices/cartSlice";
 import { useUI } from "../hooks/useRedux";
 import CouponInput from "../component/CouponInput";
@@ -50,6 +51,12 @@ const CheckoutPage = () => {
   const [savedAddress, setSavedAddress] = useState([]);
   const [currentAddressId, setCurrentAddressId] = useState(null);
   const [isEditingMode, setIsEditingMode] = useState(false);
+  const [senderMobile, setSenderMobile] = useState("");
+  const [receiverMobile, setReceiverMobile] = useState("");
+  const [mobileErrors, setMobileErrors] = useState({
+    sender: "",
+    receiver: ""
+  });
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
   const mapElement = useRef();
   const mapRef = useRef();
@@ -331,6 +338,9 @@ const CheckoutPage = () => {
       if (userProfile.userPinCode && !pincode) {
         setPincode(userProfile.userPinCode);
       }
+      if ((userProfile?.mobileNumber || userProfile?.mobile) && !senderMobile) {
+        setSenderMobile(String(userProfile.mobileNumber || userProfile.mobile));
+      }
     }
   }, [userProfile]);
 
@@ -457,6 +467,44 @@ const CheckoutPage = () => {
     }
   };
 
+  const validateMobileNumber = (mobile) => {
+    const mobileRegex = /^[0-9]{10}$/;
+    return mobileRegex.test(mobile.trim());
+  };
+
+  const stripCountryCode = (mobile) => {
+    const trimmed = mobile?.trim();
+    // Strip +91 or 91 prefix if present
+    if (trimmed.startsWith('+91')) {
+      return trimmed.substring(3);
+    } else if (trimmed.startsWith('91') && trimmed.length === 12) {
+      return trimmed.substring(2);
+    }
+    return trimmed;
+  };
+
+  const handleMobileBlur = (field, value) => {
+    const strippedValue = stripCountryCode(value);
+    
+    // Update the field with stripped value if country code was present
+    if (strippedValue !== value.trim()) {
+      setReceiverMobile(strippedValue);
+    }
+    
+    // Only validate receiver mobile (sender mobile comes from profile)
+    if (strippedValue.trim() && !validateMobileNumber(strippedValue)) {
+      setMobileErrors(prev => ({
+        ...prev,
+        [field]: "Mobile number must be exactly 10 digits"
+      }));
+    } else {
+      setMobileErrors(prev => ({
+        ...prev,
+        [field]: ""
+      }));
+    }
+  };
+
   const handleDeleteAddress = async (addressId) => {
     if (!addressId) return;
     console.log(addressId,"==addressId");
@@ -506,6 +554,26 @@ const CheckoutPage = () => {
   };
 
   const handlePayment = async () => {
+    // Use profile mobile as sender mobile
+    const senderMobileStr = String(userProfile?.mobileNumber || userProfile?.mobile || "");
+    if (!senderMobileStr.trim()) {
+      showNotification("Please update your phone number in your profile", "error");
+      return;
+    }
+
+    // Validate sender mobile from profile
+    if (!validateMobileNumber(senderMobileStr)) {
+      showNotification("Please update your phone number in your profile with a valid 10-digit number", "error");
+      return;
+    }
+
+    // Validate receiver mobile if provided
+    const receiverMobileStr = String(receiverMobile || "");
+    if (receiverMobileStr.trim() && !validateMobileNumber(receiverMobileStr)) {
+      showNotification("Please provide a valid receiver mobile number", "error");
+      return;
+    }
+
     if (!address.trim()) {
       showNotification("Please select a delivery address.", "error");
       return;
@@ -518,6 +586,8 @@ const CheckoutPage = () => {
           productId: i.id,
           quantity: i.quantity,
         })),
+        senderMobile: senderMobileStr,
+        receiverMobile: receiverMobileStr || senderMobileStr,
       };
       const orderResult = await createOrder(orderData).unwrap();
       const res = await loadRazorpay();
@@ -537,11 +607,15 @@ const CheckoutPage = () => {
         handler: async function (response) {
           try {
             const orderId = response.razorpay_order_id;
+            
+            // Clear cart completely (both Redux and backend)
+            await clearCartCompletely(dispatch, clearCart, apiBaseUrl);
+            
             showNotification(
               `Payment successful! Order ID: ${orderId}`,
               "success",
             );
-            dispatch(clearCart());
+    
             setTimeout(() => {
               navigate("/orders");
             }, 2000);
@@ -555,7 +629,7 @@ const CheckoutPage = () => {
         prefill: {
           name: userProfile?.userName || userProfile?.name || "",
           email: userProfile?.userEmail || userProfile?.email || "",
-          contact: userProfile?.userMobileNumber || userProfile?.mobile || "",
+          contact: senderMobileStr,
         },
         notes: { address: address, pincode: pincode },
         theme: { color: "#2E443C" },
@@ -813,6 +887,25 @@ const CheckoutPage = () => {
                   <div className="w-full bg-white border border-gray-200 rounded-xl p-4 text-[#2e443c] text-sm font-medium">
                       {userProfile?.userEmail || userProfile?.email || "N/A"}
                   </div>
+                </div>
+                <div className="space-y-1.5 md:col-span-2">
+                  <label className="text-[9px] uppercase tracking-widest text-[#a89068] font-bold ml-1">
+                    Receiver&apos;s Mobile Number (Optional)
+                  </label>
+                  <input
+                    type="tel"
+                    value={receiverMobile}
+                    onChange={(e) => setReceiverMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    onBlur={() => handleMobileBlur('receiver', receiverMobile)}
+                    className={`w-full bg-white border rounded-xl p-4 text-sm text-[#2e443c] 
+                      focus:outline-none transition-all placeholder:text-gray-400
+                      ${mobileErrors?.receiver ? 'border-red-500' : 'border-gray-200 focus:border-[#a89068]'}`}
+                    placeholder="10-digit mobile number"
+                  />
+                  <p className="text-[10px] text-gray-500 ml-1">For delivery coordination calls</p>
+                  {mobileErrors?.receiver && (
+                    <p className="text-[10px] text-red-500 ml-1">{mobileErrors?.receiver}</p>
+                  )}
                 </div>
               </div>
             </div>

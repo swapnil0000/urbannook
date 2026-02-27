@@ -23,7 +23,7 @@ export const userApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: data,
       }),
-      invalidatesTags: ['User', 'Cart'],
+      invalidatesTags: ['Cart'],
     }),
     updateCart: builder.mutation({
       query: (data) => ({
@@ -31,25 +31,25 @@ export const userApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: data,
       }),
-      invalidatesTags: ['User', 'Cart'],
+      invalidatesTags: ['Cart'],
     }),
     removeFromCart: builder.mutation({
       query: (productId) => ({
         url: `user/cart/${productId}`,
         method: 'DELETE',
       }),
-      invalidatesTags: ['User', 'Cart'],
+      invalidatesTags: ['Cart'],
     }),
     getCart: builder.query({
       query: () => 'user/cart/get',
-      providesTags: ['User', 'Cart'],
+      providesTags: ['Cart'],
     }),
     clearCart: builder.mutation({
       query: () => ({
         url: 'user/cart/clear',
         method: 'DELETE',
       }),
-      invalidatesTags: ['User'],
+      invalidatesTags: ['Cart'],
     }),
 
     // Wishlist APIs

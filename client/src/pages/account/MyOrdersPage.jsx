@@ -230,6 +230,39 @@ const MyOrdersPage = () => {
                                     </div>
                                 </div>
                             )}
+
+                            {/* Contact Information */}
+                            {(order.senderMobile || order.receiverMobile) && (
+                                <div className="mt-4 p-4 bg-white rounded-xl border border-gray-200 shadow-sm">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <i className="fa-solid fa-mobile text-[#a89068] text-sm"></i>
+                                        <span className="text-xs font-bold uppercase tracking-wider text-[#a89068]">Contact Information</span>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                                        {order.senderMobile && order.receiverMobile && order.senderMobile === order.receiverMobile ? (
+                                            <div>
+                                                <span className="text-gray-400 text-xs font-bold">Contact Number:</span>
+                                                <p className="text-[#2e443c] font-medium">{order.senderMobile}</p>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                {order.senderMobile && (
+                                                    <div>
+                                                        <span className="text-gray-400 text-xs font-bold">Payment Contact:</span>
+                                                        <p className="text-[#2e443c] font-medium">{order.senderMobile}</p>
+                                                    </div>
+                                                )}
+                                                {order.receiverMobile && (
+                                                    <div>
+                                                        <span className="text-gray-400 text-xs font-bold">Delivery Contact:</span>
+                                                        <p className="text-[#2e443c] font-medium">{order.receiverMobile}</p>
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="grid gap-4">
