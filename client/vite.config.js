@@ -115,48 +115,18 @@ export default defineConfig({
         return false;
       },
       treeshake: {
-        moduleSideEffects: false,
-        propertyReadSideEffects: false,
-        tryCatchDeoptimization: false,
-        // More aggressive tree shaking
-        unknownGlobalSideEffects: false,
-        correctVarValueBeforeDeclaration: false
+        moduleSideEffects: false
       },
       output: {
-        manualChunks: (id) => {
-          // Vendor chunks - split large libraries into separate bundles
-          if (id.includes('node_modules')) {
-            // Keep React and React-DOM together to prevent createContext issues
-            if (id.includes('react') || id.includes('react-dom')) {
-              return 'react-vendor';
-            }
-            // React Router splitting
-            if (id.includes('react-router-dom') || id.includes('@remix-run/router')) {
-              return 'react-router-vendor';
-            }
-            if (id.includes('@reduxjs/toolkit') || id.includes('react-redux')) {
-              return 'redux-vendor';
-            }
-            if (id.includes('ol/')) {
-              return 'map-vendor';
-            }
-            if (id.includes('axios')) {
-              return 'http-vendor';
-            }
-            return 'vendor';
-          }
-          
-          // Route-based code splitting
-          if (id.includes('/pages/home/')) return 'home-pages';
-          if (id.includes('/pages/shop/')) return 'shop-pages';
-          if (id.includes('/pages/account/')) return 'account-pages';
-          if (id.includes('/pages/support/')) return 'support-pages';
-          if (id.includes('/pages/legal/')) return 'legal-pages';
-          if (id.includes('/pages/info/')) return 'info-pages';
-          
-          // Component chunks
-          if (id.includes('/component/layout/auth/')) return 'auth-components';
-          if (id.includes('MapModal') || id.includes('CouponList')) return 'modal-components';
+        manualChunks: {
+          // Keep all React-related code together
+          'react-vendor': ['react', 'react-dom', 'react/jsx-runtime'],
+          // Keep Redux ecosystem together
+          'redux-vendor': ['@reduxjs/toolkit', 'react-redux'],
+          // Router in separate chunk
+          'router-vendor': ['react-router-dom'],
+          // Other vendors
+          'utils-vendor': ['axios']
         },
         // Optimize asset file names
         assetFileNames: (assetInfo) => {
@@ -179,8 +149,14 @@ export default defineConfig({
   },
 
   optimizeDeps: {
-    include: ["react", "react-dom", "react/jsx-runtime"],
-    // Force pre-bundling for consistent builds
+    include: [
+      "react", 
+      "react-dom", 
+      "react/jsx-runtime",
+      "@reduxjs/toolkit",
+      "react-redux",
+      "react-router-dom"
+    ],
     force: false
   },
   
