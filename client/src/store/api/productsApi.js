@@ -48,6 +48,9 @@ export const productsApi = apiSlice.injectEndpoints({
         return `products?${params}`;
       },
       providesTags: ['Product'],
+      // Enhanced caching for featured products
+      keepUnusedDataFor: 600, // Keep for 10 minutes
+      refetchOnMountOrArgChange: 60, // Only refetch if older than 1 minute
     }),
     
     // Get product categories

@@ -32,11 +32,19 @@ const AireFeaturedProducts = memo(() => {
   }, [navigate, featuredProduct?.productId]);
 
 
-  // Loading state
+  // Loading state - show skeleton instead of full loader
   if (isLoading) {
     return (
       <section className="relative mx-2 my-2 md:mx-4 md:my-4 rounded-[2rem] md:rounded-[3rem] overflow-hidden bg-[#2e443c] shadow-2xl flex items-center justify-center min-h-[85vh] lg:h-[calc(100vh-2rem)] lg:max-h-[1080px] border border-white/5">
-        <div className="w-16 h-16 border border-[#F5DEB3] rounded-full animate-spin border-t-transparent"></div>
+        {/* Skeleton loader instead of spinner */}
+        <div className="w-full h-full flex flex-col lg:flex-row items-center justify-between gap-8 lg:gap-12 p-6 md:p-10">
+          <div className="w-full lg:w-[45%] space-y-4">
+            <div className="h-8 bg-white/10 rounded animate-pulse"></div>
+            <div className="h-12 bg-white/10 rounded animate-pulse"></div>
+            <div className="h-6 bg-white/10 rounded animate-pulse w-3/4"></div>
+          </div>
+          <div className="w-full lg:w-[45%] h-[400px] bg-white/10 rounded-[2.5rem] animate-pulse"></div>
+        </div>
       </section>
     );
   }
