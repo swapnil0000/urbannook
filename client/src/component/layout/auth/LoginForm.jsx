@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
 import ForgotPassword from './ForgotPassword';
 import OTPVerification from './OTPVerification';
 import { useLoginMutation } from '../../../store/api/authApi';
 import { useAuth, useUI } from '../../../hooks/useRedux';
+import { setShowLoginModal } from '../../../store/slices/uiSlice';
 
 const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [formData, setFormData] = useState({ identifier: '', password: '' });
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showOTPVerification, setShowOTPVerification] = useState(false);
@@ -70,6 +73,9 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
         onLoginSuccess(userData);
       }
       
+      // Reset Redux login modal state
+      dispatch(setShowLoginModal(false));
+      
       if (onClose) {
         onClose();
       }
@@ -117,7 +123,10 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[100] p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[100] p-4" onClick={() => {
+      dispatch(setShowLoginModal(false));
+      onClose();
+    }}>
       
       {/* Matches SignupForm Dimensions & Style */}
       <div 
@@ -168,7 +177,10 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
         <div className="w-full md:w-7/12 overflow-y-auto px-8 py-10 md:p-12 relative flex flex-col justify-center">
           <button 
             className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:text-[#1c3026] transition-colors z-20"
-            onClick={onClose}
+            onClick={() => {
+              dispatch(setShowLoginModal(false));
+              onClose();
+            }}
           >
             <i className="fa-solid fa-xmark"></i>
           </button>

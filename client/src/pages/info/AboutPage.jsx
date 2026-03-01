@@ -1,5 +1,4 @@
 import React, { useEffect } from 'react';
-import { motion } from 'framer-motion';
 
 const aboutValues = [
     {
@@ -33,17 +32,6 @@ const AboutPage = () => {
       window.scrollTo(0, 0);
     }, []);
 
-    // Animation Variants
-    const fadeIn = {
-      hidden: { opacity: 0, y: 30 },
-      visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: "easeOut" } }
-    };
-
-    const stagger = {
-      hidden: { opacity: 0 },
-      visible: { opacity: 1, transition: { staggerChildren: 0.15 } }
-    };
-
   return (
     // BASE: New Dark Green Background
     <div className="bg-[#2e443c] min-h-screen text-[#E2E8F0] font-sans relative selection:bg-[#a89068] selection:text-white overflow-x-hidden">
@@ -59,34 +47,29 @@ const AboutPage = () => {
         <div className="absolute top-[-20%] right-[-10%] w-[800px] h-[800px] bg-gradient-to-b from-[#1a2822] to-transparent rounded-full blur-[120px] pointer-events-none opacity-60"></div>
         
         <div className="max-w-7xl mx-auto relative z-10 w-full">
-            <motion.div 
-              initial="hidden"
-              animate="visible"
-              variants={stagger}
-              className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center mb-12"
-            >
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center mb-12">
                 
                 {/* LEFT: Text Content */}
                 <div className="lg:col-span-7">
-                    <motion.div variants={fadeIn} className="flex items-center gap-4 mb-8">
+                    <div className="flex items-center gap-4 mb-8">
                         <span className="h-[1px] w-12 bg-[#F5DEB3]"></span>
                         <span className="text-[10px] font-bold tracking-[0.3em] text-[#F5DEB3] uppercase">
                             Our Urbannook Story
                         </span>
-                    </motion.div>
+                    </div>
                     
-                    <motion.h1 variants={fadeIn} className="text-4xl md:text-6xl lg:text-7xl font-serif text-white leading-[1.05] mb-8">
+                    <h1 className="text-4xl md:text-6xl lg:text-7xl font-serif text-white leading-[1.05] mb-8">
                         Designing calm corners <br />
                         <span className="italic text-[#F5DEB3] font-light">for chaotic lives.</span>
-                    </motion.h1>
+                    </h1>
                     
-                    <motion.p variants={fadeIn} className="text-lg md:text-xl text-gray-300 font-light leading-relaxed max-w-lg">
+                    <p className="text-lg md:text-xl text-gray-300 font-light leading-relaxed max-w-lg">
                         Your Home Should Tell The Story Of Who You Are, And Be A Collection Of What You Love.
-                    </motion.p>
+                    </p>
                 </div>
 
                 {/* RIGHT: Visual Element (Badge) */}
-                <motion.div variants={fadeIn} className="hidden md:flex lg:col-span-5 relative">
+                <div className="hidden md:flex lg:col-span-5 relative">
                     <div className="relative w-full aspect-square max-w-md mx-auto rounded-full border border-white/10 flex items-center justify-center p-8 bg-gradient-to-br from-white/5 to-transparent backdrop-blur-sm shadow-2xl">
                         {/* Spinning Dashed Ring */}
                         <div className="absolute inset-4 rounded-full border border-dashed border-[#a89068]/30 animate-[spin_40s_linear_infinite]"></div>
@@ -99,9 +82,9 @@ const AboutPage = () => {
                             <p className="text-sm text-[#a89068] uppercase tracking-widest font-bold">Est. 2026 • India</p>
                         </div>
                     </div>
-                </motion.div>
+                </div>
 
-            </motion.div>
+            </div>
         </div>
       </section>
 
@@ -181,12 +164,8 @@ const AboutPage = () => {
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {aboutValues.map((val, i) => (
-                    <motion.div 
+                    <div 
                         key={val.id} 
-                        initial={{ opacity: 0, y: 20 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        transition={{ delay: i * 0.1 }}
                         className="group p-8 md:p-10 rounded-[2rem] bg-[#f5f7f8] border border-transparent hover:border-[#a89068]/50 hover:shadow-[0_0_30px_rgba(168,144,104,0.15)] transition-all duration-500 cursor-default"
                     >
                         <div className="flex justify-between items-start mb-8">
@@ -201,7 +180,7 @@ const AboutPage = () => {
                         <p className="text-sm text-gray-600 font-light leading-relaxed">
                             {val.desc}
                         </p>
-                    </motion.div>
+                    </div>
                 ))}
             </div>
         </div>

@@ -1,8 +1,9 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import PlaceholderImage from '../../component/PlaceholderImage';
-import WishlistButton from '../../component/WishlistButton';
 import { useGetProductsQuery } from '../../store/api/productsApi';
+
+const PlaceholderImage = lazy(() => import('../../component/PlaceholderImage'));
+const WishlistButton = lazy(() => import('../../component/WishlistButton'));
 
 const AllProductsPage = () => {
   const navigate = useNavigate();
@@ -40,7 +41,7 @@ const AllProductsPage = () => {
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#F5DEB3]/5 rounded-full blur-[120px] pointer-events-none"></div>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-8 md:pt-34 md:pb-5 px-6 relative z-10">
+      <section className="pt-[5rem] pb-8 md:pt-[7rem] md:pb-5 px-6 relative z-10">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-end gap-10">
           
           {/* LEFT SIDE: Heading & Description */}
@@ -96,7 +97,9 @@ const AllProductsPage = () => {
                 >
                   {/* Wishlist Button (Floating Top Right) */}
                   <div className="absolute top-4 right-4 z-20">
-                     <WishlistButton productId={product.productId} />
+                    <Suspense fallback={<div className="w-8 h-8 bg-white/20 rounded-full animate-pulse"></div>}>
+                      <WishlistButton productId={product.productId} />
+                    </Suspense>
                   </div>
 
                   {/* Clickable Card Area */}

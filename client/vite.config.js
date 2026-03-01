@@ -93,25 +93,74 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000,
     
     // Asset optimization settings
-    assetsInlineLimit: 4096, // Inline assets smaller than 4KB as base64
-    cssCodeSplit: true, // Split CSS into separate files per chunk
+    assetsInlineLimit: 4096,
+    cssCodeSplit: true,
     
     // Minification options
     target: 'es2015',
     cssMinify: true,
     
-    // Esbuild minification options (remove console.log in production)
+    // Esbuild minification options
     esbuild: {
       drop: ['console', 'debugger'],
+      // Faster builds with parallel processing
+      platform: 'browser',
+      format: 'esm'
     },
     
     rollupOptions: {
+      // Force externalize React Router to separate chunk
+      external: (id) => {
+        // Don't externalize, but this helps with chunking
+        return false;
+      },
+      treeshake: {
+        moduleSideEffects: false,
+        propertyReadSideEffects: false,
+        tryCatchDeoptimization: false,
+        // More aggressive tree shaking
+        unknownGlobalSideEffects: false,
+        correctVarValueBeforeDeclaration: false
+      },
       output: {
-        manualChunks: {
+        manualChunks: (id) => {
           // Vendor chunks - split large libraries into separate bundles
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'redux-vendor': ['@reduxjs/toolkit', 'react-redux'],
-          'ui-vendor': ['framer-motion', 'lucide-react'],
+          if (id.includes('node_modules')) {
+            // More specific React Router splitting
+            if (id.includes('react-router-dom') || id.includes('@remix-run/router')) {
+              return 'react-router-vendor';
+            }
+            // React DOM splitting
+            if (id.includes('react-dom')) {
+              return 'react-dom-vendor';
+            }
+            // Core React (must be last to avoid conflicts)
+            if (id.includes('react/') || id.includes('react\\') || id.endsWith('react')) {
+              return 'react-vendor';
+            }
+            if (id.includes('@reduxjs/toolkit') || id.includes('react-redux')) {
+              return 'redux-vendor';
+            }
+            if (id.includes('ol/')) {
+              return 'map-vendor';
+            }
+            if (id.includes('axios')) {
+              return 'http-vendor';
+            }
+            return 'vendor';
+          }
+          
+          // Route-based code splitting
+          if (id.includes('/pages/home/')) return 'home-pages';
+          if (id.includes('/pages/shop/')) return 'shop-pages';
+          if (id.includes('/pages/account/')) return 'account-pages';
+          if (id.includes('/pages/support/')) return 'support-pages';
+          if (id.includes('/pages/legal/')) return 'legal-pages';
+          if (id.includes('/pages/info/')) return 'info-pages';
+          
+          // Component chunks
+          if (id.includes('/component/layout/auth/')) return 'auth-components';
+          if (id.includes('MapModal') || id.includes('CouponList')) return 'modal-components';
         },
         // Optimize asset file names
         assetFileNames: (assetInfo) => {
@@ -135,6 +184,8 @@ export default defineConfig({
 
   optimizeDeps: {
     include: ["react", "react-dom"],
+    // Force pre-bundling for consistent builds
+    force: false
   },
   
   // Enable compression

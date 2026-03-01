@@ -1,13 +1,15 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense, useMemo } from 'react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { useGetWishlistQuery,  } from '../../store/api/userApi';
 import { logout as logoutAction } from '../../store/slices/authSlice';
 import { setShowLoginModal } from '../../store/slices/uiSlice';
-import SignupForm from './auth/SignupForm';
-import LoginForm from './auth/LoginForm';
 import { useLogoutMutation } from '../../store/api/authApi';
-import CartDrawer from './CartDrawer';
+import { lazy } from 'react';
+
+const SignupForm = lazy(() => import('./auth/SignupForm'));
+const LoginForm = lazy(() => import('./auth/LoginForm'));
+const CartDrawer = lazy(() => import('./CartDrawer'));
 
 const NewHeader = () => {
   const location = useLocation();
@@ -31,7 +33,7 @@ const NewHeader = () => {
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   
   // Get wishlist count from Redux
-  const wishlistCount = wishlistItems.length;
+  const wishlistCount = wishlistItems?.length;
   
   // Fetch wishlist data - only when authenticated
   useGetWishlistQuery(undefined, { 
@@ -50,6 +52,16 @@ const NewHeader = () => {
     if (path === '/about-us') return 'about-us';
     return '';
   };
+
+  // Memoize expensive calculations
+  const navLinks = useMemo(() => [
+    { name: 'Home', path: '/', key: 'home' },
+    { name: 'Shop', path: '/products', key: 'products' },
+    { name: 'About Us', path: '/about-us', key: 'about-us' },
+    { name: 'Contact Us', path: '/contact-us', key: 'support' },
+  ], []);
+
+  const activeRoute = useMemo(() => getActiveRoute(), [location.pathname]);
 
   // Sync User from LocalStorage
   useEffect(() => {
@@ -70,6 +82,9 @@ const NewHeader = () => {
   useEffect(() => {
     if (showLoginModal) {
       setShowLogin(true);
+    } else {
+      // Reset local state when Redux state is false
+      setShowLogin(false);
     }
   }, [showLoginModal]);
 
@@ -145,13 +160,7 @@ const NewHeader = () => {
   };
   // -------------------------------
 
-  // Navigation Items Configuration
-  const navLinks = [
-    { name: 'Home', path: '/', key: 'home' },
-    { name: 'Shop', path: '/products', key: 'products' },
-    { name: 'About Us', path: '/about-us', key: 'about-us' },
-    { name: 'Contact Us', path: '/contact-us', key: 'support' },
-  ];
+  // Navigation Items Configuration - moved after useMemo
 
   return (
     <>
@@ -201,7 +210,7 @@ const NewHeader = () => {
               {/* Desktop Nav */}
               <nav className="hidden lg:flex items-center gap-1 bg-white/40 p-1.5 rounded-full border border-white/20 shadow-sm backdrop-blur-md">
                 {navLinks.map((item) => {
-                  const isActive = getActiveRoute() === item.key;
+                  const isActive = activeRoute === item.key;
                   return (
                     <Link 
                       key={item.key}
@@ -390,7 +399,7 @@ const NewHeader = () => {
               {/* 2. MAIN NAVIGATION LIST */}
               <nav className="flex flex-col gap-2 flex-shrink-0">
                 {navLinks.map((item) => {
-                  const isActive = getActiveRoute() === item.key;
+                  const isActive = activeRoute === item.key;
                   // Map specific icons for each route
                   const icons = {
                     home: 'fa-house',
@@ -433,38 +442,44 @@ const NewHeader = () => {
       </header>
       
       {/* --- MODALS --- */}
-      {showLogin && (
-        <LoginForm 
-          onClose={() => {
-            setShowLogin(false);
-            dispatch(setShowLoginModal(false));
-          }}
-          onLoginSuccess={(u) => { 
-            setUser(u); 
-            setShowLogin(false); 
-            dispatch(setShowLoginModal(false));
-          }}
-          onSwitchToSignup={() => { 
-            setShowLogin(false); 
-            setShowSignup(true); 
-            dispatch(setShowLoginModal(false));
-          }}
-        />
-      )}
+      <Suspense fallback={
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60">
+          <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      }>
+        {showLogin && (
+          <LoginForm 
+            onClose={() => {
+              setShowLogin(false);
+              dispatch(setShowLoginModal(false));
+            }}
+            onLoginSuccess={(u) => { 
+              setUser(u); 
+              setShowLogin(false); 
+              dispatch(setShowLoginModal(false));
+            }}
+            onSwitchToSignup={() => { 
+              setShowLogin(false); 
+              setShowSignup(true); 
+              dispatch(setShowLoginModal(false));
+            }}
+          />
+        )}
 
-      {showSignup && (
-        <SignupForm 
-          onClose={() => setShowSignup(false)}
-          onSignupSuccess={(u) => { setUser(u); setShowSignup(false); }}
-          onSwitchToLogin={() => { setShowSignup(false); setShowLogin(true); }}
-        />
-      )}
+        {showSignup && (
+          <SignupForm 
+            onClose={() => setShowSignup(false)}
+            onSignupSuccess={(u) => { setUser(u); setShowSignup(false); }}
+            onSwitchToLogin={() => { setShowSignup(false); setShowLogin(true); }}
+          />
+        )}
 
-      <CartDrawer 
-        isOpen={showCart} 
-        onClose={() => setShowCart(false)} 
-        cartItems={cartItems} 
-      />
+        <CartDrawer 
+          isOpen={showCart} 
+          onClose={() => setShowCart(false)} 
+          cartItems={cartItems} 
+        />
+      </Suspense>
     </>
   );
 };

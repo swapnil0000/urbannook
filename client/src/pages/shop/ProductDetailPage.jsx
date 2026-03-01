@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { useCookies } from 'react-cookie';
-import { motion, AnimatePresence } from 'framer-motion';
 
 // API & Redux imports
 import { useGetProductByIdQuery } from '../../store/api/productsApi';
@@ -16,9 +15,10 @@ import {
 import { addToWishlistLocal, removeFromWishlistLocal } from '../../store/slices/wishlistSlice';
 import { useUI } from '../../hooks/useRedux';
 import { useCartData } from '../../hooks/useCartSync';
-import OptimizedImage from '../../component/OptimizedImage';
-import LoginForm from '../../component/layout/auth/LoginForm';
-import SignupForm from '../../component/layout/auth/SignupForm';
+
+const OptimizedImage = lazy(() => import('../../component/OptimizedImage'));
+const LoginForm = lazy(() => import('../../component/layout/auth/LoginForm'));
+const SignupForm = lazy(() => import('../../component/layout/auth/SignupForm'));
 
 const ProductDetailPage = () => {
   const { productId } = useParams();
@@ -46,9 +46,6 @@ const ProductDetailPage = () => {
   const { refetch: refetchCart } = useCartData();
 
   const product = productResponse?.data;
-
-  console.log(product,"productproductproduct")
-
   // 4. Derived State
   const cartItem = cartItems.find(item => 
     String(item.id) === String(product?.productId) || 
@@ -234,7 +231,7 @@ const ProductDetailPage = () => {
       {/* Main Container */}
       <main className="mx-auto pt-24 pb-32 lg:pt-36 lg:pb-20 px-4 lg:px-12 relative z-10">
         {/* Breadcrumbs */}
-        <motion.nav
+        <nav
           initial={{ opacity: 0 }} 
           animate={{ opacity: 1 }} 
           transition={{ delay: 0.2 }}
@@ -248,11 +245,11 @@ const ProductDetailPage = () => {
           <span className="text-[#F5DEB3] font-bold border-b border-[#F5DEB3]/30 pb-0.5 hidden lg:inline">
             {product.productName}
           </span>
-        </motion.nav>
+        </nav>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-20 items-start">
           {/* --- LEFT: IMAGE GALLERY --- */}
-          <motion.div
+          <div
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
@@ -263,8 +260,7 @@ const ProductDetailPage = () => {
             <div className="relative max-w-[500px]  max-h-[520px] lg:max-h-[600px]  rounded-2xl overflow-hidden shadow-2xl  group mx-auto w-full">
               {/* Product Image */}
               <div className="w-full h-full relative cursor-pointer flex items-center justify-center">
-                <AnimatePresence mode="wait">
-                  <motion.div
+                  <div
                     key={currentImageIndex}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -272,14 +268,15 @@ const ProductDetailPage = () => {
                     transition={{ duration: 0.5 }}
                     // className="w-full h-full"
                   >
-                    <OptimizedImage
-                      src={galleryImages[currentImageIndex] || '/placeholder.jpg'}
-                      alt={product.productName}
-                      className="object-contain "
-                      loading="eager"
-                    />
-                  </motion.div>
-                </AnimatePresence>
+                    <Suspense fallback={<div className="w-full h-full bg-gray-200 animate-pulse rounded-lg"></div>}>
+                      <OptimizedImage
+                        src={galleryImages[currentImageIndex] || '/placeholder.jpg'}
+                        alt={product.productName}
+                        className="object-contain "
+                        loading="eager"
+                      />
+                    </Suspense>
+                  </div>
               </div>
 
               {/* Slider Arrows */}
@@ -313,19 +310,21 @@ const ProductDetailPage = () => {
                       : 'border-transparent opacity-60'
                   }`}
                 >
-                  <OptimizedImage
-                    src={img}
-                    alt={`Product thumbnail ${idx + 1}`}
-                    className="w-full h-full object-contain p-1"
-                    loading="lazy"
-                  />
+                  <Suspense fallback={<div className="w-full h-full bg-gray-200 animate-pulse"></div>}>
+                    <OptimizedImage
+                      src={img}
+                      alt={`Product thumbnail ${idx + 1}`}
+                      className="w-full h-full object-contain p-1"
+                      loading="lazy"
+                    />
+                  </Suspense>
                 </button>
               ))}
             </div>
-          </motion.div>
+          </div>
 
           {/* --- RIGHT: PRODUCT INFO --- */}
-          <motion.div
+          <div
             variants={fadeIn}
             initial="hidden"
             animate="visible"
@@ -457,12 +456,12 @@ const ProductDetailPage = () => {
                 Handcrafted with premium materials. Wipe clean with a soft, dry cloth.
               </AccordionItem>
             </div>
-          </motion.div>
+          </div>
         </div>
       </main>
 
       {/* --- MOBILE STICKY BOTTOM BAR --- */}
-      <motion.div
+      <div
         initial={{ y: 100 }}
         animate={{ y: 0 }}
         transition={{ delay: 0.5 }}
@@ -514,39 +513,43 @@ const ProductDetailPage = () => {
         >
           <i className={`${isInWishlist ? 'fa-solid' : 'fa-regular'} fa-heart`}></i>
         </button>
-      </motion.div>
+      </div>
 
       {/* Feedback Toast */}
-      <AnimatePresence>
         {feedbackMessage && (
-          <motion.div
+          <div
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 50 }}
             className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-[#F5DEB3] text-[#1c3026] px-6 py-3 rounded-full shadow-2xl z-[60] flex items-center gap-2 font-bold text-xs uppercase tracking-widest"
           >
             <i className="fa-solid fa-check-circle"></i> {feedbackMessage}
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
 
       {/* Login Modal */}
-      {showLoginModal && (
-        <LoginForm 
-          onClose={closeLoginModal}
-          onLoginSuccess={() => closeLoginModal()}
-          onSwitchToSignup={() => { closeLoginModal(); setShowSignup(true); }}
-        />
-      )}
+      <Suspense fallback={
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60">
+          <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      }>
+        {showLoginModal && (
+          <LoginForm 
+            onClose={closeLoginModal}
+            onLoginSuccess={() => closeLoginModal()}
+            onSwitchToSignup={() => { closeLoginModal(); setShowSignup(true); }}
+          />
+        )}
 
-      {/* Signup Modal */}
-      {showSignup && (
-        <SignupForm 
-          onClose={() => setShowSignup(false)}
-          onSignupSuccess={() => setShowSignup(false)}
-          onSwitchToLogin={() => { setShowSignup(false); openLoginModal(); }}
-        />
-      )}
+        {/* Signup Modal */}
+        {showSignup && (
+          <SignupForm 
+            onClose={() => setShowSignup(false)}
+            onSignupSuccess={() => setShowSignup(false)}
+            onSwitchToLogin={() => { setShowSignup(false); openLoginModal(); }}
+          />
+        )}
+      </Suspense>
     </div>
   );
 };
@@ -567,9 +570,8 @@ const AccordionItem = ({ title, isOpen, onClick, children }) => (
         <i className="fa-solid fa-chevron-down"></i>
       </span>
     </button>
-    <AnimatePresence>
       {isOpen && (
-        <motion.div
+        <div
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: 'auto', opacity: 1 }}
           exit={{ height: 0, opacity: 0 }}
@@ -578,9 +580,8 @@ const AccordionItem = ({ title, isOpen, onClick, children }) => (
           <div className="pb-6 text-gray-300 text-sm leading-relaxed font-light">
             {children}
           </div>
-        </motion.div>
+        </div>
       )}
-    </AnimatePresence>
   </div>
 );
 

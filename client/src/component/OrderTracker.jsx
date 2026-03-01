@@ -1,5 +1,4 @@
 import React from 'react';
-import { CheckCircle, Package, Truck, Home, XCircle } from 'lucide-react';
 
 const OrderTracker = ({ status }) => {
   // Define order flow steps

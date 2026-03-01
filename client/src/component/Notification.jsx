@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { useUI } from '../hooks/useRedux';
-import { motion, AnimatePresence } from 'framer-motion';
 
 const Notification = () => {
   const { notification } = useSelector((state) => state.ui);
@@ -55,12 +54,9 @@ const Notification = () => {
 
   return (
     <div className="fixed top-24 right-0 left-0 md:left-auto md:right-6 z-[9999] flex justify-center md:justify-end px-4 pointer-events-none">
-      <AnimatePresence>
+      <div className={`transform transition-all duration-300 ${notification ? 'translate-y-0 opacity-100 scale-100' : '-translate-y-5 opacity-0 scale-95 pointer-events-none'}`}>
         {notification && (
-          <motion.div
-            initial={{ opacity: 0, y: -20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+          <div
             className={`
                 pointer-events-auto
                 relative overflow-hidden
@@ -100,18 +96,26 @@ const Notification = () => {
 
             {/* Progress Bar Animation */}
             <div className="h-1 w-full bg-black/20">
-                <motion.div 
-                    initial={{ width: "100%" }}
-                    animate={{ width: "0%" }}
-                    transition={{ duration: 4, ease: "linear" }}
-                    className={`h-full ${style.color.replace('text-', 'bg-')}`} 
-                />
+                <div className={`h-full ${style.color.replace('text-', 'bg-')} animate-[shrink_4s_linear_forwards]`} />
             </div>
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
+      </div>
     </div>
   );
 };
+
+// Add CSS animation for progress bar
+const styleSheet = document.createElement('style');
+styleSheet.textContent = `
+  @keyframes shrink {
+    from { width: 100%; }
+    to { width: 0%; }
+  }
+`;
+if (!document.head.querySelector('style[data-notification-styles]')) {
+  styleSheet.setAttribute('data-notification-styles', 'true');
+  document.head.appendChild(styleSheet);
+}
 
 export default Notification;

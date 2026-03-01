@@ -120,6 +120,50 @@ export const userApi = apiSlice.injectEndpoints({
         body: contactData,
       }),
     }),
+
+    // Address APIs
+    searchAddress: builder.mutation({
+      query: (searchInput) => ({
+        url: 'user/address/search',
+        method: 'POST',
+        body: { userSearchInput: searchInput },
+      }),
+    }),
+    getAddressSuggestions: builder.mutation({
+      query: ({ lat, long }) => ({
+        url: 'user/address/suggestion',
+        method: 'POST',
+        body: { lat, long },
+      }),
+    }),
+    createAddress: builder.mutation({
+      query: (addressData) => ({
+        url: 'user/address/create',
+        method: 'POST',
+        body: addressData,
+      }),
+      invalidatesTags: ['Address'],
+    }),
+    getSavedAddresses: builder.query({
+      query: () => 'user/address/saved',
+      providesTags: ['Address'],
+    }),
+    updateAddress: builder.mutation({
+      query: (addressData) => ({
+        url: 'user/address/update',
+        method: 'POST',
+        body: addressData,
+      }),
+      invalidatesTags: ['Address'],
+    }),
+    deleteAddress: builder.mutation({
+      query: (addressId) => ({
+        url: 'user/address/delete',
+        method: 'POST',
+        body: { addressId },
+      }),
+      invalidatesTags: ['Address'],
+    }),
   }),
 });
 
@@ -141,4 +185,10 @@ export const {
   useCreateOrderMutation,
   useJoinCommunityMutation,
   useSubmitContactMutation,
+  useSearchAddressMutation,
+  useGetAddressSuggestionsMutation,
+  useCreateAddressMutation,
+  useGetSavedAddressesQuery,
+  useUpdateAddressMutation,
+  useDeleteAddressMutation,
 } = userApi;

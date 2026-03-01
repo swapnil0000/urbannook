@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+
 
 const CustomerSupportPage = () => {
     const [activeTab, setActiveTab] = useState('contact');
@@ -87,28 +87,16 @@ const CustomerSupportPage = () => {
                             >
                                 {tab === 'contact' ? 'Message Us' : 'Common Queries'}
                                 {activeTab === tab && (
-                                    <motion.div
-                                        layoutId="activeTab"
-                                        className="absolute inset-0 bg-[#a89068] rounded-full -z-10 shadow-lg shadow-[#a89068]/20"
-                                    />
+                                    <div className="absolute inset-0 bg-[#a89068] rounded-full -z-10 shadow-lg shadow-[#a89068]/20" />
                                 )}
                             </button>
                         ))}
                     </div>
                 </div>
 
-                <AnimatePresence mode="wait">
-
                     {/* --- CONTACT FORM TAB --- */}
                     {activeTab === 'contact' && (
-                        <motion.div
-                            key="contact"
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -20 }}
-                            transition={{ duration: 0.3 }}
-                            className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start"
-                        >
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
                             {/* Left: Interactive Form (LIGHT BOX) */}
                             <div className="lg:col-span-8 bg-[#f5f7f8] border border-transparent rounded-[24px] p-6 md:p-8 shadow-xl">
                                 <div className="mb-8 border-b border-gray-200 pb-6">
@@ -240,18 +228,12 @@ const CustomerSupportPage = () => {
                                 </a>
                             </div>
 
-                        </motion.div>
+                        </div>
                     )}
 
                     {/* --- FAQ TAB (LIGHT BOX) --- */}
                     {activeTab === 'faq' && (
-                        <motion.div
-                            key="faq"
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -20 }}
-                            transition={{ duration: 0.3 }}
-                        >
+                        <div>
                             <div className="bg-[#f5f7f8] border border-transparent rounded-[24px] overflow-hidden shadow-xl">
                                 {faqs.map((faq, index) => (
                                     <div key={faq.id} className="border-b border-gray-200 last:border-0">
@@ -266,20 +248,11 @@ const CustomerSupportPage = () => {
                                                 <i className="fa-solid fa-chevron-down text-xs"></i>
                                             </span>
                                         </button>
-                                        <AnimatePresence>
-                                            {expandedFaq === index && (
-                                                <motion.div
-                                                    initial={{ height: 0, opacity: 0 }}
-                                                    animate={{ height: 'auto', opacity: 1 }}
-                                                    exit={{ height: 0, opacity: 0 }}
-                                                    className="overflow-hidden bg-white"
-                                                >
+                                        <div className={`overflow-hidden bg-white transition-all duration-300 ${expandedFaq === index ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
                                                     <div className="px-6 md:px-8 pb-8 text-gray-500 text-sm leading-relaxed font-light">
                                                         {faq.answer}
                                                     </div>
-                                                </motion.div>
-                                            )}
-                                        </AnimatePresence>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -293,10 +266,8 @@ const CustomerSupportPage = () => {
                                     Write to us directly
                                 </button>
                             </div>
-                        </motion.div>
+                        </div>
                     )}
-
-                </AnimatePresence>
             </main>
 
         </div>
