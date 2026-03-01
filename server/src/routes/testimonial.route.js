@@ -7,7 +7,7 @@ import { testimonialRateLimiter } from "../middleware/rateLimiter.middleware.js"
 import { sanitizeTestimonialInput } from "../middleware/sanitization.middleware.js";
 
 const testimonialRouter = Router();
-testimonialRouter.get("/", getTestimonials);
+testimonialRouter.get("/testimonials", getTestimonials);
 testimonialRouter.post(
   "/",
   testimonialRateLimiter,

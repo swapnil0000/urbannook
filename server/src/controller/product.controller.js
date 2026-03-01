@@ -81,86 +81,58 @@ const productListing = asyncHandler(async (req, res) => {
 
 const specificProductDetails = asyncHandler(async (req, res) => {
   const { productId } = req.params;
-  if (!productId) {
-    throw new NotFoundError("Product ID is missing");
-  }
-  const productDetails = await Product.findOne({
-    productId,
-  }).select("-_id");
-  if (!productDetails) {
-    throw new NotFoundError("Product Doesn't exist");
-  }
-  return res
-    .status(200)
-    .json(new ApiRes(200, `Product Details`, productDetails, true));
+
+  const fetcher = async () => {
+    const productDetails = await Product.findOne({
+      productId,
+      isPublished: true,
+    }).select("-_id -createdAt -updatedAt -__v");
+
+    if (!productDetails) {
+      throw new NotFoundError("Product Doesn't exist");
+    }
+
+    return productDetails;
+  };
+
+  const result = await apiCache.handle(req.params, fetcher);
+  return res.status(200).json(new ApiRes(200, `Product Details`, result, true));
 });
 
 const getProductsByTag = asyncHandler(async (_, res) => {
-  // const tags = ["featured", "new_arrival", "best_seller", "trending"];
-  const productStatus = "in_stock";
-  const productDetails = await Product.aggregate([
-    {
-      $match: { productStatus },
-    },
-    {
-      $project: {
-        productName: 1,
-        productId: 1,
-        uiProductId: 1,
-        productImg: 1,
-        sellingPrice: 1,
-        _id: 0,
-        tags: 1,
+  const fetcher = async () => {
+    const productDetails = await Product.aggregate([
+      {
+        $match: {
+          isPublished: true,
+        },
       },
-    },
-    {
-      $facet: {
-        featured: [
-          {
-            $match: {
-              tags: "featured",
-            },
-          },
-          {
-            $limit: 2,
-          },
-        ],
-        new_arrival: [
-          {
-            $match: {
-              tags: "new_arrival",
-            },
-          },
-          {
-            $limit: 2,
-          },
-        ],
-        best_seller: [
-          {
-            $match: {
-              tags: "best_seller",
-            },
-          },
-          {
-            $limit: 2,
-          },
-        ],
-        trending: [
-          {
-            $match: {
-              tags: "trending",
-            },
-          },
-          {
-            $limit: 2,
-          },
-        ],
+      {
+        $project: {
+          productName: 1,
+          productId: 1,
+          uiProductId: 1,
+          productImg: 1,
+          sellingPrice: 1,
+          _id: 0,
+          tags: 1,
+        },
       },
-    },
-  ]);
-  return res
-    .status(200)
-    .json(new ApiRes(200, `productDetails`, productDetails, true));
+      {
+        $facet: {
+          featured: [{ $match: { tags: "featured" } }, { $limit: 2 }],
+          new_arrival: [{ $match: { tags: "new_arrival" } }, { $limit: 2 }],
+          best_seller: [{ $match: { tags: "best_seller" } }, { $limit: 2 }],
+          trending: [{ $match: { tags: "trending" } }, { $limit: 2 }],
+        },
+      },
+    ]);
+    return productDetails[0];
+  };
+
+  const result = await apiCache.handle("products_by_tags", fetcher);
+
+  return res.status(200).json(new ApiRes(200, `productDetails`, result, true));
 });
 
 export { productListing, specificProductDetails, getProductsByTag };
