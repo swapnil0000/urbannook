@@ -9,7 +9,7 @@ import { sanitizeTestimonialInput } from "../middleware/sanitization.middleware.
 const testimonialRouter = Router();
 testimonialRouter.get("/testimonials", getTestimonials);
 testimonialRouter.post(
-  "/",
+  "/testimonials",  // Fixed: Match the GET route
   testimonialRateLimiter,
   sanitizeTestimonialInput,
   submitTestimonial,

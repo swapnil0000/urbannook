@@ -346,14 +346,17 @@ const ProductDetailPage = () => {
                 {product.productName}
               </h1>
 
-              <div className="flex items-baseline gap-4">
+              <div className="flex items-baseline gap-4 mb-2">
                 <p className="text-2xl lg:text-3xl font-light text-white">
                   ₹{product.sellingPrice?.toLocaleString()}
                 </p>
                 <p className="text-sm text-gray-500 line-through">
-                  ₹{(product.sellingPrice * 1.2).toFixed(0)}
+                  ₹{product.listedPrice?.toLocaleString() || (product.sellingPrice * 1.18).toFixed(0)}
                 </p>
               </div>
+              <p className="text-[10px] text-[#F5DEB3]/60 uppercase tracking-wider">
+                + ₹50 shipping at checkout
+              </p>
             </div>
 
             {/* Description */}
@@ -408,11 +411,34 @@ const ProductDetailPage = () => {
             {/* Accordions */}
             <div className="border-t border-[#F5DEB3]/10">
               <AccordionItem
+                title="Price Breakdown"
+                isOpen={activeAccordion === 'pricing'}
+                onClick={() => setActiveAccordion(activeAccordion === 'pricing' ? '' : 'pricing')}
+              >
+                <div className="space-y-3 bg-white/5 p-4 rounded-xl">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-300">Base Price</span>
+                    <span className="text-white font-medium">₹{product.sellingPrice?.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-300">GST (18%)</span>
+                    <span className="text-white font-medium">₹{(product.sellingPrice * 0.18).toFixed(2)}</span>
+                  </div>
+                  <div className="h-px bg-[#F5DEB3]/20 my-2"></div>
+                  <div className="flex justify-between text-base font-bold">
+                    <span className="text-[#F5DEB3]">Total Price</span>
+                    <span className="text-[#F5DEB3]">₹{(product.listedPrice || product.sellingPrice * 1.18).toFixed(2)}</span>
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-2">Shipping charges (₹50) will be added at checkout</p>
+                </div>
+              </AccordionItem>
+
+              <AccordionItem
                 title="Description"
                 isOpen={activeAccordion === 'description'}
                 onClick={() => setActiveAccordion(activeAccordion === 'description' ? '' : 'description')}
               >
-                {product.productDes}
+                {product.productSubDes}
               </AccordionItem>
 
               {/* Specifications Accordion */}
@@ -453,7 +479,7 @@ const ProductDetailPage = () => {
                 isOpen={activeAccordion === 'care'}
                 onClick={() => setActiveAccordion(activeAccordion === 'care' ? '' : 'care')}
               >
-                Handcrafted with premium materials. Wipe clean with a soft, dry cloth.
+                {product.materialAndCare || "Handcrafted with premium materials. Wipe clean with a soft, dry cloth."}
               </AccordionItem>
             </div>
           </div>

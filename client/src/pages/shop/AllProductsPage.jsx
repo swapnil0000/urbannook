@@ -21,7 +21,7 @@ const AllProductsPage = () => {
   }, []);
 
   // Extract products from response
-  const products = productsResponse?.data?.listofPublishedProducts || [];
+  const products = productsResponse?.data?.products || productsResponse?.data?.listofPublishedProducts || [];
 
   const displayProducts = useMemo(() => {
     let sorted = [...products];
@@ -135,9 +135,15 @@ const AllProductsPage = () => {
                       <div className="flex justify-between items-end pt-2 border-t border-[#F5DEB3]/10] mt-auto">
                         <div className="flex flex-col">
                            <span className="text-[10px] uppercase tracking-widest text-gray-500 mb-1">Pricing</span>
-                           <span className="text-lg md:text-xl font-semibold text-[#a89068] ">
-                             ₹{product.sellingPrice?.toLocaleString()}
-                           </span>
+                           <div className="flex items-baseline gap-2">
+                             <span className="text-lg md:text-xl font-semibold text-[#a89068]">
+                               ₹{product.sellingPrice?.toLocaleString()}
+                             </span>
+                             <span className="text-xs text-gray-400 line-through">
+                               ₹{(product.listedPrice || product.sellingPrice * 1.18).toFixed(0)}
+                             </span>
+                           </div>
+                           <span className="text-[8px] text-gray-400 uppercase tracking-wider">+ ₹50 shipping</span>
                         </div>
                         
                         {/* Interactive Arrow CTA */}
