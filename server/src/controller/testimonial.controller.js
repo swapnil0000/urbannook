@@ -5,11 +5,7 @@ import {
 } from "../services/testimonial.service.js";
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
 
-/**
- * Get all approved testimonials
- * GET /api/v1/testimonials
- */
-const getTestimonials = asyncHandler(async (req, res) => {
+const getTestimonials = asyncHandler(async (_, res) => {
   const result = await getApprovedTestimonialsService();
 
   return res

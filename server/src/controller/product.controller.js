@@ -2,6 +2,7 @@ import { ApiRes } from "../utils/index.js";
 import Product from "../model/product.model.js";
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
 import { NotFoundError } from "../utils/errors.js";
+import { apiCache } from "../module/cache.manager.module.js";
 
 const productListing = asyncHandler(async (req, res) => {
   const {
@@ -13,79 +14,69 @@ const productListing = asyncHandler(async (req, res) => {
     subCategory,
     featured,
   } = req.query;
-  const page = Number(currentPage) || 1;
-  const perPage = Number(limit) || 10;
-  /*category -> Filter by category	Electronics , search -> Keyword search in name	iPhone */
-  const query = {};
-  let sort = { createdAt: -1 }; // default: latest products
 
-  if (search) {
-    if (search.length <= 2) {
-      // Short input like p , ph , pho
-      query.productName = {
-        $regex: `^${search}`,
-        $options: "i", // makes it case - insensitive Eg - Chair , chair, CHAIR - all same
-      };
-    } else {
-      // for length inputs like iPhone 15 Pro Max
-      query.$text = { $search: search };
-      sort = {
-        score: { $meta: "textScore" },
-        createdAt: -1,
-      };
+  const fetcher = async () => {
+    const page = Number(currentPage) || 1;
+    const perPage = Number(limit) || 10;
+    /*category -> Filter by category	Electronics , search -> Keyword search in name	iPhone */
+    const query = { isPublished: true };
+    let sort = { createdAt: -1 }; // default: latest products
+
+    if (search) {
+      if (search.length <= 2) {
+        // Short input like p , ph , pho
+        query.productName = {
+          $regex: `^${search}`,
+          $options: "i", // makes it case - insensitive Eg - Chair , chair, CHAIR - all same
+        };
+      } else {
+        // for length inputs like iPhone 15 Pro Max
+        query.$text = { $search: search };
+        sort = { score: { $meta: "textScore" }, createdAt: -1 };
+      }
     }
-  }
 
-  if (!query.$text) {
-    if (category) {
-      query.productCategory = { $regex: String(category), $options: "i" };
+    if (!query.$text) {
+      if (category)
+        query.productCategory = { $regex: String(category), $options: "i" };
+      if (subCategory)
+        query.productSubCategory = {
+          $regex: String(subCategory),
+          $options: "i",
+        };
+      if (status) query.productStatus = status;
+      if (featured === "true") query.tags = "featured";
     }
-    if (subCategory) {
-      query.productSubCategory = {
-        $regex: String(subCategory),
-        $options: "i",
-      };
-    }
-    if (status) {
-      query.productStatus = status;
-    }
-    // Filter by featured tag
-    if (featured === "true") {
-      query.tags = "featured";
-    }
-  }
 
-  const totalProducts = await Product.countDocuments(query);
+    const listOfProducts = await Product.find(query)
+      .skip((page - 1) * perPage)
+      .limit(perPage)
+      .sort(sort)
+      .select("-_id -createdAt -updatedAt -__v");
 
-const listOfProducts = await Product.find(query)
-  .skip((page - 1) * perPage)
-  .limit(perPage)
-  .sort(sort)
-  .select("-_id -createdAt -updatedAt -__v");
+    return {
+      listofPublishedProducts: listOfProducts,
+      pagination: {
+        NolistofPublishedProducts: listOfProducts.length,
+        currentPage: page,
+        totalPages: Math.ceil(listOfProducts?.length / perPage),
+      },
+    };
+  };
 
-// No need to filter anymore since query already includes isPublished: true
-const listofPublishedProducts = listOfProducts;
-
-  return res.status(200).json(
-    new ApiRes(
-      200,
-      listofPublishedProducts?.length == 0
-        ? `No Published Product found for your search`
-        : `Product List`,
-      listofPublishedProducts?.length == 0
-        ? null
-        : {
-            listofPublishedProducts,
-            pagination: {
-              NolistofPublishedProducts: listofPublishedProducts?.length,
-              currentPage: page,
-              totalPages: Math.ceil(listofPublishedProducts?.length / perPage),
-            },
-          },
-
-      true,
-    ),
-  );
+  const result = await apiCache.handle(req.query, fetcher);
+  return res
+    .status(200)
+    .json(
+      new ApiRes(
+        200,
+        result.listofPublishedProducts.length === 0
+          ? "No Published Product found"
+          : "Product List",
+        result.listofPublishedProducts.length === 0 ? null : result,
+        true,
+      ),
+    );
 });
 
 const specificProductDetails = asyncHandler(async (req, res) => {
