@@ -8,12 +8,13 @@ import { useCartSync } from './hooks/useCartSync';
 import { useWishlistSync } from './hooks/useWishlistSync';
 import ErrorBoundary from './component/ErrorBoundary';
 import { setCredentials } from './store/slices/authSlice';
+// Import AppRoutes directly instead of lazy loading for faster initial render
+import AppRoutes from './store/AppRoutes';
 
-// Lazy load components
+// Only lazy load non-critical components
 const Footer = lazy(() => import('./component/layout/Footer'));
 const Notification = lazy(() => import('./component/Notification'));
 const SocialMediaFAB = lazy(() => import('./component/layout/WhatsAppButton'));
-const AppRoutes = lazy(() => import('./store/AppRoutes'));
 
 // Helper function to get cookie
 const getCookie = (name) => {
@@ -65,14 +66,12 @@ function App() {
               <ErrorBoundary>
                 <NewHeader/>
               </ErrorBoundary>
-              <Suspense fallback={
-                <div className="min-h-screen flex items-center justify-center bg-[#2e443c]">
-                  <div className="w-8 h-8 border-2 border-[#a89068] border-t-transparent rounded-full animate-spin"></div>
-                </div>
-              }>
-                <ErrorBoundary>
-                  <AppRoutes />
-                </ErrorBoundary>
+              {/* AppRoutes loaded immediately - no lazy loading for critical routing */}
+              <ErrorBoundary>
+                <AppRoutes />
+              </ErrorBoundary>
+              {/* Only non-critical components are lazy loaded */}
+              <Suspense fallback={null}>
                 <ErrorBoundary>
                   <Footer />
                 </ErrorBoundary>

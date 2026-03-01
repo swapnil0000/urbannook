@@ -1,6 +1,9 @@
 import { lazy } from 'react';
 
-export const HomePage = lazy(() => import("./home/HomePage.jsx"));
+// Import HomePage directly for instant loading
+export { default as HomePage } from "./home/HomePage.jsx";
+
+// Keep other pages lazy loaded
 export const CheckoutPage = lazy(() => import("../pages/CheckoutPage"));
 export const MyOrdersPage = lazy(() => import("./account/MyOrdersPage.jsx"));
 export const WishlistPage = lazy(() => import("./account/WishlistPage.jsx"));
