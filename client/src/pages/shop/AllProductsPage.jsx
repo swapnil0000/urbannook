@@ -143,7 +143,7 @@ const AllProductsPage = () => {
                                ₹{(product.listedPrice || product.sellingPrice * 1.18).toFixed(0)}
                              </span>
                            </div>
-                           <span className="text-[8px] text-gray-400 uppercase tracking-wider">+ ₹50 shipping</span>
+                           
                         </div>
                         
                         {/* Interactive Arrow CTA */}

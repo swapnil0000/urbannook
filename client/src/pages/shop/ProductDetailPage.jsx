@@ -354,9 +354,7 @@ const ProductDetailPage = () => {
                   ₹{product.listedPrice?.toLocaleString() || (product.sellingPrice * 1.18).toFixed(0)}
                 </p>
               </div>
-              <p className="text-[10px] text-[#F5DEB3]/60 uppercase tracking-wider">
-                + ₹50 shipping at checkout
-              </p>
+          
             </div>
 
             {/* Description */}
@@ -410,28 +408,7 @@ const ProductDetailPage = () => {
 
             {/* Accordions */}
             <div className="border-t border-[#F5DEB3]/10">
-              <AccordionItem
-                title="Price Breakdown"
-                isOpen={activeAccordion === 'pricing'}
-                onClick={() => setActiveAccordion(activeAccordion === 'pricing' ? '' : 'pricing')}
-              >
-                <div className="space-y-3 bg-white/5 p-4 rounded-xl">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-300">Base Price</span>
-                    <span className="text-white font-medium">₹{product.sellingPrice?.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-300">GST (18%)</span>
-                    <span className="text-white font-medium">₹{(product.sellingPrice * 0.18).toFixed(2)}</span>
-                  </div>
-                  <div className="h-px bg-[#F5DEB3]/20 my-2"></div>
-                  <div className="flex justify-between text-base font-bold">
-                    <span className="text-[#F5DEB3]">Total Price</span>
-                    <span className="text-[#F5DEB3]">₹{(product.listedPrice || product.sellingPrice * 1.18).toFixed(2)}</span>
-                  </div>
-                  <p className="text-[10px] text-gray-400 mt-2">Shipping charges (₹50) will be added at checkout</p>
-                </div>
-              </AccordionItem>
+             
 
               <AccordionItem
                 title="Description"
