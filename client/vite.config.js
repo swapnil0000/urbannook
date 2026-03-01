@@ -126,17 +126,13 @@ export default defineConfig({
         manualChunks: (id) => {
           // Vendor chunks - split large libraries into separate bundles
           if (id.includes('node_modules')) {
-            // More specific React Router splitting
+            // Keep React and React-DOM together to prevent createContext issues
+            if (id.includes('react') || id.includes('react-dom')) {
+              return 'react-vendor';
+            }
+            // React Router splitting
             if (id.includes('react-router-dom') || id.includes('@remix-run/router')) {
               return 'react-router-vendor';
-            }
-            // React DOM splitting
-            if (id.includes('react-dom')) {
-              return 'react-dom-vendor';
-            }
-            // Core React (must be last to avoid conflicts)
-            if (id.includes('react/') || id.includes('react\\') || id.endsWith('react')) {
-              return 'react-vendor';
             }
             if (id.includes('@reduxjs/toolkit') || id.includes('react-redux')) {
               return 'redux-vendor';
@@ -183,7 +179,7 @@ export default defineConfig({
   },
 
   optimizeDeps: {
-    include: ["react", "react-dom"],
+    include: ["react", "react-dom", "react/jsx-runtime"],
     // Force pre-bundling for consistent builds
     force: false
   },
