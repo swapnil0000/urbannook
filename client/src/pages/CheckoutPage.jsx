@@ -175,7 +175,7 @@ const CheckoutPage = () => {
           if (result.success && result.data?.summary) {
             setPricingDetails({
               subtotal: result.data.summary.subtotal || 0,
-              shipping: 50,
+              shipping: result.data.summary.shipping || 50,
               discount: result.data.summary.discount || 0,
             });
           }
@@ -188,7 +188,7 @@ const CheckoutPage = () => {
               if (result.success && result.data?.summary) {
                 setPricingDetails({
                   subtotal: result.data.summary.subtotal || 0,
-                  shipping: 50,
+                  shipping: result.data.summary.shipping || 50,
                   discount: result.data.summary.discount || 0,
                 });
               }
@@ -233,7 +233,7 @@ const CheckoutPage = () => {
         setAppliedCoupon(couponData.code);
         setPricingDetails({
           subtotal: result.data.summary.subtotal || 0,
-          shipping: 50,
+          shipping: result.data.summary.shipping || 50,
           discount: result.data.summary.discount || 0,
         });
         const successMessage = result.message || "Coupon applied successfully!";
@@ -254,7 +254,7 @@ const CheckoutPage = () => {
         setAppliedCoupon(null);
         setPricingDetails({
           subtotal: result.data.summary.subtotal || 0,
-          shipping: 50,
+          shipping: result.data.summary.shipping || 50,
           discount: result.data.summary.discount || 0,
         });
         const successMessage = result.message || "Coupon removed";
@@ -329,9 +329,9 @@ const CheckoutPage = () => {
       return;
     }
     
-    if (!window.confirm('Are you sure you want to delete this address?')) {
-      return;
-    }
+    // if (!window.confirm('Are you sure you want to delete this address?')) {
+    //   return;
+    // }
     
     try {
       const result = await deleteAddress(addressId).unwrap();
@@ -635,7 +635,7 @@ const CheckoutPage = () => {
                 </div>
                 <div className="flex justify-between text-gray-500">
                   <span>Shipping</span>
-                  <span className="text-gray-800 font-medium">₹50</span>
+                  <span className="text-gray-800 font-medium">₹{pricingDetails.shipping.toLocaleString()}</span>
                 </div>
                 
                 <div className="text-[10px] text-gray-500 bg-gray-50 p-2 rounded-lg">
@@ -656,7 +656,7 @@ const CheckoutPage = () => {
                 <div className="flex justify-between items-end pt-5 border-t border-gray-200 mt-2">
                   <span className="text-xs uppercase tracking-widest text-[#a89068] font-bold">Total To Pay</span>
                   <span className="text-3xl font-serif text-[#2e443c]">
-                    ₹{(pricingDetails.subtotal + 50 - pricingDetails.discount).toLocaleString()}
+                    ₹{(pricingDetails.subtotal + pricingDetails.shipping - pricingDetails.discount).toLocaleString()}
                   </span>
                 </div>
               </div>
@@ -924,7 +924,7 @@ const CheckoutPage = () => {
           <div className="flex items-center gap-5 max-w-[1200px] mx-auto">
             <div className="flex flex-col">
                 <span className="text-[9px] text-[#a89068] uppercase tracking-widest font-bold">Total Payable</span>
-                <span className="text-2xl font-serif text-white">₹{(pricingDetails.subtotal + 50 - pricingDetails.discount).toLocaleString()}</span>
+                <span className="text-2xl font-serif text-white">₹{(pricingDetails.subtotal + pricingDetails.shipping - pricingDetails.discount).toLocaleString()}</span>
             </div>
             <button 
                 onClick={handlePayment}

@@ -466,21 +466,23 @@ const ProductDetailPage = () => {
                 </AccordionItem>
               )}
 
-              <AccordionItem
+              {/* <AccordionItem
                 title="Shipping & Returns"
                 isOpen={activeAccordion === 'shipping'}
                 onClick={() => setActiveAccordion(activeAccordion === 'shipping' ? '' : 'shipping')}
               >
                 Complimentary shipping on orders above ₹500. Securely dispatched within 24-48 hours.
-              </AccordionItem>
+              </AccordionItem> */}
 
-              <AccordionItem
-                title="Materials & Care"
-                isOpen={activeAccordion === 'care'}
-                onClick={() => setActiveAccordion(activeAccordion === 'care' ? '' : 'care')}
-              >
-                {product.materialAndCare || "Handcrafted with premium materials. Wipe clean with a soft, dry cloth."}
-              </AccordionItem>
+              {product.materialAndCare && (
+                <AccordionItem
+                  title="Materials & Care"
+                  isOpen={activeAccordion === 'care'}
+                  onClick={() => setActiveAccordion(activeAccordion === 'care' ? '' : 'care')}
+                >
+                  {product.materialAndCare}
+                </AccordionItem>
+              )}
             </div>
           </div>
         </div>
