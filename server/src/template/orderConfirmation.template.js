@@ -1,5 +1,5 @@
 const orderConfirmationTemplate = (orderDetails) => {
-  const { orderId, items = [], total, deliveryAddress, orderDate } = orderDetails;
+  const { orderId, items = [], total, deliveryAddress, orderDate, senderMobile, receiverMobile } = orderDetails;
   
   const itemsHtml = items.map(item => `
     <tr>
@@ -132,6 +132,25 @@ const orderConfirmationTemplate = (orderDetails) => {
                     ${deliveryAddress.addressLine2 ? deliveryAddress.addressLine2 + '<br/>' : ''}
                     ${deliveryAddress.city || ''}, ${deliveryAddress.state || ''} ${deliveryAddress.pincode || ''}<br/>
                     ${deliveryAddress.phone || ''}
+                  </p>
+                </td>
+              </tr>
+              ` : ''}
+
+              <!-- CONTACT INFORMATION -->
+              ${senderMobile || receiverMobile ? `
+              <tr>
+                <td style="padding:0 30px 20px 30px;">
+                  <p style="margin:0 0 8px 0; font-family:Arial, Helvetica, sans-serif; font-size:14px; color:#2E443C; font-weight:600;">
+                    Contact Information:
+                  </p>
+                  <p style="margin:0; font-family:Arial, Helvetica, sans-serif; font-size:14px; color:#666; line-height:1.6;">
+                    ${senderMobile && receiverMobile && senderMobile === receiverMobile ? `
+                      <strong>Contact Number:</strong> ${senderMobile}
+                    ` : `
+                      ${senderMobile ? `<strong>Payment Contact:</strong> ${senderMobile}<br/>` : ''}
+                      ${receiverMobile && receiverMobile !== senderMobile ? `<strong>Delivery Contact:</strong> ${receiverMobile}` : ''}
+                    `}
                   </p>
                 </td>
               </tr>

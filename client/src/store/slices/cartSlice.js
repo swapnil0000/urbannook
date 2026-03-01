@@ -55,6 +55,13 @@ const cartSlice = createSlice({
       state.items = [];
       state.totalQuantity = 0;
       state.totalAmount = 0;
+      
+      // Also clear any cached cart data in localStorage if exists
+      try {
+        localStorage.removeItem('cartItems');
+      } catch (error) {
+        console.warn('Failed to clear cart from localStorage:', error);
+      }
     },
     syncCartFromProfile: (state, action) => {
       const profileCartItems = action.payload || [];

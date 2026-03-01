@@ -1,28 +1,25 @@
-import { useState, useEffect, lazy, Suspense, useRef } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
-import { motion, AnimatePresence } from "framer-motion";
-import axios from "axios";
-
-import "ol/ol.css";
-import Map from "ol/Map";
-import View from "ol/View";
-import TileLayer from "ol/layer/Tile";
-import OSM from "ol/source/OSM";
-import { fromLonLat, toLonLat } from "ol/proj";
 
 import {
   useGetUserProfileQuery,
   useGetRazorpayKeyQuery,
   useCreateOrderMutation,
   useApplyCouponMutation,
+  useGetSavedAddressesQuery,
+  useUpdateAddressMutation,
+  useDeleteAddressMutation,
 } from "../store/api/userApi";
+import { clearCartCompletely } from "../utils/cartUtils";
 import { clearCart } from "../store/slices/cartSlice";
 import { useUI } from "../hooks/useRedux";
 import CouponInput from "../component/CouponInput";
 import { ComponentLoader } from "../component/layout/LoadingSpinner";
 
+// Lazy load heavy components
 const CouponList = lazy(() => import("../component/CouponList"));
+const MapModal = lazy(() => import("../component/MapModal"));
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
@@ -41,8 +38,6 @@ const CheckoutPage = () => {
   const [showRetry, setShowRetry] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
   const [showCouponModal, setShowCouponModal] = useState(false);
-  const [mapSuggestions, setMapSuggestions] = useState([]);
-  const [isLocating, setIsLocating] = useState(false);
   const [preciseDetails, setPreciseDetails] = useState({
     landmark: "",
     flatNo: "",
@@ -50,9 +45,13 @@ const CheckoutPage = () => {
   const [savedAddress, setSavedAddress] = useState([]);
   const [currentAddressId, setCurrentAddressId] = useState(null);
   const [isEditingMode, setIsEditingMode] = useState(false);
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
-  const mapElement = useRef();
-  const mapRef = useRef();
+  const [senderMobile, setSenderMobile] = useState("");
+  const [receiverMobile, setReceiverMobile] = useState("");
+  const [mobileErrors, setMobileErrors] = useState({
+    sender: "",
+    receiver: ""
+  });
+  const [showAllAddresses, setShowAllAddresses] = useState(false);
 
   const [pricingDetails, setPricingDetails] = useState({
     subtotal: 0,
@@ -62,12 +61,6 @@ const CheckoutPage = () => {
     grandTotal: 0,
   });
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const searchDebounceTimer = useRef(null);
-  const mapDebounceTimer = useRef(null);
-
   const {
     data: userProfileData,
     isLoading: profileLoading,
@@ -76,25 +69,30 @@ const CheckoutPage = () => {
   const { data: razorpayKeyData } = useGetRazorpayKeyQuery();
   const [createOrder, { isLoading: isOrdering }] = useCreateOrderMutation();
   const [applyCouponMutation] = useApplyCouponMutation();
+  const [updateAddress] = useUpdateAddressMutation();
+  const [deleteAddress] = useDeleteAddressMutation();
+  const { data: savedAddressData, refetch: refetchAddresses } = useGetSavedAddressesQuery();
 
   useEffect(() => {
     window.scrollTo(0, 0);
     handleSaveAdress();
-  }, []);
+  }, [savedAddressData]);
 
   const handleOpenMap = () => {
     setShowMapModal(true);
-    const defaultLat = 28.7041;
-    const defaultLon = 77.1025;
-    initializeMap(defaultLon, defaultLat);
+  };
+
+  const handleAddressConfirm = (suggestion, addressId) => {
+    setAddress(suggestion.formattedAddress);
+    setPincode(suggestion.pinCode.toString());
+    setCurrentAddressId(addressId);
+    refetchAddresses();
   };
 
   const handleResetAddress = () => {
     setAddress("");
     setPincode("");
     setPreciseDetails({ landmark: "", flatNo: "" });
-    setMapSuggestions([]);
-    setSearchQuery("");
     setCurrentAddressId(null);
     setIsEditingMode(false);
     showNotification("Shipping details reset", "info");
@@ -106,130 +104,29 @@ const CheckoutPage = () => {
     try {
       const selectedFullAddr = savedAddress.find(a => a.addressId === currentAddressId) || {};
       
-      const res = await axios.post(
-        `${apiBaseUrl}/user/address/update`,
-        {
-          addressId: currentAddressId,
-          landmark: preciseDetails.landmark,
-          flatOrFloorNumber: preciseDetails.flatNo,
-          formattedAddress: address,
-          pinCode: preciseDetails.pincode,
-          lat: selectedFullAddr.location?.coordinates[1] || 0,
-          long: selectedFullAddr.location?.coordinates[0] || 0,
-          city: selectedFullAddr.city || "",
-          state: selectedFullAddr.state || "",
-          placeId: selectedFullAddr.placeId || "N/A"
-        },
-        { withCredentials: true }
-      );
-      if (res.data.success) {
+      const addressData = {
+        addressId: currentAddressId,
+        landmark: preciseDetails.landmark,
+        flatOrFloorNumber: preciseDetails.flatNo,
+        formattedAddress: address,
+        pinCode: pincode,
+        lat: selectedFullAddr.location?.coordinates[1] || 0,
+        long: selectedFullAddr.location?.coordinates[0] || 0,
+        city: selectedFullAddr.city || "",
+        state: selectedFullAddr.state || "",
+        placeId: selectedFullAddr.placeId || "N/A"
+      };
+      
+      const result = await updateAddress(addressData).unwrap();
+      if (result.success) {
         showNotification("Address details synced", "success");
         setIsEditingMode(false);
-        handleSaveAdress();
+        refetchAddresses();
       }
     } catch (err) {
       console.error("Failed to sync precise details:", err);
       showNotification("Failed to update details", "error");
     }
-  };
-
-  const getUserCurrentLocation = () => {
-    if (navigator.geolocation) {
-      setIsLocating(true);
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const { latitude, longitude } = pos.coords;
-          if (mapRef.current) {
-            mapRef.current.getView().animate({
-              center: fromLonLat([longitude, latitude]),
-              duration: 1000,
-              zoom: 17,
-            });
-          }
-          fetchSuggestions(latitude, longitude);
-          setIsLocating(false);
-          setSearchResults([]);
-        },
-        () => {
-          showNotification("Location access denied", "error");
-          setIsLocating(false);
-        },
-        { enableHighAccuracy: true },
-      );
-    }
-  };
-
-  const handleSearchPlaces = (val) => {
-    setSearchQuery(val);
-    if (searchDebounceTimer.current) clearTimeout(searchDebounceTimer.current);
-    if (val.length < 3) {
-      setSearchResults([]);
-      setIsSearching(false);
-      return;
-    }
-
-    setIsSearching(true);
-    searchDebounceTimer.current = setTimeout(async () => {
-      try {
-        const res = await axios.post(
-          `${apiBaseUrl}/user/address/search`,
-          { userSearchInput: val },
-          { withCredentials: true },
-        );
-        if (res.data.success) setSearchResults(res.data.data);
-      } catch (err) {
-        console.error("Search API error:", err);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 800);
-  };
-
-  const handleSelectSearchResult = (item) => {
-    const lat = item.geometry.location.lat;
-    const long = item.geometry.location.lng;
-    if (mapRef.current) {
-      mapRef.current.getView().animate({
-        center: fromLonLat([long, lat]),
-        duration: 800,
-        zoom: 17,
-      });
-    }
-    setSearchResults([]);
-    setSearchQuery("");
-    fetchSuggestions(lat, long);
-  };
-
-  const initializeMap = (lon, lat) => {
-    setTimeout(() => {
-      if (mapRef.current) {
-        mapRef.current.setTarget(null);
-        mapRef.current = null;
-      }
-
-      if (mapElement.current) {
-        mapRef.current = new Map({
-          target: mapElement.current,
-          layers: [new TileLayer({ source: new OSM() })],
-          view: new View({
-            center: fromLonLat([lon, lat]),
-            zoom: 17,
-          }),
-        });
-
-        mapRef.current.on("moveend", () => {
-          if (mapDebounceTimer.current) clearTimeout(mapDebounceTimer.current);
-
-          mapDebounceTimer.current = setTimeout(() => {
-            const center = mapRef.current.getView().getCenter();
-            const [lonArr, latArr] = toLonLat(center);
-            fetchSuggestions(latArr, lonArr);
-          }, 800);
-        });
-
-        setTimeout(() => mapRef.current.updateSize(), 100);
-      }
-    }, 150);
   };
 
   useEffect(() => {
@@ -331,6 +228,9 @@ const CheckoutPage = () => {
       if (userProfile.userPinCode && !pincode) {
         setPincode(userProfile.userPinCode);
       }
+      if ((userProfile?.mobileNumber || userProfile?.mobile) && !senderMobile) {
+        setSenderMobile(String(userProfile.mobileNumber || userProfile.mobile));
+      }
     }
   }, [userProfile]);
 
@@ -385,101 +285,92 @@ const CheckoutPage = () => {
 
   const finalTotal = pricingDetails.grandTotal;
 
-  const fetchSuggestions = async (la, ln) => {
-    try {
-      const res = await axios.post(
-        `${apiBaseUrl}/user/address/suggestion`,
-        { lat: la, long: ln },
-        { withCredentials: true },
-      );
-      if (res.data.success) setMapSuggestions(res.data.data);
-    } catch (err) {
-      console.error("API Error:", err);
+  const handleSaveAdress = () => {
+    if (savedAddressData?.success) {
+      const addresses = savedAddressData.data?.extractingAddressFromAddressIds || [];
+      const ids = savedAddressData.data?.addressId || [];
+
+      const merged = addresses.map((addr, index) => ({
+        ...addr,
+        addressId: ids[index], // This is the correct addressId from backend
+        displayIndex: index, // For debugging
+      }));
+      setSavedAddress(merged);
     }
   };
 
-  const handleConfirmAddress = async (suggestion) => {
-    const center = mapRef.current.getView().getCenter();
-    const [lon, lat] = toLonLat(center);
-    try {
-      const res = await axios.post(
-        `${apiBaseUrl}/user/address/create`,
-        {
-          lat: lat,
-          long: lon,
-          placeId: suggestion.placeId,
-          formattedAddress: suggestion.formattedAddress,
-          city: suggestion.city,
-          state: suggestion.state,
-          pinCode: suggestion.pinCode,
-          landmark: preciseDetails.landmark,
-          flatOrFloorNumber: preciseDetails.flatNo,
-          addressType: "Home",
-        },
-        { withCredentials: true },
-      );
-
-      if (res.data.success) {
-        setAddress(suggestion.formattedAddress);
-        setPincode(suggestion.pinCode.toString());
-        setCurrentAddressId(res.data.data?.addressId);
-        setShowMapModal(false);
-        showNotification(res?.data?.message, "success");
-        handleSaveAdress();
-      }
-    } catch (err) {
-      const errorMessage =
-        err.response?.data?.message || "Failed to save address";
-      showNotification(errorMessage, "error");
-    }
+  const validateMobileNumber = (mobile) => {
+    const mobileRegex = /^[0-9]{10}$/;
+    return mobileRegex.test(mobile.trim());
   };
 
-  const handleSaveAdress = async () => {
-    try {
-      const res = await axios.get(`${apiBaseUrl}/user/address/saved`, {
-        withCredentials: true,
-      });
+  const stripCountryCode = (mobile) => {
+    const trimmed = mobile?.trim();
+    // Strip +91 or 91 prefix if present
+    if (trimmed.startsWith('+91')) {
+      return trimmed.substring(3);
+    } else if (trimmed.startsWith('91') && trimmed.length === 12) {
+      return trimmed.substring(2);
+    }
+    return trimmed;
+  };
 
-      if (res.data.success) {
-        const addresses = res.data.data?.extractingAddressFromAddressIds || [];
-
-        const ids = res.data.data?.addressId || [];
-
-        const merged = addresses.map((addr, index) => ({
-          ...addr,
-          addressId: ids[index],
-        }));
-
-        setSavedAddress(merged);
-      }
-    } catch (err) {
-      console.error("API Error:", err);
+  const handleMobileBlur = (field, value) => {
+    const strippedValue = stripCountryCode(value);
+    
+    // Update the field with stripped value if country code was present
+    if (strippedValue !== value.trim()) {
+      setReceiverMobile(strippedValue);
+    }
+    
+    // Only validate receiver mobile (sender mobile comes from profile)
+    if (strippedValue.trim() && !validateMobileNumber(strippedValue)) {
+      setMobileErrors(prev => ({
+        ...prev,
+        [field]: "Mobile number must be exactly 10 digits"
+      }));
+    } else {
+      setMobileErrors(prev => ({
+        ...prev,
+        [field]: ""
+      }));
     }
   };
 
   const handleDeleteAddress = async (addressId) => {
-    if (!addressId) return;
-    console.log(addressId,"==addressId");
+    if (!addressId) {
+      showNotification("Invalid address ID", "error");
+      return;
+    }
+    
+    if (!window.confirm('Are you sure you want to delete this address?')) {
+      return;
+    }
     
     try {
-      const res = await axios.post(
-        `${apiBaseUrl}/user/address/delete`,
-        { addressId },
-        {
-          withCredentials: true,
-        },
+      const result = await deleteAddress(addressId).unwrap();
+      
+      setSavedAddress((prev) =>
+        prev.filter((addr) => addr?.addressId !== addressId),
       );
-
-      if (res.data.success) {
-        setSavedAddress((prev) =>
-          prev.filter((addr) => addr.addressId !== addressId),
-        );
-        if (currentAddressId === addressId) {
-          handleResetAddress();
-        }
+      
+      if (currentAddressId === addressId) {
+        handleResetAddress();
       }
+      
+      showNotification("Address deleted successfully", "success");
+      refetchAddresses();
+      
     } catch (err) {
       console.error("Delete API Error:", err);
+      console.error("Error details:", {
+        status: err.status,
+        data: err.data,
+        message: err.data?.message
+      });
+      
+      const errorMessage = err.data?.message || err.message || "Failed to delete address";
+      showNotification(errorMessage, "error");
     }
   };
 
@@ -506,6 +397,26 @@ const CheckoutPage = () => {
   };
 
   const handlePayment = async () => {
+    // Use profile mobile as sender mobile
+    const senderMobileStr = String(userProfile?.mobileNumber || userProfile?.mobile || "");
+    if (!senderMobileStr.trim()) {
+      showNotification("Please update your phone number in your profile", "error");
+      return;
+    }
+
+    // Validate sender mobile from profile
+    if (!validateMobileNumber(senderMobileStr)) {
+      showNotification("Please update your phone number in your profile with a valid 10-digit number", "error");
+      return;
+    }
+
+    // Validate receiver mobile if provided
+    const receiverMobileStr = String(receiverMobile || "");
+    if (receiverMobileStr.trim() && !validateMobileNumber(receiverMobileStr)) {
+      showNotification("Please provide a valid receiver mobile number", "error");
+      return;
+    }
+
     if (!address.trim()) {
       showNotification("Please select a delivery address.", "error");
       return;
@@ -518,6 +429,8 @@ const CheckoutPage = () => {
           productId: i.id,
           quantity: i.quantity,
         })),
+        senderMobile: senderMobileStr,
+        receiverMobile: receiverMobileStr || senderMobileStr,
       };
       const orderResult = await createOrder(orderData).unwrap();
       const res = await loadRazorpay();
@@ -537,11 +450,15 @@ const CheckoutPage = () => {
         handler: async function (response) {
           try {
             const orderId = response.razorpay_order_id;
+            
+            // Clear cart completely (both Redux and backend)
+            await clearCartCompletely(dispatch, clearCart, apiBaseUrl);
+            
             showNotification(
               `Payment successful! Order ID: ${orderId}`,
               "success",
             );
-            dispatch(clearCart());
+    
             setTimeout(() => {
               navigate("/orders");
             }, 2000);
@@ -555,7 +472,7 @@ const CheckoutPage = () => {
         prefill: {
           name: userProfile?.userName || userProfile?.name || "",
           email: userProfile?.userEmail || userProfile?.email || "",
-          contact: userProfile?.userMobileNumber || userProfile?.mobile || "",
+          contact: senderMobileStr,
         },
         notes: { address: address, pincode: pincode },
         theme: { color: "#2E443C" },
@@ -739,22 +656,15 @@ const CheckoutPage = () => {
                   <span className="text-gray-800 font-medium">₹{pricingDetails.shipping.toLocaleString()}</span>
                 </div>
 
-                <AnimatePresence>
-                  {appliedCoupon && pricingDetails.discount > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="flex justify-between text-[#2e443c] font-medium bg-[#a89068]/20 p-3 rounded-xl border border-[#a89068]/30"
-                    >
-                      <span className="flex items-center gap-2">
-                          <i className="fa-solid fa-circle-check text-xs text-[#a89068]"></i> 
-                          Discount ({appliedCoupon})
-                      </span>
-                      <span>-₹{pricingDetails.discount.toLocaleString()}</span>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                {appliedCoupon && pricingDetails.discount > 0 && (
+                  <div className="flex justify-between text-[#2e443c] font-medium bg-[#a89068]/20 p-3 rounded-xl border border-[#a89068]/30 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <span className="flex items-center gap-2">
+                        <i className="fa-solid fa-circle-check text-xs text-[#a89068]"></i> 
+                        Discount ({appliedCoupon})
+                    </span>
+                    <span>-₹{pricingDetails.discount.toLocaleString()}</span>
+                  </div>
+                )}
                 
                 <div className="flex justify-between items-end pt-5 border-t border-gray-200 mt-2">
                   <span className="text-xs uppercase tracking-widest text-[#a89068] font-bold">Total To Pay</span>
@@ -814,6 +724,25 @@ const CheckoutPage = () => {
                       {userProfile?.userEmail || userProfile?.email || "N/A"}
                   </div>
                 </div>
+                <div className="space-y-1.5 md:col-span-2">
+                  <label className="text-[9px] uppercase tracking-widest text-[#a89068] font-bold ml-1">
+                    Receiver&apos;s Mobile Number (Optional)
+                  </label>
+                  <input
+                    type="tel"
+                    value={receiverMobile}
+                    onChange={(e) => setReceiverMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    onBlur={() => handleMobileBlur('receiver', receiverMobile)}
+                    className={`w-full bg-white border rounded-xl p-4 text-sm text-[#2e443c] 
+                      focus:outline-none transition-all placeholder:text-gray-400
+                      ${mobileErrors?.receiver ? 'border-red-500' : 'border-gray-200 focus:border-[#a89068]'}`}
+                    placeholder="10-digit mobile number"
+                  />
+                  <p className="text-[10px] text-gray-500 ml-1">For delivery coordination calls</p>
+                  {mobileErrors?.receiver && (
+                    <p className="text-[10px] text-red-500 ml-1">{mobileErrors?.receiver}</p>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -830,28 +759,49 @@ const CheckoutPage = () => {
                 <div className="space-y-8">
                   <button
                     onClick={handleOpenMap}
-                    disabled={isLocating}
                     className="w-full py-16 border-2 border-dashed border-[#a89068]/30 rounded-2xl flex flex-col items-center justify-center gap-4 hover:bg-[#a89068]/5 hover:border-[#a89068]/60 transition-all group bg-white"
                   >
                     <div className="w-16 h-16 rounded-full bg-[#a89068]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <i className={`fa-solid ${isLocating ? "fa-spinner animate-spin" : "fa-map-location-dot"} text-2xl text-[#a89068]`} />
+                      <i className="fa-solid fa-map-location-dot text-2xl text-[#a89068]" />
                     </div>
                     <span className="text-xs font-bold uppercase tracking-widest text-[#a89068]">
-                      {isLocating ? "Detecting Location..." : "Pinpoint Delivery Location"}
+                      Pinpoint Delivery Location
                     </span>
                   </button>
 
                   {savedAddress.length > 0 && (
                     <div className="space-y-4 animate-in fade-in duration-700">
-                      <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a89068] flex items-center gap-2">
-                         <i className="fa-solid fa-bookmark text-[8px]"></i> Saved Addresses
-                      </h3>
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a89068] flex items-center gap-2">
+                           <i className="fa-solid fa-bookmark text-[8px]"></i> Saved Addresses ({savedAddress.length})
+                        </h3>
+                        {savedAddress.length > 2 && (
+                          <button 
+                            onClick={() => {
+                              setShowAllAddresses(!showAllAddresses);
+                            }}
+                            className="text-[9px] text-[#a89068] hover:underline font-bold uppercase tracking-wider flex items-center gap-1"
+                          >
+                            {showAllAddresses ? (
+                              <>
+                                <i className="fa-solid fa-chevron-up text-[8px]"></i>
+                                Show Less
+                              </>
+                            ) : (
+                              <>
+                                <i className="fa-solid fa-chevron-down text-[8px]"></i>
+                                View All
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {savedAddress.map((addr, index) => (
+                        {(showAllAddresses ? savedAddress : savedAddress.slice(0, 2)).map((addr, index) => (
                           <div
-                            key={index}
+                            key={addr.addressId || index}
                             onClick={() => selectSavedAddress(addr)}
-                            className="w-full text-left bg-white border border-gray-200 hover:border-[#a89068]/40 hover:shadow-md p-4 rounded-2xl transition-all group"
+                            className="w-full text-left bg-white border border-gray-200 hover:border-[#a89068]/40 hover:shadow-md p-4 rounded-2xl transition-all group cursor-pointer"
                           >
                             {/* Top Section */}
                             <div className="flex justify-between items-center mb-2">
@@ -871,14 +821,10 @@ const CheckoutPage = () => {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
+                                console.log('Deleting address with ID:', addr.addressId); // Debug log
                                 handleDeleteAddress(addr.addressId);
                               }}
-                              className="mt-3 w-full flex items-center justify-center gap-2
-        text-[10px] font-semibold tracking-wide uppercase
-        bg-red-500/10 text-red-400
-        border border-red-500/20
-        hover:bg-red-500/20 hover:border-red-500/40 hover:text-red-300
-        py-2 rounded-xl transition-all duration-300"
+                              className="mt-3 w-full flex items-center justify-center gap-2 text-[10px] font-semibold tracking-wide uppercase bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 hover:border-red-500/40 hover:text-red-300 py-2 rounded-xl transition-all duration-300"
                             >
                               <i className="fa-solid fa-trash text-[9px]"></i>
                               Delete Address
@@ -939,298 +885,29 @@ const CheckoutPage = () => {
                 </div>
               )}
 
-              <AnimatePresence
-                onExitComplete={() => {
-                  if (mapRef.current) {
-                    mapRef.current.setTarget(null);
-                    mapRef.current = null;
-                  }
-                }}
-              >
-                {showMapModal && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm"
-                  >
-                    <motion.div
-                      initial={{ y: "100%", scale: 0.95 }}
-                      animate={{ y: 0, scale: 1 }}
-                      exit={{ y: "100%", scale: 0.95 }}
-                      transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                      className="bg-[#f5f7f8] w-full max-w-3xl h-[95vh] sm:h-[85vh] sm:rounded-[2rem] overflow-hidden border-t sm:border border-white/20 shadow-2xl flex flex-col"
-                    >
-                      <div className="p-5 border-b border-gray-200 flex justify-between items-center bg-white shrink-0">
-                        <div>
-                            <h3 className="font-serif text-[#2e443c] text-xl">Set Delivery Location</h3>
-                            <p className="text-[10px] text-[#a89068] uppercase tracking-widest mt-0.5 font-bold">Move pin to exact location</p>
-                        </div>
-                        <button onClick={() => setShowMapModal(false)} className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:text-red-500 hover:bg-red-50 transition-colors">
-                          <i className="fa-solid fa-xmark text-lg"></i>
-                        </button>
-                      </div>
-
-                      <div className="p-5 bg-[#f5f7f8] shrink-0 relative z-[110] border-b border-gray-200">
-                        <button
-                          onClick={getUserCurrentLocation}
-                          disabled={isLocating}
-                          className="w-full py-3.5 mb-4 rounded-xl bg-[#a89068]/10 border border-[#a89068]/30 text-[#a89068] font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-[#a89068]/20 transition-all disabled:opacity-50"
-                        >
-                          <i
-                            className={`fa-solid ${isLocating ? "fa-spinner animate-spin" : "fa-location-crosshairs"} text-sm`}
-                          ></i>
-                          {isLocating
-                            ? "Locating device..."
-                            : "Use Current Location"}
-                        </button>
-
-                        <div className="relative">
-                          <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => handleSearchPlaces(e.target.value)}
-                            placeholder="Search area, street, landmark..."
-                            className="w-full bg-white border border-gray-300 rounded-xl p-4 pl-12 text-sm text-[#2e443c] focus:border-[#a89068] outline-none placeholder:text-gray-400 shadow-sm"
-                          />
-                          <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                        </div>
-
-                        {(searchQuery.length > 0 || isSearching) && (
-                          <div className="absolute left-5 right-5 mt-2 bg-white border border-gray-200 rounded-2xl shadow-xl z-[120] max-h-[300px] overflow-y-auto custom-scrollbar">
-                            {isSearching ? (
-                              <div className="w-full p-8 flex flex-col items-center justify-center gap-3">
-                                <div className="w-6 h-6 border-2 border-[#a89068] border-t-transparent rounded-full animate-spin"></div>
-                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Searching...</p>
-                              </div>
-                            ) : searchResults.length > 0 ? (
-                              searchResults.map((item, i) => (
-                                <button
-                                  key={i}
-                                  onClick={() => handleSelectSearchResult(item)}
-                                  className="w-full text-left p-4 hover:bg-gray-50 border-b border-gray-100 last:border-0 flex items-start gap-4 transition-colors group"
-                                >
-                                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-[#a89068]/10">
-                                     <i className="fa-solid fa-location-dot text-gray-400 group-hover:text-[#a89068] transition-colors"></i>
-                                  </div>
-                                  <div>
-                                    <p className="text-sm text-[#2e443c] font-medium group-hover:text-[#a89068] transition-colors">
-                                      {item.structured_formatting.main_text}
-                                    </p>
-                                    <p className="text-[11px] text-gray-400 line-clamp-1 mt-0.5">
-                                      {
-                                        item.structured_formatting
-                                          .secondary_text
-                                      }
-                                    </p>
-                                  </div>
-                                </button>
-                              ))
-                            ) : (
-                              <div className="p-6 text-center text-sm text-gray-400">
-                                No results found for "{searchQuery}"
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="relative flex-1 min-h-[300px] w-full bg-gray-100">
-                        <div ref={mapElement} className="w-full h-full" />
-
-                        {mapSuggestions.length === 0 &&
-                          !isSearching &&
-                          !isLocating && (
-                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 px-8">
-                              <div className="bg-white/90 backdrop-blur-md p-6 rounded-2xl border border-white/20 text-center shadow-xl">
-                                <i className="fa-solid fa-hand-pointer text-2xl text-[#a89068] mb-3 animate-bounce"></i>
-                                <p className="text-[11px] text-[#a89068] uppercase tracking-[0.2em] font-bold mb-1">Navigation Required</p>
-                                <p className="text-sm text-gray-600 leading-relaxed font-light">Drag the map to pinpoint<br/>your exact location</p>
-                              </div>
-                            </div>
-                          )}
-
-                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full pointer-events-none z-10">
-                          <i className="fa-solid fa-location-dot text-4xl text-[#a89068] drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)]"></i>
-                          <div className="w-2 h-1 bg-black/50 rounded-full absolute -bottom-1 left-1/2 -translate-x-1/2 blur-[2px]"></div>
-                        </div>
-                      </div>
-
-                      <div className="p-5 bg-white h-[200px] flex flex-col shrink-0 border-t border-gray-200 relative z-[110]">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-[#a89068] mb-3 flex items-center gap-2">
-                           <i className="fa-solid fa-list-ul"></i> Select Nearest Match
-                        </p>
-                        <div className="space-y-3 overflow-y-auto custom-scrollbar pr-2 flex-1">
-                          {mapSuggestions.length > 0 ? (
-                            mapSuggestions.map((s, idx) => (
-                              <button
-                                key={idx}
-                                onClick={() => handleConfirmAddress(s)}
-                                className="w-full text-left p-4 rounded-xl bg-gray-50 border border-gray-100 hover:border-[#a89068]/50 hover:bg-[#a89068]/5 transition-all group flex items-center justify-between"
-                              >
-                                <div className="pr-4">
-                                    <p className="text-sm text-[#2e443c] group-hover:text-[#a89068] line-clamp-1 transition-colors font-medium">
-                                    {s.formattedAddress}
-                                    </p>
-                                    <p className="text-[10px] text-gray-500 mt-1 uppercase tracking-wider">
-                                    {s.city}, {s.state} - <span className="text-gray-800 font-mono">{s.pinCode}</span>
-                                    </p>
-                                </div>
-                                <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center group-hover:bg-[#a89068] group-hover:text-white text-gray-300 border border-gray-200 transition-colors shrink-0">
-                                    <i className="fa-solid fa-check text-xs"></i>
-                                </div>
-                              </button>
-                            ))
-                          ) : (
-                            <div className="h-full flex items-center justify-center text-gray-400 text-xs italic">
-                              Searching for nearby addresses...
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </motion.div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              {/* Map Modal */}
+              <Suspense fallback={
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60">
+                  <div className="w-12 h-12 border-2 border-[#a89068] border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              }>
+                <MapModal
+                  showMapModal={showMapModal}
+                  setShowMapModal={setShowMapModal}
+                  preciseDetails={preciseDetails}
+                  setPreciseDetails={setPreciseDetails}
+                  onAddressConfirm={handleAddressConfirm}
+                  showNotification={showNotification}
+                />
+              </Suspense>
             </div>
 
-            <AnimatePresence>
-                {paymentError && (
-                <motion.div 
-                    initial={{ opacity: 0, height: 0, y: -20 }}
-                    animate={{ opacity: 1, height: 'auto', y: 0 }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="bg-red-50 rounded-[2rem] p-6 md:p-8 border border-red-100 overflow-hidden shadow-lg"
-                >
-                    <div className="flex items-start gap-4">
-                        <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-500 shrink-0">
-                            <i className="fa-solid fa-triangle-exclamation"></i>
-                        </div>
-                        <div className="flex-1 pt-1">
-                            <h3 className="text-lg font-serif text-red-800 mb-1">Transaction Failed</h3>
-                            <p className="text-sm text-red-600 mb-5 leading-relaxed">{paymentError}</p>
-                            {showRetry && (
-                            <button
-                                onClick={handlePayment}
-                                disabled={isOrdering}
-                                className="px-6 py-3 bg-red-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-red-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 w-fit shadow-md"
-                            >
-                                <i className="fa-solid fa-rotate-right"></i>
-                                Retry Payment
-                            </button>
-                            )}
-                        </div>
-                        <button
-                            onClick={() => { setPaymentError(null); setShowRetry(false); }}
-                            className="text-red-400 hover:text-red-600 transition-colors p-1"
-                        >
-                            <i className="fa-solid fa-xmark text-xl"></i>
-                        </button>
-                    </div>
-                    {/* <div className="flex-1 pt-1">
-                      <h3 className="text-lg font-serif text-red-400 mb-1">
-                        Transaction Failed
-                      </h3>
-                      <p className="text-sm text-gray-300 mb-5 leading-relaxed">
-                        {paymentError}
-                      </p>
-                      {showRetry && (
-                        <button
-                          onClick={handlePayment}
-                          disabled={isOrdering}
-                          className="px-6 py-3 bg-red-500/20 border border-red-500/30 text-red-300 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 w-fit"
-                        >
-                          <i className="fa-solid fa-rotate-right"></i>
-                          Retry Payment
-                        </button>
-                      )}
-                    </div> */}
-                    {/* <button
-                      onClick={() => {
-                        setPaymentError(null);
-                        setShowRetry(false);
-                      }}
-                      className="text-red-400/50 hover:text-red-400 transition-colors p-1"
-                    >
-                      <i className="fa-solid fa-xmark text-xl"></i>
-                    </button> */}
-                  {/* </div> */}
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
         </div>
       </main>
 
-      <AnimatePresence>
-        {showCouponModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm"
-            onClick={() => setShowCouponModal(false)}
-          >
-            <motion.div
-              initial={{ y: "100%", scale: 0.95 }}
-              animate={{ y: 0, scale: 1 }}
-              exit={{ y: "100%", scale: 0.95 }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-[#f5f7f8] w-full max-w-2xl max-h-[85vh] sm:rounded-[2rem] overflow-hidden border-t sm:border border-white/20 shadow-2xl flex flex-col"
-            >
-              <div className="p-5 md:p-6 border-b border-gray-200 flex justify-between items-center bg-white shrink-0">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-[#a89068]/10 border border-[#a89068]/20 flex items-center justify-center">
-                    <i className="fa-solid fa-tags text-[#a89068]"></i>
-                  </div>
-                  <div>
-                    <h3 className="font-serif text-[#2e443c] text-xl">Available Coupons</h3>
-                    <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-0.5 font-bold">
-                      Select to apply discount
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowCouponModal(false)}
-                  className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:text-red-500 hover:bg-red-50 transition-colors"
-                >
-                  <i className="fa-solid fa-xmark text-lg"></i>
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-5 md:p-6 custom-scrollbar bg-[#f5f7f8]">
-                <Suspense 
-                  fallback={
-                    <div className="flex items-center justify-center py-12">
-                      <div className="w-10 h-10 border-2 border-[#a89068] border-t-transparent rounded-full animate-spin"></div>
-                    </div>
-                  }
-                >
-                  <CouponList
-                    onCouponApplied={(couponData) => {
-                      handleCouponApplied(couponData);
-                      setShowCouponModal(false);
-                    }}
-                  />
-                </Suspense>
-              </div>
-
-              <div className="p-5 md:p-6 border-t border-gray-200 bg-white shrink-0">
-                <button
-                  onClick={() => setShowCouponModal(false)}
-                  className="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-xl text-gray-600 font-bold text-xs uppercase tracking-widest transition-all"
-                >
-                  Close
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Mobile Sticky Footer */}
-      <motion.div 
+      <div 
         initial={{ y: 100 }}
         animate={{ y: 0 }}
         className="fixed bottom-0 left-0 right-0 bg-[#2e443c] border-t border-white/10 p-4 px-6 z-50 lg:hidden shadow-[0_-10px_30px_rgba(0,0,0,0.4)]"
@@ -1259,7 +936,7 @@ const CheckoutPage = () => {
             </button>
           </div>
          
-      </motion.div>
+      </div>
     </div>
   );
 };

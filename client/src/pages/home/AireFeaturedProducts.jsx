@@ -1,16 +1,35 @@
 import { useNavigate } from 'react-router-dom';
-import WishlistButton from '../../component/WishlistButton';
+import { memo, useCallback, useMemo, lazy, Suspense } from 'react';
 import { useGetFeaturedProductsQuery } from '../../store/api/productsApi';
-import OptimizedImage from '../../component/OptimizedImage';
 
-const AireFeaturedProducts = () => {
+const WishlistButton = lazy(() => import('../../component/WishlistButton'));
+const OptimizedImage = lazy(() => import('../../component/OptimizedImage'));
+
+const AireFeaturedProducts = memo(() => {
   const navigate = useNavigate();
   
-  // Fetch featured products from API (limit to 1 for hero section)
-  const { data: featuredResponse, isLoading, error } = useGetFeaturedProductsQuery({ limit: 1 });
+  // Fetch featured products from API with caching options
+  const { data: featuredResponse, isLoading, error } = useGetFeaturedProductsQuery(
+    { limit: 1 },
+    {
+      refetchOnMountOrArgChange: false,
+      refetchOnFocus: false,
+      refetchOnReconnect: false
+    }
+  );
   
-  // Extract the first featured product
-    const featuredProduct = featuredResponse?.data?.listofPublishedProducts?.[0];
+  // Memoize data extraction
+  const featuredProduct = useMemo(() => 
+    featuredResponse?.data?.listofPublishedProducts?.[0],
+    [featuredResponse]
+  );
+
+  // Memoize handler
+  const handleViewProduct = useCallback(() => {
+    if (featuredProduct?.productId) {
+      navigate(`/product/${featuredProduct.productId}`);
+    }
+  }, [navigate, featuredProduct?.productId]);
 
 
   // Loading state
@@ -69,15 +88,10 @@ const AireFeaturedProducts = () => {
              {/* Divider */}
              <div className="w-20 h-px bg-gradient-to-r from-[#F5DEB3] to-transparent mb-6 md:mb-8"></div>
 
-             {/* Description */}
-             {/* <p className="text-gray-400 text-sm md:text-base leading-relaxed max-w-lg mb-10">
-                {featuredProduct.productDes}
-             </p> */}
-
              {/* Actions */}
              <div className="flex flex-wrap items-center gap-4 md:gap-6">
                 <button 
-                  onClick={() => navigate(`/product/${featuredProduct.productId}`)}
+                  onClick={handleViewProduct}
                   className="group relative px-8 md:px-10 py-3 md:py-4 bg-white text-black rounded-full font-bold uppercase tracking-widest text-xs overflow-hidden transition-all hover:scale-105 hover:shadow-[0_0_30px_rgba(255,255,255,0.3)]"
                 >
                   <span className="relative z-10">View Product</span>
@@ -104,12 +118,14 @@ const AireFeaturedProducts = () => {
 
                 {/* Main Image Container */}
                 <div className="relative rounded-[2.5rem] overflow-hidden border border-white/10 bg-[#121212] shadow-2xl">
-                    <OptimizedImage 
-                        src={featuredProduct.productImg} 
-                        alt={featuredProduct.productName}
-                        className="w-full h-full object-cover transform transition-transform duration-[1.5s] ease-out group-hover:scale-110"
-                        loading="eager"
-                    />
+                    <Suspense fallback={<div className="w-full h-[400px] bg-gray-200 animate-pulse rounded-[2.5rem]"></div>}>
+                      <OptimizedImage 
+                          src={featuredProduct.productImg} 
+                          alt={featuredProduct.productName}
+                          className="w-full h-full object-cover transform transition-transform duration-[1.5s] ease-out group-hover:scale-110"
+                          loading="eager"
+                      />
+                    </Suspense>
                     
                     {/* Gradient Overlay for Text readability if image is bright */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60"></div>
@@ -117,42 +133,14 @@ const AireFeaturedProducts = () => {
 
                 {/* Wishlist Button */}
                 <div className="absolute top-6 right-6 z-20">
-                    <WishlistButton 
-                        productId={featuredProduct.productId} 
-                        className="bg-black/40 hover:bg-red-500 backdrop-blur-md" 
-                        size="lg"
-                    />
+                    <Suspense fallback={<div className="w-10 h-10 bg-white/20 rounded-full animate-pulse"></div>}>
+                      <WishlistButton 
+                          productId={featuredProduct.productId} 
+                          className="bg-black/40 hover:bg-red-500 backdrop-blur-md" 
+                          size="lg"
+                      />
+                    </Suspense>
                 </div>
-
-                {/* Floating Spec Card (Glassmorphism) - Show dimensions if available */}
-                {/* {featuredProduct.dimensions && (
-                  <div className="absolute -right-4 md:-right-10 bottom-10 bg-white/10 backdrop-blur-xl border border-white/20 p-5 rounded-2xl shadow-2xl animate-float hidden sm:block">
-                      <div className="space-y-4">
-                          <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-[#F5DEB3]/20 flex items-center justify-center">
-                                  <i className="fa-solid fa-cube text-[#F5DEB3] text-xs"></i>
-                              </div>
-                              <div>
-                                  <p className="text-[9px] text-white/50 uppercase font-bold">Dimensions</p>
-                                  <p className="text-xs text-white font-bold tracking-wide">
-                                    {featuredProduct.dimensions.length} × {featuredProduct.dimensions.breadth} × {featuredProduct.dimensions.height} cm
-                                  </p>
-                              </div>
-                          </div>
-                          <div className="h-px bg-white/10 w-full"></div>
-                          <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-[#F5DEB3]/20 flex items-center justify-center">
-                                  <i className="fa-solid fa-tag text-[#F5DEB3] text-xs"></i>
-                              </div>
-                              <div>
-                                  <p className="text-[9px] text-white/50 uppercase font-bold">Category</p>
-                                  <p className="text-xs text-white font-bold tracking-wide">{featuredProduct.productCategory}</p>
-                              </div>
-                          </div>
-                      </div>
-                  </div>
-                )} */}
-
             </div>
           </div>
 
@@ -179,6 +167,6 @@ const AireFeaturedProducts = () => {
       `}</style>
     </section>
   );
-};
+});
 
 export default AireFeaturedProducts;

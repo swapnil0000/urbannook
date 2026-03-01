@@ -77,7 +77,7 @@
     },
     {
         id: 4,
-        image: "https://images.unsplash.com/photo-1581833971358-2c8b550f87b3?w=800&fit=crop",
+        image: "/insta_templates/template3.webp",
         likes: "1.7k",
         comments: "22",
         caption: "Crafted for you 🔑",
@@ -85,7 +85,7 @@
     },
     {
         id: 5,
-        image: "https://images.unsplash.com/photo-1615873968403-89e068629265?w=400&fit=crop",
+        image: "/insta_templates/template3.webp",
         likes: "1.9k",
         comments: "31",
         caption: "The Urban Standard 💕",

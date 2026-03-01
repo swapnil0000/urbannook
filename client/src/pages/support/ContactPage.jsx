@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+
 import { useSubmitContactMutation } from '../../store/api/userApi';
 import { useUI } from '../../hooks/useRedux';
 
@@ -18,20 +18,13 @@ const AccordionItem = ({ question, answer, isOpen, onClick }) => (
         <i className="fa-solid fa-chevron-down text-[10px]"></i>
       </span>
     </button>
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ height: 0, opacity: 0 }}
-          animate={{ height: 'auto', opacity: 1 }}
-          exit={{ height: 0, opacity: 0 }}
-          className="overflow-hidden"
-        >
-          <div className="pb-6 text-gray-500 text-sm leading-relaxed font-light pl-2 border-l-2 border-[#a89068]/20 ml-2 mt-2">
-            {answer}
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    {isOpen && (
+      <div className="overflow-hidden">
+        <div className="pb-6 text-gray-500 text-sm leading-relaxed font-light pl-2 border-l-2 border-[#a89068]/20 ml-2 mt-2">
+          {answer}
+        </div>
+      </div>
+    )}
   </div>
 );
 
@@ -49,7 +42,7 @@ const ContactPage = () => {
 
   const [errors, setErrors] = useState({});
   const [activeInput, setActiveInput] = useState(null);
-  const [openFaq, setOpenFaq] = useState(0); // First FAQ open by default
+  const [openFaq, setOpenFaq] = useState(0);
 
   const [submitContact, { isLoading }] = useSubmitContactMutation();
   const { showNotification } = useUI();
@@ -106,7 +99,6 @@ const ContactPage = () => {
       ...formData,
       [name]: value
     });
-    // Clear error when user starts typing
     if (errors[name]) {
       const newErrors = { ...errors };
       delete newErrors[name];
@@ -123,7 +115,6 @@ const ContactPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validate all fields
     const isNameValid = validateField('name', formData.name);
     const isEmailValid = validateField('email', formData.email);
     const isMessageValid = validateField('message', formData.message);
@@ -135,11 +126,7 @@ const ContactPage = () => {
 
     try {
       await submitContact(formData).unwrap();
-      
-      // Show success notification
       showNotification('Thank you for contacting us! We will get back to you soon.', 'success');
-      
-      // Reset form
       setFormData({
         name: '',
         email: '',
@@ -155,17 +142,6 @@ const ContactPage = () => {
   };
 
   const isFormValid = formData.name && formData.email && formData.message && Object.keys(errors).length === 0;
-
-  // --- Animation Variants ---
-  const fadeIn = {
-    hidden: { opacity: 0, y: 30 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: "easeOut" } }
-  };
-
-  const stagger = {
-    hidden: { opacity: 0 },
-    visible: { opacity: 1, transition: { staggerChildren: 0.15 } }
-  };
 
   const contactInfo = [
     {
@@ -224,20 +200,15 @@ const ContactPage = () => {
       {/* --- HERO SECTION --- */}
       <section className="relative lg:pt-32 pt-24 px-6 lg:px-12 overflow-hidden flex items-center border-b border-[#a89068]/20 ">
         <div className="max-w-4xl mx-auto text-center">
-             <motion.div 
-               initial="hidden"
-               animate="visible"
-               variants={stagger}
-               className="flex flex-col items-start"
-             >
-                <motion.div variants={fadeIn} className="flex items-center gap-4 mb-8">
+             <div className="flex flex-col items-start">
+                <div className="flex items-center gap-4 mb-8">
                     <span className="h-[1px] w-12 md:w-16 bg-[#F5DEB3]"></span>
                     <span className="text-[10px] font-bold tracking-[0.3em] text-[#F5DEB3] uppercase">
                         Support & Inquiries
                     </span>
                     <span className="h-[1px] w-12 md:w-16 bg-[#F5DEB3]"></span>
-                </motion.div>
-             </motion.div>
+                </div>
+             </div>
         </div>
       </section>
 
@@ -246,12 +217,8 @@ const ContactPage = () => {
         <div className="max-w-7xl mx-auto">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {contactInfo.map((item, index) => (
-                    <motion.div 
+                    <div 
                         key={item.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        transition={{ delay: index * 0.1 }}
                         className="group bg-[#f5f7f8] p-8 lg:p-10 rounded-[2rem] border border-transparent hover:border-[#a89068]/30 hover:shadow-xl hover:-translate-y-1 transition-all duration-500 shadow-lg"
                     >
                         <div className="flex justify-between items-start mb-8">
@@ -265,7 +232,7 @@ const ContactPage = () => {
                         <h3 className="text-[10px] font-bold uppercase tracking-widest text-[#a89068] mb-2">{item.title}</h3>
                         <p className="text-xl font-serif text-[#2e443c]">{item.info}</p>
                         <p className="text-xs text-gray-400 mt-1">{item.subInfo}</p>
-                    </motion.div>
+                    </div>
                 ))}
             </div>
         </div>

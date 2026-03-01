@@ -1,12 +1,12 @@
-import React from 'react';
+import React, { memo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const AireHeroBanner = () => {
+const AireHeroBanner = memo(() => {
   const navigate = useNavigate();
 
-  const handleShopCollection = () => {
+  const handleShopCollection = useCallback(() => {
     navigate('/products'); 
-  };
+  }, [navigate]);
 
   return (
     <section className="relative min-h-[97vh] lg:h-[calc(100vh-2rem)] lg:max-h-[900px] mx-2 my-2 md:mx-4 md:my-4 rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden shadow-2xl flex items-center group bg-[#1a2822]">
@@ -15,12 +15,15 @@ const AireHeroBanner = () => {
       <div className="absolute inset-0 z-0">
         <img
           src="/assets/hero2.webp"
+          alt="Hero Background"
+          fetchPriority="high"
+          loading="eager"
           onError={(e) => {
             e.target.onerror = null;
             // Fallback
             e.target.src = "https://images.unsplash.com/photo-1513519247388-193ad5130246?q=80&w=2500";
           }}
-          alt="Hero Background"
+          // alt="Hero Background"
           className="w-full h-full object-cover opacity-80 lg:opacity-70 transition-transform duration-[20s] ease-in-out group-hover:scale-105"
         />
 
@@ -29,7 +32,7 @@ const AireHeroBanner = () => {
 
       <div className="relative z-10 w-full px-6 md:px-12 lg:px-20 py-12">
         <div className="w-full max-w-7xl mx-auto">
-          <div cla-ssName="max-w-3xl space-y-4 flex flex-col items-center sm:items-start text-center sm:text-left">
+          <div className="max-w-3xl space-y-4 flex flex-col items-center sm:items-start text-center sm:text-left">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 backdrop-blur-md border border-white/10 shadow-sm w-fit">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#F5DEB3] opacity-75"></span>
@@ -60,21 +63,12 @@ const AireHeroBanner = () => {
               >
                 Shop Collection
               </button>
-
-              {/* <button className="w-full sm:w-auto px-8 py-3 rounded-full font-bold text-white border border-white/30 hover:bg-white/10 hover:scale-105 transition-all flex items-center justify-center gap-3 text-xs uppercase tracking-widest backdrop-blur-sm">
-                <span className="w-6 h-6 rounded-full border border-white flex items-center justify-center">
-                  <i className="fa-solid fa-play text-[8px] ml-0.5"></i>
-                </span>
-                Watch Film
-              </button> */}
             </div>
 
             {/* --- STATS SECTION --- */}
             <div className="pt-8 flex flex-wrap items-center justify-center sm:justify-start gap-y-6 gap-x-8 md:gap-x-6 w-90 border-t border-white/10 mt-6">
 
-              {/* 1. Logistics */}
               <div className="text-center sm:text-left">
-                {/* Fixed Typo: Affortable -> Affordable */}
                 <p className="text-2xl font-serif italic text-white">Affordable</p>
                 <p className="text-[10px] text-[#F5DEB3] uppercase tracking-widest font-bold mt-1">Pricing</p>
               </div>
@@ -110,6 +104,6 @@ const AireHeroBanner = () => {
       </div>
     </section>
   );
-};
+});
 
 export default AireHeroBanner;

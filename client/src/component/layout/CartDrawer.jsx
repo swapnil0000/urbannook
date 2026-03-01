@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { useUpdateCartMutation } from '../../store/api/userApi';
-import OptimizedImage from '../OptimizedImage';
+
+const OptimizedImage = lazy(() => import('../OptimizedImage'));
 
 const CartDrawer = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
@@ -15,13 +16,21 @@ const CartDrawer = ({ isOpen, onClose }) => {
   const [updateCart] = useUpdateCartMutation();
 
   // Handle animation mounting
-  useEffect(() => {
+useEffect(() => {
+    // Agar drawer open ho raha hai
     if (isOpen) {
       setMounted(true);
-      document.body.style.overflow = 'hidden';
-    } else {
+      document.body.style.overflow = 'hidden'; // Scroll rok do
+      
+      // Cleanup function: Jab drawer close ho, style ko wapas normal kar do
+      return () => {
+        document.body.style.overflow = ''; 
+      };
+    } 
+    // Agar drawer close ho raha hai (ya initially closed hai)
+    else {
       const timer = setTimeout(() => setMounted(false), 300);
-      document.body.style.overflow = 'unset';
+      // Yahan humne style ko touch nahi kiya, taaki initial load pe jhatka na lage
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
@@ -148,12 +157,14 @@ const CartDrawer = ({ isOpen, onClose }) => {
                     
                     {/* Image */}
                     <div className="w-24 h-28 bg-gray-50 rounded-lg overflow-hidden shrink-0 relative border border-gray-100">
-                      <OptimizedImage
-                        src={item.image || '/placeholder.jpg'}
-                        alt={item.name}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
+                      <Suspense fallback={<div className="w-full h-full bg-gray-200 animate-pulse"></div>}>
+                        <OptimizedImage
+                          src={item.image || '/placeholder.jpg'}
+                          alt={item.name}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      </Suspense>
                     </div>
                     
                     {/* Details */}

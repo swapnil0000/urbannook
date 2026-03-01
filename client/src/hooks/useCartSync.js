@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useGetCartQuery } from '../store/api/userApi';
-import { setCartItems } from '../store/slices/cartSlice';
+import { setCartItems, clearCart } from '../store/slices/cartSlice';
 
 export const useCartSync = () => {
   const dispatch = useDispatch();
@@ -19,18 +19,26 @@ export const useCartSync = () => {
   const hasLocalUser = localStorage.getItem('user');
   const shouldFetchCart = isAuthenticated || token || hasLocalUser;
 
-  const { data: cartResponse } = useGetCartQuery(undefined, {
+  const { data: cartResponse, refetch } = useGetCartQuery(undefined, {
     skip: !shouldFetchCart,
-    refetchOnMountOrArgChange: false, // Changed to false to prevent duplicate calls
-    refetchOnFocus: false, // Don't refetch when window regains focus
-    refetchOnReconnect: false // Don't refetch on network reconnect
+    refetchOnMountOrArgChange: true, // Changed to true to ensure fresh data
+    refetchOnFocus: false,
+    refetchOnReconnect: false
   });
 
   useEffect(() => {
     if (cartResponse?.data) {
-      dispatch(setCartItems(cartResponse.data));
+      // If backend returns empty cart, clear Redux store
+      if (!cartResponse?.data?.availableItems || cartResponse?.data?.availableItems?.length === 0) {
+        dispatch(clearCart());
+      } else {
+        dispatch(setCartItems(cartResponse.data));
+      }
     }
   }, [cartResponse, dispatch]);
+
+  // Return refetch function for manual cart refresh
+  return { refetch };
 };
 
 export const useCartData = () => {
@@ -51,14 +59,19 @@ export const useCartData = () => {
 
   const { data: cartResponse, refetch } = useGetCartQuery(undefined, {
     skip: !shouldFetchCart,
-    refetchOnMountOrArgChange: false, // Changed to false
+    refetchOnMountOrArgChange: true, // Changed to true
     refetchOnFocus: false,
     refetchOnReconnect: false
   });
 
   useEffect(() => {
     if (cartResponse?.data) {
-      dispatch(setCartItems(cartResponse.data));
+      // If backend returns empty cart, clear Redux store
+      if (!cartResponse?.data?.availableItems || cartResponse?.data?.availableItems?.length === 0) {
+        dispatch(clearCart());
+      } else {
+        dispatch(setCartItems(cartResponse?.data));
+      }
     }
   }, [cartResponse, dispatch]);
 

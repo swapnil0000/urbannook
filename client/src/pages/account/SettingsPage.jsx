@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+
 
 // --- ANIMATED TOGGLE COMPONENT ---
 const AnimatedToggle = ({ checked, onChange }) => (
@@ -9,11 +9,9 @@ const AnimatedToggle = ({ checked, onChange }) => (
       checked ? 'bg-[#F5DEB3]' : 'bg-white/10'
     }`}
   >
-    <motion.div
-      layout
-      transition={{ type: "spring", stiffness: 700, damping: 30 }}
-      className={`w-5 h-5 rounded-full shadow-md ${
-        checked ? 'bg-[#1c3026]' : 'bg-gray-400'
+    <div
+      className={`w-5 h-5 rounded-full shadow-md transition-transform duration-300 ${
+        checked ? 'bg-[#1c3026] translate-x-5' : 'bg-gray-400 translate-x-0'
       }`}
     />
   </button>
@@ -106,10 +104,7 @@ const SettingsPage = () => {
                         >
                             {/* Active Background Pill */}
                             {activeTab === tab.id && (
-                                <motion.div 
-                                    layoutId="activeSettingTab"
-                                    className="absolute inset-0 bg-[#F5DEB3] rounded-xl shadow-lg"
-                                />
+                                <div className="absolute inset-0 bg-[#F5DEB3] rounded-xl shadow-lg" />
                             )}
                             
                             {/* Content */}
@@ -126,15 +121,7 @@ const SettingsPage = () => {
 
             {/* --- CONTENT AREA --- */}
             <div className="flex-1 min-h-[500px]">
-                <AnimatePresence mode="wait">
-                    <motion.div
-                        key={activeTab}
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -20 }}
-                        transition={{ duration: 0.3 }}
-                        className="space-y-6"
-                    >
+                <div className="space-y-6">
                         {/* 1. NOTIFICATIONS */}
                         {activeTab === 'notifications' && (
                             <div className="bg-[#e8e6e1]/5 backdrop-blur-md border border-white/5 rounded-[2rem] p-6 md:p-8">
@@ -236,16 +223,10 @@ const SettingsPage = () => {
                                 </div>
                             </div>
                         )}
-                    </motion.div>
-                </AnimatePresence>
+                    </div>
 
                 {/* --- SAVE BAR --- */}
-                <motion.div 
-                    initial={{ y: 20, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.5 }}
-                    className="mt-8 flex justify-end"
-                >
+                <div className="mt-8 flex justify-end">
                     <button
                         onClick={saveSettings}
                         disabled={isSaving}
@@ -260,7 +241,7 @@ const SettingsPage = () => {
                             <>Save Preferences <i className="fa-solid fa-check"></i></>
                         )}
                     </button>
-                </motion.div>
+                </div>
             </div>
 
         </div>

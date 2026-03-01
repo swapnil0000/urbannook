@@ -1,17 +1,19 @@
 import { BrowserRouter as Router } from 'react-router-dom';
 import { Provider } from 'react-redux';
-import { useEffect } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
 import { useDispatch } from 'react-redux';
 import { store } from './store/store';
 import NewHeader from './component/layout/NewHeader';
-import Footer from './component/layout/Footer';
-import Notification from './component/Notification';
 import { useCartSync } from './hooks/useCartSync';
 import { useWishlistSync } from './hooks/useWishlistSync';
-import SocialMediaFAB from './component/layout/WhatsAppButton';
-import AppRoutes from './store/AppRoutes';
 import ErrorBoundary from './component/ErrorBoundary';
 import { setCredentials } from './store/slices/authSlice';
+
+// Lazy load components
+const Footer = lazy(() => import('./component/layout/Footer'));
+const Notification = lazy(() => import('./component/Notification'));
+const SocialMediaFAB = lazy(() => import('./component/layout/WhatsAppButton'));
+const AppRoutes = lazy(() => import('./store/AppRoutes'));
 
 // Helper function to get cookie
 const getCookie = (name) => {
@@ -63,14 +65,20 @@ function App() {
               <ErrorBoundary>
                 <NewHeader/>
               </ErrorBoundary>
-              <ErrorBoundary>
-                <AppRoutes />
-              </ErrorBoundary>
-              <ErrorBoundary>
-                <Footer />
-              </ErrorBoundary>
-              <SocialMediaFAB />
-              <Notification />
+              <Suspense fallback={
+                <div className="min-h-screen flex items-center justify-center bg-[#2e443c]">
+                  <div className="w-8 h-8 border-2 border-[#a89068] border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              }>
+                <ErrorBoundary>
+                  <AppRoutes />
+                </ErrorBoundary>
+                <ErrorBoundary>
+                  <Footer />
+                </ErrorBoundary>
+                <SocialMediaFAB />
+                <Notification />
+              </Suspense>
             </SyncProvider>
           </SessionManager>
         </Router>

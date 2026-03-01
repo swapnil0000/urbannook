@@ -1,6 +1,6 @@
 import { useEffect, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+
 import { useSelector } from 'react-redux';
 import { useGetOrderHistoryQuery } from '../../store/api/userApi';
 import { ComponentLoader } from '../../component/layout/LoadingSpinner';
@@ -111,14 +111,9 @@ const MyOrdersPage = () => {
         </div>
 
         {/* --- ORDERS LIST --- */}
-        <AnimatePresence mode='wait'>
         {orders.length === 0 ? (
           // EMPTY STATE (Light Box)
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col items-center justify-center py-20 bg-[#f5f7f8] rounded-[3rem] border border-white/5 shadow-2xl"
-          >
+          <div className="flex flex-col items-center justify-center py-20 bg-[#f5f7f8] rounded-[3rem] border border-white/5 shadow-2xl">
              <div className="w-24 h-24 bg-[#a89068]/10 rounded-full flex items-center justify-center mb-6 border border-[#a89068]/20">
                 <i className="fa-solid fa-box-open text-[#F5DEB3] text-3xl"></i>
              </div>
@@ -130,7 +125,7 @@ const MyOrdersPage = () => {
              >
                Browse Collection
              </button>
-          </motion.div>
+          </div>
         ) : (
           // ORDER CARDS (Light Boxes)
           <div className="space-y-8">
@@ -139,11 +134,8 @@ const MyOrdersPage = () => {
               const dateObj = new Date(order.createdAt);
               
               return (
-                <motion.div 
+                <div 
                     key={order.orderId}
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.1 }}
                     className="bg-[#f5f7f8] rounded-[24px] border border-transparent overflow-hidden shadow-xl hover:shadow-[0_20px_40px_rgba(0,0,0,0.2)] hover:translate-y-[-5px] transition-all duration-500 group"
                 >
                     {/* --- CARD HEADER --- */}
@@ -230,6 +222,39 @@ const MyOrdersPage = () => {
                                     </div>
                                 </div>
                             )}
+
+                            {/* Contact Information */}
+                            {(order.senderMobile || order.receiverMobile) && (
+                                <div className="mt-4 p-4 bg-white rounded-xl border border-gray-200 shadow-sm">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <i className="fa-solid fa-mobile text-[#a89068] text-sm"></i>
+                                        <span className="text-xs font-bold uppercase tracking-wider text-[#a89068]">Contact Information</span>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                                        {order.senderMobile && order.receiverMobile && order.senderMobile === order.receiverMobile ? (
+                                            <div>
+                                                <span className="text-gray-400 text-xs font-bold">Contact Number:</span>
+                                                <p className="text-[#2e443c] font-medium">{order.senderMobile}</p>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                {order.senderMobile && (
+                                                    <div>
+                                                        <span className="text-gray-400 text-xs font-bold">Payment Contact:</span>
+                                                        <p className="text-[#2e443c] font-medium">{order.senderMobile}</p>
+                                                    </div>
+                                                )}
+                                                {order.receiverMobile && (
+                                                    <div>
+                                                        <span className="text-gray-400 text-xs font-bold">Delivery Contact:</span>
+                                                        <p className="text-[#2e443c] font-medium">{order.receiverMobile}</p>
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="grid gap-4">
@@ -277,12 +302,11 @@ const MyOrdersPage = () => {
                         <span className="text-xl font-serif text-[#2e443c]">₹{order.amount.toLocaleString()}</span>
                     </div>
 
-                </motion.div>
+                </div>
               );
             })}
           </div>
         )}
-        </AnimatePresence>
       </main>
     </div>
   );

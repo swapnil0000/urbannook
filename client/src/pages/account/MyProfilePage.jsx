@@ -1,5 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect, useState, useCallback, lazy, Suspense } from 'react';
 import { useAuth, useUI } from '../../hooks/useRedux';
 import { useGetUserProfileQuery, useUpdateUserProfileMutation } from '../../store/api/userApi';
 
@@ -114,6 +113,12 @@ const MyProfilePage = () => {
 
       <main className="max-w-5xl mx-auto pt-28 pb-20 px-4 md:px-8 relative z-10">
         
+        <Suspense fallback={
+          <div className="flex items-center justify-center py-20">
+            <div className="w-8 h-8 border-2 border-[#a89068] border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        }>
+        
         {/* --- HEADER --- */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-[#a89068]/20 pb-8 lg:pb-12">
            <div>
@@ -173,12 +178,9 @@ const MyProfilePage = () => {
                   </label>
                 </div>
                 
-                <AnimatePresence mode="wait">
                   {(isEditing && !field.disabled) ? (
                     field.type === 'textarea' ? (
-                      <motion.textarea
-                        initial={{ opacity: 0 }} 
-                        animate={{ opacity: 1 }}
+                      <textarea
                         name={field.name}
                         value={field.value}
                         onChange={handleInputChange}
@@ -186,9 +188,7 @@ const MyProfilePage = () => {
                         rows="3"
                       />
                     ) : (
-                      <motion.input
-                        initial={{ opacity: 0 }} 
-                        animate={{ opacity: 1 }}
+                      <input
                         type={field.type}
                         name={field.name}
                         value={field.value}
@@ -197,21 +197,17 @@ const MyProfilePage = () => {
                       />
                     )
                   ) : (
-                    <motion.div 
-                      initial={{ opacity: 0 }} 
-                      animate={{ opacity: 1 }}
-                      className="min-h-[2.5rem] flex items-center"
-                    >
+                    <div className="min-h-[2.5rem] flex items-center">
                       <p className={`font-serif text-base md:text-lg text-[#2e443c] ${field.name === 'userEmail' ? 'truncate' : ''}`}>
                         {field.value || <span className="text-gray-400 text-sm italic">Not set</span>}
                       </p>
-                    </motion.div>
+                    </div>
                   )}
-                </AnimatePresence>
               </div>
             ))}
           </div>
         </div>
+        </Suspense>
       </main>
     </div>
   );

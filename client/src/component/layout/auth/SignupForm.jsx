@@ -1,11 +1,14 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
 import OTPVerification from './OTPVerification';
 import { useOtpSentMutation, useRegisterMutation } from '../../../store/api/authApi';
 import { useUI } from '../../../hooks/useRedux';
+import { setShowLoginModal } from '../../../store/slices/uiSlice';
 
 const SignupForm = ({ onClose, onSwitchToLogin }) => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [formData, setFormData] = useState({
     name: '', 
     email: '', 
@@ -134,7 +137,10 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[100] p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[100] p-4" onClick={() => {
+      dispatch(setShowLoginModal(false));
+      onClose();
+    }}>
       <div 
         className="bg-white rounded-[2rem] w-[96%] md:w-full md:max-w-4xl shadow-2xl relative overflow-hidden flex flex-col md:flex-row animate-in fade-in zoom-in duration-300 max-h-[90vh] md:h-[650px]"
         onClick={(e) => e.stopPropagation()}
@@ -203,7 +209,10 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
         <div ref={scrollContainerRef} className="w-full md:w-7/12 overflow-y-auto px-6 py-8 md:px-12 md:py-10 relative bg-white">
           <button 
             className="absolute top-4 right-4 md:top-6 md:right-6 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:text-[#1c3026] transition-colors z-20" 
-            onClick={onClose}
+            onClick={() => {
+              dispatch(setShowLoginModal(false));
+              onClose();
+            }}
           >
             <i className="fa-solid fa-xmark"></i>
           </button>

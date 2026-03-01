@@ -55,10 +55,40 @@ const razorpayKeyGetController = asyncHandler(async (_, res) => {
 
 const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   /* Not Handling the amount because it could be manipulate at client side like 0 as amount */
-  const { items } = req.body;
+  const { items, senderMobile, receiverMobile } = req.body;
   const { userId } = req.user;
   if (!items || !Array.isArray(items) || items.length === 0) {
     throw new ValidationError("Items are required");
+  }
+
+  // Fetch user profile for fallback mobile number
+  const user = await User.findOne({ userId }).lean();
+  
+  // Helper function to strip country code
+  const stripCountryCode = (mobile) => {
+    if (!mobile) return "";
+    const trimmed = mobile.trim();
+    // Strip +91 or 91 prefix if present
+    if (trimmed.startsWith('+91')) {
+      return trimmed.substring(3);
+    } else if (trimmed.startsWith('91') && trimmed.length === 12) {
+      return trimmed.substring(2);
+    }
+    return trimmed;
+  };
+  
+  // Determine final mobile numbers with fallback logic (trim whitespace and strip country code)
+  const finalSenderMobile = stripCountryCode(senderMobile || user?.mobileNumber?.toString() || "");
+  const finalReceiverMobile = stripCountryCode(receiverMobile || finalSenderMobile);
+
+  // Validate sender mobile (required)
+  if (!finalSenderMobile || !/^[0-9]{10}$/.test(finalSenderMobile)) {
+    throw new ValidationError("Valid sender mobile number is required");
+  }
+
+  // Validate receiver mobile if provided
+  if (receiverMobile && !/^[0-9]{10}$/.test(finalReceiverMobile)) {
+    throw new ValidationError("Receiver mobile number must be exactly 10 digits");
   }
 
   // Fetch cart to get the calculated grand total from applyCoupon API
@@ -109,6 +139,8 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     userId,
     items: orderItems,
     amount: finalAmount,
+    senderMobile: finalSenderMobile,
+    receiverMobile: finalReceiverMobile,
     payment: {
       razorpayOrderId: razorpayOrder?.data?.id,
     },
@@ -125,6 +157,8 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
         razorpayOrderId: razorpayOrder?.data?.id,
         amount: finalAmount * 100, // Return amount in paise for Razorpay
         currency: "INR",
+        senderMobile: finalSenderMobile,
+        receiverMobile: finalReceiverMobile,
       },
       true,
     ),
@@ -273,7 +307,10 @@ const razorpayWebHookController = async (req, res) => {
           try {
             await Cart.updateOne(
               { userId: findingUserId?.userId },
-              { $set: { items: [] } },
+              { 
+                $set: { products: {} },
+                $unset: { appliedCoupon: 1 }
+              }
             );
             console.log(
               `[INFO] Cart cleared after successful payment - UserId: ${findingUserId?.userId}, OrderId: ${order.orderId}`,
@@ -300,6 +337,8 @@ const razorpayWebHookController = async (req, res) => {
                 })),
                 total: order.amount,
                 orderDate: order.createdAt,
+                senderMobile: order.senderMobile,
+                receiverMobile: order.receiverMobile,
               };
 
               // Send order confirmation email
