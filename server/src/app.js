@@ -28,16 +28,11 @@ dotenv.config({
 const app = express();
 app.set("trust proxy", 1);
 
-// Log CORS configuration on startup
 logCorsConfig();
 
 /* Health Route */
 app.use("/health", healthRouter);
-
-// Use CORS for all normal requests
 app.use(cors(corsOptions));
-
-// Handle preflight OPTIONS requests
 app.options(/.*/, cors(corsOptions));
 
 /*Explicity for webhook because it requires rp webhook requires raw not json */
@@ -63,17 +58,10 @@ app.use(
   userCommunityListRouter,
   nfcRouter,
   couponCodeRouter,
+  testimonialRouter,
+  contactRouter,
 );
 
-// Testimonial routes
-app.use("/api/v1/testimonials", testimonialRouter);
-
-// Contact routes
-app.use("/api/v1/contact", contactRouter);
-  console.log("Checking")
-
-
-// Error handler middleware must be registered last
 app.use(errorHandler);
 
 export default app;
