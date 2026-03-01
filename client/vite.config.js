@@ -103,7 +103,6 @@ export default defineConfig({
     // Esbuild minification options
     esbuild: {
       drop: ['console', 'debugger'],
-      // Faster builds with parallel processing
       platform: 'browser',
       format: 'esm'
     },
