@@ -7,7 +7,6 @@ import {
 } from "./config/validateEnv.js";
 import env from "./config/envConfigSetup.js";
 
-// Validate environment variables before starting server
 validateEnvironment();
 validateEnvironmentConfig();
 
