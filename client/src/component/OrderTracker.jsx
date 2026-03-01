@@ -1,12 +1,12 @@
 import React from 'react';
 
 const OrderTracker = ({ status }) => {
-  // Define order flow steps
+  // Define order flow steps with FontAwesome icons
   const steps = [
-    { key: 'CONFIRMED', label: 'Confirmed', icon: CheckCircle },
-    { key: 'PROCESSING', label: 'Processing', icon: Package },
-    { key: 'SHIPPED', label: 'Shipped', icon: Truck },
-    { key: 'DELIVERED', label: 'Delivered', icon: Home }
+    { key: 'CONFIRMED', label: 'Confirmed', icon: 'fas fa-check-circle' },
+    { key: 'PROCESSING', label: 'Processing', icon: 'fas fa-box' },
+    { key: 'SHIPPED', label: 'Shipped', icon: 'fas fa-truck' },
+    { key: 'DELIVERED', label: 'Delivered', icon: 'fas fa-home' }
   ];
 
   // Handle special statuses
@@ -14,7 +14,7 @@ const OrderTracker = ({ status }) => {
     return (
       <div className="flex items-center justify-center py-4">
         <div className="flex flex-col items-center text-red-500">
-          <XCircle className="w-12 h-12 mb-2" />
+          <i className="fas fa-times-circle text-5xl mb-2"></i>
           <span className="text-sm font-medium">
             {status === 'CANCELLED' ? 'Order Cancelled' : 'Order Failed'}
           </span>
@@ -28,7 +28,7 @@ const OrderTracker = ({ status }) => {
     return (
       <div className="flex items-center justify-center py-4">
         <div className="flex flex-col items-center text-[#a89068]">
-          <Package className="w-12 h-12 mb-2 animate-pulse" />
+          <i className="fas fa-box text-5xl mb-2 animate-pulse"></i>
           <span className="text-sm font-medium">
             {status === 'CREATED' ? 'Order Created' : 'Payment Received'}
           </span>
@@ -58,7 +58,6 @@ const OrderTracker = ({ status }) => {
 
         {/* Steps */}
         {steps.map((step, index) => {
-          const Icon = step.icon;
           const isCompleted = index <= currentStepIndex;
           const isCurrent = index === currentStepIndex;
 
@@ -79,7 +78,7 @@ const OrderTracker = ({ status }) => {
                   ${isCurrent ? 'ring-4 ring-green-200 scale-110' : ''}
                 `}
               >
-                <Icon className="w-6 h-6" />
+                <i className={`${step.icon} text-xl`}></i>
               </div>
 
               {/* Label */}
@@ -99,5 +98,4 @@ const OrderTracker = ({ status }) => {
     </div>
   );
 };
-
 export default OrderTracker;
