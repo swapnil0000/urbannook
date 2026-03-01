@@ -15,11 +15,8 @@ const applyCouponCodeService = async ({ userId, couponCodeName }) => {
   }
 
   const { cartSubtotal, availableItems } = cartRes.data;
-  const GST_RATE = 0.18;
-  const SHIPPING_CHARGES = 199;
+  const SHIPPING_CHARGES = 50;
 
-  const gstAmount = Math.round(cartSubtotal * GST_RATE);
-  const preTotal = cartSubtotal + gstAmount + SHIPPING_CHARGES;
   let discountAmount = 0;
 
   // --- CASE 1: No Coupon Code Provided ---
@@ -31,12 +28,9 @@ const applyCouponCodeService = async ({ userId, couponCodeName }) => {
       isApplied: false,
       summary: {
         subtotal: cartSubtotal,
-        gst: gstAmount,
         shipping: SHIPPING_CHARGES,
-        preTotal: preTotal,
         discount: 0,
-        grandTotal: Math.max(preTotal, 0),
-        note: "Standard calculation without coupon",
+        grandTotal: cartSubtotal + SHIPPING_CHARGES,
       },
     };
 
@@ -74,7 +68,7 @@ const applyCouponCodeService = async ({ userId, couponCodeName }) => {
 
   // Discount Calculation Logic
   if (coupon.discountType === "PERCENTAGE") {
-    discountAmount = (preTotal * coupon.discountValue) / 100;
+    discountAmount = (cartSubtotal * coupon.discountValue) / 100;
     if (coupon.maxDiscount)
       discountAmount = Math.min(discountAmount, coupon.maxDiscount);
   } else {
@@ -82,7 +76,7 @@ const applyCouponCodeService = async ({ userId, couponCodeName }) => {
   }
 
   discountAmount = Math.round(discountAmount);
-  const grandTotal = Math.max(preTotal - discountAmount, 0);
+  const grandTotal = Math.max(cartSubtotal + SHIPPING_CHARGES - discountAmount, 0);
 
   const calculationSnapshot = {
     couponCodeId: coupon.couponCodeId,
@@ -91,12 +85,9 @@ const applyCouponCodeService = async ({ userId, couponCodeName }) => {
     isApplied: true,
     summary: {
       subtotal: cartSubtotal,
-      gst: gstAmount,
       shipping: SHIPPING_CHARGES,
-      preTotal: preTotal,
       discount: discountAmount,
       grandTotal: grandTotal,
-      note: "GST (18%) and Shipping included in calculations",
     },
   };
 
