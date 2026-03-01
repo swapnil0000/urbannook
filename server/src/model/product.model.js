@@ -29,10 +29,6 @@ const productSchema = mongoose.Schema(
       type: String,
       required: [true, "productDes is required"],
     },
-    listedPrice: {
-      type: Number,
-      required: [true, "listedPrice is required"],
-    },
     sellingPrice: {
       type: Number,
       required: [true, "sellingPrice is required"],

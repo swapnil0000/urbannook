@@ -33,7 +33,6 @@ const CheckoutPage = () => {
   const [pincode, setPincode] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [appliedCoupon, setAppliedCoupon] = useState(null);
-  const [discount, setDiscount] = useState(0);
   const [paymentError, setPaymentError] = useState(null);
   const [showRetry, setShowRetry] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
@@ -55,10 +54,8 @@ const CheckoutPage = () => {
 
   const [pricingDetails, setPricingDetails] = useState({
     subtotal: 0,
-    gst: 0,
-    shipping: 0,
+    shipping: 50,
     discount: 0,
-    grandTotal: 0,
   });
 
   const {
@@ -178,26 +175,21 @@ const CheckoutPage = () => {
           if (result.success && result.data?.summary) {
             setPricingDetails({
               subtotal: result.data.summary.subtotal || 0,
-              gst: result.data.summary.gst || 0,
-              shipping: result.data.summary.shipping || 0,
+              shipping: result.data.summary.shipping || 50,
               discount: result.data.summary.discount || 0,
-              grandTotal: result.data.summary.grandTotal || 0,
             });
           }
         } catch (error) {
           // If coupon validation fails (e.g., min cart value), remove coupon and recalculate
           if (error?.data?.statusCode === 400 && appliedCoupon) {
             setAppliedCoupon(null);
-            setDiscount(0);
             try {
               const result = await applyCouponMutation(null).unwrap();
               if (result.success && result.data?.summary) {
                 setPricingDetails({
                   subtotal: result.data.summary.subtotal || 0,
-                  gst: result.data.summary.gst || 0,
-                  shipping: result.data.summary.shipping || 0,
+                  shipping: result.data.summary.shipping || 50,
                   discount: result.data.summary.discount || 0,
-                  grandTotal: result.data.summary.grandTotal || 0,
                 });
               }
             } catch (retryError) {
@@ -239,13 +231,10 @@ const CheckoutPage = () => {
       const result = await applyCouponMutation(couponData.code).unwrap();
       if (result.success && result.data?.summary) {
         setAppliedCoupon(couponData.code);
-        setDiscount(result.data.summary.discount || 0);
         setPricingDetails({
           subtotal: result.data.summary.subtotal || 0,
-          gst: result.data.summary.gst || 0,
-          shipping: result.data.summary.shipping || 0,
+          shipping: result.data.summary.shipping || 50,
           discount: result.data.summary.discount || 0,
-          grandTotal: result.data.summary.grandTotal || 0,
         });
         const successMessage = result.message || "Coupon applied successfully!";
         showNotification(successMessage, "success");
@@ -263,13 +252,10 @@ const CheckoutPage = () => {
       const result = await applyCouponMutation(null).unwrap();
       if (result.success && result.data?.summary) {
         setAppliedCoupon(null);
-        setDiscount(0);
         setPricingDetails({
           subtotal: result.data.summary.subtotal || 0,
-          gst: result.data.summary.gst || 0,
-          shipping: result.data.summary.shipping || 0,
+          shipping: result.data.summary.shipping || 50,
           discount: result.data.summary.discount || 0,
-          grandTotal: result.data.summary.grandTotal || 0,
         });
         const successMessage = result.message || "Coupon removed";
         showNotification(successMessage, "success");
@@ -343,9 +329,9 @@ const CheckoutPage = () => {
       return;
     }
     
-    if (!window.confirm('Are you sure you want to delete this address?')) {
-      return;
-    }
+    // if (!window.confirm('Are you sure you want to delete this address?')) {
+    //   return;
+    // }
     
     try {
       const result = await deleteAddress(addressId).unwrap();
@@ -618,7 +604,7 @@ const CheckoutPage = () => {
                     <CouponInput
                       key={appliedCoupon || 'no-coupon'}
                       appliedCoupon={appliedCoupon}
-                      discount={discount}
+                      discount={pricingDetails.discount}
                       onCouponApplied={handleCouponApplied}
                       onCouponRemoved={handleCouponRemoved}
                     />
@@ -648,12 +634,13 @@ const CheckoutPage = () => {
                   <span className="text-gray-800 font-medium">₹{pricingDetails.subtotal.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-gray-500">
-                  <span>GST (18%)</span>
-                  <span className="text-gray-800 font-medium">₹{pricingDetails.gst.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-gray-500">
                   <span>Shipping</span>
                   <span className="text-gray-800 font-medium">₹{pricingDetails.shipping.toLocaleString()}</span>
+                </div>
+                
+                <div className="text-[10px] text-gray-500 bg-gray-50 p-2 rounded-lg">
+                  <i className="fa-solid fa-info-circle mr-1"></i>
+                  GST (18%) included in product prices
                 </div>
 
                 {appliedCoupon && pricingDetails.discount > 0 && (
@@ -668,7 +655,9 @@ const CheckoutPage = () => {
                 
                 <div className="flex justify-between items-end pt-5 border-t border-gray-200 mt-2">
                   <span className="text-xs uppercase tracking-widest text-[#a89068] font-bold">Total To Pay</span>
-                  <span className="text-3xl font-serif text-[#2e443c]">₹{finalTotal.toLocaleString()}</span>
+                  <span className="text-3xl font-serif text-[#2e443c]">
+                    ₹{(pricingDetails.subtotal + pricingDetails.shipping - pricingDetails.discount).toLocaleString()}
+                  </span>
                 </div>
               </div>
 
@@ -906,6 +895,26 @@ const CheckoutPage = () => {
         </div>
       </main>
 
+      {/* Coupon Modal */}
+      {showCouponModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4" onClick={() => setShowCouponModal(false)}>
+          <div className="bg-[#f5f7f8] rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 bg-[#2e443c] p-6 flex items-center justify-between border-b border-white/10">
+              <h2 className="text-xl font-serif text-white">Available Coupons</h2>
+              <button onClick={() => setShowCouponModal(false)} className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
+                <i className="fa-solid fa-xmark text-white"></i>
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[calc(80vh-88px)] custom-scrollbar">
+              <Suspense fallback={<ComponentLoader />}>
+                <CouponList onCouponApplied={handleCouponApplied} />
+              </Suspense>
+            </div>
+
+        </div>
+         </div>
+      )}
+
       {/* Mobile Sticky Footer */}
       <div 
         initial={{ y: 100 }}
@@ -915,7 +924,7 @@ const CheckoutPage = () => {
           <div className="flex items-center gap-5 max-w-[1200px] mx-auto">
             <div className="flex flex-col">
                 <span className="text-[9px] text-[#a89068] uppercase tracking-widest font-bold">Total Payable</span>
-                <span className="text-2xl font-serif text-white">₹{finalTotal.toLocaleString()}</span>
+                <span className="text-2xl font-serif text-white">₹{(pricingDetails.subtotal + pricingDetails.shipping - pricingDetails.discount).toLocaleString()}</span>
             </div>
             <button 
                 onClick={handlePayment}
