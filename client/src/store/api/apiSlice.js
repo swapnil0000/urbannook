@@ -117,6 +117,9 @@ export const apiSlice = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithReauth,
   tagTypes: ['Product', 'User', 'Order', 'Category', 'Testimonials', 'Cart', 'Wishlist', 'Coupon', 'Address'],
-  keepUnusedDataFor: 60,
+  keepUnusedDataFor: 300, // Keep cached data for 5 minutes instead of 1 minute
+  refetchOnMountOrArgChange: 30, // Only refetch if data is older than 30 seconds
+  refetchOnFocus: false, // Don't refetch when window regains focus
+  refetchOnReconnect: false, // Don't refetch when reconnecting
   endpoints: (builder) => ({}),
 });
