@@ -8,9 +8,10 @@ const __dirname = path.dirname(__filename);
 const envFile =
   process.env.NODE_ENV === "production" ? ".env.production" : ".env";
 
-const envPath = path.resolve(__dirname, `../${envFile}`);
+const envPath = path.resolve(__dirname, `../../${envFile}`);
 
 console.log(`⏳ Loading Environment from: ${envFile}`);
+console.log(`📁 Full path: ${envPath}`);
 
 dotenv.config({ path: envPath });
 export default process.env

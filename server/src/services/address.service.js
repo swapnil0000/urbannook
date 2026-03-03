@@ -311,16 +311,45 @@ const getSavedAddressService = async ({ userId }) => {
       state: 1,
       pinCode: 1,
       landmark: 1,
+      addressId: 1,
       _id: 0,
     },
   ).lean();
+
+  // Create a Map for O(1) lookup by addressId
+  const foundAddressMap = new Map(
+    extractingAddressFromAddressIds.map((addr) => [addr.addressId, addr])
+  );
+
+  // Detect orphaned IDs (IDs in UserAddress but not in Address collection)
+  const orphanedIds = (userSavedAddressIds?.addresses || []).filter(
+    (id) => !foundAddressMap.has(id)
+  );
+
+  // If orphaned IDs detected, clean them up
+  if (orphanedIds.length > 0) {
+    console.log(
+      `[WARN] Orphaned address IDs detected for userId: ${userId}, orphaned IDs: ${orphanedIds.join(", ")}`
+    );
+
+    // Remove orphaned IDs from UserAddress
+    await UserAddress.updateOne(
+      { userId },
+      { $pull: { addresses: { $in: orphanedIds } } }
+    );
+  }
+
+  // Return only valid addresses (filter out orphaned IDs)
+  const validAddressIds = (userSavedAddressIds?.addresses || []).filter((id) =>
+    foundAddressMap.has(id)
+  );
 
   return {
     statusCode: 200,
     message: "Saved Address Ids",
     data: {
       extractingAddressFromAddressIds,
-      addressId: userSavedAddressIds?.addresses,
+      addressId: validAddressIds,
     },
     success: true,
   };
@@ -331,23 +360,36 @@ const deleteSavedAddressService = async ({ userId, addressId }) => {
     throw new AuthenticationError("Unauthorized");
   }
 
-  const deletedAddress = await Address.findOneAndDelete({
-    addressId,
-  });
-
-  if (!deletedAddress) {
-    throw new NotFoundError("Address not found");
-  }
-
-  const updatedMapping = await UserAddress.findOneAndUpdate(
+  // REVERSE ORDER: Remove from UserAddress FIRST
+  await UserAddress.findOneAndUpdate(
     { userId },
     { $pull: { addresses: addressId } },
     { new: true },
   );
 
+  // Then attempt to delete from Address collection
+  try {
+    const deletedAddress = await Address.findOneAndDelete({
+      addressId,
+    });
+
+    if (!deletedAddress) {
+      // Address not found - this is an orphaned ID case
+      console.log(
+        `[WARN] Orphaned address ID removed for userId: ${userId}, addressId: ${addressId}`
+      );
+    }
+  } catch (error) {
+    // Log error but don't throw - deletion is idempotent
+    console.log(
+      `[WARN] Error deleting address from Address collection: ${error.message}`
+    );
+  }
+
+  // Always return success - idempotent deletion
   return {
     statusCode: 200,
-    message: "Address deleted successfully from",
+    message: "Address deleted successfully",
     data: null,
     success: true,
   };

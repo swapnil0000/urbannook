@@ -10,6 +10,7 @@ import {
   useGetSavedAddressesQuery,
   useUpdateAddressMutation,
   useDeleteAddressMutation,
+  useUpdateCartMutation,
 } from "../store/api/userApi";
 import { clearCartCompletely } from "../utils/cartUtils";
 import { clearCart } from "../store/slices/cartSlice";
@@ -68,6 +69,7 @@ const CheckoutPage = () => {
   const [applyCouponMutation] = useApplyCouponMutation();
   const [updateAddress] = useUpdateAddressMutation();
   const [deleteAddress] = useDeleteAddressMutation();
+  const [updateCart] = useUpdateCartMutation();
   const { data: savedAddressData, refetch: refetchAddresses } = useGetSavedAddressesQuery();
 
   useEffect(() => {
@@ -266,6 +268,27 @@ const CheckoutPage = () => {
         error?.message ||
         "Failed to remove coupon. Please refresh the page.";
       showNotification(errorMessage, "error");
+    }
+  };
+
+  const handleRemoveItem = async (productId) => {
+    try {
+      // Find the item to get mongoId for backend sync
+      const item = cartItems.find(item => item.id === productId);
+      const mongoId = item?.mongoId || productId;
+      
+      // Call API with action='remove'
+      await updateCart({ productId: mongoId, quantity: 1, action: 'remove' }).unwrap();
+      
+      showNotification("Item removed from cart", "success");
+      
+      // If cart becomes empty after removal, redirect to products
+      if (cartItems.length === 1) {
+        navigate("/products");
+      }
+    } catch (error) {
+      console.error('Failed to remove item:', error);
+      showNotification("Failed to remove item", "error");
     }
   };
 
@@ -556,8 +579,20 @@ const CheckoutPage = () => {
                 {cartItems.map((item) => (
                   <div
                     key={item.id}
-                    className="flex gap-4 items-center bg-white p-3 rounded-xl border border-gray-200 hover:border-[#a89068]/40 transition-colors"
+                    className="relative flex gap-4 items-center bg-white p-3 rounded-xl border border-gray-200 hover:border-[#a89068]/40 transition-colors group"
                   >
+                    {/* Remove button - top right corner */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveItem(item.id);
+                      }}
+                      className="absolute top-2 right-2 w-4 h-4 rounded-full bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 flex items-center justify-center transition-all opacity-100"
+                      title="Remove item"
+                    >
+                      <i className="fa-solid fa-xmark text-red-500 text-xs"></i>
+                    </button>
+                    
                     <div className="w-14 h-14 bg-gray-100 rounded-lg flex items-center justify-center p-1.5 shrink-0">
                       <img
                         src={item.image || "/placeholder.jpg"}
@@ -727,7 +762,7 @@ const CheckoutPage = () => {
                       ${mobileErrors?.receiver ? 'border-red-500' : 'border-gray-200 focus:border-[#a89068]'}`}
                     placeholder="10-digit mobile number"
                   />
-                  <p className="text-[10px] text-gray-500 ml-1">For delivery coordination calls</p>
+                  <p className="text-[10px] text-gray-500 ml-1">By default your contact details will be used for delivery coordination calls</p>
                   {mobileErrors?.receiver && (
                     <p className="text-[10px] text-red-500 ml-1">{mobileErrors?.receiver}</p>
                   )}
