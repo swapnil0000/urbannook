@@ -89,8 +89,8 @@ const AireFeaturedProducts = memo(() => {
              </h2>
 
              {/* Subtitle */}
-             <p className="text-base md:text-lg lg:text-xl text-[#F5DEB3]/80 italic font-light mb-6 md:mb-8">
-                {featuredProduct.productSubDes || "Designed to stand out."}
+             <p className="text-base md:text-lg lg:text-xl text-[#F5DEB3]/80  font-light mb-6 md:mb-8">
+                {featuredProduct.productDes || "Designed to stand out."}
              </p>
 
              {/* Divider */}
