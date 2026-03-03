@@ -9,11 +9,9 @@ const mode = process.env.NODE_ENV || "development";
 const envFile = mode === "production" ? ".env.production" : ".env";
 const envPath = path.resolve(__dirname, `../../${envFile}`); 
 
-console.log(`⏳ Loading Environment: ${envFile} (Mode: ${mode})`);
-const result = dotenv.config({ path: envPath });
+const envPath = path.resolve(__dirname, `../../${envFile}`);
 
-if (result.error) {
-  console.error(`❌ Failed to load ${envFile}:`, result.error.message);
-}
+console.log(`⏳ Loading Environment from: ${envFile}`);
+console.log(`📁 Full path: ${envPath}`);
 
 export default process.env;

@@ -19,6 +19,7 @@ import healthRouter from "./routes/health.route.js";
 import { corsOptions, logCorsConfig } from "./config/cors.config.js";
 import { errorHandler } from "./middleware/errorHandler.middleware.js";
 
+
 const app = express();
 app.set("trust proxy", 1);
 
