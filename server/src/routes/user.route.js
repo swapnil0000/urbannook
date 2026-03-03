@@ -195,6 +195,12 @@ userRouter.post(
 );
 
 userRouter.post(
+  "/user/create-order/retry",
+  authGuardService("USER"),
+  razorpayCreateOrderController,
+);
+
+userRouter.post(
   "/user/payment/verification",
   authGuardService("USER"),
   razorpayPaymentVerificationController,

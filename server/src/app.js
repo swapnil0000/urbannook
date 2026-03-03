@@ -1,6 +1,5 @@
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import {
   userRouter,
   adminRouter,
@@ -19,10 +18,6 @@ import cookieParser from "cookie-parser";
 import healthRouter from "./routes/health.route.js";
 import { corsOptions, logCorsConfig } from "./config/cors.config.js";
 import { errorHandler } from "./middleware/errorHandler.middleware.js";
-
-dotenv.config({
-  path: "./.env",
-});
 
 const app = express();
 app.set("trust proxy", 1);
