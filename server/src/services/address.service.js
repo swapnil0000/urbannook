@@ -225,8 +225,8 @@ const updatedAddressService = async ({
   formattedAddress,
   addressId,
   placeId,
-  landmark,           
-  flatOrFloorNumber,  
+  landmark,
+  flatOrFloorNumber,
 }) => {
   if (!userId) {
     throw new AuthenticationError("Unauthorized");
@@ -268,8 +268,8 @@ const updatedAddressService = async ({
         state,
         pinCode,
         formattedAddress,
-        landmark,            // Update mein add kiya
-        flatOrFloorNumber,    // Update mein add kiya
+        landmark,
+        flatOrFloorNumber, 
       },
     },
     {
@@ -298,12 +298,30 @@ const getSavedAddressService = async ({ userId }) => {
   }
 
   // user - address mappings with address id - uuid v7
-  const userSavedAddressIds = await UserAddress.findOne({ userId });
+  const userSavedAddressIds = await UserAddress.findOne({ userId }).lean();
+
+  if (
+    !userSavedAddressIds ||
+    !userSavedAddressIds.addresses ||
+    userSavedAddressIds.addresses.length === 0
+  ) {
+    return {
+      statusCode: 200,
+      message: "No saved addresses",
+      data: {
+        extractingAddressFromAddressIds: [],
+        addressId: [],
+      },
+      success: true,
+    };
+  }
+
   const extractingAddressFromAddressIds = await Address.find(
     {
-      addressId: userSavedAddressIds?.addresses,
+      addressId: { $in: userSavedAddressIds.addresses },
     },
     {
+      addressId: 1,
       formattedAddress: 1,
       addressType: 1,
       flatOrFloorNumber: 1,
@@ -320,7 +338,7 @@ const getSavedAddressService = async ({ userId }) => {
     message: "Saved Address Ids",
     data: {
       extractingAddressFromAddressIds,
-      addressId: userSavedAddressIds?.addresses,
+      addressId: userSavedAddressIds.addresses,
     },
     success: true,
   };
@@ -331,23 +349,43 @@ const deleteSavedAddressService = async ({ userId, addressId }) => {
     throw new AuthenticationError("Unauthorized");
   }
 
-  const deletedAddress = await Address.findOneAndDelete({
-    addressId,
-  });
-
-  if (!deletedAddress) {
-    throw new NotFoundError("Address not found");
+  if (!addressId) {
+    throw new ValidationError("Address ID is required");
   }
 
-  const updatedMapping = await UserAddress.findOneAndUpdate(
+  const userHasAddress = await UserAddress.findOne(
+    { userId, addresses: addressId },
+    { _id: 1 },
+  ).lean();
+
+  if (!userHasAddress) {
+    throw new NotFoundError("Address not found for this user");
+  }
+
+  // Remove from UserAddress array
+  const userAddressUpdate = await UserAddress.findOneAndUpdate(
     { userId },
     { $pull: { addresses: addressId } },
     { new: true },
   );
 
+  if (!userAddressUpdate) {
+    throw new InternalServerError("Failed to remove address from user");
+  }
+
+  // Delete from global Address collection if no other user has it
+  const deletedAddress = await Address.findOneAndDelete(
+    { addressId },
+    { new: true },
+  );
+
+  if (!deletedAddress) {
+    throw new NotFoundError("Address not found in database");
+  }
+
   return {
     statusCode: 200,
-    message: "Address deleted successfully from",
+    message: "Address deleted successfully",
     data: null,
     success: true,
   };

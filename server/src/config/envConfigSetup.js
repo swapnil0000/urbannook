@@ -4,13 +4,16 @@ import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const mode = process.env.NODE_ENV || "development"; 
 
-const envFile =
-  process.env.NODE_ENV === "production" ? ".env.production" : ".env";
+const envFile = mode === "production" ? ".env.production" : ".env";
+const envPath = path.resolve(__dirname, `../../${envFile}`); 
 
-const envPath = path.resolve(__dirname, `../${envFile}`);
+console.log(`⏳ Loading Environment: ${envFile} (Mode: ${mode})`);
+const result = dotenv.config({ path: envPath });
 
-console.log(`⏳ Loading Environment from: ${envFile}`);
+if (result.error) {
+  console.error(`❌ Failed to load ${envFile}:`, result.error.message);
+}
 
-dotenv.config({ path: envPath });
-export default process.env
+export default process.env;
