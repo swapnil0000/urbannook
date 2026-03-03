@@ -40,17 +40,12 @@ const getErrorMessage = (errorCode) => {
   return PAYMENT_ERROR_MESSAGES[errorCode] || PAYMENT_ERROR_MESSAGES.default;
 };
 const razorpayKeyGetController = asyncHandler(async (_, res) => {
-  const isProduction = env.NODE_ENV === 'production';
-  const key_id = isProduction
-    ? env.RP_PROD_KEY_ID
-    : env.RP_LOCAL_TEST_KEY_ID;
+  const key_id = env.RP_KEY_ID
   if (!key_id) {
     throw new NotFoundError("Rp - Key");
   }
-  
-  return res
-    .status(200)
-    .json(new ApiRes(200, `Rp - Key`, key_id, true));
+
+  return res.status(200).json(new ApiRes(200, `Rp - Key`, key_id, true));
 });
 
 const razorpayCreateOrderController = asyncHandler(async (req, res) => {
@@ -69,17 +64,21 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     if (!mobile) return "";
     const trimmed = mobile.trim();
     // Strip +91 or 91 prefix if present
-    if (trimmed.startsWith('+91')) {
+    if (trimmed.startsWith("+91")) {
       return trimmed.substring(3);
-    } else if (trimmed.startsWith('91') && trimmed.length === 12) {
+    } else if (trimmed.startsWith("91") && trimmed.length === 12) {
       return trimmed.substring(2);
     }
     return trimmed;
   };
   
   // Determine final mobile numbers with fallback logic (trim whitespace and strip country code)
-  const finalSenderMobile = stripCountryCode(senderMobile || user?.mobileNumber?.toString() || "");
-  const finalReceiverMobile = stripCountryCode(receiverMobile || finalSenderMobile);
+  const finalSenderMobile = stripCountryCode(
+    senderMobile || user?.mobileNumber?.toString() || "",
+  );
+  const finalReceiverMobile = stripCountryCode(
+    receiverMobile || finalSenderMobile,
+  );
 
   // Validate sender mobile (required)
   if (!finalSenderMobile || !/^[0-9]{10}$/.test(finalSenderMobile)) {
@@ -88,7 +87,9 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
 
   // Validate receiver mobile if provided
   if (receiverMobile && !/^[0-9]{10}$/.test(finalReceiverMobile)) {
-    throw new ValidationError("Receiver mobile number must be exactly 10 digits");
+    throw new ValidationError(
+      "Receiver mobile number must be exactly 10 digits",
+    );
   }
 
   // Fetch cart to get the calculated grand total from applyCoupon API
@@ -252,8 +253,8 @@ const razorpayPaymentVerificationController = asyncHandler(async (req, res) => {
 });
 
 const razorpayWebHookController = async (req, res) => {
-  const secret = env.RP_WEBHOOK_TEST_SECRET;
-  
+  const secret = env.RP_WEBHOOK_SECRET;
+
   const signature = req.headers["x-razorpay-signature"];
   if (!signature) {
     return res.status(400).json({
@@ -307,10 +308,10 @@ const razorpayWebHookController = async (req, res) => {
           try {
             await Cart.updateOne(
               { userId: findingUserId?.userId },
-              { 
+              {
                 $set: { products: {} },
-                $unset: { appliedCoupon: 1 }
-              }
+                $unset: { appliedCoupon: 1 },
+              },
             );
             console.log(
               `[INFO] Cart cleared after successful payment - UserId: ${findingUserId?.userId}, OrderId: ${order.orderId}`,
