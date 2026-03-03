@@ -1,7 +1,4 @@
-import {
-  razorpayCreateOrderService,
-  razorpayPaymentVerificationService,
-} from "../services/rp.payement.service.js";
+import { razorpayCreateOrderService } from "../services/rp.payement.service.js";
 import { ApiRes } from "../utils/index.js";
 import User from "../model/user.model.js";
 import Order from "../model/order.model.js";
@@ -40,7 +37,7 @@ const getErrorMessage = (errorCode) => {
   return PAYMENT_ERROR_MESSAGES[errorCode] || PAYMENT_ERROR_MESSAGES.default;
 };
 const razorpayKeyGetController = asyncHandler(async (_, res) => {
-  const key_id = env.RP_KEY_ID
+  const key_id = env.RP_KEY_ID;
   if (!key_id) {
     throw new NotFoundError("Rp - Key");
   }
@@ -58,7 +55,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
 
   // Fetch user profile for fallback mobile number
   const user = await User.findOne({ userId }).lean();
-  
+
   // Helper function to strip country code
   const stripCountryCode = (mobile) => {
     if (!mobile) return "";
@@ -71,7 +68,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     }
     return trimmed;
   };
-  
+
   // Determine final mobile numbers with fallback logic (trim whitespace and strip country code)
   const finalSenderMobile = stripCountryCode(
     senderMobile || user?.mobileNumber?.toString() || "",
@@ -166,92 +163,6 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   );
 });
 
-const razorpayPaymentVerificationController = asyncHandler(async (req, res) => {
-  const { userId } = req.user;
-  if (!userId) {
-    throw new NotFoundError("User not found for payment");
-  }
-  const { razorpay_payment_id, razorpay_order_id, razorpay_signature, error } =
-    req.body;
-
-  console.log(
-    `[INFO] Payment verification started - UserId: ${userId}, RazorpayOrderId: ${razorpay_order_id}, RazorpayPaymentId: ${razorpay_payment_id}`,
-  );
-
-  // Handle payment failure from Razorpay
-  if (error) {
-    const errorCode = error.code || "payment_failed";
-    const errorDescription = getErrorMessage(errorCode);
-
-    console.log(
-      `[WARN] Payment failed from Razorpay - UserId: ${userId}, RazorpayOrderId: ${razorpay_order_id}, ErrorCode: ${errorCode}, ErrorDescription: ${errorDescription}`,
-    );
-
-    // Update order with error details
-    await Order.updateOne(
-      { "payment.razorpayOrderId": razorpay_order_id },
-      {
-        $set: {
-          status: "FAILED",
-          "payment.errorCode": errorCode,
-          "payment.errorDescription": errorDescription,
-        },
-      },
-    );
-
-    throw new ValidationError(errorDescription, {
-      errorCode,
-      preserveCart: true,
-    });
-  }
-
-  const isPaymentVerifiedOrNot = await razorpayPaymentVerificationService(
-    razorpay_order_id,
-    razorpay_payment_id,
-    razorpay_signature,
-  );
-  if (!isPaymentVerifiedOrNot) {
-    // Signature verification failed
-    const errorCode = "signature_verification_failed";
-    const errorDescription = getErrorMessage(errorCode);
-
-    console.error(
-      `[ERROR] Payment signature verification failed - UserId: ${userId}, RazorpayOrderId: ${razorpay_order_id}, RazorpayPaymentId: ${razorpay_payment_id}`,
-    );
-
-    await Order.updateOne(
-      { "payment.razorpayOrderId": razorpay_order_id },
-      {
-        $set: {
-          status: "FAILED",
-          "payment.errorCode": errorCode,
-          "payment.errorDescription": errorDescription,
-        },
-      },
-    );
-
-    throw new ValidationError(errorDescription, {
-      errorCode,
-      preserveCart: true,
-    });
-  }
-
-  console.log(
-    `[INFO] Payment verification successful - UserId: ${userId}, RazorpayOrderId: ${razorpay_order_id}, RazorpayPaymentId: ${razorpay_payment_id}`,
-  );
-
-  return res
-    .status(Number(isPaymentVerifiedOrNot?.statusCode))
-    .json(
-      new ApiRes(
-        Number(isPaymentVerifiedOrNot?.statusCode),
-        isPaymentVerifiedOrNot?.message,
-        isPaymentVerifiedOrNot?.data,
-        isPaymentVerifiedOrNot?.success,
-      ),
-    );
-});
-
 const razorpayWebHookController = async (req, res) => {
   const secret = env.RP_WEBHOOK_SECRET;
 
@@ -295,38 +206,10 @@ const razorpayWebHookController = async (req, res) => {
           order.payment.razorpayPaymentId = payment.id;
           order.status = "PAID";
           await order.save();
-          const findingUserId = await Order.findOne(
-            {
-              orderId: order?.orderId,
-            },
-            {
-              userId: 1,
-            },
-          ).lean();
-
-          // Clear user's cart after successful payment
-          try {
-            await Cart.updateOne(
-              { userId: findingUserId?.userId },
-              {
-                $set: { products: {} },
-                $unset: { appliedCoupon: 1 },
-              },
-            );
-            console.log(
-              `[INFO] Cart cleared after successful payment - UserId: ${findingUserId?.userId}, OrderId: ${order.orderId}`,
-            );
-          } catch (cartError) {
-            console.error(
-              `[ERROR] Failed to clear cart after payment - UserId: ${findingUserId?.userId}, OrderId: ${order.orderId}:`,
-              cartError.message,
-            );
-            // Don't fail the payment if cart clearing fails
-          }
 
           // Send order confirmation and payment receipt emails
           try {
-            const user = await User.findOne({ userId: findingUserId?.userId });
+            const user = await User.findOne({ userId: order?.userId });
             if (user && user.email) {
               // Prepare order details for email
               const orderDetails = {
@@ -343,9 +226,14 @@ const razorpayWebHookController = async (req, res) => {
               };
 
               // Send order confirmation email
-              sendOrderConfirmation(user.email, orderDetails).catch((err) => {
-                console.error("Failed to send order confirmation email:", err);
-              });
+              await sendOrderConfirmation(user.email, orderDetails).catch(
+                (err) => {
+                  console.error(
+                    "Failed to send order confirmation email:",
+                    err,
+                  );
+                },
+              );
 
               // Send payment receipt email
               const paymentDetails = {
@@ -354,9 +242,11 @@ const razorpayWebHookController = async (req, res) => {
                 orderId: order.orderId,
                 date: new Date(),
               };
-              sendPaymentReceipt(user.email, paymentDetails).catch((err) => {
-                console.error("Failed to send payment receipt email:", err);
-              });
+              await sendPaymentReceipt(user.email, paymentDetails).catch(
+                (err) => {
+                  console.error("Failed to send payment receipt email:", err);
+                },
+              );
             }
           } catch (emailError) {
             console.error("Error sending emails:", emailError);
@@ -421,7 +311,6 @@ const razorpayWebHookController = async (req, res) => {
 
 export {
   razorpayCreateOrderController,
-  razorpayPaymentVerificationController,
   razorpayKeyGetController,
   razorpayWebHookController,
 };

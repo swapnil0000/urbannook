@@ -68,7 +68,6 @@ import {
 ================================================================ */
 import {
   razorpayCreateOrderController,
-  razorpayPaymentVerificationController,
   razorpayKeyGetController,
   razorpayWebHookController,
 } from "../controller/rp.payment.controller.js";
@@ -192,12 +191,6 @@ userRouter.post(
   "/user/create-order",
   authGuardService("USER"),
   razorpayCreateOrderController,
-);
-
-userRouter.post(
-  "/user/payment/verification",
-  authGuardService("USER"),
-  razorpayPaymentVerificationController,
 );
 
 /* ===============================================================
