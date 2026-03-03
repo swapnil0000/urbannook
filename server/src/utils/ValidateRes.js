@@ -391,7 +391,7 @@ const validateUpdateUserAddress = ({
     };
   }
 
-  if (pinCode && (!Number.isInteger(pinCode) || String(pinCode).length !== 6)) {
+  if (pinCode && (String(pinCode).length !== 6)) {
     return {
       success: false,
       statusCode: 400,

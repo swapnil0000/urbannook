@@ -51,19 +51,14 @@ const userCommunityController = asyncHandler(async (req, res) => {
 
   const sendCommunityEmail = async (to) => {
     try {
-      await transporter.sendMail({
+    
+       await transporter.sendMail({
         from: "UrbanNook <urbanadmin@urbannook.in>",
         to,
         subject: "Welcome to the UrbanNook Community 🎉",
         html: communityTemplate,
       });
-      const sendEmailCommunityServiceValidation =
-        await sendEmailCommunityService(
-          to,
-          "Welcome to the UrbanNook Community 🎉",
-          communityTemplate,
-        );
-      return true;
+            return true;
     } catch (err) {
       console.error("Community email failed:", err.message);
       return false;

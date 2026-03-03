@@ -7,7 +7,7 @@ function getAllowedOrigins() {
     .map((origin) => origin.trim())
     .filter((origin) => origin.length > 0);
 
-  if (env === "development") {
+  if (env.NODE_ENV === "development") {
     const localhostOrigins = [...origins];
 
     localhostOrigins.forEach((localhost) => {
@@ -39,7 +39,7 @@ export const corsOptions = {
       console.warn(`⚠️  CORS: Rejected request from origin: ${origin}`);
       console.warn(`   Allowed origins: ${allowedOrigins.join(', ')}`);
 
-      if (env === "production") {
+      if (env.NODE_ENV === "production") {
         callback(new Error("Not allowed by CORS"));
       } else {
         // In development, be more lenient but still log the warning

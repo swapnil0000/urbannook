@@ -303,7 +303,7 @@ return (
 
           {/* 3. Map Container */}
           {/* CHANGED: min-h-[150px] on mobile so it doesn't push the bottom panel off-screen */}
-          <div className="relative flex-1 min-h-[150px] sm:min-h-[250px] w-full bg-gray-100 z-10">
+          <div className="relative flex-1 min-h-[100px] sm:min-h-[250px] w-full bg-gray-100 z-10">
             <div ref={mapElement} className="w-full h-full pointer-events-auto" style={{ touchAction: 'pan-x pan-y' }} />
 
             {/* Center Pin */}
@@ -328,7 +328,7 @@ return (
 
           {/* 4. Address Selection Bottom Panel */}
           {/* CHANGED: h-[35vh] on mobile so it takes up exact remaining space and scrolls perfectly */}
-          <div className="p-4 sm:p-5 bg-white h-[35vh] sm:h-[280px] flex flex-col shrink-0 border-t border-gray-200 relative z-[110]">
+          <div className="p-4 sm:p-5 bg-white h-[45vh] sm:h-[280px] flex flex-col shrink-0 border-t border-gray-200 relative z-[110]">
             
             {/* Address Type Selector */}
             <div className="mb-3 shrink-0">

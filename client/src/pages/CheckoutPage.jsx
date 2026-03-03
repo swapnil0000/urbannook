@@ -1,9 +1,8 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect, lazy, Suspense, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 
-import {
-  useGetUserProfileQuery,
+import { useGetUserProfileQuery,
   useGetRazorpayKeyQuery,
   useCreateOrderMutation,
   useApplyCouponMutation,
@@ -12,7 +11,6 @@ import {
   useDeleteAddressMutation,
   useUpdateCartMutation,
 } from "../store/api/userApi";
-import { clearCartCompletely } from "../utils/cartUtils";
 import { clearCart } from "../store/slices/cartSlice";
 import { useUI } from "../hooks/useRedux";
 import CouponInput from "../component/CouponInput";
@@ -28,6 +26,7 @@ const CheckoutPage = () => {
   const { showNotification, openLoginModal } = useUI();
   const { items: cartItems } = useSelector((state) => state.cart);
   const { isAuthenticated } = useSelector((state) => state.auth);
+  const paymentCompletedRef = useRef(false);
 
   const [userProfile, setUserProfile] = useState(null);
   const [address, setAddress] = useState("");
@@ -147,7 +146,8 @@ const CheckoutPage = () => {
       return;
     }
 
-    if (cartItems.length === 0) {
+    // Don't redirect if payment was completed
+    if (cartItems.length === 0 && !paymentCompletedRef.current) {
       navigate("/products");
       return;
     }
@@ -459,19 +459,53 @@ const CheckoutPage = () => {
         handler: async function (response) {
           try {
             const orderId = response.razorpay_order_id;
+            const paymentId = response.razorpay_payment_id;
+            const signature = response.razorpay_signature;            
+            // Call payment verification endpoint
+            try {
+              const verifyResponse = await fetch(`${import.meta.env.VITE_API_BASE_URL}/user/payment/verification`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                  razorpay_order_id: orderId,
+                  razorpay_payment_id: paymentId,
+                  razorpay_signature: signature,
+                }),
+              });
+              
+              const verifyData = await verifyResponse.json();
+
+              if (!verifyResponse.ok || !verifyData.success) {
+                throw new Error(verifyData.message || 'Payment verification failed');
+              }
+            } catch (verifyError) {
+              console.error('[ERROR] Payment verification failed:', verifyError);
+              showNotification(
+                "Payment received but verification failed. Please contact support.",
+                "error",
+              );
+              return;
+            }
             
-            // Clear cart completely (both Redux and backend)
-            await clearCartCompletely(dispatch, clearCart, apiBaseUrl);
+            // Mark payment as completed to prevent redirect
+            paymentCompletedRef.current = true;
+            
+            // Clear Redux cart immediately
+            dispatch(clearCart());
             
             showNotification(
-              `Payment successful! Order ID: ${orderId}`,
+              `Payment successful! Redirecting to orders...`,
               "success",
             );
     
             setTimeout(() => {
               navigate("/orders");
-            }, 2000);
+            }, 1000);
           } catch (verifyError) {
+            console.error("Payment handler error:", verifyError);
             setPaymentError(
               "Payment verification failed. Please contact support if amount was debited.",
             );
@@ -593,7 +627,7 @@ const CheckoutPage = () => {
                       <i className="fa-solid fa-xmark text-red-500 text-xs"></i>
                     </button>
                     
-                    <div className="w-14 h-14 bg-gray-100 rounded-lg flex items-center justify-center p-1.5 shrink-0">
+                    <div className="w-14 h-14 bg-gray-100 rounded-lg rounded-s flex items-center justify-center  shrink-0">
                       <img
                         src={item.image || "/placeholder.jpg"}
                         alt={item.name}
@@ -956,7 +990,7 @@ const CheckoutPage = () => {
         animate={{ y: 0 }}
         className="fixed bottom-0 left-0 right-0 bg-[#2e443c] border-t border-white/10 p-4 px-6 z-50 lg:hidden shadow-[0_-10px_30px_rgba(0,0,0,0.4)]"
       >
-          <div className="flex items-center gap-5 max-w-[1200px] mx-auto">
+          <div className="flex items-center justify-around gap-5 max-w-[1200px] mx-auto">
             <div className="flex flex-col">
                 <span className="text-[9px] text-[#a89068] uppercase tracking-widest font-bold">Total Payable</span>
                 <span className="text-2xl font-serif text-white">₹{(pricingDetails.subtotal + pricingDetails.shipping - pricingDetails.discount).toLocaleString()}</span>
@@ -964,14 +998,14 @@ const CheckoutPage = () => {
             <button 
                 onClick={handlePayment}
                 disabled={isOrdering || !address}
-                className={`flex-1 h-14 rounded-xl font-bold uppercase tracking-widest text-[11px] shadow-lg active:scale-95 transition-all flex items-center justify-center gap-3 ${
+                className={`flex-1 h-10 max-w-[150px] rounded-xl font-bold uppercase tracking-widest text-[11px] shadow-lg active:scale-95 transition-all flex items-center justify-center gap-3 ${
                     !address 
                     ? 'bg-white/10 text-gray-400 border border-white/10' 
                     : 'bg-[#a89068] text-white'
                 }`}
             >
                 {isOrdering ? (
-                    <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Proc...</>
+                    <><div className="w-2 h-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Proc...</>
                 ) : (!address ? (
                     'Set Address'
                 ) : (

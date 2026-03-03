@@ -5,20 +5,21 @@ import { validateRequest } from '../middleware/validation.middleware.js';
 import { authGuardService } from '../services/common.auth.service.js';
 
 const router = express.Router();
+
 router.post(
-  '/submit',
+  '/contact/submit',
   validateRequest(contactSubmissionSchema),
   contactController.submitContactForm
 );
 
 router.get(
-  '/submissions',
+  '/contact/submissions',
   authGuardService('Admin'),
   contactController.getAllSubmissions
 );
 
 router.patch(
-  '/submissions/:id',
+  '/contact/submissions/:id',
   authGuardService('Admin'),
   contactController.updateSubmissionStatus
 );

@@ -143,7 +143,7 @@ const Footer = () => {
                     <i className="fa-solid fa-phone text-xs text-gray-400 group-hover:text-[#1c3026]"></i>
                     <span className="text-sm">+91 82996 38749</span>
                   </a>
-                  <span className="text-[10px] text-gray-400">Mon - Sat | 10AM - 7PM</span>
+                  <span className="text-[10px] text-gray-400">Mon - Sat | 9AM - 7PM</span>
                 </div>
               </div>
             </div>

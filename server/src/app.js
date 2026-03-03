@@ -2,7 +2,6 @@ import express from "express";
 import cors from "cors";
 import {
   userRouter,
-  adminRouter,
   productRouter,
   commonRouter,
   userWaitListRouter,
@@ -43,7 +42,6 @@ app.use(cookieParser());
 app.use(
   "/api/v1",
   userRouter,
-  adminRouter,
   productRouter,
   commonRouter,
   userWaitListRouter,
