@@ -139,7 +139,7 @@ export const authApi = apiSlice.injectEndpoints({
     }),
     googleLogin: builder.mutation({
       query: (credentials) => ({
-        url: 'user/google-login',
+        url: '/user/google-login',
         method: 'POST',
         body: credentials,
       }),
