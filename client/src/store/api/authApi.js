@@ -137,6 +137,32 @@ export const authApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['User'],
     }),
+    googleLogin: builder.mutation({
+      query: (credentials) => ({
+        url: 'user/google-login',
+        method: 'POST',
+        body: credentials,
+      }),
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          // Set credentials in Redux and localStorage
+          if (data.success && data.data) {
+            dispatch(setCredentials({
+              user: {
+                email: data.data.email,
+                name: data.data.name,
+                role: data.data.role,
+                userId: data.data.userId,
+              },
+              token: data.data.userAccessToken,
+            }));
+          }
+        } catch (error) {
+          console.error('Google login failed:', error);
+        }
+      },
+    }),
   }),
 });
 
@@ -151,4 +177,5 @@ export const {
   useUpdateProfileMutation,
   useForgotPasswordRequestMutation,
   useForgotPasswordResetMutation,
+  useGoogleLoginMutation,
 } = authApi;

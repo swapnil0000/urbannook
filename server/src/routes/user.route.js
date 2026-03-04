@@ -23,6 +23,7 @@ import {
   userForgetpassword,
   userForgotPasswordRequest,
   userForgotPasswordReset,
+  userGoogleLogin,
 } from "../controller/user.controller.js";
 
 import { userOrderPreviousHistory } from "../controller/user.cart.controller.js";
@@ -85,6 +86,7 @@ const authLimiter = rateLimit({
 ================================================================ */
 userRouter.post("/user/login", authLimiter, validateRequest(loginSchema), userLogin);
 userRouter.post("/user/register", authLimiter, validateRequest(registerSchema), userRegister);
+userRouter.post("/user/google-login",authLimiter, userGoogleLogin);
 userRouter.post("/user/forgot-password", userForgetpassword);
 
 /* ===============================================================

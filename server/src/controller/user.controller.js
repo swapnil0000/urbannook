@@ -7,6 +7,8 @@ import {
   loginService,
   registerService,
 } from "../services/user.auth.service.js";
+import { verifyGoogleToken } from "../services/google.auth.service.js";
+import { v7 as uuid7 } from "uuid";
 import cookieOptions from "../config/config.js";
 import {
   profileFetchService,
@@ -152,12 +154,13 @@ const userUpdateProfile = asyncHandler(async (req, res) => {
     throw new AuthenticationError("Unauthorized");
   }
 
-  const { email, name, mobileNumber } = req.body || {};
+  const { email, name, mobileNumber, pinCode } = req.body || {};
   
   if (
     name === undefined &&
     mobileNumber == undefined &&
-    email === undefined
+    email === undefined &&
+    pinCode === undefined
   ) {
     throw new ValidationError("No fields provided for update");
   }
@@ -165,6 +168,7 @@ const userUpdateProfile = asyncHandler(async (req, res) => {
   const validate = validateUserInput({
     name,
     mobileNumber,
+    pinCode,
   });
 
   if (!validate.success) {
@@ -174,7 +178,8 @@ const userUpdateProfile = asyncHandler(async (req, res) => {
   const updateFields = {};
   if (email !== undefined) updateFields.email = email;
   if (name !== undefined) updateFields.name = name;
-  if (mobileNumber !== undefined) updateFields.mobileNumber = mobileNumber;
+  if (mobileNumber !== undefined) updateFields.mobileNumber = Number(mobileNumber); // Convert string to number for DB
+  if (pinCode !== undefined) updateFields.pinCode = pinCode;
   
   const updatedUser = await User.findOneAndUpdate(
     {
@@ -183,9 +188,10 @@ const userUpdateProfile = asyncHandler(async (req, res) => {
         email !== undefined ? { email: { $ne: email } } : null,
         name != undefined ? { name: { $ne: name } } : null,
         mobileNumber != undefined
-          ? { mobileNumber: { $ne: mobileNumber } }
+          ? { mobileNumber: { $ne: Number(mobileNumber) } }
           : null,
-      ],
+        pinCode != undefined ? { pinCode: { $ne: pinCode } } : null,
+      ].filter(Boolean),
     },
     {
       $set: updateFields,
@@ -216,6 +222,7 @@ const userUpdateProfile = asyncHandler(async (req, res) => {
         email: updatedUser.email,
         name: updatedUser.name,
         mobileNumber: updatedUser.mobileNumber,
+        pinCode: updatedUser.pinCode,
       },
       true,
     ),
@@ -374,6 +381,70 @@ const userForgotPasswordReset = asyncHandler(async (req, res) => {
     );
 });
 
+/**
+ * Google OAuth Login Controller
+ * POST /user/google-login
+ */
+const userGoogleLogin = asyncHandler(async (req, res) => {
+  const { credential } = req.body;
+
+  // Validate credential field exists in request body
+  if (!credential) {
+    throw new ValidationError("Google credential is required");
+  }
+
+  // Call verifyGoogleToken with credential from request body
+  const { email, name, googleId } = await verifyGoogleToken(credential);
+
+  // Query database for existing user by email OR googleId
+  let user = await User.findOne({
+    $or: [
+      { email },
+      { googleId }
+    ]
+  });
+
+  if (!user) {
+    // If no user exists, create new user with Google data
+    user = await User.create({
+      userId: uuid7(),
+      name: name,
+      email: email,
+      password: null,
+      mobileNumber: null,
+      googleId: googleId,
+      isVerified: true,
+      role: "USER"
+    });
+  } else if (user.email === email && !user.googleId) {
+    // If user exists with email but no googleId, update googleId field
+    user.googleId = googleId;
+    await user.save();
+  }
+
+  // Generate JWT tokens using existing User model methods
+  const userAccessToken = user.genAccessToken();
+  const userRefreshToken = user.genRefreshToken();
+
+  // Save userRefreshToken to user document
+  user.userRefreshToken = userRefreshToken;
+  await user.save();
+
+  // Set userAccessToken cookie using existing cookieOptions and return response
+  return res
+    .status(200)
+    .cookie("userAccessToken", userAccessToken, cookieOptions)
+    .json(
+      new ApiRes(200, "Google login successful", {
+        userId: user.userId,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        userAccessToken,
+      }, true)
+    );
+});
+
 export {
   userLogin,
   userRegister,
@@ -385,4 +456,5 @@ export {
   userForgetpassword,
   userForgotPasswordRequest,
   userForgotPasswordReset,
+  userGoogleLogin,
 };

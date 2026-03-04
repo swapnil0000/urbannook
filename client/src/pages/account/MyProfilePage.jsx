@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, lazy, Suspense } from 'react';
+import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useAuth, useUI } from '../../hooks/useRedux';
 import { useGetUserProfileQuery, useUpdateUserProfileMutation } from '../../store/api/userApi';
 
@@ -32,11 +32,10 @@ const MyProfilePage = () => {
       const profileData = result.data?.data || result.data;
 
       setFormData(prev => ({
-        userName: profileData?.userName || prev.userName,
-        userEmail: profileData?.userEmail || prev.userEmail,
-        userMobileNumber: profileData?.userMobileNumber || prev.userMobileNumber,
-        userAddress: profileData?.userAddress || prev.userAddress,
-        userPinCode: profileData?.userPinCode || prev.userPinCode
+        userName: profileData?.name || profileData?.userName || prev.userName,
+        userEmail: profileData?.email || profileData?.userEmail || prev.userEmail,
+        userMobileNumber: profileData?.mobileNumber || profileData?.userMobileNumber || prev.userMobileNumber,
+        userPinCode: profileData?.pinCode || profileData?.userPinCode || prev.userPinCode
       }));
     } catch (error) {
       console.error('Failed to load profile:', error);
@@ -46,12 +45,12 @@ const MyProfilePage = () => {
   useEffect(() => {
     if (userProfileData?.data) {
       const profileData = userProfileData.data;
+      console.log(profileData,"profileDataprofileDataprofileData")
       setFormData(prev => ({
-        userName: profileData?.userName || prev.userName,
-        userEmail: profileData?.userEmail || prev.userEmail,
-        userMobileNumber: profileData?.userMobileNumber || prev.userMobileNumber,
-        userAddress: profileData?.userAddress || prev.userAddress,
-        userPinCode: profileData?.userPinCode || prev.userPinCode
+        userName: profileData?.data?.name || "",
+        userEmail: profileData?.data?.email || "",
+        userMobileNumber: profileData?.data?.mobileNumber,
+        userPinCode: profileData?.data?.pinCode || profileData?.userPinCode || prev.userPinCode
       }));
     } else if (!profileLoading && (user?.email || JSON.parse(localStorage.getItem('user') || '{}')?.email)) {
       loadProfile();
@@ -70,27 +69,62 @@ const MyProfilePage = () => {
       return;
     }
     
-    setFormData({ ...formData, [name]: value });  };
+    // Validation for mobile number - only allow 10 digits
+    if (name === 'userMobileNumber') {
+      const numericValue = value.replace(/\D/g, '');
+      if (numericValue.length <= 10) {
+        setFormData({ ...formData, [name]: numericValue });
+      }
+      return;
+    }
+    
+    setFormData({ ...formData, [name]: value });
+  };
 
   const handleSave = async () => {
-  try {
-    // Filter out empty strings and whitespace-only values
-    const updateData = Object.entries(formData).reduce((acc, [key, value]) => {
-      if (value && value.trim() !== '') {
-        acc[key] = value;
+    try {
+      // Validate mobile number if provided
+      if (formData.userMobileNumber && formData.userMobileNumber.length !== 10) {
+        showNotification('Mobile number must be exactly 10 digits', 'error');
+        return;
       }
-      return acc;
-    }, {});
 
-    await updateUserProfile(updateData).unwrap();
-    showNotification('Profile updated successfully', 'success');
-    setIsEditing(false);
-    refetchProfile();
-  } catch (error) {
-    showNotification(error?.data?.message || 'Failed to update profile', 'error');
-  }
-};
+      // Map frontend field names to backend field names
+      const fieldMapping = {
+        userName: 'name',
+        userEmail: 'email',
+        userMobileNumber: 'mobileNumber',
+        userPinCode: 'pinCode'
+      };
 
+      // Filter out empty values and map to backend field names
+      const updateData = Object.entries(formData).reduce((acc, [key, value]) => {
+        // Only process fields that have a mapping (backend supports)
+        if (fieldMapping[key]) {
+          const stringValue = String(value || '').trim();
+          if (stringValue !== '') {
+            const backendKey = fieldMapping[key];
+            // Ensure mobileNumber is sent as string (Joi validation expects string)
+            acc[backendKey] = backendKey === 'mobileNumber' ? String(value) : value;
+          }
+        }
+        return acc;
+      }, {});
+
+      // Ensure at least one field is being updated
+      if (Object.keys(updateData).length === 0) {
+        showNotification('Please update at least one field', 'error');
+        return;
+      }
+
+      await updateUserProfile(updateData).unwrap();
+      showNotification('Profile updated successfully', 'success');
+      setIsEditing(false);
+      refetchProfile();
+    } catch (error) {
+      showNotification(error?.data?.message || 'Failed to update profile', 'error');
+    }
+  };
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -99,7 +133,15 @@ const MyProfilePage = () => {
   const profileFields = [
     { label: 'Full Name', name: 'userName', value: formData.userName, type: 'text', icon: 'fa-user' },
     { label: 'Email Address', name: 'userEmail', value: formData.userEmail, type: 'email', icon: 'fa-envelope', disabled: true },
-    { label: 'Mobile Number', name: 'userMobileNumber', value: formData.userMobileNumber, type: 'tel', icon: 'fa-phone', disabled: true },
+    { 
+      label: 'Mobile Number', 
+      name: 'userMobileNumber', 
+      value: formData.userMobileNumber, 
+      type: 'tel', 
+      icon: 'fa-phone', 
+      // Allow editing mobile number for all users (Google OAuth users need to add it, traditional users can update it)
+      disabled: false
+    },
     { label: 'Pin Code', name: 'userPinCode', value: formData.userPinCode, type: 'text', icon: 'fa-map-pin' },
     // { label: 'Shipping Address', name: 'userAddress', value: formData.userAddress, type: 'textarea', icon: 'fa-location-dot', fullWidth: true }
   ];
@@ -193,6 +235,7 @@ const MyProfilePage = () => {
                         name={field.name}
                         value={field.value}
                         onChange={handleInputChange}
+                        placeholder={field.name === 'userMobileNumber' ? '10-digit mobile number' : ''}
                         className="w-full p-4 bg-white border border-gray-200 rounded-xl focus:border-[#a89068] outline-none transition-all text-sm font-medium text-[#2e443c] placeholder-gray-400 shadow-inner"
                       />
                     )

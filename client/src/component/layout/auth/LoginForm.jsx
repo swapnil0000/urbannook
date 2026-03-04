@@ -6,6 +6,7 @@ import OTPVerification from './OTPVerification';
 import { useLoginMutation } from '../../../store/api/authApi';
 import { useAuth, useUI } from '../../../hooks/useRedux';
 import { setShowLoginModal } from '../../../store/slices/uiSlice';
+import GoogleLoginButton from './GoogleLoginButton';
 
 const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
   const navigate = useNavigate();
@@ -262,6 +263,35 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
                 <p className="text-red-500 text-xs text-center mt-2 font-semibold">{errors.submit}</p>
               )}
             </form>
+
+            {/* Google Login Section */}
+            <div className="mt-6">
+              <div className="relative flex items-center justify-center my-6">
+                <div className="border-t border-gray-200 w-full"></div>
+                <span className="bg-white px-4 text-xs text-gray-400 font-bold uppercase tracking-widest">OR</span>
+                <div className="border-t border-gray-200 w-full"></div>
+              </div>
+              
+              <div className="flex justify-center">
+                <GoogleLoginButton 
+                  useOneTap={true}
+                  onSuccess={(userData) => {
+                    showNotification('Google login successful!');
+                    if (onLoginSuccess) {
+                      onLoginSuccess(userData);
+                    }
+                    dispatch(setShowLoginModal(false));
+                    if (onClose) {
+                      onClose();
+                    }
+                  }}
+                  onError={(error) => {
+                    const errorMessage = error?.data?.message || 'Google login failed. Please try again.';
+                    showNotification(errorMessage);
+                  }}
+                />
+              </div>
+            </div>
 
             <p className="text-sm text-center mt-8 text-gray-500">
               New here?{' '}

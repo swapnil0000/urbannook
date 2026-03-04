@@ -5,7 +5,9 @@ import { useGetWishlistQuery,  } from '../../store/api/userApi';
 import { logout as logoutAction } from '../../store/slices/authSlice';
 import { setShowLoginModal } from '../../store/slices/uiSlice';
 import { useLogoutMutation } from '../../store/api/authApi';
+import { useAuth } from '../../hooks/useRedux';
 import { lazy } from 'react';
+import GoogleLoginButton from './auth/GoogleLoginButton';
 
 const SignupForm = lazy(() => import('./auth/SignupForm'));
 const LoginForm = lazy(() => import('./auth/LoginForm'));
@@ -18,7 +20,7 @@ const NewHeader = () => {
   
   // Get cart and auth state from Redux
   const { items: cartItems, totalQuantity } = useSelector((state) => state.cart);
-  const { isAuthenticated, user: authUser } = useSelector((state) => state.auth);
+  const { isAuthenticated, user: authUser } = useAuth();
   const { showLoginModal } = useSelector((state) => state.ui);
   const wishlistItems = useSelector((state) => state.wishlist.items);
   
@@ -385,7 +387,27 @@ const NewHeader = () => {
                 </div>
               ) : (
                 /* LOGIN CTA IF NOT LOGGED IN */
-                <div className="bg-white/40 p-1 rounded-2xl border border-white/50 mb-6">
+                <div className="bg-white/40 p-4 rounded-2xl border border-white/50 mb-6 space-y-3">
+                    <GoogleLoginButton 
+                      useOneTap={true}
+                     
+                      size="large"
+                      text="continue_with"
+                      shape="rectangular"
+                      onSuccess={(userData) => {
+                        console.log('Google login successful from mobile menu');
+                        setUser(userData);
+                        setIsMenuOpen(false);
+                      }}
+                      onError={(error) => {
+                        console.error('Google login failed from mobile menu:', error);
+                      }}
+                    />
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 h-px bg-emerald-900/20"></div>
+                      <span className="text-xs text-emerald-900/60 font-medium">or</span>
+                      <div className="flex-1 h-px bg-emerald-900/20"></div>
+                    </div>
                     <button 
                         onClick={handleMobileLogin}
                         className="w-full py-4 bg-emerald-800 text-white rounded-xl font-bold uppercase tracking-widest text-xs shadow-lg hover:bg-emerald-900 flex items-center justify-center gap-3 active:scale-95 transition-all"

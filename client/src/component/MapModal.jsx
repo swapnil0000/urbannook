@@ -27,8 +27,6 @@ const MapModal = ({
   const mapRef = useRef();
   const searchDebounceTimer = useRef(null);
   const mapDebounceTimer = useRef(null);
-  
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
 
   // RTK Query mutations
   const [searchAddress] = useSearchAddressMutation();

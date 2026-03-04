@@ -236,10 +236,11 @@ const finalProductName = (productName) => {
   return productName.replace(/\s+/g, "_").toUpperCase();
 };
 
-const validateUserInput = ({ email, name, mobileNumber }) => {
+const validateUserInput = ({ email, name, mobileNumber, pinCode }) => {
   const fullNameRegex = /^[A-Za-z]+(?:\s[A-Za-z]+)*$/;
   const mobileRegex = /^[6-9]\d{9}$/;
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  const pinCodeRegex = /^[0-9]{6}$/;
 
   if (name !== undefined) {
     if (typeof name !== "string") {
@@ -283,24 +284,31 @@ const validateUserInput = ({ email, name, mobileNumber }) => {
   }
 
   if (mobileNumber !== undefined) {
-    if (typeof mobileNumber !== "number") {
+    // Accept both string and number, convert to string for validation
+    const mobileStr = String(mobileNumber);
+    
+    if (!mobileRegex.test(mobileStr)) {
       return {
         statusCode: 400,
-        message: "Invalid mobileNumber",
-        data: null,
-        success: false,
-      };
-    }
-
-    if (!mobileRegex.test(mobileNumber)) {
-      return {
-        statusCode: 400,
-        message: "mobileRegex contains invalid characters",
+        message: "Mobile number must be exactly 10 digits starting with 6-9",
         data: null,
         success: false,
       };
     }
   }
+  
+  if (pinCode !== undefined) {
+    const pinCodeStr = String(pinCode).trim();
+    
+    if (!pinCodeRegex.test(pinCodeStr)) {
+      return {
+        statusCode: 400,
+        message: "Pin code must be exactly 6 digits",
+        data: null,
+        success: false,
+      };
+    }
+  } 
   if (email !== undefined) {
     if (!emailRegex.test(String(email))) {
       return {
