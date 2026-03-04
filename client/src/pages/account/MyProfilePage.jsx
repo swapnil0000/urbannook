@@ -15,7 +15,7 @@ const MyProfilePage = () => {
     return {
       userName: localUser.name || localUser.userName || '',
       userEmail: localUser.email || localUser.userEmail || '',
-      userMobileNumber: localUser.mobile || localUser.userMobileNumber || '',
+      userMobileNumber: localUser.mobile ? String(localUser.mobile) : (localUser.userMobileNumber ? String(localUser.userMobileNumber) : ''),
       userAddress: localUser.address || localUser.userAddress || '',
       userPinCode: localUser.pincode || localUser.userPinCode || ''
     };
@@ -34,7 +34,7 @@ const MyProfilePage = () => {
       setFormData(prev => ({
         userName: profileData?.name || profileData?.userName || prev.userName,
         userEmail: profileData?.email || profileData?.userEmail || prev.userEmail,
-        userMobileNumber: profileData?.mobileNumber || profileData?.userMobileNumber || prev.userMobileNumber,
+        userMobileNumber: profileData?.mobileNumber ? String(profileData.mobileNumber) : (profileData?.userMobileNumber ? String(profileData.userMobileNumber) : prev.userMobileNumber),
         userPinCode: profileData?.pinCode || profileData?.userPinCode || prev.userPinCode
       }));
     } catch (error) {
@@ -45,11 +45,10 @@ const MyProfilePage = () => {
   useEffect(() => {
     if (userProfileData?.data) {
       const profileData = userProfileData.data;
-      console.log(profileData,"profileDataprofileDataprofileData")
       setFormData(prev => ({
         userName: profileData?.data?.name || "",
         userEmail: profileData?.data?.email || "",
-        userMobileNumber: profileData?.data?.mobileNumber,
+        userMobileNumber: profileData?.data?.mobileNumber ? String(profileData.data.mobileNumber) : "",
         userPinCode: profileData?.data?.pinCode || profileData?.userPinCode || prev.userPinCode
       }));
     } else if (!profileLoading && (user?.email || JSON.parse(localStorage.getItem('user') || '{}')?.email)) {
@@ -84,9 +83,12 @@ const MyProfilePage = () => {
   const handleSave = async () => {
     try {
       // Validate mobile number if provided
-      if (formData.userMobileNumber && formData.userMobileNumber.length !== 10) {
-        showNotification('Mobile number must be exactly 10 digits', 'error');
-        return;
+      if (formData.userMobileNumber) {
+        const mobileStr = String(formData.userMobileNumber).trim();
+        if (mobileStr.length !== 10 || !/^\d{10}$/.test(mobileStr)) {
+          showNotification('Mobile number must be exactly 10 digits', 'error');
+          return;
+        }
       }
 
       // Map frontend field names to backend field names
@@ -101,11 +103,19 @@ const MyProfilePage = () => {
       const updateData = Object.entries(formData).reduce((acc, [key, value]) => {
         // Only process fields that have a mapping (backend supports)
         if (fieldMapping[key]) {
+          const backendKey = fieldMapping[key];
           const stringValue = String(value || '').trim();
-          if (stringValue !== '') {
-            const backendKey = fieldMapping[key];
-            // Ensure mobileNumber is sent as string (Joi validation expects string)
-            acc[backendKey] = backendKey === 'mobileNumber' ? String(value) : value;
+          
+          // For name and email, only send if not empty
+          if (backendKey === 'name' || backendKey === 'email') {
+            if (stringValue !== '') {
+              acc[backendKey] = value;
+            }
+          } 
+          // For mobileNumber and pinCode, always send (allows clearing)
+          else if (backendKey === 'mobileNumber' || backendKey === 'pinCode') {
+            // Send empty string for cleared fields, or the actual value
+            acc[backendKey] = stringValue === '' ? null : (backendKey === 'mobileNumber' ? String(value) : value);
           }
         }
         return acc;

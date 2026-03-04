@@ -178,8 +178,14 @@ const userUpdateProfile = asyncHandler(async (req, res) => {
   const updateFields = {};
   if (email !== undefined) updateFields.email = email;
   if (name !== undefined) updateFields.name = name;
-  if (mobileNumber !== undefined) updateFields.mobileNumber = Number(mobileNumber); // Convert string to number for DB
-  if (pinCode !== undefined) updateFields.pinCode = pinCode;
+  if (mobileNumber !== undefined) {
+    // Handle null for clearing mobile number, otherwise convert to number
+    updateFields.mobileNumber = mobileNumber === null ? null : Number(mobileNumber);
+  }
+  if (pinCode !== undefined) {
+    // Handle null for clearing pin code
+    updateFields.pinCode = pinCode === null ? null : pinCode;
+  }
   
   const updatedUser = await User.findOneAndUpdate(
     {
@@ -188,9 +194,9 @@ const userUpdateProfile = asyncHandler(async (req, res) => {
         email !== undefined ? { email: { $ne: email } } : null,
         name != undefined ? { name: { $ne: name } } : null,
         mobileNumber != undefined
-          ? { mobileNumber: { $ne: Number(mobileNumber) } }
+          ? { mobileNumber: { $ne: mobileNumber === null ? null : Number(mobileNumber) } }
           : null,
-        pinCode != undefined ? { pinCode: { $ne: pinCode } } : null,
+        pinCode != undefined ? { pinCode: { $ne: pinCode === null ? null : pinCode } } : null,
       ].filter(Boolean),
     },
     {
