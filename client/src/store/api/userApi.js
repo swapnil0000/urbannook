@@ -1,113 +1,118 @@
-import { apiSlice } from './apiSlice';
+import { apiSlice } from "./apiSlice";
+import { getApiUrl } from "../../config/appUrls";
 
 export const userApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     // Profile APIs
     getUserProfile: builder.query({
-      query: () => 'user/profile',
-      providesTags: ['User'],
+      query: () => "user/profile",
+      providesTags: ["User"],
     }),
     updateUserProfile: builder.mutation({
       query: (userData) => ({
-        url: 'user/profile/update',
-        method: 'PATCH',
+        url: "user/profile/update",
+        method: "PATCH",
         body: userData,
       }),
-      invalidatesTags: ['User'],
+      invalidatesTags: ["User"],
     }),
 
     // Cart APIs
     addToCart: builder.mutation({
       query: (data) => ({
-        url: 'user/cart/add',
-        method: 'POST',
+        url: "user/cart/add",
+        method: "POST",
         body: data,
       }),
-      invalidatesTags: ['Cart'],
+      invalidatesTags: ["Cart"],
     }),
     updateCart: builder.mutation({
       query: (data) => ({
-        url: 'user/cart/update',
-        method: 'POST',
+        url: "user/cart/update",
+        method: "POST",
         body: data,
       }),
-      invalidatesTags: ['Cart'],
+      invalidatesTags: ["Cart"],
     }),
     removeFromCart: builder.mutation({
       query: (productId) => ({
         url: `user/cart/${productId}`,
-        method: 'DELETE',
+        method: "DELETE",
       }),
-      invalidatesTags: ['Cart'],
+      invalidatesTags: ["Cart"],
     }),
     getCart: builder.query({
-      query: () => 'user/cart/get',
-      providesTags: ['Cart'],
+      query: () => "user/cart/get",
+      providesTags: ["Cart"],
     }),
     clearCart: builder.mutation({
       query: () => ({
-        url: 'user/cart/clear',
-        method: 'DELETE',
+        url: "user/cart/clear",
+        method: "DELETE",
       }),
-      invalidatesTags: ['Cart'],
+      invalidatesTags: ["Cart"],
     }),
 
     // Wishlist APIs
     addToWishlist: builder.mutation({
       query: (data) => ({
-        url: 'user/wishlist/add',
-        method: 'POST',
+        url: "user/wishlist/add",
+        method: "POST",
         body: data,
       }),
-      invalidatesTags: ['Wishlist', 'User'],
+      invalidatesTags: ["Wishlist", "User"],
     }),
     getWishlist: builder.query({
-      query: () => 'user/wishlist/get',
-      providesTags: ['Wishlist', 'User'],
+      query: () => "user/wishlist/get",
+      providesTags: ["Wishlist", "User"],
     }),
     removeFromWishlist: builder.mutation({
       query: (productId) => ({
         url: `user/wishlist/${productId}`,
-        method: 'DELETE',
+        method: "DELETE",
       }),
-      invalidatesTags: ['Wishlist', 'User'],
+      invalidatesTags: ["Wishlist", "User"],
     }),
 
     // Order APIs
     getOrderHistory: builder.query({
-      query: () => 'user/order/history',
-      providesTags: ['Order'],
+      query: () => "user/order/history",
+      providesTags: ["Order"],
     }),
 
     // Coupon APIs
     applyCoupon: builder.mutation({
       query: (couponCode) => ({
-        url: 'coupon/apply',
-        method: 'POST',
+        url: "coupon/apply",
+        method: "POST",
         body: { couponCodeName: couponCode },
       }),
-      invalidatesTags: ['User'],
+      invalidatesTags: ["User"],
     }),
     getAvailableCoupons: builder.query({
-      query: () => 'coupon/list',
-      providesTags: ['Coupon'],
+      query: (userId) => ({
+        url: "coupon/list",
+        method: "POST",
+        body: { userId },
+      }),
+      providesTags: ["Coupon"],
     }),
 
     // Community APIs
     joinCommunity: builder.mutation({
       query: (data) => ({
-        url: 'join/community',
-        method: 'POST',
+        url: "join/community",
+        method: "POST",
         body: data,
       }),
     }),
     getRazorpayKey: builder.query({
-      query: () => 'rp/get-key',
+      query: () => "rp/get-key",
     }),
     createOrder: builder.mutation({
       query: (data) => ({
-        url: 'user/create-order',
-        method: 'POST',
+        url: "user/create-order",
+        method: "POST",
         body: data,
       }),
     }),
@@ -115,54 +120,110 @@ export const userApi = apiSlice.injectEndpoints({
     // Contact APIs
     submitContact: builder.mutation({
       query: (contactData) => ({
-        url: 'contact/submit',
-        method: 'POST',
+        url: "contact/submit",
+        method: "POST",
         body: contactData,
       }),
+    }),
+
+    // Invoice APIs
+    generateInvoice: builder.mutation({
+      queryFn: async (data, api, _extraOptions, baseQuery) => {
+        try {
+          // Get the base URL from the config
+          const baseUrl = getApiUrl();
+          
+          // Get token from state or cookie
+          const state = api.getState();
+          let token = state.auth?.token;
+          
+          if (!token) {
+            const getCookie = (name) => {
+              const value = `; ${document.cookie}`;
+              const parts = value.split(`; ${name}=`);
+              if (parts.length === 2) return parts.pop().split(';').shift();
+            };
+            token = getCookie('userAccessToken');
+          }
+          
+          const response = await fetch(`${baseUrl}/user/order/generate-invoice`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token && { 'Authorization': `Bearer ${token}` }),
+            },
+            body: JSON.stringify(data),
+          });
+          
+          if (!response.ok) {
+            let errorData = {};
+            try {
+              errorData = await response.json();
+            } catch (e) {
+              errorData = { message: response.statusText };
+            }
+            return { error: { status: response.status, data: errorData } };
+          }
+          
+          // Get the blob from response
+          const blob = await response.blob();
+          
+          // Verify it's actually a blob
+          if (!(blob instanceof Blob)) {
+            return { error: { status: 'INVALID_RESPONSE', data: { message: 'Invalid response format' } } };
+          }
+          
+          return { data: blob };
+        } catch (error) {
+          console.error('Fetch error:', error);
+          return { error: { status: 'FETCH_ERROR', data: { message: error.message } } };
+        }
+      },
     }),
 
     // Address APIs
     searchAddress: builder.mutation({
       query: (searchInput) => ({
-        url: 'user/address/search',
-        method: 'POST',
+        url: "user/address/search",
+        method: "POST",
         body: { userSearchInput: searchInput },
       }),
     }),
     getAddressSuggestions: builder.mutation({
       query: ({ lat, long }) => ({
-        url: 'user/address/suggestion',
-        method: 'POST',
+        url: "user/address/suggestion",
+        method: "POST",
         body: { lat, long },
       }),
     }),
     createAddress: builder.mutation({
       query: (addressData) => ({
-        url: 'user/address/create',
-        method: 'POST',
+        url: "user/address/create",
+        method: "POST",
         body: addressData,
       }),
-      invalidatesTags: ['Address'],
+      invalidatesTags: ["Address"],
     }),
     getSavedAddresses: builder.query({
-      query: () => 'user/address/saved',
-      providesTags: ['Address'],
+      query: () => "user/address/saved",
+      providesTags: ["Address"],
     }),
     updateAddress: builder.mutation({
       query: (addressData) => ({
-        url: 'user/address/update',
-        method: 'POST',
+        url: "user/address/update",
+        method: "POST",
         body: addressData,
       }),
-      invalidatesTags: ['Address'],
+      invalidatesTags: ["Address"],
     }),
     deleteAddress: builder.mutation({
       query: (addressId) => ({
-        url: 'user/address/delete',
-        method: 'POST',
+        url: "user/address/delete",
+        method: "POST",
         body: { addressId },
       }),
-      invalidatesTags: ['Address'],
+      invalidatesTags: ["Address"],
     }),
   }),
 });
@@ -185,6 +246,7 @@ export const {
   useCreateOrderMutation,
   useJoinCommunityMutation,
   useSubmitContactMutation,
+  useGenerateInvoiceMutation,
   useSearchAddressMutation,
   useGetAddressSuggestionsMutation,
   useCreateAddressMutation,

@@ -4,7 +4,7 @@ import {
   userGetCart,
   userUpdateCartQuantity,
   userClearCart,
-  updateOrderStatus,
+  getOrderStatus,
 } from "../controller/user.cart.controller.js";
 import { authGuardService } from "../services/common.auth.service.js";
 const userCartRouter = Router();
@@ -22,10 +22,10 @@ userCartRouter.delete(
   userClearCart,
 );
 
-userCartRouter.put(
-  "/user/order/status",
-  authGuardService("ADMIN"),
-  updateOrderStatus,
+userCartRouter.get(
+  "/user/order/status/:orderId",
+  authGuardService("USER"),
+  getOrderStatus,
 );
 
 export default userCartRouter;
