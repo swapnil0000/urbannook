@@ -7,6 +7,7 @@ import { useLoginMutation } from '../../../store/api/authApi';
 import { useAuth, useUI } from '../../../hooks/useRedux';
 import { setShowLoginModal } from '../../../store/slices/uiSlice';
 import GoogleLoginButton from './GoogleLoginButton';
+import useFormValidation from '../../../hooks/useFormValidation';
 
 const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
   const navigate = useNavigate();
@@ -15,38 +16,32 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showOTPVerification, setShowOTPVerification] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [errors, setErrors] = useState({});
   
   const [login, { isLoading }] = useLoginMutation();
   const { login: setAuthUser } = useAuth();
   const { showNotification } = useUI();
 
+  // Use validation hook
+  const { 
+    errors, 
+    validateAllFields, 
+    clearFieldError, 
+    clearAllErrors,
+    setFieldError 
+  } = useFormValidation();
+
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     if (errors[e.target.name]) {
-      setErrors({ ...errors, [e.target.name]: '' });
+      clearFieldError(e.target.name);
     }
-  };
-
-  const validateForm = () => {
-    const newErrors = {};
-    if (!formData.identifier.trim()) {
-      newErrors.identifier = 'Email or Username is required';
-    }
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
-    }
-    return newErrors;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    const validationErrors = validateForm();
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
+    const isValid = validateAllFields(formData);
+    if (!isValid) {
       return;
     }
     
@@ -90,7 +85,7 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
         setShowOTPVerification(true);
       } else {
         showNotification(errorMessage);
-        setErrors({ submit: errorMessage });
+        setFieldError('submit', errorMessage);
       }
     }
   };

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 
 import { useSubmitContactMutation } from '../../store/api/userApi';
 import { useUI } from '../../hooks/useRedux';
+import useFormValidation from '../../hooks/useFormValidation';
 
 // --- Reusable Accordion Component for FAQs (Updated for Light Theme) ---
 const AccordionItem = ({ question, answer, isOpen, onClick }) => (
@@ -40,58 +41,19 @@ const ContactPage = () => {
     message: ''
   });
 
-  const [errors, setErrors] = useState({});
   const [activeInput, setActiveInput] = useState(null);
   const [openFaq, setOpenFaq] = useState(0);
 
   const [submitContact, { isLoading }] = useSubmitContactMutation();
   const { showNotification } = useUI();
 
-  const validateField = (name, value) => {
-    const newErrors = { ...errors };
-
-    switch (name) {
-      case 'name':
-        if (!value.trim()) {
-          newErrors.name = 'Name is required';
-        } else if (value.trim().length < 2) {
-          newErrors.name = 'Name must be at least 2 characters';
-        } else if (value.trim().length > 50) {
-          newErrors.name = 'Name cannot exceed 50 characters';
-        } else {
-          delete newErrors.name;
-        }
-        break;
-      
-      case 'email':
-        if (!value.trim()) {
-          newErrors.email = 'Email is required';
-        } else if (!/^\S+@\S+\.\S+$/.test(value)) {
-          newErrors.email = 'Please provide a valid email address';
-        } else {
-          delete newErrors.email;
-        }
-        break;
-      
-      case 'message':
-        if (!value.trim()) {
-          newErrors.message = 'Message is required';
-        } else if (value.trim().length < 10) {
-          newErrors.message = 'Message must be at least 10 characters';
-        } else if (value.trim().length > 2000) {
-          newErrors.message = 'Message cannot exceed 2000 characters';
-        } else {
-          delete newErrors.message;
-        }
-        break;
-      
-      default:
-        break;
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  // Use validation hook
+  const { 
+    errors, 
+    validateAllFields, 
+    clearFieldError, 
+    clearAllErrors 
+  } = useFormValidation();
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -100,26 +62,19 @@ const ContactPage = () => {
       [name]: value
     });
     if (errors[name]) {
-      const newErrors = { ...errors };
-      delete newErrors[name];
-      setErrors(newErrors);
+      clearFieldError(name);
     }
   };
 
   const handleBlur = (e) => {
-    const { name, value } = e.target;
-    validateField(name, value);
     setActiveInput(null);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const isNameValid = validateField('name', formData.name);
-    const isEmailValid = validateField('email', formData.email);
-    const isMessageValid = validateField('message', formData.message);
-
-    if (!isNameValid || !isEmailValid || !isMessageValid) {
+    const isValid = validateAllFields(formData);
+    if (!isValid) {
       showNotification('Please fix the errors in the form', 'error');
       return;
     }
@@ -133,7 +88,7 @@ const ContactPage = () => {
         subject: 'Product Inquiry',
         message: ''
       });
-      setErrors({});
+      clearAllErrors();
     } catch (error) {
       console.error('Failed to submit contact form:', error);
       const errorMessage = error?.data?.message || 'Failed to submit contact form. Please try again.';

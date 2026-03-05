@@ -124,3 +124,38 @@ export  const socialLinks = [
       link: 'tel:+918299638749',
     }
   ];
+
+
+   export  const subjectOptions = [
+        { value: '', label: 'Select a topic...', icon: 'fa-solid fa-circle-question', disabled: true },
+        { value: 'Product Inquiry', label: 'Product Inquiry', icon: 'fa-solid fa-box', description: 'Questions about our products' },
+        { value: 'Order Support', label: 'Order Support', icon: 'fa-solid fa-truck', description: 'Track orders & delivery' },
+        { value: 'Technical Support', label: 'Technical Support', icon: 'fa-solid fa-tools', description: 'Assembly & setup help' },
+        { value: 'Returns & Refunds', label: 'Returns & Refunds', icon: 'fa-solid fa-undo', description: 'Return policy & refunds' },
+        { value: 'General Inquiry', label: 'General Inquiry', icon: 'fa-solid fa-comment', description: 'Other questions' }
+    ];
+
+
+export    const faqs = [
+        {
+            id: 1,
+            question: 'How do I track my shipment?',
+            answer: 'Once your order is dispatched, you will receive a tracking link via email and SMS. You can also view live status in the "My Orders" section of your profile.'
+        },
+        {
+            id: 2,
+            question: 'What is the return timeline?',
+            answer: 'We accept returns within 7 days of delivery for damaged or defective products. Please ensure the item is unused and in original packaging with tags intact.'
+        },
+        {
+            id: 3,
+            question: 'Is assembly required?',
+            answer: 'Most of our decor items are pre-assembled. For larger furniture pieces, we provide a detailed, easy-to-follow manual and all necessary tools in the box.'
+        },
+        {
+            id: 4,
+            question: 'Do you ship internationally?',
+            answer: 'Currently, we ship to all pin codes within India. International shipping is part of our future roadmap. Stay tuned!'
+        }
+    ];
+    

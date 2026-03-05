@@ -24,7 +24,7 @@ const contactSubmissionSchema = Joi.object({
     }),
   
   subject: Joi.string()
-    .valid('Product Inquiry','Support')
+    .valid('Product Inquiry','Support','Order Support', 'Technical Support', 'Returns & Refunds','General Inquiry')
     .required()
     .messages({
       'any.only': 'Subject must be one of: Product Inquiry,  Support',
