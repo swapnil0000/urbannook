@@ -2,22 +2,26 @@
     {
       id: "01",
       title: "Obsessive Quality",
-      desc: "We don't just pick products; we test them for durability and touch.",
+      icon: "fa-gem",
+      desc: "We don't just pick products; we test them for durability, texture, and soul. Every piece must earn its place in your home.",
     },
     {
       id: "02",
-      title: "Radical Sustainability",
-      desc: "Eco-friendly isn't a buzzword. It's our baseline standard.",
+      title: "Radical Transparency",
+      icon: "fa-scale-balanced",
+      desc: "No hidden fees, no misleading materials. What you see is precisely the premium craftsmanship you receive.",
     },
     {
       id: "03",
       title: "Design Democracy",
-      desc: "Great aesthetics shouldn't be a luxury. We make it accessible.",
+      icon: "fa-compass-drafting",
+      desc: "Great aesthetics shouldn't be a luxury. We utilize modern manufacturing to make architectural beauty accessible.",
     },
     {
       id: "04",
       title: "Human Connection",
-      desc: "Real support, easy returns, and a team that actually cares.",
+      icon: "fa-handshake",
+      desc: "Real support, secure transactions, and a dedicated team that treats your investment with the respect it deserves.",
     }
   ];
 
@@ -135,8 +139,64 @@ export  const socialLinks = [
         { value: 'General Inquiry', label: 'General Inquiry', icon: 'fa-solid fa-comment', description: 'Other questions' }
     ];
 
+export const contactInfo = [
+    {
+        id: 1,
+        icon: "fa-solid fa-phone",
+        title: "Contact Number",
+        info: "+91 82996 38749",
+        subInfo: "Mon-Sat, 9am - 7pm",
+    },
+    {
+        id: 2,
+        icon: "fa-solid fa-envelope",
+        title: "Any Type Of Enquires",
+        info: "support@urbannook.in",
+        subInfo: "Response within 24h",
+    },
+    {
+        id: 3,
+        icon: "fa-solid fa-location-dot",
+        title: "Our Office",
+        info: "Gurgaon, India",
+        subInfo: "Sector 51, 122001",
+    }
+];
 
-export    const faqs = [
+export const contactPageFaqs = [
+    {
+        question: "Do you offer custom 3D printed designs?",
+        answer: "Yes, we love bringing your ideas to life. Whether it's a specific color variant or a completely bespoke piece, select 'Interior Design' in the form and detail your vision."
+    },
+    {
+        question: "How long does standard shipping take?",
+        answer: "All our pieces are made to order to ensure the highest quality. Please allow 3-5 business days for production, and an additional 3-4 days for pan-India delivery."
+    },
+    {
+        question: "What is your return policy?",
+        answer: "We offer a hassle-free 7-day return policy for any items damaged in transit. We just request a quick unboxing video to process replacements swiftly."
+    },
+    {
+        question: "Do you ship internationally?",
+        answer: "Currently, we are focusing on providing the best experience across India. International shipping is on our roadmap for late 2026."
+    }
+];
+
+export const cityOptions = [
+    { value: '', label: 'Select a city...', disabled: true },
+    { value: 'Mumbai', label: 'Mumbai', icon: 'fa-solid fa-city' },
+    { value: 'Delhi', label: 'Delhi', icon: 'fa-solid fa-city' },
+    { value: 'Bangalore', label: 'Bangalore', icon: 'fa-solid fa-city' },
+    { value: 'Chennai', label: 'Chennai', icon: 'fa-solid fa-city' },
+    { value: 'Kolkata', label: 'Kolkata', icon: 'fa-solid fa-city' },
+    { value: 'Hyderabad', label: 'Hyderabad', icon: 'fa-solid fa-city' },
+    { value: 'Pune', label: 'Pune', icon: 'fa-solid fa-city' },
+    { value: 'Ahmedabad', label: 'Ahmedabad', icon: 'fa-solid fa-city' },
+    { value: 'Jaipur', label: 'Jaipur', icon: 'fa-solid fa-city' }
+];
+
+
+export const supportFaqs = [
         {
             id: 1,
             question: 'How do I track my shipment?',
@@ -158,4 +218,67 @@ export    const faqs = [
             answer: 'Currently, we ship to all pin codes within India. International shipping is part of our future roadmap. Stay tuned!'
         }
     ];
+
+export const whyChooseUsFeatures = [
+  {
+    id: 1,
+    tag: "AESTHETICS",
+    title: "Design-Led Aesthetics",
+    description: "Minimal, modern designs made to elevate everyday spaces and lives.",
+    bg: "#FAFAF9", 
+    color: "#1C1917", 
+    accent: "#D97706",
+    desktopWidth: '100%',
+    mobileWidth: '100%',
+    zIndex: 1,
+    icon: "fa-solid fa-pen-ruler"
+  },
+  {
+    id: 2,
+    tag: "CRAFTSMANSHIP",
+    title: "Proudly Homegrown",
+    description: "Conceptualized, 3D printed, and wired in our own workshop in India.",
+    bg: "#E6DCC5", 
+    color: "#1C1917", 
+    accent: "#15803D", 
+    desktopWidth: '80%',
+    mobileWidth: '100%',
+    zIndex: 2,
+    icon: "fa-solid fa-layer-group"
+  },
+  {
+    id: 3,
+    tag: "LOGISTICS",
+    title: "Fast Pan-India Delivery",
+    description: "Reliable shipping across India, delivered to your doorstep.",
+    bg: "#4A675B", 
+    color: "#FFFFFF", 
+    accent: "#F5DEB3", 
+    desktopWidth: '60%',
+    mobileWidth: '100%',
+    zIndex: 3,
+    icon: "fa-solid fa-truck-fast"
+  },
+  {
+    id: 4,
+    tag: "PERSONALIZATION",
+    title: "Customization Ready",
+    description: "Personalize colors, finishes, or details to match your space.",
+    bg: "#1a2822", 
+    color: "#FFFFFF", 
+    accent: "#F5DEB3", 
+    desktopWidth: '35%',
+    mobileWidth: '100%',
+    zIndex: 4,
+    icon: "fa-solid fa-palette"
+  },
+];
+
+export   const moods = [
+    { emoji: "😡", label: "Poor" },
+    { emoji: "😕", label: "Fair" },
+    { emoji: "🙂", label: "Good" },
+    { emoji: "😍", label: "Great" },
+    { emoji: "🤩", label: "Amazing" },
+  ];
     

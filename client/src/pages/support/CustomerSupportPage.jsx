@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useSubmitContactMutation } from '../../store/api/userApi';
 import { useUI } from '../../hooks/useRedux';
 import CustomSelect from '../../component/CustomSelect';
-import { faqs, subjectOptions } from '../../data/constant';
+import { supportFaqs, subjectOptions } from '../../data/constant';
 import useFormValidation from '../../hooks/useFormValidation';
 
 const CustomerSupportPage = () => {
@@ -250,7 +250,7 @@ const CustomerSupportPage = () => {
                 {activeTab === 'faq' && (
                     <div>
                         <div className="bg-[#f5f7f8] border border-transparent rounded-[24px] overflow-hidden shadow-xl">
-                            {faqs.map((faq, index) => (
+                            {supportFaqs.map((faq, index) => (
                                 <div key={faq.id} className="border-b border-gray-200 last:border-0">
                                     <button
                                         onClick={() => setExpandedFaq(expandedFaq === index ? null : index)}

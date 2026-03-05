@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useSubmitContactMutation } from '../../store/api/userApi';
 import { useUI } from '../../hooks/useRedux';
 import useFormValidation from '../../hooks/useFormValidation';
+import { contactInfo, contactPageFaqs } from '../../data/constant';
 
 // --- Reusable Accordion Component for FAQs (Updated for Light Theme) ---
 const AccordionItem = ({ question, answer, isOpen, onClick }) => (
@@ -66,7 +67,7 @@ const ContactPage = () => {
     }
   };
 
-  const handleBlur = (e) => {
+  const handleBlur = () => {
     setActiveInput(null);
   };
 
@@ -98,49 +99,6 @@ const ContactPage = () => {
 
   const isFormValid = formData.name && formData.email && formData.message && Object.keys(errors).length === 0;
 
-  const contactInfo = [
-    {
-      id: 1,
-      icon: "fa-solid fa-phone",
-      title: "Contact Number",
-      info: "+91 82996 38749",
-      subInfo: "Mon-Sat, 9am - 7pm",
-    },
-    {
-      id: 2,
-      icon: "fa-solid fa-envelope",
-      title: "Any Type Of Enquires",
-      info: "support@urbannook.in",
-      subInfo: "Response within 24h",
-    },
-    {
-      id: 3,
-      icon: "fa-solid fa-location-dot",
-      title: "Our Office",
-      info: "Gurgaon, India",
-      subInfo: "Sector 51, 122001",
-    }
-  ];
-
-  const faqs = [
-    {
-      question: "Do you offer custom 3D printed designs?",
-      answer: "Yes, we love bringing your ideas to life. Whether it's a specific color variant or a completely bespoke piece, select 'Interior Design' in the form and detail your vision."
-    },
-    {
-      question: "How long does standard shipping take?",
-      answer: "All our pieces are made to order to ensure the highest quality. Please allow 3-5 business days for production, and an additional 3-4 days for pan-India delivery."
-    },
-    {
-      question: "What is your return policy?",
-      answer: "We offer a hassle-free 7-day return policy for any items damaged in transit. We just request a quick unboxing video to process replacements swiftly."
-    },
-    {
-      question: "Do you ship internationally?",
-      answer: "Currently, we are focusing on providing the best experience across India. International shipping is on our roadmap for late 2026."
-    }
-  ];
-
   return (
     <div className="bg-[#2e443c] min-h-screen text-gray-200 font-sans relative selection:bg-[#a89068] selection:text-white overflow-x-hidden">
       
@@ -171,7 +129,7 @@ const ContactPage = () => {
       <section className="py-4 px-6 relative z-10">
         <div className="max-w-7xl mx-auto">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {contactInfo.map((item, index) => (
+                {contactInfo.map((item) => (
                     <div 
                         key={item.id}
                         className="group bg-[#f5f7f8] p-8 lg:p-10 rounded-[2rem] border border-transparent hover:border-[#a89068]/30 hover:shadow-xl hover:-translate-y-1 transition-all duration-500 shadow-lg"
@@ -351,7 +309,7 @@ const ContactPage = () => {
                     <div>
                         <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#2e443c] mb-6">Frequently Asked</h3>
                         <div className="border-t border-gray-200">
-                            {faqs.map((faq, index) => (
+                            {contactPageFaqs.map((faq, index) => (
                                 <AccordionItem 
                                     key={index}
                                     question={faq.question}
