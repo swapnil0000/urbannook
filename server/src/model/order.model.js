@@ -1,6 +1,10 @@
 import mongoose from "mongoose";
 const orderSchema = new mongoose.Schema(
   {
+    userEmail: {
+      type: String,
+      required: true,
+    },
     userId: {
       type: String,
       required: true,
@@ -31,6 +35,7 @@ const orderSchema = new mongoose.Schema(
             type: Number,
             required: true,
           },
+          shipping: String,
         },
       },
     ],
@@ -39,7 +44,6 @@ const orderSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
-
     // Coupon snapshot
     coupon: {
       couponCodeId: {
@@ -71,22 +75,22 @@ const orderSchema = new mongoose.Schema(
       type: String,
       required: false,
       validate: {
-        validator: function(v) {
+        validator: function (v) {
           return !v || /^[0-9]{10}$/.test(v);
         },
-        message: 'Sender mobile must be exactly 10 digits'
-      }
+        message: "Sender mobile must be exactly 10 digits",
+      },
     },
 
     receiverMobile: {
       type: String,
       required: false,
       validate: {
-        validator: function(v) {
+        validator: function (v) {
           return !v || /^[0-9]{10}$/.test(v);
         },
-        message: 'Receiver mobile must be exactly 10 digits'
-      }
+        message: "Receiver mobile must be exactly 10 digits",
+      },
     },
 
     payment: {
@@ -99,7 +103,16 @@ const orderSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["CREATED", "PAID", "CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED", "FAILED"],
+      enum: [
+        "CREATED",
+        "PAID",
+        "CONFIRMED",
+        "PROCESSING",
+        "SHIPPED",
+        "DELIVERED",
+        "CANCELLED",
+        "FAILED",
+      ],
       default: "CREATED",
     },
 

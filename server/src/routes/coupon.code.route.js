@@ -10,6 +10,6 @@ couponCodeRouter.post(
   authGuardService("USER"),
   applyCouponCodeController,
 );
-couponCodeRouter.get("/coupon/list", getAllCouponCodeController);
+couponCodeRouter.post("/coupon/list", getAllCouponCodeController);
 
 export default couponCodeRouter;

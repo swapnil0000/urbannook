@@ -26,9 +26,9 @@ const applyCouponCodeController = asyncHandler(async (req, res) => {
     );
 });
 
-const getAllCouponCodeController = asyncHandler(async (_, res) => {
-  const result = await getAllCouponCodeService();
-
+const getAllCouponCodeController = asyncHandler(async (req, res) => {
+  const { userId } = req.body;
+  const result = await getAllCouponCodeService({ userId });
   return res
     .status(result.statusCode)
     .json(

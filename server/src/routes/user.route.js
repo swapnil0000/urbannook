@@ -26,7 +26,10 @@ import {
   userGoogleLogin,
 } from "../controller/user.controller.js";
 
-import { userOrderPreviousHistory } from "../controller/user.cart.controller.js";
+import {
+  userOrderPreviousHistory,
+  generateOrderInvoice,
+} from "../controller/user.cart.controller.js";
 
 import {
   userAddToWishList,
@@ -84,9 +87,19 @@ const authLimiter = rateLimit({
    ---------------------------------------------------------------
    These routes do NOT require authentication
 ================================================================ */
-userRouter.post("/user/login", authLimiter, validateRequest(loginSchema), userLogin);
-userRouter.post("/user/register", authLimiter, validateRequest(registerSchema), userRegister);
-userRouter.post("/user/google-login",authLimiter, userGoogleLogin);
+userRouter.post(
+  "/user/login",
+  // authLimiter,
+  validateRequest(loginSchema),
+  userLogin,
+);
+userRouter.post(
+  "/user/register",
+  // authLimiter,
+  validateRequest(registerSchema),
+  userRegister,
+);
+userRouter.post("/user/google-login", authLimiter, userGoogleLogin);
 userRouter.post("/user/forgot-password", userForgetpassword);
 
 /* ===============================================================
@@ -94,8 +107,18 @@ userRouter.post("/user/forgot-password", userForgetpassword);
    ---------------------------------------------------------------
    Two-step password reset flow with OTP verification
 ================================================================ */
-userRouter.post("/user/forgot-password/request", authLimiter, validateRequest(forgotPasswordRequestSchema), userForgotPasswordRequest);
-userRouter.post("/user/forgot-password/reset", authLimiter, validateRequest(forgotPasswordResetSchema), userForgotPasswordReset);
+userRouter.post(
+  "/user/forgot-password/request",
+  authLimiter,
+  validateRequest(forgotPasswordRequestSchema),
+  userForgotPasswordRequest,
+);
+userRouter.post(
+  "/user/forgot-password/reset",
+  authLimiter,
+  validateRequest(forgotPasswordResetSchema),
+  userForgotPasswordReset,
+);
 
 /* ===============================================================
    PROFILE & ACCOUNT (PROTECTED)
@@ -125,6 +148,14 @@ userRouter.get(
   "/user/order/history",
   authGuardService("USER"),
   userOrderPreviousHistory,
+);
+
+// Generat PDF for Invoice
+
+userRouter.post(
+  "/user/order/generate-invoice",
+  authGuardService("USER"),
+  generateOrderInvoice,
 );
 
 /* ===============================================================

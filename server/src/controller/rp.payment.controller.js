@@ -47,7 +47,9 @@ const razorpayKeyGetController = asyncHandler(async (_, res) => {
 
 const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   /* Not Handling the amount because it could be manipulate at client side like 0 as amount */
-  const { items, senderMobile, receiverMobile } = req.body;
+  const { items, userEmail, senderMobile, receiverMobile } = req.body;
+  console.log(userEmail);
+
   const { userId } = req.user;
   if (!items || !Array.isArray(items) || items.length === 0) {
     throw new ValidationError("Items are required");
@@ -99,7 +101,6 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   }
 
   const finalAmount = cart.appliedCoupon.summary.grandTotal;
-
   // Fetch products for order snapshot
   const productIds = items.map((i) => i.productId);
   const products = await Product.find({
@@ -110,6 +111,15 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   if (products.length !== productIds.length) {
     throw new ValidationError("One or more products unavailable");
   }
+
+  const {
+    couponCodeId,
+    name: couponCodeName,
+    discountValue: discountAmount,
+    isApplied,
+    summary,
+  } = cart?.appliedCoupon;
+  console.log(cart?.appliedCoupon);
 
   // Create order items snapshot
   const orderItems = items.map((item) => {
@@ -123,6 +133,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
         productCategory: product.productCategory,
         productSubCategory: product.productSubCategory,
         priceAtPurchase: product.sellingPrice,
+        shipping: summary?.shipping,
       },
     };
   });
@@ -134,6 +145,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
 
   const order = await Order.create({
     orderId: uuidv7(),
+    userEmail,
     userId,
     items: orderItems,
     amount: finalAmount,
@@ -144,6 +156,13 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     },
     qunatity: items?.qunatity || 1,
     status: "CREATED",
+    coupon: {
+      couponCodeId,
+      couponCodeName,
+      discountAmount,
+      isApplied,
+    },
+    note: "Amount is the final amount paid by the user",
   });
 
   return res.status(200).json(
@@ -205,12 +224,32 @@ const razorpayWebHookController = async (req, res) => {
         if (order.status !== "PAID") {
           order.payment.razorpayPaymentId = payment.id;
           order.status = "PAID";
+          order.payment.errorCode = null;
+          order.payment.errorDescription = "";
           await order.save();
+
+          // ✅ CLEAR CART IMMEDIATELY AFTER PAYMENT SUCCESS
+          try {
+            await Cart.updateOne(
+              { userId: order.userId },
+              {
+                $set: { products: {} },
+                $unset: { appliedCoupon: 1 },
+              },
+            );
+            console.log(
+              `[INFO] Cart cleared after successful payment - UserId: ${order.userId}, OrderId: ${order.orderId}`,
+            );
+          } catch (cartError) {
+            console.error(
+              `[ERROR] Failed to clear cart after payment - UserId: ${order.userId}, OrderId: ${order.orderId}:`,
+              cartError.message,
+            );
+          }
 
           // Send order confirmation and payment receipt emails
           try {
-            const user = await User.findOne({ userId: order?.userId });
-            if (user && user.email) {
+            if (order && order.userEmail) {
               // Prepare order details for email
               const orderDetails = {
                 orderId: order.orderId,
@@ -226,7 +265,7 @@ const razorpayWebHookController = async (req, res) => {
               };
 
               // Send order confirmation email
-              await sendOrderConfirmation(user.email, orderDetails).catch(
+              await sendOrderConfirmation(order.userEmail, orderDetails).catch(
                 (err) => {
                   console.error(
                     "Failed to send order confirmation email:",
@@ -242,7 +281,7 @@ const razorpayWebHookController = async (req, res) => {
                 orderId: order.orderId,
                 date: new Date(),
               };
-              await sendPaymentReceipt(user.email, paymentDetails).catch(
+              await sendPaymentReceipt(order.userEmail, paymentDetails).catch(
                 (err) => {
                   console.error("Failed to send payment receipt email:", err);
                 },
