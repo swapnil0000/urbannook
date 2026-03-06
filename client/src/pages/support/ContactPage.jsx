@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 
 import { useSubmitContactMutation } from '../../store/api/userApi';
 import { useUI } from '../../hooks/useRedux';
+import useFormValidation from '../../hooks/useFormValidation';
+import { contactInfo, contactPageFaqs } from '../../data/constant';
 
 // --- Reusable Accordion Component for FAQs (Updated for Light Theme) ---
 const AccordionItem = ({ question, answer, isOpen, onClick }) => (
@@ -40,58 +42,19 @@ const ContactPage = () => {
     message: ''
   });
 
-  const [errors, setErrors] = useState({});
   const [activeInput, setActiveInput] = useState(null);
   const [openFaq, setOpenFaq] = useState(0);
 
   const [submitContact, { isLoading }] = useSubmitContactMutation();
   const { showNotification } = useUI();
 
-  const validateField = (name, value) => {
-    const newErrors = { ...errors };
-
-    switch (name) {
-      case 'name':
-        if (!value.trim()) {
-          newErrors.name = 'Name is required';
-        } else if (value.trim().length < 2) {
-          newErrors.name = 'Name must be at least 2 characters';
-        } else if (value.trim().length > 50) {
-          newErrors.name = 'Name cannot exceed 50 characters';
-        } else {
-          delete newErrors.name;
-        }
-        break;
-      
-      case 'email':
-        if (!value.trim()) {
-          newErrors.email = 'Email is required';
-        } else if (!/^\S+@\S+\.\S+$/.test(value)) {
-          newErrors.email = 'Please provide a valid email address';
-        } else {
-          delete newErrors.email;
-        }
-        break;
-      
-      case 'message':
-        if (!value.trim()) {
-          newErrors.message = 'Message is required';
-        } else if (value.trim().length < 10) {
-          newErrors.message = 'Message must be at least 10 characters';
-        } else if (value.trim().length > 2000) {
-          newErrors.message = 'Message cannot exceed 2000 characters';
-        } else {
-          delete newErrors.message;
-        }
-        break;
-      
-      default:
-        break;
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  // Use validation hook
+  const { 
+    errors, 
+    validateAllFields, 
+    clearFieldError, 
+    clearAllErrors 
+  } = useFormValidation();
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -100,26 +63,19 @@ const ContactPage = () => {
       [name]: value
     });
     if (errors[name]) {
-      const newErrors = { ...errors };
-      delete newErrors[name];
-      setErrors(newErrors);
+      clearFieldError(name);
     }
   };
 
-  const handleBlur = (e) => {
-    const { name, value } = e.target;
-    validateField(name, value);
+  const handleBlur = () => {
     setActiveInput(null);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const isNameValid = validateField('name', formData.name);
-    const isEmailValid = validateField('email', formData.email);
-    const isMessageValid = validateField('message', formData.message);
-
-    if (!isNameValid || !isEmailValid || !isMessageValid) {
+    const isValid = validateAllFields(formData);
+    if (!isValid) {
       showNotification('Please fix the errors in the form', 'error');
       return;
     }
@@ -133,7 +89,7 @@ const ContactPage = () => {
         subject: 'Product Inquiry',
         message: ''
       });
-      setErrors({});
+      clearAllErrors();
     } catch (error) {
       console.error('Failed to submit contact form:', error);
       const errorMessage = error?.data?.message || 'Failed to submit contact form. Please try again.';
@@ -142,49 +98,6 @@ const ContactPage = () => {
   };
 
   const isFormValid = formData.name && formData.email && formData.message && Object.keys(errors).length === 0;
-
-  const contactInfo = [
-    {
-      id: 1,
-      icon: "fa-solid fa-phone",
-      title: "Contact Number",
-      info: "+91 82996 38749",
-      subInfo: "Mon-Sat, 9am - 7pm",
-    },
-    {
-      id: 2,
-      icon: "fa-solid fa-envelope",
-      title: "Any Type Of Enquires",
-      info: "support@urbannook.in",
-      subInfo: "Response within 24h",
-    },
-    {
-      id: 3,
-      icon: "fa-solid fa-location-dot",
-      title: "Our Office",
-      info: "Gurgaon, India",
-      subInfo: "Sector 51, 122001",
-    }
-  ];
-
-  const faqs = [
-    {
-      question: "Do you offer custom 3D printed designs?",
-      answer: "Yes, we love bringing your ideas to life. Whether it's a specific color variant or a completely bespoke piece, select 'Interior Design' in the form and detail your vision."
-    },
-    {
-      question: "How long does standard shipping take?",
-      answer: "All our pieces are made to order to ensure the highest quality. Please allow 3-5 business days for production, and an additional 3-4 days for pan-India delivery."
-    },
-    {
-      question: "What is your return policy?",
-      answer: "We offer a hassle-free 7-day return policy for any items damaged in transit. We just request a quick unboxing video to process replacements swiftly."
-    },
-    {
-      question: "Do you ship internationally?",
-      answer: "Currently, we are focusing on providing the best experience across India. International shipping is on our roadmap for late 2026."
-    }
-  ];
 
   return (
     <div className="bg-[#2e443c] min-h-screen text-gray-200 font-sans relative selection:bg-[#a89068] selection:text-white overflow-x-hidden">
@@ -216,7 +129,7 @@ const ContactPage = () => {
       <section className="py-4 px-6 relative z-10">
         <div className="max-w-7xl mx-auto">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {contactInfo.map((item, index) => (
+                {contactInfo.map((item) => (
                     <div 
                         key={item.id}
                         className="group bg-[#f5f7f8] p-8 lg:p-10 rounded-[2rem] border border-transparent hover:border-[#a89068]/30 hover:shadow-xl hover:-translate-y-1 transition-all duration-500 shadow-lg"
@@ -396,7 +309,7 @@ const ContactPage = () => {
                     <div>
                         <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#2e443c] mb-6">Frequently Asked</h3>
                         <div className="border-t border-gray-200">
-                            {faqs.map((faq, index) => (
+                            {contactPageFaqs.map((faq, index) => (
                                 <AccordionItem 
                                     key={index}
                                     question={faq.question}

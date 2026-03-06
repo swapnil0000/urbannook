@@ -5,6 +5,7 @@ import OTPVerification from './OTPVerification';
 import { useOtpSentMutation, useRegisterMutation } from '../../../store/api/authApi';
 import { useUI } from '../../../hooks/useRedux';
 import { setShowLoginModal } from '../../../store/slices/uiSlice';
+import useFormValidation from '../../../hooks/useFormValidation';
 
 const SignupForm = ({ onClose, onSwitchToLogin }) => {
   const navigate = useNavigate();
@@ -17,7 +18,6 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
     confirmPassword: ''
   });
   const [showOTP, setShowOTP] = useState(false);
-  const [errors, setErrors] = useState({});
   const [showPwd, setShowPwd] = useState(false);
   const [showConfirmPwd, setShowConfirmPwd] = useState(false);
 
@@ -26,6 +26,15 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
   const [register, { isLoading: isRegistering }] = useRegisterMutation();
   const [otpSent, { isLoading: isSendingOtp }] = useOtpSentMutation();
   const { showNotification } = useUI();
+
+  // Use validation hook
+  const { 
+    errors, 
+    validateAllFields, 
+    clearFieldError, 
+    clearAllErrors,
+    setFieldError 
+  } = useFormValidation();
 
   const handleAutoScroll = (e) => {
     // Only scroll on mobile to avoid jarring movements on desktop
@@ -38,41 +47,25 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
     const { name, value } = e.target;
     let cleanValue = value;
 
-    if (name === 'mobile') cleanValue = value.replace(/\D/g, '');
-    if (name === 'mobile' && cleanValue.length > 0) {
-      if (!/^[6-9]/.test(cleanValue)) {
-        setErrors(prev => ({ ...prev, mobile: 'Mobile number must start with 6-9' }));
+    if (name === 'mobile') {
+      cleanValue = value.replace(/\D/g, '');
+      if (cleanValue.length > 0 && !/^[6-9]/.test(cleanValue)) {
+        setFieldError('mobile', 'Mobile number must start with 6-9');
         return; 
       }
     }
 
     setFormData({ ...formData, [name]: cleanValue });
-    if (errors[name]) setErrors({ ...errors, [name]: '' });
-  };
-
-  const validateForm = () => {
-    const newErrors = {};
-    if (!formData.name.trim()) newErrors.name = 'Full name is required';
-    if (!formData.email.trim()) newErrors.email = 'Email is required';
-    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Invalid email format';
-
-    if (!formData.mobile) newErrors.mobile = 'Mobile number is required';
-    else if (formData.mobile.length !== 10) newErrors.mobile = 'Must be exactly 10 digits';
-
-    const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-    if (!formData.password) newErrors.password = 'Password is required';
-    else if (!strongPasswordRegex.test(formData.password)) newErrors.password = '8+ chars, Upper, Lower, Number & Symbol';
-
-    if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
-
-    return newErrors;
+    if (errors[name]) {
+      clearFieldError(name);
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const newErrors = validateForm();
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
+    
+    const isValid = validateAllFields(formData);
+    if (!isValid) {
       return;
     }
 
@@ -107,7 +100,7 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
         onSwitchToLogin();
       } else {
         showNotification(errorMessage);
-        setErrors({ submit: errorMessage });
+        setFieldError('submit', errorMessage);
       }
     }
   };

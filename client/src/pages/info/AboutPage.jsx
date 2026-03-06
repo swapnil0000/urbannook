@@ -1,31 +1,5 @@
 import React, { useEffect } from 'react';
-
-const aboutValues = [
-    {
-      id: "01",
-      title: "Obsessive Quality",
-      icon: "fa-gem",
-      desc: "We don't just pick products; we test them for durability, texture, and soul. Every piece must earn its place in your home.",
-    },
-    {
-      id: "02",
-      title: "Radical Transparency",
-      icon: "fa-scale-balanced",
-      desc: "No hidden fees, no misleading materials. What you see is precisely the premium craftsmanship you receive.",
-    },
-    {
-      id: "03",
-      title: "Design Democracy",
-      icon: "fa-compass-drafting",
-      desc: "Great aesthetics shouldn't be a luxury. We utilize modern manufacturing to make architectural beauty accessible.",
-    },
-    {
-      id: "04",
-      title: "Human Connection",
-      icon: "fa-handshake",
-      desc: "Real support, secure transactions, and a dedicated team that treats your investment with the respect it deserves.",
-    }
-];
+import { aboutValues } from '../../data/constant';
 
 const AboutPage = () => {
     useEffect(() => {
