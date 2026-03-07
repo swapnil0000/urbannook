@@ -8,6 +8,7 @@ import { useLogoutMutation } from '../../store/api/authApi';
 import { useAuth } from '../../hooks/useRedux';
 import { lazy } from 'react';
 import GoogleLoginButton from './auth/GoogleLoginButton';
+import { clearCsrfToken } from '../../store/api/apiSlice';
 
 const SignupForm = lazy(() => import('./auth/SignupForm'));
 const LoginForm = lazy(() => import('./auth/LoginForm'));
@@ -65,13 +66,18 @@ const NewHeader = () => {
 
   const activeRoute = useMemo(() => getActiveRoute(), [location.pathname]);
 
-  // Sync User from LocalStorage
+  // Sync User from auth state
   useEffect(() => {
     const syncUser = () => {
-      if (!isAuthenticated) {
-        setUser(JSON.parse(localStorage.getItem('user') || 'null'));
-      } else {
+      const storedUser = JSON.parse(localStorage.getItem('user') || 'null');
+      
+      if (isAuthenticated && authUser) {
         setUser(authUser);
+      } else if (storedUser && localStorage.getItem('authToken')) {
+        // localStorage has auth data but Redux lost state (e.g., before SessionManager runs)
+        setUser(storedUser);
+      } else {
+        setUser(null);
       }
     };
     
@@ -110,37 +116,22 @@ const NewHeader = () => {
 
   const handleLogout = async () => {
     try {
-      // Call logout API
       await logoutAPI().unwrap();
       
-      // Clear local state
       setUser(null);
       setShowUserDropdown(false);
       setIsMenuOpen(false);
-      
-      // Dispatch logout action to clear Redux state
       dispatch(logoutAction());
+      clearCsrfToken();
       
-      // Clear localStorage
-      localStorage.removeItem('user');
-      localStorage.removeItem('token');
-      
-      // Clear cookie
-      document.cookie = 'userAccessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-      
-      // Trigger storage event for other tabs
       window.dispatchEvent(new Event('storage'));
-      
-      // Navigate to home
       navigate('/');
     } catch (error) {
       console.error('Logout failed:', error);
       // Even if API fails, clear local state
       setUser(null);
       dispatch(logoutAction());
-      localStorage.removeItem('user');
-      localStorage.removeItem('token');
-      document.cookie = 'userAccessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      clearCsrfToken();
       navigate('/');
     }
   };
@@ -193,7 +184,7 @@ const NewHeader = () => {
                 <img 
                     src="/assets/logo.webp" 
                     alt="UrbanNook" 
-                    className="h-10 w-auto object-contain rounded-full mix-blend-multiply" 
+                    className="h-14 w-auto object-contain rounded-full mix-blend-multiply" 
                 />
               </Link>
             </div>
@@ -205,7 +196,7 @@ const NewHeader = () => {
                  <img 
                     src="/assets/logo.webp" 
                     alt="UrbanNook" 
-                    className="h-9 w-auto object-contain rounded-full mix-blend-multiply" 
+                    className="h-14 w-auto object-contain rounded-full mix-blend-multiply" 
                 />
               </Link>
 

@@ -7,15 +7,6 @@ import env from "../config/envConfigSetup.js";
  * but not used since this is the terminal error handler
  */
 export const errorHandler = async (err, req, res, next) => {
-  // Debug log
-  console.log("=== ERROR HANDLER TRIGGERED ===");
-  console.log("err.statusCode:", err.statusCode);
-  console.log("err.name:", err.name);
-  console.log("err.constructor.name:", err.constructor.name);
-  console.log("err.message:", err.message);
-  console.log("typeof err.statusCode:", typeof err.statusCode);
-  console.log("===========================");
-
   // Log error with context
   console.error(
     `[ERROR] Request error - Method: ${req.method}, URL: ${req.url}, UserId: ${req.user?.userId || "N/A"}, StatusCode: ${err.statusCode || 500}:`,

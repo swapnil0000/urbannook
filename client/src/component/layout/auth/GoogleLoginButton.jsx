@@ -24,6 +24,8 @@ export default function GoogleLoginButton({
       }).unwrap();
 
       if (result.success && result.data) {
+        const token = result.data.userAccessToken;
+        
         // Dispatch setCredentials action with user data and token
         dispatch(setCredentials({
           user: {
@@ -32,7 +34,7 @@ export default function GoogleLoginButton({
             role: result.data.role,
             userId: result.data.userId,
           },
-          token: result.data.userAccessToken,
+          token,
         }));
 
         // Call optional onSuccess callback
@@ -44,7 +46,9 @@ export default function GoogleLoginButton({
         navigate('/');
       }
     } catch (error) {
-      console.error('Google login failed:', error);
+      console.error('[Google Login] Error:', error);
+      
+      const errorMessage = error?.data?.message || 'Google login failed. Please try again.';
       
       // Call optional onError callback with error details
       if (onError) {

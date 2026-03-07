@@ -12,7 +12,7 @@ import {
   sendPaymentReceipt,
 } from "../services/email.service.js";
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
-import { ValidationError, NotFoundError } from "../utils/errors.js";
+import { ValidationError, NotFoundError, InternalServerError } from "../utils/errors.js";
 
 const PAYMENT_ERROR_MESSAGES = {
   BAD_REQUEST_ERROR: "Payment failed due to invalid request. Please try again.",
@@ -48,7 +48,6 @@ const razorpayKeyGetController = asyncHandler(async (_, res) => {
 const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   /* Not Handling the amount because it could be manipulate at client side like 0 as amount */
   const { items, userEmail, senderMobile, receiverMobile } = req.body;
-  console.log(userEmail);
 
   const { userId } = req.user;
   if (!items || !Array.isArray(items) || items.length === 0) {
@@ -94,13 +93,19 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   // Fetch cart to get the calculated grand total from applyCoupon API
   const cart = await Cart.findOne({ userId }).lean();
 
-  if (!cart?.appliedCoupon?.summary?.grandTotal) {
+  if (!cart) {
+    throw new ValidationError("Cart not found. Please add items to your cart.");
+  }
+
+  // Check if pricing has been calculated (appliedCoupon.summary must exist with a valid grandTotal)
+  const grandTotal = cart?.appliedCoupon?.summary?.grandTotal;
+  if (grandTotal == null || grandTotal <= 0) {
     throw new ValidationError(
       "Cart pricing not calculated. Please refresh the page.",
     );
   }
 
-  const finalAmount = cart.appliedCoupon.summary.grandTotal;
+  const finalAmount = grandTotal;
   // Fetch products for order snapshot
   const productIds = items.map((i) => i.productId);
   const products = await Product.find({
@@ -112,14 +117,11 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     throw new ValidationError("One or more products unavailable");
   }
 
-  const {
-    couponCodeId,
-    name: couponCodeName,
-    discountValue: discountAmount,
-    isApplied,
-    summary,
-  } = cart?.appliedCoupon;
-  console.log(cart?.appliedCoupon);
+  const couponCodeId = cart.appliedCoupon?.couponCodeId || null;
+  const couponCodeName = cart.appliedCoupon?.name || null;
+  const discountAmount = cart.appliedCoupon?.discountValue || 0;
+  const isApplied = cart.appliedCoupon?.isApplied || false;
+  const summary = cart.appliedCoupon?.summary || {};
 
   // Create order items snapshot
   const orderItems = items.map((item) => {
@@ -133,7 +135,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
         productCategory: product.productCategory,
         productSubCategory: product.productSubCategory,
         priceAtPurchase: product.sellingPrice,
-        shipping: summary?.shipping,
+        shipping: String(summary?.shipping ?? ""),
       },
     };
   });

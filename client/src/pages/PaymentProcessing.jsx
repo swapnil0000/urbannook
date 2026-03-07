@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { clearCart } from "../store/slices/cartSlice";
+import { useClearCartMutation } from "../store/api/userApi";
 
 const PaymentProcessing = () => {
   const { orderId } = useParams();
@@ -9,6 +10,7 @@ const PaymentProcessing = () => {
   const dispatch = useDispatch();
 
   const [message, setMessage] = useState("Processing your payment...");
+  const [clearCartApi] = useClearCartMutation();
 
   useEffect(() => {
     if (!orderId) return;
@@ -32,6 +34,12 @@ const PaymentProcessing = () => {
         if (status === "PAID") {
           clearInterval(interval);
           dispatch(clearCart());
+          try {
+            await clearCartApi().unwrap();
+          } catch (error) {
+            console.error("Failed to clear cart from backend:", error);
+          }
+          
           navigate("/orders");
         }
 

@@ -9,7 +9,7 @@ import {
 } from "../services/user.auth.service.js";
 import { verifyGoogleToken } from "../services/google.auth.service.js";
 import { v7 as uuid7 } from "uuid";
-import cookieOptions from "../config/config.js";
+import cookieOptions, { refreshCookieOptions } from "../config/config.js";
 import {
   profileFetchService,
   resetPasswordService,
@@ -31,6 +31,7 @@ const userLogin = asyncHandler(async (req, res) => {
   return res
     .status(result.statusCode)
     .cookie("userAccessToken", result.data.userAccessToken, cookieOptions)
+    .cookie("userRefreshToken", result.data.userRefreshToken, refreshCookieOptions)
     .json(
       new ApiRes(result.statusCode, result.message, {
         role: result.data.role,
@@ -399,33 +400,34 @@ const userGoogleLogin = asyncHandler(async (req, res) => {
     throw new ValidationError("Google credential is required");
   }
 
-  // Call verifyGoogleToken with credential from request body
-  const { email, name, googleId } = await verifyGoogleToken(credential);
+  // Verify Google token
+  const verificationResult = await verifyGoogleToken(credential);
+  
+  const { email, name, googleId } = verificationResult;
 
   // Query database for existing user by email OR googleId
   let user = await User.findOne({
-    $or: [
-      { email },
-      { googleId }
-    ]
+    $or: [{ email }, { googleId }]
   });
 
   if (!user) {
-    // If no user exists, create new user with Google data
+    // Create new user with Google data
     user = await User.create({
       userId: uuid7(),
-      name: name,
-      email: email,
+      name,
+      email,
       password: null,
       mobileNumber: null,
-      googleId: googleId,
+      googleId,
       isVerified: true,
       role: "USER"
     });
-  } else if (user.email === email && !user.googleId) {
-    // If user exists with email but no googleId, update googleId field
-    user.googleId = googleId;
-    await user.save();
+  } else {
+    if (user.email === email && !user.googleId) {
+      // Link Google account to existing email user
+      user.googleId = googleId;
+      await user.save();
+    }
   }
 
   // Generate JWT tokens using existing User model methods
@@ -440,6 +442,7 @@ const userGoogleLogin = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .cookie("userAccessToken", userAccessToken, cookieOptions)
+    .cookie("userRefreshToken", userRefreshToken, refreshCookieOptions)
     .json(
       new ApiRes(200, "Google login successful", {
         userId: user.userId,

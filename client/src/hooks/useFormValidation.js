@@ -70,6 +70,14 @@ const validationRules = {
         }
     },
     
+    // Password validation (for login - only required check)
+    loginPassword: {
+        required: true,
+        messages: {
+            required: 'Password is required'
+        }
+    },
+    
     // Confirm password validation
     confirmPassword: {
         required: true,

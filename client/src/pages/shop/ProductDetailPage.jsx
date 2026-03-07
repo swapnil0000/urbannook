@@ -80,20 +80,10 @@ const ProductDetailPage = () => {
   const handleInitialAddToCart = async () => {
     if (!product) return;
     
-    // Check if user is logged in
-    const getCookie = (name) => {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop().split(';').shift();
-      return null;
-    };
-
-    const token = getCookie('userAccessToken') || cookies.userAccessToken;
-    const hasLocalUser = localStorage.getItem('user');
-    const isLoggedIn = isAuthenticated || token || hasLocalUser;
+    const hasToken = !!localStorage.getItem('authToken');
+    const isLoggedIn = isAuthenticated || hasToken;
 
     if (!isLoggedIn) {
-      // User must login to add to cart
       openLoginModal();
       return;
     }
@@ -145,17 +135,9 @@ const ProductDetailPage = () => {
   };
 
   const handleCheckoutClick = () => {
-    const getCookie = (name) => {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop().split(';').shift();
-      return null;
-    };
+    const hasToken = !!localStorage.getItem('authToken');
 
-    const token = getCookie('userAccessToken') || cookies.userAccessToken;
-    const hasLocalUser = localStorage.getItem('user');
-
-    if (isAuthenticated || token || hasLocalUser) {
+    if (isAuthenticated || hasToken) {
       navigate('/checkout');
     } else {
       openLoginModal();
@@ -163,20 +145,10 @@ const ProductDetailPage = () => {
   };
 
   const handleWishlistToggle = async () => {
-    // Check if user is logged in
-    const getCookie = (name) => {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop().split(';').shift();
-      return null;
-    };
-
-    const token = getCookie('userAccessToken') || cookies.userAccessToken;
-    const hasLocalUser = localStorage.getItem('user');
-    const isLoggedIn = isAuthenticated || token || hasLocalUser;
+    const hasToken = !!localStorage.getItem('authToken');
+    const isLoggedIn = isAuthenticated || hasToken;
 
     if (!isLoggedIn) {
-      // User must login to add to wishlist
       openLoginModal();
       return;
     }
@@ -359,7 +331,7 @@ const ProductDetailPage = () => {
 
             {/* Description */}
             <p className="text-gray-300 leading-relaxed mb-8 font-light text-sm lg:text-md">
-              {product.productDes}
+              {product.productSubDes}
             </p>
 
             {/* --- DESKTOP ACTION BUTTONS --- */}
@@ -410,13 +382,13 @@ const ProductDetailPage = () => {
             <div className="border-t border-[#F5DEB3]/10">
              
 
-              <AccordionItem
+              {/* <AccordionItem
                 title="Description"
                 isOpen={activeAccordion === 'description'}
                 onClick={() => setActiveAccordion(activeAccordion === 'description' ? '' : 'description')}
               >
                 {product.productSubDes}
-              </AccordionItem>
+              </AccordionItem> */}
 
               {/* Specifications Accordion */}
               {product.specifications && product.specifications.length > 0 && (
@@ -439,6 +411,28 @@ const ProductDetailPage = () => {
                         </span>
                       </div>
                     ))}
+                  </div>
+                </AccordionItem>
+              )}
+
+              {/* Dimensions Accordion */}
+              {product.dimensions && (product.dimensions.length || product.dimensions.breadth || product.dimensions.height) && (
+                <AccordionItem
+                  title="Dimensions"
+                  isOpen={activeAccordion === 'dimensions'}
+                  onClick={() => setActiveAccordion(activeAccordion === 'dimensions' ? '' : 'dimensions')}
+                >
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-[#F5DEB3]/60 text-xs uppercase tracking-wider font-medium">
+                      Size
+                    </span>
+                    <span className="text-gray-200 text-sm">
+                      {[
+                        product.dimensions.length && `${product.dimensions.length}L`,
+                        product.dimensions.breadth && `${product.dimensions.breadth}B`,
+                        product.dimensions.height && `${product.dimensions.height}H`
+                      ].filter(Boolean).join(' × ')} cm
+                    </span>
                   </div>
                 </AccordionItem>
               )}

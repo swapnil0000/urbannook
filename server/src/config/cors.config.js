@@ -50,7 +50,7 @@ export const corsOptions = {
   },
   credentials: true, // Allow cookies and authentication headers
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Accept-Language", "Origin"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Accept-Language", "Origin", "X-CSRF-Token"],
   exposedHeaders: ["Set-Cookie"],
   optionsSuccessStatus: 200, // Some legacy browsers choke on 204
   maxAge: 86400, // Cache preflight requests for 24 hours

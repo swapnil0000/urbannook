@@ -21,14 +21,21 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
   const { login: setAuthUser } = useAuth();
   const { showNotification } = useUI();
 
-  // Use validation hook
+  // Use validation hook with custom rules for login (password without pattern validation)
   const { 
     errors, 
     validateAllFields, 
     clearFieldError, 
     clearAllErrors,
     setFieldError 
-  } = useFormValidation();
+  } = useFormValidation({
+    password: {
+      required: true,
+      messages: {
+        required: 'Password is required'
+      }
+    }
+  });
 
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -59,7 +66,6 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
         mobile: result.data?.userMobileNumber || result.user?.mobile || ''
       };
       if (token) {
-        document.cookie = `userAccessToken=${token}; path=/; max-age=2592000`;
         setAuthUser(userData, token);
       }
       

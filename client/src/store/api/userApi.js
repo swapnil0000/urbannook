@@ -133,17 +133,12 @@ export const userApi = apiSlice.injectEndpoints({
           // Get the base URL from the config
           const baseUrl = getApiUrl();
           
-          // Get token from state or cookie
+          // Get token from state or localStorage
           const state = api.getState();
           let token = state.auth?.token;
           
           if (!token) {
-            const getCookie = (name) => {
-              const value = `; ${document.cookie}`;
-              const parts = value.split(`; ${name}=`);
-              if (parts.length === 2) return parts.pop().split(';').shift();
-            };
-            token = getCookie('userAccessToken');
+            token = localStorage.getItem('authToken');
           }
           
           const response = await fetch(`${baseUrl}/user/order/generate-invoice`, {

@@ -13,16 +13,16 @@ const getEnvironment = () => {
     return 'local';
   }
   
+  // Always use local API when running on localhost, even in production mode
+  // This ensures local testing with `npm run start:prod` hits localhost:8000
+  const hostname = window.location.hostname;
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return 'local';
+  }
+  
   // Check custom environment variable
   if (import.meta.env.VITE_APP_ENV) {
     return import.meta.env.VITE_APP_ENV;
-  }
-  
-  // Check hostname for automatic detection
-  const hostname = window.location.hostname;
-  
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return 'local';
   }
   
   // For any production deployment (Vercel, Netlify, custom domain)

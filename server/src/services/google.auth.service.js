@@ -14,26 +14,22 @@ const verifyGoogleToken = async (idToken) => {
     throw new InternalServerError('Google Client ID not configured');
   }
 
-  // Create OAuth2Client instance with GOOGLE_CLIENT_ID
   const client = new OAuth2Client(env.GOOGLE_CLIENT_ID);
   
   try {
-    // Verify ID token using client.verifyIdToken()
     const ticket = await client.verifyIdToken({
       idToken,
       audience: env.GOOGLE_CLIENT_ID,
     });
     
-    // Extract email, name, and sub (googleId) from token payload
     const payload = ticket.getPayload();
     
     return {
-      email: payload.email.toLowerCase(), // Convert email to lowercase
-      name: payload.name.toLowerCase(),   // Convert name to lowercase
-      googleId: payload.sub,              // Google's unique user ID
+      email: payload.email.toLowerCase(),
+      name: payload.name,
+      googleId: payload.sub,
     };
   } catch (error) {
-    // Throw AuthenticationError for invalid/expired tokens
     throw new AuthenticationError('Invalid or expired Google token');
   }
 };

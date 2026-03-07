@@ -13,12 +13,13 @@ const userSchema = mongoose.Schema(
     name: {
       type: String,
       required: [true, "Name is required"],
-      lowercase: true,
       trim: true,
     },
     email: {
       type: String,
       required: [true, "userEmail is required"],
+      lowercase: true,
+      trim: true,
     },
     password: {
       type: String,
@@ -62,7 +63,7 @@ const userSchema = mongoose.Schema(
 userSchema.index({ userId: 1 });
 userSchema.index({ email: 1 });
 userSchema.index({ mobileNumber: 1 }, { sparse: true });
-userSchema.index({ googleId: 1 });
+// googleId index is already defined in schema with unique: true, sparse: true
 userSchema.index({ verificationOtp: 1 });
 userSchema.index(
   { verificationOtpExpiresAt: 1 },

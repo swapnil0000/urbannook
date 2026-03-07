@@ -205,7 +205,7 @@ const registerService = async (name, email, password, mobileNumber) => {
   const OTP_EXPIRY_TIME = 5 * 60 * 1000; // 5 minutes
 
   const newRegisteringUser = await User.create({
-    name: name.toLowerCase(),
+    name: name.trim(),
     email: email.toLowerCase(),
     password,
     mobileNumber,

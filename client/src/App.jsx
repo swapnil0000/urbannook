@@ -8,6 +8,7 @@ import { useCartSync } from './hooks/useCartSync';
 import { useWishlistSync } from './hooks/useWishlistSync';
 import ErrorBoundary from './component/ErrorBoundary';
 import { setCredentials } from './store/slices/authSlice';
+import { fetchCsrfToken } from './store/api/apiSlice';
 // Import AppRoutes directly instead of lazy loading for faster initial render
 import AppRoutes from './store/AppRoutes';
 
@@ -16,21 +17,13 @@ const Footer = lazy(() => import('./component/layout/Footer'));
 const Notification = lazy(() => import('./component/Notification'));
 const SocialMediaFAB = lazy(() => import('./component/layout/WhatsAppButton'));
 
-// Helper function to get cookie
-const getCookie = (name) => {
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop().split(';').shift();
-  return null;
-};
-
 // Component to handle session restoration
 const SessionManager = ({ children }) => {
   const dispatch = useDispatch();
 
   useEffect(() => {
     // Check for existing session on app load
-    const token = getCookie('userAccessToken') || localStorage.getItem('token');
+    const token = localStorage.getItem('authToken');
     const storedUser = localStorage.getItem('user');
     
     if (token && storedUser) {
@@ -38,11 +31,15 @@ const SessionManager = ({ children }) => {
         const user = JSON.parse(storedUser);
         // Restore session in Redux
         dispatch(setCredentials({ user, token }));
+        
+        // Fetch CSRF token for authenticated user
+        fetchCsrfToken().catch(err => {
+          console.warn('[CSRF] Failed to fetch token on session restore:', err);
+        });
       } catch (error) {
         console.error('Failed to restore session:', error);
-        // Clear invalid data
         localStorage.removeItem('user');
-        localStorage.removeItem('token');
+        localStorage.removeItem('authToken');
       }
     }
   }, [dispatch]);
