@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState } from "react";
 import { whyChooseUsFeatures } from "../../data/constant";
 
 // Background image
@@ -73,7 +73,7 @@ export default function WhyChooseUs() {
     }}
   >
     {/* Gradient Overlay */}
-    <div className="absolute inset-0 bg-gradient-to-b from-stone-900/60 to-[#2e443c]/90 z-0"></div>
+    <div className="absolute inset-0 bg-gradient-to-b from-stone-900/60 to-brand-secondary/90 z-0"></div>
 
     {/* --- TOP CONTENT CONTAINER --- */}
     <div className="absolute top-0 left-0 w-full z-20 px-6 flex flex-col 
@@ -82,18 +82,18 @@ export default function WhyChooseUs() {
     >
       {/* 1. Header Section */}
       <div className="flex items-center gap-3 mb-4 md:mb-6">
-         <span className="w-8 h-[1px] bg-[#F5DEB3]"></span>
-         <span className="text-[#F5DEB3] text-[10px] md:text-xs font-bold uppercase tracking-[0.3em]">
+         <span className="w-8 h-[1px] bg-brand-tertiary"></span>
+         <span className="text-brand-tertiary text-[10px] md:text-xs font-bold uppercase tracking-[0.3em]">
            The Urban Nook Difference
          </span>
-         <span className="w-8 h-[1px] bg-[#F5DEB3] hidden md:block"></span>
+         <span className="w-8 h-[1px] bg-brand-tertiary hidden md:block"></span>
       </div>
 
-      <h2 className="text-4xl md:text-6xl lg:text-7xl font-serif text-white mb-4 tracking-tight leading-[1.1]">
+      <h2 className="text-4xl md:text-6xl lg:text-7xl font-serif text-text-inverse mb-4 tracking-tight leading-[1.1]">
         Built Locally, <br className="md:hidden" />
         <span className="relative inline-block group">
-          <span className="italic font-light text-[#F5DEB3] relative z-10">Designed Globally</span>
-          <div className="absolute -bottom-1 left-0 w-full h-[2px] bg-[#F5DEB3]/50 rounded-full"></div>
+          <span className="italic font-light text-brand-tertiary relative z-10">Designed Globally</span>
+          <div className="absolute -bottom-1 left-0 w-full h-[2px] bg-brand-tertiary/50 rounded-full"></div>
         </span>
       </h2>
 
@@ -102,21 +102,21 @@ export default function WhyChooseUs() {
       </p>
 
       {/* 2. Stats / Trust Badges */}
-      <div className="w-full max-w-lg md:mx-auto grid grid-cols-2 gap-6 border-t border-white/10 pt-6">
+      <div className="w-full max-w-lg md:mx-auto grid grid-cols-2 gap-6 border-t border-border-subtle pt-6">
           <div className="flex flex-col items-start md:items-center">
-              <span className="text-2xl md:text-3xl font-serif text-white mb-1">50+</span>
-              <span className="text-[10px] text-[#F5DEB3] uppercase tracking-widest font-bold">Unique Styles</span>
+              <span className="text-2xl md:text-3xl font-serif text-text-inverse mb-1">50+</span>
+              <span className="text-[10px] text-brand-tertiary uppercase tracking-widest font-bold">Unique Styles</span>
           </div>
           <div className="flex flex-col items-start md:items-center">
-              <span className="text-2xl md:text-3xl font-serif text-white mb-1">100%</span>
-              <span className="text-[10px] text-[#F5DEB3] uppercase tracking-widest font-bold">Made in India</span>
+              <span className="text-2xl md:text-3xl font-serif text-text-inverse mb-1">100%</span>
+              <span className="text-[10px] text-brand-tertiary uppercase tracking-widest font-bold">Made in India</span>
           </div>
       </div>
 
       {/* 3. Scroll Indicator */}
       <div className="mt-12 md:mt-16 flex flex-col items-center gap-2 animate-bounce opacity-50">
-         <span className="text-[9px] text-white uppercase tracking-widest">Scroll</span>
-         <i className="fa-solid fa-chevron-down text-white text-xs"></i>
+         <span className="text-[9px] text-text-inverse uppercase tracking-widest">Scroll</span>
+         <i className="fa-solid fa-chevron-down text-text-inverse text-xs"></i>
       </div>
     </div>
 
@@ -156,10 +156,10 @@ export default function WhyChooseUs() {
           <div className="relative z-10 h-full p-6 md:p-12 flex flex-col justify-between">
             <div className="space-y-4">
               <div className="flex justify-between items-center pb-2">
-                 <div className="w-10 h-10 rounded-full flex items-center justify-center border border-current border-opacity-10">
+                 <div className="w-10 h-10 rounded-full flex items-center justify-center border border-subtle-dark">
                     <i className={`${feature.icon} text-lg`} ></i>
                  </div>
-                 <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-widest opacity-60 border border-current border-opacity-20 px-3 py-1 rounded-full">
+                 <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-widest opacity-60 border border-subtle-dark px-3 py-1 rounded-full">
                    {feature.tag}
                  </span>
               </div>
@@ -168,7 +168,7 @@ export default function WhyChooseUs() {
               </h3>
             </div>
 
-            <div className="flex items-end justify-between gap-4 pt-4 border-t border-black border-opacity-5">
+            <div className="flex items-end justify-between gap-4 pt-4 border-t border-subtle-dark">
                <p className="text-xs md:text-sm font-light leading-relaxed opacity-80 max-w-[70%]">
                   {feature.description}
                </p>

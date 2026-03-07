@@ -80,7 +80,7 @@ const AireTestimonials = () => {
 
   return (
     // Outer container restricted to viewport height on desktop
-    <section className="relative min-h-[97vh] lg:h-[calc(100vh-2rem)] lg:max-h-[900px] mx-2 my-2 md:mx-4 md:my-4 rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden shadow-2xl flex items-center group bg-[#1a2822]">
+    <section className="relative min-h-[97vh] lg:h-[calc(100vh-2rem)] lg:max-h-[900px] mx-2 my-2 md:mx-4 md:my-4 rounded-[1.5rem] md:rounded-[2.5rem]  overflow-hidden shadow-2xl flex items-center group bg-brand-dark">
       
       {/* --- CORE CSS FOR MARQUEE & CUSTOM SCROLLBAR --- */}
       <style>{`
@@ -109,11 +109,11 @@ const AireTestimonials = () => {
       `}</style>
 
       {/* Main Inner Box */}
-      <div className="w-full h-full relative overflow-hidden  bg-[#2e443c] flex items-center ">
+      <div className="w-full h-full relative overflow-hidden  bg-brand-secondary flex items-center ">
         
         {/* Background Atmosphere */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#F5DEB3]/5 rounded-full blur-[100px]"></div>
+          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-brand-tertiary/5 rounded-full blur-[100px]"></div>
           <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}></div>
         </div>
 
@@ -125,12 +125,12 @@ const AireTestimonials = () => {
             
             {/* Header Text */}
             <div className="space-y-4 left mb-8 md:mb-10">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#F5DEB3]/10 border border-[#F5DEB3]/20">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#F5DEB3] animate-pulse"></span>
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#F5DEB3]">Community Voices</span>
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-tertiary/10 border border-brand-tertiary/20">
+                <span className="w-1.5 h-1.5 rounded-full bg-brand-tertiary animate-pulse"></span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-tertiary">Community Voices</span>
               </div>
-              <h2 className="text-4xl md:text-5xl lg:text-6xl font-serif text-white leading-tight">
-                Stories from <span className="italic text-[#F5DEB3] font-light">Indian Homes.</span>
+              <h2 className="text-4xl md:text-5xl lg:text-6xl font-serif text-text-inverse leading-tight">
+                Stories from <span className="italic text-brand-tertiary font-light">Indian Homes.</span>
               </h2>
               <p className="text-green-50/60 font-light text-sm md:text-base max-w-md mx-auto lg:mx-0">
                  Discover how our meticulously crafted pieces are transforming spaces across the country.
@@ -141,10 +141,10 @@ const AireTestimonials = () => {
             <div className="relative w-full overflow-hidden mask-horizontal pb-4">
                {isLoading ? (
                   <div className="flex items-center justify-center h-[220px]">
-                     <div className="w-8 h-8 border-2 border-[#F5DEB3] border-t-transparent rounded-full animate-spin"></div>
+                     <div className="w-8 h-8 border-2 border-brand-tertiary border-t-transparent rounded-full animate-spin"></div>
                   </div>
                ) : testimonials.length === 0 ? (
-                  <div className="flex items-center justify-center h-[220px] bg-black/10 rounded-[2rem] border border-white/5">
+                  <div className="flex items-center justify-center h-[220px] bg-white/5 rounded-[2rem] border border-brand-tertiary/20">
                      <p className="text-gray-400 font-serif italic">No stories shared yet. Be the first!</p>
                   </div>
                ) : (
@@ -153,15 +153,15 @@ const AireTestimonials = () => {
                       {/* Set 1 */}
                       <div className="flex gap-4 pr-4">
                         {scrollingItems.map((t, idx) => (
-                          <div key={`set1-${idx}`} className="bg-white/5 backdrop-blur-md border border-white/10 p-5 rounded-3xl flex flex-col w-[280px] md:w-[340px] h-[220px] shrink-0 group hover:border-[#F5DEB3]/30 hover:bg-white/10 transition-all duration-500 shadow-xl relative">
+                          <div key={`set1-${idx}`} className="bg-white/5 backdrop-blur-md border border-brand-tertiary/20 p-5 rounded-3xl flex flex-col w-[280px] md:w-[340px] h-[220px] shrink-0 group hover:border-brand-tertiary/30 hover:bg-white/10 transition-all duration-500 shadow-xl relative">
                               
                               <div className="flex gap-1 shrink-0 mb-3">
                                 {(() => {
                                   const rating = typeof t.rating === 'number' && t.rating >= 1 && t.rating <= 5 ? t.rating : 0;
                                   return (
                                     <>
-                                      {[...Array(rating)].map((_, i) => <i key={`filled-${i}`} className="fa-solid fa-star text-[#F5DEB3] text-[10px]"></i>)}
-                                      {[...Array(5 - rating)].map((_, i) => <i key={`empty-${i}`} className="fa-regular fa-star text-white/20 text-[10px]"></i>)}
+                                      {[...Array(rating)].map((_, i) => <i key={`filled-${i}`} className="fa-solid fa-star text-brand-tertiary text-[10px]"></i>)}
+                                      {[...Array(5 - rating)].map((_, i) => <i key={`empty-${i}`} className="fa-regular fa-star text-text-inverse/20 text-[10px]"></i>)}
                                     </>
                                   );
                                 })()}
@@ -176,13 +176,13 @@ const AireTestimonials = () => {
                                 </p>
                               </div>
 
-                              <div className="shrink-0 pt-3 border-t border-white/5 flex items-center justify-between">
+                              <div className="shrink-0 pt-3 border-t border-white/10 flex items-center justify-between">
                                 <div className="flex items-center gap-3 overflow-hidden">
-                                  <div className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-[10px] shadow-lg bg-[#F5DEB3] text-[#1c3026]">
+                                  <div className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-[10px] shadow-lg bg-brand-tertiary text-brand-dark">
                                       {getInitials(t.userName || t.name)}
                                   </div>
                                   <div className="min-w-0 flex-1">
-                                    <h4 className="font-bold text-white text-xs truncate">{t.userName || t.name}</h4>
+                                    <h4 className="font-bold text-text-inverse text-xs truncate">{t.userName || t.name}</h4>
                                     {(t.userRole || t.role || t.userLocation || t.location) && (
                                       <p className="text-[9px] text-gray-400 truncate mt-0.5">
                                         {t.userRole || t.role} {(t.userLocation || t.location) ? `• ${t.userLocation || t.location}` : ''}
@@ -190,7 +190,7 @@ const AireTestimonials = () => {
                                     )}
                                   </div>
                                 </div>
-                                <i className="fa-solid fa-quote-right text-2xl text-white/5 group-hover:text-[#F5DEB3]/20 transition-colors duration-500 shrink-0 ml-2"></i>
+                                <i className="fa-solid fa-quote-right text-2xl text-text-inverse/5 group-hover:text-brand-tertiary/20 transition-colors duration-500 shrink-0 ml-2"></i>
                               </div>
                           </div>
                         ))}
@@ -199,14 +199,14 @@ const AireTestimonials = () => {
                       {/* Set 2 (Duplicate for Seamless Loop) */}
                       <div className="flex gap-4 pr-4">
                         {scrollingItems.map((t, idx) => (
-                          <div key={`set2-${idx}`} className="bg-white/5 backdrop-blur-md border border-white/10 p-5 rounded-3xl flex flex-col w-[280px] md:w-[340px] h-[220px] shrink-0 group hover:border-[#F5DEB3]/30 hover:bg-white/10 transition-all duration-500 shadow-xl relative">
+                          <div key={`set2-${idx}`} className="bg-white/5 backdrop-blur-md border border-brand-tertiary/20 p-5 rounded-3xl flex flex-col w-[280px] md:w-[340px] h-[220px] shrink-0 group hover:border-brand-tertiary/30 hover:bg-white/10 transition-all duration-500 shadow-xl relative">
                               <div className="flex gap-1 shrink-0 mb-3">
                                 {(() => {
                                   const rating = typeof t.rating === 'number' && t.rating >= 1 && t.rating <= 5 ? t.rating : 0;
                                   return (
                                     <>
-                                      {[...Array(rating)].map((_, i) => <i key={`filled-${i}`} className="fa-solid fa-star text-[#F5DEB3] text-[10px]"></i>)}
-                                      {[...Array(5 - rating)].map((_, i) => <i key={`empty-${i}`} className="fa-regular fa-star text-white/20 text-[10px]"></i>)}
+                                      {[...Array(rating)].map((_, i) => <i key={`filled-${i}`} className="fa-solid fa-star text-brand-tertiary text-[10px]"></i>)}
+                                      {[...Array(5 - rating)].map((_, i) => <i key={`empty-${i}`} className="fa-regular fa-star text-text-inverse/20 text-[10px]"></i>)}
                                     </>
                                   );
                                 })()}
@@ -216,13 +216,13 @@ const AireTestimonials = () => {
                                   "{t.content}"
                                 </p>
                               </div>
-                              <div className="shrink-0 pt-3 border-t border-white/5 flex items-center justify-between">
+                              <div className="shrink-0 pt-3 border-t border-subtle flex items-center justify-between">
                                 <div className="flex items-center gap-3 overflow-hidden">
-                                  <div className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-[10px] shadow-lg bg-[#F5DEB3] text-[#1c3026]">
+                                  <div className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-[10px] shadow-lg bg-brand-tertiary text-brand-dark">
                                       {getInitials(t.userName || t.name)}
                                   </div>
                                   <div className="min-w-0 flex-1">
-                                    <h4 className="font-bold text-white text-xs truncate">{t.userName || t.name}</h4>
+                                    <h4 className="font-bold text-text-inverse text-xs truncate">{t.userName || t.name}</h4>
                                     {(t.userRole || t.role || t.userLocation || t.location) && (
                                       <p className="text-[9px] text-gray-400 truncate mt-0.5">
                                         {t.userRole || t.role} {(t.userLocation || t.location) ? `• ${t.userLocation || t.location}` : ''}
@@ -230,7 +230,7 @@ const AireTestimonials = () => {
                                     )}
                                   </div>
                                 </div>
-                                <i className="fa-solid fa-quote-right text-2xl text-white/5 group-hover:text-[#F5DEB3]/20 transition-colors duration-500 shrink-0 ml-2"></i>
+                                <i className="fa-solid fa-quote-right text-2xl text-text-inverse/5 group-hover:text-brand-tertiary/20 transition-colors duration-500 shrink-0 ml-2"></i>
                               </div>
                           </div>
                         ))}
@@ -244,37 +244,37 @@ const AireTestimonials = () => {
 
           {/* --- RIGHT COLUMN: COMPACT FORM --- */}
           <div className="lg:col-span-5 w-full max-w-[480px] mx-auto lg:ml-auto z-20">
-            <div className="bg-[#2e443c]/80 backdrop-blur-xl rounded-[2.5rem] p-6 md:p-8 shadow-2xl border border-white/10 relative overflow-hidden">
+            <div className="bg-brand-secondary/80 backdrop-blur-xl rounded-[2.5rem] p-6 md:p-8 shadow-2xl border border-brand-tertiary/20 relative overflow-hidden">
               
               {formState === 'success' && (
-                <div className="absolute inset-0 z-50 bg-[#2e443c]/95 backdrop-blur-md flex flex-col items-center justify-center text-center p-8">
-                  <div className="w-16 h-16 bg-[#F5DEB3]/20 rounded-full flex items-center justify-center mb-4 text-[#F5DEB3] animate-bounce">
+                <div className="absolute inset-0 z-50 bg-brand-secondary/95 backdrop-blur-md flex flex-col items-center justify-center text-center p-8">
+                  <div className="w-16 h-16 bg-brand-tertiary/20 rounded-full flex items-center justify-center mb-4 text-brand-tertiary animate-bounce">
                     <i className="fa-solid fa-check text-2xl"></i>
                   </div>
-                  <h3 className="text-2xl font-serif text-white mb-2">Received!</h3>
+                  <h3 className="text-2xl font-serif text-text-inverse mb-2">Received!</h3>
                   <p className="text-gray-300 text-sm">Thank you for sharing your experience.</p>
                 </div>
               )}
 
               <div className="mb-5 text-center lg:text-left">
-                <h3 className="text-xl md:text-2xl font-serif text-white tracking-tight">Share your thought</h3>
+                <h3 className="text-xl md:text-2xl font-serif text-text-inverse tracking-tight">Share your thought</h3>
                 <p className="text-gray-400 text-xs mt-1 font-light">We truly value your feedback.</p>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-[9px] font-bold text-[#F5DEB3]/80 uppercase tracking-widest ml-1">Name *</label>
-                  <input type="text" required value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Full Name" className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-[#F5DEB3] outline-none transition-all" />
+                  <label className="text-[9px] font-bold text-brand-tertiary/80 uppercase tracking-widest ml-1">Name *</label>
+                  <input type="text" required value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Full Name" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-400 focus:border-brand-tertiary focus:bg-white/10 outline-none transition-all" />
                 </div>
                 
                 <div className="space-y-2 pt-1">
                   <div className="flex justify-between items-center px-1">
-                    <label className="text-[9px] font-bold uppercase tracking-widest text-[#F5DEB3]/80">Experience</label>
-                    <span className="text-[10px] font-bold text-[#F5DEB3] uppercase">{moods[mood].label}</span>
+                    <label className="text-[9px] font-bold uppercase tracking-widest text-brand-tertiary/80">Experience</label>
+                    <span className="text-[10px] font-bold text-brand-tertiary uppercase">{moods[mood].label}</span>
                   </div>
-                  <div className="flex justify-between bg-black/20 p-1.5 rounded-xl border border-white/5">
+                  <div className="flex justify-between bg-white/5 p-1.5 rounded-xl border border-brand-tertiary/20">
                     {moods.map((m, i) => (
-                      <button key={i} type="button" onClick={() => { setMood(i); playSound('click'); }} className={`w-10 h-10 flex items-center justify-center rounded-lg transition-all ${mood === i ? 'bg-[#F5DEB3] scale-105 shadow-lg text-lg' : 'opacity-40 grayscale hover:grayscale-0 hover:bg-white/10'}`}>
+                      <button key={i} type="button" onClick={() => { setMood(i); playSound('click'); }} className={`w-10 h-10 flex items-center justify-center rounded-lg transition-all ${mood === i ? 'bg-brand-tertiary scale-105 shadow-lg text-lg' : 'opacity-40 grayscale hover:grayscale-0 hover:bg-white/10'}`}>
                         <span>{m.emoji}</span>
                       </button>
                     ))}
@@ -282,11 +282,11 @@ const AireTestimonials = () => {
                 </div>
 
                 <div className="space-y-1.5 pt-1">
-                  <label className="text-[9px] font-bold text-[#F5DEB3]/80 uppercase tracking-widest ml-1">Your Review *</label>
-                  <textarea required value={reviewText} onChange={(e) => setReviewText(e.target.value)} placeholder="Describe your experience..." className="w-full h-20 bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-[#F5DEB3] outline-none resize-none custom-scrollbar transition-all" />
+                  <label className="text-[9px] font-bold text-brand-tertiary/80 uppercase tracking-widest ml-1">Your Review *</label>
+                  <textarea required value={reviewText} onChange={(e) => setReviewText(e.target.value)} placeholder="Describe your experience..." className="w-full h-20 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-400 focus:border-brand-tertiary focus:bg-white/10 outline-none resize-none custom-scrollbar transition-all" />
                 </div>
 
-                <button type="submit" disabled={isSubmitting || !reviewText || !userName} className="w-full py-3.5 mt-2 bg-[#F5DEB3] text-[#1c3026] rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-white transition-all shadow-xl disabled:opacity-50">
+                <button type="submit" disabled={isSubmitting || !reviewText || !userName} className="w-full py-3.5 mt-2 bg-brand-tertiary text-brand-dark rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-surface-primary transition-all shadow-xl disabled:opacity-50">
                   {isSubmitting ? 'Processing...' : 'Post Review'}
                 </button>
               </form>

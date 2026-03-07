@@ -1,0 +1,133 @@
+# Implementation Plan
+
+- [x] 1. Write bug condition exploration test
+  - **Property 1: Fault Condition** - Hardcoded Colors Detection
+  - **CRITICAL**: This test MUST FAIL on unfixed code - failure confirms the bug exists
+  - **DO NOT attempt to fix the test or the code when it fails**
+  - **NOTE**: This test encodes the expected behavior - it will validate the fix when it passes after implementation
+  - **GOAL**: Surface counterexamples that demonstrate hardcoded colors exist in components
+  - **Scoped PBT Approach**: Scope the property to concrete failing cases - search for hardcoded color patterns in the 4 files requiring changes
+  - Test that components use hardcoded color values instead of semantic tokens (from Fault Condition in design)
+  - Search for patterns: `bg-\[#[0-9a-fA-F]{6}\]`, `text-\[#[0-9a-fA-F]{6}\]`, `text-white`, `bg-black`, `border-black border-opacity-*`
+  - Test files: AireFeaturedProducts.jsx, WhyChooseUs.jsx, AireTestimonials.jsx, AireInstagramFeed.jsx
+  - Run test on UNFIXED code
+  - **EXPECTED OUTCOME**: Test FAILS (this is correct - it proves hardcoded colors exist)
+  - Document counterexamples found:
+    - `text-[#F5DEB3]` instances in multiple files
+    - `bg-[#2e443c]` and `bg-[#1a2822]` in testimonials and Instagram feed
+    - `border-black border-opacity-*` in WhyChooseUs
+    - `bg-black/40 hover:bg-red-500` in AireFeaturedProducts
+  - Mark task complete when test is written, run, and failure is documented
+  - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7_
+
+- [x] 2. Write preservation property tests (BEFORE implementing fix)
+  - **Property 2: Preservation** - Visual Appearance and Non-Color Styling
+  - **IMPORTANT**: Follow observation-first methodology
+  - Observe behavior on UNFIXED code for non-buggy styling (layout, spacing, typography, Tailwind gray scale)
+  - Capture baseline screenshots of all 6 HomePage components in various states
+  - Write property-based tests capturing observed behavior patterns from Preservation Requirements:
+    - Layout utilities (flex, grid, positioning) remain unchanged
+    - Spacing utilities (padding, margin, gap) remain unchanged
+    - Typography utilities (font-size, font-weight) remain unchanged
+    - Tailwind gray scale colors (text-gray-*, bg-gray-*, text-stone-*) remain unchanged
+    - Interactive functionality (clicks, form submissions) works identically
+  - Property-based testing generates many test cases for stronger guarantees
+  - Run tests on UNFIXED code
+  - **EXPECTED OUTCOME**: Tests PASS (this confirms baseline behavior to preserve)
+  - Mark task complete when tests are written, run, and passing on unfixed code
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7_
+
+- [x] 3. Fix for semantic color token migration across HomePage components
+
+  - [x] 3.1 Update AireFeaturedProducts.jsx (4 changes)
+    - Replace `text-[#F5DEB3]/50` with `text-brand-tertiary/50`
+    - Replace `text-[#F5DEB3]/80` with `text-brand-tertiary/80`
+    - Replace `text-[#F5DEB3]/60` with `text-brand-tertiary/60`
+    - Replace `bg-black/40` with `bg-overlay` and `hover:bg-red-500` with `hover:bg-error`
+    - _Bug_Condition: isBugCondition(className) where className matches hardcoded color patterns_
+    - _Expected_Behavior: All color references use semantic tokens (brand-tertiary, overlay, error)_
+    - _Preservation: Layout, spacing, typography, and non-color styling remain unchanged_
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 3.1, 3.2, 3.3, 3.4, 3.5_
+
+  - [x] 3.2 Update WhyChooseUs.jsx (3 changes)
+    - Replace all `border-black border-opacity-5` with `border-subtle-dark`
+    - Replace all `border-black border-opacity-10` with `border-subtle-dark`
+    - Replace all `border-black border-opacity-20` with `border-subtle-dark`
+    - _Bug_Condition: isBugCondition(className) where className uses border-black with opacity_
+    - _Expected_Behavior: Border colors use semantic token border-subtle-dark_
+    - _Preservation: Card layout, spacing, and non-border styling remain unchanged_
+    - _Requirements: 2.1, 2.6, 3.1, 3.2, 3.3, 3.4_
+
+  - [x] 3.3 Update AireTestimonials.jsx (20+ changes)
+    - Replace all `bg-[#1a2822]` with `bg-brand-dark`
+    - Replace all `bg-[#2e443c]` with `bg-brand-secondary`
+    - Replace all `bg-[#2e443c]/80` with `bg-brand-secondary/80`
+    - Replace all `bg-[#F5DEB3]` with `bg-brand-tertiary`
+    - Replace all `bg-[#F5DEB3]/5` with `bg-brand-tertiary/5`
+    - Replace all `bg-[#F5DEB3]/10` with `bg-brand-tertiary/10`
+    - Replace all `text-[#F5DEB3]` with `text-brand-tertiary`
+    - Replace all `text-[#F5DEB3]/80` with `text-brand-tertiary/80`
+    - Replace all `border-[#F5DEB3]/20` with `border-brand-tertiary/20`
+    - Replace all `focus:border-[#F5DEB3]` with `focus:border-brand-tertiary`
+    - Replace all `text-[#1c3026]` with `text-brand-dark`
+    - Replace `text-white` (in headings/cards) with `text-inverse`
+    - Replace `text-white/20` with `text-inverse/20`
+    - Replace `text-white/5` with `text-inverse/5`
+    - Replace `bg-white/5` with `bg-overlay-light`
+    - Replace `border-white/10` with `border-subtle`
+    - Replace `border-white/5` with `border-subtle`
+    - Replace `bg-black/20` with `bg-overlay-light`
+    - _Bug_Condition: isBugCondition(className) where className uses hex codes or named colors_
+    - _Expected_Behavior: All colors use semantic tokens (brand-dark, brand-secondary, brand-tertiary, text-inverse, overlay-light, border-subtle)_
+    - _Preservation: Testimonial layout, form functionality, gray scale colors (text-gray-200, text-gray-400), and emerald accent colors remain unchanged_
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
+
+  - [x] 3.4 Update AireInstagramFeed.jsx (10+ changes)
+    - Replace all `bg-[#1a2822]` with `bg-brand-dark`
+    - Replace all `bg-[#2e443c]` with `bg-brand-secondary`
+    - Replace all `bg-[#F5DEB3]` with `bg-brand-tertiary`
+    - Replace all `text-[#F5DEB3]` with `text-brand-tertiary`
+    - Replace `text-white` (in headings) with `text-inverse`
+    - Replace `bg-white` (button) with `bg-surface-primary`
+    - Replace `bg-white/5` with `bg-overlay-light`
+    - Replace `border-white/5` with `border-subtle`
+    - Replace `border-white/10` with `border-subtle`
+    - _Bug_Condition: isBugCondition(className) where className uses hex codes or named colors_
+    - _Expected_Behavior: All colors use semantic tokens (brand-dark, brand-secondary, brand-tertiary, text-inverse, surface-primary, overlay-light, border-subtle)_
+    - _Preservation: Instagram feed layout, gray scale colors (text-gray-400, bg-zinc-900), and emerald accent colors remain unchanged_
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
+
+  - [x] 3.5 Verify bug condition exploration test now passes
+    - **Property 1: Expected Behavior** - Semantic Tokens Used
+    - **IMPORTANT**: Re-run the SAME test from task 1 - do NOT write a new test
+    - The test from task 1 encodes the expected behavior
+    - When this test passes, it confirms semantic tokens are used throughout
+    - Run bug condition exploration test from step 1
+    - **EXPECTED OUTCOME**: Test PASSES (confirms hardcoded colors are replaced)
+    - Verify no hardcoded color patterns remain in the 4 updated files
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7_
+
+  - [x] 3.6 Verify preservation tests still pass
+    - **Property 2: Preservation** - Visual Appearance Unchanged
+    - **IMPORTANT**: Re-run the SAME tests from task 2 - do NOT write new tests
+    - Run preservation property tests from step 2
+    - **EXPECTED OUTCOME**: Tests PASS (confirms no regressions)
+    - Compare before/after screenshots pixel-by-pixel
+    - Verify layout, spacing, typography remain identical
+    - Verify Tailwind gray scale colors remain unchanged
+    - Verify interactive functionality works identically
+    - Confirm all tests still pass after fix (no regressions)
+    - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7_
+
+- [x] 4. Visual verification and testing
+  - Run the application and visually inspect all 6 HomePage components
+  - Verify HomePage.jsx and AireHeroBanner.jsx remain unchanged (already compliant)
+  - Test interactive states (hover, focus, active) on all components
+  - Verify responsive behavior across mobile, tablet, desktop breakpoints
+  - Test form interactions in AireTestimonials component
+  - Verify gradient transitions and overlay colors look identical
+  - Confirm accessibility (color contrast ratios unchanged)
+  - Take final screenshots for documentation
+
+- [x] 5. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise

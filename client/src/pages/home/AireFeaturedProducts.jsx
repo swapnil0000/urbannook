@@ -35,15 +35,15 @@ const AireFeaturedProducts = memo(() => {
   // Loading state - show skeleton instead of full loader
   if (isLoading) {
     return (
-      <section className="relative mx-2 my-2 md:mx-4 md:my-4 rounded-[2rem] md:rounded-[3rem] overflow-hidden bg-[#2e443c] shadow-2xl flex items-center justify-center min-h-[85vh] lg:h-[calc(100vh-2rem)] lg:max-h-[1080px] border border-white/5">
+      <section className="relative mx-2 my-2 md:mx-4 md:my-4 rounded-[2rem] md:rounded-[3rem] overflow-hidden bg-brand-secondary shadow-2xl flex items-center justify-center min-h-[85vh] lg:h-[calc(100vh-2rem)] lg:max-h-[1080px] border border-border-subtle">
         {/* Skeleton loader instead of spinner */}
         <div className="w-full h-full flex flex-col lg:flex-row items-center justify-between gap-8 lg:gap-12 p-6 md:p-10">
           <div className="w-full lg:w-[45%] space-y-4">
-            <div className="h-8 bg-white/10 rounded animate-pulse"></div>
-            <div className="h-12 bg-white/10 rounded animate-pulse"></div>
-            <div className="h-6 bg-white/10 rounded animate-pulse w-3/4"></div>
+            <div className="h-8 bg-bg-overlay-light rounded animate-pulse"></div>
+            <div className="h-12 bg-bg-overlay-light rounded animate-pulse"></div>
+            <div className="h-6 bg-bg-overlay-light rounded animate-pulse w-3/4"></div>
           </div>
-          <div className="w-full lg:w-[45%] h-[400px] bg-white/10 rounded-[2.5rem] animate-pulse"></div>
+          <div className="w-full lg:w-[45%] h-[400px] bg-bg-overlay-light rounded-[2.5rem] animate-pulse"></div>
         </div>
       </section>
     );
@@ -55,19 +55,19 @@ const AireFeaturedProducts = memo(() => {
   }
 
   return (
-    <section className="relative mx-2 my-2 md:mx-4 md:my-4 rounded-[2rem] md:rounded-[3rem] overflow-hidden bg-[#2e443c] shadow-2xl flex flex-col justify-center min-h-[85vh] lg:h-[calc(100vh-2rem)] lg:max-h-[1080px] border border-white/5">
+    <section className="relative mx-2 my-2 md:mx-4 md:my-4 rounded-[2rem] md:rounded-[3rem] overflow-hidden bg-brand-secondary shadow-2xl flex flex-col justify-center min-h-[85vh] lg:h-[calc(100vh-2rem)] lg:max-h-[1080px] border border-border-subtle">
     
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full text-center pointer-events-none select-none z-0 overflow-hidden">
-        <span className="text-[8rem] md:text-[20rem] lg:text-[25rem] font-black text-white/[0.03] leading-none whitespace-nowrap">
+        <span className="text-[8rem] md:text-[20rem] lg:text-[25rem] font-black text-text-inverse/[0.03] leading-none whitespace-nowrap">
          FEATURED 
         </span>
       </div>
       <div className="relative z-10 w-full h-full flex flex-col px-6 py-0 md:px-10 md:py-10">
         
-        <div className="flex justify-between items-start w-full border-b border-white/10 pb-6 mb-8 mt-8 lg:mb-auto">
+        <div className="flex justify-between items-start w-full border-b border-border-subtle pb-6 mb-8 mt-8 lg:mb-auto">
              <div className="flex items-center gap-3">
-                <span className="w-2 h-2 bg-[#F5DEB3] rounded-full animate-pulse"></span>
-                <span className="text-[#F5DEB3] font-mono text-xs tracking-[0.3em] uppercase">Featured Product</span>
+                <span className="w-2 h-2 bg-brand-tertiary rounded-full animate-pulse"></span>
+                <span className="text-brand-tertiary font-mono text-xs tracking-[0.3em] uppercase">Featured Product</span>
              </div>
         </div>
 
@@ -78,43 +78,43 @@ const AireFeaturedProducts = memo(() => {
              
              {/* Tag */}
              <div className="mb-4 md:mb-6">
-                <span className="px-4 py-2 rounded-full border border-[#F5DEB3]/30 text-[#F5DEB3] text-[10px] font-bold uppercase tracking-widest bg-[#F5DEB3]/5">
+                <span className="px-4 py-2 rounded-full border border-brand-tertiary/30 text-brand-tertiary text-[10px] font-bold uppercase tracking-widest bg-brand-tertiary/5">
                     {featuredProduct.productCategory || 'Signature Piece'}
                 </span>
              </div>
 
              {/* Title */}
-             <h2 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-serif text-white leading-[0.9] mb-3 md:mb-4">
+             <h2 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-serif text-text-inverse leading-[0.9] mb-3 md:mb-4">
                 {featuredProduct.productName}
              </h2>
 
              {/* Subtitle */}
-             <p className="text-base md:text-lg lg:text-xl text-[#F5DEB3]/80  font-light mb-6 md:mb-8">
+             <p className="text-base md:text-lg lg:text-xl text-brand-tertiary/80  font-light mb-6 md:mb-8">
                 {featuredProduct.productDes || "Designed to stand out."}
              </p>
 
              {/* Divider */}
-             <div className="w-20 h-px bg-gradient-to-r from-[#F5DEB3] to-transparent mb-6 md:mb-8"></div>
+             <div className="w-20 h-px bg-gradient-to-r from-brand-tertiary to-transparent mb-6 md:mb-8"></div>
 
              {/* Actions */}
              <div className="flex flex-wrap items-center gap-4 md:gap-6">
                 <button 
                   onClick={handleViewProduct}
-                  className="group relative px-8 md:px-10 py-3 md:py-4 bg-white text-black rounded-full font-bold uppercase tracking-widest text-xs overflow-hidden transition-all hover:scale-105 hover:shadow-[0_0_30px_rgba(255,255,255,0.3)]"
+                  className="group relative px-8 md:px-10 py-3 md:py-4 bg-surface-primary text-text-primary rounded-full font-bold uppercase tracking-widest text-xs overflow-hidden transition-all hover:scale-105 hover:shadow-[0_0_30px_rgba(255,255,255,0.3)]"
                 >
                   <span className="relative z-10">View Product</span>
-                  <div className="absolute inset-0 bg-[#F5DEB3] translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+                  <div className="absolute inset-0 bg-brand-tertiary translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
                 </button>
                 
                 <div className="flex flex-col">
                     <div className="flex items-baseline gap-2">
-                      <span className="text-white text-lg md:text-xl font-serif">₹{featuredProduct.sellingPrice?.toLocaleString()}</span>
-                      {/* <span className="text-sm text-[#F5DEB3]/50 line-through">₹{(featuredProduct.listedPrice || featuredProduct.sellingPrice * 1.18).toFixed(0)}</span> */}
+                      <span className="text-text-inverse text-lg md:text-xl font-serif">₹{featuredProduct.sellingPrice?.toLocaleString()}</span>
+                      {/* <span className="text-sm text-brand-tertiary/50 line-through">₹{(featuredProduct.listedPrice || featuredProduct.sellingPrice * 1.18).toFixed(0)}</span> */}
                     </div>
-                    {/* <span className="text-[10px] text-[#F5DEB3]/80 uppercase tracking-widest font-bold">
+                    {/* <span className="text-[10px] text-brand-tertiary/80 uppercase tracking-widest font-bold">
                       {featuredProduct.productStatus === 'in_stock' ? 'In Stock' : 'Limited Stock'}
                     </span>
-                    <span className="text-[8px] text-[#F5DEB3]/60 uppercase tracking-wider">+ ₹50 shipping</span> */}
+                    <span className="text-[8px] text-brand-tertiary/60 uppercase tracking-wider">+ ₹50 shipping</span> */}
                 </div>
              </div>
           </div>
@@ -126,11 +126,11 @@ const AireFeaturedProducts = memo(() => {
             <div className="relative w-full max-w-[350px] md:max-w-[450px]  group">
                 
                 {/* Glow behind image */}
-                <div className="absolute inset-0 bg-[#F5DEB3]/20 rounded-[2.5rem] blur-2xl transform group-hover:scale-105 transition-transform duration-700"></div>
+                <div className="absolute inset-0 bg-brand-tertiary/20 rounded-[2.5rem] blur-2xl transform group-hover:scale-105 transition-transform duration-700"></div>
 
                 {/* Main Image Container */}
-                <div className="relative rounded-[2.5rem] overflow-hidden border border-white/10 bg-[#121212] shadow-2xl">
-                    <Suspense fallback={<div className="w-full h-[400px] bg-gray-200 animate-pulse rounded-[2.5rem]"></div>}>
+                <div className="relative rounded-[2.5rem] overflow-hidden border border-border-subtle bg-bg-neutral-dark shadow-2xl">
+                    <Suspense fallback={<div className="w-full h-[400px] bg-bg-secondary animate-pulse rounded-[2.5rem]"></div>}>
                       <OptimizedImage 
                           src={featuredProduct.productImg} 
                           alt={featuredProduct.productName}
@@ -140,15 +140,15 @@ const AireFeaturedProducts = memo(() => {
                     </Suspense>
                     
                     {/* Gradient Overlay for Text readability if image is bright */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60"></div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-bg-overlay via-transparent to-transparent opacity-60"></div>
                 </div>
 
                 {/* Wishlist Button */}
                 <div className="absolute top-6 right-6 z-20">
-                    <Suspense fallback={<div className="w-10 h-10 bg-white/20 rounded-full animate-pulse"></div>}>
+                    <Suspense fallback={<div className="w-10 h-10 bg-bg-overlay-light rounded-full animate-pulse"></div>}>
                       <WishlistButton 
                           productId={featuredProduct.productId} 
-                          className="bg-black/40 hover:bg-red-500 backdrop-blur-md" 
+                          className="bg-overlay hover:bg-error backdrop-blur-md" 
                           size="lg"
                       />
                     </Suspense>
@@ -159,8 +159,8 @@ const AireFeaturedProducts = memo(() => {
         </div>
 
         {/* Footer: Technical Detail */}
-        <div className="mt-auto pt-8 border-t border-white/10 flex justify-between items-end">
-            <div className="hidden md:block text-[10px] text-gray-500 font-mono uppercase tracking-widest max-w-xs">
+        <div className="mt-auto pt-8 border-t border-border-subtle flex justify-between items-end">
+            <div className="hidden md:block text-[10px] text-text-muted font-mono uppercase tracking-widest max-w-xs">
                 Precision crafted for modern interiors. <br/> {featuredProduct.productSubCategory || 'Premium Quality'}
             </div>
         </div>
