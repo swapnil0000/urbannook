@@ -379,26 +379,6 @@ const NewHeader = () => {
               ) : (
                 /* LOGIN CTA IF NOT LOGGED IN */
                 <div className="bg-white/40 p-4 rounded-2xl border border-white/50 mb-6 space-y-3">
-                    <GoogleLoginButton 
-                      useOneTap={true}
-                     
-                      size="large"
-                      text="continue_with"
-                      shape="rectangular"
-                      onSuccess={(userData) => {
-                        console.log('Google login successful from mobile menu');
-                        setUser(userData);
-                        setIsMenuOpen(false);
-                      }}
-                      onError={(error) => {
-                        console.error('Google login failed from mobile menu:', error);
-                      }}
-                    />
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 h-px bg-emerald-900/20"></div>
-                      <span className="text-xs text-emerald-900/60 font-medium">or</span>
-                      <div className="flex-1 h-px bg-emerald-900/20"></div>
-                    </div>
                     <button 
                         onClick={handleMobileLogin}
                         className="w-full py-4 bg-emerald-800 text-white rounded-xl font-bold uppercase tracking-widest text-xs shadow-lg hover:bg-emerald-900 flex items-center justify-center gap-3 active:scale-95 transition-all"
