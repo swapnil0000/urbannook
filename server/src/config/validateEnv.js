@@ -5,7 +5,37 @@
  * before the server starts. This prevents runtime errors due to missing configuration.
  */
 import env from "./envConfigSetup.js";
-const requiredEnvVars = [
+const requiredEnvVarsLocal = [
+  // Server Configuration
+  "PORT",
+  "NODE_ENV",
+  "WHITE_LIST_CLIENT_URI",
+
+  // Database
+  "DB_URI",
+
+  // JWT Secrets
+  "ADMIN_ACCESS_TOKEN_SECRET",
+  "USER_ACCESS_TOKEN_SECRET",
+  "REFRESH_TOKEN_SECRET",
+
+  // Email Configuration (ZOHO SMTP)
+  "ZOHO_ADMIN_EMAIL",
+  "ZOHO_SMTP_SECRET",
+
+  // Payment Gateway (Razorpay)
+  "RP_KEY_ID",
+  "RP_SECRET",
+  "RP_WEBHOOK_SECRET",
+
+  // AWS S3 Configuration
+  "AWS_ACCESS_KEY",
+  "AWS_SECRET",
+  "AWS_BUCKET_REGION",
+  "AWS_BUCKET_NAME",
+  "AWS_CDN_BASE_URL",
+];
+const requiredEnvVarsStaging = [
   // Server Configuration
   "PORT",
   "NODE_ENV",
@@ -73,7 +103,9 @@ export function validateEnvironment() {
   const missing =
     env.NODE_ENV == "production"
       ? requiredEnvVarsProd.filter((varName) => !env[varName])
-      : requiredEnvVars.filter((varName) => !env[varName]);
+      : env.NODE_ENV == "staging"
+        ? requiredEnvVarsStaging.filter((varName) => !env[varName])
+        : requiredEnvVarsLocal.filter((varName) => !env[varName]);
 
   if (missing.length > 0) {
     console.error("\n❌ ERROR: Missing required environment variables:\n");
