@@ -61,7 +61,7 @@
         likes: "2.3k",
         comments: "42",
         caption: "New Arrival: 3D Printed Magic ✨",
-        link: "https://www.instagram.com/reel/DTumPdjAdNt/?igsh=MW8xdmJpamZ2bGh0ZA=="
+        link: "https://www.instagram.com/reel/DUOUbvmAbpJ/?igsh=MWNiZWl1NTRnMDd2OQ=="
     },
     {
         id: 2,
@@ -69,7 +69,7 @@
         likes: "1.8k",
         comments: "15",
         caption: "UrbanNook Aesthetics 🌿",
-        link: "https://www.instagram.com/reel/DTcCR9LgdhS/?igsh=MWF3ZnczZmhrZjl2bw=="
+        link: "https://www.instagram.com/reel/DT5gZ80ASaS/?igsh=bXpuM3pmcHY2aW4z"
     },
     {
         id: 3,
@@ -77,23 +77,23 @@
         likes: "3.1k",
         comments: "89",
         caption: "Illuminating spaces 💡",
-        link: "https://www.instagram.com/reel/DTMezUqgbhy/?igsh=MWdmaW5lYzk3ZXJ4NA=="
+        link: "https://www.instagram.com/reel/DTumPdjAdNt/?igsh=MW8xdmJpamZ2bGh0ZA=="
     },
     {
         id: 4,
-        image: "/insta_templates/template3.webp",
+        image: "/insta_templates/template4.webp",
         likes: "1.7k",
         comments: "22",
         caption: "Crafted for you 🔑",
-        link: "https://www.instagram.com/reel/DTkE46tAf0G/?igsh=dDJ4Y3J1anl1NGhu"
+        link: "https://www.instagram.com/reel/DVLBe9ZAa8u/?igsh=d3o0dWh5amtwMGZn"
     },
     {
         id: 5,
-        image: "/insta_templates/template3.webp",
+        image: "/insta_templates/template5.webp",
         likes: "1.9k",
         comments: "31",
         caption: "The Urban Standard 💕",
-        link: "https://www.instagram.com/reel/DT5gZ80ASaS/?igsh=bXpuM3pmcHY2aW4z"
+        link: "https://www.instagram.com/reel/DU90HNPiA7_/?igsh=YWxhemxjeTZnM29t"
     }
 ];
 

@@ -164,7 +164,7 @@ const generateOrderInvoice = asyncHandler(async (req, res) => {
   if (!order) throw new NotFoundError("Order not found");
 
   // Allow invoice for any order that has been paid (not CREATED, FAILED, or CANCELLED)
-  if (!order.status !== "PAID")
+  if (order.status !== "PAID")
     throw new ValidationError("Invoice only available for paid orders");
 
   const html = `

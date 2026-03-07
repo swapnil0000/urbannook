@@ -49,6 +49,17 @@ import {
 } from "../services/common.auth.service.js";
 
 /* ===============================================================
+   CSRF PROTECTION
+   ---------------------------------------------------------------
+   csrfTokenGenerator → Generates CSRF token
+   csrfProtection → Validates CSRF token on state-changing requests
+================================================================ */
+import {
+  csrfTokenGenerator,
+  csrfProtection,
+} from "../middleware/csrf.middleware.js";
+
+/* ===============================================================
    VALIDATION MIDDLEWARE
    ---------------------------------------------------------------
    Input validation using Joi schemas
@@ -87,15 +98,34 @@ const authLimiter = rateLimit({
    ---------------------------------------------------------------
    These routes do NOT require authentication
 ================================================================ */
+
+/* ===============================================================
+   CSRF TOKEN ENDPOINT (PROTECTED)
+   ---------------------------------------------------------------
+   Provides CSRF token to authenticated users
+================================================================ */
+userRouter.get(
+  "/csrf-token",
+  authGuardService("USER"),
+  csrfTokenGenerator,
+  (req, res) => {
+    res.status(200).json({
+      success: true,
+      csrfToken: req.csrfToken,
+      message: "CSRF token generated successfully"
+    });
+  }
+);
+
 userRouter.post(
   "/user/login",
-  // authLimiter,
+  authLimiter,
   validateRequest(loginSchema),
   userLogin,
 );
 userRouter.post(
   "/user/register",
-  // authLimiter,
+  authLimiter,
   validateRequest(registerSchema),
   userRegister,
 );
@@ -130,6 +160,7 @@ userRouter.get("/user/profile", authGuardService("USER"), userProfile);
 userRouter.patch(
   "/user/profile/update",
   authGuardService("USER"),
+  csrfProtection,
   validateRequest(updateProfileSchema),
   userUpdateProfile,
 );
@@ -137,6 +168,7 @@ userRouter.patch(
 userRouter.post(
   "/user/reset-password",
   authGuardService("USER"),
+  csrfProtection,
   validateRequest(resetPasswordSchema),
   userResetPassword,
 );
@@ -170,6 +202,7 @@ userRouter.post(
 userRouter.post(
   "/user/addtowishlist",
   authGuardService("USER"),
+  csrfProtection,
   userAddToWishList,
 );
 
@@ -182,6 +215,7 @@ userRouter.get(
 userRouter.delete(
   "/user/wishlist/:productId",
   authGuardService("USER"),
+  csrfProtection,
   userDeleteFromProductWishList,
 );
 
@@ -194,19 +228,21 @@ userRouter.delete(
 userRouter.post(
   "/user/delete-preview",
   authGuardService("USER"),
+  csrfProtection,
   userAccountDeletePreview,
 );
 
 userRouter.delete(
   "/user/delete-confirm",
   authGuardService("USER"),
+  csrfProtection,
   userAccountDeleteConfirm,
 );
 
 /* ===============================================================
    SESSION & TOKEN MANAGEMENT
 ================================================================ */
-userRouter.post("/user/logout", authGuardService("USER"), logoutService);
+userRouter.post("/user/logout", authGuardService("USER"), csrfProtection, logoutService);
 /* ===============================================================
    RAZORPAY CHECKOUT FLOW (PROTECTED)
    ---------------------------------------------------------------
@@ -223,6 +259,7 @@ userRouter.get(
 userRouter.post(
   "/user/create-order",
   authGuardService("USER"),
+  csrfProtection,
   razorpayCreateOrderController,
 );
 

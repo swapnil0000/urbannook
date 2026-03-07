@@ -21,6 +21,7 @@ import {
 } from "../pages/index.js";
 import PaymentProcessing from "../pages/PaymentProcessing.jsx";
 import PaymentFailed from "../pages/PaymentFailed.jsx";
+import ProtectedRoute from "../component/ProtectedRoute.jsx";
 
 // Minimal loader for individual route transitions only
 const MinimalLoader = () => (
@@ -69,38 +70,57 @@ const AppRoutes = () => {
       <Route
         path="/checkout"
         element={
-          <Suspense fallback={<MinimalLoader />}>
-            <CheckoutPage />
-          </Suspense>
+          <ProtectedRoute>
+            <Suspense fallback={<MinimalLoader />}>
+              <CheckoutPage />
+            </Suspense>
+          </ProtectedRoute>
         }
       />
       <Route
         path="/profile"
         element={
-          <Suspense fallback={<MinimalLoader />}>
-            <MyProfilePage />
-          </Suspense>
+          <ProtectedRoute>
+            <Suspense fallback={<MinimalLoader />}>
+              <MyProfilePage />
+            </Suspense>
+          </ProtectedRoute>
         }
       />
       <Route
         path="/payment-processing/:orderId"
-        element={<PaymentProcessing />}
+        element={
+          <ProtectedRoute>
+            <PaymentProcessing />
+          </ProtectedRoute>
+        }
       />
-      <Route path="/payment-failed" element={<PaymentFailed />} />
+      <Route
+        path="/payment-failed"
+        element={
+          <ProtectedRoute>
+            <PaymentFailed />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/orders"
         element={
-          <Suspense fallback={<MinimalLoader />}>
-            <MyOrdersPage />
-          </Suspense>
+          <ProtectedRoute>
+            <Suspense fallback={<MinimalLoader />}>
+              <MyOrdersPage />
+            </Suspense>
+          </ProtectedRoute>
         }
       />
       <Route
         path="/wishlist"
         element={
-          <Suspense fallback={<MinimalLoader />}>
-            <WishlistPage />
-          </Suspense>
+          <ProtectedRoute>
+            <Suspense fallback={<MinimalLoader />}>
+              <WishlistPage />
+            </Suspense>
+          </ProtectedRoute>
         }
       />
       <Route
@@ -122,9 +142,11 @@ const AppRoutes = () => {
       <Route
         path="/settings"
         element={
-          <Suspense fallback={<MinimalLoader />}>
-            <SettingsPage />
-          </Suspense>
+          <ProtectedRoute>
+            <Suspense fallback={<MinimalLoader />}>
+              <SettingsPage />
+            </Suspense>
+          </ProtectedRoute>
         }
       />
       <Route

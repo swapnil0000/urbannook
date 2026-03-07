@@ -39,17 +39,8 @@ const Footer = () => {
   const handleTrackOrderClick = (e) => {
     e.preventDefault();
 
-    // Check if user is authenticated
-    const getCookie = (name) => {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop().split(";").shift();
-      return null;
-    };
-
-    const userToken = getCookie('userAccessToken');
-    const hasLocalUser = localStorage.getItem('user');
-    const isLoggedIn = isAuthenticated || userToken || hasLocalUser;
+    const hasToken = !!localStorage.getItem('authToken');
+    const isLoggedIn = isAuthenticated || hasToken;
 
     if (!isLoggedIn) {
       showNotification('Please login to track your orders', 'error');

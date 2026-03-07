@@ -78,9 +78,8 @@ const OTPVerificationScreen = ({ email, onClose, onVerified }) => {
 
       showNotification('Email verified successfully!');
       
-      // Store token in cookie
+      // Token is set as httpOnly cookie by server, store in localStorage for client use
       if (result.userAccessToken) {
-        document.cookie = `userAccessToken=${result.userAccessToken}; path=/; max-age=2592000`;
         login(result.user, result.userAccessToken);
       }
 

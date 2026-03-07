@@ -23,17 +23,8 @@ const MyOrdersPage = () => {
   useEffect(() => {
     window.scrollTo(0, 0);
 
-    // Check authentication
-    const getCookie = (name) => {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop().split(";").shift();
-      return null;
-    };
-
-    const userToken = getCookie("userAccessToken");
-    const hasLocalUser = localStorage.getItem("user");
-    const isLoggedIn = isAuthenticated || userToken || hasLocalUser;
+    const hasToken = !!localStorage.getItem('authToken');
+    const isLoggedIn = isAuthenticated || hasToken;
 
     if (!isLoggedIn) {
       showNotification("Please login to view your orders", "error");
@@ -53,16 +44,11 @@ const MyOrdersPage = () => {
     try {
       setGeneratingOrderId(orderId);
       
-      // Get token from Redux or cookie
+      // Get token from Redux or localStorage
       let token = authToken;
       
       if (!token) {
-        const getCookie = (name) => {
-          const value = `; ${document.cookie}`;
-          const parts = value.split(`; ${name}=`);
-          if (parts.length === 2) return parts.pop().split(';').shift();
-        };
-        token = getCookie('userAccessToken');
+        token = localStorage.getItem('authToken');
       }
 
       // Direct fetch call to bypass RTK Query serialization

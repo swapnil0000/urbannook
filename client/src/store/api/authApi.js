@@ -1,4 +1,4 @@
-import { apiSlice } from './apiSlice';
+import { apiSlice, fetchCsrfToken, clearCsrfToken } from './apiSlice';
 import { setCredentials, logout as logoutAction } from '../slices/authSlice';
 
 export const authApi = apiSlice.injectEndpoints({
@@ -30,8 +30,8 @@ export const authApi = apiSlice.injectEndpoints({
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          // Set credentials in Redux and localStorage
           if (data.success && data.data) {
+            const token = data.data.userAccessToken;
             dispatch(setCredentials({
               user: {
                 email: data.data.email,
@@ -39,8 +39,11 @@ export const authApi = apiSlice.injectEndpoints({
                 role: data.data.role,
                 userMobileNumber: data.data.userMobileNumber,
               },
-              token: data.data.userAccessToken,
+              token,
             }));
+            
+            // Fetch CSRF token after successful login
+            await fetchCsrfToken();
           }
         } catch (error) {
           console.error('Login failed:', error);
@@ -56,6 +59,7 @@ export const authApi = apiSlice.injectEndpoints({
         try {
           // Clear Redux state, localStorage, and cookies
           dispatch(logoutAction());
+          clearCsrfToken();
           
           // Wait for the API call to complete (optional)
           await queryFulfilled;
@@ -65,6 +69,7 @@ export const authApi = apiSlice.injectEndpoints({
         } catch (error) {
           // Even if API call fails, still logout locally
           dispatch(logoutAction());
+          clearCsrfToken();
           window.location.href = '/';
         }
       },
@@ -99,8 +104,8 @@ export const authApi = apiSlice.injectEndpoints({
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          // After successful OTP verification, authenticate the user
           if (data.success && data.data) {
+            const token = data?.data?.userAccessToken;
             dispatch(setCredentials({
               user: {
                 email: data?.data?.user?.email || data?.data?.email,
@@ -108,10 +113,14 @@ export const authApi = apiSlice.injectEndpoints({
                 userId: data?.data?.user?.id,
                 role: data?.data?.user?.role,
               },
-              token: data?.data?.userAccessToken,
+              token,
             }));
+            
             // Clear pending verification data
             sessionStorage.removeItem('pendingVerification');
+            
+            // Fetch CSRF token after successful verification
+            await fetchCsrfToken();
           }
         } catch (error) {
           console.error('OTP verification failed:', error);
@@ -146,8 +155,8 @@ export const authApi = apiSlice.injectEndpoints({
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          // Set credentials in Redux and localStorage
           if (data.success && data.data) {
+            const token = data.data.userAccessToken;
             dispatch(setCredentials({
               user: {
                 email: data.data.email,
@@ -155,8 +164,11 @@ export const authApi = apiSlice.injectEndpoints({
                 role: data.data.role,
                 userId: data.data.userId,
               },
-              token: data.data.userAccessToken,
+              token,
             }));
+            
+            // Fetch CSRF token after successful Google login
+            await fetchCsrfToken();
           }
         } catch (error) {
           console.error('Google login failed:', error);

@@ -7,28 +7,18 @@ export const useCartSync = () => {
   const dispatch = useDispatch();
   const { isAuthenticated } = useSelector((state) => state.auth);
 
-  // Check if user is authenticated
-  const getCookie = (name) => {
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop().split(';').shift();
-    return null;
-  };
-
-  const token = getCookie('userAccessToken');
-  const hasLocalUser = localStorage.getItem('user');
-  const shouldFetchCart = isAuthenticated || token || hasLocalUser;
+  const hasToken = !!localStorage.getItem('authToken');
+  const shouldFetchCart = isAuthenticated || hasToken;
 
   const { data: cartResponse, refetch } = useGetCartQuery(undefined, {
     skip: !shouldFetchCart,
-    refetchOnMountOrArgChange: true, // Changed to true to ensure fresh data
+    refetchOnMountOrArgChange: true,
     refetchOnFocus: false,
     refetchOnReconnect: false
   });
 
   useEffect(() => {
     if (cartResponse?.data) {
-      // If backend returns empty cart, clear Redux store
       if (!cartResponse?.data?.availableItems || cartResponse?.data?.availableItems?.length === 0) {
         dispatch(clearCart());
       } else {
@@ -37,7 +27,6 @@ export const useCartSync = () => {
     }
   }, [cartResponse, dispatch]);
 
-  // Return refetch function for manual cart refresh
   return { refetch };
 };
 
@@ -45,28 +34,18 @@ export const useCartData = () => {
   const dispatch = useDispatch();
   const { isAuthenticated } = useSelector((state) => state.auth);
 
-  // Check if user is authenticated
-  const getCookie = (name) => {
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop().split(';').shift();
-    return null;
-  };
-
-  const token = getCookie('userAccessToken');
-  const hasLocalUser = localStorage.getItem('user');
-  const shouldFetchCart = isAuthenticated || token || hasLocalUser;
+  const hasToken = !!localStorage.getItem('authToken');
+  const shouldFetchCart = isAuthenticated || hasToken;
 
   const { data: cartResponse, refetch } = useGetCartQuery(undefined, {
     skip: !shouldFetchCart,
-    refetchOnMountOrArgChange: true, // Changed to true
+    refetchOnMountOrArgChange: true,
     refetchOnFocus: false,
     refetchOnReconnect: false
   });
 
   useEffect(() => {
     if (cartResponse?.data) {
-      // If backend returns empty cart, clear Redux store
       if (!cartResponse?.data?.availableItems || cartResponse?.data?.availableItems?.length === 0) {
         dispatch(clearCart());
       } else {
