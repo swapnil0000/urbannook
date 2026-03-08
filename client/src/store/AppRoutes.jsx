@@ -189,6 +189,8 @@ const AppRoutes = () => {
           </Suspense>
         }
       />
+      {/* Catch-all route for 404 - redirect to home */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 };

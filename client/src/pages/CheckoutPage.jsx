@@ -13,6 +13,7 @@ import {
   useUpdateCartMutation,
 } from "../store/api/userApi";
 import { useUI } from "../hooks/useRedux";
+import { logout } from "../store/slices/authSlice";
 import CouponInput from "../component/CouponInput";
 import { ComponentLoader } from "../component/layout/LoadingSpinner";
 
@@ -27,6 +28,25 @@ const CheckoutPage = () => {
   const { items: cartItems } = useSelector((state) => state.cart);
   const { isAuthenticated } = useSelector((state) => state.auth);
   const paymentCompletedRef = useRef(false);
+
+  // CRITICAL: Immediate synchronous auth check before any rendering
+  const authToken = localStorage.getItem('authToken');
+  const userToken = localStorage.getItem('user');
+  
+  // If tokens are missing but Redux thinks we're authenticated, this is a security issue
+  if (!authToken || !userToken) {
+    // Force immediate redirect without rendering anything
+    if (isAuthenticated) {
+      // Dispatch logout to sync Redux state
+      dispatch(logout());
+    }
+    // Show notification and redirect
+    showNotification("Please login to access checkout", "error");
+    openLoginModal();
+    navigate("/", { replace: true });
+    // Return null to prevent any rendering
+    return null;
+  }
 
   const [userProfile, setUserProfile] = useState(null);
   const [address, setAddress] = useState("");
@@ -438,6 +458,17 @@ const CheckoutPage = () => {
       showNotification("Please select a delivery address.", "error");
       return;
     }
+    
+    // Check authentication before proceeding
+    const authToken = localStorage.getItem('authToken');
+    if (!authToken) {
+      showNotification("Your session has expired. Please login again.", "error");
+      dispatch(logout());
+      openLoginModal();
+      navigate("/");
+      return;
+    }
+    
     setPaymentError(null);
     try {
       const razorpayKey = razorpayKeyData?.data;
