@@ -1,23 +1,30 @@
 // Service Worker for Urban Nook
-const CACHE_NAME = 'urbannook-v1';
-const STATIC_CACHE = 'urbannook-static-v1';
+// Implements versioned caching with cache-first for static assets
+// and network-first for API calls
+// Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5
 
-// Assets to cache immediately
+const CACHE_VERSION = 'v2';
+const STATIC_CACHE = `urbannook-static-${CACHE_VERSION}`;
+const DYNAMIC_CACHE = `urbannook-dynamic-${CACHE_VERSION}`;
+const API_CACHE = `urbannook-api-${CACHE_VERSION}`;
+
+// Static assets to cache immediately on install
+// Includes hero images, fonts, and logo for optimal performance
 const STATIC_ASSETS = [
   '/',
+  '/assets/hero21.webp',
   '/assets/hero2.webp',
-  '/assets/logo.webp',
-  'https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap',
-  'https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css'
+  '/assets/logo.webp'
 ];
 
 // Install event - cache static assets
+// Validates: Requirements 5.1, 5.2
 self.addEventListener('install', (event) => {
-  console.log('🛠️ SW: Installing...');
+  console.log('🛠️ SW: Installing version', CACHE_VERSION);
   event.waitUntil(
     caches.open(STATIC_CACHE)
       .then((cache) => {
-        console.log('💾 SW: Caching static assets:', STATIC_ASSETS);
+        console.log('💾 SW: Caching static assets');
         return cache.addAll(STATIC_ASSETS);
       })
       .then(() => {
@@ -30,14 +37,16 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Activate event - clean old caches
+// Activate event - clean up old cache versions
+// Validates: Requirements 5.4
 self.addEventListener('activate', (event) => {
-  console.log('🔄 SW: Activating...');
+  console.log('🔄 SW: Activating version', CACHE_VERSION);
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME && cacheName !== STATIC_CACHE) {
+          // Delete any cache that doesn't match current version
+          if (cacheName.startsWith('urbannook-') && !cacheName.includes(CACHE_VERSION)) {
             console.log('🗑️ SW: Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
@@ -50,42 +59,78 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch event - serve from cache, fallback to network
+// Fetch event - implement caching strategies
+// Cache-first for static resources (Requirement 5.2)
+// Network-first for API calls (Requirement 5.3)
 self.addEventListener('fetch', (event) => {
-  // Skip non-GET requests
-  if (event.request.method !== 'GET') return;
+  const { request } = event;
+  const url = new URL(request.url);
   
-  // Skip API calls
-  if (event.request.url.includes('/api/')) return;
-
-  event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        if (response) {
-          console.log('💾 SW: Serving from cache:', event.request.url);
+  // Skip non-GET requests
+  if (request.method !== 'GET') return;
+  
+  // Network-first strategy for API calls
+  // Validates: Requirements 5.3
+  if (url.pathname.startsWith('/api/')) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          // Clone and cache successful API responses
+          if (response && response.status === 200) {
+            const responseToCache = response.clone();
+            caches.open(API_CACHE).then((cache) => {
+              cache.put(request, responseToCache);
+            });
+          }
           return response;
+        })
+        .catch(() => {
+          // Fallback to cache if network fails
+          return caches.match(request).then((cachedResponse) => {
+            if (cachedResponse) {
+              console.log('💾 SW: Serving API from cache (offline):', url.pathname);
+              return cachedResponse;
+            }
+            // Return a basic error response if no cache available
+            return new Response(JSON.stringify({ error: 'Offline and no cached data' }), {
+              status: 503,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          });
+        })
+    );
+    return;
+  }
+
+  // Cache-first strategy for static resources
+  // Validates: Requirements 5.2, 5.5
+  event.respondWith(
+    caches.match(request)
+      .then((cachedResponse) => {
+        if (cachedResponse) {
+          return cachedResponse;
         }
 
-        console.log('🌐 SW: Fetching from network:', event.request.url);
-        return fetch(event.request).then((response) => {
+        // Fetch from network and cache if it's a static asset
+        return fetch(request).then((response) => {
           // Don't cache if not a valid response
-          if (!response || response.status !== 200 || response.type !== 'basic') {
+          if (!response || response.status !== 200 || response.type === 'error') {
             return response;
           }
 
-          // Clone the response
-          const responseToCache = response.clone();
-
-          // Cache JS, CSS, and image files
-          if (event.request.url.match(/\.(js|css|png|jpg|jpeg|webp|svg|woff2?)$/)) {
-            caches.open(CACHE_NAME)
-              .then((cache) => {
-                console.log('💾 SW: Caching new file:', event.request.url);
-                cache.put(event.request, responseToCache);
-              });
+          // Cache static assets (JS, CSS, images, fonts)
+          if (url.pathname.match(/\.(js|css|png|jpg|jpeg|webp|svg|woff2?)$/)) {
+            const responseToCache = response.clone();
+            caches.open(DYNAMIC_CACHE).then((cache) => {
+              cache.put(request, responseToCache);
+            });
           }
 
           return response;
+        }).catch((error) => {
+          console.error('❌ SW: Fetch failed:', url.pathname, error);
+          // Return cached response if available, even for failed requests
+          return caches.match(request);
         });
       })
   );

@@ -21,6 +21,9 @@ const MyProfilePage = () => {
     };
   });
 
+  // Store original data to compare changes
+  const [originalData, setOriginalData] = useState(formData);
+
   // Load Profile Logic (Kept Original)
   const loadProfile = useCallback(async () => {
     try {
@@ -45,12 +48,14 @@ const MyProfilePage = () => {
   useEffect(() => {
     if (userProfileData?.data) {
       const profileData = userProfileData.data;
-      setFormData(prev => ({
+      const newFormData = {
         userName: profileData?.data?.name || "",
         userEmail: profileData?.data?.email || "",
         userMobileNumber: profileData?.data?.mobileNumber ? String(profileData.data.mobileNumber) : "",
-        userPinCode: profileData?.data?.pinCode || profileData?.userPinCode || prev.userPinCode
-      }));
+        userPinCode: profileData?.data?.pinCode || profileData?.userPinCode || ""
+      };
+      setFormData(newFormData);
+      setOriginalData(newFormData); // Store original data for comparison
     } else if (!profileLoading && (user?.email || JSON.parse(localStorage.getItem('user') || '{}')?.email)) {
       loadProfile();
     }
@@ -99,23 +104,40 @@ const MyProfilePage = () => {
         userPinCode: 'pinCode'
       };
 
+      // Check if any data has actually changed
+      const hasChanges = Object.keys(formData).some(key => {
+        const currentValue = String(formData[key] || '').trim();
+        const originalValue = String(originalData[key] || '').trim();
+        return currentValue !== originalValue;
+      });
+
+      if (!hasChanges) {
+        showNotification('No changes detected', 'info');
+        setIsEditing(false);
+        return;
+      }
+
       // Filter out empty values and map to backend field names
       const updateData = Object.entries(formData).reduce((acc, [key, value]) => {
         // Only process fields that have a mapping (backend supports)
         if (fieldMapping[key]) {
           const backendKey = fieldMapping[key];
           const stringValue = String(value || '').trim();
+          const originalValue = String(originalData[key] || '').trim();
           
-          // For name and email, only send if not empty
-          if (backendKey === 'name' || backendKey === 'email') {
-            if (stringValue !== '') {
-              acc[backendKey] = value;
+          // Only include fields that have changed
+          if (stringValue !== originalValue) {
+            // For name and email, only send if not empty
+            if (backendKey === 'name' || backendKey === 'email') {
+              if (stringValue !== '') {
+                acc[backendKey] = value;
+              }
+            } 
+            // For mobileNumber and pinCode, always send (allows clearing)
+            else if (backendKey === 'mobileNumber' || backendKey === 'pinCode') {
+              // Send empty string for cleared fields, or the actual value
+              acc[backendKey] = stringValue === '' ? null : (backendKey === 'mobileNumber' ? String(value) : value);
             }
-          } 
-          // For mobileNumber and pinCode, always send (allows clearing)
-          else if (backendKey === 'mobileNumber' || backendKey === 'pinCode') {
-            // Send empty string for cleared fields, or the actual value
-            acc[backendKey] = stringValue === '' ? null : (backendKey === 'mobileNumber' ? String(value) : value);
           }
         }
         return acc;
@@ -123,13 +145,17 @@ const MyProfilePage = () => {
 
       // Ensure at least one field is being updated
       if (Object.keys(updateData).length === 0) {
-        showNotification('Please update at least one field', 'error');
+        showNotification('No changes to save', 'info');
+        setIsEditing(false);
         return;
       }
 
       await updateUserProfile(updateData).unwrap();
       showNotification('Profile updated successfully', 'success');
       setIsEditing(false);
+      
+      // Update original data with new values
+      setOriginalData(formData);
       refetchProfile();
     } catch (error) {
       showNotification(error?.data?.message || 'Failed to update profile', 'error');

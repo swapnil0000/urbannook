@@ -1,6 +1,12 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "node:url";
+import { webcrypto } from "node:crypto";
+
+// Fix crypto.getRandomValues issue in Node.js environment
+if (!globalThis.crypto) {
+  globalThis.crypto = webcrypto;
+}
 
 /**
  * Bundle Size Monitor Plugin
@@ -87,6 +93,13 @@ export default defineConfig({
     },
   },
 
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.js',
+    css: true
+  },
+
   build: {
     sourcemap: false,
     minify: "esbuild",
@@ -96,15 +109,17 @@ export default defineConfig({
     assetsInlineLimit: 4096,
     cssCodeSplit: true,
     
-    // Minification options
+    // Minification options (Requirements 9.1, 9.2, 9.3)
     target: 'es2015',
-    cssMinify: true,
+    cssMinify: true, // CSS minification enabled
     
-    // Esbuild minification options
+    // Esbuild minification options for JavaScript
     esbuild: {
       drop: ['console', 'debugger'],
       platform: 'browser',
-      format: 'esm'
+      format: 'esm',
+      minify: true, // Ensure JS minification
+      treeShaking: true // Remove unused code
     },
     
     rollupOptions: {

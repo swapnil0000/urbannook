@@ -123,14 +123,14 @@ const AireFeaturedProducts = memo(() => {
           <div className="relative flex items-center justify-center order-1 lg:order-2 w-full lg:w-[45%]">
             
             {/* The Image Card */}
-            <div className="relative w-full max-w-[350px] md:max-w-[450px]  group">
+            <div className="relative w-full max-w-[350px] md:max-w-[450px] aspect-square group">
                 
                 {/* Glow behind image */}
                 <div className="absolute inset-0 bg-[#F5DEB3]/20 rounded-[2.5rem] blur-2xl transform group-hover:scale-105 transition-transform duration-700"></div>
 
                 {/* Main Image Container */}
-                <div className="relative rounded-[2.5rem] overflow-hidden border border-white/10 bg-[#121212] shadow-2xl">
-                    <Suspense fallback={<div className="w-full h-[400px] bg-gray-200 animate-pulse rounded-[2.5rem]"></div>}>
+                <div className="relative rounded-[2.5rem] overflow-hidden border border-white/10 bg-[#121212] shadow-2xl aspect-square">
+                    <Suspense fallback={<div className="w-full h-full bg-gray-200 animate-pulse rounded-[2.5rem]"></div>}>
                       <OptimizedImage 
                           src={featuredProduct.productImg} 
                           alt={featuredProduct.productName}
