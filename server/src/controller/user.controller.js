@@ -7,7 +7,9 @@ import {
   loginService,
   registerService,
 } from "../services/user.auth.service.js";
-import cookieOptions from "../config/config.js";
+import { verifyGoogleToken } from "../services/google.auth.service.js";
+import { v7 as uuid7 } from "uuid";
+import cookieOptions, { refreshCookieOptions } from "../config/config.js";
 import {
   profileFetchService,
   resetPasswordService,
@@ -29,6 +31,7 @@ const userLogin = asyncHandler(async (req, res) => {
   return res
     .status(result.statusCode)
     .cookie("userAccessToken", result.data.userAccessToken, cookieOptions)
+    .cookie("userRefreshToken", result.data.userRefreshToken, refreshCookieOptions)
     .json(
       new ApiRes(result.statusCode, result.message, {
         role: result.data.role,
@@ -152,12 +155,13 @@ const userUpdateProfile = asyncHandler(async (req, res) => {
     throw new AuthenticationError("Unauthorized");
   }
 
-  const { email, name, mobileNumber } = req.body || {};
+  const { email, name, mobileNumber, pinCode } = req.body || {};
   
   if (
     name === undefined &&
     mobileNumber == undefined &&
-    email === undefined
+    email === undefined &&
+    pinCode === undefined
   ) {
     throw new ValidationError("No fields provided for update");
   }
@@ -165,6 +169,7 @@ const userUpdateProfile = asyncHandler(async (req, res) => {
   const validate = validateUserInput({
     name,
     mobileNumber,
+    pinCode,
   });
 
   if (!validate.success) {
@@ -174,7 +179,14 @@ const userUpdateProfile = asyncHandler(async (req, res) => {
   const updateFields = {};
   if (email !== undefined) updateFields.email = email;
   if (name !== undefined) updateFields.name = name;
-  if (mobileNumber !== undefined) updateFields.mobileNumber = mobileNumber;
+  if (mobileNumber !== undefined) {
+    // Handle null for clearing mobile number, otherwise convert to number
+    updateFields.mobileNumber = mobileNumber === null ? null : Number(mobileNumber);
+  }
+  if (pinCode !== undefined) {
+    // Handle null for clearing pin code
+    updateFields.pinCode = pinCode === null ? null : pinCode;
+  }
   
   const updatedUser = await User.findOneAndUpdate(
     {
@@ -183,9 +195,10 @@ const userUpdateProfile = asyncHandler(async (req, res) => {
         email !== undefined ? { email: { $ne: email } } : null,
         name != undefined ? { name: { $ne: name } } : null,
         mobileNumber != undefined
-          ? { mobileNumber: { $ne: mobileNumber } }
+          ? { mobileNumber: { $ne: mobileNumber === null ? null : Number(mobileNumber) } }
           : null,
-      ],
+        pinCode != undefined ? { pinCode: { $ne: pinCode === null ? null : pinCode } } : null,
+      ].filter(Boolean),
     },
     {
       $set: updateFields,
@@ -216,6 +229,7 @@ const userUpdateProfile = asyncHandler(async (req, res) => {
         email: updatedUser.email,
         name: updatedUser.name,
         mobileNumber: updatedUser.mobileNumber,
+        pinCode: updatedUser.pinCode,
       },
       true,
     ),
@@ -374,6 +388,72 @@ const userForgotPasswordReset = asyncHandler(async (req, res) => {
     );
 });
 
+/**
+ * Google OAuth Login Controller
+ * POST /user/google-login
+ */
+const userGoogleLogin = asyncHandler(async (req, res) => {
+  const { credential } = req.body;
+
+  // Validate credential field exists in request body
+  if (!credential) {
+    throw new ValidationError("Google credential is required");
+  }
+
+  // Verify Google token
+  const verificationResult = await verifyGoogleToken(credential);
+  
+  const { email, name, googleId } = verificationResult;
+
+  // Query database for existing user by email OR googleId
+  let user = await User.findOne({
+    $or: [{ email }, { googleId }]
+  });
+
+  if (!user) {
+    // Create new user with Google data
+    user = await User.create({
+      userId: uuid7(),
+      name,
+      email,
+      password: null,
+      mobileNumber: null,
+      googleId,
+      isVerified: true,
+      role: "USER"
+    });
+  } else {
+    if (user.email === email && !user.googleId) {
+      // Link Google account to existing email user
+      user.googleId = googleId;
+      await user.save();
+    }
+  }
+
+  // Generate JWT tokens using existing User model methods
+  const userAccessToken = user.genAccessToken();
+  const userRefreshToken = user.genRefreshToken();
+
+  // Save userRefreshToken to user document
+  user.userRefreshToken = userRefreshToken;
+  await user.save();
+
+  // Set userAccessToken cookie using existing cookieOptions and return response
+  return res
+    .status(200)
+    .cookie("userAccessToken", userAccessToken, cookieOptions)
+    .cookie("userRefreshToken", userRefreshToken, refreshCookieOptions)
+    .json(
+      new ApiRes(200, "Google login successful", {
+        userId: user.userId,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        userAccessToken,
+      }, true)
+    );
+});
+
 export {
   userLogin,
   userRegister,
@@ -385,4 +465,5 @@ export {
   userForgetpassword,
   userForgotPasswordRequest,
   userForgotPasswordReset,
+  userGoogleLogin,
 };

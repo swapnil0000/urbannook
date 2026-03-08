@@ -13,20 +13,31 @@ const userSchema = mongoose.Schema(
     name: {
       type: String,
       required: [true, "Name is required"],
-      lowercase: true,
       trim: true,
     },
     email: {
       type: String,
       required: [true, "userEmail is required"],
+      lowercase: true,
+      trim: true,
     },
     password: {
       type: String,
-      required: [true, "userPassword is required"],
+      required: false,
+      default: null,
     },
     mobileNumber: {
       type: Number,
-      required: [true, "userMobileNumber is required"],
+      required: false,
+      default: null,
+    },
+    googleId: {
+      type: String,
+      sparse: true,
+      unique: true,
+    },
+    pinCode: {
+      type: String,
     },
     verificationOtp: {
       type: Number,
@@ -51,7 +62,8 @@ const userSchema = mongoose.Schema(
 );
 userSchema.index({ userId: 1 });
 userSchema.index({ email: 1 });
-userSchema.index({ mobileNumber: 1 });
+userSchema.index({ mobileNumber: 1 }, { sparse: true });
+// googleId index is already defined in schema with unique: true, sparse: true
 userSchema.index({ verificationOtp: 1 });
 userSchema.index(
   { verificationOtpExpiresAt: 1 },
@@ -61,12 +73,15 @@ userSchema.index(
   },
 );
 userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next();
+  if (!this.isModified("password") || this.password === null) return next();
   this.password = await bcrypt.hash(this.password, 12);
   next();
 });
 
 userSchema.methods.passCheck = async function (password) {
+  if (this.password === null) {
+    return false;
+  }
   return await bcrypt.compare(password, this.password);
 };
 

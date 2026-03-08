@@ -44,15 +44,5 @@ export const refreshCartData = async (refetchCart) => {
  * @returns {boolean} - Authentication status
  */
 export const isUserAuthenticated = () => {
-  const getCookie = (name) => {
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop().split(';').shift();
-    return null;
-  };
-
-  const token = getCookie('userAccessToken');
-  const hasLocalUser = localStorage.getItem('user');
-  
-  return !!(token || hasLocalUser);
+  return !!localStorage.getItem('authToken');
 };

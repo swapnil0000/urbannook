@@ -2,22 +2,26 @@
     {
       id: "01",
       title: "Obsessive Quality",
-      desc: "We don't just pick products; we test them for durability and touch.",
+      icon: "fa-gem",
+      desc: "We don't just pick products; we test them for durability, texture, and soul. Every piece must earn its place in your home.",
     },
     {
       id: "02",
-      title: "Radical Sustainability",
-      desc: "Eco-friendly isn't a buzzword. It's our baseline standard.",
+      title: "Radical Transparency",
+      icon: "fa-scale-balanced",
+      desc: "No hidden fees, no misleading materials. What you see is precisely the premium craftsmanship you receive.",
     },
     {
       id: "03",
       title: "Design Democracy",
-      desc: "Great aesthetics shouldn't be a luxury. We make it accessible.",
+      icon: "fa-compass-drafting",
+      desc: "Great aesthetics shouldn't be a luxury. We utilize modern manufacturing to make architectural beauty accessible.",
     },
     {
       id: "04",
       title: "Human Connection",
-      desc: "Real support, easy returns, and a team that actually cares.",
+      icon: "fa-handshake",
+      desc: "Real support, secure transactions, and a dedicated team that treats your investment with the respect it deserves.",
     }
   ];
 
@@ -57,7 +61,7 @@
         likes: "2.3k",
         comments: "42",
         caption: "New Arrival: 3D Printed Magic ✨",
-        link: "https://www.instagram.com/reel/DTumPdjAdNt/?igsh=MW8xdmJpamZ2bGh0ZA=="
+        link: "https://www.instagram.com/reel/DUOUbvmAbpJ/?igsh=MWNiZWl1NTRnMDd2OQ=="
     },
     {
         id: 2,
@@ -65,7 +69,7 @@
         likes: "1.8k",
         comments: "15",
         caption: "UrbanNook Aesthetics 🌿",
-        link: "https://www.instagram.com/reel/DTcCR9LgdhS/?igsh=MWF3ZnczZmhrZjl2bw=="
+        link: "https://www.instagram.com/reel/DT5gZ80ASaS/?igsh=bXpuM3pmcHY2aW4z"
     },
     {
         id: 3,
@@ -73,23 +77,23 @@
         likes: "3.1k",
         comments: "89",
         caption: "Illuminating spaces 💡",
-        link: "https://www.instagram.com/reel/DTMezUqgbhy/?igsh=MWdmaW5lYzk3ZXJ4NA=="
+        link: "https://www.instagram.com/reel/DTumPdjAdNt/?igsh=MW8xdmJpamZ2bGh0ZA=="
     },
     {
         id: 4,
-        image: "/insta_templates/template3.webp",
+        image: "/insta_templates/template4.webp",
         likes: "1.7k",
         comments: "22",
         caption: "Crafted for you 🔑",
-        link: "https://www.instagram.com/reel/DTkE46tAf0G/?igsh=dDJ4Y3J1anl1NGhu"
+        link: "https://www.instagram.com/reel/DVLBe9ZAa8u/?igsh=d3o0dWh5amtwMGZn"
     },
     {
         id: 5,
-        image: "/insta_templates/template3.webp",
+        image: "/insta_templates/template5.webp",
         likes: "1.9k",
         comments: "31",
         caption: "The Urban Standard 💕",
-        link: "https://www.instagram.com/reel/DT5gZ80ASaS/?igsh=bXpuM3pmcHY2aW4z"
+        link: "https://www.instagram.com/reel/DU90HNPiA7_/?igsh=YWxhemxjeTZnM29t"
     }
 ];
 
@@ -124,3 +128,157 @@ export  const socialLinks = [
       link: 'tel:+918299638749',
     }
   ];
+
+
+   export  const subjectOptions = [
+        { value: '', label: 'Select a topic...', icon: 'fa-solid fa-circle-question', disabled: true },
+        { value: 'Product Inquiry', label: 'Product Inquiry', icon: 'fa-solid fa-box', description: 'Questions about our products' },
+        { value: 'Order Support', label: 'Order Support', icon: 'fa-solid fa-truck', description: 'Track orders & delivery' },
+        { value: 'Technical Support', label: 'Technical Support', icon: 'fa-solid fa-tools', description: 'Assembly & setup help' },
+        { value: 'Returns & Refunds', label: 'Returns & Refunds', icon: 'fa-solid fa-undo', description: 'Return policy & refunds' },
+        { value: 'General Inquiry', label: 'General Inquiry', icon: 'fa-solid fa-comment', description: 'Other questions' }
+    ];
+
+export const contactInfo = [
+    {
+        id: 1,
+        icon: "fa-solid fa-phone",
+        title: "Contact Number",
+        info: "+91 82996 38749",
+        subInfo: "Mon-Sat, 9am - 7pm",
+    },
+    {
+        id: 2,
+        icon: "fa-solid fa-envelope",
+        title: "Any Type Of Enquires",
+        info: "support@urbannook.in",
+        subInfo: "Response within 24h",
+    },
+    {
+        id: 3,
+        icon: "fa-solid fa-location-dot",
+        title: "Our Office",
+        info: "Gurgaon, India",
+        subInfo: "Sector 51, 122001",
+    }
+];
+
+export const contactPageFaqs = [
+    {
+        question: "Do you offer custom 3D printed designs?",
+        answer: "Yes, we love bringing your ideas to life. Whether it's a specific color variant or a completely bespoke piece, select 'Interior Design' in the form and detail your vision."
+    },
+    {
+        question: "How long does standard shipping take?",
+        answer: "All our pieces are made to order to ensure the highest quality. Please allow 3-5 business days for production, and an additional 3-4 days for pan-India delivery."
+    },
+    {
+        question: "What is your return policy?",
+        answer: "We offer a hassle-free 7-day return policy for any items damaged in transit. We just request a quick unboxing video to process replacements swiftly."
+    },
+    {
+        question: "Do you ship internationally?",
+        answer: "Currently, we are focusing on providing the best experience across India. International shipping is on our roadmap for late 2026."
+    }
+];
+
+export const cityOptions = [
+    { value: '', label: 'Select a city...', disabled: true },
+    { value: 'Mumbai', label: 'Mumbai', icon: 'fa-solid fa-city' },
+    { value: 'Delhi', label: 'Delhi', icon: 'fa-solid fa-city' },
+    { value: 'Bangalore', label: 'Bangalore', icon: 'fa-solid fa-city' },
+    { value: 'Chennai', label: 'Chennai', icon: 'fa-solid fa-city' },
+    { value: 'Kolkata', label: 'Kolkata', icon: 'fa-solid fa-city' },
+    { value: 'Hyderabad', label: 'Hyderabad', icon: 'fa-solid fa-city' },
+    { value: 'Pune', label: 'Pune', icon: 'fa-solid fa-city' },
+    { value: 'Ahmedabad', label: 'Ahmedabad', icon: 'fa-solid fa-city' },
+    { value: 'Jaipur', label: 'Jaipur', icon: 'fa-solid fa-city' }
+];
+
+
+export const supportFaqs = [
+        {
+            id: 1,
+            question: 'How do I track my shipment?',
+            answer: 'Once your order is dispatched, you will receive a tracking link via email and SMS. You can also view live status in the "My Orders" section of your profile.'
+        },
+        {
+            id: 2,
+            question: 'What is the return timeline?',
+            answer: 'We accept returns within 7 days of delivery for damaged or defective products. Please ensure the item is unused and in original packaging with tags intact.'
+        },
+        {
+            id: 3,
+            question: 'Is assembly required?',
+            answer: 'Most of our decor items are pre-assembled. For larger furniture pieces, we provide a detailed, easy-to-follow manual and all necessary tools in the box.'
+        },
+        {
+            id: 4,
+            question: 'Do you ship internationally?',
+            answer: 'Currently, we ship to all pin codes within India. International shipping is part of our future roadmap. Stay tuned!'
+        }
+    ];
+
+export const whyChooseUsFeatures = [
+  {
+    id: 1,
+    tag: "AESTHETICS",
+    title: "Design-Led Aesthetics",
+    description: "Minimal, modern designs made to elevate everyday spaces and lives.",
+    bg: "#FAFAF9", 
+    color: "#1C1917", 
+    accent: "#D97706",
+    desktopWidth: '100%',
+    mobileWidth: '100%',
+    zIndex: 1,
+    icon: "fa-solid fa-pen-ruler"
+  },
+  {
+    id: 2,
+    tag: "CRAFTSMANSHIP",
+    title: "Proudly Homegrown",
+    description: "Conceptualized, 3D printed, and wired in our own workshop in India.",
+    bg: "#E6DCC5", 
+    color: "#1C1917", 
+    accent: "#15803D", 
+    desktopWidth: '80%',
+    mobileWidth: '100%',
+    zIndex: 2,
+    icon: "fa-solid fa-layer-group"
+  },
+  {
+    id: 3,
+    tag: "LOGISTICS",
+    title: "Fast Pan-India Delivery",
+    description: "Reliable shipping across India, delivered to your doorstep.",
+    bg: "#4A675B", 
+    color: "#FFFFFF", 
+    accent: "#F5DEB3", 
+    desktopWidth: '60%',
+    mobileWidth: '100%',
+    zIndex: 3,
+    icon: "fa-solid fa-truck-fast"
+  },
+  {
+    id: 4,
+    tag: "PERSONALIZATION",
+    title: "Customization Ready",
+    description: "Personalize colors, finishes, or details to match your space.",
+    bg: "#1a2822", 
+    color: "#FFFFFF", 
+    accent: "#F5DEB3", 
+    desktopWidth: '35%',
+    mobileWidth: '100%',
+    zIndex: 4,
+    icon: "fa-solid fa-palette"
+  },
+];
+
+export   const moods = [
+    { emoji: "😡", label: "Poor" },
+    { emoji: "😕", label: "Fair" },
+    { emoji: "🙂", label: "Good" },
+    { emoji: "😍", label: "Great" },
+    { emoji: "🤩", label: "Amazing" },
+  ];
+    

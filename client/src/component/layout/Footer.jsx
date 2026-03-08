@@ -39,17 +39,8 @@ const Footer = () => {
   const handleTrackOrderClick = (e) => {
     e.preventDefault();
 
-    // Check if user is authenticated
-    const getCookie = (name) => {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop().split(";").shift();
-      return null;
-    };
-
-    const userToken = getCookie('userAccessToken');
-    const hasLocalUser = localStorage.getItem('user');
-    const isLoggedIn = isAuthenticated || userToken || hasLocalUser;
+    const hasToken = !!localStorage.getItem('authToken');
+    const isLoggedIn = isAuthenticated || hasToken;
 
     if (!isLoggedIn) {
       showNotification('Please login to track your orders', 'error');
@@ -143,7 +134,7 @@ const Footer = () => {
                     <i className="fa-solid fa-phone text-xs text-gray-400 group-hover:text-[#1c3026]"></i>
                     <span className="text-sm">+91 82996 38749</span>
                   </a>
-                  <span className="text-[10px] text-gray-400">Mon - Sat | 10AM - 7PM</span>
+                  <span className="text-[10px] text-gray-400">Mon - Sat | 9AM - 7PM</span>
                 </div>
               </div>
             </div>

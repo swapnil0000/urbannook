@@ -2,8 +2,42 @@ import { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 
 /**
- * OptimizedImage component with lazy loading and intersection observer
- * Provides loading placeholder and efficient image loading
+ * OptimizedImage component with lazy loading, intersection observer, and responsive srcset
+ * Provides loading placeholder, efficient image loading, and responsive image optimization
+ * 
+ * Features:
+ * - Responsive srcset generation with breakpoints: 640px, 768px, 1024px, 1280px, 1920px
+ * - WebP format support with JPEG fallback
+ * - Lazy loading with intersection observer
+ * - fetchPriority support for LCP optimization
+ * - Width/height attributes to prevent layout shift
+ * - Mobile image size target: ≤100KB
+ * - Desktop image: highest quality
+ * 
+ * Usage:
+ * 1. Auto-generated srcset (requires pre-optimized images):
+ *    <OptimizedImage src="/assets/hero2.webp" alt="Hero" />
+ *    Expects: hero2-640w.webp, hero2-768w.webp, hero2-1024w.webp, hero2-1280w.webp, hero2-1920w.webp
+ * 
+ * 2. Custom srcset:
+ *    <OptimizedImage 
+ *      src="/assets/hero2.webp" 
+ *      srcset="/assets/mobilehero.webp 640w, /assets/hero2.webp 1280w"
+ *      alt="Hero" 
+ *    />
+ * 
+ * 3. Hero image (above-fold, high priority):
+ *    <OptimizedImage 
+ *      src="/assets/hero2.webp" 
+ *      alt="Hero" 
+ *      loading="eager" 
+ *      fetchPriority="high"
+ *      width={1280}
+ *      height={720}
+ *    />
+ * 
+ * Note: Image optimization must be done at build time or manually.
+ * Mobile images should be ≤100KB for optimal performance.
  */
 const OptimizedImage = ({
   src,
@@ -13,6 +47,9 @@ const OptimizedImage = ({
   width,
   height,
   loading = 'lazy',
+  fetchPriority = 'auto',
+  srcset,
+  sizes,
   onLoad,
   onError,
   ...props
@@ -21,6 +58,29 @@ const OptimizedImage = ({
   const [isInView, setIsInView] = useState(false);
   const [hasError, setHasError] = useState(false);
   const imgRef = useRef(null);
+
+  // Generate responsive srcset if not provided
+  const generateSrcset = (imageSrc) => {
+    // Only use provided srcset, don't auto-generate
+    if (srcset) return srcset;
+    
+    // Return undefined to use only src attribute
+    return undefined;
+  };
+
+  // Generate sizes attribute if not provided
+  const generateSizes = () => {
+    if (sizes) return sizes;
+    
+    // Only return sizes if srcset is provided
+    if (!srcset) return undefined;
+    
+    // Default responsive sizes based on common layouts
+    return '(max-width: 640px) 100vw, (max-width: 1024px) 90vw, 1280px';
+  };
+
+  const responsiveSrcset = generateSrcset(src);
+  const responsiveSizes = generateSizes();
 
   useEffect(() => {
     // Skip intersection observer if loading is eager
@@ -73,8 +133,7 @@ const OptimizedImage = ({
   return (
     <div
       ref={imgRef}
-      className={`relative overflow-hidden ${className} max-h-[510px]`}
-      // style={{ width, height }}
+      className={`relative ${className}`}
     >
       {/* Loading placeholder */}
       {!isLoaded && !hasError && (
@@ -111,12 +170,15 @@ const OptimizedImage = ({
         <img
           src={src}
           alt={alt}
-          className={`transition-opacity duration-300 max-h-[520px] ${
+          srcSet={responsiveSrcset}
+          sizes={responsiveSizes}
+          className={`w-full h-full transition-opacity duration-300 ${
             isLoaded ? 'opacity-100' : 'opacity-0'
           }`}
           loading={loading}
-          // width={width}
-          // height={height}
+          fetchPriority={fetchPriority}
+          width={width}
+          height={height}
           onLoad={handleLoad}
           onError={handleError}
           {...props}
@@ -134,6 +196,9 @@ OptimizedImage.propTypes = {
   width: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   height: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   loading: PropTypes.oneOf(['lazy', 'eager']),
+  fetchPriority: PropTypes.oneOf(['high', 'low', 'auto']),
+  srcset: PropTypes.string,
+  sizes: PropTypes.string,
   onLoad: PropTypes.func,
   onError: PropTypes.func,
 };

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useForgotPasswordRequestMutation, useForgotPasswordResetMutation } from '../../../store/api/authApi';
 import { useUI } from '../../../hooks/useRedux';
+import useFormValidation from '../../../hooks/useFormValidation';
 
 const ForgotPassword = ({ onClose, onBackToLogin }) => {
   const [step, setStep] = useState('email'); // email, otp, success
@@ -15,6 +16,13 @@ const ForgotPassword = ({ onClose, onBackToLogin }) => {
   const [forgotPasswordRequest, { isLoading: isRequestingOTP }] = useForgotPasswordRequestMutation();
   const [forgotPasswordReset, { isLoading: isResetting }] = useForgotPasswordResetMutation();
   const { showNotification } = useUI();
+
+  // Use validation hook for password reset
+  const { 
+    errors, 
+    validateField,
+    clearFieldError 
+  } = useFormValidation();
 
   const handleRequestOTP = async (e) => {
     e.preventDefault();
@@ -51,18 +59,15 @@ const ForgotPassword = ({ onClose, onBackToLogin }) => {
       return;
     }
 
-    if (!newPassword) {
-      setError('Please enter a new password');
+    // Validate new password with strict requirements
+    const isPasswordValid = validateField('password', newPassword);
+    if (!isPasswordValid) {
       return;
     }
 
-    if (newPassword.length < 8) {
-      setError('Password must be at least 8 characters long');
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      setError('Passwords do not match');
+    // Validate confirm password
+    const isConfirmPasswordValid = validateField('confirmPassword', confirmPassword, { password: newPassword });
+    if (!isConfirmPasswordValid) {
       return;
     }
 
@@ -181,9 +186,10 @@ const ForgotPassword = ({ onClose, onBackToLogin }) => {
                   onChange={(e) => {
                     setNewPassword(e.target.value);
                     setError('');
+                    clearFieldError('password');
                   }}
                   className={`w-full p-4 bg-slate-50 border rounded-2xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all outline-none text-slate-900 text-sm pr-12 ${
-                    error ? 'border-red-500' : 'border-slate-300'
+                    errors.password ? 'border-red-500' : 'border-slate-300'
                   }`}
                   placeholder="At least 8 characters"
                   required
@@ -196,6 +202,7 @@ const ForgotPassword = ({ onClose, onBackToLogin }) => {
                   <i className={`fa-solid ${showPassword ? 'fa-eye-slash' : 'fa-eye'} text-xs`}></i>
                 </button>
               </div>
+              {errors.password && <p className="text-red-500 text-[10px] font-bold ml-2 uppercase">{errors.password}</p>}
             </div>
 
             <div className="space-y-2">
@@ -209,9 +216,10 @@ const ForgotPassword = ({ onClose, onBackToLogin }) => {
                   onChange={(e) => {
                     setConfirmPassword(e.target.value);
                     setError('');
+                    clearFieldError('confirmPassword');
                   }}
                   className={`w-full p-4 bg-slate-50 border rounded-2xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all outline-none text-slate-900 text-sm pr-12 ${
-                    error ? 'border-red-500' : 'border-slate-300'
+                    errors.confirmPassword ? 'border-red-500' : 'border-slate-300'
                   }`}
                   placeholder="Re-enter password"
                   required
@@ -224,6 +232,7 @@ const ForgotPassword = ({ onClose, onBackToLogin }) => {
                   <i className={`fa-solid ${showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'} text-xs`}></i>
                 </button>
               </div>
+              {errors.confirmPassword && <p className="text-red-500 text-[10px] font-bold ml-2 uppercase">{errors.confirmPassword}</p>}
             </div>
 
             {error && <p className="text-red-500 text-xs ml-1">{error}</p>}

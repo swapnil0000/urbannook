@@ -2,7 +2,7 @@ import { ApiError, ApiRes, ValidationError, NotFoundError, AuthenticationError, 
 import Admin from "../model/admin.model.js";
 import User from "../model/user.model.js";
 import jwt from "jsonwebtoken";
-import cookieOptions from "../config/config.js";
+import cookieOptions, { refreshCookieOptions } from "../config/config.js";
 import crypto from "crypto";
 import { sendEmail } from "./email.service.js";
 import bcrypt from "bcrypt";
@@ -76,6 +76,7 @@ const logoutService = async (req, res) => {
 
   return res
     .clearCookie("userAccessToken", cookieOptions)
+    .clearCookie("userRefreshToken", { ...refreshCookieOptions, maxAge: 0 })
     .status(200)
     .json(new ApiRes(200, `User Logout Successfully`, null, true));
 };
@@ -102,52 +103,71 @@ const profileFetchService = async ({ userId, role }) => {
   };
 };
 
-const regenerateTokenService = async ({ userId, userRole }) => {
-  if (!userId) {
+const regenerateTokenService = async ({ refreshToken }) => {
+  if (!refreshToken) {
     return {
       statusCode: 401,
-      message: `Unauthorized User`,
+      message: `Refresh token missing`,
       data: null,
       success: false,
     };
   }
 
-  const Model = userRole == "USER" ? User : Admin;
-  if (!Model) {
+  // Verify the refresh token
+  let decoded;
+  try {
+    decoded = jwt.verify(refreshToken, env.REFRESH_TOKEN_SECRET);
+  } catch (err) {
     return {
-      statusCode: 404,
-      message: `Can't find the model of the userId`,
+      statusCode: 401,
+      message: `Refresh token expired or invalid`,
       data: null,
       success: false,
     };
   }
-  const tokenName =
-    Model.modelName == "USER" ? `userRefreshToken` : `adminRefreshToken`;
-  const userDetails = await Model.findOne({ userId });
+
+  // Find user by _id (refresh token payload contains _id)
+  const userDetails = await User.findById(decoded._id);
   if (!userDetails) {
     return {
       statusCode: 404,
-      message: `Can't find the user`,
+      message: `User not found`,
       data: null,
       success: false,
     };
   }
-  const refreshToken = await userDetails.genRefreshToken();
-  if (!refreshToken) {
+
+  // Verify the refresh token matches what's stored in DB (prevents reuse of old tokens)
+  if (userDetails.userRefreshToken !== refreshToken) {
     return {
-      statusCode: 404,
-      message: `Can't generate the refresh token please try after some time! for ${userDetails?.email}`,
+      statusCode: 401,
+      message: `Refresh token has been revoked`,
       data: null,
       success: false,
     };
   }
-  userDetails[tokenName] = refreshToken;
-  await userDetails.save();
+
+  // Generate new access token
+  const userAccessToken = userDetails.genAccessToken();
+  if (!userAccessToken) {
+    return {
+      statusCode: 500,
+      message: `Failed to generate access token`,
+      data: null,
+      success: false,
+    };
+  }
+
+  // Rotate refresh token (generate new one, invalidate old)
+  const newRefreshToken = userDetails.genRefreshToken();
+  userDetails.userRefreshToken = newRefreshToken;
+  await userDetails.save({ validateBeforeSave: false });
+
   return {
     statusCode: 200,
-    message: `Successfully generated refresh token for ${userDetails?.email}`,
-    data: null,
-    success: false,
+    message: `Tokens refreshed successfully`,
+    data: { userAccessToken, newRefreshToken },
+    success: true,
   };
 };
 
@@ -302,6 +322,7 @@ const verifyOtpEmailService = async (email, emailOtp) => {
       data: {
         email: verifiedUser.email,
         userAccessToken,
+        userRefreshToken,
         user: {
           id: verifiedUser.userId,
           email: verifiedUser.email,

@@ -2,24 +2,24 @@
 
 ## Overview
 The application automatically uses the correct Razorpay credentials based on the `NODE_ENV` environment variable:
-- **Development/Test**: Uses `RP_LOCAL_TEST_KEY_ID` and `RP_LOCAL_TEST_SECRET`
-- **Production**: Uses `RP_PROD_KEY_ID` and `RP_PROD_SECRET`
+- **Development/Test**: Uses `RP_KEY_ID` and `RP_SECRET`
+- **Production**: Uses `RP_KEY_ID` and `RP_SECRET`
 
 ## Environment Variables
 
 ### Test Mode (Development)
 ```env
 NODE_ENV=development
-RP_LOCAL_TEST_KEY_ID=rzp_test_xxxxxxxxxxxxx
-RP_LOCAL_TEST_SECRET=your_test_secret_here
-RP_WEBHOOK_TEST_SECRET=your_webhook_test_secret
+RP_KEY_ID=rzp_test_xxxxxxxxxxxxx
+RP_SECRET=your_test_secret_here
+RP_WEBHOOK_SECRET=your_webhook_test_secret
 ```
 
 ### Production Mode
 ```env
 NODE_ENV=production
-RP_PROD_KEY_ID=rzp_live_xxxxxxxxxxxxx
-RP_PROD_SECRET=your_production_secret_here
+RP_KEY_ID=rzp_live_xxxxxxxxxxxxx
+RP_SECRET=your_production_secret_here
 RP_WEBHOOK_PROD_SECRET=your_webhook_prod_secret
 ```
 
@@ -42,8 +42,8 @@ RP_WEBHOOK_PROD_SECRET=your_webhook_prod_secret
    ```
 3. Add the production credentials:
    ```env
-   RP_PROD_KEY_ID=rzp_live_your_actual_key_id
-   RP_PROD_SECRET=your_actual_production_secret
+   RP_KEY_ID=rzp_live_your_actual_key_id
+   RP_SECRET=your_actual_production_secret
    RP_WEBHOOK_PROD_SECRET=your_actual_webhook_secret
    ```
 4. Restart your server
@@ -52,8 +52,8 @@ RP_WEBHOOK_PROD_SECRET=your_webhook_prod_secret
 1. Go to your platform's dashboard
 2. Navigate to Environment Variables section
 3. Add these variables:
-   - `RP_PROD_KEY_ID` = `rzp_live_xxxxxxxxxxxxx`
-   - `RP_PROD_SECRET` = `your_production_secret`
+   - `RP_KEY_ID` = `rzp_live_xxxxxxxxxxxxx`
+   - `RP_SECRET` = `your_production_secret`
    - `RP_WEBHOOK_PROD_SECRET` = `your_webhook_secret`
 4. Redeploy your application
 
@@ -85,8 +85,8 @@ NODE_ENV=production
 ```bash
 # Your .env should have:
 NODE_ENV=development
-RP_LOCAL_TEST_KEY_ID=rzp_test_xxxxx
-RP_LOCAL_TEST_SECRET=test_secret
+RP_KEY_ID=rzp_test_xxxxx
+RP_SECRET=test_secret
 
 # Start server
 npm run dev
@@ -107,7 +107,7 @@ NODE_ENV=production npm start
 1. Go to Razorpay Dashboard → **Test Mode**
 2. Settings → **Webhooks**
 3. Add webhook URL: `https://your-test-domain.com/api/v1/payment/webhook`
-4. Copy the webhook secret to `RP_WEBHOOK_TEST_SECRET`
+4. Copy the webhook secret to `RP_WEBHOOK_SECRET`
 
 ### Production Webhooks
 1. Go to Razorpay Dashboard → **Live Mode**

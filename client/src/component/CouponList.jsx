@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react';
 import { useGetAvailableCouponsQuery, useApplyCouponMutation } from '../store/api/userApi';
 import { useUI } from '../hooks/useRedux';
 
-const CouponList = ({ onCouponApplied }) => {
+const CouponList = ({ onCouponApplied,userId }) => {  
   const [expandedCoupon, setExpandedCoupon] = useState(null);
   const [applyingCoupon, setApplyingCoupon] = useState(null);
   
-  const { data: couponsData, isLoading, error } = useGetAvailableCouponsQuery();
+  const { data: couponsData, isLoading, error } = useGetAvailableCouponsQuery(userId);
   const [applyCoupon] = useApplyCouponMutation();
   const { showNotification } = useUI();
 
@@ -56,7 +56,7 @@ const CouponList = ({ onCouponApplied }) => {
     );
   }
 
-  const coupons = couponsData?.data || [];
+  const coupons = couponsData?.data || [];  
 
   if (coupons.length === 0) {
     return (

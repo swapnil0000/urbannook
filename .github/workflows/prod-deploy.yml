@@ -43,7 +43,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 24 #
+          node-version: 24
 
       - name: Cache npm
         uses: actions/cache@v4
@@ -57,7 +57,7 @@ jobs:
         working-directory: client
         run: |
           npm install
-          npm run build
+          npm run build:prod
 
       - name: Configure AWS
         uses: aws-actions/configure-aws-credentials@v4
@@ -127,14 +127,13 @@ jobs:
           server/ \
           ubuntu@${{ secrets.PROD_SSH_HOST }}:/home/ubuntu/urbannook-prod/server/
 
-      - name: Restart Backend
-        if: env.EC2_AVAILABLE == 'true'
+      - name: Restart Production Backend
         run: |
           ssh ubuntu@${{ secrets.PROD_SSH_HOST }} << 'EOF'
             cd /home/ubuntu/urbannook-prod/server
             # to make sure server has zero down time in case if json and lock-json got version mismatch
             npm ci --omit=dev || npm install --omit=dev 
-            pm2 restart urbannook-server || pm2 start .ecosystem.config.cjs --env production
+            pm2 reload urbannook-server --env production || pm2 start ecosystem.config.cjs --env production
             pm2 save
           EOF
 

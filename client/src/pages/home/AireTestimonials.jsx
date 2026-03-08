@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useGetTestimonialsQuery, useSubmitTestimonialMutation } from '../../store/api/testimonialsApi';
+import { moods } from '../../data/constant';
 
 const AireTestimonials = () => {
   const [mood, setMood] = useState(4); // 0-4 scale
@@ -18,14 +19,6 @@ const AireTestimonials = () => {
 
   const clickSound = useRef(null);
   const successSound = useRef(null);
-
-  const moods = [
-    { emoji: "😡", label: "Poor" },
-    { emoji: "😕", label: "Fair" },
-    { emoji: "🙂", label: "Good" },
-    { emoji: "😍", label: "Great" },
-    { emoji: "🤩", label: "Amazing" },
-  ];
 
   // Audio Setup
   useEffect(() => {

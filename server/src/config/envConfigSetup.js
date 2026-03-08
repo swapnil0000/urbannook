@@ -1,17 +1,26 @@
 import dotenv from "dotenv";
 import path from "path";
-import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const mode = process.env.NODE_ENV || "development"; 
+const mode = process.env.NODE_ENV || "development";
 
-const envFile = mode === "production" ? ".env.production" : ".env";
-const envPath = path.resolve(__dirname, `../../${envFile}`); 
+const envFiles = {
+  development: ".env",
+  staging: ".env.staging",
+  production: ".env.production"
+};
 
-const envPath = path.resolve(__dirname, `../../${envFile}`);
+const envFile = envFiles[mode] || ".env";
 
+const envPath = path.resolve(process.cwd(), envFile);
+
+console.log(`🚀 Mode: ${mode.toUpperCase()}`);
 console.log(`⏳ Loading Environment from: ${envFile}`);
 console.log(`📁 Full path: ${envPath}`);
+
+const result = dotenv.config({ path: envPath });
+
+if (result.error) {
+  console.error(`❌ Error loading ${envFile}:`, result.error.message);
+}
 
 export default process.env;

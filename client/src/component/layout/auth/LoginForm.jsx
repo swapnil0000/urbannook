@@ -6,6 +6,8 @@ import OTPVerification from './OTPVerification';
 import { useLoginMutation } from '../../../store/api/authApi';
 import { useAuth, useUI } from '../../../hooks/useRedux';
 import { setShowLoginModal } from '../../../store/slices/uiSlice';
+import GoogleLoginButton from './GoogleLoginButton';
+import useFormValidation from '../../../hooks/useFormValidation';
 
 const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
   const navigate = useNavigate();
@@ -14,38 +16,39 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showOTPVerification, setShowOTPVerification] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [errors, setErrors] = useState({});
   
   const [login, { isLoading }] = useLoginMutation();
   const { login: setAuthUser } = useAuth();
   const { showNotification } = useUI();
 
+  // Use validation hook with custom rules for login (password without pattern validation)
+  const { 
+    errors, 
+    validateAllFields, 
+    clearFieldError, 
+    clearAllErrors,
+    setFieldError 
+  } = useFormValidation({
+    password: {
+      required: true,
+      messages: {
+        required: 'Password is required'
+      }
+    }
+  });
+
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     if (errors[e.target.name]) {
-      setErrors({ ...errors, [e.target.name]: '' });
+      clearFieldError(e.target.name);
     }
-  };
-
-  const validateForm = () => {
-    const newErrors = {};
-    if (!formData.identifier.trim()) {
-      newErrors.identifier = 'Email or Username is required';
-    }
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
-    }
-    return newErrors;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    const validationErrors = validateForm();
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
+    const isValid = validateAllFields(formData);
+    if (!isValid) {
       return;
     }
     
@@ -63,7 +66,6 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
         mobile: result.data?.userMobileNumber || result.user?.mobile || ''
       };
       if (token) {
-        document.cookie = `userAccessToken=${token}; path=/; max-age=2592000`;
         setAuthUser(userData, token);
       }
       
@@ -89,7 +91,7 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
         setShowOTPVerification(true);
       } else {
         showNotification(errorMessage);
-        setErrors({ submit: errorMessage });
+        setFieldError('submit', errorMessage);
       }
     }
   };
@@ -262,6 +264,35 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
                 <p className="text-red-500 text-xs text-center mt-2 font-semibold">{errors.submit}</p>
               )}
             </form>
+
+            {/* Google Login Section */}
+            <div className="mt-6">
+              <div className="relative flex items-center justify-center my-6">
+                <div className="border-t border-gray-200 w-full"></div>
+                <span className="bg-white px-4 text-xs text-gray-400 font-bold uppercase tracking-widest">OR</span>
+                <div className="border-t border-gray-200 w-full"></div>
+              </div>
+              
+              <div className="flex justify-center">
+                <GoogleLoginButton 
+                  useOneTap={true}
+                  onSuccess={(userData) => {
+                    showNotification('Google login successful!');
+                    if (onLoginSuccess) {
+                      onLoginSuccess(userData);
+                    }
+                    dispatch(setShowLoginModal(false));
+                    if (onClose) {
+                      onClose();
+                    }
+                  }}
+                  onError={(error) => {
+                    const errorMessage = error?.data?.message || 'Google login failed. Please try again.';
+                    showNotification(errorMessage);
+                  }}
+                />
+              </div>
+            </div>
 
             <p className="text-sm text-center mt-8 text-gray-500">
               New here?{' '}

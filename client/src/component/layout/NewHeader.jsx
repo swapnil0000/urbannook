@@ -5,7 +5,10 @@ import { useGetWishlistQuery,  } from '../../store/api/userApi';
 import { logout as logoutAction } from '../../store/slices/authSlice';
 import { setShowLoginModal } from '../../store/slices/uiSlice';
 import { useLogoutMutation } from '../../store/api/authApi';
+import { useAuth } from '../../hooks/useRedux';
 import { lazy } from 'react';
+import GoogleLoginButton from './auth/GoogleLoginButton';
+import { clearCsrfToken } from '../../store/api/apiSlice';
 
 const SignupForm = lazy(() => import('./auth/SignupForm'));
 const LoginForm = lazy(() => import('./auth/LoginForm'));
@@ -18,7 +21,7 @@ const NewHeader = () => {
   
   // Get cart and auth state from Redux
   const { items: cartItems, totalQuantity } = useSelector((state) => state.cart);
-  const { isAuthenticated, user: authUser } = useSelector((state) => state.auth);
+  const { isAuthenticated, user: authUser } = useAuth();
   const { showLoginModal } = useSelector((state) => state.ui);
   const wishlistItems = useSelector((state) => state.wishlist.items);
   
@@ -63,13 +66,18 @@ const NewHeader = () => {
 
   const activeRoute = useMemo(() => getActiveRoute(), [location.pathname]);
 
-  // Sync User from LocalStorage
+  // Sync User from auth state
   useEffect(() => {
     const syncUser = () => {
-      if (!isAuthenticated) {
-        setUser(JSON.parse(localStorage.getItem('user') || 'null'));
-      } else {
+      const storedUser = JSON.parse(localStorage.getItem('user') || 'null');
+      
+      if (isAuthenticated && authUser) {
         setUser(authUser);
+      } else if (storedUser && localStorage.getItem('authToken')) {
+        // localStorage has auth data but Redux lost state (e.g., before SessionManager runs)
+        setUser(storedUser);
+      } else {
+        setUser(null);
       }
     };
     
@@ -108,37 +116,22 @@ const NewHeader = () => {
 
   const handleLogout = async () => {
     try {
-      // Call logout API
       await logoutAPI().unwrap();
       
-      // Clear local state
       setUser(null);
       setShowUserDropdown(false);
       setIsMenuOpen(false);
-      
-      // Dispatch logout action to clear Redux state
       dispatch(logoutAction());
+      clearCsrfToken();
       
-      // Clear localStorage
-      localStorage.removeItem('user');
-      localStorage.removeItem('token');
-      
-      // Clear cookie
-      document.cookie = 'userAccessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-      
-      // Trigger storage event for other tabs
       window.dispatchEvent(new Event('storage'));
-      
-      // Navigate to home
       navigate('/');
     } catch (error) {
       console.error('Logout failed:', error);
       // Even if API fails, clear local state
       setUser(null);
       dispatch(logoutAction());
-      localStorage.removeItem('user');
-      localStorage.removeItem('token');
-      document.cookie = 'userAccessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      clearCsrfToken();
       navigate('/');
     }
   };
@@ -191,7 +184,7 @@ const NewHeader = () => {
                 <img 
                     src="/assets/logo.webp" 
                     alt="UrbanNook" 
-                    className="h-10 w-auto object-contain rounded-full mix-blend-multiply" 
+                    className="h-14 w-auto object-contain rounded-full mix-blend-multiply" 
                 />
               </Link>
             </div>
@@ -203,7 +196,7 @@ const NewHeader = () => {
                  <img 
                     src="/assets/logo.webp" 
                     alt="UrbanNook" 
-                    className="h-9 w-auto object-contain rounded-full mix-blend-multiply" 
+                    className="h-14 w-auto object-contain rounded-full mix-blend-multiply" 
                 />
               </Link>
 
@@ -385,7 +378,7 @@ const NewHeader = () => {
                 </div>
               ) : (
                 /* LOGIN CTA IF NOT LOGGED IN */
-                <div className="bg-white/40 p-1 rounded-2xl border border-white/50 mb-6">
+                <div className="bg-white/40 p-4 rounded-2xl border border-white/50 mb-6 space-y-3">
                     <button 
                         onClick={handleMobileLogin}
                         className="w-full py-4 bg-emerald-800 text-white rounded-xl font-bold uppercase tracking-widest text-xs shadow-lg hover:bg-emerald-900 flex items-center justify-center gap-3 active:scale-95 transition-all"

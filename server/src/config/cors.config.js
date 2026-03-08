@@ -7,16 +7,6 @@ function getAllowedOrigins() {
     .map((origin) => origin.trim())
     .filter((origin) => origin.length > 0);
 
-  if (env === "development") {
-    const localhostOrigins = [...origins];
-
-    localhostOrigins.forEach((localhost) => {
-      if (!origins.includes(localhost)) {
-        origins.push(localhost);
-      }
-    });
-  }
-
   return origins;
 }
 
@@ -26,6 +16,7 @@ function getAllowedOrigins() {
 export const corsOptions = {
   origin: function (origin, callback) {
     const allowedOrigins = getAllowedOrigins();
+    const mode = env.NODE_ENV;
     // Allow requests with no origin (mobile apps, Postman, server-to-server)
     if (!origin) {
       return callback(null, true);
@@ -37,20 +28,21 @@ export const corsOptions = {
     } else {
       // Log rejected origin for debugging
       console.warn(`⚠️  CORS: Rejected request from origin: ${origin}`);
-      console.warn(`   Allowed origins: ${allowedOrigins.join(', ')}`);
+      console.warn(`   Allowed origins: ${allowedOrigins.join(", ")}`);
 
-      if (env === "production") {
-        callback(new Error("Not allowed by CORS"));
-      } else {
-        // In development, be more lenient but still log the warning
-        console.warn("   (Allowed in development mode)");
-        callback(null, true);
+      if (mode === "development") {
+        console.warn("   (Allowed because NODE_ENV is development)");
+        return callback(null, true);
       }
+      console.error(`   ❌ Access Denied in ${mode} mode`);
+      callback(
+        new Error(`CORS Error: Origin ${origin} not allowed in ${mode} mode`),
+      );
     }
   },
   credentials: true, // Allow cookies and authentication headers
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Accept-Language", "Origin"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Accept-Language", "Origin", "X-CSRF-Token"],
   exposedHeaders: ["Set-Cookie"],
   optionsSuccessStatus: 200, // Some legacy browsers choke on 204
   maxAge: 86400, // Cache preflight requests for 24 hours

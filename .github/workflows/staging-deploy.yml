@@ -1,0 +1,146 @@
+name: Staging
+
+on:
+  push:
+    branches:
+      - staging
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      client: ${{ steps.changes.outputs.client }}
+      server: ${{ steps.changes.outputs.server }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed paths
+        id: changes
+        run: |
+          if git diff --name-only HEAD~1..HEAD | grep '^client/'; then
+            echo "client=true" >> $GITHUB_OUTPUT
+          else
+            echo "client=false" >> $GITHUB_OUTPUT
+          fi
+
+          if git diff --name-only HEAD~1..HEAD | grep '^server/'; then
+            echo "server=true" >> $GITHUB_OUTPUT
+          else
+            echo "server=false" >> $GITHUB_OUTPUT
+          fi
+
+  deploy-client:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.client == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Cache Client npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: staging-client-npm-${{ runner.os }}-${{ hashFiles('client/package-lock.json') }}
+          restore-keys: |
+            staging-client-npm-${{ runner.os }}-
+
+      - name: Build Client
+        working-directory: client
+        run: |
+          npm ci
+          npm run build
+
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_S3_BUCKET_REGION }}
+
+      - name: Deploy Frontend to S3
+        run: |
+          aws s3 sync client/dist/ s3://${{ secrets.S3_STAGING_BUCKET }} --delete --only-show-errors
+      
+      - name: Invalidate CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.STAGING_CLOUDFRONT_DIST_ID }} \
+            --paths "/*"
+
+  deploy-server:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.server == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.STAGING_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.STAGING_HOST }} >> ~/.ssh/known_hosts || true
+
+      - name: Check Staging EC2 availability
+        id: ec2_check
+        run: |
+          if ssh -o ConnectTimeout=5 ubuntu@${{ secrets.STAGING_HOST }} "echo EC2 is running staging" >/dev/null 2>&1; then
+            echo "EC2_AVAILABLE=true" >> $GITHUB_ENV
+          else
+            echo "EC2_AVAILABLE=false" >> $GITHUB_ENV
+            echo "::error::Staging EC2 is stopped. Deployment failed fast."
+            exit 1
+          fi
+
+      - name: Cache Server npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: staging-server-npm-v1-${{ runner.os }}-${{ hashFiles('server/package-lock.json') }}
+          restore-keys: |
+            staging-server-npm-${{ runner.os }}-
+
+      - name: Install Server Dependencies
+        working-directory: server
+        run: npm install
+
+      - name: Upload Server to Staging Folder
+        run: |
+          rsync -avz \
+          --exclude '.env' \
+          --exclude '.env.production' \
+          --exclude '.env.staging' \
+          --exclude 'node_modules' \
+          server/ \
+          ubuntu@${{ secrets.STAGING_HOST }}:/home/ubuntu/urbannook-staging/server/
+
+      - name: Restart Staging Backend
+        run: |
+          ssh ubuntu@${{ secrets.STAGING_HOST }} << 'EOF'
+            cd /home/ubuntu/urbannook-staging/server
+            npm ci --omit=dev || npm install --omit=dev
+            pm2 reload urbannook-staging --env staging || pm2 start ecosystem.config.cjs --env staging --name urbannook-staging
+            pm2 save
+          EOF
+
+  nothing-to-deploy:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.client == 'false' && needs.detect-changes.outputs.server == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "No changes in client or server for staging branch."

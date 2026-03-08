@@ -1,62 +1,8 @@
 import React, { useRef, useEffect, useState } from "react";
+import { whyChooseUsFeatures } from "../../data/constant";
 
 // Background image
 const desktopBgImage = "/assets/chooseus.webp"
-
-const features = [
-  {
-    id: 1,
-    tag: "AESTHETICS",
-    title: "Design-Led Aesthetics",
-    description: "Minimal, modern designs made to elevate everyday spaces and lives.",
-    bg: "#FAFAF9", 
-    color: "#1C1917", 
-    accent: "#D97706",
-    desktopWidth: '100%',
-    mobileWidth: '100%',
-    zIndex: 1,
-    icon: "fa-solid fa-pen-ruler"
-  },
-  {
-    id: 2,
-    tag: "CRAFTSMANSHIP",
-    title: "Proudly Homegrown",
-    description: "Conceptualized, 3D printed, and wired in our own workshop in India.",
-    bg: "#E6DCC5", 
-    color: "#1C1917", 
-    accent: "#15803D", 
-    desktopWidth: '80%',
-    mobileWidth: '100%',
-    zIndex: 2,
-    icon: "fa-solid fa-layer-group"
-  },
-  {
-    id: 3,
-    tag: "LOGISTICS",
-    title: "Fast Pan-India Delivery",
-    description: "Reliable shipping across India, delivered to your doorstep.",
-    bg: "#4A675B", 
-    color: "#FFFFFF", 
-    accent: "#F5DEB3", 
-    desktopWidth: '60%',
-    mobileWidth: '100%',
-    zIndex: 3,
-    icon: "fa-solid fa-truck-fast"
-  },
-  {
-    id: 4,
-    tag: "PERSONALIZATION",
-    title: "Customization Ready",
-    description: "Personalize colors, finishes, or details to match your space.",
-    bg: "#1a2822", 
-    color: "#FFFFFF", 
-    accent: "#F5DEB3", 
-    desktopWidth: '35%',
-    mobileWidth: '100%',
-    zIndex: 4,
-    icon: "fa-solid fa-palette"
-  },
-];
 
 export default function WhyChooseUs() {
   const containerRef = useRef(null);
@@ -176,7 +122,7 @@ export default function WhyChooseUs() {
 
     {/* --- CARDS CONTAINER --- */}
     <div className="absolute bottom-0 left-0 w-full h-full pointer-events-none z-30">
-      {features.map((feature, index) => (
+      {whyChooseUsFeatures.map((feature, index) => (
         <div
           key={feature.id}
           ref={addToCardRefs}

@@ -7,17 +7,8 @@ export const useWishlistSync = () => {
   const dispatch = useDispatch();
   const { isAuthenticated } = useSelector((state) => state.auth);
 
-  // Check if user is authenticated
-  const getCookie = (name) => {
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop().split(';').shift();
-    return null;
-  };
-
-  const token = getCookie('userAccessToken');
-  const hasLocalUser = localStorage.getItem('user');
-  const shouldFetchWishlist = isAuthenticated || token || hasLocalUser;
+  const hasToken = !!localStorage.getItem('authToken');
+  const shouldFetchWishlist = isAuthenticated || hasToken;
 
   const { data: wishlistResponse } = useGetWishlistQuery(undefined, {
     skip: !shouldFetchWishlist,

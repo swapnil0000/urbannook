@@ -87,13 +87,21 @@ export const updateProfileSchema = Joi.object({
       'string.email': 'Please provide a valid email address',
     }),
   
-  mobileNumber: Joi.string()
-    .pattern(/^[0-9]{10}$/)
-    .messages({
-      'string.pattern.base': 'Mobile number must be exactly 10 digits',
-    }),
+  mobileNumber: Joi.alternatives().try(
+    Joi.string().pattern(/^[0-9]{10}$/),
+    Joi.allow(null)
+  ).messages({
+    'string.pattern.base': 'Mobile number must be exactly 10 digits',
+  }),
+  
+  pinCode: Joi.alternatives().try(
+    Joi.string().pattern(/^[0-9]{6}$/),
+    Joi.allow(null)
+  ).messages({
+    'string.pattern.base': 'Pin code must be exactly 6 digits',
+  }),
 }).min(1).messages({
-  'object.min': 'At least one field (name, email, or mobileNumber) is required',
+  'object.min': 'At least one field (name, email, mobileNumber, or pinCode) is required',
 });
 
 /**

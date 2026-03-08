@@ -1,7 +1,4 @@
-import {
-  razorpayCreateOrderService,
-  razorpayPaymentVerificationService,
-} from "../services/rp.payement.service.js";
+import { razorpayCreateOrderService } from "../services/rp.payement.service.js";
 import { ApiRes } from "../utils/index.js";
 import User from "../model/user.model.js";
 import Order from "../model/order.model.js";
@@ -15,7 +12,7 @@ import {
   sendPaymentReceipt,
 } from "../services/email.service.js";
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
-import { ValidationError, NotFoundError } from "../utils/errors.js";
+import { ValidationError, NotFoundError, InternalServerError } from "../utils/errors.js";
 
 const PAYMENT_ERROR_MESSAGES = {
   BAD_REQUEST_ERROR: "Payment failed due to invalid request. Please try again.",
@@ -40,22 +37,18 @@ const getErrorMessage = (errorCode) => {
   return PAYMENT_ERROR_MESSAGES[errorCode] || PAYMENT_ERROR_MESSAGES.default;
 };
 const razorpayKeyGetController = asyncHandler(async (_, res) => {
-  const isProduction = env.NODE_ENV === 'production';
-  const key_id = isProduction
-    ? env.RP_PROD_KEY_ID
-    : env.RP_LOCAL_TEST_KEY_ID;
+  const key_id = env.RP_KEY_ID;
   if (!key_id) {
     throw new NotFoundError("Rp - Key");
   }
-  
-  return res
-    .status(200)
-    .json(new ApiRes(200, `Rp - Key`, key_id, true));
+
+  return res.status(200).json(new ApiRes(200, `Rp - Key`, key_id, true));
 });
 
 const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   /* Not Handling the amount because it could be manipulate at client side like 0 as amount */
-  const { items, senderMobile, receiverMobile } = req.body;
+  const { items, userEmail, senderMobile, receiverMobile } = req.body;
+
   const { userId } = req.user;
   if (!items || !Array.isArray(items) || items.length === 0) {
     throw new ValidationError("Items are required");
@@ -63,23 +56,27 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
 
   // Fetch user profile for fallback mobile number
   const user = await User.findOne({ userId }).lean();
-  
+
   // Helper function to strip country code
   const stripCountryCode = (mobile) => {
     if (!mobile) return "";
     const trimmed = mobile.trim();
     // Strip +91 or 91 prefix if present
-    if (trimmed.startsWith('+91')) {
+    if (trimmed.startsWith("+91")) {
       return trimmed.substring(3);
-    } else if (trimmed.startsWith('91') && trimmed.length === 12) {
+    } else if (trimmed.startsWith("91") && trimmed.length === 12) {
       return trimmed.substring(2);
     }
     return trimmed;
   };
-  
+
   // Determine final mobile numbers with fallback logic (trim whitespace and strip country code)
-  const finalSenderMobile = stripCountryCode(senderMobile || user?.mobileNumber?.toString() || "");
-  const finalReceiverMobile = stripCountryCode(receiverMobile || finalSenderMobile);
+  const finalSenderMobile = stripCountryCode(
+    senderMobile || user?.mobileNumber?.toString() || "",
+  );
+  const finalReceiverMobile = stripCountryCode(
+    receiverMobile || finalSenderMobile,
+  );
 
   // Validate sender mobile (required)
   if (!finalSenderMobile || !/^[0-9]{10}$/.test(finalSenderMobile)) {
@@ -88,20 +85,27 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
 
   // Validate receiver mobile if provided
   if (receiverMobile && !/^[0-9]{10}$/.test(finalReceiverMobile)) {
-    throw new ValidationError("Receiver mobile number must be exactly 10 digits");
+    throw new ValidationError(
+      "Receiver mobile number must be exactly 10 digits",
+    );
   }
 
   // Fetch cart to get the calculated grand total from applyCoupon API
   const cart = await Cart.findOne({ userId }).lean();
 
-  if (!cart?.appliedCoupon?.summary?.grandTotal) {
+  if (!cart) {
+    throw new ValidationError("Cart not found. Please add items to your cart.");
+  }
+
+  // Check if pricing has been calculated (appliedCoupon.summary must exist with a valid grandTotal)
+  const grandTotal = cart?.appliedCoupon?.summary?.grandTotal;
+  if (grandTotal == null || grandTotal <= 0) {
     throw new ValidationError(
       "Cart pricing not calculated. Please refresh the page.",
     );
   }
 
-  const finalAmount = cart.appliedCoupon.summary.grandTotal;
-
+  const finalAmount = grandTotal;
   // Fetch products for order snapshot
   const productIds = items.map((i) => i.productId);
   const products = await Product.find({
@@ -112,6 +116,12 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   if (products.length !== productIds.length) {
     throw new ValidationError("One or more products unavailable");
   }
+
+  const couponCodeId = cart.appliedCoupon?.couponCodeId || null;
+  const couponCodeName = cart.appliedCoupon?.name || null;
+  const discountAmount = cart.appliedCoupon?.discountValue || 0;
+  const isApplied = cart.appliedCoupon?.isApplied || false;
+  const summary = cart.appliedCoupon?.summary || {};
 
   // Create order items snapshot
   const orderItems = items.map((item) => {
@@ -125,6 +135,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
         productCategory: product.productCategory,
         productSubCategory: product.productSubCategory,
         priceAtPurchase: product.sellingPrice,
+        shipping: String(summary?.shipping ?? ""),
       },
     };
   });
@@ -136,6 +147,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
 
   const order = await Order.create({
     orderId: uuidv7(),
+    userEmail,
     userId,
     items: orderItems,
     amount: finalAmount,
@@ -146,6 +158,13 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     },
     qunatity: items?.qunatity || 1,
     status: "CREATED",
+    coupon: {
+      couponCodeId,
+      couponCodeName,
+      discountAmount,
+      isApplied,
+    },
+    note: "Amount is the final amount paid by the user",
   });
 
   return res.status(200).json(
@@ -165,95 +184,9 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   );
 });
 
-const razorpayPaymentVerificationController = asyncHandler(async (req, res) => {
-  const { userId } = req.user;
-  if (!userId) {
-    throw new NotFoundError("User not found for payment");
-  }
-  const { razorpay_payment_id, razorpay_order_id, razorpay_signature, error } =
-    req.body;
-
-  console.log(
-    `[INFO] Payment verification started - UserId: ${userId}, RazorpayOrderId: ${razorpay_order_id}, RazorpayPaymentId: ${razorpay_payment_id}`,
-  );
-
-  // Handle payment failure from Razorpay
-  if (error) {
-    const errorCode = error.code || "payment_failed";
-    const errorDescription = getErrorMessage(errorCode);
-
-    console.log(
-      `[WARN] Payment failed from Razorpay - UserId: ${userId}, RazorpayOrderId: ${razorpay_order_id}, ErrorCode: ${errorCode}, ErrorDescription: ${errorDescription}`,
-    );
-
-    // Update order with error details
-    await Order.updateOne(
-      { "payment.razorpayOrderId": razorpay_order_id },
-      {
-        $set: {
-          status: "FAILED",
-          "payment.errorCode": errorCode,
-          "payment.errorDescription": errorDescription,
-        },
-      },
-    );
-
-    throw new ValidationError(errorDescription, {
-      errorCode,
-      preserveCart: true,
-    });
-  }
-
-  const isPaymentVerifiedOrNot = await razorpayPaymentVerificationService(
-    razorpay_order_id,
-    razorpay_payment_id,
-    razorpay_signature,
-  );
-  if (!isPaymentVerifiedOrNot) {
-    // Signature verification failed
-    const errorCode = "signature_verification_failed";
-    const errorDescription = getErrorMessage(errorCode);
-
-    console.error(
-      `[ERROR] Payment signature verification failed - UserId: ${userId}, RazorpayOrderId: ${razorpay_order_id}, RazorpayPaymentId: ${razorpay_payment_id}`,
-    );
-
-    await Order.updateOne(
-      { "payment.razorpayOrderId": razorpay_order_id },
-      {
-        $set: {
-          status: "FAILED",
-          "payment.errorCode": errorCode,
-          "payment.errorDescription": errorDescription,
-        },
-      },
-    );
-
-    throw new ValidationError(errorDescription, {
-      errorCode,
-      preserveCart: true,
-    });
-  }
-
-  console.log(
-    `[INFO] Payment verification successful - UserId: ${userId}, RazorpayOrderId: ${razorpay_order_id}, RazorpayPaymentId: ${razorpay_payment_id}`,
-  );
-
-  return res
-    .status(Number(isPaymentVerifiedOrNot?.statusCode))
-    .json(
-      new ApiRes(
-        Number(isPaymentVerifiedOrNot?.statusCode),
-        isPaymentVerifiedOrNot?.message,
-        isPaymentVerifiedOrNot?.data,
-        isPaymentVerifiedOrNot?.success,
-      ),
-    );
-});
-
 const razorpayWebHookController = async (req, res) => {
-  const secret = env.RP_WEBHOOK_TEST_SECRET;
-  
+  const secret = env.RP_WEBHOOK_SECRET;
+
   const signature = req.headers["x-razorpay-signature"];
   if (!signature) {
     return res.status(400).json({
@@ -293,40 +226,32 @@ const razorpayWebHookController = async (req, res) => {
         if (order.status !== "PAID") {
           order.payment.razorpayPaymentId = payment.id;
           order.status = "PAID";
+          order.payment.errorCode = null;
+          order.payment.errorDescription = "";
           await order.save();
-          const findingUserId = await Order.findOne(
-            {
-              orderId: order?.orderId,
-            },
-            {
-              userId: 1,
-            },
-          ).lean();
 
-          // Clear user's cart after successful payment
+          // ✅ CLEAR CART IMMEDIATELY AFTER PAYMENT SUCCESS
           try {
             await Cart.updateOne(
-              { userId: findingUserId?.userId },
-              { 
+              { userId: order.userId },
+              {
                 $set: { products: {} },
-                $unset: { appliedCoupon: 1 }
-              }
+                $unset: { appliedCoupon: 1 },
+              },
             );
             console.log(
-              `[INFO] Cart cleared after successful payment - UserId: ${findingUserId?.userId}, OrderId: ${order.orderId}`,
+              `[INFO] Cart cleared after successful payment - UserId: ${order.userId}, OrderId: ${order.orderId}`,
             );
           } catch (cartError) {
             console.error(
-              `[ERROR] Failed to clear cart after payment - UserId: ${findingUserId?.userId}, OrderId: ${order.orderId}:`,
+              `[ERROR] Failed to clear cart after payment - UserId: ${order.userId}, OrderId: ${order.orderId}:`,
               cartError.message,
             );
-            // Don't fail the payment if cart clearing fails
           }
 
           // Send order confirmation and payment receipt emails
           try {
-            const user = await User.findOne({ userId: findingUserId?.userId });
-            if (user && user.email) {
+            if (order && order.userEmail) {
               // Prepare order details for email
               const orderDetails = {
                 orderId: order.orderId,
@@ -342,9 +267,14 @@ const razorpayWebHookController = async (req, res) => {
               };
 
               // Send order confirmation email
-              sendOrderConfirmation(user.email, orderDetails).catch((err) => {
-                console.error("Failed to send order confirmation email:", err);
-              });
+              await sendOrderConfirmation(order.userEmail, orderDetails).catch(
+                (err) => {
+                  console.error(
+                    "Failed to send order confirmation email:",
+                    err,
+                  );
+                },
+              );
 
               // Send payment receipt email
               const paymentDetails = {
@@ -353,9 +283,11 @@ const razorpayWebHookController = async (req, res) => {
                 orderId: order.orderId,
                 date: new Date(),
               };
-              sendPaymentReceipt(user.email, paymentDetails).catch((err) => {
-                console.error("Failed to send payment receipt email:", err);
-              });
+              await sendPaymentReceipt(order.userEmail, paymentDetails).catch(
+                (err) => {
+                  console.error("Failed to send payment receipt email:", err);
+                },
+              );
             }
           } catch (emailError) {
             console.error("Error sending emails:", emailError);
@@ -420,7 +352,6 @@ const razorpayWebHookController = async (req, res) => {
 
 export {
   razorpayCreateOrderController,
-  razorpayPaymentVerificationController,
   razorpayKeyGetController,
   razorpayWebHookController,
 };

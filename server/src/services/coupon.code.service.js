@@ -1,11 +1,16 @@
 import CouponCode from "../model/coupon.code.model.js";
 import { getCartService } from "../services/user.cart.service.js";
 import Cart from "../model/user.cart.model.js";
-import { ValidationError, NotFoundError, InternalServerError } from "../utils/errors.js";
+import {
+  ValidationError,
+  NotFoundError,
+  InternalServerError,
+} from "../utils/errors.js";
+import User from "../model/user.model.js";
 
 const applyCouponCodeService = async ({ userId, couponCodeName }) => {
   const cartRes = await getCartService({ userId });
-  
+
   if (
     !cartRes.success ||
     (cartRes.data.availableItems.length === 0 &&
@@ -49,21 +54,25 @@ const applyCouponCodeService = async ({ userId, couponCodeName }) => {
 
   // --- CASE 2: Global Rule Check (Subtotal <= 99) ---
   if (cartSubtotal <= 99) {
-    throw new ValidationError("Coupons are not applicable on cart values of ₹99 or less");
+    throw new ValidationError(
+      "Coupons are not applicable on cart values of ₹99 or less",
+    );
   }
 
   // --- CASE 3: Fetch and Validate Coupon ---
   const coupon = await CouponCode.findOne({
     name: couponCodeName.toUpperCase(),
     isPublished: true,
-  }).lean();
+  }).lean();  
 
   if (!coupon) {
     throw new NotFoundError("Invalid or inactive coupon");
   }
 
   if (cartSubtotal < coupon.minCartValue) {
-    throw new ValidationError(`Minimum order of ₹${coupon.minCartValue} required for this coupon`);
+    throw new ValidationError(
+      `Minimum order of ₹${coupon.minCartValue} required for this coupon`,
+    );
   }
 
   // Discount Calculation Logic
@@ -76,7 +85,10 @@ const applyCouponCodeService = async ({ userId, couponCodeName }) => {
   }
 
   discountAmount = Math.round(discountAmount);
-  const grandTotal = Math.max(cartSubtotal + SHIPPING_CHARGES - discountAmount, 0);
+  const grandTotal = Math.max(
+    cartSubtotal + SHIPPING_CHARGES - discountAmount,
+    0,
+  );
 
   const calculationSnapshot = {
     couponCodeId: coupon.couponCodeId,
@@ -107,27 +119,67 @@ const applyCouponCodeService = async ({ userId, couponCodeName }) => {
   };
 };
 
-const getAllCouponCodeService = async () => {
-  const activeCouponCodeList = await CouponCode.find(
+const getAllCouponCodeService = async ({ userId }) => {
+  const allUserRegisterdAndWaitListIsJoined = await User.aggregate([
     {
-      isPublished: true,
+      $match: {
+        userId,
+        isVerified: true,
+      },
     },
     {
-      _id: 0,
-      __v: 0,
-      createdAt: 0,
-      updatedAt: 0,
+      $lookup: {
+        from: "userwaistlists",
+        localField: "email",
+        foreignField: "userEmail",
+        as: "waitlistData",
+      },
     },
-  ).lean();
+    {
+      $match: {
+        waitlistData: { $ne: [] }, // only those present in waitlist
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        userId: 1,
+        name: 1,
+        email: 1,
+        role: 1,
+      },
+    },
+  ]);
 
-  if (!activeCouponCodeList) {
-    throw new InternalServerError("activeCouponCodeList can't retrived");
+  if (allUserRegisterdAndWaitListIsJoined?.length > 0) {
+    const activeCouponCodeList = await CouponCode.find(
+      {
+        isPublished: true,
+      },
+      {
+        _id: 0,
+        __v: 0,
+        createdAt: 0,
+        updatedAt: 0,
+      },
+    ).lean();
+
+    if (!activeCouponCodeList) {
+      throw new InternalServerError("activeCouponCodeList can't retrived");
+    }
+
+    return {
+      statusCode: 200,
+      message: "activeCouponCodeList",
+      data: activeCouponCodeList,
+      success: true,
+    };
   }
-  
+
   return {
     statusCode: 200,
     message: "activeCouponCodeList",
-    data: activeCouponCodeList,
+    data: null,
     success: true,
   };
 };

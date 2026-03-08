@@ -1,5 +1,5 @@
 import { ApiRes } from "../utils/index.js";
-import cookieOptions from "../config/config.js";
+import cookieOptions, { refreshCookieOptions } from "../config/config.js";
 import {
   sendOtpViaEmailService,
   verifyOtpEmailService,
@@ -39,6 +39,7 @@ const verifyEmailOtpController = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .cookie("userAccessToken", result?.data?.userAccessToken, cookieOptions)
+    .cookie("userRefreshToken", result?.data?.userRefreshToken, refreshCookieOptions)
     .json(
       new ApiRes(
         200,
@@ -71,11 +72,22 @@ const verifyOtpEmailForgotPasswordController = asyncHandler(async (req, res) => 
 });
 
 const regenrateRefreshToken = asyncHandler(async (req, res) => {
-  const { userId, userRole } = req.user;
-  const result = await regenerateTokenService({
-    userId,
-    userRole,
-  });
+  const refreshToken = req.cookies?.userRefreshToken;
+  
+  if (!refreshToken) {
+    return res.status(401).json(
+      new ApiRes(401, "Refresh token missing", null, false)
+    );
+  }
+  
+  const result = await regenerateTokenService({ refreshToken });
+  
+  if (result.success && result.data?.userAccessToken) {
+    // Set new access token cookie
+    res.cookie("userAccessToken", result.data.userAccessToken, cookieOptions);
+    // Rotate refresh token cookie
+    res.cookie("userRefreshToken", result.data.newRefreshToken, refreshCookieOptions);
+  }
   
   return res
     .status(result.statusCode)
@@ -83,7 +95,7 @@ const regenrateRefreshToken = asyncHandler(async (req, res) => {
       new ApiRes(
         result.statusCode,
         result.message,
-        result.data,
+        result.success ? { userAccessToken: result.data.userAccessToken } : null,
         result.success,
       ),
     );

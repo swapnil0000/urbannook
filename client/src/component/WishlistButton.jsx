@@ -19,19 +19,9 @@ const WishlistButton = ({ productId, className = "", size = "md" }) => {
   const handleWishlistToggle = async (e) => {
     e.stopPropagation();
 
+    const hasToken = !!localStorage.getItem('authToken');
     
-    // Check authentication
-    const getCookie = (name) => {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop().split(';').shift();
-      return null;
-    };
-    
-    const token = getCookie('userAccessToken');
-    const hasLocalUser = localStorage.getItem('user');
-    
-    if (!isAuthenticated && !token && !hasLocalUser) {
+    if (!isAuthenticated && !hasToken) {
       openLoginModal();
       return;
     }

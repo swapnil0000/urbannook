@@ -117,8 +117,8 @@ const getCartService = async ({ userId }) => {
             if: { $gt: ["$productFound", 0] },
             then: {
               $and: [
-                { $eq: ["$product.productStatus", "in_stock"] }, 
-                { $gt: ["$product.productQuantity", 0] }
+                { $eq: ["$product.productStatus", "in_stock"] },
+                { $gt: ["$product.productQuantity", 0] },
               ],
             },
             else: false,
@@ -187,7 +187,7 @@ const getCartService = async ({ userId }) => {
     data: cartData[0],
     success: true,
   };
-}
+};
 
 const cartQuantityService = async ({ userId, productId, quantity, action }) => {
   if (!userId) {

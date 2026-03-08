@@ -3,26 +3,64 @@ import { getApiUrl } from '../../config/appUrls';
 import { logout, setCredentials } from '../slices/authSlice';
 import { setNotification } from '../slices/uiSlice';
 
+// Store CSRF token in memory (not localStorage for security)
+let csrfToken = null;
+
+/**
+ * Fetch CSRF token from backend
+ * Call this after user logs in or on app load if user is authenticated
+ */
+export const fetchCsrfToken = async () => {
+  try {
+    const response = await fetch(`${getApiUrl()}/csrf-token`, {
+      credentials: 'include', // Send cookies
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      csrfToken = data.csrfToken;
+      return csrfToken;
+    } else {
+      console.warn('[CSRF] Failed to fetch token:', response.status);
+      return null;
+    }
+  } catch (error) {
+    console.error('[CSRF] Error fetching token:', error);
+    return null;
+  }
+};
+
+/**
+ * Clear CSRF token (call on logout)
+ */
+export const clearCsrfToken = () => {
+  csrfToken = null;
+};
+
+/**
+ * Get current CSRF token
+ */
+export const getCsrfToken = () => csrfToken;
+
 const baseQuery = fetchBaseQuery({
   baseUrl: getApiUrl(),
-  credentials: 'include', // Send cookies with requests
+  credentials: 'include', // Send cookies with requests (httpOnly cookies go automatically)
   prepareHeaders: (headers, { getState }) => {
-    // Try to get token from Redux state first
-    let token = getState().auth.token;
-    
-    // If not in Redux, try to get from cookie
-    if (!token) {
-      const getCookie = (name) => {
-        const value = `; ${document.cookie}`;
-        const parts = value.split(`; ${name}=`);
-        if (parts.length === 2) return parts.pop().split(';').shift();
-      };
-      token = getCookie('userAccessToken');
-    }
+    // Get token from Redux state (sourced from localStorage)
+    const token = getState().auth.token;
     
     if (token) {
       headers.set('authorization', `Bearer ${token}`);
     }
+    
+    // Add CSRF token to headers for state-changing requests
+    if (csrfToken) {
+      headers.set('X-CSRF-Token', csrfToken);
+    }
+    
     return headers;
   },
 });
@@ -36,10 +74,21 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
     const status = result.error.status;
     const errorMessage = result.error.data?.message || '';
     
+    // Skip reauth logic for network errors, CORS errors, etc.
+    if (status === 'FETCH_ERROR' || status === 'PARSING_ERROR' || status === 'TIMEOUT_ERROR') {
+      return result;
+    }
+    
+    // Get the endpoint URL to check if it's a login/register endpoint
+    const url = typeof args === 'string' ? args : args.url;
+    const isAuthEndpoint = url?.includes('/login') || 
+                          url?.includes('/register') || 
+                          url?.includes('/google-login') ||
+                          url?.includes('/forgot-password');
+    
     // Handle 401 (Unauthorized) - token might be expired
-    if (status === 401) {
-      console.log('Access token expired, attempting to refresh...');
-      
+    // BUT: Don't try to refresh on auth endpoints (login, register, google-login)
+    if (status === 401 && !isAuthEndpoint) {
       // Try to refresh the token
       const refreshResult = await baseQuery(
         { url: '/refresh-token', method: 'POST' },
@@ -52,12 +101,7 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
         const newAccessToken = refreshResult.data.data?.userAccessToken;
         
         if (newAccessToken) {
-          console.log('Token refreshed successfully');
-          
-          // Update cookie with new token
-          document.cookie = `userAccessToken=${newAccessToken}; path=/; max-age=2592000`;
-          
-          // Update Redux state with new token
+          // Update Redux state and localStorage with new token
           const user = JSON.parse(localStorage.getItem('user') || '{}');
           api.dispatch(setCredentials({ user, token: newAccessToken }));
           
@@ -66,12 +110,10 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
         }
       } else {
         // Refresh token also expired or invalid - logout user
-        console.log('Refresh token expired, logging out user');
         
         // Clear all session data
         localStorage.removeItem('user');
-        localStorage.removeItem('token');
-        document.cookie = 'userAccessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        localStorage.removeItem('authToken');
         
         // Dispatch logout action to clear Redux state
         api.dispatch(logout());
@@ -85,28 +127,28 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
         // Trigger storage event for other tabs
         window.dispatchEvent(new Event('storage'));
       }
+    } else if (status === 401 && isAuthEndpoint) {
+      // For auth endpoints, just return the error without trying to refresh
     } else if (status === 403) {
-      // 403 might indicate insufficient permissions or other auth issues
-      const isAuthIssue = 
-        errorMessage.toLowerCase().includes('token') ||
-        errorMessage.toLowerCase().includes('unauthorized') ||
-        errorMessage.toLowerCase().includes('forbidden');
+      // 403 might indicate CSRF token issue or insufficient permissions
+      const isCsrfIssue = 
+        errorMessage.toLowerCase().includes('csrf');
       
-      if (isAuthIssue) {
-        // Clear session and logout
-        localStorage.removeItem('user');
-        localStorage.removeItem('token');
-        document.cookie = 'userAccessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      if (isCsrfIssue) {
+        // Try to fetch new CSRF token and retry
+        const newCsrfToken = await fetchCsrfToken();
         
-        api.dispatch(logout());
-        
-        api.dispatch(setNotification({
-          message: 'Authentication error. Please log in again.',
-          type: 'error'
-        }));
-        
-        window.dispatchEvent(new Event('storage'));
+        if (newCsrfToken) {
+          // Retry the original request with new CSRF token
+          result = await baseQuery(args, api, extraOptions);
+        } else {
+          api.dispatch(setNotification({
+            message: 'Security token expired. Please refresh the page.',
+            type: 'warning'
+          }));
+        }
       }
+      // Don't logout on generic 403 - it could be a permissions issue, not auth
     }
   }
   
