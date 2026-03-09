@@ -216,21 +216,30 @@ const razorpayWebHookController = async (req, res) => {
         const payment = payload.payload.payment.entity;
         const razorpayOrderId = payment.order_id;
 
-        const order = await Order.findOne({
-          "payment.razorpayOrderId": razorpayOrderId,
-        });
-
+        const order = await Order.findOne({ "payment.razorpayOrderId": razorpayOrderId });
         if (!order) break;
 
         // idempotent update
         if (order.status !== "PAID") {
+          const wasFailedByCron = order.status === "FAILED";
+
           order.payment.razorpayPaymentId = payment.id;
           order.status = "PAID";
           order.payment.errorCode = null;
           order.payment.errorDescription = "";
+
+          const historyNote = wasFailedByCron 
+            ? "Late Payment Recovery: Order was FAILED by system (timeout), but payment was confirmed later via webhook." 
+            : "Payment successfully captured via Razorpay.";
+
+          order.statusHistory.push({
+            status: "PAID",
+            timestamp: new Date(),
+            note: historyNote
+          });
+
           await order.save();
 
-          // ✅ CLEAR CART IMMEDIATELY AFTER PAYMENT SUCCESS
           try {
             await Cart.updateOne(
               { userId: order.userId },
@@ -249,10 +258,8 @@ const razorpayWebHookController = async (req, res) => {
             );
           }
 
-          // Send order confirmation and payment receipt emails
           try {
-            if (order && order.userEmail) {
-              // Prepare order details for email
+            if (order.userEmail) {
               const orderDetails = {
                 orderId: order.orderId,
                 items: order.items.map((item) => ({
@@ -298,46 +305,42 @@ const razorpayWebHookController = async (req, res) => {
         break;
       }
 
-      /* =======================
-         PAYMENT FAILED
-      ======================== */
       case "payment.failed": {
         const payment = payload.payload.payment.entity;
         const errorCode = payment.error_code || "payment_failed";
-        const errorDescription =
-          payment.error_description || getErrorMessage(errorCode);
+        const errorDescription = payment.error_description || "Payment attempt failed.";
 
+        // Sirf un orders ko fail karo jo abhi terminal state mein nahi hain
         await Order.updateOne(
-          { "payment.razorpayOrderId": payment.order_id },
+          { "payment.razorpayOrderId": payment.order_id, status: { $nin: ["PAID", "DELIVERED", "SHIPPED"] } },
           {
             $set: {
               status: "FAILED",
               "payment.errorCode": errorCode,
               "payment.errorDescription": errorDescription,
             },
-          },
+            $push: {
+              statusHistory: {
+                status: "FAILED",
+                timestamp: new Date(),
+                note: `Payment failed: ${errorDescription}`
+              }
+            }
+          }
         );
 
         console.log("❌ Payment Failed:", payment.id, errorCode);
         break;
       }
-
-      /* =======================
-         ORDER PAID (OPTIONAL)
-      ======================== */
       case "order.paid": {
         const orderEntity = payload.payload.order.entity;
         console.log("📦 Order Paid Event:", orderEntity.id);
         break;
       }
 
-      /* =======================
-         DEFAULT
-      ======================== */
       default:
         console.log("Unhandled event:", event);
     }
-
     return res.status(200).json({ status: "ok" });
   } else {
     // Signature is invalid

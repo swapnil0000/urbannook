@@ -32,6 +32,7 @@
     "mongoose": "^8.20.1",
     "multer": "^2.0.2",
     "multer-s3": "^3.0.1",
+    "node-cron": "^4.2.1",
     "nodemailer": "^7.0.12",
     "otp-generator": "^4.0.1",
     "razorpay": "^2.9.6",
