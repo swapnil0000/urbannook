@@ -69,6 +69,9 @@ const orderSchema = new mongoose.Schema(
       formattedAddress: String,
       lat: Number,
       long: Number,
+      landmark: String,
+      flatOrFloorNumber: String,
+      pinCode: Number,
     },
 
     senderMobile: {
