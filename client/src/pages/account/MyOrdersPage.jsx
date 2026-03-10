@@ -255,7 +255,7 @@ const MyOrdersPage = () => {
                     </div>
 
                     {/* Right: Actions */}
-                    <div className="flex items-center gap-3 mt-2 md:mt-0">
+                    {/* <div className="flex items-center gap-3 mt-2 md:mt-0">
                       <button
                         onClick={() => handleGenerateInvoice(order.orderId, order.payment?.razorpayOrderId)}
                         disabled={generatingOrderId === order.orderId}
@@ -268,7 +268,7 @@ const MyOrdersPage = () => {
                           Track
                         </button>
                       )}
-                    </div>
+                    </div> */}
                   </div>
 
                   {/* --- ITEMS LIST --- */}
