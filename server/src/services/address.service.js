@@ -156,8 +156,39 @@ const createAddressService = async ({
     throw new ValidationError("Maximum 5 addresses allowed");
   }
 
-  // Duplicate check (placeId based - Global Address Table)
-  const existingAddress = await Address.findOne({ placeId });
+  const numLat = Number(lat);
+  const numLong = Number(long);
+  const normalizedFlat = flatOrFloorNumber?.trim() || "";
+  const normalizedLandmark = landmark?.trim() || "";
+
+  // --- DUPLICATE CHECK LOGIC ---
+  // Step 1: Check by (placeId OR formattedAddress) AND exact flat/landmark
+  let existingAddress = await Address.findOne({
+    $and: [
+      {
+        $or: [
+          { placeId },
+          { formattedAddress: { $regex: new RegExp(`^${formattedAddress.trim()}$`, "i") } },
+        ]
+      },
+      { flatOrFloorNumber: normalizedFlat },
+      { landmark: normalizedLandmark }
+    ]
+  });
+
+  // Step 2: If no match, check by Geospatial Proximity (Within 10 meters) AND exact flat/landmark
+  if (!existingAddress) {
+    existingAddress = await Address.findOne({
+      location: {
+        $near: {
+          $geometry: { type: "Point", coordinates: [numLong, numLat] },
+          $maxDistance: 10,
+        },
+      },
+      flatOrFloorNumber: normalizedFlat,
+      landmark: normalizedLandmark
+    });
+  }
 
   if (existingAddress) {
     // Case A: User already has this specific address in their list
@@ -165,7 +196,7 @@ const createAddressService = async ({
       return {
         statusCode: 200,
         data: { addressId: existingAddress.addressId },
-        message: "Address already exists in your list",
+        message: "This address is already in your saved list",
         success: true,
       };
     }
@@ -179,7 +210,7 @@ const createAddressService = async ({
     return {
       statusCode: 200,
       data: { addressId: existingAddress.addressId },
-      message: "Address added successfully",
+      message: "Address selected from saved locations",
       success: true,
     };
   }
@@ -188,7 +219,7 @@ const createAddressService = async ({
     addressId: uuidv7(),
     location: {
       type: "Point",
-      coordinates: [Number(long), Number(lat)],
+      coordinates: [numLong, numLat],
     },
     placeId,
     formattedAddress,

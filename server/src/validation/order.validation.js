@@ -39,4 +39,21 @@ export const createOrderSchema = Joi.object({
     .messages({
       'string.pattern.base': 'Receiver mobile number must be exactly 10 digits',
     }),
+
+  addressId: Joi.string().required(),
+  
+  deliveryAddress: Joi.object({
+    addressId: Joi.string().optional(),
+    fullName: Joi.string().optional(),
+    mobileNumber: Joi.string().optional(),
+    addressLine: Joi.string().optional(),
+    city: Joi.string().optional(),
+    state: Joi.string().optional(),
+    pinCode: Joi.number().optional(),
+    formattedAddress: Joi.string().optional(),
+    landmark: Joi.string().allow("").optional(),
+    flatOrFloorNumber: Joi.string().allow("").optional(),
+    lat: Joi.number().optional(),
+    long: Joi.number().optional(),
+  }).optional(),
 });
