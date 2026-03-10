@@ -437,6 +437,11 @@ const MyOrdersPage = () => {
                                 <p className="text-gray-500 text-xs mb-1">
                                   {variant}
                                 </p>
+                                {snapshot.selectedColor && (
+                                  <p className="text-gray-500 text-xs mb-1">
+                                    Color: <span className="font-medium">{snapshot.selectedColor}</span>
+                                  </p>
+                                )}
                                 <div className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 border border-gray-200 text-[10px] text-gray-500 font-bold">
                                   Qty: {qty}
                                 </div>

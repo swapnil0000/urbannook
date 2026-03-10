@@ -7,7 +7,7 @@ const cartSchema = mongoose.Schema({
   },
   products: {
     type: Map,
-    of: Number,
+    of: mongoose.Schema.Types.Mixed,
     default: {},
   },
 

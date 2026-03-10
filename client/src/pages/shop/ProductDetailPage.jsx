@@ -15,6 +15,7 @@ import {
 import { addToWishlistLocal, removeFromWishlistLocal } from '../../store/slices/wishlistSlice';
 import { useUI } from '../../hooks/useRedux';
 import { useCartData } from '../../hooks/useCartSync';
+import ColorSelector from '../../component/ColorSelector';
 
 const OptimizedImage = lazy(() => import('../../component/OptimizedImage'));
 const LoginForm = lazy(() => import('../../component/layout/auth/LoginForm'));
@@ -36,6 +37,7 @@ const ProductDetailPage = () => {
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showSignup, setShowSignup] = useState(false);
+  const [selectedColor, setSelectedColor] = useState(null);
 
   // 3. API Hooks
   const { data: productResponse, isLoading, error } = useGetProductByIdQuery(productId);
@@ -67,6 +69,11 @@ const ProductDetailPage = () => {
     window.scrollTo(0, 0);
   }, []);
 
+  // Reset selectedColor when product changes
+  useEffect(() => {
+    setSelectedColor(null);
+  }, [productId]);
+
   // Slider Handlers
   const nextImage = () => {
     setCurrentImageIndex((prev) => (prev + 1) % galleryImages.length);
@@ -88,9 +95,25 @@ const ProductDetailPage = () => {
       return;
     }
 
+    // Validate color selection if product has color options
+    if (product.colorOptions?.length > 0 && !selectedColor) {
+      showNotification('Please select a color', 'error');
+      return;
+    }
+
     // Logged in user - add to backend cart
     try {
-      await addToCartAPI({ productId: product?.productId, quantity: 1 }).unwrap();
+      const requestBody = { 
+        productId: product?.productId, 
+        quantity: 1 
+      };
+      
+      // Include selectedColor only if it exists
+      if (selectedColor) {
+        requestBody.selectedColor = selectedColor;
+      }
+      
+      await addToCartAPI(requestBody).unwrap();
       
       // Refresh cart data to ensure synchronization
       await refetchCart();
@@ -333,6 +356,21 @@ const ProductDetailPage = () => {
             <p className="text-gray-300 leading-relaxed mb-8 font-light text-sm lg:text-md">
               {product.productSubDes}
             </p>
+
+            {/* Color Selector */}
+            {product.colorOptions && product.colorOptions.length > 0 && (
+              <div className="mb-8">
+                <label className="block text-[#F5DEB3]/70 text-xs font-bold uppercase tracking-[0.2em] mb-3">
+                  Select Color
+                </label>
+                <ColorSelector
+                  colors={product.colorOptions}
+                  selectedColor={selectedColor}
+                  onColorSelect={setSelectedColor}
+                  disabled={product.productStatus !== 'in_stock'}
+                />
+              </div>
+            )}
 
             {/* --- DESKTOP ACTION BUTTONS --- */}
             <div className="hidden lg:block bg-white/5 backdrop-blur-sm p-8 rounded-[2rem] border border-[#F5DEB3]/10 mb-10">

@@ -52,7 +52,7 @@ const productListing = asyncHandler(async (req, res) => {
       .skip((page - 1) * perPage)
       .limit(perPage)
       .sort(sort)
-      .select("-_id -createdAt -updatedAt -__v");
+      .select("-_id -createdAt -updatedAt -__v -colorOptions"); // Exclude colorOptions
 
     return {
       listofPublishedProducts: listOfProducts,
@@ -86,7 +86,7 @@ const specificProductDetails = asyncHandler(async (req, res) => {
     const productDetails = await Product.findOne({
       productId,
       isPublished: true,
-    }).select("-_id -createdAt -updatedAt -__v");
+    }).select("-_id -createdAt -updatedAt -__v"); // Include colorOptions
 
     if (!productDetails) {
       throw new NotFoundError("Product Doesn't exist");

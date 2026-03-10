@@ -16,12 +16,13 @@ import html_to_pdf from "html-pdf-node";
 
 const userAddToCart = asyncHandler(async (req, res) => {
   const { userId } = req.user;
-  const { productId, productQuanity } = req.body;
+  const { productId, productQuanity, selectedColor } = req.body;
 
   const result = await addToCartService({
     userId,
     productId,
     productQuanity: productQuanity || 1,
+    selectedColor,
   });
 
   return res

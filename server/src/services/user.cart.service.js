@@ -9,7 +9,7 @@ import {
   AuthenticationError,
 } from "../utils/errors.js";
 
-const addToCartService = async ({ userId, productId }) => {
+const addToCartService = async ({ userId, productId, selectedColor }) => {
   const userAndProductIdValidation = cartDetailsMissing(userId, productId);
   if (!userAndProductIdValidation?.success) {
     throw new ValidationError(
@@ -29,11 +29,33 @@ const addToCartService = async ({ userId, productId }) => {
 
   const productDetails = await Product.findOne(
     { productId },
-    { productName: 1 },
+    { productName: 1, colorOptions: 1 },
   ).lean();
 
   if (!productDetails) {
     throw new NotFoundError(`productDetails not found with ${productId}`);
+  }
+
+  // Color validation: if product has colorOptions, validate selectedColor
+  if (productDetails.colorOptions && productDetails.colorOptions.length > 0) {
+    // Require selectedColor when product has color options
+    if (!selectedColor) {
+      throw new ValidationError(
+        "Color selection required for this product",
+        { availableColors: productDetails.colorOptions },
+      );
+    }
+
+    // Validate that selectedColor exists in product's colorOptions
+    if (!productDetails.colorOptions.includes(selectedColor)) {
+      throw new ValidationError(
+        `Invalid color selection: ${selectedColor}`,
+        {
+          selectedColor,
+          availableColors: productDetails.colorOptions,
+        },
+      );
+    }
   }
 
   const key = `products.${productId}`;
@@ -59,12 +81,19 @@ const addToCartService = async ({ userId, productId }) => {
 
   /* Cart Structure -> userId -> user mongooseId , product -> key : value -> product mongooseId : 1 
     Here quantity is saved with 1 always - to update we use different endpoints
+    
+    For products with colors: store as object { quantity: 1, selectedColor: "White" }
+    For legacy products: store as plain number 1 (backward compatible)
   */
+  const cartValue = selectedColor 
+    ? { quantity: 1, selectedColor } 
+    : 1;
+
   await Cart.findOneAndUpdate(
     { userId },
     {
       $setOnInsert: { userId },
-      $set: { [key]: 1 },
+      $set: { [key]: cartValue },
     },
     { upsert: true },
   );
@@ -101,13 +130,33 @@ const getCartService = async ({ userId }) => {
     },
     { $unwind: { path: "$product", preserveNullAndEmptyArrays: true } },
     {
+      $addFields: {
+        // Handle both legacy format (plain number) and new format (object with quantity and selectedColor)
+        parsedQuantity: {
+          $cond: {
+            if: { $eq: [{ $type: "$items.v" }, "object"] },
+            then: "$items.v.quantity",
+            else: "$items.v"
+          }
+        },
+        parsedSelectedColor: {
+          $cond: {
+            if: { $eq: [{ $type: "$items.v" }, "object"] },
+            then: "$items.v.selectedColor",
+            else: null
+          }
+        }
+      }
+    },
+    {
       $project: {
         _id: 0,
         productId: "$product.productId",
         name: "$product.productName",
         price: "$product.sellingPrice",
         image: "$product.productImg",
-        quantity: "$items.v",
+        quantity: "$parsedQuantity",
+        selectedColor: "$parsedSelectedColor",
         stock: "$product.productQuantity",
         productStatus: "$product.productStatus",
         productFound: 1,
@@ -211,16 +260,34 @@ const cartQuantityService = async ({ userId, productId, quantity, action }) => {
     throw new ValidationError("Product not in cart");
   }
 
-  const productQuantity = productQuanityMap.get(productId);
+  const cartValue = productQuanityMap.get(productId);
+  
+  // Handle both number (legacy) and object (new with selectedColor) formats
+  const isObjectFormat = typeof cartValue === 'object' && cartValue !== null;
+  const currentQuantity = isObjectFormat ? cartValue.quantity : cartValue;
+  const selectedColor = isObjectFormat ? cartValue.selectedColor : undefined;
+  
   switch (action) {
     case "add":
-      productQuanityMap.set(productId, productQuantity + quantity);
+      const newAddQuantity = currentQuantity + quantity;
+      productQuanityMap.set(
+        productId, 
+        isObjectFormat 
+          ? { quantity: newAddQuantity, selectedColor } 
+          : newAddQuantity
+      );
       break;
     case "sub":
-      if (productQuantity <= quantity) {
+      if (currentQuantity <= quantity) {
         throw new ValidationError("Cannot reduce below 1. Use remove instead.");
       }
-      productQuanityMap.set(productId, productQuantity - quantity);
+      const newSubQuantity = currentQuantity - quantity;
+      productQuanityMap.set(
+        productId, 
+        isObjectFormat 
+          ? { quantity: newSubQuantity, selectedColor } 
+          : newSubQuantity
+      );
       break;
     case "remove":
       productQuanityMap.delete(productId);

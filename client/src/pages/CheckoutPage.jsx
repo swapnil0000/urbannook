@@ -479,7 +479,7 @@ const CheckoutPage = () => {
         })),
         senderMobile: senderMobileStr,
         userEmail: userProfile?.email,
-        receiverMobile: receiverMobileStr || senderMobileStr,
+        receiverMobile: receiverMobileStr ,
       };
       const orderResult = await createOrder(orderData).unwrap();
       const res = await loadRazorpay();
@@ -638,6 +638,11 @@ const CheckoutPage = () => {
                       <h3 className="font-medium text-sm text-[#2e443c] truncate mb-1">
                         {item.name}
                       </h3>
+                      {item?.selectedColor && (
+                        <p className="text-[10px] text-gray-600 mb-1">
+                          Color: <span className="font-medium">{item?.selectedColor}</span>
+                        </p>
+                      )}
                       <div className="flex justify-between items-center">
                         <p className="text-[10px] text-gray-500 uppercase tracking-widest">
                           Qty: {item.quantity}

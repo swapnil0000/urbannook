@@ -63,6 +63,11 @@ const productSchema = mongoose.Schema(
       type: Boolean,
       require: true,
     },
+    // Color options for products that support color selection
+    colorOptions: {
+      type: [String],
+      default: [], // Default to empty array for backward compatibility
+    },
   },
   {
     timestamps: true,

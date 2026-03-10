@@ -36,6 +36,7 @@ const orderSchema = new mongoose.Schema(
             required: true,
           },
           shipping: String,
+          selectedColor: String,
         },
       },
     ],

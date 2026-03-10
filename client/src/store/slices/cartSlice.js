@@ -117,7 +117,8 @@ const cartSlice = createSlice({
         name: item.name || item.productName,
         price: item.price || item.productPrice || item.sellingPrice,
         image: item.image || item.productImage || item.productImg,
-        quantity: item.quantity || 1
+        quantity: item.quantity || 1,
+        selectedColor: item.selectedColor || null  // Add selectedColor field, null if not present
       }));
       
       state.totalQuantity = state.items.reduce((total, item) => total + item.quantity, 0);
