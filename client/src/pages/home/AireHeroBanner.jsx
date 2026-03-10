@@ -15,22 +15,7 @@ const AireHeroBanner = memo(() => {
       {/* --- BACKGROUND IMAGE LAYER --- */}
       <div className="absolute inset-0 z-0">
         {/* Mobile Image (hero21.webp) */}
-        <OptimizedImage
-          src="/assets/hero21.webp"
-          alt="Hero Background"
-          fetchPriority="high"
-          loading="eager"
-          // width={768}
-          // height={1024}
-          className="w-full h-full object-cover opacity-80 lg:hidden transition-transform duration-[20s] ease-in-out group-hover:scale-105"
-          onError={(e) => {
-            e.target.onerror = null;
-            e.target.src = "https://images.unsplash.com/photo-1513519247388-193ad5130246?q=80&w=2500";
-          }}
-        />
-        
-        {/* Desktop Image (hero2.webp) */}
-        <OptimizedImage
+        <img
           src="/assets/hero2.webp"
           alt="Hero Background"
           fetchPriority="high"
