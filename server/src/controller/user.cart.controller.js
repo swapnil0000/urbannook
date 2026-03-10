@@ -98,12 +98,18 @@ const userClearCart = asyncHandler(async (req, res) => {
 
 const userOrderPreviousHistory = asyncHandler(async (req, res) => {
   const { userId } = req.user;
-
+  const { userEmail } = req.body;
+  
   if (!userId) {
     throw new AuthenticationError("Unauthorized");
   }
 
-  const orders = await Order.find({ userId })
+  const query = { userId };
+  if (userEmail) {
+    query.userEmail = userEmail;
+  }  
+  
+  const orders = await Order.find(query)
     .sort({ createdAt: -1 })
     .lean()
     .select("-_id");

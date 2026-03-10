@@ -176,7 +176,7 @@ userRouter.post(
 /* ===============================================================
    ORDER HISTORY (PROTECTED)
 ================================================================ */
-userRouter.get(
+userRouter.post(
   "/user/order/history",
   authGuardService("USER"),
   userOrderPreviousHistory,
