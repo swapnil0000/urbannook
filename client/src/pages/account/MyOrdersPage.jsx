@@ -2,7 +2,7 @@ import { useEffect, lazy, Suspense, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useSelector } from "react-redux";
-import { useGetOrderHistoryQuery } from "../../store/api/userApi";
+import { useOrderHistoryQuery } from "../../store/api/userApi";
 import { ComponentLoader } from "../../component/layout/LoadingSpinner";
 import { useUI } from "../../hooks/useRedux";
 import { getApiUrl } from "../../config/appUrls";
@@ -12,10 +12,10 @@ const OrderTracker = lazy(() => import("../../component/OrderTracker"));
 
 const MyOrdersPage = () => {
   const navigate = useNavigate();
-  const { isAuthenticated } = useSelector((state) => state.auth);
+  const { isAuthenticated, user } = useSelector((state) => state.auth);
   const authToken = useSelector((state) => state.auth?.token);
   const { openLoginModal, showNotification } = useUI();
-  const { data: orderResponse, isLoading, error } = useGetOrderHistoryQuery();
+  const { data: orderResponse, isLoading, error } = useOrderHistoryQuery(user?.email);
   const [generatingOrderId, setGeneratingOrderId] = useState(null);
 
   const orders = orderResponse?.data?.orders || [];
