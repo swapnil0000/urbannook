@@ -160,8 +160,8 @@ const CheckoutPage = () => {
       return;
     }
 
-    // Don't redirect if payment was completed
-    if (cartItems.length === 0 && !paymentCompletedRef.current) {
+    // Only redirect to products if cart is empty AND profile is loaded (not initial loading state)
+    if (cartItems.length === 0 && !paymentCompletedRef.current && !profileLoading && userProfileData) {
       navigate("/products");
       return;
     }
