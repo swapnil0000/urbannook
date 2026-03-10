@@ -118,7 +118,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   }
 
   // Check if pricing has been calculated (appliedCoupon.summary must exist with a valid grandTotal)
-  const grandTotal = cart?.appliedCoupon?.summary?.grandTotal;
+  const grandTotal = cart?.appliedCoupon?.summary?.grandTotal;  
   if (grandTotal == null || grandTotal <= 0) {
     throw new ValidationError(
       "Cart pricing not calculated. Please refresh the page.",
