@@ -50,8 +50,7 @@ jobs:
       - name: Build Frontend
         working-directory: client
         run: |
-          # legacy-peer-deps + no-package-lock for strict fresh install
-          npm install --legacy-peer-deps --no-package-lock
+          npm install --legacy-peer-deps
           npm run build:prod
 
       - name: Configure AWS
@@ -83,8 +82,8 @@ jobs:
 
       - name: Install Server Dependencies
         working-directory: server
-        # FIX: Added --no-package-lock to ignore strict lockfile validation during CI
-        run: npm install --legacy-peer-deps --no-package-lock
+        # --legacy-peer-deps is enough once package versions are aligned
+        run: npm install --legacy-peer-deps
 
       - name: Setup SSH
         run: |
@@ -100,7 +99,6 @@ jobs:
             echo "available=true" >> $GITHUB_OUTPUT
           else
             echo "available=false" >> $GITHUB_OUTPUT
-            echo "::warning::Prod EC2 is not reachable."
           fi
 
       - name: Upload Server to EC2
@@ -119,8 +117,8 @@ jobs:
         run: |
           ssh ubuntu@${{ secrets.PROD_SSH_HOST }} << 'EOF'
             cd /home/ubuntu/urbannook-prod/server
-            # PROD FIX: Use --no-package-lock on server to prevent ERESOLVE
-            npm install --omit=dev --legacy-peer-deps --no-package-lock
+            # CI approach for clean install
+            npm install --omit=dev --legacy-peer-deps
             pm2 reload urbannook-server --env production || pm2 start ecosystem.config.cjs --env production
             pm2 save
           EOF
