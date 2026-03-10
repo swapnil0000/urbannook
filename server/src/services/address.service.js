@@ -8,8 +8,6 @@ import {
   ValidationError,
   NotFoundError,
   AuthenticationError,
-  ConflictError,
-  InternalServerError,
 } from "../utils/errors.js";
 
 const getSearchSuggestionsService = async ({ userId, userSearchInput }) => {
@@ -156,30 +154,101 @@ const createAddressService = async ({
     throw new ValidationError("Maximum 5 addresses allowed");
   }
 
-  // Duplicate check (placeId based - Global Address Table)
-  const existingAddress = await Address.findOne({ placeId });
+  const numLat = Number(lat);
+  const numLong = Number(long);
+  const normalizedFlat = flatOrFloorNumber?.trim() || "";
+  const normalizedLandmark = landmark?.trim() || "";
 
-  if (existingAddress) {
-    // Case A: User already has this specific address in their list
-    if (userAddress.addresses.includes(existingAddress.addressId)) {
-      return {
-        statusCode: 200,
-        data: { addressId: existingAddress.addressId },
-        message: "Address already exists in your list",
-        success: true,
-      };
-    }
+  // --- DUPLICATE CHECK LOGIC ---
+  const userAddressIds = userAddress?.addresses || [];
 
-    // Case B: Sibling Case (Address exists in DB but not for this user)
-    await UserAddress.updateOne(
-      { userId },
-      { $addToSet: { addresses: existingAddress.addressId } },
+  // Step 1: Check if the CURRENT USER already has an address at this location
+  // We split this into two queries because MongoDB doesn't allow $near inside $or
+  let existingUserAddress = await Address.findOne({
+    addressId: { $in: userAddressIds },
+    $or: [
+      { placeId: { $ne: "N/A", $eq: placeId } },
+      { formattedAddress: { $regex: new RegExp(`^${formattedAddress.trim()}$`, "i") } },
+    ],
+  });
+
+  if (!existingUserAddress) {
+    existingUserAddress = await Address.findOne({
+      addressId: { $in: userAddressIds },
+      location: {
+        $near: {
+          $geometry: { type: "Point", coordinates: [numLong, numLat] },
+          $maxDistance: 10,
+        },
+      },
+    });
+  }
+
+  if (existingUserAddress) {
+    // Update the existing record with any new details (flat, landmark, etc.) to keep it current
+    await Address.updateOne(
+      { addressId: existingUserAddress.addressId },
+      {
+        $set: {
+          location: { type: "Point", coordinates: [numLong, numLat] },
+          placeId,
+          formattedAddress,
+          city,
+          state,
+          pinCode: Number(pinCode),
+          landmark: normalizedLandmark,
+          flatOrFloorNumber: normalizedFlat,
+          addressType: addressType || "Home",
+        },
+      }
     );
 
     return {
       statusCode: 200,
-      data: { addressId: existingAddress.addressId },
-      message: "Address added successfully",
+      data: { addressId: existingUserAddress.addressId },
+      message: "Address already in your saved list",
+      success: true,
+    };
+  }
+
+  // Step 2: Sibling Case - Check if ANY address in DB matches location AND flat/landmark exactly
+  let siblingAddress = await Address.findOne({
+    $and: [
+      {
+        $or: [
+          { placeId: { $ne: "N/A", $eq: placeId } },
+          { formattedAddress: { $regex: new RegExp(`^${formattedAddress.trim()}$`, "i") } },
+        ],
+      },
+      { flatOrFloorNumber: normalizedFlat },
+      { landmark: normalizedLandmark },
+    ],
+  });
+
+  if (!siblingAddress) {
+    siblingAddress = await Address.findOne({
+      location: {
+        $near: {
+          $geometry: { type: "Point", coordinates: [numLong, numLat] },
+          $maxDistance: 10,
+        },
+      },
+      flatOrFloorNumber: normalizedFlat,
+      landmark: normalizedLandmark,
+    });
+  }
+
+  if (siblingAddress) {
+    // Link the existing sibling address to this user
+    await UserAddress.updateOne(
+      { userId },
+      { $addToSet: { addresses: siblingAddress.addressId } }
+    );
+
+    return {
+      statusCode: 200,
+      data: { addressId: siblingAddress.addressId },
+      message: "Address selected from saved locations",
       success: true,
     };
   }
@@ -188,7 +257,7 @@ const createAddressService = async ({
     addressId: uuidv7(),
     location: {
       type: "Point",
-      coordinates: [Number(long), Number(lat)],
+      coordinates: [numLong, numLat],
     },
     placeId,
     formattedAddress,
@@ -312,11 +381,11 @@ const getSavedAddressService = async ({ userId }) => {
       pinCode: 1,
       landmark: 1,
       addressId: 1,
+      location: 1,
       _id: 0,
     },
   ).lean();
 
-  // Create a Map for O(1) lookup by addressId
   const foundAddressMap = new Map(
     extractingAddressFromAddressIds.map((addr) => [addr.addressId, addr])
   );

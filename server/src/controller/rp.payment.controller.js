@@ -12,7 +12,11 @@ import {
   sendPaymentReceipt,
 } from "../services/email.service.js";
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
-import { ValidationError, NotFoundError, InternalServerError } from "../utils/errors.js";
+import { ValidationError, NotFoundError } from "../utils/errors.js";
+import { uploadInvoiceToS3 } from "../utils/s3.utils.js";
+import Address from "../model/address.new.model.js";
+import html_to_pdf from "html-pdf-node";
+import { generateInvoiceHtmlTemplate } from "../template/invoiceTemplate.template.js";
 
 const PAYMENT_ERROR_MESSAGES = {
   BAD_REQUEST_ERROR: "Payment failed due to invalid request. Please try again.",
@@ -36,6 +40,13 @@ const PAYMENT_ERROR_MESSAGES = {
 const getErrorMessage = (errorCode) => {
   return PAYMENT_ERROR_MESSAGES[errorCode] || PAYMENT_ERROR_MESSAGES.default;
 };
+
+const stripCountryCode = (mobile) => {
+  if (!mobile) return "";
+  const cleaned = mobile.toString().replace(/\D/g, "");
+  return cleaned.length > 10 ? cleaned.slice(-10) : cleaned;
+};
+
 const razorpayKeyGetController = asyncHandler(async (_, res) => {
   const key_id = env.RP_KEY_ID;
   if (!key_id) {
@@ -47,17 +58,21 @@ const razorpayKeyGetController = asyncHandler(async (_, res) => {
 
 const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   /* Not Handling the amount because it could be manipulate at client side like 0 as amount */
-  const { items, userEmail, senderMobile, receiverMobile } = req.body;
-
+  const {
+    items,
+    userEmail,
+    senderMobile,
+    receiverMobile,
+    addressId,
+    deliveryAddress: clientAddress,
+  } = req.body;
   const { userId } = req.user;
   if (!items || !Array.isArray(items) || items.length === 0) {
     throw new ValidationError("Items are required");
   }
+  if (!addressId) throw new ValidationError("Delivery address is required");
 
-  // Fetch user profile for fallback mobile number
   const user = await User.findOne({ userId }).lean();
-
-  // Helper function to strip country code
   const stripCountryCode = (mobile) => {
     if (!mobile) return "";
     const trimmed = mobile.trim();
@@ -69,8 +84,13 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     }
     return trimmed;
   };
+  const selectedAddr = await Address.findOne({ addressId }).lean();
 
-  // Determine final mobile numbers with fallback logic (trim whitespace and strip country code)
+  if (!selectedAddr && !clientAddress) {
+    throw new ValidationError("Selected address not found");
+  }
+
+  // Determine final mobile numbers with fallback logic
   const finalSenderMobile = stripCountryCode(
     senderMobile || user?.mobileNumber?.toString() || "",
   );
@@ -98,7 +118,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   }
 
   // Check if pricing has been calculated (appliedCoupon.summary must exist with a valid grandTotal)
-  const grandTotal = cart?.appliedCoupon?.summary?.grandTotal;
+  const grandTotal = cart?.appliedCoupon?.summary?.grandTotal;  
   if (grandTotal == null || grandTotal <= 0) {
     throw new ValidationError(
       "Cart pricing not calculated. Please refresh the page.",
@@ -106,7 +126,6 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   }
 
   const finalAmount = grandTotal;
-  // Fetch products for order snapshot
   const productIds = items.map((i) => i.productId);
   const products = await Product.find({
     productId: { $in: productIds },
@@ -123,7 +142,6 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   const isApplied = cart.appliedCoupon?.isApplied || false;
   const summary = cart.appliedCoupon?.summary || {};
 
-  // Create order items snapshot
   const orderItems = items.map((item) => {
     const product = products.find((p) => p.productId === item.productId);
     return {
@@ -142,21 +160,58 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
 
   const razorpayOrder = await razorpayCreateOrderService(
     finalAmount * 100, // Razorpay expects amount in paise
-    "INR", //currency
+    "INR",
   );
+
+  const deliveryAddressSnapshot = {
+    addressId: addressId,
+    fullName:
+      clientAddress?.fullName ||
+      selectedAddr?.fullName ||
+      user?.userName ||
+      user?.name ||
+      "Customer",
+    mobileNumber:
+      clientAddress?.mobileNumber ||
+      selectedAddr?.mobileNumber ||
+      finalSenderMobile,
+    addressLine:
+      clientAddress?.addressLine ||
+      clientAddress?.formattedAddress ||
+      selectedAddr?.formattedAddress ||
+      selectedAddr?.addressLine,
+    city: clientAddress?.city || selectedAddr?.city || "",
+    state: clientAddress?.state || selectedAddr?.state || "",
+    pinCode: clientAddress?.pinCode || selectedAddr?.pinCode || null,
+    formattedAddress:
+      clientAddress?.formattedAddress || selectedAddr?.formattedAddress || "",
+    landmark: clientAddress?.landmark || selectedAddr?.landmark || "",
+    flatOrFloorNumber:
+      clientAddress?.flatOrFloorNumber || selectedAddr?.flatOrFloorNumber || "",
+    lat:
+      clientAddress?.lat ||
+      selectedAddr?.location?.coordinates?.[1] ||
+      selectedAddr?.lat ||
+      0,
+    long:
+      clientAddress?.long ||
+      selectedAddr?.location?.coordinates?.[0] ||
+      selectedAddr?.long ||
+      0,
+  };
 
   const order = await Order.create({
     orderId: uuidv7(),
     userEmail,
     userId,
+    userName: deliveryAddressSnapshot.fullName,
+    userMobile: deliveryAddressSnapshot.mobileNumber,
     items: orderItems,
     amount: finalAmount,
     senderMobile: finalSenderMobile,
     receiverMobile: finalReceiverMobile,
-    payment: {
-      razorpayOrderId: razorpayOrder?.data?.id,
-    },
-    qunatity: items?.qunatity || 1,
+    deliveryAddress: deliveryAddressSnapshot,
+    payment: { razorpayOrderId: razorpayOrder?.data?.id },
     status: "CREATED",
     coupon: {
       couponCodeId,
@@ -216,7 +271,9 @@ const razorpayWebHookController = async (req, res) => {
         const payment = payload.payload.payment.entity;
         const razorpayOrderId = payment.order_id;
 
-        const order = await Order.findOne({ "payment.razorpayOrderId": razorpayOrderId });
+        const order = await Order.findOne({
+          "payment.razorpayOrderId": razorpayOrderId,
+        });
         if (!order) break;
 
         // idempotent update
@@ -228,14 +285,14 @@ const razorpayWebHookController = async (req, res) => {
           order.payment.errorCode = null;
           order.payment.errorDescription = "";
 
-          const historyNote = wasFailedByCron 
-            ? "Late Payment Recovery: Order was FAILED by system (timeout), but payment was confirmed later via webhook." 
+          const historyNote = wasFailedByCron
+            ? "Late Payment Recovery: Order was FAILED by system (timeout), but payment was confirmed later via webhook."
             : "Payment successfully captured via Razorpay.";
 
           order.statusHistory.push({
             status: "PAID",
             timestamp: new Date(),
-            note: historyNote
+            note: historyNote,
           });
 
           await order.save();
@@ -258,6 +315,7 @@ const razorpayWebHookController = async (req, res) => {
             );
           }
 
+          // 2. EMAIL NOTIFICATION LOGIC
           try {
             if (order.userEmail) {
               const orderDetails = {
@@ -283,7 +341,6 @@ const razorpayWebHookController = async (req, res) => {
                 },
               );
 
-              // Send payment receipt email
               const paymentDetails = {
                 paymentId: payment.id,
                 amount: order.amount,
@@ -299,6 +356,49 @@ const razorpayWebHookController = async (req, res) => {
           } catch (emailError) {
             console.error("Error sending emails:", emailError);
           }
+
+          try {
+            if (!order.invoiceData || !order.invoiceData.isGenerated) {
+              console.log(
+                `[INFO] Generating PDF Invoice for Order: ${order.orderId}...`,
+              );
+              const invoiceHtml = generateInvoiceHtmlTemplate(order);
+              const file = { content: invoiceHtml };
+              const options = {
+                format: "A4",
+                args: [
+                  "--no-sandbox",
+                  "--disable-setuid-sandbox",
+                  "--disable-dev-shm-usage",
+                  "--disable-gpu",
+                ],
+              };
+              const pdfBuffer = await html_to_pdf.generatePdf(file, options);
+              const savedFileKey = await uploadInvoiceToS3(
+                pdfBuffer,
+                order.userId,
+                order.orderId,
+              );
+              await Order.updateOne(
+                { _id: order._id },
+                {
+                  $set: {
+                    "invoiceData.isGenerated": true,
+                    "invoiceData.s3FileKey": savedFileKey,
+                  },
+                },
+              );
+
+              console.log(
+                `✅ Invoice uploaded to S3 successfully: ${savedFileKey}`,
+              );
+            }
+          } catch (invoiceError) {
+            console.error(
+              "❌ Error generating or uploading invoice to S3:",
+              invoiceError,
+            );
+          }
         }
 
         console.log("✅ Payment Captured:", payment.id);
@@ -308,11 +408,14 @@ const razorpayWebHookController = async (req, res) => {
       case "payment.failed": {
         const payment = payload.payload.payment.entity;
         const errorCode = payment.error_code || "payment_failed";
-        const errorDescription = payment.error_description || "Payment attempt failed.";
+        const errorDescription =
+          payment.error_description || "Payment attempt failed.";
 
-        // Sirf un orders ko fail karo jo abhi terminal state mein nahi hain
         await Order.updateOne(
-          { "payment.razorpayOrderId": payment.order_id, status: { $nin: ["PAID", "DELIVERED", "SHIPPED"] } },
+          {
+            "payment.razorpayOrderId": payment.order_id,
+            status: { $nin: ["PAID", "DELIVERED", "SHIPPED"] },
+          },
           {
             $set: {
               status: "FAILED",
@@ -323,10 +426,10 @@ const razorpayWebHookController = async (req, res) => {
               statusHistory: {
                 status: "FAILED",
                 timestamp: new Date(),
-                note: `Payment failed: ${errorDescription}`
-              }
-            }
-          }
+                note: `Payment failed: ${errorDescription}`,
+              },
+            },
+          },
         );
 
         console.log("❌ Payment Failed:", payment.id, errorCode);

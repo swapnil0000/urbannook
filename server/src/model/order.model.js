@@ -1,71 +1,49 @@
 import mongoose from "mongoose";
+
 const orderSchema = new mongoose.Schema(
   {
-    userEmail: {
-      type: String,
-      required: true,
-    },
-    userId: {
-      type: String,
-      required: true,
-    },
-    orderId: {
-      type: String,
-      required: true,
-    },
+    userEmail: { type: String, required: true },
+    userId: { type: String, required: true },
+    userName: { type: String },
+    userMobile: { type: String },
+
+    orderId: { type: String, required: true },
     items: [
       {
         _id: false,
-        productId: {
-          type: String,
-          required: true,
-        },
+        productId: { type: String, required: true },
+
+
         /* Saving this because the price could be changed when the user is viewing the history */
         productSnapshot: {
           productName: { type: String, required: true },
           productImg: { type: String, required: true },
-          quantity: {
-            type: Number,
-            required: true,
-            min: 1,
-          },
+          quantity: { type: Number, required: true, min: 1 },
           productCategory: String,
           productSubCategory: String,
-          priceAtPurchase: {
-            type: Number,
-            required: true,
-          },
+          priceAtPurchase: { type: Number, required: true },
           shipping: String,
         },
       },
     ],
-
-    amount: {
-      type: Number,
-      required: true,
+    invoiceData: {
+      isGenerated: { type: Boolean, default: false },
+      s3FileKey: { type: String, default: null },
     },
-    // Coupon snapshot
+    amount: { type: Number, required: true },
     coupon: {
-      couponCodeId: {
-        type: String,
-        default: null,
-      },
-      couponCodeName: {
-        type: String,
-        default: null,
-      },
-      discountAmount: {
-        type: Number,
-        default: 0,
-      },
-      isApplied: {
-        type: Boolean,
-        default: false,
-      },
+      couponCodeId: { type: String, default: null },
+      couponCodeName: { type: String, default: null },
+      discountAmount: { type: Number, default: 0 },
+      isApplied: { type: Boolean, default: false },
     },
-
     deliveryAddress: {
       addressId: String,
+      fullName: String, 
+      mobileNumber: String, 
+      addressLine: String, 
+      city: String, 
+      state: String, 
       formattedAddress: String,
       lat: Number,
       long: Number,
@@ -122,39 +100,20 @@ const orderSchema = new mongoose.Schema(
     statusHistory: [
       {
         _id: false,
-        status: {
-          type: String,
-          required: true,
-        },
-        timestamp: {
-          type: Date,
-          default: Date.now,
-        },
-        note: {
-          type: String,
-          default: "",
-        },
+        status: { type: String, required: true },
+        timestamp: { type: Date, default: Date.now },
+        note: { type: String, default: "" },
       },
     ],
-
     trackingInfo: {
-      carrier: {
-        type: String,
-        default: null,
-      },
-      trackingNumber: {
-        type: String,
-        default: null,
-      },
-      estimatedDelivery: {
-        type: Date,
-        default: null,
-      },
+      carrier: { type: String, default: null },
+      trackingNumber: { type: String, default: null },
+      estimatedDelivery: { type: Date, default: null },
     },
   },
   { timestamps: true },
 );
-// Indexes for performance optimization
+
 orderSchema.index({ orderId: 1 }, { unique: true });
 orderSchema.index({ userId: 1 });
 orderSchema.index({ status: 1 });

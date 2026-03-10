@@ -65,25 +65,14 @@ const MyOrdersPage = () => {
         }
       );
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Failed to generate invoice');
+      const responseData = await response.json();
+
+      if (!response.ok || !responseData.success) {
+        throw new Error(responseData.message || 'Failed to generate invoice');
       }
 
-      const blob = await response.blob();
-      
-      if (!(blob instanceof Blob)) {
-        throw new Error('Invalid response: expected Blob');
-      }
-
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `invoice-${orderId}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
+      const s3Url = responseData.data.url;
+      window.open(s3Url, '_blank');
 
       showNotification("Invoice downloaded successfully", "success");
     } catch (error) {
@@ -266,7 +255,7 @@ const MyOrdersPage = () => {
                     </div>
 
                     {/* Right: Actions */}
-                    <div className="flex items-center gap-3 mt-2 md:mt-0">
+                    {/* <div className="flex items-center gap-3 mt-2 md:mt-0">
                       <button
                         onClick={() => handleGenerateInvoice(order.orderId, order.payment?.razorpayOrderId)}
                         disabled={generatingOrderId === order.orderId}
@@ -279,7 +268,7 @@ const MyOrdersPage = () => {
                           Track
                         </button>
                       )}
-                    </div>
+                    </div> */}
                   </div>
 
                   {/* --- ITEMS LIST --- */}

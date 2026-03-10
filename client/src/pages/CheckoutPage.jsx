@@ -454,6 +454,8 @@ const CheckoutPage = () => {
     }
     
     setPaymentError(null);
+    const selectedFullAddr = savedAddress.find(a => a.addressId === currentAddressId);
+    
     try {
       const razorpayKey = razorpayKeyData?.data;
       const orderData = {
@@ -464,6 +466,18 @@ const CheckoutPage = () => {
         senderMobile: senderMobileStr,
         userEmail: userProfile?.email,
         receiverMobile: receiverMobileStr || senderMobileStr,
+        addressId: currentAddressId,
+        deliveryAddress: {
+          addressId: currentAddressId,
+          fullName: userProfile?.userName || userProfile?.name || "",
+          mobileNumber: senderMobileStr,
+          formattedAddress: address,
+          pinCode: pincode ? parseInt(pincode, 10) : null,
+          landmark: preciseDetails.landmark,
+          flatOrFloorNumber: preciseDetails.flatNo,
+          lat: selectedFullAddr?.location?.coordinates?.[1] || selectedFullAddr?.lat || 0,
+          long: selectedFullAddr?.location?.coordinates?.[0] || selectedFullAddr?.long || 0,
+        }
       };
       const orderResult = await createOrder(orderData).unwrap();
       const res = await loadRazorpay();

@@ -133,8 +133,14 @@ const getCartService = async ({ userId }) => {
         cartSubtotal: {
           $sum: {
             $cond: [
-              "$isEligibleForCalc",
-              { $multiply: ["$price", "$quantity"] },
+              {
+                $and: [
+                  "$isEligibleForCalc",
+                  { $isNumber: "$price" },
+                  { $isNumber: "$quantity" },
+                ],
+              },
+              { $multiply: [{ $ifNull: ["$price", 0] }, { $ifNull: ["$quantity", 0] }] },
               0,
             ],
           },
