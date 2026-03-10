@@ -80,6 +80,11 @@ jobs:
         with:
           node-version: 24
 
+      - name: Install Server Dependencies
+        working-directory: server
+        # FIX 1: --legacy-peer-deps added to fix AWS SDK conflict
+        run: npm install --legacy-peer-deps
+
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
@@ -90,13 +95,11 @@ jobs:
       - name: Check Prod EC2 availability
         id: check_ec2
         run: |
-          if ssh -o ConnectTimeout=10 ubuntu@${{ secrets.PROD_SSH_HOST }} "echo EC2_OK" > /dev/null 2>&1; then
+          if ssh -o ConnectTimeout=15 ubuntu@${{ secrets.PROD_SSH_HOST }} "echo EC2_OK" > /dev/null 2>&1; then
             echo "available=true" >> $GITHUB_OUTPUT
-            echo "EC2_AVAILABLE=true" >> $GITHUB_ENV
           else
             echo "available=false" >> $GITHUB_OUTPUT
-            echo "EC2_AVAILABLE=false" >> $GITHUB_ENV
-            echo "::warning::Prod EC2 is not reachable. Skipping server deployment steps."
+            echo "::warning::Prod EC2 is not reachable. Skipping server deployment."
           fi
 
       - name: Upload Server to EC2
@@ -114,8 +117,8 @@ jobs:
         run: |
           ssh ubuntu@${{ secrets.PROD_SSH_HOST }} << 'EOF'
             cd /home/ubuntu/urbannook-prod/server
-            # npm ci faster and more reliable than install
-            npm ci --omit=dev || npm install --omit=dev 
+            # FIX 2: Added --legacy-peer-deps here as well for production sync
+            npm ci --omit=dev --legacy-peer-deps || npm install --omit=dev --legacy-peer-deps
             pm2 reload urbannook-server --env production || pm2 start ecosystem.config.cjs --env production
             pm2 save
           EOF
