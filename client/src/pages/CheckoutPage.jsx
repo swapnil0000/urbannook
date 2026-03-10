@@ -28,25 +28,8 @@ const CheckoutPage = () => {
   const { items: cartItems } = useSelector((state) => state.cart);
   const { isAuthenticated } = useSelector((state) => state.auth);
   const paymentCompletedRef = useRef(false);
+  const cartLoadedRef = useRef(false);
 
-  // CRITICAL: Immediate synchronous auth check before any rendering
-  const authToken = localStorage.getItem('authToken');
-  const userToken = localStorage.getItem('user');
-  
-  // If tokens are missing but Redux thinks we're authenticated, this is a security issue
-  if (!authToken || !userToken) {
-    // Force immediate redirect without rendering anything
-    if (isAuthenticated) {
-      // Dispatch logout to sync Redux state
-      dispatch(logout());
-    }
-    // Show notification and redirect
-    showNotification("Please login to access checkout", "error");
-    openLoginModal();
-    navigate("/", { replace: true });
-    // Return null to prevent any rendering
-    return null;
-  }
 
   const [userProfile, setUserProfile] = useState(null);
   const [address, setAddress] = useState("");
@@ -159,9 +142,10 @@ const CheckoutPage = () => {
       navigate("/");
       return;
     }
-
-    // Only redirect to products if cart is empty AND profile is loaded (not initial loading state)
-    if (cartItems.length === 0 && !paymentCompletedRef.current && !profileLoading && userProfileData) {
+    if (cartItems.length > 0) {
+      cartLoadedRef.current = true;
+    }
+    if (cartItems.length === 0 && cartLoadedRef.current && !paymentCompletedRef.current && !profileLoading && userProfileData) {
       navigate("/products");
       return;
     }
