@@ -319,7 +319,7 @@ const NewHeader = () => {
               
               {/* 1. MOBILE USER CONTROL CENTER */}
               {user ? (
-                <div className="bg-white/60 p-5 rounded-3xl border border-white/60 shadow-sm mb-6 relative overflow-hidden group flex-shrink-0">
+                <div className="bg-white/60 p-3 rounded-3xl border border-white/60 shadow-sm mb-6 relative overflow-hidden group flex-shrink-0">
                     {/* Decorative Background Blob */}
                     <div className="absolute -right-10 -top-10 w-32 h-32 bg-emerald-200/30 rounded-full blur-2xl group-hover:bg-emerald-300/40 transition-all"></div>
 
@@ -340,7 +340,7 @@ const NewHeader = () => {
                     </div>
 
                     {/* THE APP-STYLE GRID (Modified to 3 Cols since Orders is removed) */}
-                    <div className="grid grid-cols-3 gap-5 relative z-10">
+                    <div className="grid grid-cols-4 gap-3 relative z-10">
                         
                     
 
@@ -376,6 +376,13 @@ const NewHeader = () => {
                                 </span>
                             )}
                             <span className="text-[10px] font-bold text-emerald-900 uppercase tracking-wide">Wishlist</span>
+                        </button>
+
+                        <button onClick={() => handleMobileNav('/orders')} className="flex flex-col items-center gap-2 group/btn">
+                            <div className="w-12 h-12 rounded-2xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-700 shadow-sm group-hover/btn:scale-105 group-hover/btn:border-emerald-300 transition-all">
+                                <i className="fa-solid fa-headset text-lg"></i>
+                            </div>
+                            <span className="text-[10px] font-bold text-emerald-900 uppercase tracking-wide">My Orders</span>
                         </button>
 
                     </div>
