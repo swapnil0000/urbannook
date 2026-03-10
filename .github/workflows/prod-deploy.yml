@@ -118,7 +118,7 @@ jobs:
           ssh ubuntu@${{ secrets.PROD_SSH_HOST }} << 'EOF'
             cd /home/ubuntu/urbannook-prod/server
             # FIX 2: Added --legacy-peer-deps here as well for production sync
-            npm ci --omit=dev --legacy-peer-deps || npm install --omit=dev --legacy-peer-deps
+            npm install --omit=dev --legacy-peer-deps
             pm2 reload urbannook-server --env production || pm2 start ecosystem.config.cjs --env production
             pm2 save
           EOF
