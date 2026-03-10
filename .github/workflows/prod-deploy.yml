@@ -47,10 +47,11 @@ jobs:
         with:
           node-version: 24
 
-      - name: Build and Sync Frontend
+      - name: Build Frontend
         working-directory: client
         run: |
-          npm install
+          # Added legacy-peer-deps for frontend safety too
+          npm install --legacy-peer-deps
           npm run build:prod
 
       - name: Configure AWS
@@ -82,7 +83,6 @@ jobs:
 
       - name: Install Server Dependencies
         working-directory: server
-        # FIX 1: --legacy-peer-deps added to fix AWS SDK conflict
         run: npm install --legacy-peer-deps
 
       - name: Setup SSH
@@ -99,7 +99,7 @@ jobs:
             echo "available=true" >> $GITHUB_OUTPUT
           else
             echo "available=false" >> $GITHUB_OUTPUT
-            echo "::warning::Prod EC2 is not reachable. Skipping server deployment."
+            echo "::warning::Prod EC2 is not reachable. Skipping server deployment steps."
           fi
 
       - name: Upload Server to EC2
@@ -117,7 +117,7 @@ jobs:
         run: |
           ssh ubuntu@${{ secrets.PROD_SSH_HOST }} << 'EOF'
             cd /home/ubuntu/urbannook-prod/server
-            # FIX 2: Added --legacy-peer-deps here as well for production sync
+            # PROD FIX: Use legacy-peer-deps here too
             npm install --omit=dev --legacy-peer-deps
             pm2 reload urbannook-server --env production || pm2 start ecosystem.config.cjs --env production
             pm2 save
