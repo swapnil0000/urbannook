@@ -3,11 +3,13 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { clearCart } from "../store/slices/cartSlice";
 import { useClearCartMutation } from "../store/api/userApi";
+import { useUI } from "../hooks/useRedux";
 
 const PaymentProcessing = () => {
   const { orderId } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { showNotification } = useUI();
 
   const [message, setMessage] = useState("Processing your payment...");
   const [clearCartApi] = useClearCartMutation();
@@ -33,6 +35,11 @@ const PaymentProcessing = () => {
 
         if (status === "PAID") {
           clearInterval(interval);
+          
+          // Update message to show success
+          setMessage("Payment successful! Redirecting...");
+          
+          // Clear cart from Redux and backend
           dispatch(clearCart());
           try {
             await clearCartApi().unwrap();
@@ -40,12 +47,25 @@ const PaymentProcessing = () => {
             console.error("Failed to clear cart from backend:", error);
           }
           
-          navigate("/orders");
+          // Show success notification
+          showNotification("Order placed successfully! Thank you for your purchase.", "success");
+          
+          // Wait 2 seconds to let user see the notification before redirecting
+          setTimeout(() => {
+            navigate("/orders");
+          }, 2000);
         }
 
         if (status === "FAILED") {
           clearInterval(interval);
-          navigate("/payment-failed");
+          
+          // Show error notification
+          showNotification("Payment failed. Please try again or contact support.", "error");
+          
+          // Wait 2 seconds before redirecting to payment failed page
+          setTimeout(() => {
+            navigate("/payment-failed");
+          }, 2000);
         }
       } catch (err) {
         console.error("Status error:", err);
@@ -58,7 +78,7 @@ const PaymentProcessing = () => {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [orderId]);
+  }, [orderId, dispatch, clearCartApi, navigate, showNotification]);
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
