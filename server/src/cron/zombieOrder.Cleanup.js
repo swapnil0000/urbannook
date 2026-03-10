@@ -6,7 +6,7 @@ import cron from "node-cron";
 import Order from "../model/order.model.js";
 
 const startOrderCleanupJob = () => {
-  cron.schedule("*/15 * * * *", async () => {
+  cron.schedule("0 * * * *", async () => {
     const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000);
 
     try {
@@ -24,6 +24,7 @@ const startOrderCleanupJob = () => {
         createdAt: { $lt: thirtyMinsAgo },
       })
         .select("orderId")
+        .limit(20)
         .lean();
       if (zombieOrders.length === 0) {
         console.log(

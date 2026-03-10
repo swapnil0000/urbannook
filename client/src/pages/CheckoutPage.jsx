@@ -480,6 +480,16 @@ const CheckoutPage = () => {
         senderMobile: senderMobileStr,
         userEmail: userProfile?.email,
         receiverMobile: receiverMobileStr || senderMobileStr,
+        addressId: currentAddressId,
+        deliveryAddress: {
+          addressId: currentAddressId,
+          fullName: userProfile?.userName || userProfile?.name || "",
+          mobileNumber: senderMobileStr,
+          formattedAddress: address,
+          pinCode: pincode ? parseInt(pincode, 10) : null,
+          landmark: preciseDetails.landmark,
+          flatOrFloorNumber: preciseDetails.flatNo,
+        }
       };
       const orderResult = await createOrder(orderData).unwrap();
       const res = await loadRazorpay();
