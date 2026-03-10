@@ -16,7 +16,7 @@ const addressSchema = mongoose.Schema(
         default: "Point",
       },
       coordinates: {
-        type: [Number], // [lng, lat]
+        type: [Number], // [long, latitu]
         required: true,
       },
     },
