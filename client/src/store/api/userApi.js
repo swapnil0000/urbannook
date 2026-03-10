@@ -74,10 +74,13 @@ export const userApi = apiSlice.injectEndpoints({
       invalidatesTags: ["Wishlist", "User"],
     }),
 
-    // Order APIs
-    getOrderHistory: builder.query({
-      query: () => "user/order/history",
-      providesTags: ["Order"],
+    orderHistory: builder.query({
+      query: (userEmail) => ({
+        url: "user/order/history",
+        method: "POST",
+        body: { userEmail },
+      }),
+      providesTags: ["Orders"],
     }),
 
     // Coupon APIs
@@ -234,7 +237,7 @@ export const {
   useAddToWishlistMutation,
   useGetWishlistQuery,
   useRemoveFromWishlistMutation,
-  useGetOrderHistoryQuery,
+  useOrderHistoryQuery,
   useApplyCouponMutation,
   useGetAvailableCouponsQuery,
   useGetRazorpayKeyQuery,
