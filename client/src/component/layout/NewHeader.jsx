@@ -249,6 +249,10 @@ const NewHeader = () => {
                           <Link to="/profile" onClick={() => setShowUserDropdown(false)} className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-600 hover:bg-emerald-50 hover:text-emerald-900 rounded-xl transition-colors">
                              <i className="fa-regular fa-user w-5"></i> Profile
                           </Link>
+
+                           <Link to="/orders" onClick={() => setShowUserDropdown(false)} className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-600 hover:bg-emerald-50 hover:text-emerald-900 rounded-xl transition-colors">
+                             <i className="fa-regular fa-user w-5"></i> My Orders
+                          </Link>
     
                            <Link to="/customer-support" onClick={() => setShowUserDropdown(false)} className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-600 hover:bg-emerald-50 hover:text-emerald-900 rounded-xl transition-colors">
                              <i className="fa-solid fa-headset text-lg"></i> Support

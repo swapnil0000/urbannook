@@ -37,7 +37,7 @@ const PaymentProcessing = () => {
           clearInterval(interval);
           
           // Update message to show success
-          setMessage("Payment successful! Redirecting...");
+          // setMessage("Payment successful! Redirecting...");
           
           // Clear cart from Redux and backend
           dispatch(clearCart());
@@ -53,7 +53,7 @@ const PaymentProcessing = () => {
           // Wait 2 seconds to let user see the notification before redirecting
           setTimeout(() => {
             navigate("/orders");
-          }, 2000);
+          }, 1000);
         }
 
         if (status === "FAILED") {

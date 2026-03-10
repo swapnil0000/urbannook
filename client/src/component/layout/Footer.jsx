@@ -145,7 +145,7 @@ const Footer = () => {
                 <h4 className="text-[#1a1a1a] font-bold uppercase tracking-widest text-[10px] mb-6 md:mb-8 text-center md:text-left">Support</h4>
                 <ul className="space-y-3 md:space-y-4">
                   {[
-                    { name: 'Track Order', path: '/orders', requiresAuth: true },
+                    { name: 'My Order', path: '/orders', requiresAuth: true },
                     { name: 'Returns & Exchange', path: '/return-policy' },
                     { name: 'Cancellation & Refund', path: '/cancellation-refund' },
                     { name: 'FAQs', path: '/faqs' }

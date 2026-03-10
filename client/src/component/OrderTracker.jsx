@@ -24,15 +24,16 @@ const OrderTracker = ({ status }) => {
   }
 
   // Handle CREATED and PAID statuses (before CONFIRMED)
-  if (status === 'CREATED' || status === 'PAID') {
+  if ( status === 'PAID') {
     return (
       <div className="flex items-center justify-center py-4">
         <div className="flex flex-col items-center text-[#a89068]">
           <i className="fas fa-box text-5xl mb-2 animate-pulse"></i>
           <span className="text-sm font-medium">
-            {status === 'CREATED' ? 'Order Created' : 'Payment Received'}
+            {status === 'CREATED' ? 'Order Created' : 'Order Placed Successfully'}
+
           </span>
-          <span className="text-xs text-gray-500 mt-1">Awaiting confirmation</span>
+          <span className="text-xs text-gray-500 mt-1">Processing Your Shipment</span>
         </div>
       </div>
     );
