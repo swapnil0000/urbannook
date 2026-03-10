@@ -20,13 +20,13 @@ jobs:
       - name: Detect changed paths
         id: changes
         run: |
-          if git diff -w --name-only origin/main~1..origin/main | grep '^client/'; then
+          if git diff --name-only origin/main~1..origin/main | grep '^client/'; then
             echo "client=true" >> $GITHUB_OUTPUT
           else
             echo "client=false" >> $GITHUB_OUTPUT
           fi
 
-          if git diff -w --name-only origin/main~1..origin/main | grep '^server/'; then
+          if git diff --name-only origin/main~1..origin/main | grep '^server/'; then
             echo "server=true" >> $GITHUB_OUTPUT
           else
             echo "server=false" >> $GITHUB_OUTPUT
@@ -36,6 +36,8 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.client == 'true'
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -45,15 +47,7 @@ jobs:
         with:
           node-version: 24
 
-      - name: Cache npm
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: client-npm-v2-${{ runner.os }}-${{ hashFiles('client/package-lock.json') }}
-          restore-keys: |
-            client-npm-v2-${{ runner.os }}-
-
-      - name: Build Client
+      - name: Build and Sync Frontend
         working-directory: client
         run: |
           npm install
@@ -66,20 +60,17 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_S3_BUCKET_REGION }}
 
-      - name: Deploy Frontend to S3
+      - name: S3 Sync & CloudFront Invalidation
         run: |
           aws s3 sync client/dist/ s3://${{ secrets.S3_BUCKET }} --delete --only-show-errors
-
-      - name: Invalidate CloudFront
-        run: |
-          aws cloudfront create-invalidation \
-            --distribution-id ${{ secrets.CLOUDFRONT_DIST_ID }} \
-            --paths "/*"
+          aws cloudfront create-invalidation --distribution-id ${{ secrets.CLOUDFRONT_DIST_ID }} --paths "/*"
 
   deploy-server:
     needs: detect-changes
     if: needs.detect-changes.outputs.server == 'true'
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -89,18 +80,6 @@ jobs:
         with:
           node-version: 24
 
-      - name: Cache npm
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: server-npm-v2-${{ runner.os }}-${{ hashFiles('server/package-lock.json') }}
-          restore-keys: |
-            server-npm-v2-${{ runner.os }}-
-
-      - name: Install Server Dependencies
-        working-directory: server
-        run: npm install
-
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
@@ -109,16 +88,19 @@ jobs:
           ssh-keyscan -H ${{ secrets.PROD_SSH_HOST }} >> ~/.ssh/known_hosts || true
 
       - name: Check Prod EC2 availability
+        id: check_ec2
         run: |
-          if ssh -o ConnectTimeout=5 ubuntu@${{ secrets.PROD_SSH_HOST }} "echo EC2 is running" >/dev/null 2>&1; then
+          if ssh -o ConnectTimeout=10 ubuntu@${{ secrets.PROD_SSH_HOST }} "echo EC2_OK" > /dev/null 2>&1; then
+            echo "available=true" >> $GITHUB_OUTPUT
             echo "EC2_AVAILABLE=true" >> $GITHUB_ENV
           else
+            echo "available=false" >> $GITHUB_OUTPUT
             echo "EC2_AVAILABLE=false" >> $GITHUB_ENV
-            echo "Prod EC2 is stopped. Deployment skipped."
+            echo "::warning::Prod EC2 is not reachable. Skipping server deployment steps."
           fi
 
       - name: Upload Server to EC2
-        if: env.EC2_AVAILABLE == 'true'
+        if: steps.check_ec2.outputs.available == 'true'
         run: |
           rsync -avz --delete \
           --exclude '.env' \
@@ -128,10 +110,11 @@ jobs:
           ubuntu@${{ secrets.PROD_SSH_HOST }}:/home/ubuntu/urbannook-prod/server/
 
       - name: Restart Production Backend
+        if: steps.check_ec2.outputs.available == 'true'
         run: |
           ssh ubuntu@${{ secrets.PROD_SSH_HOST }} << 'EOF'
             cd /home/ubuntu/urbannook-prod/server
-            # to make sure server has zero down time in case if json and lock-json got version mismatch
+            # npm ci faster and more reliable than install
             npm ci --omit=dev || npm install --omit=dev 
             pm2 reload urbannook-server --env production || pm2 start ecosystem.config.cjs --env production
             pm2 save
