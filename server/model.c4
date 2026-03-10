@@ -10,6 +10,7 @@ specification {
   tag routes { color #7B1FA2 }
   tag controller { color #E65100 }
   tag service { color #FB8C00 }
+  tag payment { color #D32F2F }
   tag model { color #C62828 }
   tag db { color #0D47A1 }
 }
@@ -27,42 +28,75 @@ model {
 
     backend = container "Backend (Node + Express)" {
 
-      routes = component "Routes Layer" {
+      routesLayer = component "Routes Layer" {
         #routes
-        description "Express routes (admin, user, product, cart, wishlist, waitlist)"
+        description "admin, user, product, cart, wishlist, waitlist, address, coupon, contact, testimonial, nfc, common"
       }
 
-      controllers = component "Controllers Layer" {
+      controllersLayer = component "Controllers Layer" {
         #controller
-        description "Request handling & orchestration"
+        description "Request handlers for business logic"
       }
 
-      services = component "Services Layer" {
+      rpPaymentController = component "rp.payment.controller.js" {
+        #payment
+        description "Razorpay payment creation & verification"
+      }
+
+      servicesLayer = component "Services Layer" {
         #service
-        description "Business logic, auth, payments, email"
+        description "Business logic & integrations (auth, cart, wishlist, email, contact, OTP)"
       }
 
-      models = component "Models Layer" {
+      rpPaymentService = component "rp.payement.service.js" {
+        #payment
+        description "Razorpay payment logic & order management"
+      }
+
+      addressService = component "address.service.js" {
+        #service
+        description "Address creation, update, deletion with Ola Maps"
+      }
+
+      modelsLayer = component "Models Layer" {
         #model
-        description "Mongoose schemas"
+        description "Mongoose schemas (User, Product, Order, Cart, Wishlist, Address, etc)"
       }
 
-      routes -> controllers
-      controllers -> services
-      services -> models
+      routesLayer -> controllersLayer "route to"
+      controllersLayer -> servicesLayer "calls"
+      controllersLayer -> rpPaymentController "routes payment requests"
+      rpPaymentController -> rpPaymentService "executes"
+      servicesLayer -> modelsLayer "queries"
+      rpPaymentService -> modelsLayer "manages orders"
+      servicesLayer -> addressService "uses"
     }
 
     database = container "MongoDB" {
       #db
+      description "Stores users, products, orders, addresses, cart, wishlist"
     }
 
     razorpay = container "Razorpay API" {
+      #payment
+      description "Payment gateway - create orders, verify payments, refunds"
+    }
+
+    olaMapAPI = container "Ola Map API" {
       #service
+      description "Address autocomplete & reverse geocoding"
+    }
+
+    emailService = container "Email Service" {
+      #service
+      description "Send notifications & transactional emails"
     }
 
     frontend -> backend "REST APIs"
-    models -> database "CRUD"
-    services -> razorpay "Payment processing"
+    modelsLayer -> database "CRUD operations"
+    rpPaymentService -> razorpay "payment processing"
+    addressService -> olaMapAPI "location queries"
+    servicesLayer -> emailService "sends emails"
 
     customer -> frontend
   }
@@ -72,12 +106,36 @@ views {
 
   view system {
     title "Urban Nook – System Overview"
+    description "Complete architecture with Razorpay payment integration & address services"
     include *
   }
 
   view backend {
     title "Backend Layered Architecture"
+    description "Detailed view of routes, controllers, services, models and their interactions"
     include urbanNook.backend.*
+  }
+
+  view payments {
+    title "Payment Processing Flow"
+    description "Razorpay payment controller → service → order models → database"
+    include urbanNook.backend.routesLayer
+    include urbanNook.backend.rpPaymentController
+    include urbanNook.backend.rpPaymentService
+    include urbanNook.backend.modelsLayer
+    include urbanNook.database
+    include urbanNook.razorpay
+  }
+
+  view addresses {
+    title "Address Management"
+    description "Address service with Ola Maps integration"
+    include urbanNook.backend.routesLayer
+    include urbanNook.backend.servicesLayer
+    include urbanNook.backend.addressService
+    include urbanNook.backend.modelsLayer
+    include urbanNook.database
+    include urbanNook.olaMapAPI
   }
 
 }

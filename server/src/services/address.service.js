@@ -225,8 +225,8 @@ const updatedAddressService = async ({
   formattedAddress,
   addressId,
   placeId,
-  landmark,           
-  flatOrFloorNumber,  
+  landmark,
+  flatOrFloorNumber,
 }) => {
   if (!userId) {
     throw new AuthenticationError("Unauthorized");
@@ -268,8 +268,8 @@ const updatedAddressService = async ({
         state,
         pinCode,
         formattedAddress,
-        landmark,            // Update mein add kiya
-        flatOrFloorNumber,    // Update mein add kiya
+        landmark,
+        flatOrFloorNumber, 
       },
     },
     {
@@ -298,12 +298,30 @@ const getSavedAddressService = async ({ userId }) => {
   }
 
   // user - address mappings with address id - uuid v7
-  const userSavedAddressIds = await UserAddress.findOne({ userId });
+  const userSavedAddressIds = await UserAddress.findOne({ userId }).lean();
+
+  if (
+    !userSavedAddressIds ||
+    !userSavedAddressIds.addresses ||
+    userSavedAddressIds.addresses.length === 0
+  ) {
+    return {
+      statusCode: 200,
+      message: "No saved addresses",
+      data: {
+        extractingAddressFromAddressIds: [],
+        addressId: [],
+      },
+      success: true,
+    };
+  }
+
   const extractingAddressFromAddressIds = await Address.find(
     {
-      addressId: userSavedAddressIds?.addresses,
+      addressId: { $in: userSavedAddressIds.addresses },
     },
     {
+      addressId: 1,
       formattedAddress: 1,
       addressType: 1,
       flatOrFloorNumber: 1,
