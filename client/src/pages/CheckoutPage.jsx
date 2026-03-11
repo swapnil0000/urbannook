@@ -499,7 +499,17 @@ const CheckoutPage = () => {
             const orderId = response.razorpay_order_id;
             const paymentId = response.razorpay_payment_id;
             const signature = response.razorpay_signature;
-            navigate(`/payment-processing/${orderId}`);
+            
+            // Show immediate success feedback
+            showNotification("Payment successful! Processing your order...", "success");
+            
+            // Clear cart immediately (optimistic)
+            dispatch(clearCart());
+            
+            // Navigate with optimistic state
+            navigate(`/payment-processing/${orderId}`, { 
+              state: { optimistic: true, paymentId, signature } 
+            });
           } catch (verifyError) {
             console.error("Payment handler error:", verifyError);
             setPaymentError(

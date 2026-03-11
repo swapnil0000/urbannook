@@ -436,7 +436,7 @@ const MyOrdersPage = () => {
                                   ₹{(price * qty).toLocaleString()}
                                 </p>
                                 <p className="text-gray-400 text-[10px]">
-                                  ₹{price} ea
+                                  ₹{price} 
                                 </p>
                               </div>
                             </div>
