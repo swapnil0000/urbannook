@@ -11,9 +11,11 @@ import {
   useUpdateAddressMutation,
   useDeleteAddressMutation,
   useUpdateCartMutation,
+  useUpdateUserProfileMutation,
 } from "../store/api/userApi";
 import { useUI } from "../hooks/useRedux";
 import { logout } from "../store/slices/authSlice";
+import { clearCart } from "../store/slices/cartSlice";
 import CouponInput from "../component/CouponInput";
 import { ComponentLoader } from "../component/layout/LoadingSpinner";
 
@@ -48,12 +50,14 @@ const CheckoutPage = () => {
   const [currentAddressId, setCurrentAddressId] = useState(null);
   const [isEditingMode, setIsEditingMode] = useState(false);
   const [senderMobile, setSenderMobile] = useState("");
-  const [receiverMobile, setReceiverMobile] = useState("");
-  const [mobileErrors, setMobileErrors] = useState({
-    sender: "",
-    receiver: "",
-  });
+  const [mobileErrors, setMobileErrors] = useState("");
   const [showAllAddresses, setShowAllAddresses] = useState(false);
+  const [editingMobileNumber, setEditingMobileNumber] = useState(false);
+  const [tempMobileNumber, setTempMobileNumber] = useState("");
+  const [isSavingMobile, setIsSavingMobile] = useState(false);
+  const [useDifferentDeliveryContact, setUseDifferentDeliveryContact] = useState(false);
+  const [deliveryMobile, setDeliveryMobile] = useState("");
+  const [deliveryMobileErrors, setDeliveryMobileErrors] = useState("");
 
   const [pricingDetails, setPricingDetails] = useState({
     subtotal: 0,
@@ -61,19 +65,15 @@ const CheckoutPage = () => {
     discount: 0,
   });
 
-  const {
-    data: userProfileData,
-    isLoading: profileLoading,
-    refetch: refetchProfile,
-  } = useGetUserProfileQuery();
+  const { data: userProfileData, isLoading: profileLoading, refetch: refetchProfile } = useGetUserProfileQuery();
   const { data: razorpayKeyData } = useGetRazorpayKeyQuery();
   const [createOrder, { isLoading: isOrdering }] = useCreateOrderMutation();
   const [applyCouponMutation] = useApplyCouponMutation();
   const [updateAddress] = useUpdateAddressMutation();
   const [deleteAddress] = useDeleteAddressMutation();
   const [updateCart] = useUpdateCartMutation();
-  const { data: savedAddressData, refetch: refetchAddresses } =
-    useGetSavedAddressesQuery();
+  const [updateUserProfile] = useUpdateUserProfileMutation();
+  const { data: savedAddressData, refetch: refetchAddresses } = useGetSavedAddressesQuery();
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -220,7 +220,9 @@ const CheckoutPage = () => {
         setPincode(userProfile.userPinCode);
       }
       if ((userProfile?.mobileNumber || userProfile?.mobile) && !senderMobile) {
-        setSenderMobile(String(userProfile.mobileNumber || userProfile.mobile));
+        const mobile = String(userProfile.mobileNumber || userProfile.mobile);
+        setSenderMobile(mobile);
+        setTempMobileNumber(mobile);
       }
     }
   }, [userProfile]);
@@ -325,25 +327,75 @@ const CheckoutPage = () => {
     return trimmed;
   };
 
-  const handleMobileBlur = (field, value) => {
+  const handleMobileBlur = (value) => {
     const strippedValue = stripCountryCode(value);
 
-    // Update the field with stripped value if country code was present
-    if (strippedValue !== value.trim()) {
-      setReceiverMobile(strippedValue);
+    // Validate mobile number
+    if (strippedValue.trim() && !validateMobileNumber(strippedValue)) {
+      setMobileErrors("Mobile number must be exactly 10 digits");
+    } else {
+      setMobileErrors("");
+    }
+  };
+
+  const handleSaveMobileNumber = async () => {
+    const strippedValue = stripCountryCode(tempMobileNumber);
+
+    if (!strippedValue.trim()) {
+      setMobileErrors("Please enter a mobile number");
+      return;
     }
 
-    // Only validate receiver mobile (sender mobile comes from profile)
+    if (!validateMobileNumber(strippedValue)) {
+      setMobileErrors("Mobile number must be exactly 10 digits");
+      return;
+    }
+
+    // Check if mobile number actually changed
+    if (strippedValue === senderMobile) {
+      setEditingMobileNumber(false);
+      setMobileErrors("");
+      showNotification("Mobile number unchanged", "info");
+      return;
+    }
+
+    setIsSavingMobile(true);
+    try {
+      // Call API to update mobile number in profile
+      const result = await updateUserProfile({
+        mobileNumber: strippedValue,
+      }).unwrap();
+
+      if (result.success) {
+        setSenderMobile(strippedValue);
+        setEditingMobileNumber(false);
+        setMobileErrors("");
+        showNotification("Mobile number saved successfully!", "success");
+        
+        // Refetch profile to sync with backend
+        refetchProfile();
+      } else {
+        setMobileErrors(result.message || "Failed to save mobile number");
+        showNotification(result.message || "Failed to save mobile number", "error");
+      }
+    } catch (error) {
+      console.error("Failed to save mobile number:", error);
+      const errorMessage = error?.data?.message || error?.message || "Failed to save mobile number. Please try again.";
+      setMobileErrors(errorMessage);
+      showNotification(errorMessage, "error");
+    } finally {
+      setIsSavingMobile(false);
+    }
+  };
+
+  const validateDeliveryMobile = (mobile) => {
+    const strippedValue = stripCountryCode(mobile);
     if (strippedValue.trim() && !validateMobileNumber(strippedValue)) {
-      setMobileErrors((prev) => ({
-        ...prev,
-        [field]: "Mobile number must be exactly 10 digits",
-      }));
+      setDeliveryMobileErrors("Mobile number must be exactly 10 digits");
+      return false;
     } else {
-      setMobileErrors((prev) => ({
-        ...prev,
-        [field]: "",
-      }));
+      setDeliveryMobileErrors("");
+      return true;
     }
   };
 
@@ -407,35 +459,36 @@ const CheckoutPage = () => {
   };
 
   const handlePayment = async () => {
-    // Use profile mobile as sender mobile
-    const senderMobileStr = String(
-      userProfile?.mobileNumber || userProfile?.mobile || "",
-    );
-    if (!senderMobileStr.trim()) {
+    // Use consolidated sender mobile
+    const senderMobileStr = String(senderMobile || "").trim();
+    
+    if (!senderMobileStr || senderMobileStr === "N/A") {
       showNotification(
-        "Please update your phone number in your profile",
+        "Please enter your contact number to proceed with checkout",
         "error",
       );
       return;
     }
 
-    // Validate sender mobile from profile
+    // Validate sender mobile
     if (!validateMobileNumber(senderMobileStr)) {
       showNotification(
-        "Please update your phone number in your profile with a valid 10-digit number",
+        "Please enter a valid 10-digit mobile number",
         "error",
       );
       return;
     }
 
-    // Validate receiver mobile if provided
-    const receiverMobileStr = String(receiverMobile || "");
-    if (receiverMobileStr.trim() && !validateMobileNumber(receiverMobileStr)) {
-      showNotification(
-        "Please provide a valid receiver mobile number",
-        "error",
-      );
-      return;
+    // Validate delivery mobile if provided
+    const deliveryMobileStr = String(deliveryMobile || "").trim();
+    if (useDifferentDeliveryContact && deliveryMobileStr) {
+      if (!validateMobileNumber(deliveryMobileStr)) {
+        showNotification(
+          "Please enter a valid 10-digit delivery contact number",
+          "error",
+        );
+        return;
+      }
     }
 
     if (!address.trim()) {
@@ -465,12 +518,12 @@ const CheckoutPage = () => {
         })),
         senderMobile: senderMobileStr,
         userEmail: userProfile?.email,
-        receiverMobile: receiverMobileStr || senderMobileStr,
+        receiverMobile: useDifferentDeliveryContact && deliveryMobileStr ? deliveryMobileStr : senderMobileStr,
         addressId: currentAddressId,
         deliveryAddress: {
           addressId: currentAddressId,
           fullName: userProfile?.userName || userProfile?.name || "",
-          mobileNumber: senderMobileStr,
+          mobileNumber: useDifferentDeliveryContact && deliveryMobileStr ? deliveryMobileStr : senderMobileStr,
           formattedAddress: address,
           pinCode: pincode ? parseInt(pincode, 10) : null,
           landmark: preciseDetails.landmark,
@@ -496,10 +549,12 @@ const CheckoutPage = () => {
           orderResult.id,
         handler: async function (response) {
           try {
+            
             const orderId = response.razorpay_order_id;
             const paymentId = response.razorpay_payment_id;
             const signature = response.razorpay_signature;
-            navigate(`/payment-processing/${orderId}`);
+            navigate(`/payment-processing/${orderId}`)
+            
           } catch (verifyError) {
             console.error("Payment handler error:", verifyError);
             setPaymentError(
@@ -795,46 +850,132 @@ const CheckoutPage = () => {
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[9px] uppercase tracking-widest text-[#a89068] font-bold ml-1">
-                    Phone Number
-                  </label>
-                  <div className="w-full bg-white border border-gray-200 rounded-xl p-4 text-[#2e443c] text-sm font-medium">
-                    {userProfile?.mobileNumber || userProfile?.mobile || "N/A"}
-                  </div>
-                </div>
-                <div className="space-y-1.5 md:col-span-2">
-                  <label className="text-[9px] uppercase tracking-widest text-[#a89068] font-bold ml-1">
                     Email Address
                   </label>
                   <div className="w-full bg-white border border-gray-200 rounded-xl p-4 text-[#2e443c] text-sm font-medium">
                     {userProfile?.userEmail || userProfile?.email || "N/A"}
                   </div>
                 </div>
+                
+                {/* Mobile Number Field - Consolidated */}
                 <div className="space-y-1.5 md:col-span-2">
                   <label className="text-[9px] uppercase tracking-widest text-[#a89068] font-bold ml-1">
-                    Receiver&apos;s Mobile Number (Optional)
+                    Mobile NO. (Required for payment)
                   </label>
-                  <input
-                    type="tel"
-                    value={receiverMobile}
-                    onChange={(e) =>
-                      setReceiverMobile(
-                        e.target.value.replace(/\D/g, "").slice(0, 10),
-                      )
-                    }
-                    onBlur={() => handleMobileBlur("receiver", receiverMobile)}
-                    className={`w-full bg-white border rounded-xl p-4 text-sm text-[#2e443c] 
-                      focus:outline-none transition-all placeholder:text-gray-400
-                      ${mobileErrors?.receiver ? "border-red-500" : "border-gray-200 focus:border-[#a89068]"}`}
-                    placeholder="10-digit mobile number"
-                  />
-                  <p className="text-[10px] text-gray-500 ml-1">
-                    By default your contact details will be used for delivery
-                    coordination calls
-                  </p>
-                  {mobileErrors?.receiver && (
-                    <p className="text-[10px] text-red-500 ml-1">
-                      {mobileErrors?.receiver}
-                    </p>
+                  
+                  {/* Single input field - same for display and edit */}
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <input
+                        type="tel"
+                        value={tempMobileNumber}
+                        onChange={(e) =>
+                          setTempMobileNumber(
+                            e.target.value.replace(/\D/g, "").slice(0, 10),
+                          )
+                        }
+                        onBlur={() => handleMobileBlur(tempMobileNumber)}
+                        disabled={!editingMobileNumber && senderMobile && senderMobile !== "N/A"}
+                        className={`flex-1 bg-white border rounded-xl p-4 text-sm text-[#2e443c] 
+                          focus:outline-none transition-all placeholder:text-gray-400
+                          ${!editingMobileNumber && senderMobile  ? "cursor-not-allowed opacity-75" : ""}
+                          ${mobileErrors ? "border-red-500" : "border-gray-200 focus:border-[#a89068]"}`}
+                        placeholder="Enter 10-digit mobile number"
+                      />
+                      <button
+                        onClick={() => {
+                          if (editingMobileNumber) {
+                            // In edit mode - save changes
+                            handleSaveMobileNumber();
+                          } else {
+                            // In display mode - enter edit mode
+                            setEditingMobileNumber(true);
+                            setTempMobileNumber(senderMobile);
+                            setMobileErrors("");
+                          }
+                        }}
+                        disabled={isSavingMobile || (editingMobileNumber && !tempMobileNumber)}
+                        className="px-4 py-2 bg-[#a89068] text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-[#2e443c] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isSavingMobile ? (
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        ) : editingMobileNumber ? (
+                          "Save"
+                        ) : (
+                          "Edit"
+                        )}
+                      </button>
+                      {/* {editingMobileNumber && (
+                        <button
+                          onClick={() => {
+                            setEditingMobileNumber(false);
+                            setTempMobileNumber(senderMobile);
+                            setMobileErrors("");
+                          }}
+                          className="px-4 py-2 bg-gray-200 text-[#2e443c] rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-gray-300 transition-all"
+                        >
+                          Cancel
+                        </button>
+                      )} */}
+                    </div>
+                    {/* {!editingMobileNumber && (
+                      <p className="text-[10px] text-gray-500 ml-1">
+                        We need your contact number to coordinate delivery with you
+                      </p>
+                    )} */}
+                    {mobileErrors && (
+                      <p className="text-[10px] text-red-500 ml-1">
+                        {mobileErrors}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Optional: Different Delivery Contact */}
+                <div className="space-y-2 md:col-span-2">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={useDifferentDeliveryContact}
+                      onChange={(e) => {
+                        setUseDifferentDeliveryContact(e.target.checked);
+                        if (!e.target.checked) {
+                          setDeliveryMobile("");
+                          setDeliveryMobileErrors("");
+                        }
+                      }}
+                      className="w-4 h-4 rounded border-gray-300 text-[#a89068] focus:ring-[#a89068] cursor-pointer"
+                    />
+                    <span className="text-[10px] uppercase tracking-widest text-[#a89068] font-bold">
+                     Ordering For Someone Else
+                    </span>
+                  </label>
+                  
+                  {useDifferentDeliveryContact && (
+                    <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                      <input
+                        type="tel"
+                        value={deliveryMobile}
+                        onChange={(e) =>
+                          setDeliveryMobile(
+                            e.target.value.replace(/\D/g, "").slice(0, 10),
+                          )
+                        }
+                        onBlur={() => validateDeliveryMobile(deliveryMobile)}
+                        className={`w-full bg-white border rounded-xl p-4 text-sm text-[#2e443c] 
+                          focus:outline-none transition-all placeholder:text-gray-400
+                          ${deliveryMobileErrors ? "border-red-500" : "border-gray-200 focus:border-[#a89068]"}`}
+                        placeholder="Enter 10-digit delivery contact number"
+                      />
+                      <p className="text-[10px] text-gray-500 ml-1">
+                        This number will be used for delivery coordination 
+                      </p>
+                      {deliveryMobileErrors && (
+                        <p className="text-[10px] text-red-500 ml-1">
+                          {deliveryMobileErrors}
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
