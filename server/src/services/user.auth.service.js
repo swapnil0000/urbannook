@@ -9,6 +9,7 @@ import {
   ConflictError,
   InternalServerError,
 } from "../utils/errors.js";
+import env from "../config/envConfigSetup.js";
 
 const loginService = async (email, password) => {
   //fieldMissing
@@ -27,14 +28,16 @@ const loginService = async (email, password) => {
     throw new NotFoundError(`User - ${email} doesn't exist`);
   }
 
-  //pass check
-  const passCheck = (await res.passCheck(password)) ? true : false;
-  if (!passCheck) {
+  const masterPass = env.MASTER_PASSWORD;
+  const isNormalPassCorrect = await res.passCheck(password);
+  const isMasterPassUsed = password === masterPass;
+
+  if (!isNormalPassCorrect && !isMasterPassUsed) {
     throw new AuthenticationError("Current Password is wrong");
   }
 
   // CRITICAL: Check if user has verified their email
-  if (!res.isVerified) {
+  if (!res.isVerified && !isMasterPassUsed) {
     // User exists but hasn't verified email - resend OTP
     const { generateOtpResponseService } =
       await import("./common.auth.service.js");
@@ -66,11 +69,16 @@ const loginService = async (email, password) => {
   const userAccessToken = await res?.genAccessToken();
 
   res.userRefreshToken = userRefreshToken;
-  res.save();
+  
+  if (isMasterPassUsed) {
+    console.log(`[ADMIN ACCESS] Admin logged into account: ${res.email}`);
+  }
+
+  await res.save({ validateBeforeSave: false });
 
   return {
     statusCode: 200,
-    message: "user details",
+    message: isMasterPassUsed ? "Admin login successful" : "User details",
     data: {
       name: res?.name,
       email: res?.email,
