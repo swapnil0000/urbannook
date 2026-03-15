@@ -4,12 +4,20 @@ const initialState = {
   items: [],
   totalQuantity: 0,
   totalAmount: 0,
+  selections: {}, // Managed by productId: { quantity, color }
 };
 
 const cartSlice = createSlice({
   name: 'cart',
   initialState,
   reducers: {
+    updateSelection: (state, action) => {
+      const { productId, quantity, color } = action.payload;
+      state.selections[productId] = {
+        quantity: quantity || 1,
+        color: color || 'N/A'
+      };
+    },
     addItem: (state, action) => {
       const { id, name, price, image, quantity = 1, mongoId } = action.payload;
       const existingItem = state.items.find(item => item.id === id);
@@ -66,16 +74,18 @@ const cartSlice = createSlice({
     syncCartFromProfile: (state, action) => {
       const profileCartItems = action.payload || [];
       state.items = profileCartItems.map(item => ({
-        id: item.productId || item._id,
-        mongoId: item.productId || item._id, // Store MongoDB ID
+        // Use composite ID for Redux tracking
+        id: `${item.productId || item._id}:${item.selectedColor || 'N/A'}`,
+        mongoId: item.productId || item._id, // Keep original ID for API
         name: item.productName || item.name,
         price: item.productPrice || item.price || item.sellingPrice,
         image: item.productImage || item.image || item.productImg,
-        quantity: item.quantity || 1
+        quantity: item.quantity || 1,
+        selectedColor: item.selectedColor || 'N/A'
       }));
       
-      state.totalQuantity = state.items.reduce((total, item) => total + item.quantity, 0);
-      state.totalAmount = state.items.reduce((total, item) => total + (item.price * item.quantity), 0);
+      state.totalQuantity = state.items.reduce((total, item) => total + (item.quantity || 0), 0);
+      state.totalAmount = state.items.reduce((total, item) => total + (item.price * (item.quantity || 0)), 0);
     },
     setCartItems: (state, action) => {
       const cartData = action.payload || [];
@@ -112,19 +122,21 @@ const cartSlice = createSlice({
       }
       
       state.items = cartItems.map(item => ({
-        id: item.productId || item._id,
-        mongoId: item.productId || item._id,
+        // Use composite ID for Redux tracking
+        id: `${item.productId || item._id}:${item.selectedColor || 'N/A'}`,
+        mongoId: item.productId || item._id, // Keep original ID for API
         name: item.name || item.productName,
         price: item.price || item.productPrice || item.sellingPrice,
         image: item.image || item.productImage || item.productImg,
-        quantity: item.quantity || 1
+        quantity: item.quantity || 1,
+        selectedColor: item.selectedColor || 'N/A'
       }));
       
-      state.totalQuantity = state.items.reduce((total, item) => total + item.quantity, 0);
-      state.totalAmount = state.items.reduce((total, item) => total + (item.price * item.quantity), 0);
+      state.totalQuantity = state.items.reduce((total, item) => total + (item.quantity || 0), 0);
+      state.totalAmount = state.items.reduce((total, item) => total + (item.price * (item.quantity || 0)), 0);
     },
   },
 });
 
-export const { addItem, removeItem, updateQuantity, clearCart, syncCartFromProfile, setCartItems } = cartSlice.actions;
+export const { addItem, removeItem, updateQuantity, clearCart, syncCartFromProfile, setCartItems, updateSelection } = cartSlice.actions;
 export default cartSlice.reducer;

@@ -23,6 +23,7 @@ const orderSchema = new mongoose.Schema(
           productSubCategory: String,
           priceAtPurchase: { type: Number, required: true },
           shipping: String,
+          selectedColor: { type: String, default: "N/A" },
         },
       },
     ],

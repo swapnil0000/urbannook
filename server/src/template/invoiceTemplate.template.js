@@ -67,7 +67,12 @@ export const generateInvoiceHtmlTemplate = (order) => {
           <tbody>
             ${order.items.map(item => `
               <tr>
-                <td>${item.productSnapshot.productName}</td>
+                <td>
+                  ${item.productSnapshot.productName}
+                  ${item.productSnapshot.selectedColor && item.productSnapshot.selectedColor !== 'N/A' 
+                    ? `<br/><small style="color: #666;">Color: ${item.productSnapshot.selectedColor}</small>` 
+                    : ''}
+                </td>
                 <td class="center">${item.productSnapshot.quantity}</td>
                 <td class="center">₹${item.productSnapshot.priceAtPurchase}</td>
                 <td class="center">₹${item.productSnapshot.priceAtPurchase * item.productSnapshot.quantity}</td>

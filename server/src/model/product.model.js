@@ -11,6 +11,9 @@ const productSchema = mongoose.Schema(
       required: [true, "productId is required"],
       unique: true,
     },
+    color: {
+      type: [String],
+    },
     uiProductId: {
       type: String,
       required: [true, "uiProductId is required"],

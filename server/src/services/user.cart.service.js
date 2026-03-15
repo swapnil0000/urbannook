@@ -9,7 +9,7 @@ import {
   AuthenticationError,
 } from "../utils/errors.js";
 
-const addToCartService = async ({ userId, productId }) => {
+const addToCartService = async ({ userId, productId, productQuanity, color }) => {
   const userAndProductIdValidation = cartDetailsMissing(userId, productId);
   if (!userAndProductIdValidation?.success) {
     throw new ValidationError(
@@ -29,42 +29,44 @@ const addToCartService = async ({ userId, productId }) => {
 
   const productDetails = await Product.findOne(
     { productId },
-    { productName: 1 },
+    { productName: 1, color: 1 },
   ).lean();
 
   if (!productDetails) {
     throw new NotFoundError(`productDetails not found with ${productId}`);
   }
 
-  const key = `products.${productId}`;
+  // Determine the effective color
+  let selectedColor = color;
+  if (!selectedColor || selectedColor === "N/A") {
+    selectedColor =
+      productDetails.color && productDetails.color.length > 0
+        ? productDetails.color[0]
+        : "N/A";
+  }
 
-  /*
-   Existing Cart check and Updating are seperated intentionally because 
-   MongoDB update queries do not reliably tell whether a field already existed or was newly added, 
-   which makes it difficult to return the correct business message ("Added" vs "Already in cart").
-   */
-  const cart = await Cart.findOne({
-    userId,
-    [key]: { $exists: true },
-  }).lean();
+  // Composite Key for Map: productId:color
+  const cartKey = `${productId}:${selectedColor}`;
+  const key = `products.${cartKey}`;
 
-  if (cart) {
+  const cart = await Cart.findOne({ userId }).lean();
+
+  if (cart && cart.products && cart.products[cartKey]) {
     return {
       statusCode: 200,
       message: "Already in cart",
-      data: `User - ${userDetails.name}, Product - ${productDetails.productName}`,
+      data: `User - ${userDetails.name}, Product - ${productDetails.productName} (${selectedColor})`,
       success: true,
     };
   }
 
-  /* Cart Structure -> userId -> user mongooseId , product -> key : value -> product mongooseId : 1 
-    Here quantity is saved with 1 always - to update we use different endpoints
-  */
   await Cart.findOneAndUpdate(
     { userId },
     {
       $setOnInsert: { userId },
-      $set: { [key]: 1 },
+      $set: {
+        [key]: { quantity: productQuanity || 1, selectedColor },
+      },
     },
     { upsert: true },
   );
@@ -72,7 +74,7 @@ const addToCartService = async ({ userId, productId }) => {
   return {
     statusCode: 200,
     message: `Added to cart`,
-    data: `User - ${userDetails?.name} and Product Name :${productDetails.productName}`,
+    data: `User - ${userDetails?.name}, Product: ${productDetails.productName} (${selectedColor})`,
     success: true,
   };
 };
@@ -87,9 +89,17 @@ const getCartService = async ({ userId }) => {
     { $project: { items: { $objectToArray: "$products" } } },
     { $unwind: "$items" },
     {
+      $addFields: {
+        // Composite key split: productId:color
+        extractedProductId: {
+          $arrayElemAt: [{ $split: ["$items.k", ":"] }, 0],
+        },
+      },
+    },
+    {
       $lookup: {
         from: "products",
-        localField: "items.k",
+        localField: "extractedProductId",
         foreignField: "productId",
         as: "product",
       },
@@ -104,14 +114,27 @@ const getCartService = async ({ userId }) => {
       $project: {
         _id: 0,
         productId: "$product.productId",
+        cartKey: "$items.k", // Keep full key for updates
         name: "$product.productName",
         price: "$product.sellingPrice",
         image: "$product.productImg",
-        quantity: "$items.v",
+        quantity: {
+          $cond: {
+            if: { $isNumber: "$items.v" },
+            then: "$items.v",
+            else: { $ifNull: ["$items.v.quantity", 0] },
+          },
+        },
+        selectedColor: {
+          $cond: {
+            if: { $isNumber: "$items.v" },
+            then: "N/A",
+            else: { $ifNull: ["$items.v.selectedColor", "N/A"] },
+          },
+        },
         stock: "$product.productQuantity",
         productStatus: "$product.productStatus",
         productFound: 1,
-        // Calculation eligibility: Stock check and Status check
         isEligibleForCalc: {
           $cond: {
             if: { $gt: ["$productFound", 0] },
@@ -137,7 +160,7 @@ const getCartService = async ({ userId }) => {
                 $and: [
                   "$isEligibleForCalc",
                   { $isNumber: "$price" },
-                  { $isNumber: "$quantity" },
+                  { $gt: ["$quantity", 0] },
                 ],
               },
               { $multiply: [{ $ifNull: ["$price", 0] }, { $ifNull: ["$quantity", 0] }] },
@@ -195,7 +218,7 @@ const getCartService = async ({ userId }) => {
   };
 };
 
-const cartQuantityService = async ({ userId, productId, quantity, action }) => {
+const cartQuantityService = async ({ userId, productId, quantity, action, color }) => {
   if (!userId) {
     throw new AuthenticationError("Unauthorized");
   }
@@ -211,28 +234,47 @@ const cartQuantityService = async ({ userId, productId, quantity, action }) => {
   }
 
   const productQuanityMap = cartDetails.products;
-  const cartHasProductOrNot = productQuanityMap.has(String(productId));
-
-  if (!cartHasProductOrNot) {
-    throw new ValidationError("Product not in cart");
+  
+  // Try to find by composite key first, fallback to plain productId
+  let selectedColor = color || "N/A";
+  let cartKey = `${productId}:${selectedColor}`;
+  
+  if (!productQuanityMap.has(cartKey)) {
+    // Fallback check if it was stored without color (legacy)
+    if (productQuanityMap.has(String(productId))) {
+      cartKey = String(productId);
+    } else {
+      throw new ValidationError("Product variant not in cart");
+    }
   }
 
-  const productQuantity = productQuanityMap.get(productId);
+  let itemData = productQuanityMap.get(cartKey);
+  let currentQty = typeof itemData === "object" ? itemData.quantity : itemData;
+
   switch (action) {
     case "add":
-      productQuanityMap.set(productId, productQuantity + quantity);
+      currentQty += quantity;
       break;
     case "sub":
-      if (productQuantity <= quantity) {
+      if (currentQty <= quantity) {
         throw new ValidationError("Cannot reduce below 1. Use remove instead.");
       }
-      productQuanityMap.set(productId, productQuantity - quantity);
+      currentQty -= quantity;
       break;
     case "remove":
-      productQuanityMap.delete(productId);
+      productQuanityMap.delete(cartKey);
       break;
     default:
       throw new ValidationError("Invalid action");
+  }
+
+  if (action !== "remove") {
+    if (typeof itemData === "object") {
+      const updatedItemData = { ...itemData, quantity: currentQty };
+      productQuanityMap.set(cartKey, updatedItemData);
+    } else {
+      productQuanityMap.set(cartKey, currentQty);
+    }
   }
 
   await cartDetails.save();
