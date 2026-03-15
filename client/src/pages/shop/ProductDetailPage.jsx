@@ -267,10 +267,10 @@ const ProductDetailPage = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-20 items-start">
           <div
-            className="lg:col-span-6 w-full lg:sticky lg:top-24 lg:self-start"
+            className="lg:col-span-6 w-full lg:sticky lg:top-24 flex flex-col items-center justify-center"
             style={{ maxHeight: 'calc(100vh - 6rem)' }}
           >
-            <div className="relative max-w-[500px] max-h-[520px] lg:max-h-[600px] rounded-2xl overflow-hidden shadow-2xl group mx-auto w-full">
+            <div className="relative max-w-[500px] max-h-[520px] lg:max-h-[600px] rounded-2xl overflow-hidden shadow-2xl group w-full">
               <div className="w-full h-full relative cursor-pointer flex items-center justify-center">
                   <div key={currentImageIndex}>
                     <Suspense fallback={<div className="w-full h-full bg-gray-200 animate-pulse rounded-lg"></div>}>
@@ -302,7 +302,7 @@ const ProductDetailPage = () => {
               )}
             </div>
 
-            <div className="flex gap-3 mt-6 overflow-x-auto pb-2 justify-center px-2">
+            <div className="flex gap-3 mt-6 overflow-x-auto pb-2 justify-center px-2 md:max-w-[500px] max-w-[350px]">
               {galleryImages.map((img, idx) => (
                 <button
                   key={idx}
