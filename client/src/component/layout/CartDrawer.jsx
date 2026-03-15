@@ -16,21 +16,16 @@ const CartDrawer = ({ isOpen, onClose }) => {
   const [updateCart] = useUpdateCartMutation();
 
   // Handle animation mounting
-useEffect(() => {
-    // Agar drawer open ho raha hai
+  useEffect(() => {
     if (isOpen) {
       setMounted(true);
-      document.body.style.overflow = 'hidden'; // Scroll rok do
-      
-      // Cleanup function: Jab drawer close ho, style ko wapas normal kar do
+      document.body.style.overflow = 'hidden'; 
       return () => {
         document.body.style.overflow = ''; 
       };
     } 
-    // Agar drawer close ho raha hai (ya initially closed hai)
     else {
       const timer = setTimeout(() => setMounted(false), 300);
-      // Yahan humne style ko touch nahi kiya, taaki initial load pe jhatka na lage
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
@@ -42,36 +37,31 @@ useEffect(() => {
     }
 
     try {
-      // Find the item to get mongoId and current quantity for backend sync
       const item = cartItems.find(item => item.id === productId);
       const mongoId = item?.mongoId || productId;
-      const currentQty = item?.quantity || 0;
       
-      // Determine action based on quantity change
+      // SAFE CHECK: Handles both flat number and nested object
+      const currentQty = typeof item?.quantity === 'object' ? Number(item.quantity?.quantity || 0) : Number(item?.quantity || 0);
+      const selectedColor = item?.selectedColor || 'N/A';
+      
       const action = newQuantity > currentQty ? 'add' : 'sub';
       
-      // Call API with quantity=1 (the amount to change, not the new total)
-      // RTK Query will automatically invalidate and refetch
-      await updateCart({ productId: mongoId, quantity: 1, action }).unwrap();
+      await updateCart({ productId: mongoId, quantity: 1, action, color: selectedColor }).unwrap();
     } catch (error) {
       console.error('Failed to update cart:', error);
-      // Revert local state on error
       window.location.reload();
     }
   };
 
   const handleRemoveItem = async (productId) => {
     try {
-      // Find the item to get mongoId for backend sync
       const item = cartItems.find(item => item.id === productId);
       const mongoId = item?.mongoId || productId;
+      const selectedColor = item?.selectedColor || 'N/A';
       
-      // Call API with action='remove' (quantity is ignored by backend for remove action)
-      // RTK Query will automatically invalidate and refetch
-      await updateCart({ productId: mongoId, quantity: 1, action: 'remove' }).unwrap();
+      await updateCart({ productId: mongoId, quantity: 1, action: 'remove', color: selectedColor }).unwrap();
     } catch (error) {
       console.error('Failed to remove item:', error);
-      // Revert local state on error
       window.location.reload();
     }
   };
@@ -84,7 +74,6 @@ useEffect(() => {
   if (!mounted && !isOpen) return null;
 
   const subtotal = totalAmount;
-  // UPDATED: Threshold changed to 300
   const freeShippingThreshold = 300; 
   const progress = Math.min((subtotal / freeShippingThreshold) * 100, 100);
   const remainingForFreeShip = freeShippingThreshold - subtotal;
@@ -92,7 +81,7 @@ useEffect(() => {
   return (
     <div className="fixed inset-0 z-[9999] flex justify-end">
       
-      {/* Backdrop (Darker & Blurring for focus) */}
+      {/* Backdrop */}
       <div 
         className={`absolute inset-0 bg-[#0a110e]/60 backdrop-blur-sm transition-opacity duration-300 ${
           isOpen ? 'opacity-100' : 'opacity-0'
@@ -102,29 +91,29 @@ useEffect(() => {
 
       {/* Drawer Panel */}
       <div 
-        className={`relative w-full max-w-[400px] bg-white h-full shadow-2xl flex flex-col transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] transform ${
+        className={`relative w-full max-w-[420px] bg-white h-full shadow-2xl flex flex-col transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] transform ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
         
         {/* --- HEADER --- */}
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-white z-10">
+        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-white z-10 shrink-0">
           <div>
             <h2 className="text-2xl font-serif text-[#0a110e] tracking-tight">Your Nook</h2>
-            <p className="text-xs font-medium text-gray-400 uppercase tracking-widest mt-1">
-              {cartItems.length} {cartItems.length === 1 ? 'Item' : 'Items'}
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
+              {cartItems.length} {cartItems.length === 1 ? 'ITEM' : 'ITEMS'}
             </p>
           </div>
           <button 
             onClick={onClose}
-            className="group w-10 h-10 rounded-full border border-gray-100 flex items-center justify-center text-gray-400 hover:bg-[#0a110e] hover:border-[#0a110e] hover:text-white transition-all duration-300"
+            className="group w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-[#0a110e] transition-all duration-300"
           >
-            <i className="fa-solid fa-xmark text-lg group-hover:rotate-90 transition-transform duration-300"></i>
+            <i className="fa-solid fa-xmark text-sm group-hover:rotate-90 transition-transform duration-300"></i>
           </button>
         </div>
 
         {/* --- SCROLLABLE CONTENT --- */}
-        <div className="flex-1 overflow-y-auto p-8 scrollbar-hide">
+        <div className="flex-1 overflow-y-auto p-6 md:p-8 scrollbar-hide">
           
           {cartItems.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center space-y-6 opacity-80">
@@ -142,72 +131,100 @@ useEffect(() => {
                   onClose();
                   navigate('/products');
                 }}
-                className="px-8 py-3.5 bg-[#0a110e] text-white text-xs font-bold uppercase tracking-[0.15em] rounded-full hover:bg-emerald-700 hover:shadow-lg hover:shadow-emerald-900/20 transition-all duration-300"
+                className="px-8 py-3.5 bg-[#0a110e] text-white text-xs font-bold uppercase tracking-[0.15em] rounded-full hover:bg-[#1a2b24] transition-all duration-300"
               >
                 Start Exploring
               </button>
             </div>
           ) : (
             <>
-
               {/* Items List */}
-              <div className="space-y-8">
-                {cartItems.map((item) => (
-                  <div key={item.id} className="flex gap-5 group relative">
-                    
-                    {/* Image */}
-                    <div className="w-24 h-28 bg-gray-50 rounded-lg overflow-hidden shrink-0 relative border border-gray-100">
-                      <Suspense fallback={<div className="w-full h-full bg-gray-200 animate-pulse"></div>}>
-                        <OptimizedImage
-                          src={item.image || '/placeholder.jpg'}
-                          alt={item.name}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                      </Suspense>
-                    </div>
-                    
-                    {/* Details */}
-                    <div className="flex-1 flex flex-col justify-between py-1">
-                      <div>
-                        <div className="flex justify-between items-start">
-                             <h4 className="text-base font-serif text-[#0a110e] leading-snug pr-4 hover:text-emerald-700 transition-colors cursor-pointer">
-                                {item.name}
-                             </h4>
-                             {/* Remove Button (Top Right) */}
-                             <button 
-                                onClick={() => handleRemoveItem(item.id)}
-                                className="text-gray-300 hover:text-red-500 transition-colors p-1"
-                             >
-                                <i className="fa-regular fa-trash-can text-sm"></i>
-                             </button>
-                        </div>
-                        <p className="text-xs text-gray-400 mt-1 font-medium tracking-wide">Standard Variant</p>
-                      </div>
+              <div className="space-y-6">
+                {cartItems.map((item) => {
+                  // Mongoose bug safe extraction
+                  const itemQty = typeof item.quantity === 'object' ? Number(item.quantity?.quantity || 0) : Number(item.quantity || 0);
 
-                      <div className="flex items-center justify-between mt-3">
-                        {/* Quantity UI */}
-                        <div className="flex items-center gap-4 bg-white border border-gray-200 rounded-full h-8 px-3 shadow-sm">
-                          <button 
-                            onClick={() => handleQuantityChange(item.id, Math.max(0, item.quantity - 1))}
-                            className="text-gray-400 hover:text-[#0a110e] transition-colors w-4 flex justify-center"
-                          >
-                            <i className="fa-solid fa-minus text-[10px]"></i>
-                          </button>
-                          <span className="text-xs font-bold text-[#0a110e] min-w-[12px] text-center">{item.quantity}</span>
-                          <button 
-                            onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
-                            className="text-gray-400 hover:text-[#0a110e] transition-colors w-4 flex justify-center"
-                          >
-                            <i className="fa-solid fa-plus text-[10px]"></i>
-                          </button>
+                  return (
+                    <div key={item.id} className="flex items-stretch gap-4 group relative pb-6 border-b border-gray-50 last:border-0 last:pb-0">
+                      
+                      {/* Image */}
+                      <div className="w-[85px] h-[85px] bg-gray-50 rounded-2xl overflow-hidden shrink-0 relative border border-gray-100 flex items-center justify-center">
+                        <Suspense fallback={<div className="w-full h-full bg-gray-100 animate-pulse"></div>}>
+                          <OptimizedImage
+                            src={item.image || '/placeholder.jpg'}
+                            alt={item.name}
+                            className="w-full h-full object-contain p-2 mix-blend-multiply"
+                            loading="lazy"
+                          />
+                        </Suspense>
+                      </div>
+                      
+                      {/* Details */}
+                      <div className="flex-1 flex flex-col min-w-0 justify-between min-h-[85px]">
+                        
+                        <div>
+                          {/* Name & Delete */}
+                          <div className="flex justify-between items-start mb-1">
+                            <h4 className="text-base font-serif text-[#0a110e] leading-snug pr-4 hover:text-emerald-700 transition-colors cursor-pointer">
+                              {item.name}
+                            </h4>
+                            <button 
+                              onClick={() => handleRemoveItem(item.id)}
+                              className="text-gray-300 hover:text-red-500 transition-colors p-1 -mt-1 -mr-1 shrink-0"
+                              title="Remove Item"
+                            >
+                              <i className="fa-regular fa-trash-can text-sm"></i>
+                            </button>
+                          </div>
+                          
+                          <p className="text-xs text-gray-400 mt-1 font-medium tracking-wide">
+                            {item.category || "Standard Variant"}
+                          </p>
+
+                          {/* Color Selection (If Exists) */}
+                          {item.selectedColor && item.selectedColor !== 'N/A' && (
+                            <div className="flex items-center gap-1.5 mb-2">
+                              <div 
+                                className="w-2.5 h-2.5 rounded-full border border-gray-200 shadow-sm"
+                                style={{ 
+                                  background: item.selectedColor.toLowerCase() === 'rainbow' 
+                                    ? 'linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)' 
+                                    : item.selectedColor.replace(/\s+/g, '').toLowerCase() 
+                                }}
+                              ></div>
+                              <span className="text-xs text-gray-400 mt-1 font-medium tracking-wide">{item.selectedColor}</span>
+                            </div>
+                          )}
                         </div>
 
-                        <p className="text-sm font-bold text-[#0a110e]">₹{item.price?.toLocaleString()}</p>
+                        <div className="flex items-center justify-between mt-2">
+                          {/* Quantity Controls - Exact match to your screenshot inspector */}
+                          <div className="flex items-center gap-4 bg-white border border-gray-200 rounded-full h-8 px-3 shadow-sm">
+                            <button 
+                              onClick={() => handleQuantityChange(item.id, Math.max(0, itemQty - 1))}
+                              className="w-4 h-full flex items-center justify-center text-gray-400 hover:text-[#0a110e] transition-colors"
+                            >
+                              <i className="fa-solid fa-minus text-[10px]"></i>
+                            </button>
+                            <span className="text-xs font-bold text-[#0a110e] min-w-[12px] text-center">
+                              {itemQty}
+                            </span>
+                            <button 
+                              onClick={() => handleQuantityChange(item.id, itemQty + 1)}
+                              className="w-4 h-full flex items-center justify-center text-gray-400 hover:text-[#0a110e] transition-colors"
+                            >
+                              <i className="fa-solid fa-plus text-[10px]"></i>
+                            </button>
+                          </div>
+
+                          {/* Price */}
+                          <p className="text-sm font-bold text-[#0a110e]">₹{item.price?.toLocaleString()}</p>
+                        </div>
+
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </>
           )}
@@ -215,13 +232,13 @@ useEffect(() => {
 
         {/* --- FOOTER (CHECKOUT) --- */}
         {cartItems?.length > 0 && (
-          <div className="p-6 bg-white border-t border-gray-100 z-10 shadow-[0_-5px_20px_rgba(0,0,0,0.02)]">
-            <div className="space-y-2 mb-6">
-                <div className="flex justify-between items-center text-sm text-gray-500">
+          <div className="px-6 py-6 bg-white border-t border-gray-100 z-10 shrink-0">
+            <div className="space-y-3 mb-6">
+                <div className="flex justify-between items-center text-[11px] font-bold text-gray-400 uppercase tracking-widest">
                     <span>Subtotal</span>
                     <span className="font-medium text-[#0a110e]">₹{subtotal?.toLocaleString()}</span>
                 </div>
-                <div className="pt-4 border-t border-gray-100 flex justify-between items-end">
+                <div className="pt-3 border-t border-gray-100 flex justify-between items-center">
                     <span className="text-base font-serif text-[#0a110e]">Total</span>
                     <span className="text-xl font-bold text-[#0a110e]">₹{subtotal?.toLocaleString()}</span>
                 </div>
@@ -229,12 +246,12 @@ useEffect(() => {
 
             <button 
               onClick={handleCheckout}
-              className="w-full py-4 bg-[#0a110e] text-white rounded-full font-bold uppercase tracking-[0.15em] text-xs hover:bg-emerald-800 transition-all duration-300 shadow-lg hover:shadow-emerald-900/30 active:scale-[0.98] flex items-center justify-center gap-3"
+              className="w-full py-4 bg-[#0a110e] text-white rounded-full font-bold uppercase tracking-[0.15em] text-[10px] hover:bg-[#1a2b24] transition-all duration-300 active:scale-[0.98] flex items-center justify-between px-6"
             >
                 <span>Proceed to Checkout</span>
                 <i className="fa-solid fa-arrow-right-long"></i>
             </button>
-            <div className="mt-4 flex justify-center items-center gap-2 text-[10px] text-gray-400 uppercase tracking-widest">
+            <div className="mt-4 flex justify-center items-center gap-1.5 text-[9px] text-gray-400 uppercase tracking-widest font-bold">
                 <i className="fa-solid fa-lock"></i>
                 <span>Secure Checkout</span>
             </div>

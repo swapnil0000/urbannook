@@ -134,15 +134,49 @@ const AllProductsPage = () => {
                       
                       <div className="flex justify-between items-end pt-2 border-t border-[#F5DEB3]/10] mt-auto">
                         <div className="flex flex-col">
-                           <span className="text-[10px] uppercase tracking-widest text-gray-500 mb-1">Pricing</span>
-                           <div className="flex items-baseline gap-2">
-                             <span className="text-lg md:text-xl font-semibold text-[#a89068]">
-                               ₹{product.sellingPrice?.toLocaleString()}
-                             </span>
-                             <span className="text-xs text-gray-400 line-through">
-                               ₹{(product.listedPrice || product.sellingPrice * 1.18).toFixed(0)}
-                             </span>
-                           </div>
+                          
+                          {/* --- Available Colors Section --- */}
+                          {product?.color && product.color.length > 0 && (
+                            <div className="mb-3">
+                              <span className="text-[10px] uppercase tracking-widest text-gray-500 mb-1.5 block">
+                                Available Colors
+                              </span>
+                              <div className="flex flex-wrap gap-1.5 items-center">
+                                {/* Sirf pehle 5 colors dikhayenge */}
+                                {product.color.slice(0, 5).map((colorName, idx) => (
+                                  <div
+                                    key={idx}
+                                    title={colorName}
+                                    className="w-4 h-4 rounded-full border border-[#d1d5db] shadow-sm transition-transform hover:scale-110"
+                                    style={
+                                      colorName.toLowerCase() === 'rainbow'
+                                        ? { background: 'linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)' }
+                                        : { backgroundColor: colorName.replace(/\s+/g, '').toLowerCase() }
+                                    }
+                                  ></div>
+                                ))}
+                                
+                                {/* 5 se zyada hone par +X dikhayenge */}
+                                {product.color.length > 5 && (
+                                  <span className="text-[10px] font-medium text-gray-500 ml-1">
+                                    +{product.color.length - 5}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          <span className="text-[10px] uppercase tracking-widest text-gray-500 mb-1 block">
+                            Pricing
+                          </span>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-lg md:text-xl font-semibold text-[#a89068]">
+                              ₹{product.sellingPrice?.toLocaleString()}
+                            </span>
+                            <span className="text-xs text-gray-400 line-through">
+                              ₹{(product.listedPrice || product.sellingPrice * 1.18).toFixed(0)}
+                            </span>
+                          </div>
                            
                         </div>
                         

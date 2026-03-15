@@ -127,12 +127,14 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
 
   const finalAmount = grandTotal;
   const productIds = items.map((i) => i.productId);
+  const uniqueProductIds = [...new Set(productIds)]; // Get unique IDs
+
   const products = await Product.find({
-    productId: { $in: productIds },
+    productId: { $in: uniqueProductIds },
     productStatus: "in_stock",
   });
 
-  if (products.length !== productIds.length) {
+  if (products.length !== uniqueProductIds.length) {
     throw new ValidationError("One or more products unavailable");
   }
 
@@ -154,6 +156,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
         productSubCategory: product.productSubCategory,
         priceAtPurchase: product.sellingPrice,
         shipping: String(summary?.shipping ?? ""),
+        selectedColor: item.color || "N/A",
       },
     };
   });
