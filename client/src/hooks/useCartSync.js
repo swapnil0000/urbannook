@@ -13,6 +13,7 @@ export const useCartSync = () => {
 
   const prevAuthRef = useRef(false);
   const hasMergedRef = useRef(false);
+  const isMergingRef = useRef(false);
 
   const [addToCartAPI] = useAddToCartMutation();
   const [updateCart] = useUpdateCartMutation();
@@ -30,17 +31,21 @@ export const useCartSync = () => {
 
     if (!wasAuth && shouldFetchCart) {
       hasMergedRef.current = false;
+      isMergingRef.current = false;
       refetch();
     }
 
     if (wasAuth && !shouldFetchCart) {
       prevAuthRef.current = false;
       hasMergedRef.current = false;
+      isMergingRef.current = false;
     }
   }, [shouldFetchCart, refetch]);
 
   useEffect(() => {
     if (!cartResponse?.data) return;
+    // Skip normal sync while guest cart merge is in progress
+    if (isMergingRef.current) return;
 
     const backendItems = cartResponse.data?.availableItems || [];
 
@@ -51,6 +56,7 @@ export const useCartSync = () => {
       const guestItems = loadGuestCart();
 
       if (guestItems.length > 0) {
+        isMergingRef.current = true;
         const syncLocal = async () => {
           for (const localItem of guestItems) {
             const productId = localItem.mongoId || localItem.id;
@@ -74,6 +80,7 @@ export const useCartSync = () => {
             }
           }
           clearGuestCart();
+          isMergingRef.current = false;
           const fresh = await refetch();
           if (fresh?.data?.data) {
             const merged = fresh.data.data?.availableItems || [];
@@ -88,8 +95,7 @@ export const useCartSync = () => {
     }
 
     // Normal sync
-    const backendItems2 = cartResponse.data?.availableItems || [];
-    if (backendItems2.length === 0) {
+    if (backendItems.length === 0) {
       dispatch(clearCart());
     } else {
       dispatch(setCartItems(cartResponse.data));
