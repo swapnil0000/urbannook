@@ -27,11 +27,15 @@ const CheckoutPage = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { showNotification, openLoginModal } = useUI();
+  const showNotificationRef = useRef(showNotification);
+  const openLoginModalRef = useRef(openLoginModal);
+  useEffect(() => { showNotificationRef.current = showNotification; }, [showNotification]);
+  useEffect(() => { openLoginModalRef.current = openLoginModal; }, [openLoginModal]);
   const { items: cartItems } = useSelector((state) => state.cart);
   const { isAuthenticated } = useSelector((state) => state.auth);
   const paymentCompletedRef = useRef(false);
   const cartLoadedRef = useRef(false);
-
+  const wasGuestRef = useRef(false);
 
   const [userProfile, setUserProfile] = useState(null);
   const [address, setAddress] = useState("");
@@ -77,8 +81,11 @@ const CheckoutPage = () => {
 
   useEffect(() => {
     window.scrollTo(0, 0);
+  }, []);
+
+  useEffect(() => {
     handleSaveAdress();
-  }, [savedAddressData]);
+  }, [savedAddressData?.data]);
 
   const handleOpenMap = () => {
     setShowMapModal(true);
@@ -137,21 +144,31 @@ const CheckoutPage = () => {
     const isLoggedIn = isAuthenticated || hasToken;
 
     if (!isLoggedIn) {
-      showNotification("Please login to access checkout", "error");
-      openLoginModal();
-      navigate("/");
+      if (!wasGuestRef.current) {
+        wasGuestRef.current = true;
+        showNotificationRef.current("Please login to complete your order", "info");
+        openLoginModalRef.current();
+        navigate("/");
+      }
       return;
     }
+
+    // User just logged in
+    if (wasGuestRef.current) {
+      wasGuestRef.current = false;
+    }
+
     if (cartItems.length > 0) {
       cartLoadedRef.current = true;
     }
+
     if (cartItems.length === 0 && cartLoadedRef.current && !paymentCompletedRef.current && !profileLoading && userProfileData) {
       navigate("/products");
       return;
     }
 
-    if (userProfileData?.data) {      
-      setUserProfile(userProfileData?.data?.data);
+    if (userProfileData?.data) {
+      setUserProfile(userProfileData.data?.data);
       setIsLoading(false);
     } else if (!profileLoading) {
       refetchProfile();
@@ -163,13 +180,12 @@ const CheckoutPage = () => {
     userProfileData,
     profileLoading,
     refetchProfile,
-    showNotification,
-    openLoginModal,
   ]);
 
+  const cartItemsLength = cartItems?.length;
   useEffect(() => {
     const fetchInitialPricing = async () => {
-      if (cartItems.length > 0) {
+      if (cartItemsLength > 0) {
         try {
           const result = await applyCouponMutation(
             appliedCoupon || null,
@@ -209,7 +225,7 @@ const CheckoutPage = () => {
       }
     };
     fetchInitialPricing();
-  }, [cartItems, applyCouponMutation, appliedCoupon]);
+  }, [cartItemsLength, applyCouponMutation, appliedCoupon]);
 
   useEffect(() => {
     if (userProfile) {

@@ -107,7 +107,19 @@ const getCartService = async ({ userId }) => {
         name: "$product.productName",
         price: "$product.sellingPrice",
         image: "$product.productImg",
-        quantity: "$items.v",
+        quantity: {
+          $cond: {
+            if: { $isNumber: "$items.v" },
+            then: "$items.v",
+            else: {
+              $cond: {
+                if: { $isNumber: "$items.v.quantity" },
+                then: "$items.v.quantity",
+                else: 1
+              }
+            }
+          }
+        },
         stock: "$product.productQuantity",
         productStatus: "$product.productStatus",
         productFound: 1,

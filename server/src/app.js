@@ -24,6 +24,7 @@ import env from "./config/envConfigSetup.js";
 
 const app = express();
 app.set("trust proxy", 1);
+app.set("etag", false); // Disable ETags — prevents browser returning stale 304 for dynamic API responses
 
 logCorsConfig();
 

@@ -44,6 +44,7 @@ export const userApi = apiSlice.injectEndpoints({
     getCart: builder.query({
       query: () => "user/cart/get",
       providesTags: ["Cart"],
+      keepUnusedDataFor: 0, // Never cache cart — always fetch fresh
     }),
     clearCart: builder.mutation({
       query: () => ({

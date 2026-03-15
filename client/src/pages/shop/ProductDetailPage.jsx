@@ -13,6 +13,7 @@ import {
   useGetCartQuery 
 } from '../../store/api/userApi';
 import { addToWishlistLocal, removeFromWishlistLocal } from '../../store/slices/wishlistSlice';
+import { addItem, updateQuantity, removeItem } from '../../store/slices/cartSlice';
 import { useUI } from '../../hooks/useRedux';
 import { useCartData } from '../../hooks/useCartSync';
 
@@ -83,54 +84,80 @@ const ProductDetailPage = () => {
     const hasToken = !!localStorage.getItem('authToken');
     const isLoggedIn = isAuthenticated || hasToken;
 
-    if (!isLoggedIn) {
-      openLoginModal();
-      return;
-    }
-
-    // Logged in user - add to backend cart
-    try {
-      await addToCartAPI({ productId: product?.productId, quantity: 1 }).unwrap();
-      
-      // Refresh cart data to ensure synchronization
-      await refetchCart();
+    if (isLoggedIn) {
+      // Logged in user - add to backend cart
+      try {
+        await addToCartAPI({ productId: product?.productId, quantity: 1 }).unwrap();
+        
+        // Refresh cart data to ensure synchronization
+        await refetchCart();
+        
+        setFeedbackMessage("Added");
+        setTimeout(() => setFeedbackMessage(""), 2000);
+      } catch (err) {
+        console.error('Add to cart failed:', err);
+        showNotification(err.data?.message || "Something went wrong", 'error');
+      }
+    } else {
+      // Unauthenticated user - add to local Redux cart (silently)
+      dispatch(addItem({
+        id: product?.productId,
+        mongoId: product?.productId,
+        name: product?.productName,
+        price: product?.sellingPrice || product?.price,
+        image: product?.productImg,
+        quantity: 1
+      }));
       
       setFeedbackMessage("Added");
       setTimeout(() => setFeedbackMessage(""), 2000);
-    } catch (err) {
-      console.error('Add to cart failed:', err);
-      showNotification(err.data?.message || "Something went wrong", 'error');
+      // No notification - user will see login modal at checkout
     }
   };
 
   const handleUpdateQty = async (newQuantity) => {
+    const hasToken = !!localStorage.getItem('authToken');
+    const isLoggedIn = isAuthenticated || hasToken;
+
     // using remove because sub handles till quamt = 1and quant < 1 means removing 
     if (newQuantity < 1) {
-      try {
-        await updateCart({
-          productId: product.productId,
-          quantity: 1,
-          action: 'remove',
-        }).unwrap();
-        
-        // Refresh cart data after removal
-        await refetchCart();
-      } catch (err) {
-        console.error('Remove from cart failed:', err);
-        showNotification('Failed to update cart', 'error');
+      if (isLoggedIn) {
+        // Authenticated user - API call
+        try {
+          await updateCart({
+            productId: product.productId,
+            quantity: 1,
+            action: 'remove',
+          }).unwrap();
+          
+          // Refresh cart data after removal
+          await refetchCart();
+        } catch (err) {
+          console.error('Remove from cart failed:', err);
+          showNotification('Failed to update cart', 'error');
+        }
+      } else {
+        // Unauthenticated user - update local Redux cart
+        dispatch(removeItem(product?.productId));
       }
       return;
     }
 
-    try {
-      const action = newQuantity > currentCartQty ? 'add' : 'sub';
-      await updateCart({ productId: product.productId, quantity: 1, action }).unwrap();
-      
-      // Refresh cart data after update
-      await refetchCart();
-    } catch (err) {
-      console.error('Update failed:', err);
-      window.location.reload();
+    if (isLoggedIn) {
+      // Authenticated user - API call
+      try {
+        const action = newQuantity > currentCartQty ? 'add' : 'sub';
+        await updateCart({ productId: product.productId, quantity: 1, action }).unwrap();
+        
+        // Refresh cart data after update
+        await refetchCart();
+      } catch (err) {
+        console.error('Update failed:', err);
+        window.location.reload();
+      }
+    } else {
+      // Unauthenticated user - update local Redux cart
+      dispatch(updateQuantity({ id: product.productId, quantity: newQuantity }));
     }
   };
 

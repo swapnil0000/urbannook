@@ -1,12 +1,14 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { useUpdateCartMutation } from '../../store/api/userApi';
+import { updateQuantity, removeItem } from '../../store/slices/cartSlice';
 
 const OptimizedImage = lazy(() => import('../OptimizedImage'));
 
 const CartDrawer = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [mounted, setMounted] = useState(false);
   
   // Get cart items from Redux store
@@ -41,38 +43,56 @@ useEffect(() => {
       return;
     }
 
-    try {
-      // Find the item to get mongoId and current quantity for backend sync
-      const item = cartItems.find(item => item.id === productId);
-      const mongoId = item?.mongoId || productId;
-      const currentQty = item?.quantity || 0;
-      
-      // Determine action based on quantity change
-      const action = newQuantity > currentQty ? 'add' : 'sub';
-      
-      // Call API with quantity=1 (the amount to change, not the new total)
-      // RTK Query will automatically invalidate and refetch
-      await updateCart({ productId: mongoId, quantity: 1, action }).unwrap();
-    } catch (error) {
-      console.error('Failed to update cart:', error);
-      // Revert local state on error
-      window.location.reload();
+    const hasToken = !!localStorage.getItem('authToken');
+    const isLoggedIn = isAuthenticated || hasToken;
+
+    if (isLoggedIn) {
+      // Authenticated user - API call
+      try {
+        // Find the item to get mongoId and current quantity for backend sync
+        const item = cartItems.find(item => item.id === productId);
+        const mongoId = item?.mongoId || productId;
+        const currentQty = item?.quantity || 0;
+        
+        // Determine action based on quantity change
+        const action = newQuantity > currentQty ? 'add' : 'sub';
+        
+        // Call API with quantity=1 (the amount to change, not the new total)
+        // RTK Query will automatically invalidate and refetch
+        await updateCart({ productId: mongoId, quantity: 1, action }).unwrap();
+      } catch (error) {
+        console.error('Failed to update cart:', error);
+        // Revert local state on error
+        window.location.reload();
+      }
+    } else {
+      // Unauthenticated user - update local Redux cart
+      dispatch(updateQuantity({ id: productId, quantity: newQuantity }));
     }
   };
 
   const handleRemoveItem = async (productId) => {
-    try {
-      // Find the item to get mongoId for backend sync
-      const item = cartItems.find(item => item.id === productId);
-      const mongoId = item?.mongoId || productId;
-      
-      // Call API with action='remove' (quantity is ignored by backend for remove action)
-      // RTK Query will automatically invalidate and refetch
-      await updateCart({ productId: mongoId, quantity: 1, action: 'remove' }).unwrap();
-    } catch (error) {
-      console.error('Failed to remove item:', error);
-      // Revert local state on error
-      window.location.reload();
+    const hasToken = !!localStorage.getItem('authToken');
+    const isLoggedIn = isAuthenticated || hasToken;
+
+    if (isLoggedIn) {
+      // Authenticated user - API call
+      try {
+        // Find the item to get mongoId for backend sync
+        const item = cartItems.find(item => item.id === productId);
+        const mongoId = item?.mongoId || productId;
+        
+        // Call API with action='remove' (quantity is ignored by backend for remove action)
+        // RTK Query will automatically invalidate and refetch
+        await updateCart({ productId: mongoId, quantity: 1, action: 'remove' }).unwrap();
+      } catch (error) {
+        console.error('Failed to remove item:', error);
+        // Revert local state on error
+        window.location.reload();
+      }
+    } else {
+      // Unauthenticated user - remove from local Redux cart
+      dispatch(removeItem(productId));
     }
   };
   
