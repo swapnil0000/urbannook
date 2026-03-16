@@ -4,7 +4,7 @@ const NewsTicker = () => {
   const [isPaused, setIsPaused] = useState(false);
 
   const headlines = [
-    "🚚 ₹50 DELIVERY ALL OVER INDIA",
+    "🚚 50₹ SHIPPING ALL OVER INDIA TILL 20th MARCH",
     "🌿 WAITLIST MEMBERS: USE CODE WLUSER FOR EXCLUSIVE DISCOUNT",
   ];
 
@@ -43,7 +43,7 @@ const NewsTicker = () => {
                 <span className={`text-[10px] sm:text-xs font-bold tracking-[0.15em] uppercase ${
                   headline.includes('₹50 DELIVERY') 
                     ? 'text-emerald-700 font-extrabold text-xs sm:text-sm' 
-                    : 'text-emerald-700/70'
+                    : 'text-emerald-700 font-extrabold text-xs sm:text-sm'
                 }`}>
                   {headline}
                 </span>
