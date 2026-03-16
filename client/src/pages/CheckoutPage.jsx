@@ -385,8 +385,6 @@ const CheckoutPage = () => {
       setIsSavingMobile(false);
     }
   };
-      setIsSavingMobile(false);
-    }
   
 
   const validateDeliveryMobile = (mobile) => {
@@ -1207,8 +1205,6 @@ const CheckoutPage = () => {
 
       {/* Mobile Sticky Footer */}
       <div
-        initial={{ y: 100 }}
-        animate={{ y: 0 }}
         className="fixed bottom-0 left-0 right-0 bg-[#2e443c] border-t border-white/10 p-4 px-6 z-50 lg:hidden shadow-[0_-10px_30px_rgba(0,0,0,0.4)]"
       >
         <div className="flex items-center justify-around gap-5 max-w-[1200px] mx-auto">
@@ -1256,5 +1252,6 @@ const CheckoutPage = () => {
       </div>
     </div>
   );
+};
 
 export default CheckoutPage;
