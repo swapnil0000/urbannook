@@ -385,6 +385,9 @@ const CheckoutPage = () => {
       setIsSavingMobile(false);
     }
   };
+      setIsSavingMobile(false);
+    }
+  
 
   const validateDeliveryMobile = (mobile) => {
     const strippedValue = stripCountryCode(mobile);
@@ -1253,6 +1256,5 @@ const CheckoutPage = () => {
       </div>
     </div>
   );
-};
 
 export default CheckoutPage;

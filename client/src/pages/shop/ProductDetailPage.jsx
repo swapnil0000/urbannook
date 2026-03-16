@@ -33,8 +33,7 @@ const ProductDetailPage = () => {
   const { productId } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const { showNotification, showLoginModal, openLoginModal, closeLoginModal } =
-    useUI();
+  const { showNotification, openLoginModal, closeLoginModal } = useUI();
 
   // 1. Auth & Cookies
   const [cookies] = useCookies(["userAccessToken"]);
@@ -61,7 +60,6 @@ const ProductDetailPage = () => {
 
   useEffect(() => {
     if (product?.color && product.color.length > 0) {
-      // Check Redux selections instead of localStorage
       const savedSelection = cartSelections[product.productId];
       let initialColor = product.color[0];
       
@@ -82,12 +80,10 @@ const ProductDetailPage = () => {
 
     if (!isIdMatch) return false;
 
-    // Agar product mein color property hi nahi hai (BMW Lamp case)
     if (!product?.color || product.color.length === 0) {
       return true;
     }
 
-    // Backend provides selectedColor at top level now
     return (item.selectedColor || 'N/A') === (selectedColor || 'N/A');
   });
 
@@ -99,7 +95,6 @@ const ProductDetailPage = () => {
     (item) => item.productName === product?.productName,
   );
 
-  // Build gallery from product images
   const galleryImages = product
     ? [ ...(product.secondaryImages || [])].filter(Boolean)
     : [];
@@ -108,7 +103,6 @@ const ProductDetailPage = () => {
     window.scrollTo(0, 0);
   }, []);
 
-  // Slider Handlers
   const nextImage = () => {
     setCurrentImageIndex((prev) => (prev + 1) % galleryImages.length);
   };
@@ -119,7 +113,6 @@ const ProductDetailPage = () => {
     );
   };
 
-  // 6. Logic: Add to Cart / Update / Checkout
   const handleInitialAddToCart = async () => {
     if (!product) return;
 
@@ -127,7 +120,6 @@ const ProductDetailPage = () => {
     const isLoggedIn = isAuthenticated || hasToken;
 
     if (isLoggedIn) {
-      // Logged in user - add to backend cart with color
       try {
         await addToCartAPI({
           productId: product?.productId,
@@ -135,7 +127,6 @@ const ProductDetailPage = () => {
           color: selectedColor || 'N/A',
         }).unwrap();
 
-        // Update Redux Selection ONLY on click
         dispatch(updateSelection({
           productId: product.productId,
           quantity: 1,
@@ -160,7 +151,6 @@ const ProductDetailPage = () => {
         showNotification(err.data?.message || "Something went wrong", 'error');
       }
     } else {
-      // Unauthenticated user - add to local Redux cart (silently)
       dispatch(addItem({
         id: product?.productId,
         mongoId: product?.productId,
@@ -173,7 +163,6 @@ const ProductDetailPage = () => {
       
       setFeedbackMessage("Added");
       setTimeout(() => setFeedbackMessage(""), 2000);
-      // No notification - user will see login modal at checkout
     }
   };
 
@@ -181,10 +170,8 @@ const ProductDetailPage = () => {
     const hasToken = !!localStorage.getItem('authToken');
     const isLoggedIn = isAuthenticated || hasToken;
 
-    // using remove because sub handles till quamt = 1and quant < 1 means removing 
     if (newQuantity < 1) {
       if (isLoggedIn) {
-        // Authenticated user - API call
         try {
           await updateCart({
             productId: product.productId,
@@ -193,21 +180,18 @@ const ProductDetailPage = () => {
             color: selectedColor || undefined,
           }).unwrap();
           
-          // Refresh cart data after removal
           await refetchCart();
         } catch (err) {
           console.error('Remove from cart failed:', err);
           showNotification('Failed to update cart', 'error');
         }
       } else {
-        // Unauthenticated user - update local Redux cart
         dispatch(removeItem(product?.productId));
       }
       return;
     }
 
     if (isLoggedIn) {
-      // Authenticated user - API call
       try {
         const action = newQuantity > currentCartQty ? 'add' : 'sub';
         await updateCart({
@@ -217,14 +201,12 @@ const ProductDetailPage = () => {
           color: selectedColor || undefined,
         }).unwrap();
         
-        // Refresh cart data after update
         await refetchCart();
       } catch (err) {
         console.error('Update failed:', err);
         window.location.reload();
       }
     } else {
-      // Unauthenticated user - update local Redux cart
       dispatch(updateQuantity({ id: product.productId, quantity: newQuantity }));
     }
   };
@@ -301,21 +283,21 @@ const ProductDetailPage = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-20 items-start">
           <div
-            className="lg:col-span-6 w-full lg:sticky lg:top-24 flex flex-col items-start "
+            className="lg:col-span-6 w-full lg:sticky lg:top-24 flex flex-col items-start"
             style={{ maxHeight: 'calc(100vh - 6rem)' }}
           >
             <div className="relative max-w-[500px] max-h-[520px] lg:max-h-[600px] rounded-2xl overflow-hidden shadow-2xl group w-full">
-              <div className="w-full  h-full relative cursor-pointer flex items-center justify-center">
-                  <div key={currentImageIndex}>
-                    <Suspense fallback={<div className="w-full h-full bg-gray-200 animate-pulse rounded-lg"></div>}>
-                      <OptimizedImage
-                        src={galleryImages[currentImageIndex] || '/placeholder.jpg'}
-                        alt={product.productName}
-                        className="object-contain"
-                        loading="eager"
-                      />
-                    </Suspense>
-                  </div>
+              <div className="w-full h-full relative cursor-pointer flex items-center justify-center">
+                <div key={currentImageIndex}>
+                  <Suspense fallback={<div className="w-full h-full bg-gray-200 animate-pulse rounded-lg"></div>}>
+                    <OptimizedImage
+                      src={galleryImages[currentImageIndex] || '/placeholder.jpg'}
+                      alt={product.productName}
+                      className="object-contain"
+                      loading="eager"
+                    />
+                  </Suspense>
+                </div>
               </div>
 
               {galleryImages.length > 1 && (
@@ -351,15 +333,15 @@ const ProductDetailPage = () => {
                     }`}
                   >
                     <Suspense fallback={<div className="w-full h-full bg-gray-200 animate-pulse"></div>}>
-                    <OptimizedImage
-                      src={img}
-                      alt={`Product thumbnail ${idx + 1}`}
-                      className="w-full h-full object-contain p-1"
-                      loading="lazy"
-                    />
-                  </Suspense>
-                </button>
-              ))}
+                      <OptimizedImage
+                        src={img}
+                        alt={`Product thumbnail ${idx + 1}`}
+                        className="w-full h-full object-contain p-1"
+                        loading="lazy"
+                      />
+                    </Suspense>
+                  </button>
+                ))}
               </div>
 
               {/* Simple Counter Below Thumbnails */}
@@ -634,14 +616,6 @@ const ProductDetailPage = () => {
           </div>
         }
       >
-        {showLoginModal && (
-          <LoginForm 
-            onClose={closeLoginModal}
-            onLoginSuccess={() => closeLoginModal()}
-            onSwitchToSignup={() => { closeLoginModal(); setShowSignup(true); }}
-          />
-        )}
-
         {showSignup && (
           <SignupForm
             onClose={() => setShowSignup(false)}

@@ -204,7 +204,4 @@ const cartSlice = createSlice({
 
 export const { addItem, removeItem, updateQuantity, clearCart, syncCartFromProfile, setCartItems, updateSelection } = cartSlice.actions;
 
-// // Export the clearGuestCart helper for use in hooks
-// export { clearGuestCart };
-
 export default cartSlice.reducer;
