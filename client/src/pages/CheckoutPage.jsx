@@ -22,6 +22,7 @@ import { ComponentLoader } from "../component/layout/LoadingSpinner";
 // Lazy load heavy components
 const CouponList = lazy(() => import("../component/CouponList"));
 const MapModal = lazy(() => import("../component/MapModal"));
+const MobileNumberModal = lazy(() => import("../component/MobileNumberModal"));
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
@@ -31,7 +32,7 @@ const CheckoutPage = () => {
   const openLoginModalRef = useRef(openLoginModal);
   useEffect(() => { showNotificationRef.current = showNotification; }, [showNotification]);
   useEffect(() => { openLoginModalRef.current = openLoginModal; }, [openLoginModal]);
-  const { items: cartItems } = useSelector((state) => state.cart);
+  const { items: cartItems, selections: cartSelections } = useSelector((state) => state.cart);
   const { isAuthenticated } = useSelector((state) => state.auth);
   const paymentCompletedRef = useRef(false);
   const cartLoadedRef = useRef(false);
@@ -46,6 +47,7 @@ const CheckoutPage = () => {
   const [showRetry, setShowRetry] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
   const [showCouponModal, setShowCouponModal] = useState(false);
+  const [showMobileModal, setShowMobileModal] = useState(false);
   const [preciseDetails, setPreciseDetails] = useState({
     landmark: "",
     flatNo: "",
@@ -56,8 +58,6 @@ const CheckoutPage = () => {
   const [senderMobile, setSenderMobile] = useState("");
   const [mobileErrors, setMobileErrors] = useState("");
   const [showAllAddresses, setShowAllAddresses] = useState(false);
-  const [editingMobileNumber, setEditingMobileNumber] = useState(false);
-  const [tempMobileNumber, setTempMobileNumber] = useState("");
   const [isSavingMobile, setIsSavingMobile] = useState(false);
   const [useDifferentDeliveryContact, setUseDifferentDeliveryContact] = useState(false);
   const [deliveryMobile, setDeliveryMobile] = useState("");
@@ -105,6 +105,17 @@ const CheckoutPage = () => {
     setCurrentAddressId(null);
     setIsEditingMode(false);
     showNotification("Shipping details reset", "info");
+  };
+
+  const handleScrollToAddress = () => {
+    // Find the Delivery Details section and scroll to it
+    const deliverySection = document.querySelector('[data-section="delivery-details"]');
+    if (deliverySection) {
+      // Add a small delay to ensure the DOM is ready
+      setTimeout(() => {
+        deliverySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
   };
 
   const handleUpdateAddressDetails = async () => {
@@ -198,7 +209,6 @@ const CheckoutPage = () => {
             });
           }
         } catch (error) {
-          // If coupon validation fails (e.g., min cart value), remove coupon and recalculate
           if (error?.data?.statusCode === 400 && appliedCoupon) {
             setAppliedCoupon(null);
             try {
@@ -238,10 +248,10 @@ const CheckoutPage = () => {
       if ((userProfile?.mobileNumber || userProfile?.mobile) && !senderMobile) {
         const mobile = String(userProfile.mobileNumber || userProfile.mobile);
         setSenderMobile(mobile);
-        setTempMobileNumber(mobile);
       }
     }
   }, [userProfile]);
+
   const handleCouponApplied = async (couponData) => {
     try {
       const result = await applyCouponMutation(couponData.code).unwrap();
@@ -287,26 +297,26 @@ const CheckoutPage = () => {
 
   const handleRemoveItem = async (productId) => {
     try {
-      // Find the item to get mongoId for backend sync
       const item = cartItems.find((item) => item.id === productId);
       const mongoId = item?.mongoId || productId;
+      const selectedColor = item?.selectedColor || "N/A";
 
-      // Call API with action='remove'
       await updateCart({
         productId: mongoId,
         quantity: 1,
         action: "remove",
+        color: selectedColor,
       }).unwrap();
 
       showNotification("Item removed from cart", "success");
 
-      // If cart becomes empty after removal, redirect to products
       if (cartItems.length === 1) {
         navigate("/products");
       }
     } catch (error) {
       console.error("Failed to remove item:", error);
-      showNotification("Failed to remove item", "error");
+      const errorMessage = error?.data?.message || "Failed to remove item";
+      showNotification(errorMessage, "error");
     }
   };
 
@@ -320,8 +330,8 @@ const CheckoutPage = () => {
 
       const merged = addresses.map((addr, index) => ({
         ...addr,
-        addressId: ids[index], // This is the correct addressId from backend
-        displayIndex: index, // For debugging
+        addressId: ids[index], 
+        displayIndex: index, 
       }));
       setSavedAddress(merged);
     }
@@ -334,7 +344,6 @@ const CheckoutPage = () => {
 
   const stripCountryCode = (mobile) => {
     const trimmed = mobile?.trim();
-    // Strip +91 or 91 prefix if present
     if (trimmed.startsWith("+91")) {
       return trimmed.substring(3);
     } else if (trimmed.startsWith("91") && trimmed.length === 12) {
@@ -343,62 +352,35 @@ const CheckoutPage = () => {
     return trimmed;
   };
 
-  const handleMobileBlur = (value) => {
-    const strippedValue = stripCountryCode(value);
-
-    // Validate mobile number
-    if (strippedValue.trim() && !validateMobileNumber(strippedValue)) {
-      setMobileErrors("Mobile number must be exactly 10 digits");
-    } else {
-      setMobileErrors("");
-    }
-  };
-
-  const handleSaveMobileNumber = async () => {
-    const strippedValue = stripCountryCode(tempMobileNumber);
+  const handleSaveMobileNumber = async (mobileNumber) => {
+    const strippedValue = stripCountryCode(mobileNumber);
 
     if (!strippedValue.trim()) {
-      setMobileErrors("Please enter a mobile number");
-      return;
+      throw "Please enter a mobile number";
     }
 
     if (!validateMobileNumber(strippedValue)) {
-      setMobileErrors("Mobile number must be exactly 10 digits");
-      return;
-    }
-
-    // Check if mobile number actually changed
-    if (strippedValue === senderMobile) {
-      setEditingMobileNumber(false);
-      setMobileErrors("");
-      showNotification("Mobile number unchanged", "info");
-      return;
+      throw "Mobile number must be exactly 10 digits";
     }
 
     setIsSavingMobile(true);
     try {
-      // Call API to update mobile number in profile
       const result = await updateUserProfile({
         mobileNumber: strippedValue,
       }).unwrap();
 
       if (result.success) {
         setSenderMobile(strippedValue);
-        setEditingMobileNumber(false);
         setMobileErrors("");
         showNotification("Mobile number saved successfully!", "success");
-        
-        // Refetch profile to sync with backend
         refetchProfile();
       } else {
-        setMobileErrors(result.message || "Failed to save mobile number");
-        showNotification(result.message || "Failed to save mobile number", "error");
+        throw result.message || "Failed to save mobile number";
       }
     } catch (error) {
       console.error("Failed to save mobile number:", error);
-      const errorMessage = error?.data?.message || error?.message || "Failed to save mobile number. Please try again.";
-      setMobileErrors(errorMessage);
-      showNotification(errorMessage, "error");
+      const errorMessage = error?.data?.message || error?.message || error || "Failed to save mobile number. Please try again.";
+      throw errorMessage;
     } finally {
       setIsSavingMobile(false);
     }
@@ -421,10 +403,6 @@ const CheckoutPage = () => {
       return;
     }
 
-    // if (!window.confirm('Are you sure you want to delete this address?')) {
-    //   return;
-    // }
-
     try {
       const result = await deleteAddress(addressId).unwrap();
 
@@ -440,12 +418,6 @@ const CheckoutPage = () => {
       refetchAddresses();
     } catch (err) {
       console.error("Delete API Error:", err);
-      console.error("Error details:", {
-        status: err.status,
-        data: err.data,
-        message: err.data?.message,
-      });
-
       const errorMessage =
         err.data?.message || err.message || "Failed to delete address";
       showNotification(errorMessage, "error");
@@ -475,7 +447,6 @@ const CheckoutPage = () => {
   };
 
   const handlePayment = async () => {
-    // Use consolidated sender mobile
     const senderMobileStr = String(senderMobile || "").trim();
     
     if (!senderMobileStr || senderMobileStr === "N/A") {
@@ -483,10 +454,11 @@ const CheckoutPage = () => {
         "Please enter your contact number to proceed with checkout",
         "error",
       );
+      // Open mobile modal instead of scrolling
+      setShowMobileModal(true);
       return;
     }
 
-    // Validate sender mobile
     if (!validateMobileNumber(senderMobileStr)) {
       showNotification(
         "Please enter a valid 10-digit mobile number",
@@ -495,7 +467,6 @@ const CheckoutPage = () => {
       return;
     }
 
-    // Validate delivery mobile if provided
     const deliveryMobileStr = String(deliveryMobile || "").trim();
     if (useDifferentDeliveryContact && deliveryMobileStr) {
       if (!validateMobileNumber(deliveryMobileStr)) {
@@ -512,7 +483,6 @@ const CheckoutPage = () => {
       return;
     }
     
-    // Check authentication before proceeding
     const authToken = localStorage.getItem('authToken');
     if (!authToken) {
       showNotification("Your session has expired. Please login again.", "error");
@@ -526,11 +496,13 @@ const CheckoutPage = () => {
     const selectedFullAddr = savedAddress.find(a => a.addressId === currentAddressId);
     
     try {
-      const razorpayKey = razorpayKeyData?.data;
+      const razorpayKey = razorpayKeyData?.data;      
       const orderData = {
         items: cartItems.map((i) => ({
-          productId: i.id,
+          productId: i.mongoId || i.id.split(':')[0], // Extract raw productId
           quantity: i.quantity,
+          color: (i.selectedColor && i.selectedColor !== 'N/A') ? i.selectedColor : 
+                 (cartSelections[i.id]?.color || cartSelections[i.mongoId]?.color || "") 
         })),
         senderMobile: senderMobileStr,
         userEmail: userProfile?.email,
@@ -548,6 +520,8 @@ const CheckoutPage = () => {
           long: selectedFullAddr?.location?.coordinates?.[0] || selectedFullAddr?.long || 0,
         }
       };
+      console.log(orderData?.items);
+      
       const orderResult = await createOrder(orderData).unwrap();
       const res = await loadRazorpay();
       if (!res) return;
@@ -565,12 +539,8 @@ const CheckoutPage = () => {
           orderResult.id,
         handler: async function (response) {
           try {
-            
             const orderId = response.razorpay_order_id;
-            const paymentId = response.razorpay_payment_id;
-            const signature = response.razorpay_signature;
             navigate(`/payment-processing/${orderId}`)
-            
           } catch (verifyError) {
             console.error("Payment handler error:", verifyError);
             setPaymentError(
@@ -703,10 +673,37 @@ const CheckoutPage = () => {
                         className="w-full h-full object-contain mix-blend-multiply"
                       />
                     </div>
+                    
                     <div className="flex-1 min-w-0">
                       <h3 className="font-medium text-sm text-[#2e443c] truncate mb-1">
                         {item.name}
                       </h3>
+                      
+                      {/* --- NAYA: COLOR DISPLAY --- */}
+                      {(() => {
+                        const itemColor = item.selectedColor !== 'N/A' ? item.selectedColor : 
+                                          (cartSelections[item.id]?.color || cartSelections[item.mongoId]?.color);
+                                          
+                        if (!itemColor || itemColor === 'N/A') return null;
+                        
+                        return (
+                          <div className="flex items-center gap-1.5 mb-1.5 mt-1">
+                            <span className="text-[9px] text-gray-400 uppercase tracking-widest">Color:</span>
+                            <div 
+                              className="w-3 h-3 rounded-full border border-gray-300 shadow-sm"
+                              style={{
+                                background: itemColor.toLowerCase() === 'rainbow' 
+                                  ? 'linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)' 
+                                  : itemColor.replace(/\s+/g, '').toLowerCase()
+                              }}
+                              title={itemColor}
+                            ></div>
+                            <span className="text-[10px] font-medium text-[#a89068]">{itemColor}</span>
+                          </div>
+                        );
+                      })()}
+                      {/* ------------------------- */}
+
                       <div className="flex justify-between items-center">
                         <p className="text-[10px] text-gray-500 uppercase tracking-widest">
                           Qty: {item.quantity}
@@ -726,8 +723,6 @@ const CheckoutPage = () => {
               <div className="absolute -inset-[1px] bg-gradient-to-r from-[#a89068]/40 to-[#a89068]/10 rounded-[2rem] blur-[2px] opacity-70 group-hover:opacity-100 transition-opacity duration-500"></div>
 
               <div className="relative bg-[#f5f7f8] border border-white/50 rounded-[2rem] p-6 md:p-7 shadow-2xl overflow-hidden">
-                {/* <div className="absolute -top-10 -right-10 w-32 h-32 bg-[#a89068]/10 blur-3xl rounded-full"></div> */}
-
                 <div className="flex items-center gap-4 ">
                   <div className="w-12 h-12 rounded-full bg-[#a89068]/10 border border-[#a89068]/20 flex items-center justify-center shrink-0">
                     <i className="fa-solid fa-ticket text-[#a89068] text-xl"></i>
@@ -873,75 +868,30 @@ const CheckoutPage = () => {
                   </div>
                 </div>
                 
-                {/* Mobile Number Field - Consolidated */}
+                {/* Mobile Number Field - Display Only with Edit */}
                 <div className="space-y-1.5 md:col-span-2">
                   <label className="text-[9px] uppercase tracking-widest text-[#a89068] font-bold ml-1">
                     Mobile NO. (Required for payment)
                   </label>
                   
-                  {/* Single input field - same for display and edit */}
+                  {/* Display with Edit button */}
                   <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <input
-                        type="tel"
-                        value={tempMobileNumber}
-                        onChange={(e) =>
-                          setTempMobileNumber(
-                            e.target.value.replace(/\D/g, "").slice(0, 10),
-                          )
-                        }
-                        onBlur={() => handleMobileBlur(tempMobileNumber)}
-                        disabled={!editingMobileNumber && senderMobile && senderMobile !== "N/A"}
-                        className={`flex-1 bg-white border rounded-xl p-4 text-sm text-[#2e443c] 
-                          focus:outline-none transition-all placeholder:text-gray-400
-                          ${!editingMobileNumber && senderMobile  ? "cursor-not-allowed opacity-75" : ""}
-                          ${mobileErrors ? "border-red-500" : "border-gray-200 focus:border-[#a89068]"}`}
-                        placeholder="Enter 10-digit mobile number"
-                      />
+                    <div className="flex gap-2 items-center">
+                      <div className="flex-1 bg-white border border-gray-200 rounded-xl p-4 text-sm text-[#2e443c] font-medium">
+                        {senderMobile && senderMobile !== "N/A" ? senderMobile : "Not added"}
+                      </div>
                       <button
-                        onClick={() => {
-                          if (editingMobileNumber) {
-                            // In edit mode - save changes
-                            handleSaveMobileNumber();
-                          } else {
-                            // In display mode - enter edit mode
-                            setEditingMobileNumber(true);
-                            setTempMobileNumber(senderMobile);
-                            setMobileErrors("");
-                          }
-                        }}
-                        disabled={isSavingMobile || (editingMobileNumber && !tempMobileNumber)}
-                        className="px-4 py-2 bg-[#a89068] text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-[#2e443c] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={() => setShowMobileModal(true)}
+                        className="px-4 py-2 bg-[#a89068] text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-[#2e443c] transition-all"
                       >
-                        {isSavingMobile ? (
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        ) : editingMobileNumber ? (
-                          "Save"
-                        ) : (
-                          "Edit"
-                        )}
+                        <i className="fa-solid fa-pen mr-1"></i>
+                        Edit
                       </button>
-                      {/* {editingMobileNumber && (
-                        <button
-                          onClick={() => {
-                            setEditingMobileNumber(false);
-                            setTempMobileNumber(senderMobile);
-                            setMobileErrors("");
-                          }}
-                          className="px-4 py-2 bg-gray-200 text-[#2e443c] rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-gray-300 transition-all"
-                        >
-                          Cancel
-                        </button>
-                      )} */}
                     </div>
-                    {/* {!editingMobileNumber && (
-                      <p className="text-[10px] text-gray-500 ml-1">
-                        We need your contact number to coordinate delivery with you
-                      </p>
-                    )} */}
-                    {mobileErrors && (
-                      <p className="text-[10px] text-red-500 ml-1">
-                        {mobileErrors}
+                    {(!senderMobile || senderMobile === "N/A") && (
+                      <p className="text-[10px] text-[#a89068] ml-1 flex items-center gap-1">
+                        <i className="fa-solid fa-info-circle text-[8px]"></i>
+                        You'll be prompted to add it at checkout
                       </p>
                     )}
                   </div>
@@ -999,6 +949,7 @@ const CheckoutPage = () => {
 
             {/* Delivery Details (Box Color: #f5f7f8) */}
             <div
+              data-section="delivery-details"
               className={`bg-[#f5f7f8] rounded-[2rem] p-6 md:p-8 border transition-all duration-500 shadow-lg ${!address ? "border-[#a89068]/40" : "border-white/10"}`}
             >
               <h2 className="text-lg font-serif text-[#2e443c] mb-6 border-b border-gray-200 pb-4 flex items-center gap-3">
@@ -1198,6 +1149,24 @@ const CheckoutPage = () => {
                   showNotification={showNotification}
                 />
               </Suspense>
+
+              {/* Mobile Number Modal */}
+              <Suspense
+                fallback={
+                  <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60">
+                    <div className="w-12 h-12 border-2 border-[#a89068] border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                }
+              >
+                <MobileNumberModal
+                  showMobileModal={showMobileModal}
+                  setShowMobileModal={setShowMobileModal}
+                  userProfile={userProfile}
+                  onSaveMobileNumber={handleSaveMobileNumber}
+                  showNotification={showNotification}
+                  isSaving={isSavingMobile}
+                />
+              </Suspense>
             </div>
           </div>
         </div>
@@ -1254,12 +1223,14 @@ const CheckoutPage = () => {
             </span>
           </div>
           <button
-            onClick={handlePayment}
-            disabled={isOrdering || !address}
+            onClick={!address ? handleScrollToAddress : handlePayment}
+            disabled={isOrdering || showMobileModal}
             className={`flex-1 h-10 max-w-[150px] rounded-xl font-bold uppercase tracking-widest text-[11px] shadow-lg active:scale-95 transition-all flex items-center justify-center gap-3 ${
-              !address
-                ? "bg-white/10 text-gray-400 border border-white/10"
-                : "bg-[#a89068] text-white"
+              showMobileModal
+                ? "bg-gray-400 text-white cursor-not-allowed opacity-60"
+                : !address
+                ? "bg-[#a89068] text-white border border-[#a89068] hover:bg-[#a89068]/90"
+                : "bg-[#a89068] text-white hover:bg-[#2e443c]"
             }`}
           >
             {isOrdering ? (
@@ -1268,7 +1239,10 @@ const CheckoutPage = () => {
                 Proc...
               </>
             ) : !address ? (
-              "Set Address"
+              <>
+                <i className="fa-solid fa-map-pin text-[12px]"></i>
+                Set Address
+              </>
             ) : (
               <>
                 Pay Now <i className="fa-solid fa-lock text-[10px]"></i>

@@ -158,7 +158,7 @@ const NewHeader = () => {
   return (
     <>
       <header
-        className={`fixed top-3 left-3 right-3 md:top-6 md:left-6 md:right-6 z-50 bg-[#e8f8d7]/90 backdrop-blur-xl shadow-lg border border-white/40 ${
+        className={`fixed top-14 left-3 right-3 md:top-12 md:left-6 md:right-6 z-50 bg-[#e8f8d7]/90 backdrop-blur-xl shadow-lg border border-white/40 ${
           isMenuOpen ? 'rounded-[2rem]' : 'rounded-full'
         }`}
         style={{

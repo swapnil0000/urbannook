@@ -10,7 +10,7 @@ const AireHeroBanner = memo(() => {
   }, [navigate]);
 
   return (
-    <section className="relative min-h-[97vh] lg:h-[calc(100vh-2rem)] lg:max-h-[900px] mx-2 my-2 md:mx-4 md:my-4 rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden shadow-2xl flex items-center group bg-[#1a2822]">
+    <section className="relative min-h-[97vh] lg:h-[calc(100vh-2rem)] lg:max-h-[900px] mx-2  md:mx-4 rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden shadow-2xl flex items-center group bg-[#1a2822]">
       
       {/* --- BACKGROUND IMAGE LAYER --- */}
       <div className="absolute inset-0 z-0">

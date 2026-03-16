@@ -43,20 +43,37 @@ const initialState = {
   items: persistedItems,
   totalQuantity: persistedItems.reduce((t, i) => t + (i.quantity || 0), 0),
   totalAmount: persistedItems.reduce((t, i) => t + ((i.price || 0) * (i.quantity || 0)), 0),
+  selections: {}, // Managed by productId: { quantity, color }
 };
 
 const cartSlice = createSlice({
   name: 'cart',
   initialState,
   reducers: {
+    updateSelection: (state, action) => {
+      const { productId, quantity, color } = action.payload;
+      state.selections[productId] = {
+        quantity: quantity || 1,
+        color: color || 'N/A'
+      };
+    },
+
     addItem: (state, action) => {
-      const { id, name, price, image, quantity = 1, mongoId } = action.payload;
+      const { id, name, price, image, quantity = 1, mongoId, selectedColor } = action.payload;
       const existingItem = state.items.find(item => item.id === id);
 
       if (existingItem) {
         existingItem.quantity += quantity;
       } else {
-        state.items.push({ id, mongoId: mongoId || id, name, price, image, quantity });
+        state.items.push({
+          id,
+          mongoId: mongoId || id,
+          name,
+          price,
+          image,
+          quantity,
+          selectedColor: selectedColor || 'N/A'
+        });
       }
 
       state.totalQuantity += quantity;
@@ -104,6 +121,7 @@ const cartSlice = createSlice({
       state.items = [];
       state.totalQuantity = 0;
       state.totalAmount = 0;
+      state.selections = {};
       // Clear guest cart from localStorage on logout or order completion
       clearGuestCart();
     },
@@ -124,6 +142,7 @@ const cartSlice = createSlice({
           price: typeof item.price === 'number' ? item.price : (item.sellingPrice || item.productPrice || 0),
           image: item.productImage || item.image || item.productImg,
           quantity,
+          selectedColor: item.selectedColor || 'N/A'
         };
       });
 
@@ -173,6 +192,7 @@ const cartSlice = createSlice({
           price,
           image: item.image || item.productImage || item.productImg,
           quantity,
+          selectedColor: item.selectedColor || 'N/A'
         };
       });
 
@@ -182,5 +202,9 @@ const cartSlice = createSlice({
   },
 });
 
-export const { addItem, removeItem, updateQuantity, clearCart, syncCartFromProfile, setCartItems } = cartSlice.actions;
+export const { addItem, removeItem, updateQuantity, clearCart, syncCartFromProfile, setCartItems, updateSelection } = cartSlice.actions;
+
+// // Export the clearGuestCart helper for use in hooks
+// export { clearGuestCart };
+
 export default cartSlice.reducer;

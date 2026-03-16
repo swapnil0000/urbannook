@@ -1,42 +1,53 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useSelector, useDispatch } from 'react-redux';
-import { useCookies } from 'react-cookie';
+import { useState, useEffect, lazy, Suspense } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useSelector, useDispatch } from "react-redux";
+import { useCookies } from "react-cookie";
+import confetti from "canvas-confetti";
 
 // API & Redux imports
-import { useGetProductByIdQuery } from '../../store/api/productsApi';
-import { 
-  useAddToCartMutation, 
-  useUpdateCartMutation, 
-  useAddToWishlistMutation, 
+import { useGetProductByIdQuery } from "../../store/api/productsApi";
+import {
+  useAddToCartMutation,
+  useUpdateCartMutation,
+  useAddToWishlistMutation,
   useRemoveFromWishlistMutation,
-  useGetCartQuery 
-} from '../../store/api/userApi';
-import { addToWishlistLocal, removeFromWishlistLocal } from '../../store/slices/wishlistSlice';
-import { addItem, updateQuantity, removeItem } from '../../store/slices/cartSlice';
-import { useUI } from '../../hooks/useRedux';
-import { useCartData } from '../../hooks/useCartSync';
+} from "../../store/api/userApi";
+import {
+  addToWishlistLocal,
+  removeFromWishlistLocal,
+} from "../../store/slices/wishlistSlice";
+import {
+  addItem,
+  updateQuantity,
+  removeItem,
+  updateSelection,
+} from "../../store/slices/cartSlice";
+import { useUI } from "../../hooks/useRedux";
+import { useCartData } from "../../hooks/useCartSync";
 
-const OptimizedImage = lazy(() => import('../../component/OptimizedImage'));
-const LoginForm = lazy(() => import('../../component/layout/auth/LoginForm'));
-const SignupForm = lazy(() => import('../../component/layout/auth/SignupForm'));
+const OptimizedImage = lazy(() => import("../../component/OptimizedImage"));
+const LoginForm = lazy(() => import("../../component/layout/auth/LoginForm"));
+const SignupForm = lazy(() => import("../../component/layout/auth/SignupForm"));
 
 const ProductDetailPage = () => {
   const { productId } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const { showNotification, showLoginModal, openLoginModal, closeLoginModal } = useUI();
+  const { showNotification, showLoginModal, openLoginModal, closeLoginModal } =
+    useUI();
 
   // 1. Auth & Cookies
-  const [cookies] = useCookies(['userAccessToken']);
+  const [cookies] = useCookies(["userAccessToken"]);
   const { isAuthenticated } = useSelector((state) => state.auth);
   const cartItems = useSelector((state) => state.cart.items);
+  const cartSelections = useSelector((state) => state.cart.selections);
 
   // 2. Local UI States
-  const [activeAccordion, setActiveAccordion] = useState('description');
+  const [activeAccordion, setActiveAccordion] = useState("description");
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showSignup, setShowSignup] = useState(false);
+  const [selectedColor, setSelectedColor] = useState("");
 
   // 3. API Hooks
   const { data: productResponse, isLoading, error } = useGetProductByIdQuery(productId);
@@ -47,21 +58,50 @@ const ProductDetailPage = () => {
   const { refetch: refetchCart } = useCartData();
 
   const product = productResponse?.data;
-  // 4. Derived State
-  const cartItem = cartItems.find(item => 
-    String(item.id) === String(product?.productId) || 
-    String(item.mongoId) === String(product?.productId) ||
-    String(item.productId) === String(product?.productId)
-  );
-  
+
+  useEffect(() => {
+    if (product?.color && product.color.length > 0) {
+      // Check Redux selections instead of localStorage
+      const savedSelection = cartSelections[product.productId];
+      let initialColor = product.color[0];
+      
+      if (savedSelection && savedSelection.color && product.color.includes(savedSelection.color)) {
+        initialColor = savedSelection.color;
+      }
+      setSelectedColor(initialColor);
+    } else {
+      setSelectedColor("");
+    }
+  }, [product, cartSelections]);
+
+  const cartItem = cartItems.find((item) => {
+    const isIdMatch =
+      String(item.id) === String(product?.productId) ||
+      String(item.mongoId) === String(product?.productId) ||
+      String(item.productId) === String(product?.productId);
+
+    if (!isIdMatch) return false;
+
+    // Agar product mein color property hi nahi hai (BMW Lamp case)
+    if (!product?.color || product.color.length === 0) {
+      return true;
+    }
+
+    // Backend provides selectedColor at top level now
+    return (item.selectedColor || 'N/A') === (selectedColor || 'N/A');
+  });
+
   const isInCart = !!cartItem;
-  const currentCartQty = cartItem?.quantity || 0;
+  const currentCartQty = cartItem ? (Number(cartItem.quantity) || 0) : 0;
+
   const wishlistItems = useSelector((state) => state.wishlist.items);
-  const isInWishlist = wishlistItems.some(item => item.productName === product?.productName);
+  const isInWishlist = wishlistItems.some(
+    (item) => item.productName === product?.productName,
+  );
 
   // Build gallery from product images
   const galleryImages = product
-    ? [product.productImg, ...(product.secondaryImages || [])].filter(Boolean)
+    ? [ ...(product.secondaryImages || [])].filter(Boolean)
     : [];
 
   useEffect(() => {
@@ -74,25 +114,46 @@ const ProductDetailPage = () => {
   };
 
   const prevImage = () => {
-    setCurrentImageIndex((prev) => (prev - 1 + galleryImages.length) % galleryImages.length);
+    setCurrentImageIndex(
+      (prev) => (prev - 1 + galleryImages.length) % galleryImages.length,
+    );
   };
 
   // 6. Logic: Add to Cart / Update / Checkout
   const handleInitialAddToCart = async () => {
     if (!product) return;
-    
-    const hasToken = !!localStorage.getItem('authToken');
+
+    const hasToken = !!localStorage.getItem("authToken");
     const isLoggedIn = isAuthenticated || hasToken;
 
     if (isLoggedIn) {
-      // Logged in user - add to backend cart
+      // Logged in user - add to backend cart with color
       try {
-        await addToCartAPI({ productId: product?.productId, quantity: 1 }).unwrap();
-        
-        // Refresh cart data to ensure synchronization
+        await addToCartAPI({
+          productId: product?.productId,
+          quantity: 1,
+          color: selectedColor || 'N/A',
+        }).unwrap();
+
+        // Update Redux Selection ONLY on click
+        dispatch(updateSelection({
+          productId: product.productId,
+          quantity: 1,
+          color: selectedColor || 'N/A'
+        }));
+
+        confetti({
+          particleCount: 150,
+          spread: 80,
+          origin: { y: 0.6 },
+          colors: ["#F5DEB3", "#1c3026", "#a89068", "#ffffff"],
+        });
+
         await refetchCart();
-        
-        setFeedbackMessage("Added");
+
+        setFeedbackMessage(
+          selectedColor ? `Added ${selectedColor} to Cart` : "Added to Cart",
+        );
         setTimeout(() => setFeedbackMessage(""), 2000);
       } catch (err) {
         console.error('Add to cart failed:', err);
@@ -106,7 +167,8 @@ const ProductDetailPage = () => {
         name: product?.productName,
         price: product?.sellingPrice || product?.price,
         image: product?.productImg,
-        quantity: 1
+        quantity: 1,
+        selectedColor: selectedColor || 'N/A'
       }));
       
       setFeedbackMessage("Added");
@@ -128,6 +190,7 @@ const ProductDetailPage = () => {
             productId: product.productId,
             quantity: 1,
             action: 'remove',
+            color: selectedColor || undefined,
           }).unwrap();
           
           // Refresh cart data after removal
@@ -147,7 +210,12 @@ const ProductDetailPage = () => {
       // Authenticated user - API call
       try {
         const action = newQuantity > currentCartQty ? 'add' : 'sub';
-        await updateCart({ productId: product.productId, quantity: 1, action }).unwrap();
+        await updateCart({
+          productId: product.productId,
+          quantity: 1,
+          action,
+          color: selectedColor || undefined,
+        }).unwrap();
         
         // Refresh cart data after update
         await refetchCart();
@@ -172,7 +240,7 @@ const ProductDetailPage = () => {
   };
 
   const handleWishlistToggle = async () => {
-    const hasToken = !!localStorage.getItem('authToken');
+    const hasToken = !!localStorage.getItem("authToken");
     const isLoggedIn = isAuthenticated || hasToken;
 
     if (!isLoggedIn) {
@@ -180,7 +248,6 @@ const ProductDetailPage = () => {
       return;
     }
 
-    // Logged in user - toggle wishlist
     try {
       if (isInWishlist) {
         await removeFromWishlist(product.productId).unwrap();
@@ -196,12 +263,6 @@ const ProductDetailPage = () => {
       console.error('Failed to toggle wishlist:', error);
       showNotification(error.data?.message || "Something went wrong", 'error');
     }
-  };
-
-  // Animation Variants
-  const fadeIn = { 
-    hidden: { opacity: 0, y: 30 }, 
-    visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: "easeOut" } } 
   };
 
   if (isLoading) return (
@@ -224,18 +285,10 @@ const ProductDetailPage = () => {
 
   return (
     <div className="bg-[#2e443c] min-h-screen font-sans text-gray-200 selection:bg-[#F5DEB3] selection:text-[#1c3026] relative overflow-hidden">
-      {/* Lighting Effect */}
       <div className="fixed top-0 left-0 w-[300px] h-[300px] bg-[#2e443c] rounded-full blur-[150px] pointer-events-none opacity-40"></div>
 
-      {/* Main Container */}
       <main className="mx-auto pt-24 pb-32 lg:pt-36 lg:pb-20 px-4 lg:px-12 relative z-10">
-        {/* Breadcrumbs */}
-        <nav
-          initial={{ opacity: 0 }} 
-          animate={{ opacity: 1 }} 
-          transition={{ delay: 0.2 }}
-          className="flex items-center text-[10px] tracking-[0.2em] uppercase text-[#F5DEB3]/50 mb-6 lg:mb-12 cursor-pointer"
-        >
+        <nav className="flex items-center text-[10px] tracking-[0.2em] uppercase text-[#F5DEB3]/50 mb-6 lg:mb-12 cursor-pointer">
           <span onClick={() => navigate('/products')} className="flex items-center gap-2 hover:text-[#F5DEB3] transition-colors">
             <i className="fa-solid fa-arrow-left lg:hidden"></i>
             <span>Shop</span>
@@ -247,38 +300,24 @@ const ProductDetailPage = () => {
         </nav>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-20 items-start">
-          {/* --- LEFT: IMAGE GALLERY --- */}
           <div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className="lg:col-span-6 w-full lg:sticky lg:top-24 lg:self-start"
+            className="lg:col-span-6 w-full lg:sticky lg:top-24 flex flex-col items-start "
             style={{ maxHeight: 'calc(100vh - 6rem)' }}
           >
-            {/* Main Image Card */}
-            <div className="relative max-w-[500px]  max-h-[520px] lg:max-h-[600px]  rounded-2xl overflow-hidden shadow-2xl  group mx-auto w-full">
-              {/* Product Image */}
-              <div className="w-full h-full relative cursor-pointer flex items-center justify-center">
-                  <div
-                    key={currentImageIndex}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.5 }}
-                    // className="w-full h-full"
-                  >
+            <div className="relative max-w-[500px] max-h-[520px] lg:max-h-[600px] rounded-2xl overflow-hidden shadow-2xl group w-full">
+              <div className="w-full  h-full relative cursor-pointer flex items-center justify-center">
+                  <div key={currentImageIndex}>
                     <Suspense fallback={<div className="w-full h-full bg-gray-200 animate-pulse rounded-lg"></div>}>
                       <OptimizedImage
                         src={galleryImages[currentImageIndex] || '/placeholder.jpg'}
                         alt={product.productName}
-                        className="object-contain "
+                        className="object-contain"
                         loading="eager"
                       />
                     </Suspense>
                   </div>
               </div>
 
-              {/* Slider Arrows */}
               {galleryImages.length > 1 && (
                 <>
                   <button
@@ -297,19 +336,21 @@ const ProductDetailPage = () => {
               )}
             </div>
 
-            {/* Thumbnail Strip */}
-            <div className="flex gap-3 mt-6 overflow-x-auto pb-2 justify-center px-2">
-              {galleryImages.map((img, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setCurrentImageIndex(idx)}
-                  className={`w-16 h-16 lg:w-20 lg:h-20 rounded-xl border bg-[#e8e6e1] overflow-hidden transition-all flex-shrink-0 ${
-                    currentImageIndex === idx
-                      ? 'border-[#F5DEB3] ring-2 ring-[#F5DEB3]/30 scale-105'
-                      : 'border-transparent opacity-60'
-                  }`}
-                >
-                  <Suspense fallback={<div className="w-full h-full bg-gray-200 animate-pulse"></div>}>
+            {/* Gallery Thumbnails with Carousel Indicator */}
+            <div className="w-full max-w-[500px] mt-6 relative">
+              {/* Scroll Container */}
+              <div className="flex gap-3 overflow-x-auto pb-2 px-2 md:max-w-[500px] max-w-[390px] scroll-smooth" style={{ scrollBehavior: 'smooth' }}>
+                {galleryImages.map((img, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setCurrentImageIndex(idx)}
+                    className={`w-16 h-16 lg:w-20 lg:h-20 rounded-xl border bg-[#e8e6e1] overflow-hidden transition-all flex-shrink-0 relative group ${
+                      currentImageIndex === idx
+                        ? 'border-[#F5DEB3] ring-2 ring-[#F5DEB3]/30 scale-105'
+                        : 'border-transparent opacity-60 hover:opacity-80'
+                    }`}
+                  >
+                    <Suspense fallback={<div className="w-full h-full bg-gray-200 animate-pulse"></div>}>
                     <OptimizedImage
                       src={img}
                       alt={`Product thumbnail ${idx + 1}`}
@@ -319,25 +360,30 @@ const ProductDetailPage = () => {
                   </Suspense>
                 </button>
               ))}
+              </div>
+
+              {/* Simple Counter Below Thumbnails */}
+              {galleryImages.length > 1 && (
+                <div className="mt-3 flex justify-end px-2">
+                  <span className="text-[10px] text-[#F5DEB3]/60 font-mono bg-[#1c3026]/50 px-2.5 py-1 rounded">
+                    {currentImageIndex + 1}/{galleryImages.length}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* --- RIGHT: PRODUCT INFO --- */}
-          <div
-            variants={fadeIn}
-            initial="hidden"
-            animate="visible"
-            className="lg:col-span-5 flex flex-col"
-          >
+          <div className="lg:col-span-5 flex flex-col">
             <div className="mb-1 lg:mb-2 border-b border-[#F5DEB3]/10 pb-2 lg:pb-3">
               <div className="flex justify-between items-start mb-4">
                 <span className="text-[#1c3026] text-[9px] lg:text-[10px] font-bold tracking-[0.2em] uppercase bg-[#F5DEB3] px-3 py-1.5 rounded-full shadow-lg shadow-[#F5DEB3]/10">
                   {product.productCategory || 'Featured'}
                 </span>
-                {/* Mobile Rating */}
                 <div className="flex text-[#F5DEB3] text-xs gap-1 items-center bg-white/5 px-3 py-1 rounded-full">
                   <i className="fa-solid fa-star text-[10px]"></i>
-                  <span className="ml-1 text-gray-300 font-mono text-[10px]">4.8</span>
+                  <span className="ml-1 text-gray-300 font-mono text-[10px]">
+                    4.8
+                  </span>
                 </div>
               </div>
 
@@ -353,15 +399,62 @@ const ProductDetailPage = () => {
                   ₹{product.listedPrice?.toLocaleString() || (product.sellingPrice * 1.18).toFixed(0)}
                 </p>
               </div>
-          
             </div>
 
-            {/* Description */}
             <p className="text-gray-300 leading-relaxed mb-8 font-light text-sm lg:text-md">
               {product.productSubDes}
             </p>
 
-            {/* --- DESKTOP ACTION BUTTONS --- */}
+            {product?.color && product.color.length > 0 && (
+              <div className="mb-8 bg-white/5 p-5 rounded-2xl border border-[#F5DEB3]/10">
+                <div className="flex justify-between items-baseline mb-3">
+                  <span className="text-[10px] uppercase tracking-[0.2em] text-[#F5DEB3]/70 font-bold">
+                    Choose Color
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    Selected:{" "}
+                    <strong className="text-white font-medium">
+                      {selectedColor}
+                    </strong>
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap gap-3 items-center">
+                  {product.color.map((colorName, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => {
+                        setSelectedColor(colorName);
+                      }}
+                      title={colorName}
+                      className={`w-8 h-8 rounded-full transition-all duration-300 ${
+                        selectedColor === colorName
+                          ? "border-[3px] border-[#F5DEB3] scale-110 shadow-[0_0_15px_rgba(245,222,179,0.4)]"
+                          : "border-2 border-transparent shadow-md hover:scale-110"
+                      }`}
+                      style={
+                        colorName.toLowerCase() === "rainbow"
+                          ? {
+                              background:
+                                "linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)",
+                            }
+                          : {
+                              backgroundColor: colorName
+                                .replace(/\s+/g, "")
+                                .toLowerCase(),
+                            }
+                      }
+                    ></button>
+                  ))}
+                </div>
+
+                <p className="text-[10px] text-[#F5DEB3] mt-3 italic font-light">
+                  * By default <strong>{product.color[0]}</strong> is selected
+                  if you don't choose one.
+                </p>
+              </div>
+            )}
+
             <div className="hidden lg:block bg-white/5 backdrop-blur-sm p-8 rounded-[2rem] border border-[#F5DEB3]/10 mb-10">
               <div className="flex flex-row gap-4">
                 {!isInCart ? (
@@ -405,19 +498,7 @@ const ProductDetailPage = () => {
               </div>
             </div>
 
-            {/* Accordions */}
             <div className="border-t border-[#F5DEB3]/10">
-             
-
-              {/* <AccordionItem
-                title="Description"
-                isOpen={activeAccordion === 'description'}
-                onClick={() => setActiveAccordion(activeAccordion === 'description' ? '' : 'description')}
-              >
-                {product.productSubDes}
-              </AccordionItem> */}
-
-              {/* Specifications Accordion */}
               {product.specifications && product.specifications.length > 0 && (
                 <AccordionItem
                   title="Specifications"
@@ -442,35 +523,39 @@ const ProductDetailPage = () => {
                 </AccordionItem>
               )}
 
-              {/* Dimensions Accordion */}
-              {product.dimensions && (product.dimensions.length || product.dimensions.breadth || product.dimensions.height) && (
-                <AccordionItem
-                  title="Dimensions"
-                  isOpen={activeAccordion === 'dimensions'}
-                  onClick={() => setActiveAccordion(activeAccordion === 'dimensions' ? '' : 'dimensions')}
-                >
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-[#F5DEB3]/60 text-xs uppercase tracking-wider font-medium">
-                      Size
-                    </span>
-                    <span className="text-gray-200 text-sm">
-                      {[
-                        product.dimensions.length && `${product.dimensions.length}L`,
-                        product.dimensions.breadth && `${product.dimensions.breadth}B`,
-                        product.dimensions.height && `${product.dimensions.height}H`
-                      ].filter(Boolean).join(' × ')} cm
-                    </span>
-                  </div>
-                </AccordionItem>
-              )}
-
-              {/* <AccordionItem
-                title="Shipping & Returns"
-                isOpen={activeAccordion === 'shipping'}
-                onClick={() => setActiveAccordion(activeAccordion === 'shipping' ? '' : 'shipping')}
-              >
-                Complimentary shipping on orders above ₹500. Securely dispatched within 24-48 hours.
-              </AccordionItem> */}
+              {product.dimensions &&
+                (product.dimensions.length ||
+                  product.dimensions.breadth ||
+                  product.dimensions.height) && (
+                  <AccordionItem
+                    title="Dimensions"
+                    isOpen={activeAccordion === "dimensions"}
+                    onClick={() =>
+                      setActiveAccordion(
+                        activeAccordion === "dimensions" ? "" : "dimensions",
+                      )
+                    }
+                  >
+                    <div className="flex justify-between items-center py-2">
+                      <span className="text-[#F5DEB3]/60 text-xs uppercase tracking-wider font-medium">
+                        Size
+                      </span>
+                      <span className="text-gray-200 text-sm">
+                        {[
+                          product.dimensions.length &&
+                            `${product.dimensions.length}L`,
+                          product.dimensions.breadth &&
+                            `${product.dimensions.breadth}B`,
+                          product.dimensions.height &&
+                            `${product.dimensions.height}H`,
+                        ]
+                          .filter(Boolean)
+                          .join(" × ")}{" "}
+                        cm
+                      </span>
+                    </div>
+                  </AccordionItem>
+                )}
 
               {product.materialAndCare && (
                 <AccordionItem
@@ -486,11 +571,7 @@ const ProductDetailPage = () => {
         </div>
       </main>
 
-      {/* --- MOBILE STICKY BOTTOM BAR --- */}
       <div
-        initial={{ y: 100 }}
-        animate={{ y: 0 }}
-        transition={{ delay: 0.5 }}
         className="fixed bottom-0 left-0 right-0 bg-[#1c3026]/95 backdrop-blur-xl border-t border-[#F5DEB3]/20 p-4 px-6 z-50 lg:hidden flex gap-4 items-center shadow-[0_-10px_40px_rgba(0,0,0,0.3)]"
       >
         <div className="flex-1">
@@ -506,7 +587,6 @@ const ProductDetailPage = () => {
             </button>
           ) : (
             <div className="flex gap-3 w-full">
-              {/* Qty Control */}
               <div className="flex items-center justify-between bg-[#111f18] border border-[#F5DEB3]/20 rounded-full h-12 px-4 w-[120px]">
                 <button onClick={() => handleUpdateQty(currentCartQty - 1)} className="text-[#F5DEB3] p-1">
                   <i className="fa-solid fa-minus text-[10px]"></i>
@@ -517,7 +597,6 @@ const ProductDetailPage = () => {
                 </button>
               </div>
 
-              {/* Checkout Button */}
               <button
                 onClick={handleCheckoutClick}
                 className="flex-1 h-12 bg-[#F5DEB3] text-[#1c3026] rounded-full font-bold uppercase tracking-widest text-[10px] shadow-lg active:scale-95 transition-transform"
@@ -528,7 +607,6 @@ const ProductDetailPage = () => {
           )}
         </div>
 
-        {/* Wishlist Button Mobile */}
         <button
           onClick={handleWishlistToggle}
           className={`w-12 h-12 border rounded-full flex items-center justify-center transition-colors flex-shrink-0 ${
@@ -541,24 +619,21 @@ const ProductDetailPage = () => {
         </button>
       </div>
 
-      {/* Feedback Toast */}
-        {feedbackMessage && (
-          <div
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 50 }}
-            className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-[#F5DEB3] text-[#1c3026] px-6 py-3 rounded-full shadow-2xl z-[60] flex items-center gap-2 font-bold text-xs uppercase tracking-widest"
-          >
-            <i className="fa-solid fa-check-circle"></i> {feedbackMessage}
-          </div>
-        )}
-
-      {/* Login Modal */}
-      <Suspense fallback={
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60">
-          <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+      {feedbackMessage && (
+        <div
+          className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-[#F5DEB3] text-[#1c3026] px-6 py-3 rounded-full shadow-2xl z-[60] flex items-center gap-2 font-bold text-xs uppercase tracking-widest"
+        >
+          <i className="fa-solid fa-check-circle"></i> {feedbackMessage}
         </div>
-      }>
+      )}
+
+      <Suspense
+        fallback={
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60">
+            <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        }
+      >
         {showLoginModal && (
           <LoginForm 
             onClose={closeLoginModal}
@@ -567,9 +642,8 @@ const ProductDetailPage = () => {
           />
         )}
 
-        {/* Signup Modal */}
         {showSignup && (
-          <SignupForm 
+          <SignupForm
             onClose={() => setShowSignup(false)}
             onSignupSuccess={() => setShowSignup(false)}
             onSwitchToLogin={() => { setShowSignup(false); openLoginModal(); }}
@@ -580,7 +654,6 @@ const ProductDetailPage = () => {
   );
 };
 
-// Accordion Component
 const AccordionItem = ({ title, isOpen, onClick, children }) => (
   <div className="border-b border-[#F5DEB3]/10">
     <button 
@@ -590,24 +663,23 @@ const AccordionItem = ({ title, isOpen, onClick, children }) => (
       <span className="text-xs font-bold uppercase tracking-[0.2em] group-hover:text-[#F5DEB3] transition-colors">
         {title}
       </span>
-      <span className={`flex items-center justify-center w-6 h-6 rounded-full border border-[#F5DEB3]/20 text-[#F5DEB3] text-[10px] transition-transform duration-300 ${
-        isOpen ? 'rotate-180 text-[#1c3026]' : ''
-      }`}>
+      <span
+        className={`flex items-center justify-center w-6 h-6 rounded-full border border-[#F5DEB3]/20 text-[#F5DEB3] text-[10px] transition-transform duration-300 ${
+          isOpen ? "rotate-180 text-[#1c3026]" : ""
+        }`}
+      >
         <i className="fa-solid fa-chevron-down"></i>
       </span>
     </button>
-      {isOpen && (
-        <div
-          initial={{ height: 0, opacity: 0 }}
-          animate={{ height: 'auto', opacity: 1 }}
-          exit={{ height: 0, opacity: 0 }}
-          className="overflow-hidden"
-        >
-          <div className="pb-6 text-gray-300 text-sm leading-relaxed font-light">
-            {children}
-          </div>
+    {isOpen && (
+      <div
+        className="overflow-hidden"
+      >
+        <div className="pb-6 text-gray-300 text-sm leading-relaxed font-light">
+          {children}
         </div>
-      )}
+      </div>
+    )}
   </div>
 );
 

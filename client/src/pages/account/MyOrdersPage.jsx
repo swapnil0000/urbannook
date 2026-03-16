@@ -23,7 +23,7 @@ const MyOrdersPage = () => {
   useEffect(() => {
     window.scrollTo(0, 0);
 
-    const hasToken = !!localStorage.getItem('authToken');
+    const hasToken = !!localStorage.getItem("authToken");
     const isLoggedIn = isAuthenticated || hasToken;
 
     if (!isLoggedIn) {
@@ -185,7 +185,6 @@ const MyOrdersPage = () => {
 
         {/* --- ORDERS LIST --- */}
         {orders.length === 0 ? (
-          // EMPTY STATE (Light Box)
           <div className="flex flex-col items-center justify-center py-20 bg-[#f5f7f8] rounded-[3rem] border border-white/5 shadow-2xl">
             <div className="w-24 h-24 bg-[#a89068]/10 rounded-full flex items-center justify-center mb-6 border border-[#a89068]/20">
               <i className="fa-solid fa-box-open text-[#F5DEB3] text-3xl"></i>
@@ -204,11 +203,11 @@ const MyOrdersPage = () => {
             </button>
           </div>
         ) : (
-          // ORDER CARDS (Light Boxes)
           <div className="space-y-8">
             {orders.map((order, idx) => {
               const statusConfig = getStatusConfig(order.status);
               const dateObj = new Date(order.createdAt);
+              const dynamicShipping = Number(order.items?.[0]?.productSnapshot?.shipping || 0);
 
               return (
                 <div
@@ -253,30 +252,11 @@ const MyOrdersPage = () => {
                         </div>
                       </div>
                     </div>
-
-                    {/* Right: Actions */}
-                    {/* <div className="flex items-center gap-3 mt-2 md:mt-0">
-                      <button
-                        onClick={() => handleGenerateInvoice(order.orderId, order.payment?.razorpayOrderId)}
-                        disabled={generatingOrderId === order.orderId}
-                        className="flex-1 md:flex-none py-2 px-4 rounded-xl border border-gray-300 text-gray-500 hover:text-[#2e443c] hover:border-[#2e443c] text-[10px] font-bold uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {generatingOrderId === order.orderId ? "Generating..." : "Invoice"}
-                      </button>
-                      {statusConfig.label !== "Delivered" && (
-                        <button className="flex-1 md:flex-none py-2 px-4 rounded-xl bg-[#a89068] text-white text-[10px] font-bold uppercase tracking-widest hover:bg-[#2e443c] transition-all shadow-md">
-                          Track
-                        </button>
-                      )}
-                    </div> */}
                   </div>
 
-                  {/* --- ITEMS LIST --- */}
                   <div className="p-6">
-                    {/* Order Tracker */}
                     <div className="mb-6 pb-6 border-b border-gray-200">
                       <Suspense fallback={<ComponentLoader />}>
-                        {/* Note: OrderTracker might need internal styling updates if it assumes dark mode */}
                         <OrderTracker status={order.status} />
                       </Suspense>
 
@@ -382,6 +362,7 @@ const MyOrdersPage = () => {
                       )}
                     </div>
 
+                    {/* ITEMS MAPPING */}
                     <div className="grid gap-4">
                       {order.items.map((item, i) => {
                         const snapshot = item.productSnapshot || {};
@@ -400,6 +381,8 @@ const MyOrdersPage = () => {
                         const price =
                           item.priceAtPurchase || snapshot.priceAtPurchase || 0;
                         const qty = item.quantity || snapshot.quantity || 1;
+                        const selectedColor =
+                          item?.productSnapshot?.selectedColor || "N/A";
 
                         return (
                           <div
@@ -423,21 +406,51 @@ const MyOrdersPage = () => {
                                 <h4 className="text-[#2e443c] font-medium text-sm md:text-base truncate pr-4 group-hover/item:text-[#a89068] transition-colors">
                                   {name}
                                 </h4>
-                                <p className="text-gray-500 text-xs mb-1">
+                                <p className="text-gray-500 text-xs mb-2">
                                   {variant}
                                 </p>
-                                <div className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 border border-gray-200 text-[10px] text-gray-500 font-bold">
-                                  Qty: {qty}
+
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <div className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 border border-gray-200 text-[10px] text-gray-500 font-bold">
+                                    Qty: {qty}
+                                  </div>
+
+                                  {selectedColor !== "N/A" && (
+                                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-gray-100 border border-gray-200 text-[10px] text-gray-500 font-bold">
+                                      <span>Color:</span>
+                                      <div
+                                        className="w-2.5 h-2.5 rounded-full border border-gray-300 shadow-sm"
+                                        style={
+                                          selectedColor.toLowerCase() === "rainbow"
+                                            ? {
+                                                background:
+                                                  "linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)",
+                                              }
+                                            : {
+                                                backgroundColor: selectedColor
+                                                  .replace(/\s+/g, "")
+                                                  .toLowerCase(),
+                                              }
+                                        }
+                                      ></div>
+                                      <span className="text-[#a89068]">
+                                        {selectedColor}
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
+                                {/* ------------------------------ */}
                               </div>
 
-                              <div className="text-right">
+                              <div className="text-right mt-2 md:mt-0">
                                 <p className="text-[#2e443c] font-mono font-bold">
                                   ₹{(price * qty).toLocaleString()}
                                 </p>
-                                <p className="text-gray-400 text-[10px]">
-                                  ₹{price} 
-                                </p>
+                                {qty > 1 && (
+                                  <p className="text-gray-400 text-[10px]">
+                                    ₹{price} each
+                                  </p>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -447,13 +460,47 @@ const MyOrdersPage = () => {
                   </div>
 
                   {/* --- FOOTER TOTAL --- */}
-                  <div className="px-6 py-4 bg-gray-100 border-t border-gray-200 flex justify-between items-center">
-                    <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">
-                      Total Amount
-                    </span>
-                    <span className="text-xl font-serif text-[#2e443c]">
-                      ₹{order.amount.toLocaleString()}
-                    </span>
+                  <div className="px-6 py-4 bg-gray-100 border-t border-gray-200 flex flex-col gap-2.5">
+                    
+                    {/* Dynamic Shipping Row */}
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
+                        Shipping
+                      </span>
+                      <span className="text-[#2e443c] font-bold text-xs">
+                        ₹{dynamicShipping.toLocaleString()}
+                      </span>
+                    </div>
+
+                    {/* Coupon Row */}
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
+                        Coupon Applied
+                      </span>
+                      {order?.coupon?.isApplied && order?.coupon?.couponCodeName ? (
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded bg-[#a89068]/10 text-[#a89068] text-[10px] font-bold uppercase tracking-widest border border-[#a89068]/20">
+                            <i className="fa-solid fa-tag mr-1"></i>
+                            {order.coupon.couponCodeName}
+                          </span>
+                          <span className="text-[#2e443c] font-bold text-xs">
+                            -₹{order.coupon.discountAmount?.toLocaleString() || 0}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 font-medium text-[10px]">N/A</span>
+                      )}
+                    </div>
+
+                    {/* Total Amount Row */}
+                    <div className="flex justify-between items-center pt-3 border-t border-gray-200 mt-1">
+                      <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">
+                        Total Amount
+                      </span>
+                      <span className="text-xl font-serif text-[#2e443c]">
+                        ₹{order.amount.toLocaleString()}
+                      </span>
+                    </div>
                   </div>
                 </div>
               );

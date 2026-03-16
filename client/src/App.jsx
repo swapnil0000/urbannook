@@ -10,12 +10,14 @@ import { setCredentials, logout } from './store/slices/authSlice';
 import { fetchCsrfToken } from './store/api/apiSlice';
 // Import AppRoutes directly instead of lazy loading for faster initial render
 import AppRoutes from './store/AppRoutes';
+import NewsTicker from './pages/home/NewsTicker';
 
 // Only lazy load non-critical components
 const NewHeader = lazy(() => import('./component/layout/NewHeader'));
 const Footer = lazy(() => import('./component/layout/Footer'));
 const Notification = lazy(() => import('./component/Notification'));
 const SocialMediaFAB = lazy(() => import('./component/layout/WhatsAppButton'));
+const OpenInBrowserBanner = lazy(() => import('./component/OpenInBrowserBanner'));
 
 // Component to handle session restoration and token removal detection
 const SessionManager = ({ children }) => {
@@ -94,8 +96,14 @@ function App() {
         <Router> 
           <SessionManager>
             <SyncProvider>
+              <Suspense fallback={null}>
+                <OpenInBrowserBanner />
+              </Suspense>
               <ErrorBoundary>
+                <div style={{display:'flex',flexDirection:'column'}}>
+                <NewsTicker/>
                 <NewHeader/>
+                </div>
               </ErrorBoundary>
               {/* AppRoutes loaded immediately - no lazy loading for critical routing */}
               <ErrorBoundary>

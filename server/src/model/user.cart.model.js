@@ -1,15 +1,16 @@
 import mongoose from "mongoose";
 
-const cartSchema = mongoose.Schema({
-  userId: {
-    type: String,
-    required: true,
-  },
-  products: {
-    type: Map,
-    of: Number,
-    default: {},
-  },
+const cartSchema = mongoose.Schema(
+  {
+    userId: {
+      type: String,
+      required: true,
+    },
+    products: {
+      type: Map,
+      of:Object,
+      default: {},
+    },
 
   appliedCoupon: {
     couponCodeId: {
