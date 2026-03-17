@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import SEOHead from '../../component/SEOHead';
 
 const Faq = () => {
   useEffect(() => {
@@ -31,8 +32,26 @@ const Faq = () => {
     }
   ];
 
+  const faqStructuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqs.flatMap(cat =>
+      cat.items.map(item => ({
+        '@type': 'Question',
+        name: item.q,
+        acceptedAnswer: { '@type': 'Answer', text: item.a },
+      }))
+    ),
+  };
+
   return (
     <div className="bg-[#2e443c] min-h-screen text-gray-300 font-sans relative selection:bg-[#F5DEB3] selection:text-white">
+      <SEOHead
+        title="FAQs"
+        description="Frequently asked questions about UrbanNook — shipping, returns, custom orders, assembly, and more."
+        url="/faqs"
+        structuredData={faqStructuredData}
+      />
       
       {/* Background Elements */}
       <div className="fixed top-20 left-0 w-full overflow-hidden pointer-events-none opacity-[0.02]">

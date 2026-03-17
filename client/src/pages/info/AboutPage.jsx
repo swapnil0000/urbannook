@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { aboutValues } from '../../data/constant';
+import SEOHead from '../../component/SEOHead';
 
 const AboutPage = () => {
     useEffect(() => {
@@ -9,6 +10,11 @@ const AboutPage = () => {
   return (
     // BASE: New Dark Green Background
     <div className="bg-[#2e443c] min-h-screen text-[#E2E8F0] font-sans relative selection:bg-[#a89068] selection:text-white overflow-x-hidden">
+      <SEOHead
+        title="About Us"
+        description="Learn about UrbanNook — a proudly Indian brand designing premium 3D printed home decor. Our story, values, and commitment to quality craftsmanship."
+        url="/about-us"
+      />
       
       {/* Subtle Texture Overlay */}
       <div className="fixed inset-0 opacity-[0.03] pointer-events-none z-0 mix-blend-overlay" 

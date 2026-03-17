@@ -2,15 +2,34 @@ import { BrowserRouter as Router } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { useEffect, lazy, Suspense } from 'react';
 import { useDispatch } from 'react-redux';
+import { HelmetProvider } from 'react-helmet-async';
 import { store } from './store/store';
 import { useCartSync } from './hooks/useCartSync';
 import { useWishlistSync } from './hooks/useWishlistSync';
 import ErrorBoundary from './component/ErrorBoundary';
 import { setCredentials, logout } from './store/slices/authSlice';
 import { fetchCsrfToken } from './store/api/apiSlice';
-// Import AppRoutes directly instead of lazy loading for faster initial render
 import AppRoutes from './store/AppRoutes';
 import NewsTicker from './pages/home/NewsTicker';
+import SEOHead from './component/SEOHead';
+
+const ORG_STRUCTURED_DATA = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: 'UrbanNook',
+  url: 'https://www.urbannook.in',
+  logo: 'https://www.urbannook.in/assets/logo_with_text.webp',
+  sameAs: [
+    'https://www.instagram.com/urbannook.store',
+  ],
+  contactPoint: {
+    '@type': 'ContactPoint',
+    telephone: '+91-82996-38749',
+    contactType: 'customer service',
+    areaServed: 'IN',
+    availableLanguage: ['English', 'Hindi'],
+  },
+};
 
 // Only lazy load non-critical components
 const NewHeader = lazy(() => import('./component/layout/NewHeader'));
@@ -92,8 +111,10 @@ const SyncProvider = ({ children }) => {
 
 function App() {
   return (
+    <HelmetProvider>
     <Provider store={store}>
         <Router> 
+          <SEOHead structuredData={ORG_STRUCTURED_DATA} />
           <SessionManager>
             <SyncProvider>
               <Suspense fallback={null}>
@@ -119,6 +140,7 @@ function App() {
           </SessionManager>
         </Router>
     </Provider>
+    </HelmetProvider>
   );
 }
 

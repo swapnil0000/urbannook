@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useSubmitContactMutation } from '../../store/api/userApi';
 import { useUI } from '../../hooks/useRedux';
 import useFormValidation from '../../hooks/useFormValidation';
+import SEOHead from '../../component/SEOHead';
 import { contactInfo, contactPageFaqs } from '../../data/constant';
 
 // --- Reusable Accordion Component for FAQs (Updated for Light Theme) ---
@@ -101,6 +102,11 @@ const ContactPage = () => {
 
   return (
     <div className="bg-[#2e443c] min-h-screen text-gray-200 font-sans relative selection:bg-[#a89068] selection:text-white overflow-x-hidden">
+      <SEOHead
+        title="Contact Us"
+        description="Get in touch with UrbanNook. Reach us via WhatsApp, email or phone for product inquiries, order support, and custom design requests."
+        url="/contact-us"
+      />
       
       {/* 1. BACKGROUND ATMOSPHERE */}
       <div className="fixed inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-[#3a554a] via-[#2e443c] to-[#1a2822] pointer-events-none z-0 opacity-50"></div>

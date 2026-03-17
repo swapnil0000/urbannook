@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGetProductsQuery } from '../../store/api/productsApi';
+import SEOHead from '../../component/SEOHead';
 
 const PlaceholderImage = lazy(() => import('../../component/PlaceholderImage'));
 const WishlistButton = lazy(() => import('../../component/WishlistButton'));
@@ -36,6 +37,11 @@ const AllProductsPage = () => {
 
   return (
     <div className="min-h-screen bg-[#2e443c] relative font-sans selection:bg-[#F5DEB3] selection:text-[#2e443c] pb-10">
+      <SEOHead
+        title="Shop All Products"
+        description="Browse UrbanNook's full collection of premium 3D printed home decor, lighting & lifestyle products. Modern designs, fast pan-India delivery."
+        url="/products"
+      />
 
       {/* --- Ambient Background Glow --- */}
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#F5DEB3]/5 rounded-full blur-[120px] pointer-events-none"></div>
