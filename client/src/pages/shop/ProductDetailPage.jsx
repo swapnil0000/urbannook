@@ -95,9 +95,9 @@ const ProductDetailPage = () => {
     (item) => item.productName === product?.productName,
   );
 
-  const galleryImages = product
-    ? [ ...(product.secondaryImages || [])].filter(Boolean)
-    : [];
+ const galleryImages = product
+  ? [product?.image, ...(product?.secondaryImages || [])].filter(Boolean)
+  : [];
 
   useEffect(() => {
     window.scrollTo(0, 0);
