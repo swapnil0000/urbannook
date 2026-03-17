@@ -120,7 +120,7 @@ const ProductDetailPage = () => {
     const isLoggedIn = isAuthenticated || hasToken;
 
     if (isLoggedIn) {
-      try {
+       try {
         await addToCartAPI({
           productId: product?.productId,
           quantity: 1,
@@ -186,7 +186,11 @@ const ProductDetailPage = () => {
           showNotification('Failed to update cart', 'error');
         }
       } else {
-        dispatch(removeItem(product?.productId));
+        // FIX: Pass color when removing guest item
+        dispatch(removeItem({ 
+          id: product?.productId,
+          selectedColor: selectedColor || 'N/A'
+        }));
       }
       return;
     }
@@ -207,7 +211,12 @@ const ProductDetailPage = () => {
         window.location.reload();
       }
     } else {
-      dispatch(updateQuantity({ id: product.productId, quantity: newQuantity }));
+      // FIX: Pass color when updating guest item quantity
+      dispatch(updateQuantity({ 
+        id: product.productId, 
+        quantity: newQuantity,
+        selectedColor: selectedColor || 'N/A'
+      }));
     }
   };
 
@@ -281,9 +290,9 @@ const ProductDetailPage = () => {
           </span>
         </nav>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-20 items-start">
+        <div className="flex flex-col md:flex-row items-start">
           <div
-            className="lg:col-span-6 w-full lg:sticky lg:top-24 flex flex-col items-start"
+            className="lg:col-span-6 max-w-[500px] w-full lg:sticky lg:top-24 flex flex-col items-start"
             style={{ maxHeight: 'calc(100vh - 6rem)' }}
           >
             <div className="relative max-w-[500px] max-h-[520px] lg:max-h-[600px] rounded-2xl overflow-hidden shadow-2xl group w-full">
@@ -355,7 +364,7 @@ const ProductDetailPage = () => {
             </div>
           </div>
 
-          <div className="lg:col-span-5 flex flex-col">
+<div className="lg:col-span-5 flex flex-col ml-auto w-full lg:max-w-[calc(100%-560px)]">
             <div className="mb-1 lg:mb-2 border-b border-[#F5DEB3]/10 pb-2 lg:pb-3">
               <div className="flex justify-between items-start mb-4">
                 <span className="text-[#1c3026] text-[9px] lg:text-[10px] font-bold tracking-[0.2em] uppercase bg-[#F5DEB3] px-3 py-1.5 rounded-full shadow-lg shadow-[#F5DEB3]/10">
@@ -437,7 +446,7 @@ const ProductDetailPage = () => {
               </div>
             )}
 
-            <div className="hidden lg:block bg-white/5 backdrop-blur-sm p-8 rounded-[2rem] border border-[#F5DEB3]/10 mb-10">
+            <div className="hidden lg:block bg-white/5 backdrop-blur-sm p-8 rounded-[2rem] max-w-[400px] border border-[#F5DEB3]/10 mb-10">
               <div className="flex flex-row gap-4">
                 {!isInCart ? (
                   <button

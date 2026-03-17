@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useGetCartQuery } from '../store/api/userApi';
-import { useAddToCartMutation, useUpdateCartMutation } from '../store/api/userApi';
+import { useGetCartQuery, useMergeGuestCartMutation } from '../store/api/userApi';
 import { setCartItems, clearCart, clearGuestCart, loadGuestCart } from '../store/slices/cartSlice';
 
 export const useCartSync = () => {
@@ -13,9 +12,9 @@ export const useCartSync = () => {
 
   const prevAuthRef = useRef(false);
   const hasMergedRef = useRef(false);
+  const isMergingRef = useRef(false);
 
-  const [addToCartAPI] = useAddToCartMutation();
-  const [updateCart] = useUpdateCartMutation();
+  const [mergeGuestCartAPI] = useMergeGuestCartMutation();
 
   const { data: cartResponse, refetch } = useGetCartQuery(undefined, {
     skip: !shouldFetchCart,
@@ -36,67 +35,64 @@ export const useCartSync = () => {
     if (wasAuth && !shouldFetchCart) {
       prevAuthRef.current = false;
       hasMergedRef.current = false;
+      isMergingRef.current = false;
     }
   }, [shouldFetchCart, refetch]);
 
   useEffect(() => {
-    if (!cartResponse?.data) return;
+    if (!cartResponse || !shouldFetchCart) return;
+
+    // If merge is in progress, skip — the merge handler will update Redux
+    if (isMergingRef.current) {
+      console.log('[useCartSync] Merge in progress, skipping sync');
+      return;
+    }
 
     const backendItems = cartResponse.data?.availableItems || [];
 
-    if (!hasMergedRef.current && shouldFetchCart) {
+    // First time after login — attempt merge
+    if (!hasMergedRef.current) {
       hasMergedRef.current = true;
 
       // Read guest items directly from localStorage — Redux cart may already be cleared
       const guestItems = loadGuestCart();
 
       if (guestItems.length > 0) {
-        const syncLocal = async () => {
-          for (const localItem of guestItems) {
-            const productId = localItem.mongoId || localItem.id;
-            const inBackend = backendItems.find(
-              (b) => b.productId === localItem.id || b.productId === localItem.mongoId
-            );
 
-            try {
-              if (!inBackend) {
-                // Not in backend — add it (always adds with qty 1), then bump to full qty in one call
-                await addToCartAPI({ productId, quantity: 1 }).unwrap();
-                if (localItem.quantity > 1) {
-                  await updateCart({ productId, quantity: localItem.quantity - 1, action: 'add' }).unwrap();
-                }
-              } else {
-                // Already in backend — add guest qty on top in one call
-                await updateCart({ productId, quantity: localItem.quantity, action: 'add' }).unwrap();
-              }
-            } catch (e) {
-              // ignore
-            }
-          }
-          clearGuestCart();
-          const fresh = await refetch();
-          if (fresh?.data?.data) {
-            const merged = fresh.data.data?.availableItems || [];
-            dispatch(merged.length === 0 ? clearCart() : setCartItems(fresh.data.data));
+        const doMerge = async () => {
+          isMergingRef.current = true;
+          try {
+            const result = await mergeGuestCartAPI({ guestItems }).unwrap();
+          } catch (e) {
+          } finally {
+            isMergingRef.current = false;
+            clearGuestCart();
+            const fresh = await refetch();
+            const freshItems = fresh?.data?.data?.availableItems || [];
+            dispatch(freshItems.length > 0 ? setCartItems(fresh.data.data) : clearCart());
           }
         };
-        syncLocal();
-        return;
+        doMerge();
+        return; // Don't run normal sync below
       }
-
-      clearGuestCart();
+      if (backendItems.length > 0) {
+        dispatch(setCartItems(cartResponse.data));
+      } else {
+        dispatch(clearCart());
+      }
+      return;
     }
 
-    // Normal sync
-    const backendItems2 = cartResponse.data?.availableItems || [];
-    if (backendItems2.length === 0) {
-      dispatch(clearCart());
-    } else {
+    // Normal sync after merge is done — keep Redux in sync with backend
+    console.log('[useCartSync] Normal sync, backend items:', backendItems.length);
+    if (backendItems.length > 0) {
       dispatch(setCartItems(cartResponse.data));
+    } else {
+      dispatch(clearCart());
     }
-  }, [cartResponse, dispatch]);
+  }, [cartResponse, dispatch, mergeGuestCartAPI, refetch, shouldFetchCart]);
 
-  return { refetch };
+  return { refetch, isMergingRef };
 };
 
 export const useCartData = () => {

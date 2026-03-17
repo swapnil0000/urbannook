@@ -219,6 +219,30 @@ const generateOrderInvoice = asyncHandler(async (req, res) => {
   });
 });
 
+// NEW: Merge guest cart items with user cart
+const userMergeGuestCart = asyncHandler(async (req, res) => {
+  const { userId } = req.user;
+  const { guestItems } = req.body;
+
+  if (!guestItems || !Array.isArray(guestItems)) {
+    throw new ValidationError("guestItems must be an array");
+  }
+
+  const { mergeGuestCartService } = await import("../services/user.cart.service.js");
+  const result = await mergeGuestCartService({ userId, guestItems });
+
+  return res
+    .status(result.statusCode)
+    .json(
+      new ApiRes(
+        result.statusCode,
+        result.message,
+        result.data,
+        result.success,
+      ),
+    );
+});
+
 export {
   userAddToCart,
   userGetCart,
@@ -227,4 +251,5 @@ export {
   userOrderPreviousHistory,
   getOrderStatus,
   generateOrderInvoice,
+  userMergeGuestCart,
 };

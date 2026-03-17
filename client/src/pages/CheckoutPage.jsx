@@ -1229,7 +1229,7 @@ const CheckoutPage = () => {
                 ? "bg-gray-400 text-white cursor-not-allowed opacity-60"
                 : !address
                 ? "bg-[#a89068] text-white border border-[#a89068] hover:bg-[#a89068]/90"
-                : "bg-[#a89068] text-white hover:bg-[#2e443c]"
+                : "bg-[#a89068] text-white hover:bg-[#a89068]/90"
             }`}
           >
             {isOrdering ? (

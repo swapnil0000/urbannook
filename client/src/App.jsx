@@ -100,10 +100,8 @@ function App() {
                 <OpenInBrowserBanner />
               </Suspense>
               <ErrorBoundary>
-                <div style={{display:'flex',flexDirection:'column'}}>
                 <NewsTicker/>
                 <NewHeader/>
-                </div>
               </ErrorBoundary>
               {/* AppRoutes loaded immediately - no lazy loading for critical routing */}
               <ErrorBoundary>

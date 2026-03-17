@@ -34,6 +34,14 @@ export const userApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["Cart"],
     }),
+    mergeGuestCart: builder.mutation({
+      query: (data) => ({
+        url: "user/cart/merge",
+        method: "POST",
+        body: data,
+      }),
+      invalidatesTags: ["Cart"],
+    }),
     removeFromCart: builder.mutation({
       query: (productId) => ({
         url: `user/cart/${productId}`,
@@ -232,6 +240,7 @@ export const {
   useUpdateUserProfileMutation,
   useAddToCartMutation,
   useUpdateCartMutation,
+  useMergeGuestCartMutation,
   useRemoveFromCartMutation,
   useGetCartQuery,
   useClearCartMutation,

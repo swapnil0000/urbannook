@@ -15,17 +15,20 @@ export const getOrCreateGuestId = () => {
 
 const saveGuestCart = (items) => {
   try {
-    localStorage.setItem(GUEST_CART_KEY, JSON.stringify(items));
+    const json = JSON.stringify(items);
+    localStorage.setItem(GUEST_CART_KEY, json);
   } catch (e) {
-    console.warn('[GuestCart] Failed to save:', e);
+    console.error('[saveGuestCart] Failed to save:', e);
   }
 };
 
 export const loadGuestCart = () => {
   try {
     const raw = localStorage.getItem(GUEST_CART_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const parsed = raw ? JSON.parse(raw) : [];
+    return parsed;
   } catch (e) {
+    console.error('[loadGuestCart] Error parsing:', e);
     return [];
   }
 };
@@ -60,7 +63,10 @@ const cartSlice = createSlice({
 
     addItem: (state, action) => {
       const { id, name, price, image, quantity = 1, mongoId, selectedColor } = action.payload;
-      const existingItem = state.items.find(item => item.id === id);
+      const existingItem = state.items.find(item => 
+        item.id === id && 
+        (item.selectedColor || 'N/A') === (selectedColor || 'N/A')
+      );
 
       if (existingItem) {
         existingItem.quantity += quantity;
@@ -80,20 +86,30 @@ const cartSlice = createSlice({
       state.totalAmount += price * quantity;
 
       // Persist to localStorage for guest users so cart survives refresh
-      if (isGuest()) {
+      const isGuestUser = isGuest();
+      if (isGuestUser) {
         getOrCreateGuestId();
         saveGuestCart(state.items);
+      } else {
+        console.log('[cartSlice] User is logged in, not saving to guest cart');
       }
     },
 
     removeItem: (state, action) => {
-      const id = action.payload;
-      const existingItem = state.items.find(item => item.id === id);
+      const { id, selectedColor } = action.payload;
+      
+      // FIX: Check both ID and color to remove correct variant
+      const existingItem = state.items.find(item => 
+        item.id === id && 
+        (item.selectedColor || 'N/A') === (selectedColor || 'N/A')
+      );
 
       if (existingItem) {
         state.totalQuantity -= existingItem.quantity;
         state.totalAmount -= existingItem.price * existingItem.quantity;
-        state.items = state.items.filter(item => item.id !== id);
+        state.items = state.items.filter(item => 
+          !(item.id === id && (item.selectedColor || 'N/A') === (selectedColor || 'N/A'))
+        );
       }
 
       if (isGuest()) {
@@ -102,8 +118,13 @@ const cartSlice = createSlice({
     },
 
     updateQuantity: (state, action) => {
-      const { id, quantity } = action.payload;
-      const existingItem = state.items.find(item => item.id === id);
+      const { id, quantity, selectedColor } = action.payload;
+      
+      // FIX: Check both ID and color to update correct variant
+      const existingItem = state.items.find(item => 
+        item.id === id && 
+        (item.selectedColor || 'N/A') === (selectedColor || 'N/A')
+      );
 
       if (existingItem && quantity > 0) {
         const diff = quantity - existingItem.quantity;
@@ -123,7 +144,7 @@ const cartSlice = createSlice({
       state.totalAmount = 0;
       state.selections = {};
       // Clear guest cart from localStorage on logout or order completion
-      clearGuestCart();
+      // clearGuestCart();
     },
 
     syncCartFromProfile: (state, action) => {

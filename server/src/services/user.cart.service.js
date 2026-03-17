@@ -329,9 +329,123 @@ const clearCartService = async ({ userId }) => {
   };
 };
 
+// NEW: Dedicated merge service for guest cart items
+const mergeGuestCartService = async ({ userId, guestItems }) => {
+  if (!userId) {
+    throw new AuthenticationError("Unauthorized");
+  }
+
+  if (!Array.isArray(guestItems) || guestItems.length === 0) {
+    throw new ValidationError("guestItems must be a non-empty array");
+  }
+
+  const userDetails = await User.findOne({ userId }).lean();
+  if (!userDetails) {
+    throw new AuthenticationError("Invalid userDetails - unauthorized");
+  }
+
+  let cart = await Cart.findOne({ userId });
+  if (!cart) {
+    cart = new Cart({ userId, products: {} });
+  }
+
+  const syncedItems = [];
+  const failedItems = [];
+
+  for (const guestItem of guestItems) {
+    try {
+      const productId = guestItem.mongoId || guestItem.id;
+      const selectedColor = guestItem.selectedColor || 'N/A';
+      const guestQuantity = guestItem.quantity || 1;
+
+      // Validate product exists
+      const productDetails = await Product.findOne(
+        { productId },
+        { productName: 1, color: 1 },
+      ).lean();
+
+      if (!productDetails) {
+        failedItems.push({
+          ...guestItem,
+          reason: `Product not found: ${productId}`
+        });
+        continue;
+      }
+
+      // Determine effective color
+      let effectiveColor = selectedColor;
+      if (!effectiveColor || effectiveColor === "N/A") {
+        effectiveColor =
+          productDetails.color && productDetails.color.length > 0
+            ? productDetails.color[0]
+            : "N/A";
+      }
+
+      const cartKey = `${productId}:${effectiveColor}`;
+
+      // Check if item already exists in cart
+      if (cart.products.has(cartKey)) {
+        // Item exists - add guest quantity to existing quantity
+        const existingData = cart.products.get(cartKey);
+        const existingQty = typeof existingData === "object" ? existingData.quantity : existingData;
+        const newQty = existingQty + guestQuantity;
+
+        cart.products.set(cartKey, {
+          quantity: newQty,
+          selectedColor: effectiveColor
+        });
+
+        syncedItems.push({
+          productId,
+          color: effectiveColor,
+          action: 'merged',
+          previousQty: existingQty,
+          addedQty: guestQuantity,
+          newQty: newQty
+        });
+      } else {
+        // Item doesn't exist - add it
+        cart.products.set(cartKey, {
+          quantity: guestQuantity,
+          selectedColor: effectiveColor
+        });
+
+        syncedItems.push({
+          productId,
+          color: effectiveColor,
+          action: 'added',
+          quantity: guestQuantity
+        });
+      }
+    } catch (e) {
+      console.error('Failed to merge guest item:', guestItem, e);
+      failedItems.push({
+        ...guestItem,
+        reason: e.message
+      });
+    }
+  }
+
+  // Save cart
+  await cart.save();
+
+  return {
+    statusCode: 200,
+    message: `Merged ${syncedItems.length} items${failedItems.length > 0 ? `, ${failedItems.length} failed` : ''}`,
+    data: {
+      syncedItems,
+      failedItems,
+      totalSynced: syncedItems.length,
+      totalFailed: failedItems.length
+    },
+    success: failedItems.length === 0
+  };
+};
+
 export {
   addToCartService,
   getCartService,
   cartQuantityService,
   clearCartService,
+  mergeGuestCartService,
 };
