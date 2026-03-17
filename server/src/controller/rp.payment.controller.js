@@ -146,11 +146,21 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
 
   const orderItems = items.map((item) => {
     const product = products.find((p) => p.productId === item.productId);
+    
+    // Find the cart item to get its specific image
+    let itemImage = product.productImg;
+    const cartKey = `${item.productId}:${item.color || "N/A"}`;
+    if (cart.products && cart.products[cartKey] && cart.products[cartKey].image) {
+      itemImage = cart.products[cartKey].image;
+    } else if (cart.products && cart.products[item.productId] && cart.products[item.productId].image) {
+      itemImage = cart.products[item.productId].image;
+    }
+
     return {
       productId: product.productId,
       productSnapshot: {
         quantity: item.quantity,
-        productImg: product.productImg,
+        productImg: itemImage,
         productName: product.productName,
         productCategory: product.productCategory,
         productSubCategory: product.productSubCategory,

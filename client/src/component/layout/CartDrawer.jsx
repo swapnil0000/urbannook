@@ -33,7 +33,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
     }
   }, [isOpen]);
 
-  const handleQuantityChange = async (productId, selectedColor, newQuantity, mongoId, currentQty) => {
+  const handleQuantityChange = async (productId, selectedColor, newQuantity, mongoId, currentQty, image) => {
     if (newQuantity <= 0) {
       handleRemoveItem(productId, selectedColor, mongoId);
       return;
@@ -45,7 +45,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
     if (isLoggedIn) {
       try {
         const action = newQuantity > currentQty ? 'add' : 'sub';
-        await updateCart({ productId: mongoId || productId, quantity: 1, action, color: selectedColor }).unwrap();
+        await updateCart({ productId: mongoId || productId, quantity: 1, action, color: selectedColor, image }).unwrap();
       } catch (error) {
         console.error('Failed to update cart:', error);
         window.location.reload();
@@ -213,7 +213,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
                           {/* Quantity Controls - Exact match to your screenshot inspector */}
                           <div className="flex items-center gap-4 bg-white border border-gray-200 rounded-full h-8 px-3 shadow-sm">
                             <button 
-                              onClick={() => handleQuantityChange(item.id, itemColor, Math.max(0, itemQty - 1), item.mongoId, itemQty)}
+                              onClick={() => handleQuantityChange(item.id, itemColor, Math.max(0, itemQty - 1), item.mongoId, itemQty, item.image)}
                               className="w-4 h-full flex items-center justify-center text-gray-400 hover:text-[#0a110e] transition-colors"
                             >
                               <i className="fa-solid fa-minus text-[10px]"></i>
@@ -222,7 +222,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
                               {itemQty}
                             </span>
                             <button 
-                              onClick={() => handleQuantityChange(item.id, itemColor, itemQty + 1, item.mongoId, itemQty)}
+                              onClick={() => handleQuantityChange(item.id, itemColor, itemQty + 1, item.mongoId, itemQty, item.image)}
                               className="w-4 h-full flex items-center justify-center text-gray-400 hover:text-[#0a110e] transition-colors"
                             >
                               <i className="fa-solid fa-plus text-[10px]"></i>

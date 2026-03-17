@@ -282,12 +282,14 @@ const CheckoutPage = () => {
       const item = cartItems.find((item) => item.id === productId);
       const mongoId = item?.mongoId || productId;
       const selectedColor = item?.selectedColor || "N/A";
+      const itemImage = item?.image || "";
 
       await updateCart({
         productId: mongoId,
         quantity: 1,
         action: "remove",
         color: selectedColor,
+        image: itemImage,
       }).unwrap();
 
       showNotification("Item removed from cart", "success");

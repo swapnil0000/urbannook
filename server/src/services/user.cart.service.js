@@ -9,7 +9,7 @@ import {
   AuthenticationError,
 } from "../utils/errors.js";
 
-const addToCartService = async ({ userId, productId, productQuanity, color }) => {
+const addToCartService = async ({ userId, productId, productQuanity, color, image }) => {
   const userAndProductIdValidation = cartDetailsMissing(userId, productId);
   if (!userAndProductIdValidation?.success) {
     throw new ValidationError(
@@ -29,7 +29,7 @@ const addToCartService = async ({ userId, productId, productQuanity, color }) =>
 
   const productDetails = await Product.findOne(
     { productId },
-    { productName: 1, color: 1 },
+    { productName: 1, color: 1, productImg: 1 },
   ).lean();
 
   if (!productDetails) {
@@ -44,6 +44,8 @@ const addToCartService = async ({ userId, productId, productQuanity, color }) =>
         ? productDetails.color[0]
         : "N/A";
   }
+
+  const selectedImage = image || productDetails.productImg;
 
   // Composite Key for Map: productId:color
   const cartKey = `${productId}:${selectedColor}`;
@@ -65,7 +67,7 @@ const addToCartService = async ({ userId, productId, productQuanity, color }) =>
     {
       $setOnInsert: { userId },
       $set: {
-        [key]: { quantity: productQuanity || 1, selectedColor },
+        [key]: { quantity: productQuanity || 1, selectedColor, image: selectedImage },
       },
     },
     { upsert: true },
@@ -117,7 +119,13 @@ const getCartService = async ({ userId }) => {
         cartKey: "$items.k", // Keep full key for updates
         name: "$product.productName",
         price: "$product.sellingPrice",
-        image: "$product.productImg",
+        image: {
+          $cond: {
+            if: { $and: [{ $not: { $isNumber: "$items.v" } }, { $ifNull: ["$items.v.image", false] }] },
+            then: "$items.v.image",
+            else: "$product.productImg"
+          }
+        },
         quantity: {
           $cond: {
             if: { $isNumber: "$items.v" },
@@ -224,7 +232,7 @@ const getCartService = async ({ userId }) => {
   };
 };
 
-const cartQuantityService = async ({ userId, productId, quantity, action, color }) => {
+const cartQuantityService = async ({ userId, productId, quantity, action, color, image }) => {
   if (!userId) {
     throw new AuthenticationError("Unauthorized");
   }
@@ -276,10 +284,14 @@ const cartQuantityService = async ({ userId, productId, quantity, action, color 
 
   if (action !== "remove") {
     if (typeof itemData === "object") {
-      const updatedItemData = { ...itemData, quantity: currentQty };
+      const updatedItemData = { 
+        ...itemData, 
+        quantity: currentQty,
+        image: image || itemData.image 
+      };
       productQuanityMap.set(cartKey, updatedItemData);
     } else {
-      productQuanityMap.set(cartKey, currentQty);
+      productQuanityMap.set(cartKey, { quantity: currentQty, selectedColor, image });
     }
   }
 
@@ -382,6 +394,7 @@ const mergeGuestCartService = async ({ userId, guestItems }) => {
       }
 
       const cartKey = `${productId}:${effectiveColor}`;
+      const selectedImage = guestItem.image || productDetails.productImg;
 
       // Check if item already exists in cart
       if (cart.products.has(cartKey)) {
@@ -392,7 +405,8 @@ const mergeGuestCartService = async ({ userId, guestItems }) => {
 
         cart.products.set(cartKey, {
           quantity: newQty,
-          selectedColor: effectiveColor
+          selectedColor: effectiveColor,
+          image: selectedImage
         });
 
         syncedItems.push({
@@ -407,7 +421,8 @@ const mergeGuestCartService = async ({ userId, guestItems }) => {
         // Item doesn't exist - add it
         cart.products.set(cartKey, {
           quantity: guestQuantity,
-          selectedColor: effectiveColor
+          selectedColor: effectiveColor,
+          image: selectedImage
         });
 
         syncedItems.push({
