@@ -27,19 +27,6 @@ export const clearCartCompletely = async (dispatch, clearCart, apiBaseUrl) => {
 };
 
 /**
- * Refresh cart data from backend and sync with Redux store
- * @param {Function} refetchCart - Cart refetch function from RTK Query
- */
-export const refreshCartData = async (refetchCart) => {
-  try {
-    await refetchCart();
-    console.log('Cart data refreshed successfully');
-  } catch (error) {
-    console.error('Failed to refresh cart data:', error);
-  }
-};
-
-/**
  * Check if user is authenticated
  * @returns {boolean} - Authentication status
  */

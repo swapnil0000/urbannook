@@ -17,6 +17,9 @@ import {
   removeFromWishlistLocal,
 } from "../../store/slices/wishlistSlice";
 import {
+  addItem,
+  updateQuantity,
+  removeItem,
   updateSelection,
 } from "../../store/slices/cartSlice";
 import { useUI } from "../../hooks/useRedux";
@@ -30,8 +33,7 @@ const ProductDetailPage = () => {
   const { productId } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const { showNotification, showLoginModal, openLoginModal, closeLoginModal } =
-    useUI();
+  const { showNotification, openLoginModal, closeLoginModal } = useUI();
 
   // 1. Auth & Cookies
   const [cookies] = useCookies(["userAccessToken"]);
@@ -58,7 +60,6 @@ const ProductDetailPage = () => {
 
   useEffect(() => {
     if (product?.color && product.color.length > 0) {
-      // Check Redux selections instead of localStorage
       const savedSelection = cartSelections[product.productId];
       let initialColor = product.color[0];
       
@@ -79,12 +80,10 @@ const ProductDetailPage = () => {
 
     if (!isIdMatch) return false;
 
-    // Agar product mein color property hi nahi hai (BMW Lamp case)
     if (!product?.color || product.color.length === 0) {
       return true;
     }
 
-    // Backend provides selectedColor at top level now
     return (item.selectedColor || 'N/A') === (selectedColor || 'N/A');
   });
 
@@ -96,16 +95,14 @@ const ProductDetailPage = () => {
     (item) => item.productName === product?.productName,
   );
 
-  // Build gallery from product images
   const galleryImages = product
-    ? [product.productImg, ...(product.secondaryImages || [])].filter(Boolean)
+    ? [ ...(product.secondaryImages || [])].filter(Boolean)
     : [];
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
-  // Slider Handlers
   const nextImage = () => {
     setCurrentImageIndex((prev) => (prev + 1) % galleryImages.length);
   };
@@ -116,82 +113,110 @@ const ProductDetailPage = () => {
     );
   };
 
-  // 6. Logic: Add to Cart / Update / Checkout
   const handleInitialAddToCart = async () => {
     if (!product) return;
 
     const hasToken = !!localStorage.getItem("authToken");
     const isLoggedIn = isAuthenticated || hasToken;
 
-    if (!isLoggedIn) {
-      openLoginModal();
-      return;
-    }
+    if (isLoggedIn) {
+       try {
+        await addToCartAPI({
+          productId: product?.productId,
+          quantity: 1,
+          color: selectedColor || 'N/A',
+        }).unwrap();
 
-    try {
-      await addToCartAPI({
-        productId: product?.productId,
-        quantity: 1,
-        color: selectedColor || 'N/A', 
-      }).unwrap();
+        dispatch(updateSelection({
+          productId: product.productId,
+          quantity: 1,
+          color: selectedColor || 'N/A'
+        }));
 
-      // Update Redux Selection ONLY on click
-      dispatch(updateSelection({
-        productId: product.productId,
+        confetti({
+          particleCount: 150,
+          spread: 80,
+          origin: { y: 0.6 },
+          colors: ["#F5DEB3", "#1c3026", "#a89068", "#ffffff"],
+        });
+
+        await refetchCart();
+
+        setFeedbackMessage(
+          selectedColor ? `Added ${selectedColor} to Cart` : "Added to Cart",
+        );
+        setTimeout(() => setFeedbackMessage(""), 2000);
+      } catch (err) {
+        console.error('Add to cart failed:', err);
+        showNotification(err.data?.message || "Something went wrong", 'error');
+      }
+    } else {
+      dispatch(addItem({
+        id: product?.productId,
+        mongoId: product?.productId,
+        name: product?.productName,
+        price: product?.sellingPrice || product?.price,
+        image: product?.productImg,
         quantity: 1,
-        color: selectedColor || 'N/A'
+        selectedColor: selectedColor || 'N/A'
       }));
-
-      confetti({
-        particleCount: 150,
-        spread: 80,
-        origin: { y: 0.6 },
-        colors: ["#F5DEB3", "#1c3026", "#a89068", "#ffffff"],
-      });
-
-      await refetchCart();
-
-      setFeedbackMessage(
-        selectedColor ? `Added ${selectedColor} to Cart` : "Added to Cart",
-      );
+      
+      setFeedbackMessage("Added");
       setTimeout(() => setFeedbackMessage(""), 2000);
-    } catch (err) {
-      console.error("Add to cart failed:", err);
-      showNotification(err.data?.message || "Something went wrong", "error");
     }
   };
 
   const handleUpdateQty = async (newQuantity) => {
-    if (newQuantity < 1) {
-      try {
-        await updateCart({
-          productId: product.productId,
-          quantity: 1,
-          action: "remove",
-          color: selectedColor || undefined,
-        }).unwrap();
+    const hasToken = !!localStorage.getItem('authToken');
+    const isLoggedIn = isAuthenticated || hasToken;
 
-        await refetchCart();
-      } catch (err) {
-        console.error("Remove from cart failed:", err);
-        showNotification("Failed to update cart", "error");
+    if (newQuantity < 1) {
+      if (isLoggedIn) {
+        try {
+          await updateCart({
+            productId: product.productId,
+            quantity: 1,
+            action: 'remove',
+            color: selectedColor || undefined,
+          }).unwrap();
+          
+          await refetchCart();
+        } catch (err) {
+          console.error('Remove from cart failed:', err);
+          showNotification('Failed to update cart', 'error');
+        }
+      } else {
+        // FIX: Pass color when removing guest item
+        dispatch(removeItem({ 
+          id: product?.productId,
+          selectedColor: selectedColor || 'N/A'
+        }));
       }
       return;
     }
 
-    try {
-      const action = newQuantity > currentCartQty ? "add" : "sub";
-      await updateCart({
-        productId: product.productId,
-        quantity: 1,
-        action,
-        color: selectedColor || undefined,
-      }).unwrap();
-
-      await refetchCart();
-    } catch (err) {
-      console.error("Update failed:", err);
-      window.location.reload();
+    if (isLoggedIn) {
+      try {
+        const action = newQuantity > currentCartQty ? 'add' : 'sub';
+        await updateCart({
+          productId: product.productId,
+          quantity: 1,
+          action,
+          color: selectedColor || undefined,
+        }).unwrap();
+        
+        await refetchCart();
+      } catch (err) {
+        console.error('Update failed:', err);
+        window.location.reload();
+      }
+    } else {
+      // FIX: Pass color when updating guest item quantity
+      dispatch(updateQuantity({ 
+        id: product.productId, 
+        quantity: newQuantity,
+        selectedColor: selectedColor || 'N/A'
+      }));
     }
   };
 
@@ -265,23 +290,29 @@ const ProductDetailPage = () => {
           </span>
         </nav>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-20 items-start">
+        <div className="flex flex-col md:flex-row items-start">
           <div
-            className="lg:col-span-6 w-full lg:sticky lg:top-24 flex flex-col items-center justify-center"
+            className="lg:col-span-6 max-w-[500px] w-full lg:sticky lg:top-24 flex flex-col items-start"
             style={{ maxHeight: 'calc(100vh - 6rem)' }}
           >
-            <div className="relative max-w-[500px] max-h-[520px] lg:max-h-[600px] rounded-2xl overflow-hidden shadow-2xl group w-full">
+            <div className="relative max-w-[500px] h-[400px] lg:h-[520px] rounded-2xl overflow-hidden shadow-2xl group w-full">
               <div className="w-full h-full relative cursor-pointer flex items-center justify-center">
-                  <div key={currentImageIndex}>
-                    <Suspense fallback={<div className="w-full h-full bg-gray-200 animate-pulse rounded-lg"></div>}>
+                <Suspense fallback={<div className="w-full h-full bg-gray-200 animate-pulse rounded-lg"></div>}>
+                  {galleryImages.map((img, idx) => (
+                    <div
+                      key={idx}
+                      className="absolute inset-0 flex items-center justify-center transition-opacity duration-300"
+                      style={{ opacity: idx === currentImageIndex ? 1 : 0, pointerEvents: idx === currentImageIndex ? 'auto' : 'none' }}
+                    >
                       <OptimizedImage
-                        src={galleryImages[currentImageIndex] || '/placeholder.jpg'}
+                        src={img || '/placeholder.jpg'}
                         alt={product.productName}
                         className="object-contain"
-                        loading="eager"
+                        loading={idx === 0 ? 'eager' : 'lazy'}
                       />
-                    </Suspense>
-                  </div>
+                    </div>
+                  ))}
+                </Suspense>
               </div>
 
               {galleryImages.length > 1 && (
@@ -302,31 +333,44 @@ const ProductDetailPage = () => {
               )}
             </div>
 
-            <div className="flex gap-3 mt-6 overflow-x-auto pb-2 justify-center px-2 md:max-w-[500px] max-w-[350px]">
-              {galleryImages.map((img, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setCurrentImageIndex(idx)}
-                  className={`w-16 h-16 lg:w-20 lg:h-20 rounded-xl border bg-[#e8e6e1] overflow-hidden transition-all flex-shrink-0 ${
-                    currentImageIndex === idx
-                      ? 'border-[#F5DEB3] ring-2 ring-[#F5DEB3]/30 scale-105'
-                      : 'border-transparent opacity-60'
-                  }`}
-                >
-                  <Suspense fallback={<div className="w-full h-full bg-gray-200 animate-pulse"></div>}>
-                    <OptimizedImage
-                      src={img}
-                      alt={`Product thumbnail ${idx + 1}`}
-                      className="w-full h-full object-contain p-1"
-                      loading="lazy"
-                    />
-                  </Suspense>
-                </button>
-              ))}
+            {/* Gallery Thumbnails with Carousel Indicator */}
+            <div className="w-full max-w-[500px] mt-6 relative">
+              {/* Scroll Container */}
+              <div className="flex gap-3 overflow-x-auto pb-2 px-2 md:max-w-[500px] max-w-[390px] scroll-smooth" style={{ scrollBehavior: 'smooth' }}>
+                {galleryImages.map((img, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setCurrentImageIndex(idx)}
+                    className={`w-16 h-16 lg:w-20 lg:h-20 rounded-xl border bg-[#e8e6e1] overflow-hidden transition-all flex-shrink-0 relative group ${
+                      currentImageIndex === idx
+                        ? 'border-[#F5DEB3] ring-2 ring-[#F5DEB3]/30 scale-105'
+                        : 'border-transparent opacity-60 hover:opacity-80'
+                    }`}
+                  >
+                    <Suspense fallback={<div className="w-full h-full bg-gray-200 animate-pulse"></div>}>
+                      <OptimizedImage
+                        src={img}
+                        alt={`Product thumbnail ${idx + 1}`}
+                        className="w-full h-full object-contain"
+                        loading="lazy"
+                      />
+                    </Suspense>
+                  </button>
+                ))}
+              </div>
+
+              {/* Simple Counter Below Thumbnails */}
+              {galleryImages.length > 1 && (
+                <div className="mt-3 flex justify-end px-2">
+                  <span className="text-[10px] text-[#F5DEB3]/60 font-mono bg-[#1c3026]/50 px-2.5 py-1 rounded">
+                    {currentImageIndex + 1}/{galleryImages.length}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="lg:col-span-5 flex flex-col">
+<div className="lg:col-span-5 flex flex-col ml-auto w-full lg:max-w-[calc(100%-530px)]">
             <div className="mb-1 lg:mb-2 border-b border-[#F5DEB3]/10 pb-2 lg:pb-3">
               <div className="flex justify-between items-start mb-4">
                 <span className="text-[#1c3026] text-[9px] lg:text-[10px] font-bold tracking-[0.2em] uppercase bg-[#F5DEB3] px-3 py-1.5 rounded-full shadow-lg shadow-[#F5DEB3]/10">
@@ -408,7 +452,7 @@ const ProductDetailPage = () => {
               </div>
             )}
 
-            <div className="hidden lg:block bg-white/5 backdrop-blur-sm p-8 rounded-[2rem] border border-[#F5DEB3]/10 mb-10">
+            <div className="hidden lg:block bg-white/5 backdrop-blur-sm p-8 rounded-[2rem] max-w-[420px] border border-[#F5DEB3]/10 mb-10">
               <div className="flex flex-row gap-4">
                 {!isInCart ? (
                   <button
@@ -587,14 +631,6 @@ const ProductDetailPage = () => {
           </div>
         }
       >
-        {showLoginModal && (
-          <LoginForm 
-            onClose={closeLoginModal}
-            onLoginSuccess={() => closeLoginModal()}
-            onSwitchToSignup={() => { closeLoginModal(); setShowSignup(true); }}
-          />
-        )}
-
         {showSignup && (
           <SignupForm
             onClose={() => setShowSignup(false)}

@@ -22,16 +22,18 @@ import { ComponentLoader } from "../component/layout/LoadingSpinner";
 // Lazy load heavy components
 const CouponList = lazy(() => import("../component/CouponList"));
 const MapModal = lazy(() => import("../component/MapModal"));
+const MobileNumberModal = lazy(() => import("../component/MobileNumberModal"));
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const { showNotification, openLoginModal } = useUI();
+  const { showNotification } = useUI();
+  const showNotificationRef = useRef(showNotification);
+  useEffect(() => { showNotificationRef.current = showNotification; }, [showNotification]);
   const { items: cartItems, selections: cartSelections } = useSelector((state) => state.cart);
   const { isAuthenticated } = useSelector((state) => state.auth);
   const paymentCompletedRef = useRef(false);
   const cartLoadedRef = useRef(false);
-
 
   const [userProfile, setUserProfile] = useState(null);
   const [address, setAddress] = useState("");
@@ -42,6 +44,7 @@ const CheckoutPage = () => {
   const [showRetry, setShowRetry] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
   const [showCouponModal, setShowCouponModal] = useState(false);
+  const [showMobileModal, setShowMobileModal] = useState(false);
   const [preciseDetails, setPreciseDetails] = useState({
     landmark: "",
     flatNo: "",
@@ -52,8 +55,6 @@ const CheckoutPage = () => {
   const [senderMobile, setSenderMobile] = useState("");
   const [mobileErrors, setMobileErrors] = useState("");
   const [showAllAddresses, setShowAllAddresses] = useState(false);
-  const [editingMobileNumber, setEditingMobileNumber] = useState(false);
-  const [tempMobileNumber, setTempMobileNumber] = useState("");
   const [isSavingMobile, setIsSavingMobile] = useState(false);
   const [useDifferentDeliveryContact, setUseDifferentDeliveryContact] = useState(false);
   const [deliveryMobile, setDeliveryMobile] = useState("");
@@ -77,8 +78,11 @@ const CheckoutPage = () => {
 
   useEffect(() => {
     window.scrollTo(0, 0);
+  }, []);
+
+  useEffect(() => {
     handleSaveAdress();
-  }, [savedAddressData]);
+  }, [savedAddressData?.data]);
 
   const handleOpenMap = () => {
     setShowMapModal(true);
@@ -98,6 +102,17 @@ const CheckoutPage = () => {
     setCurrentAddressId(null);
     setIsEditingMode(false);
     showNotification("Shipping details reset", "info");
+  };
+
+  const handleScrollToAddress = () => {
+    // Find the Delivery Details section and scroll to it
+    const deliverySection = document.querySelector('[data-section="delivery-details"]');
+    if (deliverySection) {
+      // Add a small delay to ensure the DOM is ready
+      setTimeout(() => {
+        deliverySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
   };
 
   const handleUpdateAddressDetails = async () => {
@@ -136,22 +151,17 @@ const CheckoutPage = () => {
     const hasToken = !!localStorage.getItem('authToken');
     const isLoggedIn = isAuthenticated || hasToken;
 
-    if (!isLoggedIn) {
-      showNotification("Please login to access checkout", "error");
-      openLoginModal();
-      navigate("/");
-      return;
-    }
     if (cartItems.length > 0) {
       cartLoadedRef.current = true;
     }
+
     if (cartItems.length === 0 && cartLoadedRef.current && !paymentCompletedRef.current && !profileLoading && userProfileData) {
       navigate("/products");
       return;
     }
 
-    if (userProfileData?.data) {      
-      setUserProfile(userProfileData?.data?.data);
+    if (userProfileData?.data) {
+      setUserProfile(userProfileData.data?.data);
       setIsLoading(false);
     } else if (!profileLoading) {
       refetchProfile();
@@ -163,13 +173,12 @@ const CheckoutPage = () => {
     userProfileData,
     profileLoading,
     refetchProfile,
-    showNotification,
-    openLoginModal,
   ]);
 
+  const cartItemsLength = cartItems?.length;
   useEffect(() => {
     const fetchInitialPricing = async () => {
-      if (cartItems.length > 0) {
+      if (cartItemsLength > 0) {
         try {
           const result = await applyCouponMutation(
             appliedCoupon || null,
@@ -208,7 +217,7 @@ const CheckoutPage = () => {
       }
     };
     fetchInitialPricing();
-  }, [cartItems, applyCouponMutation, appliedCoupon]);
+  }, [cartItemsLength, applyCouponMutation, appliedCoupon]);
 
   useEffect(() => {
     if (userProfile) {
@@ -221,7 +230,6 @@ const CheckoutPage = () => {
       if ((userProfile?.mobileNumber || userProfile?.mobile) && !senderMobile) {
         const mobile = String(userProfile.mobileNumber || userProfile.mobile);
         setSenderMobile(mobile);
-        setTempMobileNumber(mobile);
       }
     }
   }, [userProfile]);
@@ -326,33 +334,15 @@ const CheckoutPage = () => {
     return trimmed;
   };
 
-  const handleMobileBlur = (value) => {
-    const strippedValue = stripCountryCode(value);
-    if (strippedValue.trim() && !validateMobileNumber(strippedValue)) {
-      setMobileErrors("Mobile number must be exactly 10 digits");
-    } else {
-      setMobileErrors("");
-    }
-  };
-
-  const handleSaveMobileNumber = async () => {
-    const strippedValue = stripCountryCode(tempMobileNumber);
+  const handleSaveMobileNumber = async (mobileNumber) => {
+    const strippedValue = stripCountryCode(mobileNumber);
 
     if (!strippedValue.trim()) {
-      setMobileErrors("Please enter a mobile number");
-      return;
+      throw "Please enter a mobile number";
     }
 
     if (!validateMobileNumber(strippedValue)) {
-      setMobileErrors("Mobile number must be exactly 10 digits");
-      return;
-    }
-
-    if (strippedValue === senderMobile) {
-      setEditingMobileNumber(false);
-      setMobileErrors("");
-      showNotification("Mobile number unchanged", "info");
-      return;
+      throw "Mobile number must be exactly 10 digits";
     }
 
     setIsSavingMobile(true);
@@ -363,23 +353,21 @@ const CheckoutPage = () => {
 
       if (result.success) {
         setSenderMobile(strippedValue);
-        setEditingMobileNumber(false);
         setMobileErrors("");
         showNotification("Mobile number saved successfully!", "success");
         refetchProfile();
       } else {
-        setMobileErrors(result.message || "Failed to save mobile number");
-        showNotification(result.message || "Failed to save mobile number", "error");
+        throw result.message || "Failed to save mobile number";
       }
     } catch (error) {
       console.error("Failed to save mobile number:", error);
-      const errorMessage = error?.data?.message || error?.message || "Failed to save mobile number. Please try again.";
-      setMobileErrors(errorMessage);
-      showNotification(errorMessage, "error");
+      const errorMessage = error?.data?.message || error?.message || error || "Failed to save mobile number. Please try again.";
+      throw errorMessage;
     } finally {
       setIsSavingMobile(false);
     }
   };
+  
 
   const validateDeliveryMobile = (mobile) => {
     const strippedValue = stripCountryCode(mobile);
@@ -449,6 +437,8 @@ const CheckoutPage = () => {
         "Please enter your contact number to proceed with checkout",
         "error",
       );
+      // Open mobile modal instead of scrolling
+      setShowMobileModal(true);
       return;
     }
 
@@ -861,58 +851,30 @@ const CheckoutPage = () => {
                   </div>
                 </div>
                 
-                {/* Mobile Number Field - Consolidated */}
+                {/* Mobile Number Field - Display Only with Edit */}
                 <div className="space-y-1.5 md:col-span-2">
                   <label className="text-[9px] uppercase tracking-widest text-[#a89068] font-bold ml-1">
                     Mobile NO. (Required for payment)
                   </label>
                   
-                  {/* Single input field - same for display and edit */}
+                  {/* Display with Edit button */}
                   <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <input
-                        type="tel"
-                        value={tempMobileNumber}
-                        onChange={(e) =>
-                          setTempMobileNumber(
-                            e.target.value.replace(/\D/g, "").slice(0, 10),
-                          )
-                        }
-                        onBlur={() => handleMobileBlur(tempMobileNumber)}
-                        disabled={!editingMobileNumber && senderMobile && senderMobile !== "N/A"}
-                        className={`flex-1 bg-white border rounded-xl p-4 text-sm text-[#2e443c] 
-                          focus:outline-none transition-all placeholder:text-gray-400
-                          ${!editingMobileNumber && senderMobile  ? "cursor-not-allowed opacity-75" : ""}
-                          ${mobileErrors ? "border-red-500" : "border-gray-200 focus:border-[#a89068]"}`}
-                        placeholder="Enter 10-digit mobile number"
-                      />
+                    <div className="flex gap-2 items-center">
+                      <div className="flex-1 bg-white border border-gray-200 rounded-xl p-4 text-sm text-[#2e443c] font-medium">
+                        {senderMobile && senderMobile !== "N/A" ? senderMobile : "Not added"}
+                      </div>
                       <button
-                        onClick={() => {
-                          if (editingMobileNumber) {
-                            // In edit mode - save changes
-                            handleSaveMobileNumber();
-                          } else {
-                            // In display mode - enter edit mode
-                            setEditingMobileNumber(true);
-                            setTempMobileNumber(senderMobile);
-                            setMobileErrors("");
-                          }
-                        }}
-                        disabled={isSavingMobile || (editingMobileNumber && !tempMobileNumber)}
-                        className="px-4 py-2 bg-[#a89068] text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-[#2e443c] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={() => setShowMobileModal(true)}
+                        className="px-4 py-2 bg-[#a89068] text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-[#2e443c] transition-all"
                       >
-                        {isSavingMobile ? (
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        ) : editingMobileNumber ? (
-                          "Save"
-                        ) : (
-                          "Edit"
-                        )}
+                        <i className="fa-solid fa-pen mr-1"></i>
+                        Edit
                       </button>
                     </div>
-                    {mobileErrors && (
-                      <p className="text-[10px] text-red-500 ml-1">
-                        {mobileErrors}
+                    {(!senderMobile || senderMobile === "N/A") && (
+                      <p className="text-[10px] text-[#a89068] ml-1 flex items-center gap-1">
+                        <i className="fa-solid fa-info-circle text-[8px]"></i>
+                        You'll be prompted to add it at checkout
                       </p>
                     )}
                   </div>
@@ -970,6 +932,7 @@ const CheckoutPage = () => {
 
             {/* Delivery Details (Box Color: #f5f7f8) */}
             <div
+              data-section="delivery-details"
               className={`bg-[#f5f7f8] rounded-[2rem] p-6 md:p-8 border transition-all duration-500 shadow-lg ${!address ? "border-[#a89068]/40" : "border-white/10"}`}
             >
               <h2 className="text-lg font-serif text-[#2e443c] mb-6 border-b border-gray-200 pb-4 flex items-center gap-3">
@@ -1169,6 +1132,24 @@ const CheckoutPage = () => {
                   showNotification={showNotification}
                 />
               </Suspense>
+
+              {/* Mobile Number Modal */}
+              <Suspense
+                fallback={
+                  <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60">
+                    <div className="w-12 h-12 border-2 border-[#a89068] border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                }
+              >
+                <MobileNumberModal
+                  showMobileModal={showMobileModal}
+                  setShowMobileModal={setShowMobileModal}
+                  userProfile={userProfile}
+                  onSaveMobileNumber={handleSaveMobileNumber}
+                  showNotification={showNotification}
+                  isSaving={isSavingMobile}
+                />
+              </Suspense>
             </div>
           </div>
         </div>
@@ -1206,8 +1187,6 @@ const CheckoutPage = () => {
 
       {/* Mobile Sticky Footer */}
       <div
-        initial={{ y: 100 }}
-        animate={{ y: 0 }}
         className="fixed bottom-0 left-0 right-0 bg-[#2e443c] border-t border-white/10 p-4 px-6 z-50 lg:hidden shadow-[0_-10px_30px_rgba(0,0,0,0.4)]"
       >
         <div className="flex items-center justify-around gap-5 max-w-[1200px] mx-auto">
@@ -1225,12 +1204,14 @@ const CheckoutPage = () => {
             </span>
           </div>
           <button
-            onClick={handlePayment}
-            disabled={isOrdering || !address}
+            onClick={!address ? handleScrollToAddress : handlePayment}
+            disabled={isOrdering || showMobileModal}
             className={`flex-1 h-10 max-w-[150px] rounded-xl font-bold uppercase tracking-widest text-[11px] shadow-lg active:scale-95 transition-all flex items-center justify-center gap-3 ${
-              !address
-                ? "bg-white/10 text-gray-400 border border-white/10"
-                : "bg-[#a89068] text-white"
+              showMobileModal
+                ? "bg-gray-400 text-white cursor-not-allowed opacity-60"
+                : !address
+                ? "bg-[#a89068] text-white border border-[#a89068] hover:bg-[#a89068]/90"
+                : "bg-[#a89068] text-white hover:bg-[#a89068]/90"
             }`}
           >
             {isOrdering ? (
@@ -1239,7 +1220,10 @@ const CheckoutPage = () => {
                 Proc...
               </>
             ) : !address ? (
-              "Set Address"
+              <>
+                <i className="fa-solid fa-map-pin text-[12px]"></i>
+                Set Address
+              </>
             ) : (
               <>
                 Pay Now <i className="fa-solid fa-lock text-[10px]"></i>

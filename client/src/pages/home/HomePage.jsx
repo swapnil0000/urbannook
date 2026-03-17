@@ -6,7 +6,7 @@ import AireHeroBanner from './AireHeroBanner';
 import AireFeaturedProducts from './AireFeaturedProducts';
 import AireTestimonials from './AireTestimonials';
 import AireInstagramFeed from './AireInstagramFeed';
-// const NewsTicker = lazy(() => import('./NewsTicker'));
+
 
 const HomePage = () => {
     useEffect(() => {

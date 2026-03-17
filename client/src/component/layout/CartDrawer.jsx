@@ -1,12 +1,15 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { useUpdateCartMutation } from '../../store/api/userApi';
+import { updateQuantity, removeItem } from '../../store/slices/cartSlice';
+import { setShowLoginModal } from '../../store/slices/uiSlice';
 
 const OptimizedImage = lazy(() => import('../OptimizedImage'));
 
 const CartDrawer = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [mounted, setMounted] = useState(false);
   
   // Get cart items from Redux store
@@ -30,45 +33,53 @@ const CartDrawer = ({ isOpen, onClose }) => {
     }
   }, [isOpen]);
 
-  const handleQuantityChange = async (productId, newQuantity) => {
+  const handleQuantityChange = async (productId, selectedColor, newQuantity, mongoId, currentQty) => {
     if (newQuantity <= 0) {
-      handleRemoveItem(productId);
+      handleRemoveItem(productId, selectedColor, mongoId);
       return;
     }
 
-    try {
-      const item = cartItems.find(item => item.id === productId);
-      const mongoId = item?.mongoId || productId;
-      
-      // SAFE CHECK: Handles both flat number and nested object
-      const currentQty = typeof item?.quantity === 'object' ? Number(item.quantity?.quantity || 0) : Number(item?.quantity || 0);
-      const selectedColor = item?.selectedColor || 'N/A';
-      
-      const action = newQuantity > currentQty ? 'add' : 'sub';
-      
-      await updateCart({ productId: mongoId, quantity: 1, action, color: selectedColor }).unwrap();
-    } catch (error) {
-      console.error('Failed to update cart:', error);
-      window.location.reload();
+    const hasToken = !!localStorage.getItem('authToken');
+    const isLoggedIn = isAuthenticated || hasToken;
+
+    if (isLoggedIn) {
+      try {
+        const action = newQuantity > currentQty ? 'add' : 'sub';
+        await updateCart({ productId: mongoId || productId, quantity: 1, action, color: selectedColor }).unwrap();
+      } catch (error) {
+        console.error('Failed to update cart:', error);
+        window.location.reload();
+      }
+    } else {
+      dispatch(updateQuantity({ id: productId, quantity: newQuantity, selectedColor }));
     }
   };
 
-  const handleRemoveItem = async (productId) => {
-    try {
-      const item = cartItems.find(item => item.id === productId);
-      const mongoId = item?.mongoId || productId;
-      const selectedColor = item?.selectedColor || 'N/A';
-      
-      await updateCart({ productId: mongoId, quantity: 1, action: 'remove', color: selectedColor }).unwrap();
-    } catch (error) {
-      console.error('Failed to remove item:', error);
-      window.location.reload();
+  const handleRemoveItem = async (productId, selectedColor, mongoId) => {
+    const hasToken = !!localStorage.getItem('authToken');
+    const isLoggedIn = isAuthenticated || hasToken;
+
+    if (isLoggedIn) {
+      try {
+        await updateCart({ productId: mongoId || productId, quantity: 1, action: 'remove', color: selectedColor }).unwrap();
+      } catch (error) {
+        console.error('Failed to remove item:', error);
+        window.location.reload();
+      }
+    } else {
+      dispatch(removeItem({ id: productId, selectedColor }));
     }
   };
   
   const handleCheckout = () => {
+    const hasToken = !!localStorage.getItem('authToken');
+    const isLoggedIn = isAuthenticated || hasToken;
     onClose();
-    navigate('/checkout');
+    if (isLoggedIn) {
+      navigate('/checkout');
+    } else {
+      dispatch(setShowLoginModal(true));
+    }
   };
 
   if (!mounted && !isOpen) return null;
@@ -143,9 +154,10 @@ const CartDrawer = ({ isOpen, onClose }) => {
                 {cartItems.map((item) => {
                   // Mongoose bug safe extraction
                   const itemQty = typeof item.quantity === 'object' ? Number(item.quantity?.quantity || 0) : Number(item.quantity || 0);
+                  const itemColor = item.selectedColor || 'N/A';
 
                   return (
-                    <div key={item.id} className="flex items-stretch gap-4 group relative pb-6 border-b border-gray-50 last:border-0 last:pb-0">
+                    <div key={`${item.id}-${itemColor}`} className="flex items-stretch gap-4 group relative pb-6 border-b border-gray-50 last:border-0 last:pb-0">
                       
                       {/* Image */}
                       <div className="w-[85px] h-[85px] bg-gray-50 rounded-2xl overflow-hidden shrink-0 relative border border-gray-100 flex items-center justify-center">
@@ -153,7 +165,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
                           <OptimizedImage
                             src={item.image || '/placeholder.jpg'}
                             alt={item.name}
-                            className="w-full h-full object-contain p-2 mix-blend-multiply"
+                            className="w-full h-full object-contain mix-blend-multiply"
                             loading="lazy"
                           />
                         </Suspense>
@@ -169,7 +181,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
                               {item.name}
                             </h4>
                             <button 
-                              onClick={() => handleRemoveItem(item.id)}
+                              onClick={() => handleRemoveItem(item.id, itemColor, item.mongoId)}
                               className="text-gray-300 hover:text-red-500 transition-colors p-1 -mt-1 -mr-1 shrink-0"
                               title="Remove Item"
                             >
@@ -201,7 +213,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
                           {/* Quantity Controls - Exact match to your screenshot inspector */}
                           <div className="flex items-center gap-4 bg-white border border-gray-200 rounded-full h-8 px-3 shadow-sm">
                             <button 
-                              onClick={() => handleQuantityChange(item.id, Math.max(0, itemQty - 1))}
+                              onClick={() => handleQuantityChange(item.id, itemColor, Math.max(0, itemQty - 1), item.mongoId, itemQty)}
                               className="w-4 h-full flex items-center justify-center text-gray-400 hover:text-[#0a110e] transition-colors"
                             >
                               <i className="fa-solid fa-minus text-[10px]"></i>
@@ -210,7 +222,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
                               {itemQty}
                             </span>
                             <button 
-                              onClick={() => handleQuantityChange(item.id, itemQty + 1)}
+                              onClick={() => handleQuantityChange(item.id, itemColor, itemQty + 1, item.mongoId, itemQty)}
                               className="w-4 h-full flex items-center justify-center text-gray-400 hover:text-[#0a110e] transition-colors"
                             >
                               <i className="fa-solid fa-plus text-[10px]"></i>

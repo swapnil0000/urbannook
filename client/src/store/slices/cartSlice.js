@@ -1,9 +1,51 @@
 import { createSlice } from '@reduxjs/toolkit';
 
+// --- Guest Cart localStorage helpers ---
+const GUEST_CART_KEY = 'guestCart';
+const GUEST_ID_KEY = 'guestId';
+
+export const getOrCreateGuestId = () => {
+  let guestId = localStorage.getItem(GUEST_ID_KEY);
+  if (!guestId) {
+    guestId = 'guest_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+    localStorage.setItem(GUEST_ID_KEY, guestId);
+  }
+  return guestId;
+};
+
+const saveGuestCart = (items) => {
+  try {
+    const json = JSON.stringify(items);
+    localStorage.setItem(GUEST_CART_KEY, json);
+  } catch (e) {
+    console.error('[saveGuestCart] Failed to save:', e);
+  }
+};
+
+export const loadGuestCart = () => {
+  try {
+    const raw = localStorage.getItem(GUEST_CART_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return parsed;
+  } catch (e) {
+    console.error('[loadGuestCart] Error parsing:', e);
+    return [];
+  }
+};
+
+export const clearGuestCart = () => {
+  localStorage.removeItem(GUEST_CART_KEY);
+};
+
+const isGuest = () => !localStorage.getItem('authToken');
+
+// Load persisted guest cart on app start — only for guests, not logged-in users
+const isLoggedInOnLoad = !!localStorage.getItem('authToken');
+const persistedItems = isLoggedInOnLoad ? [] : loadGuestCart();
 const initialState = {
-  items: [],
-  totalQuantity: 0,
-  totalAmount: 0,
+  items: persistedItems,
+  totalQuantity: persistedItems.reduce((t, i) => t + (i.quantity || 0), 0),
+  totalAmount: persistedItems.reduce((t, i) => t + ((i.price || 0) * (i.quantity || 0)), 0),
   selections: {}, // Managed by productId: { quantity, color }
 };
 
@@ -18,125 +60,169 @@ const cartSlice = createSlice({
         color: color || 'N/A'
       };
     },
+
     addItem: (state, action) => {
-      const { id, name, price, image, quantity = 1, mongoId } = action.payload;
-      const existingItem = state.items.find(item => item.id === id);
-      
+      const { id, name, price, image, quantity = 1, mongoId, selectedColor } = action.payload;
+      const existingItem = state.items.find(item => 
+        item.id === id && 
+        (item.selectedColor || 'N/A') === (selectedColor || 'N/A')
+      );
+
       if (existingItem) {
         existingItem.quantity += quantity;
       } else {
-        state.items.push({ 
-          id, 
-          mongoId: mongoId || id, // Use provided mongoId or fallback to id
-          name, 
-          price, 
-          image, 
-          quantity 
+        state.items.push({
+          id,
+          mongoId: mongoId || id,
+          name,
+          price,
+          image,
+          quantity,
+          selectedColor: selectedColor || 'N/A'
         });
       }
-      
+
       state.totalQuantity += quantity;
       state.totalAmount += price * quantity;
+
+      // Persist to localStorage for guest users so cart survives refresh
+      const isGuestUser = isGuest();
+      if (isGuestUser) {
+        getOrCreateGuestId();
+        saveGuestCart(state.items);
+      } else {
+        console.log('[cartSlice] User is logged in, not saving to guest cart');
+      }
     },
+
     removeItem: (state, action) => {
-      const id = action.payload;
-      const existingItem = state.items.find(item => item.id === id);
+      const { id, selectedColor } = action.payload;
       
+      // FIX: Check both ID and color to remove correct variant
+      const existingItem = state.items.find(item => 
+        item.id === id && 
+        (item.selectedColor || 'N/A') === (selectedColor || 'N/A')
+      );
+
       if (existingItem) {
         state.totalQuantity -= existingItem.quantity;
         state.totalAmount -= existingItem.price * existingItem.quantity;
-        state.items = state.items.filter(item => item.id !== id);
+        state.items = state.items.filter(item => 
+          !(item.id === id && (item.selectedColor || 'N/A') === (selectedColor || 'N/A'))
+        );
+      }
+
+      if (isGuest()) {
+        saveGuestCart(state.items);
       }
     },
+
     updateQuantity: (state, action) => {
-      const { id, quantity } = action.payload;
-      const existingItem = state.items.find(item => item.id === id);
+      const { id, quantity, selectedColor } = action.payload;
       
+      // FIX: Check both ID and color to update correct variant
+      const existingItem = state.items.find(item => 
+        item.id === id && 
+        (item.selectedColor || 'N/A') === (selectedColor || 'N/A')
+      );
+
       if (existingItem && quantity > 0) {
         const diff = quantity - existingItem.quantity;
         existingItem.quantity = quantity;
         state.totalQuantity += diff;
         state.totalAmount += diff * existingItem.price;
       }
+
+      if (isGuest()) {
+        saveGuestCart(state.items);
+      }
     },
+
     clearCart: (state) => {
       state.items = [];
       state.totalQuantity = 0;
       state.totalAmount = 0;
-      
-      // Also clear any cached cart data in localStorage if exists
-      try {
-        localStorage.removeItem('cartItems');
-      } catch (error) {
-        console.warn('Failed to clear cart from localStorage:', error);
-      }
+      state.selections = {};
+      // Clear guest cart from localStorage on logout or order completion
+      // clearGuestCart();
     },
+
     syncCartFromProfile: (state, action) => {
       const profileCartItems = action.payload || [];
-      state.items = profileCartItems.map(item => ({
-        // Use composite ID for Redux tracking
-        id: `${item.productId || item._id}:${item.selectedColor || 'N/A'}`,
-        mongoId: item.productId || item._id, // Keep original ID for API
-        name: item.productName || item.name,
-        price: item.productPrice || item.price || item.sellingPrice,
-        image: item.productImage || item.image || item.productImg,
-        quantity: item.quantity || 1,
-        selectedColor: item.selectedColor || 'N/A'
-      }));
-      
-      state.totalQuantity = state.items.reduce((total, item) => total + (item.quantity || 0), 0);
-      state.totalAmount = state.items.reduce((total, item) => total + (item.price * (item.quantity || 0)), 0);
+      state.items = profileCartItems.map(item => {
+        let quantity = 1;
+        if (typeof item.quantity === 'number') {
+          quantity = item.quantity;
+        } else if (item.quantity !== null && typeof item.quantity === 'object') {
+          quantity = typeof item.quantity.quantity === 'number' ? item.quantity.quantity : 1;
+        }
+        return {
+          id: item.productId || item._id,
+          mongoId: item.productId || item._id,
+          name: item.productName || item.name,
+          price: typeof item.price === 'number' ? item.price : (item.sellingPrice || item.productPrice || 0),
+          image: item.productImage || item.image || item.productImg,
+          quantity,
+          selectedColor: item.selectedColor || 'N/A'
+        };
+      });
+
+      state.totalQuantity = state.items.reduce((total, item) => total + item.quantity, 0);
+      state.totalAmount = state.items.reduce((total, item) => total + (item.price * item.quantity), 0);
     },
+
     setCartItems: (state, action) => {
       const cartData = action.payload || [];
-      
-      // CRITICAL FIX: Handle multiple possible data structures safely
+
       let cartItems = [];
-      
+
       if (Array.isArray(cartData)) {
-        // If cartData is already an array
         if (cartData.length > 0 && cartData[0]?.items) {
-          // Format: [{ items: [...] }]
           cartItems = cartData[0].items;
         } else {
-          // Format: [item1, item2, ...]
           cartItems = cartData;
         }
       } else if (cartData && typeof cartData === 'object') {
-        // If cartData is an object
         if (cartData.availableItems && Array.isArray(cartData.availableItems)) {
-          // Format: { availableItems: [...] } - Backend format
           cartItems = cartData.availableItems;
         } else if (cartData.items && Array.isArray(cartData.items)) {
-          // Format: { items: [...] }
           cartItems = cartData.items;
         } else if (cartData.data && Array.isArray(cartData.data)) {
-          // Format: { data: [...] }
           cartItems = cartData.data;
         }
       }
-      
-      // Ensure cartItems is always an array before mapping
+
       if (!Array.isArray(cartItems)) {
         cartItems = [];
       }
-      
-      state.items = cartItems.map(item => ({
-        // Use composite ID for Redux tracking
-        id: `${item.productId || item._id}:${item.selectedColor || 'N/A'}`,
-        mongoId: item.productId || item._id, // Keep original ID for API
-        name: item.name || item.productName,
-        price: item.price || item.productPrice || item.sellingPrice,
-        image: item.image || item.productImage || item.productImg,
-        quantity: item.quantity || 1,
-        selectedColor: item.selectedColor || 'N/A'
-      }));
-      
+
+      state.items = cartItems.map(item => {
+        let quantity = 1;
+        if (typeof item.quantity === 'number') {
+          quantity = item.quantity;
+        } else if (item.quantity !== null && typeof item.quantity === 'object') {
+          quantity = typeof item.quantity.quantity === 'number' ? item.quantity.quantity : 1;
+        }
+
+        const price = typeof item.price === 'number' ? item.price : (item.price?.price ?? 0);
+
+        return {
+          id: item.productId || item._id,
+          mongoId: item.productId || item._id,
+          name: item.name || item.productName,
+          price,
+          image: item.image || item.productImage || item.productImg,
+          quantity,
+          selectedColor: item.selectedColor || 'N/A'
+        };
+      });
+
       state.totalQuantity = state.items.reduce((total, item) => total + (item.quantity || 0), 0);
-      state.totalAmount = state.items.reduce((total, item) => total + (item.price * (item.quantity || 0)), 0);
+      state.totalAmount = state.items.reduce((total, item) => total + ((item.price || 0) * (item.quantity || 0)), 0);
     },
   },
 });
 
 export const { addItem, removeItem, updateQuantity, clearCart, syncCartFromProfile, setCartItems, updateSelection } = cartSlice.actions;
+
 export default cartSlice.reducer;

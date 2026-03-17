@@ -158,7 +158,7 @@ const NewHeader = () => {
   return (
     <>
       <header
-        className={`fixed top-3 left-3 right-3 md:top-6 md:left-6 md:right-6 z-50 bg-[#e8f8d7]/90 backdrop-blur-xl shadow-lg border border-white/40 ${
+        className={`fixed top-14 left-3 right-3 md:top-12 md:left-6 md:right-6 z-50 bg-[#e8f8d7]/90 backdrop-blur-xl shadow-lg border border-white/40 ${
           isMenuOpen ? 'rounded-[2rem]' : 'rounded-full'
         }`}
         style={{
@@ -354,7 +354,7 @@ const NewHeader = () => {
 
                          {/* Cart */}
                          <button onClick={handleMobileCart} className="flex flex-col items-center gap-2 group/btn relative">
-                            <div className="w-12 h-12 rounded-2xl bg-emerald-100 border border-emerald-200 flex items-center justify-center text-emerald-800 shadow-sm group-hover/btn:scale-105 group-hover/btn:bg-emerald-200 transition-all">
+                            <div className="w-12 h-12 rounded-2xl bg-white border border-emerald-200 flex items-center justify-center text-emerald-800 shadow-sm group-hover/btn:scale-105 group-hover/btn:bg-emerald-200 transition-all">
                                 <i className="fa-solid fa-cart-shopping text-lg"></i>
                             </div>
                             {totalQuantity > 0 && (
@@ -396,6 +396,19 @@ const NewHeader = () => {
                     >
                         <i className="fa-regular fa-user text-sm"></i> 
                         Login / Create Account
+                    </button>
+                    {/* Cart button for guests */}
+                    <button
+                        onClick={handleMobileCart}
+                        className="w-full py-4 bg-white border border-emerald-200 text-emerald-900 rounded-xl font-bold uppercase tracking-widest text-xs shadow-sm hover:bg-emerald-50 flex items-center justify-center gap-3 active:scale-95 transition-all relative"
+                    >
+                        <i className="fa-solid fa-cart-shopping text-sm"></i>
+                        View Cart
+                        {totalQuantity > 0 && (
+                            <span className="absolute top-2 right-4 w-5 h-5 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold border-2 border-white shadow-sm">
+                                {totalQuantity}
+                            </span>
+                        )}
                     </button>
                 </div>
               )}
