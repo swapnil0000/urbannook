@@ -295,18 +295,24 @@ const ProductDetailPage = () => {
             className="lg:col-span-6 max-w-[500px] w-full lg:sticky lg:top-24 flex flex-col items-start"
             style={{ maxHeight: 'calc(100vh - 6rem)' }}
           >
-            <div className="relative max-w-[500px] max-h-[520px] lg:max-h-[600px] rounded-2xl overflow-hidden shadow-2xl group w-full">
+            <div className="relative max-w-[500px] h-[400px] lg:h-[520px] rounded-2xl overflow-hidden shadow-2xl group w-full">
               <div className="w-full h-full relative cursor-pointer flex items-center justify-center">
-                <div key={currentImageIndex}>
-                  <Suspense fallback={<div className="w-full h-full bg-gray-200 animate-pulse rounded-lg"></div>}>
-                    <OptimizedImage
-                      src={galleryImages[currentImageIndex] || '/placeholder.jpg'}
-                      alt={product.productName}
-                      className="object-contain"
-                      loading="eager"
-                    />
-                  </Suspense>
-                </div>
+                <Suspense fallback={<div className="w-full h-full bg-gray-200 animate-pulse rounded-lg"></div>}>
+                  {galleryImages.map((img, idx) => (
+                    <div
+                      key={idx}
+                      className="absolute inset-0 flex items-center justify-center transition-opacity duration-300"
+                      style={{ opacity: idx === currentImageIndex ? 1 : 0, pointerEvents: idx === currentImageIndex ? 'auto' : 'none' }}
+                    >
+                      <OptimizedImage
+                        src={img || '/placeholder.jpg'}
+                        alt={product.productName}
+                        className="object-contain"
+                        loading={idx === 0 ? 'eager' : 'lazy'}
+                      />
+                    </div>
+                  ))}
+                </Suspense>
               </div>
 
               {galleryImages.length > 1 && (
@@ -345,7 +351,7 @@ const ProductDetailPage = () => {
                       <OptimizedImage
                         src={img}
                         alt={`Product thumbnail ${idx + 1}`}
-                        className="w-full h-full object-contain p-1"
+                        className="w-full h-full object-contain"
                         loading="lazy"
                       />
                     </Suspense>
@@ -364,7 +370,7 @@ const ProductDetailPage = () => {
             </div>
           </div>
 
-<div className="lg:col-span-5 flex flex-col ml-auto w-full lg:max-w-[calc(100%-560px)]">
+<div className="lg:col-span-5 flex flex-col ml-auto w-full lg:max-w-[calc(100%-530px)]">
             <div className="mb-1 lg:mb-2 border-b border-[#F5DEB3]/10 pb-2 lg:pb-3">
               <div className="flex justify-between items-start mb-4">
                 <span className="text-[#1c3026] text-[9px] lg:text-[10px] font-bold tracking-[0.2em] uppercase bg-[#F5DEB3] px-3 py-1.5 rounded-full shadow-lg shadow-[#F5DEB3]/10">
@@ -446,7 +452,7 @@ const ProductDetailPage = () => {
               </div>
             )}
 
-            <div className="hidden lg:block bg-white/5 backdrop-blur-sm p-8 rounded-[2rem] max-w-[400px] border border-[#F5DEB3]/10 mb-10">
+            <div className="hidden lg:block bg-white/5 backdrop-blur-sm p-8 rounded-[2rem] max-w-[420px] border border-[#F5DEB3]/10 mb-10">
               <div className="flex flex-row gap-4">
                 {!isInCart ? (
                   <button

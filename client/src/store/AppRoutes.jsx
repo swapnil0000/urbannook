@@ -70,9 +70,11 @@ const AppRoutes = () => {
       <Route
         path="/checkout"
         element={
-          <Suspense fallback={<MinimalLoader />}>
-            <CheckoutPage />
-          </Suspense>
+          <ProtectedRoute>
+            <Suspense fallback={<MinimalLoader />}>
+              <CheckoutPage />
+            </Suspense>
+          </ProtectedRoute>
         }
       />
       <Route

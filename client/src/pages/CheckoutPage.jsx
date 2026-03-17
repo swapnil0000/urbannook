@@ -27,16 +27,13 @@ const MobileNumberModal = lazy(() => import("../component/MobileNumberModal"));
 const CheckoutPage = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const { showNotification, openLoginModal } = useUI();
+  const { showNotification } = useUI();
   const showNotificationRef = useRef(showNotification);
-  const openLoginModalRef = useRef(openLoginModal);
   useEffect(() => { showNotificationRef.current = showNotification; }, [showNotification]);
-  useEffect(() => { openLoginModalRef.current = openLoginModal; }, [openLoginModal]);
   const { items: cartItems, selections: cartSelections } = useSelector((state) => state.cart);
   const { isAuthenticated } = useSelector((state) => state.auth);
   const paymentCompletedRef = useRef(false);
   const cartLoadedRef = useRef(false);
-  const wasGuestRef = useRef(false);
 
   const [userProfile, setUserProfile] = useState(null);
   const [address, setAddress] = useState("");
@@ -153,21 +150,6 @@ const CheckoutPage = () => {
   useEffect(() => {
     const hasToken = !!localStorage.getItem('authToken');
     const isLoggedIn = isAuthenticated || hasToken;
-
-    if (!isLoggedIn) {
-      if (!wasGuestRef.current) {
-        wasGuestRef.current = true;
-        showNotificationRef.current("Please login to complete your order", "info");
-        openLoginModalRef.current();
-        navigate("/");
-      }
-      return;
-    }
-
-    // User just logged in
-    if (wasGuestRef.current) {
-      wasGuestRef.current = false;
-    }
 
     if (cartItems.length > 0) {
       cartLoadedRef.current = true;
