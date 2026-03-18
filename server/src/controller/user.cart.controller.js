@@ -21,13 +21,14 @@ import {
 
 const userAddToCart = asyncHandler(async (req, res) => {
   const { userId } = req.user;
-  const { productId, productQuanity, quantity, color } = req.body;
+  const { productId, productQuanity, quantity, color, image } = req.body;
 
   const result = await addToCartService({
     userId,
     productId,
     productQuanity: productQuanity || quantity || 1,
     color,
+    image,
   });
 
   return res
@@ -60,7 +61,7 @@ const userGetCart = asyncHandler(async (req, res) => {
 
 const userUpdateCartQuantity = asyncHandler(async (req, res) => {
   const { userId } = req.user;
-  const { productId, quantity, action, color } = req.body || {};
+  const { productId, quantity, action, color, image } = req.body || {};
 
   const result = await cartQuantityService({
     userId,
@@ -68,6 +69,7 @@ const userUpdateCartQuantity = asyncHandler(async (req, res) => {
     quantity: quantity || 1,
     action,
     color,
+    image,
   });
 
   return res

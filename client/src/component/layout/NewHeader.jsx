@@ -98,10 +98,16 @@ const NewHeader = () => {
 
   // Hide/Show Header on Scroll
   useEffect(() => {
+    const threshold = 10;
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
+      
+      if (Math.abs(currentScrollY - lastScrollY.current) < threshold) {
+        return;
+      }
+
       if (!isMenuOpen) {
-        if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
+        if (currentScrollY > lastScrollY.current && currentScrollY > 100) {
           setShowHeader(false);
           setShowUserDropdown(false);
         } else {
@@ -110,7 +116,7 @@ const NewHeader = () => {
       }
       lastScrollY.current = currentScrollY;
     };
-    window.addEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, [isMenuOpen]);
 
@@ -158,11 +164,11 @@ const NewHeader = () => {
   return (
     <>
       <header
-        className={`fixed top-14 left-3 right-3 md:top-12 md:left-6 md:right-6 z-50 bg-[#e8f8d7]/90 backdrop-blur-xl shadow-lg border border-white/40 ${
+        className={`fixed top-14 left-3 right-3 md:top-12 md:left-6 md:right-6 z-50 bg-[#e8f8d7]/90 backdrop-blur-xl shadow-lg border border-white/40 transition-all duration-0 md:duration-500 ease-in-out ${
           isMenuOpen ? 'rounded-[2rem]' : 'rounded-full'
         }`}
         style={{
-          transform: showHeader ? 'translateY(0)' : 'translateY(-150%)',
+          transform: showHeader ? 'translateY(0)' : 'translateY(-200%)',
         }}
       >
         <div className="px-4 py-2">

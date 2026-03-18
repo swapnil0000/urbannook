@@ -277,17 +277,20 @@ const CheckoutPage = () => {
     }
   };
 
-  const handleRemoveItem = async (productId) => {
+  const handleRemoveItem = async (productId, selectedColor) => {
     try {
-      const item = cartItems.find((item) => item.id === productId);
+      const item = cartItems.find(
+        (item) => item.id === productId && (item.selectedColor || 'N/A') === (selectedColor || 'N/A')
+      );
       const mongoId = item?.mongoId || productId;
-      const selectedColor = item?.selectedColor || "N/A";
+      const itemImage = item?.image || "";
 
       await updateCart({
         productId: mongoId,
         quantity: 1,
         action: "remove",
         color: selectedColor,
+        image: itemImage,
       }).unwrap();
 
       showNotification("Item removed from cart", "success");
@@ -641,7 +644,7 @@ const CheckoutPage = () => {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleRemoveItem(item.id);
+                        handleRemoveItem(item?.id, item?.selectedColor);
                       }}
                       className="absolute top-2 right-2 w-4 h-4 rounded-full bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 flex items-center justify-center transition-all opacity-100"
                       title="Remove item"

@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect, lazy, Suspense, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { useCookies } from "react-cookie";
@@ -58,6 +58,16 @@ const ProductDetailPage = () => {
   const { refetch: refetchCart } = useCartData();
 
   const product = productResponse?.data;
+  const galleryImages = useMemo(() => {
+    if (!product) return [];
+    if (product.secondaryImages?.length === product.color?.length && product.color?.length > 0) {
+        return product.secondaryImages;
+    }
+
+    const all = [product.productImg, ...(product.secondaryImages || [])].filter(Boolean);
+    // Remove duplicate URLs
+    return all.filter((url, index) => all.indexOf(url) === index);
+  }, [product]);
 
   useEffect(() => {
     if (product?.color && product.color.length > 0) {
@@ -68,37 +78,52 @@ const ProductDetailPage = () => {
         initialColor = savedSelection.color;
       }
       setSelectedColor(initialColor);
+      const colorIdx = product.color.indexOf(initialColor);
+      if (colorIdx !== -1 && galleryImages[colorIdx]) {
+          setCurrentImageIndex(colorIdx);
+      }
     } else {
       setSelectedColor("");
     }
-  }, [product, cartSelections]);
+  }, [product, cartSelections, galleryImages]);
 
-  const cartItem = cartItems.find((item) => {
-    const isIdMatch =
-      String(item.id) === String(product?.productId) ||
-      String(item.mongoId) === String(product?.productId) ||
-      String(item.productId) === String(product?.productId);
-
-    if (!isIdMatch) return false;
-
-    if (!product?.color || product.color.length === 0) {
-      return true;
+  useEffect(() => {
+    if (!product?.color || product.color.length === 0) return;
+    if (product.color[currentImageIndex]) {
+        setSelectedColor(product.color[currentImageIndex]);
     }
+  }, [currentImageIndex, product]);
 
-    return (item.selectedColor || 'N/A') === (selectedColor || 'N/A');
-  });
+  const cartItem = useMemo(() => {
+    if (!product) return null;
+    return cartItems.find((item) => {
+        const isIdMatch =
+          String(item.id) === String(product?.productId) ||
+          String(item.mongoId) === String(product?.productId) ||
+          String(item.productId) === String(product?.productId);
+
+        if (!isIdMatch) return false;
+
+        if (!product?.color || product.color.length === 0) {
+          return true;
+        }
+
+        return (item.selectedColor || 'N/A') === (selectedColor || 'N/A');
+    });
+  }, [cartItems, product, selectedColor]);
 
   const isInCart = !!cartItem;
-  const currentCartQty = cartItem ? (Number(cartItem.quantity) || 0) : 0;
+  const currentCartQty = cartItem ? (Number(itemQty(cartItem.quantity)) || 0) : 0;
+
+  function itemQty(q) {
+    if (typeof q === 'object' && q !== null) return q.quantity || 0;
+    return q || 0;
+  }
 
   const wishlistItems = useSelector((state) => state.wishlist.items);
   const isInWishlist = wishlistItems.some(
     (item) => item.productName === product?.productName,
   );
-
- const galleryImages = product
-  ? [product?.image, ...(product?.secondaryImages || [])].filter(Boolean)
-  : [];
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -117,6 +142,10 @@ const ProductDetailPage = () => {
   const handleInitialAddToCart = async () => {
     if (!product) return;
 
+    const effectiveColor = selectedColor || (product.color && product.color.length > 0 ? product.color[0] : 'N/A');
+    const colorIdx = product.color?.indexOf(effectiveColor) || 0;
+    const selectedImage = galleryImages[colorIdx] || product.productImg;
+
     const hasToken = !!localStorage.getItem("authToken");
     const isLoggedIn = isAuthenticated || hasToken;
 
@@ -125,13 +154,14 @@ const ProductDetailPage = () => {
         await addToCartAPI({
           productId: product?.productId,
           quantity: 1,
-          color: selectedColor || 'N/A',
+          color: effectiveColor,
+          image: selectedImage
         }).unwrap();
 
         dispatch(updateSelection({
           productId: product.productId,
           quantity: 1,
-          color: selectedColor || 'N/A'
+          color: effectiveColor
         }));
 
         confetti({
@@ -142,9 +172,10 @@ const ProductDetailPage = () => {
         });
 
         await refetchCart();
+        setSelectedColor(effectiveColor);
 
         setFeedbackMessage(
-          selectedColor ? `Added ${selectedColor} to Cart` : "Added to Cart",
+          effectiveColor !== 'N/A' ? `Added ${effectiveColor} to Cart` : "Added to Cart",
         );
         setTimeout(() => setFeedbackMessage(""), 2000);
       } catch (err) {
@@ -157,19 +188,25 @@ const ProductDetailPage = () => {
         mongoId: product?.productId,
         name: product?.productName,
         price: product?.sellingPrice || product?.price,
-        image: product?.productImg,
+        image: selectedImage,
         quantity: 1,
-        selectedColor: selectedColor || 'N/A'
+        selectedColor: effectiveColor
       }));
       
+      setSelectedColor(effectiveColor);
       setFeedbackMessage("Added");
       setTimeout(() => setFeedbackMessage(""), 2000);
     }
   };
 
   const handleUpdateQty = async (newQuantity) => {
+    if (!product) return;
+    
     const hasToken = !!localStorage.getItem('authToken');
     const isLoggedIn = isAuthenticated || hasToken;
+    
+    const colorIdx = product.color?.indexOf(selectedColor) || 0;
+    const selectedImage = galleryImages[colorIdx] || product.productImg;
 
     if (newQuantity < 1) {
       if (isLoggedIn) {
@@ -179,6 +216,7 @@ const ProductDetailPage = () => {
             quantity: 1,
             action: 'remove',
             color: selectedColor || undefined,
+            image: selectedImage
           }).unwrap();
           
           await refetchCart();
@@ -187,7 +225,6 @@ const ProductDetailPage = () => {
           showNotification('Failed to update cart', 'error');
         }
       } else {
-        // FIX: Pass color when removing guest item
         dispatch(removeItem({ 
           id: product?.productId,
           selectedColor: selectedColor || 'N/A'
@@ -204,6 +241,7 @@ const ProductDetailPage = () => {
           quantity: 1,
           action,
           color: selectedColor || undefined,
+          image: selectedImage
         }).unwrap();
         
         await refetchCart();
@@ -212,7 +250,6 @@ const ProductDetailPage = () => {
         window.location.reload();
       }
     } else {
-      // FIX: Pass color when updating guest item quantity
       dispatch(updateQuantity({ 
         id: product.productId, 
         quantity: newQuantity,
@@ -374,7 +411,10 @@ const ProductDetailPage = () => {
                 {galleryImages.map((img, idx) => (
                   <button
                     key={idx}
-                    onClick={() => setCurrentImageIndex(idx)}
+                    onClick={() => {
+                        setCurrentImageIndex(idx);
+                        if (product.color?.[idx]) setSelectedColor(product.color[idx]);
+                    }}
                     className={`w-16 h-16 lg:w-20 lg:h-20 rounded-xl border bg-[#e8e6e1] overflow-hidden transition-all flex-shrink-0 relative group ${
                       currentImageIndex === idx
                         ? 'border-[#F5DEB3] ring-2 ring-[#F5DEB3]/30 scale-105'
@@ -456,6 +496,9 @@ const ProductDetailPage = () => {
                       key={idx}
                       onClick={() => {
                         setSelectedColor(colorName);
+                        if (galleryImages[idx]) {
+                            setCurrentImageIndex(idx);
+                        }
                       }}
                       title={colorName}
                       className={`w-8 h-8 rounded-full transition-all duration-300 ${
@@ -602,9 +645,8 @@ const ProductDetailPage = () => {
         </div>
       </main>
 
-      <div
-        className="fixed bottom-0 left-0 right-0 bg-[#1c3026]/95 backdrop-blur-xl border-t border-[#F5DEB3]/20 p-4 px-6 z-50 lg:hidden flex gap-4 items-center shadow-[0_-10px_40px_rgba(0,0,0,0.3)]"
-      >
+      {/* Mobile Sticky Bar */}
+      <div className="fixed bottom-0 left-0 right-0 bg-[#1c3026]/95 backdrop-blur-xl border-t border-[#F5DEB3]/20 p-4 px-6 z-50 lg:hidden flex gap-4 items-center shadow-[0_-10px_40px_rgba(0,0,0,0.3)]">
         <div className="flex-1">
           {!isInCart ? (
             <button
