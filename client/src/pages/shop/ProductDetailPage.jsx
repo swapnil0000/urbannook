@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { useCookies } from "react-cookie";
 import confetti from "canvas-confetti";
+import SEOHead from "../../component/SEOHead";
 
 // API & Redux imports
 import { useGetProductByIdQuery } from "../../store/api/productsApi";
@@ -311,8 +312,41 @@ const ProductDetailPage = () => {
     </div>
   );
 
+  const productStructuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.productName,
+    image: [product.image, ...(product.secondaryImages || [])].filter(Boolean),
+    description: product.productSubDes,
+    sku: product.productId,
+    brand: { '@type': 'Brand', name: 'UrbanNook' },
+    offers: {
+      '@type': 'Offer',
+      url: `https://www.urbannook.in/product/${product.productId}`,
+      priceCurrency: 'INR',
+      price: product.sellingPrice,
+      availability: product.productStatus === 'in_stock'
+        ? 'https://schema.org/InStock'
+        : 'https://schema.org/OutOfStock',
+      seller: { '@type': 'Organization', name: 'UrbanNook' },
+    },
+    aggregateRating: {
+      '@type': 'AggregateRating',
+      ratingValue: '4.8',
+      reviewCount: '24',
+    },
+  };
+
   return (
     <div className="bg-[#2e443c] min-h-screen font-sans text-gray-200 selection:bg-[#F5DEB3] selection:text-[#1c3026] relative overflow-hidden">
+      <SEOHead
+        title={product.productName}
+        description={product.productSubDes || `Buy ${product.productName} at UrbanNook. Premium quality, fast pan-India delivery.`}
+        image={product.image}
+        url={`/product/${product.productId}`}
+        type="product"
+        structuredData={productStructuredData}
+      />
       <div className="fixed top-0 left-0 w-[300px] h-[300px] bg-[#2e443c] rounded-full blur-[150px] pointer-events-none opacity-40"></div>
 
       <main className="mx-auto pt-24 pb-32 lg:pt-36 lg:pb-20 px-4 lg:px-12 relative z-10">

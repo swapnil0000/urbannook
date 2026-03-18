@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+
+# Block private/account routes
+Disallow: /checkout
+Disallow: /profile
+Disallow: /orders
+Disallow: /wishlist
+Disallow: /settings
+Disallow: /payment-processing/
+Disallow: /payment-failed
+
+Sitemap: https://www.urbannook.in/sitemap.xml
