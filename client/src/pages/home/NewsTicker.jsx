@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 const NewsTicker = () => {
   const [isPaused, setIsPaused] = useState(false);
@@ -9,9 +10,9 @@ const NewsTicker = () => {
   ];
 
   return (
-    <div className="relative overflow-hidden">
+    <Link to="/products" className="block relative overflow-hidden group">
       {/* News Ticker Scroll - Matching Header Style */}
-      <div className="bg-emerald-50/50 border-b border-emerald-200/40 overflow-hidden relative py-3.5 sm:py-3">
+      <div className="bg-emerald-50/50 border-b border-emerald-200/40 overflow-hidden relative py-2.5 sm:py-3 transition-colors hover:bg-emerald-100/50">
         {/* Custom Marquee Keyframes */}
         <style>{`
           @keyframes marquee {
@@ -40,11 +41,7 @@ const NewsTicker = () => {
                 key={index}
                 className="flex items-center px-6 sm:px-8"
               >
-                <span className={`text-[10px] sm:text-xs font-bold tracking-[0.15em] uppercase ${
-                  headline.includes('₹50 DELIVERY') 
-                    ? 'text-emerald-700 font-extrabold text-xs sm:text-sm' 
-                    : 'text-emerald-700 font-extrabold text-xs sm:text-sm'
-                }`}>
+                <span className={`text-[9px] sm:text-xs font-bold tracking-[0.15em] uppercase text-emerald-700 font-extrabold`}>
                   {headline}
                 </span>
                 {/* Separator Icon */}
@@ -62,8 +59,9 @@ const NewsTicker = () => {
         <div className="absolute inset-y-0 left-0 w-16 sm:w-20 bg-gradient-to-r from-emerald-50/50 to-transparent z-10 pointer-events-none"></div>
         <div className="absolute inset-y-0 right-0 w-16 sm:w-20 bg-gradient-to-l from-emerald-50/50 to-transparent z-10 pointer-events-none"></div>
       </div>
-    </div>
+    </Link>
   );
 };
 
 export default NewsTicker;
+

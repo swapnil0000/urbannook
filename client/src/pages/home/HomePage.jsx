@@ -7,6 +7,7 @@ import AireHeroBanner from './AireHeroBanner';
 import AireFeaturedProducts from './AireFeaturedProducts';
 import AireTestimonials from './AireTestimonials';
 import AireInstagramFeed from './AireInstagramFeed';
+import NewLaunchPopup from '../../component/NewLaunchPopup';
 
 const HOME_STRUCTURED_DATA = {
   '@context': 'https://schema.org',
@@ -31,6 +32,7 @@ const HomePage = () => {
         url="/"
         structuredData={HOME_STRUCTURED_DATA}
       />
+      <NewLaunchPopup />
       {/* No Suspense wrapper - components load immediately */}
       <AireHeroBanner />
       <AireFeaturedProducts />
