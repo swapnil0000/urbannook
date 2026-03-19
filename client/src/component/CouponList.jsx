@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useGetAvailableCouponsQuery, useApplyCouponMutation } from '../store/api/userApi';
-import { useUI } from '../hooks/useRedux';
+import { useUI, useAuth } from '../hooks/useRedux';
 
 const CouponList = ({ onCouponApplied,userId }) => {  
   const [expandedCoupon, setExpandedCoupon] = useState(null);
@@ -9,6 +9,7 @@ const CouponList = ({ onCouponApplied,userId }) => {
   const { data: couponsData, isLoading, error } = useGetAvailableCouponsQuery(userId);
   const [applyCoupon] = useApplyCouponMutation();
   const { showNotification } = useUI();
+  const { user } = useAuth();
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -18,7 +19,10 @@ const CouponList = ({ onCouponApplied,userId }) => {
     setApplyingCoupon(couponCode);
 
     try {
-      const result = await applyCoupon(couponCode).unwrap();
+      const result = await applyCoupon({
+        couponCode,
+        email: user?.email
+      }).unwrap();
       
       if (result.success && onCouponApplied) {
         onCouponApplied({

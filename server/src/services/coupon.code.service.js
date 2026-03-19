@@ -7,8 +7,9 @@ import {
   InternalServerError,
 } from "../utils/errors.js";
 import User from "../model/user.model.js";
+import UserWaistList from "../model/user.waitlist.model.js";
 
-const applyCouponCodeService = async ({ userId, couponCodeName }) => {
+const applyCouponCodeService = async ({ userId, couponCodeName, email }) => {
   const cartRes = await getCartService({ userId });
 
   if (
@@ -65,11 +66,23 @@ const applyCouponCodeService = async ({ userId, couponCodeName }) => {
     isPublished: true,
   }).lean();  
 
-  if (!coupon) {
-    throw new NotFoundError("Invalid or inactive coupon");
-  }
+if (!coupon) {
+  throw new NotFoundError("Invalid or inactive coupon");
+}
 
-  if (cartSubtotal < coupon.minCartValue) {
+// --- CASE 4: Waitlist Membership Check ---
+if (!email) {
+  throw new ValidationError("User email is required for coupon application");
+}
+
+const isWaitlisted = await UserWaistList.findOne({ userEmail: email });
+if (!isWaitlisted) {
+  throw new ValidationError(
+    "This coupon is only valid for the email address used during waitlist signup."
+  );
+}
+
+if (cartSubtotal < coupon.minCartValue) {
     throw new ValidationError(
       `Minimum order of ₹${coupon.minCartValue} required for this coupon`,
     );

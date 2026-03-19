@@ -94,10 +94,10 @@ export const userApi = apiSlice.injectEndpoints({
 
     // Coupon APIs
     applyCoupon: builder.mutation({
-      query: (couponCode) => ({
+      query: ({ couponCode, email }) => ({
         url: "coupon/apply",
         method: "POST",
-        body: { couponCodeName: couponCode },
+        body: { couponCodeName: couponCode, email },
       }),
       invalidatesTags: ["User"],
     }),
