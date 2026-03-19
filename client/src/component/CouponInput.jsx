@@ -106,7 +106,7 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
               onKeyDown={handleKeyPress}
               placeholder="Enter coupon code..."
               disabled={isLoading}
-              className="flex-1 bg-black/10 border border-white/10 rounded-xl px-4 py-3 text-white  focus:outline-none focus:border-[#F5DEB3] focus:ring-1 focus:ring-[#F5DEB3] transition-all uppercase tracking-wider text-sm disabled:opacity-50"
+              className="flex-1 bg-white border border-[#F5DEB3] rounded-xl px-4 py-3 text-[#2e443c]  focus:outline-none focus:border-[#F5DEB3] focus:ring-1 focus:ring-[#F5DEB3] transition-all uppercase tracking-wider text-sm disabled:opacity-50"
             />
             <button
               onClick={handleApplyCoupon}
