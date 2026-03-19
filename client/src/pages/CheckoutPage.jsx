@@ -176,13 +176,16 @@ const CheckoutPage = () => {
   ]);
 
   const cartItemsLength = cartItems?.length;
+  const userEmail = userProfile?.email;
+
   useEffect(() => {
     const fetchInitialPricing = async () => {
       if (cartItemsLength > 0) {
         try {
-          const result = await applyCouponMutation(
-            appliedCoupon || null,
-          ).unwrap();
+          const result = await applyCouponMutation({
+            couponCode: appliedCoupon || null,
+            email: userEmail
+          }).unwrap();
           if (result.success && result.data?.summary) {
             setPricingDetails({
               subtotal: result.data.summary.subtotal || 0,
@@ -194,7 +197,10 @@ const CheckoutPage = () => {
           if (error?.data?.statusCode === 400 && appliedCoupon) {
             setAppliedCoupon(null);
             try {
-              const result = await applyCouponMutation(null).unwrap();
+              const result = await applyCouponMutation({
+                couponCode: null,
+                email: userEmail
+              }).unwrap();
               if (result.success && result.data?.summary) {
                 setPricingDetails({
                   subtotal: result.data.summary.subtotal || 0,
@@ -217,7 +223,7 @@ const CheckoutPage = () => {
       }
     };
     fetchInitialPricing();
-  }, [cartItemsLength, applyCouponMutation, appliedCoupon]);
+  }, [cartItemsLength, applyCouponMutation, appliedCoupon, userEmail]);
 
   useEffect(() => {
     if (userProfile) {
@@ -236,7 +242,10 @@ const CheckoutPage = () => {
 
   const handleCouponApplied = async (couponData) => {
     try {
-      const result = await applyCouponMutation(couponData.code).unwrap();
+      const result = await applyCouponMutation({
+        couponCode: couponData.code,
+        email: userEmail
+      }).unwrap();
       if (result.success && result.data?.summary) {
         setAppliedCoupon(couponData.code);
         setPricingDetails({
@@ -257,7 +266,10 @@ const CheckoutPage = () => {
 
   const handleCouponRemoved = async () => {
     try {
-      const result = await applyCouponMutation(null).unwrap();
+      const result = await applyCouponMutation({
+        couponCode: null,
+        email: userEmail
+      }).unwrap();
       if (result.success && result.data?.summary) {
         setAppliedCoupon(null);
         setPricingDetails({

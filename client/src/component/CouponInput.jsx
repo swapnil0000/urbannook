@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useApplyCouponMutation } from '../store/api/userApi';
-import { useUI } from '../hooks/useRedux';
+import { useUI, useAuth } from '../hooks/useRedux';
 
 const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved }) => {
   const [couponCode, setCouponCode] = useState('');
@@ -9,6 +9,7 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
   
   const [applyCoupon, { isLoading }] = useApplyCouponMutation();
   const { showNotification } = useUI();
+  const { user } = useAuth();
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) {
@@ -20,7 +21,10 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
     setSuccess('');
 
     try {
-      const result = await applyCoupon(couponCode?.trim()?.toUpperCase()).unwrap();
+      const result = await applyCoupon({
+        couponCode: couponCode?.trim()?.toUpperCase(),
+        email: user?.email
+      }).unwrap();
       
       if (result?.success) {
         const discountAmount = result.data?.summary?.discount || 0;
@@ -43,12 +47,14 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
         const errorMessage = result.message || 'Failed to apply coupon';
         showNotification(errorMessage, "error");
         setError(errorMessage);
+        setTimeout(() => setError(''), 3000);
       }
     } catch (err) {
       // Extract error message from backend response
       const errorMessage = err?.data?.message || err?.message || 'Invalid or expired coupon code';
       showNotification(errorMessage, "error");
       setError(errorMessage);
+      setTimeout(() => setError(''), 3000);
     }
   };
 
@@ -58,7 +64,10 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
 
     try {
       // Call applyCoupon with null to remove the coupon
-      const result = await applyCoupon(null).unwrap();
+      const result = await applyCoupon({
+        couponCode: null,
+        email: user?.email
+      }).unwrap();
       
       if (result.success) {
         setSuccess('Coupon removed');
