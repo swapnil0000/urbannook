@@ -5,7 +5,7 @@ const OpenInBrowserBanner = () => {
   const [showBanner, setShowBanner] = useState(false);
 
   const headlines = [
-    "🚚 50₹ SHIPPING ALL OVER INDIA TILL 20th MARCH",
+    "🚚 50₹ SHIPPING ALL OVER INDIA TILL 25th March",
     "🌿 WAITLIST MEMBERS: USE CODE WLUSER FOR EXCLUSIVE DISCOUNT",
   ];
 
