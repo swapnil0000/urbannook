@@ -62,6 +62,10 @@ const productSchema = mongoose.Schema(
     },
     productSubDes: String,
     productSubCategory: String,
+    warranty: {
+      type: String,
+      default: null,
+    },
     isPublished: {
       type: Boolean,
       require: true,

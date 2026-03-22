@@ -131,8 +131,60 @@ const TermsConditions = () => {
             </p>
           </section>
 
-          {/* Section 8: Contact */}
-      
+          {/* Section 8: Warranty */}
+          <section id="warranty-policy">
+            <h2 className="text-xl md:text-2xl font-serif text-white mb-4 flex items-center gap-3">
+              <span className="text-[#F5DEB3] text-sm font-sans font-bold">08.</span> Warranty Policy
+            </h2>
+
+            <div className="space-y-8">
+              {/* Scope */}
+              <div>
+                <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
+                  <i className="fa-solid fa-shield-halved text-[#F5DEB3] text-sm"></i>
+                  Scope of Warranty
+                </h3>
+                <p className="text-gray-400 leading-relaxed mb-3">This warranty covers only:</p>
+                <ul className="list-disc pl-5 space-y-1.5 text-gray-400 marker:text-[#F5DEB3]">
+                  <li>Manufacturing defects</li>
+                  <li>Electrical failure under normal usage conditions</li>
+                </ul>
+                <p className="text-gray-400 leading-relaxed mt-4 mb-3">The warranty does <strong className="text-white">not</strong> cover:</p>
+                <ul className="list-disc pl-5 space-y-1.5 text-gray-400 marker:text-red-400">
+                  <li>Physical damage, burns, or breakage</li>
+                  <li>Damage due to misuse, improper handling, or unauthorized modifications</li>
+                  <li>Damage caused by power surges, water exposure, or external factors</li>
+                </ul>
+              </div>
+
+              {/* Warranty Period */}
+              <div>
+                <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
+                  <i className="fa-solid fa-calendar text-[#F5DEB3] text-sm"></i>
+                  Warranty Period
+                </h3>
+                <p className="text-gray-400 leading-relaxed">
+                  The warranty period shall be calculated from the <strong className="text-white">date of manufacturing</strong>, not from the date of purchase or delivery.
+                </p>
+              </div>
+
+              {/* Claim Process */}
+              <div>
+                <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
+                  <i className="fa-solid fa-file-lines text-[#F5DEB3] text-sm"></i>
+                  Claim Process
+                </h3>
+                <p className="text-gray-400 leading-relaxed mb-3">To initiate a warranty claim, the customer must:</p>
+                <ul className="list-disc pl-5 space-y-1.5 text-gray-400 marker:text-[#F5DEB3]">
+                  <li>Provide valid proof of purchase (invoice / order ID)</li>
+                  <li>Share clear images/videos of the defect (if requested)</li>
+                  <li>Ship the defective product to the provided address after approval</li>
+                  <li>The customer is responsible for <strong className="text-white">both-way shipping charges</strong> (sending the defective product and receiving the replacement/repaired unit)</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+
         </div>
       </div>
     </div>
