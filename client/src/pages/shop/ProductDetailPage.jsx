@@ -575,7 +575,7 @@ const ProductDetailPage = () => {
               <div className="mt-5 pt-4 border-t border-[#F5DEB3]/10 grid grid-cols-3 gap-2 text-center">
                 <div className="flex flex-col items-center gap-1">
                   <i className="fa-solid fa-truck text-[#F5DEB3] text-sm"></i>
-                  <span className="text-[9px] text-[#F5DEB3]/70 uppercase tracking-wider font-bold leading-tight">5–7 Day<br/>Delivery</span>
+                  <span className="text-[9px] text-[#F5DEB3]/70 uppercase tracking-wider font-bold leading-tight"> 5–7 Business Days<br/>Delivery</span>
                 </div>
                 <div className="flex flex-col items-center gap-1">
                   <i className="fa-solid fa-shield-halved text-[#F5DEB3] text-sm"></i>
@@ -667,7 +667,7 @@ const ProductDetailPage = () => {
         <div className="flex items-center bg-white justify-center gap-4 px-4 py-2 border-b border-[#F5DEB3]/10">
           <span className="flex items-center gap-1.5 text-[9px] text-[#2e443c]/70 uppercase tracking-wider font-bold">
             <i className="fa-solid fa-truck text-[#2e443c] text-[9px]"></i>
-            5–7 Day Delivery
+           5–7 Business Days
           </span>
           <span className="w-1 h-1 rounded-full bg-[#F5DEB3]/20"></span>
           <span className="flex items-center gap-1.5 text-[9px] text-[#2e443c]/70 uppercase tracking-wider font-bold">
