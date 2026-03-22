@@ -785,6 +785,17 @@ const CheckoutPage = () => {
                   GST (18%) included in product prices
                 </div>
 
+                {/* Delivery info */}
+                <div className="flex items-center gap-3 bg-[#2e443c]/8 border border-[#2e443c]/15 rounded-xl p-3">
+                  <div className="w-8 h-8 rounded-full bg-[#2e443c] flex items-center justify-center shrink-0">
+                    <i className="fa-solid fa-truck text-[#F5DEB3] text-[10px]"></i>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-[#2e443c] uppercase tracking-wider">Estimated Delivery: 5–7 Business Days</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">AWB number shared once order is shipped</p>
+                  </div>
+                </div>
+
                 {appliedCoupon && pricingDetails.discount > 0 && (
                   <div className="flex justify-between text-[#2e443c] font-medium bg-[#a89068]/20 p-3 rounded-xl border border-[#a89068]/30 animate-in fade-in slide-in-from-top-2 duration-300">
                     <span className="flex items-center gap-2">

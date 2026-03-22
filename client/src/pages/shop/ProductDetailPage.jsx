@@ -570,6 +570,22 @@ const ProductDetailPage = () => {
                   <i className={`${isInWishlist ? 'fa-solid' : 'fa-regular'} fa-heart`}></i>
                 </button>
               </div>
+
+              {/* Delivery reassurance */}
+              <div className="mt-5 pt-4 border-t border-[#F5DEB3]/10 grid grid-cols-3 gap-2 text-center">
+                <div className="flex flex-col items-center gap-1">
+                  <i className="fa-solid fa-truck text-[#F5DEB3] text-sm"></i>
+                  <span className="text-[9px] text-[#F5DEB3]/70 uppercase tracking-wider font-bold leading-tight">5–7 Day<br/>Delivery</span>
+                </div>
+                <div className="flex flex-col items-center gap-1">
+                  <i className="fa-solid fa-shield-halved text-[#F5DEB3] text-sm"></i>
+                  <span className="text-[9px] text-[#F5DEB3]/70 uppercase tracking-wider font-bold leading-tight">Secure<br/>Payment</span>
+                </div>
+                <div className="flex flex-col items-center gap-1">
+                  <i className="fa-solid fa-location-dot text-[#F5DEB3] text-sm"></i>
+                  <span className="text-[9px] text-[#F5DEB3]/70 uppercase tracking-wider font-bold leading-tight">Pan India<br/>Shipping</span>
+                </div>
+              </div>
             </div>
 
             <div className="border-t border-[#F5DEB3]/10">
@@ -646,7 +662,25 @@ const ProductDetailPage = () => {
       </main>
 
       {/* Mobile Sticky Bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-[#1c3026]/95 backdrop-blur-xl border-t border-[#F5DEB3]/20 p-4 px-6 z-50 lg:hidden flex gap-4 items-center shadow-[0_-10px_40px_rgba(0,0,0,0.3)]">
+      <div className="fixed bottom-0 left-0 right-0 bg-[#1c3026]/95 backdrop-blur-xl border-t border-[#F5DEB3]/20 z-50 lg:hidden shadow-[0_-10px_40px_rgba(0,0,0,0.3)]">
+        {/* Delivery strip above buttons */}
+        <div className="flex items-center bg-white justify-center gap-4 px-4 py-2 border-b border-[#F5DEB3]/10">
+          <span className="flex items-center gap-1.5 text-[9px] text-[#2e443c]/70 uppercase tracking-wider font-bold">
+            <i className="fa-solid fa-truck text-[#2e443c] text-[9px]"></i>
+            5–7 Day Delivery
+          </span>
+          <span className="w-1 h-1 rounded-full bg-[#F5DEB3]/20"></span>
+          <span className="flex items-center gap-1.5 text-[9px] text-[#2e443c]/70 uppercase tracking-wider font-bold">
+            <i className="fa-solid fa-location-dot text-[#2e443c] text-[9px]"></i>
+            Pan India
+          </span>
+          <span className="w-1 h-1 rounded-full bg-[#F5DEB3]/20"></span>
+          <span className="flex items-center gap-1.5 text-[9px] text-[#2e443c]/70 uppercase tracking-wider font-bold">
+            <i className="fa-solid fa-shield-halved text-[#2e443c] text-[9px]"></i>
+            Secure Pay
+          </span>
+        </div>
+        <div className="flex gap-4 items-center p-4 px-6">
         <div className="flex-1">
           {!isInCart ? (
             <button
@@ -690,6 +724,7 @@ const ProductDetailPage = () => {
         >
           <i className={`${isInWishlist ? 'fa-solid' : 'fa-regular'} fa-heart`}></i>
         </button>
+        </div>
       </div>
 
       {feedbackMessage && (
