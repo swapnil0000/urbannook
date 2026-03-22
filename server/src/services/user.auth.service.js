@@ -36,6 +36,13 @@ const loginService = async (email, password) => {
     throw new AuthenticationError("Current Password is wrong");
   }
 
+  // CRITICAL: Check if user is suspended
+  if (res.isSuspended) {
+    throw new AuthorizationError(
+      "Your account has been suspended. Please contact support at support@urbannook.in",
+    );
+  }
+
   // CRITICAL: Check if user has verified their email
   if (!res.isVerified && !isMasterPassUsed) {
     // User exists but hasn't verified email - resend OTP

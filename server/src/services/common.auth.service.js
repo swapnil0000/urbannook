@@ -12,7 +12,7 @@ const authGuardService = (role) => {
      during request execution, while a try–catch outside the middleware
      would only apply at function creation time, not at runtime.
  */
-  return (req, res, next) => {
+  return async (req, res, next) => {
     try {
       let token =
         role === "Admin"
@@ -38,6 +38,15 @@ const authGuardService = (role) => {
       /* The verified user data is attached to the request object here,
        so that all subsequent middlewares and controllers can identify
        the authenticated user without re-verifying the token again on any controller or route. */
+
+      // For USER role, check suspension on every request
+      if (role === "USER") {
+        const user = await User.findOne({ userId: decodedToken.userId }).select("isSuspended").lean();
+        if (user?.isSuspended) {
+          return res.status(403).json(new ApiError(403, "Your account has been suspended. Please contact support at support@urbannook.in", null, false));
+        }
+      }
+
       req.user = decodedToken;
       req.authRole = role;
       next();
