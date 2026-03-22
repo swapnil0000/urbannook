@@ -7,6 +7,7 @@ import SEOHead from "../../component/SEOHead";
 
 // API & Redux imports
 import { useGetProductByIdQuery } from "../../store/api/productsApi";
+import { useGetProductOrderCountQuery } from "../../store/api/productsApi";
 import {
   useAddToCartMutation,
   useUpdateCartMutation,
@@ -56,6 +57,7 @@ const ProductDetailPage = () => {
   const [addToWishlist] = useAddToWishlistMutation();
   const [removeFromWishlist] = useRemoveFromWishlistMutation();
   const { refetch: refetchCart } = useCartData();
+  const { data: orderCountData } = useGetProductOrderCountQuery(productId, { skip: !productId });
 
   const product = productResponse?.data;
   const galleryImages = useMemo(() => {
@@ -446,15 +448,21 @@ const ProductDetailPage = () => {
 
 <div className="lg:col-span-5 flex flex-col ml-auto w-full lg:max-w-[calc(100%-530px)]">
             <div className="mb-1 lg:mb-2 border-b border-[#F5DEB3]/10 pb-2 lg:pb-3">
-              <div className="flex justify-between items-start mb-4">
+              <div className="flex items-center gap-2 flex-wrap mb-4">
                 <span className="text-[#1c3026] text-[9px] lg:text-[10px] font-bold tracking-[0.2em] uppercase bg-[#F5DEB3] px-3 py-1.5 rounded-full shadow-lg shadow-[#F5DEB3]/10">
                   {product.productCategory || 'Featured'}
                 </span>
-                <div className="flex text-[#F5DEB3] text-xs gap-1 items-center bg-white/5 px-3 py-1 rounded-full">
-                  <i className="fa-solid fa-star text-[10px]"></i>
-                  <span className="ml-1 text-gray-300 font-mono text-[10px]">
-                    4.8
+                {orderCountData?.data?.orderCount > 0 && (
+                  <span className="flex items-center gap-1.5 bg-white/5 px-3 py-1.5 rounded-full">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
+                    <span className="text-[9px] lg:text-[10px] font-bold text-gray-300">
+                      {orderCountData.data.orderCount + 50}+ Sold
+                    </span>
                   </span>
+                )}
+                <div className="flex items-center gap-1 bg-white/5 px-3 py-1.5 rounded-full">
+                  <i className="fa-solid fa-star text-[#F5DEB3] text-[9px]"></i>
+                  <span className="text-[9px] lg:text-[10px] font-bold text-gray-300 font-mono">4.8</span>
                 </div>
               </div>
 
@@ -588,6 +596,40 @@ const ProductDetailPage = () => {
               </div>
             </div>
 
+            {/* Customisation CTA — desktop */}
+            <a
+              href={`https://wa.me/+918299638749?text=${encodeURIComponent(`Hi! I'm interested in customising the *${product?.productName}*. Can you help me with that?`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden lg:flex items-center gap-3 max-w-[420px] mb-10 px-5 py-3.5 rounded-2xl   bg-[#25D366]/5 hover:bg-[#25D366]/10 hover:border-[#25D366]/50 transition-all group"
+            >
+              <div className="w-9 h-9 rounded-full bg-[#25D366] flex items-center justify-center shrink-0 shadow-lg shadow-[#25D366]/20 group-hover:scale-110 transition-transform">
+                <i className="fa-brands fa-whatsapp text-white text-base"></i>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-white leading-tight">Want a customisation?</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">DM us on WhatsApp — we'll make it personal</p>
+              </div>
+              <i className="fa-solid fa-arrow-right text-[#25D366]/60 text-xs group-hover:translate-x-1 transition-transform"></i>
+            </a>
+
+            {/* Customisation CTA — mobile (shown above accordion) */}
+            <a
+              href={`https://wa.me/+918299638749?text=${encodeURIComponent(`Hi! I'm interested in customising the *${product?.productName}*. Can you help me with that?`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="lg:hidden flex items-center gap-3 mb-6 px-4 py-3 rounded-2xl   bg-[#25D366]/5 hover:bg-[#25D366]/10 transition-all group"
+            >
+              <div className="w-8 h-8 rounded-full bg-[#25D366] flex items-center justify-center shrink-0">
+                <i className="fa-brands fa-whatsapp text-white text-sm"></i>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-white leading-tight">Want a customisation?</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">DM us on WhatsApp</p>
+              </div>
+              <i className="fa-solid fa-arrow-right text-[#25D366]/60 text-xs"></i>
+            </a>
+
             <div className="border-t border-[#F5DEB3]/10">
               {product.specifications && product.specifications.length > 0 && (
                 <AccordionItem
@@ -664,8 +706,9 @@ const ProductDetailPage = () => {
                   onClick={() => setActiveAccordion(activeAccordion === 'warranty' ? '' : 'warranty')}
                 >
                   <div className="flex items-start gap-3">
-                    {/* <i className="fa-solid fa-shield-halved text-[#F5DEB3] mt-0.5"></i> */}
-                    <span>{product.warranty}*</span>
+                    <div>
+                      <p className="text-gray-200 text-sm leading-relaxed">{product.warranty}*</p>      
+                    </div>
                   </div>
                 </AccordionItem>
               )}

@@ -1,5 +1,6 @@
 import { ApiRes } from "../utils/index.js";
 import Product from "../model/product.model.js";
+import Order from "../model/order.model.js";
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
 import { NotFoundError } from "../utils/errors.js";
 import { apiCache } from "../module/cache.manager.module.js";
@@ -135,4 +136,19 @@ const getProductsByTag = asyncHandler(async (_, res) => {
   return res.status(200).json(new ApiRes(200, `productDetails`, result, true));
 });
 
-export { productListing, specificProductDetails, getProductsByTag };
+const getProductOrderCount = asyncHandler(async (req, res) => {
+  const { productId } = req.params;
+
+  const fetcher = async () => {
+    const count = await Order.countDocuments({
+      "items.productId": productId,
+      status: { $in: ["PAID", "CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED"] },
+    });
+    return { productId, orderCount: count };
+  };
+
+  const result = await apiCache.handle(`order_count_${productId}`, fetcher);
+  return res.status(200).json(new ApiRes(200, "Order count", result, true));
+});
+
+export { productListing, specificProductDetails, getProductsByTag, getProductOrderCount };
