@@ -13,6 +13,7 @@ import {
 } from "../services/email.service.js";
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
 import { ValidationError, NotFoundError } from "../utils/errors.js";
+import IgOrder from "../model/ig.order.model.js";
 import { uploadInvoiceToS3 } from "../utils/s3.utils.js";
 import Address from "../model/address.new.model.js";
 import html_to_pdf from "html-pdf-node";
@@ -287,6 +288,18 @@ const razorpayWebHookController = async (req, res) => {
         const order = await Order.findOne({
           "payment.razorpayOrderId": razorpayOrderId,
         });
+
+        // Check if this is an Instagram order
+        const igOrder = await IgOrder.findOne({
+          "payment.razorpayOrderId": razorpayOrderId,
+        });
+        if (igOrder && igOrder.status !== "PAID") {
+          igOrder.status = "PAID";
+          igOrder.payment.razorpayPaymentId = payment.id;
+          await igOrder.save();
+          console.log("✅ IgOrder marked PAID:", igOrder.igOrderId);
+        }
+
         if (!order) break;
 
         // idempotent update
