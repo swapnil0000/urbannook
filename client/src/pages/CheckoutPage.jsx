@@ -593,6 +593,7 @@ const CheckoutPage = () => {
         error.data?.message ||
         error.message ||
         "Failed to initialize payment. Please try again.";
+      showNotification(errorMessage, "error");
       setPaymentError(errorMessage);
       setShowRetry(true);
     }
