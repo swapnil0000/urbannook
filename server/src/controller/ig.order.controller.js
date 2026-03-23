@@ -16,9 +16,7 @@ const getIgOrderController = asyncHandler(async (req, res) => {
   if (!order) throw new NotFoundError("Order");
 
   if (order.status === "PAID") {
-    return res.status(410).json(
-      new ApiRes(410, "Link Expired", null, false)
-    );
+    return res.status(410).json(new ApiRes(410, "Link Expired", null, false));
   }
 
   return res.status(200).json(
@@ -34,35 +32,50 @@ const getIgOrderController = asyncHandler(async (req, res) => {
 
 /**
  * POST /api/v1/ig-orders/init-payment
- * Public — accepts igOrderId, customerInstaId, shippingAddress
- * Fetches amount from DB (never trusts client), creates Razorpay order
+ * Public — collects full customer details, creates Razorpay order
+ * Amount is always fetched from DB — never trusted from client
  */
 const initIgPaymentController = asyncHandler(async (req, res) => {
-  const { igOrderId, customerInstaId, shippingAddress } = req.body;
+  const {
+    igOrderId,
+    customerName,
+    customerEmail,
+    customerMobile,
+    customerInstaId,
+    shippingAddress,
+    shippingCity,
+    shippingState,
+    shippingPinCode,
+  } = req.body;
 
   if (!igOrderId) throw new ValidationError("igOrderId is required");
-  if (!customerInstaId) throw new ValidationError("Instagram handle is required");
-  if (!shippingAddress) throw new ValidationError("Shipping address is required");
+  if (!customerName?.trim()) throw new ValidationError("Full name is required");
+  if (!customerMobile?.trim()) throw new ValidationError("Mobile number is required");
+  if (!/^[0-9]{10}$/.test(customerMobile.trim())) throw new ValidationError("Mobile number must be 10 digits");
+  if (!shippingAddress?.trim()) throw new ValidationError("Shipping address is required");
+  if (!shippingPinCode?.trim()) throw new ValidationError("Pincode is required");
 
   const order = await IgOrder.findOne({ orderId: igOrderId });
   if (!order) throw new NotFoundError("Order");
 
   if (order.status === "PAID") {
-    return res.status(410).json(
-      new ApiRes(410, "Link Expired", null, false)
-    );
+    return res.status(410).json(new ApiRes(410, "Link Expired", null, false));
   }
 
   // Create Razorpay order — amount from DB only
-  const razorpayResult = await razorpayCreateOrderService(
-    order.amount * 100, // paise
-    "INR"
-  );
+  const razorpayResult = await razorpayCreateOrderService(order.amount * 100, "INR");
 
-  // Update record with insta handle, address, razorpay order id
-  order.customerInstaId = customerInstaId;
-  order.shippingAddress = shippingAddress;
+  // Save all customer details
+  order.customerName = customerName.trim();
+  order.customerEmail = customerEmail?.trim() || null;
+  order.customerMobile = customerMobile.trim();
+  order.customerInstaId = customerInstaId?.trim() || null;
+  order.shippingAddress = shippingAddress.trim();
+  order.shippingCity = shippingCity?.trim() || null;
+  order.shippingState = shippingState?.trim() || null;
+  order.shippingPinCode = shippingPinCode.trim();
   order.payment.razorpayOrderId = razorpayResult.data.id;
+  order.status = "PENDING";
   await order.save();
 
   return res.status(200).json(
@@ -85,4 +98,29 @@ const getIgRpKeyController = asyncHandler(async (_, res) => {
   return res.status(200).json(new ApiRes(200, "Key", key_id, true));
 });
 
-export { getIgOrderController, initIgPaymentController, getIgRpKeyController };
+/**
+ * GET /api/v1/admin/ig-orders
+ * Admin — list all IG orders with optional status filter
+ */
+const listIgOrdersAdminController = asyncHandler(async (req, res) => {
+  const { status, page = 1, limit = 20 } = req.query;
+  const filter = {};
+  if (status) filter.status = status.toUpperCase();
+
+  const skip = (Number(page) - 1) * Number(limit);
+  const [orders, total] = await Promise.all([
+    IgOrder.find(filter).sort({ createdAt: -1 }).skip(skip).limit(Number(limit)).lean(),
+    IgOrder.countDocuments(filter),
+  ]);
+
+  return res.status(200).json(
+    new ApiRes(200, "IG orders fetched", { orders, total, page: Number(page), limit: Number(limit) }, true)
+  );
+});
+
+export {
+  getIgOrderController,
+  initIgPaymentController,
+  getIgRpKeyController,
+  listIgOrdersAdminController,
+};
