@@ -484,6 +484,22 @@ const ProductDetailPage = () => {
               {product.productSubDes}
             </p>
 
+            {product?.productCategory?.toLowerCase().includes('lamp') && (
+              <div className="mb-8 rounded-2xl border border-[#F5DEB3]/30 bg-[#F5DEB3]/8 px-5 py-4 flex gap-3 items-start">
+                <div className="relative flex-shrink-0 mt-0.5">
+                  <i className="fa-solid fa-bell text-[#F5DEB3] text-base"></i>
+                  <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+                  <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400"></span>
+                </div>
+                <div>
+                  <p className="text-[#F5DEB3] text-xs font-bold uppercase tracking-widest mb-1">Notice</p>
+                  <p className="text-[#F5DEB3]/80 text-sm leading-relaxed font-light">
+                    We're overwhelmed by the response! Our lamps are currently at their production limit — shipping for new orders starts after <span className="text-[#F5DEB3] font-medium">April 1st</span>. If you're happy to wait for a little extra glow, we'd love for you to place your order!
+                  </p>
+                </div>
+              </div>
+            )}
+
             {product?.color && product.color.length > 0 && (
               <div className="mb-8 bg-white/5 p-5 rounded-2xl border border-[#F5DEB3]/10">
                 <div className="flex justify-between items-baseline mb-3">
@@ -651,6 +667,19 @@ const ProductDetailPage = () => {
                         </span>
                       </div>
                     ))}
+                  </div>
+                </AccordionItem>
+              )}
+
+               {product?.warranty && (
+                <AccordionItem
+                  title="Warranty"
+                  isOpen={activeAccordion === 'warranty'}
+                  onClick={() => setActiveAccordion(activeAccordion === 'warranty' ? '' : 'warranty')}
+                >
+                  <div className="flex items-start gap-3">
+                    {/* <i className="fa-solid fa-shield-halved text-[#F5DEB3] mt-0.5"></i> */}
+                    <span>{product.warranty}*</span>
                   </div>
                 </AccordionItem>
               )}
