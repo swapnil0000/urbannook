@@ -629,6 +629,19 @@ const ProductDetailPage = () => {
                 </AccordionItem>
               )}
 
+               {product?.warranty && (
+                <AccordionItem
+                  title="Warranty"
+                  isOpen={activeAccordion === 'warranty'}
+                  onClick={() => setActiveAccordion(activeAccordion === 'warranty' ? '' : 'warranty')}
+                >
+                  <div className="flex items-start gap-3">
+                    {/* <i className="fa-solid fa-shield-halved text-[#F5DEB3] mt-0.5"></i> */}
+                    <span>{product.warranty}*</span>
+                  </div>
+                </AccordionItem>
+              )}
+
               {product.dimensions &&
                 (product.dimensions.length ||
                   product.dimensions.breadth ||
@@ -673,18 +686,7 @@ const ProductDetailPage = () => {
                 </AccordionItem>
               )}
 
-              {product.warranty && (
-                <AccordionItem
-                  title="Warranty"
-                  isOpen={activeAccordion === 'warranty'}
-                  onClick={() => setActiveAccordion(activeAccordion === 'warranty' ? '' : 'warranty')}
-                >
-                  <div className="flex items-start gap-3">
-                    {/* <i className="fa-solid fa-shield-halved text-[#F5DEB3] mt-0.5"></i> */}
-                    <span>{product.warranty}*</span>
-                  </div>
-                </AccordionItem>
-              )}
+             
             </div>
           </div>
         </div>
