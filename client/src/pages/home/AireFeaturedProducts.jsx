@@ -167,16 +167,7 @@ const AireFeaturedProducts = memo(() => {
 
       </div>
 
-      {/* Custom Keyframe for Floating Animation */}
-      <style jsx>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-10px); }
-        }
-        .animate-float {
-          animation: float 6s ease-in-out infinite;
-        }
-      `}</style>
+      {/* Custom Keyframe for Floating Animation — moved to index.css */}
     </section>
   );
 });

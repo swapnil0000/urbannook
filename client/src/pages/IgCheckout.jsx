@@ -7,20 +7,20 @@ const OLA_KEY = import.meta.env.VITE_OLA_MAP_API_KEY;
 const OLA_AUTOCOMPLETE = "https://api.olamaps.io/places/v1/autocomplete";
 const OLA_REVERSE = "https://api.olamaps.io/places/v1/reverse-geocode";
 
-const apiFetch = async (url, options = {}) => {
-  const res = await fetch(url, {
-    headers: { "Content-Type": "application/json" },
-    ...options,
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    const err = new Error(data?.message || "Request failed");
-    err.status = res.status;
-    err.data = data;
-    throw err;
-  }
-  return data;
-};
+// const apiFetch = async (url, options = {}) => {
+//   const res = await fetch(url, {
+//     headers: { "Content-Type": "application/json" },
+//     ...options,
+//   });
+//   const data = await res.json();
+//   if (!res.ok) {
+//     const err = new Error(data?.message || "Request failed");
+//     err.status = res.status;
+//     err.data = data;
+//     throw err;
+//   }
+//   return data;
+// };
 
 const INITIAL_FORM = {
   customerName: "",
@@ -31,6 +31,18 @@ const INITIAL_FORM = {
   shippingCity: "",
   shippingState: "",
   shippingPinCode: "",
+};
+
+const apiFetch = async (url, options = {}) => {
+  const res = await fetch(url, { headers: { "Content-Type": "application/json" }, ...options });
+  const data = await res.json();
+  if (!res.ok) {
+    const err = new Error(data?.message || "Request failed");
+    err.status = res.status;
+    err.data = data;
+    throw err;
+  }
+  return data;
 };
 
 const IgCheckout = () => {
