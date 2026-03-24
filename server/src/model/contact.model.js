@@ -31,6 +31,12 @@ const contactSchema = new mongoose.Schema(
       minlength: [10, 'Message must be at least 10 characters'],
       maxlength: [2000, 'Message cannot exceed 2000 characters']
     },
+    mobile: {
+      type: String,
+      trim: true,
+      match: [/^[6-9]\d{9}$/, 'Please provide a valid 10-digit mobile number'],
+      default: null
+    },
     status: {
       type: String,
       enum: ['pending', 'in-progress', 'resolved', 'closed'],

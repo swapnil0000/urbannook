@@ -4,13 +4,14 @@ import { ValidationError, NotFoundError, InternalServerError } from '../utils/er
 import env from '../config/envConfigSetup.js';
 import { sendEmail } from './email.service.js';
 class ContactService {
-  async createSubmission({ name, email, subject, message }) {
+  async createSubmission({ name, email, subject, message, mobile }) {
     // Create and save contact submission
     const contact = new Contact({
       name,
       email,
       subject,
       message,
+      mobile: mobile || null,
       status: 'pending'
     });
 
@@ -51,6 +52,7 @@ class ContactService {
       email: contact.email,
       subject: contact.subject,
       message: contact.message,
+      mobile: contact.mobile,
       timestamp: contact.createdAt
     });
 
