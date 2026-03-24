@@ -1,6 +1,4 @@
-import React from 'react';
-
-const OrderTracker = ({ status }) => {
+const OrderTracker = ({ status, trackingNumber }) => {
   // Define order flow steps with FontAwesome icons
   const steps = [
     { key: 'CONFIRMED', label: 'Confirmed', icon: 'fas fa-check-circle' },
@@ -24,16 +22,18 @@ const OrderTracker = ({ status }) => {
   }
 
   // Handle CREATED and PAID statuses (before CONFIRMED)
-  if ( status === 'PAID') {
+  if (status === 'PAID') {
+    const isShipped = !!trackingNumber;
     return (
       <div className="flex items-center justify-center py-4">
-        <div className="flex flex-col items-center text-[#a89068]">
-          <i className="fas fa-box text-5xl mb-2 animate-pulse"></i>
+        <div className={`flex flex-col items-center ${isShipped ? 'text-blue-500' : 'text-[#a89068]'}`}>
+          <i className={`${isShipped ? 'fas fa-truck text-blue-500' : 'fas fa-box text-[#a89068] animate-pulse'} text-5xl mb-2`}></i>
           <span className="text-sm font-medium">
-            {status === 'CREATED' ? 'Order Created' : 'Order Placed Successfully'}
-
+            {isShipped ? 'Your Order is Shipped' : (status === 'CREATED' ? 'Order Created' : 'Order Placed Successfully')}
           </span>
-          <span className="text-xs text-gray-500 mt-1">Processing Your Shipment</span>
+          <span className="text-xs text-gray-500 mt-1">
+            {isShipped ? `AWB: ${trackingNumber}` : 'Processing Your Shipment'}
+          </span>
         </div>
       </div>
     );
