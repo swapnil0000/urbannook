@@ -236,9 +236,13 @@ const MyOrdersPage = () => {
                             {dateObj.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                           </span>
                         </div>
-                        <span className="font-serif text-[#2e443c] text-base md:text-lg leading-none truncate block">
-                          Order #{order.orderId.slice(0, 8)}
-                        </span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); copyToClipboard(order.orderId); }}
+                          className="flex items-center gap-1.5 group"
+                        >
+                          <span className="font-serif text-[#2e443c] text-base md:text-lg leading-none">Order #{order.orderId.slice(0, 8)}</span>
+                          <i className="fa-regular fa-copy text-xs text-gray-300 group-hover:text-[#a89068] transition-colors"></i>
+                        </button>
                       </div>
                     </div>
 
@@ -253,62 +257,51 @@ const MyOrdersPage = () => {
                     </div>
                   </div>
 
+                  {/* --- ORDER TRACKER (always visible) --- */}
+                  <div className="px-5 md:px-6 border-b border-gray-100">
+                    <Suspense fallback={<ComponentLoader />}>
+                      <OrderTracker status={order.status} trackingNumber={order.trackingInfo?.trackingNumber} />
+                    </Suspense>
+                  </div>
+
                   {isExpanded && (
                     <div className="p-5 md:p-6 animate-in fade-in duration-300">
                       <div className="mb-6 pb-6 border-b border-gray-200">
-                        <Suspense fallback={<ComponentLoader />}>
-                          <OrderTracker status={order.status} />
-                        </Suspense>
 
-                        <div className="mt-6 flex flex-wrap gap-3">
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); copyToClipboard(order.orderId); }}
-                                className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-[10px] font-bold uppercase tracking-widest text-gray-600 hover:border-[#a89068] transition-colors flex items-center gap-2"
-                            >
-                                <i className="fa-regular fa-copy"></i> Copy Order ID
-                            </button>
-                        </div>
-
-                        <div className="mt-6 space-y-3">
-                            <div className="flex flex-col">
-                                <div 
-                                    className={`p-4 flex items-center justify-between cursor-pointer bg-white border border-gray-200 shadow-sm transition-all ${activeSubSection === 'tracking' ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'}`}
-                                    onClick={() => toggleSubSection('tracking')}
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <i className="fa-solid fa-truck-fast text-[#a89068] text-xs"></i>
-                                        <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#a89068]">Tracking Info</span>
+                        {/* Tracking — flat, always visible */}
+                        {order?.status !== 'CANCELLED' && (
+                          <div className="mb-4 p-4 bg-white rounded-2xl border border-gray-200 shadow-sm space-y-3">
+                            {order?.trackingInfo?.trackingNumber ? (
+                              <>
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <span className="text-[9px] font-bold text-gray-400 uppercase">AWB Number</span>
+                                    <div
+                                      onClick={(e) => { e.stopPropagation(); copyAWB(order.trackingInfo.trackingNumber); }}
+                                      className="flex items-center gap-2 mt-0.5 cursor-pointer group"
+                                    >
+                                      <span className="font-mono font-bold text-sm text-[#2e443c] group-hover:text-[#a89068]">{order.trackingInfo.trackingNumber}</span>
+                                      <i className="fa-regular fa-copy text-gray-300 text-xs group-hover:text-[#a89068]"></i>
                                     </div>
-                                    <i className={`fa-solid fa-chevron-down text-[10px] text-gray-400 transition-transform duration-300 ${activeSubSection === 'tracking' ? 'rotate-180' : ''}`}></i>
+                                  </div>
+                                  <a
+                                    href={`https://panel.shipmozo.com/track-order?awb=${order.trackingInfo.trackingNumber}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="px-4 py-2 bg-[#a89068] text-white rounded-xl text-[10px] font-bold uppercase tracking-[0.15em] flex items-center gap-2 shrink-0"
+                                  >
+                                    <i className="fa-solid fa-location-arrow text-xs"></i> Track Order
+                                  </a>
                                 </div>
-                                {activeSubSection === 'tracking' && (
-                                    <div className="px-5 pb-5 bg-white rounded-b-2xl border border-t-0 border-gray-200 shadow-sm animate-in fade-in duration-300">
-                                        {order.status === "CANCELLED" ? (
-                                            <div className="py-4 text-center">
-                                                <p className="text-gray-400 text-[10px] uppercase font-bold">Order Cancelled</p>
-                                            </div>
-                                        ) : (
-                                            <div className="pt-2 space-y-4">
-                                                <a href="https://panel.shipmozo.com/track-order" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="w-full py-3 bg-[#a89068] text-white rounded-xl text-[10px] font-bold uppercase tracking-[0.2em] text-center block">Open Shipping Portal</a>
-                                                <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                    <div>
-                                                        <span className="text-[9px] font-bold text-gray-400 uppercase">AWB Number</span>
-                                                        {order.trackingInfo?.trackingNumber ? (
-                                                            <div onClick={(e) => { e.stopPropagation(); copyAWB(order.trackingInfo.trackingNumber); }} className="flex items-center gap-2 mt-0.5 cursor-pointer group">
-                                                                <span className="font-mono font-bold text-sm text-[#2e443c] group-hover:text-[#a89068]">{order.trackingInfo.trackingNumber}</span>
-                                                                <i className="fa-regular fa-copy text-gray-300 text-xs group-hover:text-[#a89068]"></i>
-                                                            </div>
-                                                        ) : (
-                                                            <p className="text-[10px] text-gray-400 mt-1 italic">AWB will be available once your order is dispatched.</p>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
+                              </>
+                            ) : (
+                              <p className="text-[10px] text-gray-400 italic">Tracking details will be available once your order is dispatched.</p>
+                            )}
+                          </div>
+                        )}
 
+                        <div className="mt-2 space-y-3">
                             <div className="flex flex-col">
                                 <div 
                                     className={`p-4 flex items-center justify-between cursor-pointer bg-white border border-gray-200 shadow-sm transition-all ${activeSubSection === 'shipping' ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'}`}
@@ -355,7 +348,7 @@ const MyOrdersPage = () => {
                                 </div>
                               </div>
                               <div className="text-right">
-                                <p className="text-[#2e443c] font-mono font-bold text-sm">₹{((item.priceAtPurchase || 0) * (item.quantity || 1)).toLocaleString()}</p>
+                                <p className="text-[#2e443c] font-mono font-bold text-sm">₹{((item?.productSnapshot?.priceAtPurchase || 0) * (item.quantity || 1)).toLocaleString()}</p>
                               </div>
                             </div>
                           </div>
