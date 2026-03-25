@@ -8,38 +8,40 @@ const cartSchema = mongoose.Schema(
     },
     products: {
       type: Map,
-      of:Object,
+      of: Object,
       default: {},
     },
 
-  appliedCoupon: {
-    couponCodeId: {
-      type: String,
-      default: null,
+    appliedCoupon: {
+      couponCodeId: {
+        type: String,
+        default: null,
+      },
+      name: {
+        type: String,
+        default: null,
+      },
+      discountValue: {
+        type: Number,
+        default: 0,
+      },
+      isApplied: {
+        type: Boolean,
+        default: false,
+      },
+      summary: {
+        subtotal: { type: Number, default: 0 },
+        gst: { type: Number, default: 0 },
+        shipping: { type: Number, default: 149 },
+        preTotal: { type: Number, default: 0 },
+        discount: { type: Number, default: 0 },
+        grandTotal: { type: Number, default: 0 },
+        note: { type: String, default: "" },
+      },
     },
-    name: {
-      type: String,
-      default: null,
-    },
-    discountValue: {
-      type: Number,
-      default: 0,
-    },
-    isApplied: {
-      type: Boolean,
-      default: false,
-    },
-    summary: {
-      subtotal: { type: Number, default: 0 },
-      gst: { type: Number, default: 0 },
-      shipping: { type: Number, default: 199 },
-      preTotal: { type: Number, default: 0 },
-      discount: { type: Number, default: 0 },
-      grandTotal: { type: Number, default: 0 },
-      note: { type: String, default: "" }
-    }
   },
-}, { timestamps: true });
+  { timestamps: true },
+);
 
 cartSchema.index({ userId: 1 }, { unique: true });
 
