@@ -486,7 +486,7 @@ const ProductDetailPage = () => {
                 <div>
                   <p className="text-[#F5DEB3] text-xs font-bold uppercase tracking-widest mb-1">Notice</p>
                   <p className="text-[#F5DEB3]/80 text-sm leading-relaxed font-light">
-                    We're overwhelmed by the response! Our lamps are currently at their production limit — shipping for new orders starts after <span className="text-[#F5DEB3] font-medium">April 1st</span>. If you're happy to wait for a little extra glow, we'd love for you to place your order!
+                    We're overwhelmed by the response! Our lamps are currently at their production limit — shipping for new orders starts after <span className="text-[#F5DEB3] font-medium">April 5th</span>. If you're happy to wait for a little extra glow, we'd love for you to place your order!
                   </p>
                 </div>
               </div>
