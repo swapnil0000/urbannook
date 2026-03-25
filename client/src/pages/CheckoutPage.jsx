@@ -62,7 +62,7 @@ const CheckoutPage = () => {
 
   const [pricingDetails, setPricingDetails] = useState({
     subtotal: 0,
-    shipping: 50,
+    shipping: 149,
     discount: 0,
   });
 
@@ -189,7 +189,7 @@ const CheckoutPage = () => {
           if (result.success && result.data?.summary) {
             setPricingDetails({
               subtotal: result.data.summary.subtotal || 0,
-              shipping: result.data.summary.shipping || 50,
+              shipping: result.data.summary.shipping || 149,
               discount: result.data.summary.discount || 0,
             });
           }
@@ -204,7 +204,7 @@ const CheckoutPage = () => {
               if (result.success && result.data?.summary) {
                 setPricingDetails({
                   subtotal: result.data.summary.subtotal || 0,
-                  shipping: result.data.summary.shipping || 50,
+                  shipping: result.data.summary.shipping || 149,
                   discount: result.data.summary.discount || 0,
                 });
               }
@@ -250,7 +250,7 @@ const CheckoutPage = () => {
         setAppliedCoupon(couponData.code);
         setPricingDetails({
           subtotal: result.data.summary.subtotal || 0,
-          shipping: result.data.summary.shipping || 50,
+          shipping: result.data.summary.shipping || 149,
           discount: result.data.summary.discount || 0,
         });
         const successMessage = result.message || "Coupon applied successfully!";
@@ -274,7 +274,7 @@ const CheckoutPage = () => {
         setAppliedCoupon(null);
         setPricingDetails({
           subtotal: result.data.summary.subtotal || 0,
-          shipping: result.data.summary.shipping || 50,
+          shipping: result.data.summary.shipping || 149,
           discount: result.data.summary.discount || 0,
         });
         const successMessage = result.message || "Coupon removed";
