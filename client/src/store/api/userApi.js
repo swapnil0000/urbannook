@@ -138,6 +138,29 @@ export const userApi = apiSlice.injectEndpoints({
       }),
     }),
 
+    // Guest checkout APIs
+    guestCreateOrder: builder.mutation({
+      query: (data) => ({
+        url: "guest/create-order",
+        method: "POST",
+        body: data,
+      }),
+    }),
+    guestSendOtp: builder.mutation({
+      query: (data) => ({
+        url: "guest/send-otp",
+        method: "POST",
+        body: data,
+      }),
+    }),
+    guestVerifyOtp: builder.mutation({
+      query: (data) => ({
+        url: "guest/verify-otp",
+        method: "POST",
+        body: data,
+      }),
+    }),
+
     // Invoice APIs
     generateInvoice: builder.mutation({
       queryFn: async (data, api, _extraOptions, baseQuery) => {
@@ -261,4 +284,7 @@ export const {
   useGetSavedAddressesQuery,
   useUpdateAddressMutation,
   useDeleteAddressMutation,
+  useGuestCreateOrderMutation,
+  useGuestSendOtpMutation,
+  useGuestVerifyOtpMutation,
 } = userApi;

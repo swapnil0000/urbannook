@@ -3,7 +3,6 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { useUpdateCartMutation } from '../../store/api/userApi';
 import { updateQuantity, removeItem } from '../../store/slices/cartSlice';
-import { setShowLoginModal } from '../../store/slices/uiSlice';
 
 const OptimizedImage = lazy(() => import('../OptimizedImage'));
 
@@ -72,14 +71,8 @@ const CartDrawer = ({ isOpen, onClose }) => {
   };
   
   const handleCheckout = () => {
-    const hasToken = !!localStorage.getItem('authToken');
-    const isLoggedIn = isAuthenticated || hasToken;
     onClose();
-    if (isLoggedIn) {
-      navigate('/checkout');
-    } else {
-      dispatch(setShowLoginModal(true));
-    }
+    navigate('/checkout');
   };
 
   if (!mounted && !isOpen) return null;

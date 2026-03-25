@@ -12,6 +12,7 @@ import {
   useDeleteAddressMutation,
   useUpdateCartMutation,
   useUpdateUserProfileMutation,
+  useGuestCreateOrderMutation,
 } from "../store/api/userApi";
 import { useUI } from "../hooks/useRedux";
 import { logout } from "../store/slices/authSlice";
@@ -38,7 +39,7 @@ const CheckoutPage = () => {
   const [userProfile, setUserProfile] = useState(null);
   const [address, setAddress] = useState("");
   const [pincode, setPincode] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(isAuthenticated);
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [paymentError, setPaymentError] = useState(null);
   const [showRetry, setShowRetry] = useState(false);
@@ -66,15 +67,20 @@ const CheckoutPage = () => {
     discount: 0,
   });
 
-  const { data: userProfileData, isLoading: profileLoading, refetch: refetchProfile } = useGetUserProfileQuery();
-  const { data: razorpayKeyData } = useGetRazorpayKeyQuery();
+  const { data: userProfileData, isLoading: profileLoading, refetch: refetchProfile } = useGetUserProfileQuery(undefined, { skip: !isAuthenticated });
+  const { data: razorpayKeyData } = useGetRazorpayKeyQuery(undefined, { skip: !isAuthenticated });
   const [createOrder, { isLoading: isOrdering }] = useCreateOrderMutation();
   const [applyCouponMutation] = useApplyCouponMutation();
   const [updateAddress] = useUpdateAddressMutation();
   const [deleteAddress] = useDeleteAddressMutation();
   const [updateCart] = useUpdateCartMutation();
   const [updateUserProfile] = useUpdateUserProfileMutation();
-  const { data: savedAddressData, refetch: refetchAddresses } = useGetSavedAddressesQuery();
+  const { data: savedAddressData, refetch: refetchAddresses } = useGetSavedAddressesQuery(undefined, { skip: !isAuthenticated });
+  const [guestCreateOrder, { isLoading: isGuestOrdering }] = useGuestCreateOrderMutation();
+
+  // Guest form state
+  const [guestForm, setGuestForm] = useState({ name: '', email: '', mobile: '', address: '' });
+  const [guestErrors, setGuestErrors] = useState({});
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -148,8 +154,7 @@ const CheckoutPage = () => {
   };
 
   useEffect(() => {
-    const hasToken = !!localStorage.getItem('authToken');
-    const isLoggedIn = isAuthenticated || hasToken;
+    if (!isAuthenticated) return;
 
     if (cartItems.length > 0) {
       cartLoadedRef.current = true;
@@ -180,6 +185,7 @@ const CheckoutPage = () => {
 
   useEffect(() => {
     const fetchInitialPricing = async () => {
+      if (!isAuthenticated) return;
       if (cartItemsLength > 0) {
         try {
           const result = await applyCouponMutation({
@@ -335,7 +341,8 @@ const CheckoutPage = () => {
   };
 
   const validateMobileNumber = (mobile) => {
-    const mobileRegex = /^[0-9]{10}$/;
+    // Indian mobile: must be exactly 10 digits, starting with 6, 7, 8, or 9
+    const mobileRegex = /^[6-9][0-9]{9}$/;
     return mobileRegex.test(mobile.trim());
   };
 
@@ -357,7 +364,7 @@ const CheckoutPage = () => {
     }
 
     if (!validateMobileNumber(strippedValue)) {
-      throw "Mobile number must be exactly 10 digits";
+      throw "Enter a valid 10-digit Indian mobile number (starting with 6, 7, 8, or 9)";
     }
 
     setIsSavingMobile(true);
@@ -387,7 +394,7 @@ const CheckoutPage = () => {
   const validateDeliveryMobile = (mobile) => {
     const strippedValue = stripCountryCode(mobile);
     if (strippedValue.trim() && !validateMobileNumber(strippedValue)) {
-      setDeliveryMobileErrors("Mobile number must be exactly 10 digits");
+      setDeliveryMobileErrors("Enter a valid 10-digit Indian mobile number (starting with 6, 7, 8, or 9)");
       return false;
     } else {
       setDeliveryMobileErrors("");
@@ -442,6 +449,64 @@ const CheckoutPage = () => {
       script.onerror = () => resolve(false);
       document.body.appendChild(script);
     });
+  };
+
+  // Guest checkout payment handler
+  const handleGuestPayment = async () => {
+    const errors = {};
+    if (!guestForm.name.trim()) errors.name = 'Name is required';
+    if (!guestForm.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestForm.email)) errors.email = 'Valid email is required';
+    if (!guestForm.mobile.trim() || !/^[6-9][0-9]{9}$/.test(guestForm.mobile)) errors.mobile = 'Enter a valid 10-digit Indian mobile number (starting with 6-9)';
+    if (!guestForm.address.trim()) errors.address = 'Delivery address is required';
+    if (Object.keys(errors).length > 0) { setGuestErrors(errors); return; }
+    setGuestErrors({});
+
+    const res = await loadRazorpay();
+    if (!res) { showNotification('Failed to load payment gateway', 'error'); return; }
+
+    try {
+      const guestSubtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+      const orderResult = await guestCreateOrder({
+        name: guestForm.name.trim(),
+        email: guestForm.email.trim().toLowerCase(),
+        mobile: guestForm.mobile.trim(),
+        items: cartItems.map((i) => ({
+          productId: i.mongoId || i.id.split(':')[0],
+          quantity: i.quantity,
+          color: i.selectedColor && i.selectedColor !== 'N/A' ? i.selectedColor : '',
+        })),
+        deliveryAddress: { formattedAddress: guestForm.address.trim() },
+      }).unwrap();
+
+      const options = {
+        key: orderResult.data?.razorpayKey,
+        amount: orderResult.data?.amount,
+        currency: 'INR',
+        name: 'Urban Nook',
+        description: 'Purchase from Urban Nook',
+        order_id: orderResult.data?.razorpayOrderId,
+        handler: function (response) {
+          // Store guest email for confirmation page
+          sessionStorage.setItem('guestEmail', guestForm.email.trim().toLowerCase());
+          navigate(`/payment-processing/${response.razorpay_order_id}`);
+        },
+        prefill: { name: guestForm.name, email: guestForm.email, contact: guestForm.mobile },
+        theme: { color: '#2E443C' },
+        modal: {
+          ondismiss: () => showNotification('Payment cancelled. Your cart is preserved.', 'info'),
+          escape: false,
+          confirm_close: true,
+        },
+      };
+
+      const paymentObject = new window.Razorpay(options);
+      paymentObject.on('payment.failed', (response) => {
+        showNotification(response.error.description || 'Payment failed. Please try again.', 'error');
+      });
+      paymentObject.open();
+    } catch (error) {
+      showNotification(error?.data?.message || 'Failed to initialize payment.', 'error');
+    }
   };
 
   const handlePayment = async () => {
@@ -600,10 +665,176 @@ const CheckoutPage = () => {
     }
   };
 
-  if (isLoading) {
+  if (isLoading && isAuthenticated) {
     return (
       <div className="h-screen flex items-center justify-center bg-[#2e443c]">
         <div className="w-12 h-12 border-2 border-[#a89068] border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  // Guest checkout UI
+  if (!isAuthenticated) {
+    const guestSubtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const guestTotal = guestSubtotal + 50;
+
+    return (
+      <div className="bg-[#2e443c] min-h-screen font-sans text-gray-800 selection:bg-[#a89068] selection:text-white pb-24 lg:pb-0">
+        <div className="fixed top-0 left-0 w-full h-[400px] bg-gradient-to-b from-[#1a2822] to-transparent pointer-events-none opacity-60 z-0"></div>
+        <main className="max-w-[900px] mx-auto pt-24 lg:pt-36 px-4 lg:px-8 relative z-10">
+          <div className="mb-8 text-center">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#a89068]/20 border border-[#a89068]/30 mb-3">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#a89068] animate-pulse"></span>
+              <span className="text-[9px] uppercase tracking-[0.25em] text-[#a89068] font-bold">Guest Checkout</span>
+            </div>
+            <h1 className="text-4xl md:text-5xl font-serif text-white">Complete your order.</h1>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* Guest form */}
+            <div className="lg:col-span-7 space-y-6">
+              <div className="bg-[#f5f7f8] rounded-[2rem] p-6 md:p-8 border border-white/10 shadow-lg">
+                <h2 className="text-lg font-serif text-[#2e443c] mb-6 border-b border-gray-200 pb-4 flex items-center gap-3">
+                  <span className="w-6 h-6 rounded-full bg-[#a89068] text-white flex items-center justify-center text-xs font-bold">1</span>
+                  Your Details
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] uppercase tracking-widest text-[#a89068] font-bold ml-1">Full Name</label>
+                    <input
+                      value={guestForm.name}
+                      onChange={(e) => setGuestForm(f => ({ ...f, name: e.target.value }))}
+                      className={`w-full bg-white border rounded-xl p-4 text-sm text-[#2e443c] focus:outline-none focus:border-[#a89068] transition-all ${guestErrors.name ? 'border-red-400' : 'border-gray-200'}`}
+                      placeholder="John Doe"
+                    />
+                    {guestErrors.name && <p className="text-red-500 text-[10px] ml-1">{guestErrors.name}</p>}
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] uppercase tracking-widest text-[#a89068] font-bold ml-1">Email</label>
+                    <input
+                      type="email"
+                      value={guestForm.email}
+                      onChange={(e) => setGuestForm(f => ({ ...f, email: e.target.value }))}
+                      className={`w-full bg-white border rounded-xl p-4 text-sm text-[#2e443c] focus:outline-none focus:border-[#a89068] transition-all ${guestErrors.email ? 'border-red-400' : 'border-gray-200'}`}
+                      placeholder="you@example.com"
+                    />
+                    {guestErrors.email && <p className="text-red-500 text-[10px] ml-1">{guestErrors.email}</p>}
+                  </div>
+                  <div className="space-y-1.5 md:col-span-2">
+                    <label className="text-[9px] uppercase tracking-widest text-[#a89068] font-bold ml-1">Mobile Number</label>
+                    <input
+                      type="tel"
+                      value={guestForm.mobile}
+                      onChange={(e) => setGuestForm(f => ({ ...f, mobile: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
+                      className={`w-full bg-white border rounded-xl p-4 text-sm text-[#2e443c] focus:outline-none focus:border-[#a89068] transition-all ${guestErrors.mobile ? 'border-red-400' : 'border-gray-200'}`}
+                      placeholder="10-digit mobile number"
+                    />
+                    {guestErrors.mobile && <p className="text-red-500 text-[10px] ml-1">{guestErrors.mobile}</p>}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-[#f5f7f8] rounded-[2rem] p-6 md:p-8 border border-white/10 shadow-lg">
+                <h2 className="text-lg font-serif text-[#2e443c] mb-6 border-b border-gray-200 pb-4 flex items-center gap-3">
+                  <span className="w-6 h-6 rounded-full bg-[#a89068] text-white flex items-center justify-center text-xs font-bold">2</span>
+                  Delivery Address
+                </h2>
+                <textarea
+                  value={guestForm.address}
+                  onChange={(e) => setGuestForm(f => ({ ...f, address: e.target.value }))}
+                  rows={3}
+                  className={`w-full bg-white border rounded-xl p-4 text-sm text-[#2e443c] focus:outline-none focus:border-[#a89068] transition-all resize-none ${guestErrors.address ? 'border-red-400' : 'border-gray-200'}`}
+                  placeholder="Full delivery address including city, state and pincode"
+                />
+                {guestErrors.address && <p className="text-red-500 text-[10px] ml-1 mt-1">{guestErrors.address}</p>}
+              </div>
+            </div>
+
+            {/* Order summary */}
+            <div className="lg:col-span-5 lg:sticky lg:top-32 flex flex-col gap-6">
+              <div className="bg-[#f5f7f8] rounded-[2rem] p-6 border border-white/10 shadow-lg">
+                <div className="flex justify-between items-center mb-5">
+                  <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a89068]">Your Items</h3>
+                  <span className="text-xs bg-[#2e443c] text-white px-2.5 py-1 rounded-md font-medium">{cartItems.length}</span>
+                </div>
+                <div className="space-y-3 max-h-[200px] overflow-y-auto pr-1">
+                  {cartItems.map((item) => (
+                    <div key={item.id} className="flex gap-3 items-center bg-white p-3 rounded-xl border border-gray-200">
+                      <div className="w-12 h-12 bg-gray-100 rounded-lg shrink-0">
+                        <img src={item.image || '/placeholder.jpg'} alt={item.name} className="w-full h-full object-contain mix-blend-multiply" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm text-[#2e443c] truncate">{item.name}</p>
+                        <div className="flex justify-between items-center mt-1">
+                          <p className="text-[10px] text-gray-500">Qty: {item.quantity}</p>
+                          <p className="font-mono text-sm text-[#a89068] font-bold">₹{(item.price * item.quantity).toLocaleString()}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-[#f5f7f8] rounded-[2rem] p-6 md:p-8 shadow-xl border border-white/10">
+                <h3 className="font-serif text-[#2e443c] text-xl mb-5">Payment Summary</h3>
+                <div className="space-y-4 text-sm">
+                  <div className="flex justify-between text-gray-500">
+                    <span>Subtotal</span>
+                    <span className="text-gray-800 font-medium">₹{guestSubtotal.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-500">
+                    <span>Shipping</span>
+                    <span className="text-gray-800 font-medium">₹50</span>
+                  </div>
+                  <div className="flex justify-between items-end pt-5 border-t border-gray-200 mt-2">
+                    <span className="text-xs uppercase tracking-widest text-[#a89068] font-bold">Total To Pay</span>
+                    <span className="text-3xl font-serif text-[#2e443c]">₹{guestTotal.toLocaleString()}</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleGuestPayment}
+                  disabled={isGuestOrdering}
+                  className="hidden lg:flex w-full mt-8 py-4 bg-[#a89068] text-white rounded-xl font-bold uppercase tracking-widest text-[11px] hover:bg-[#2e443c] transition-all disabled:opacity-50 shadow-lg items-center justify-center gap-3"
+                >
+                  {isGuestOrdering ? (
+                    <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Processing...</>
+                  ) : (
+                    <>Proceed to Pay <i className="fa-solid fa-lock"></i></>
+                  )}
+                </button>
+
+                <div className="mt-3 flex justify-center gap-4 opacity-40 text-[#2e443c]">
+                  <i className="fa-brands fa-cc-visa text-lg"></i>
+                  <i className="fa-brands fa-cc-mastercard text-lg"></i>
+                  <i className="fa-brands fa-google-pay text-lg"></i>
+                  <i className="fa-solid fa-building-columns text-lg"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+
+        {/* Mobile sticky footer for guest */}
+        <div className="fixed bottom-0 left-0 right-0 bg-[#2e443c] border-t border-white/10 p-4 px-6 z-50 lg:hidden shadow-[0_-10px_30px_rgba(0,0,0,0.4)]">
+          <div className="flex items-center justify-around gap-5 max-w-[1200px] mx-auto">
+            <div className="flex flex-col">
+              <span className="text-[9px] text-[#a89068] uppercase tracking-widest font-bold">Total Payable</span>
+              <span className="text-2xl font-serif text-white">₹{guestTotal.toLocaleString()}</span>
+            </div>
+            <button
+              onClick={handleGuestPayment}
+              disabled={isGuestOrdering}
+              className="flex-1 h-10 max-w-[150px] rounded-xl font-bold uppercase tracking-widest text-[11px] shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 bg-[#a89068] text-white hover:bg-[#a89068]/90 disabled:opacity-50"
+            >
+              {isGuestOrdering ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                <>Pay Now <i className="fa-solid fa-lock text-[10px]"></i></>
+              )}
+            </button>
+          </div>
+        </div>
       </div>
     );
   }

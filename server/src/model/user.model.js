@@ -53,6 +53,10 @@ const userSchema = mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    isGuest: {
+      type: Boolean,
+      default: false,
+    },
     userRefreshToken: String,
     role: {
       type: String,

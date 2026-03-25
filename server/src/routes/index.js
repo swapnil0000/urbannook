@@ -9,6 +9,7 @@ import userCommunityListRouter from "./user.community.js";
 import couponCodeRouter from "./coupon.code.route.js";
 import testimonialRouter from "./testimonial.route.js";
 import contactRouter from "./contact.route.js";
+import guestRouter from "./guest.route.js";
 export {
   userRouter,
   productRouter,
@@ -21,4 +22,5 @@ export {
   couponCodeRouter,
   testimonialRouter,
   contactRouter,
+  guestRouter,
 };

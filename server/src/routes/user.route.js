@@ -14,6 +14,7 @@ import rateLimit from "express-rate-limit";
 ================================================================ */
 import {
   userLogin,
+  userLoginVerifyOtp,
   userRegister,
   userProfile,
   userAccountDeletePreview,
@@ -126,6 +127,11 @@ userRouter.post(
   authLimiter,
   validateRequest(loginSchema),
   userLogin,
+);
+userRouter.post(
+  "/user/login/verify-otp",
+  authLimiter,
+  userLoginVerifyOtp,
 );
 userRouter.post(
   "/user/register",

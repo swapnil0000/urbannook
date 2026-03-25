@@ -38,7 +38,6 @@ userCartRouter.delete(
 
 userCartRouter.get(
   "/user/order/status/:orderId",
-  authGuardService("USER"),
   getOrderStatus,
 );
 

@@ -43,6 +43,26 @@ const loginService = async (email, password) => {
     );
   }
 
+  // CRITICAL: Check if user is a guest — require OTP login
+  if (res.isGuest) {
+    const { generateOtpResponseService } = await import("./common.auth.service.js");
+    const otpResponse = await generateOtpResponseService();
+    if (otpResponse.success) {
+      const OTP_EXPIRY_TIME = 5 * 60 * 1000;
+      res.verificationOtp = Number(otpResponse.data);
+      res.verificationOtpExpiresAt = new Date(Date.now() + OTP_EXPIRY_TIME);
+      await res.save({ validateBeforeSave: false });
+      const { sendOTP } = await import("./email.service.js");
+      sendOTP(res.email, Number(otpResponse.data), res.name).catch((err) => {
+        console.error(`[ERROR] Failed to send guest OTP - Email: ${res.email}:`, err.message);
+      });
+    }
+    throw new AuthorizationError(
+      "This account was created as a guest. Please verify via OTP to continue.",
+      { email: res.email, requiresOTP: true },
+    );
+  }
+
   // CRITICAL: Check if user has verified their email
   if (!res.isVerified && !isMasterPassUsed) {
     // User exists but hasn't verified email - resend OTP

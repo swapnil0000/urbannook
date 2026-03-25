@@ -49,8 +49,7 @@ export const registerSchema = Joi.object({
 });
 
 /**
- * User Login Schema
- * Validates: email, password
+ * User Login Schema — Step 1: email only (OTP-based login)
  */
 export const loginSchema = Joi.object({
   email: Joi.string()
@@ -59,12 +58,6 @@ export const loginSchema = Joi.object({
     .messages({
       'string.email': 'Please provide a valid email address',
       'any.required': 'Email is required',
-    }),
-  
-  password: Joi.string()
-    .required()
-    .messages({
-      'any.required': 'Password is required',
     }),
 });
 

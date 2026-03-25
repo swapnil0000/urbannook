@@ -25,7 +25,15 @@ export const authApi = apiSlice.injectEndpoints({
       query: (credentials) => ({
         url: 'user/login',
         method: 'POST',
-        body: credentials,
+        body: credentials, // { email } only — OTP sent to email
+      }),
+      // No onQueryStarted here — step 1 just sends OTP, no token yet
+    }),
+    loginVerifyOtp: builder.mutation({
+      query: (data) => ({
+        url: 'user/login/verify-otp',
+        method: 'POST',
+        body: data, // { email, otp }
       }),
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
@@ -41,12 +49,10 @@ export const authApi = apiSlice.injectEndpoints({
               },
               token,
             }));
-            
-            // Fetch CSRF token after successful login
             await fetchCsrfToken();
           }
         } catch (error) {
-          console.error('Login failed:', error);
+          console.error('Login OTP verification failed:', error);
         }
       },
     }),
@@ -180,6 +186,7 @@ export const authApi = apiSlice.injectEndpoints({
 
 export const {
   useLoginMutation,
+  useLoginVerifyOtpMutation,
   useRegisterMutation,
   useLogoutMutation,
   useOtpSentMutation,

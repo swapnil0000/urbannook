@@ -22,23 +22,105 @@ import {
   ValidationError
 } from "../utils/errors.js";
 import env from "../config/envConfigSetup.js";
+/**
+ * POST /user/login  — Step 1: send OTP to email
+ * Accepts { email } — sends OTP regardless of account type
+ */
 const userLogin = asyncHandler(async (req, res) => {
-  const { email, password } = req.body;    
-  
-  // field Missing , existing User and pass check
-  const result = await loginService(email, password);
-      
+  const { email } = req.body;
+
+  if (!email) {
+    throw new ValidationError("Email is required");
+  }
+
+  const emailLower = email.toLowerCase().trim();
+  const user = await User.findOne({ email: emailLower });
+
+  if (!user) {
+    throw new NotFoundError(`No account found with email ${emailLower}`);
+  }
+
+  if (user.isSuspended) {
+    throw new AuthorizationError(
+      "Your account has been suspended. Please contact support at support@urbannook.in",
+    );
+  }
+
+  // Generate OTP
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const OTP_EXPIRY_TIME = 5 * 60 * 1000;
+  user.verificationOtp = Number(otp);
+  user.verificationOtpExpiresAt = new Date(Date.now() + OTP_EXPIRY_TIME);
+  await user.save({ validateBeforeSave: false });
+
+  const { sendOTP } = await import("../services/email.service.js");
+  sendOTP(emailLower, Number(otp), user.name).catch((err) => {
+    console.error(`[ERROR] Failed to send login OTP - Email: ${emailLower}:`, err.message);
+  });
+
+  return res.status(200).json(
+    new ApiRes(200, "OTP sent to your email", { email: emailLower, requiresOTP: true }, true)
+  );
+});
+
+/**
+ * POST /user/login/verify-otp  — Step 2: verify OTP and return token
+ */
+const userLoginVerifyOtp = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+
+  if (!email || !otp) {
+    throw new ValidationError("Email and OTP are required");
+  }
+
+  const emailLower = email.toLowerCase().trim();
+  const user = await User.findOne({ email: emailLower });
+
+  if (!user) {
+    throw new NotFoundError("User not found");
+  }
+
+  if (!user.verificationOtp || !user.verificationOtpExpiresAt) {
+    throw new ValidationError("No OTP found. Please request a new one.");
+  }
+
+  if (new Date() > user.verificationOtpExpiresAt) {
+    user.verificationOtp = undefined;
+    user.verificationOtpExpiresAt = undefined;
+    await user.save({ validateBeforeSave: false });
+    throw new ValidationError("OTP has expired. Please request a new one.");
+  }
+
+  if (user.verificationOtp !== Number(otp)) {
+    throw new AuthenticationError("Invalid OTP");
+  }
+
+  // Clear OTP
+  user.verificationOtp = undefined;
+  user.verificationOtpExpiresAt = undefined;
+
+  // Mark guest as verified/activated if they log in via OTP
+  if (user.isGuest) {
+    user.isGuest = false;
+    user.isVerified = true;
+  }
+
+  const userAccessToken = user.genAccessToken();
+  const userRefreshToken = user.genRefreshToken();
+  user.userRefreshToken = userRefreshToken;
+  await user.save({ validateBeforeSave: false });
+
   return res
-    .status(result.statusCode)
-    .cookie("userAccessToken", result.data.userAccessToken, cookieOptions)
-    .cookie("userRefreshToken", result.data.userRefreshToken, refreshCookieOptions)
+    .status(200)
+    .cookie("userAccessToken", userAccessToken, cookieOptions)
+    .cookie("userRefreshToken", userRefreshToken, refreshCookieOptions)
     .json(
-      new ApiRes(result.statusCode, result.message, {
-        role: result.data.role,
-        name: result.data.name,
-        email: result.data.email,
-        userMobileNumber: result.data.mobileNumber,
-        userAccessToken: result.data.userAccessToken,
+      new ApiRes(200, "Login successful", {
+        role: user.role,
+        name: user.name,
+        email: user.email,
+        userMobileNumber: user.mobileNumber,
+        userAccessToken,
       }, true)
     );
 });
@@ -456,6 +538,7 @@ const userGoogleLogin = asyncHandler(async (req, res) => {
 
 export {
   userLogin,
+  userLoginVerifyOtp,
   userRegister,
   userProfile,
   userAccountDeletePreview,
