@@ -457,7 +457,7 @@ const ProductDetailPage = () => {
                   <span className="flex items-center gap-1.5 bg-white/5 px-3 py-1.5 rounded-full">
                     <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
                     <span className="text-[9px] lg:text-[10px] font-bold text-gray-300">
-                      {orderCountData.data.orderCount + 50}+ Sold
+                      {orderCountData?.data?.orderCount + 50}+ Sold
                     </span>
                   </span>
                 )}
@@ -468,7 +468,7 @@ const ProductDetailPage = () => {
               </div>
 
               <h1 className="text-3xl lg:text-6xl font-serif text-[#F5DEB3] leading-tight mb-4">
-                {product.productName}
+                {product?.productName}
               </h1>
 
               <div className="flex items-baseline gap-4 mb-2">
@@ -476,13 +476,13 @@ const ProductDetailPage = () => {
                   ₹{product.sellingPrice?.toLocaleString()}
                 </p>
                 <p className="text-sm text-gray-500 line-through">
-                  ₹{product.listedPrice?.toLocaleString() || (product.sellingPrice * 1.18).toFixed(0)}
+                  ₹{product?.listedPrice?.toLocaleString() || (product?.sellingPrice * 1.18).toFixed(0)}
                 </p>
               </div>
             </div>
 
             <p className="text-gray-300 leading-relaxed mb-8 font-light text-sm lg:text-md">
-              {product.productSubDes}
+              {product?.productSubDes}
             </p>
 
             {product?.productCategory?.toLowerCase().includes('lamp') && (
@@ -501,7 +501,7 @@ const ProductDetailPage = () => {
               </div>
             )}
 
-            {product?.color && product.color.length > 0 && (
+            {product?.color && product?.color?.length > 0 && (
               <div className="mb-8 bg-white/5 p-5 rounded-2xl border border-[#F5DEB3]/10">
                 <div className="flex justify-between items-baseline mb-3">
                   <span className="text-[10px] uppercase tracking-[0.2em] text-[#F5DEB3]/70 font-bold">
@@ -516,7 +516,7 @@ const ProductDetailPage = () => {
                 </div>
 
                 <div className="flex flex-wrap gap-3 items-center">
-                  {product.color.map((colorName, idx) => (
+                  {product?.color.map((colorName, idx) => (
                     <button
                       key={idx}
                       onClick={() => {
