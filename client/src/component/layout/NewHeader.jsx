@@ -7,7 +7,6 @@ import { setShowLoginModal } from '../../store/slices/uiSlice';
 import { useLogoutMutation } from '../../store/api/authApi';
 import { useAuth } from '../../hooks/useRedux';
 import { lazy } from 'react';
-import GoogleLoginButton from './auth/GoogleLoginButton';
 import { clearCsrfToken } from '../../store/api/apiSlice';
 
 const SignupForm = lazy(() => import('./auth/SignupForm'));
@@ -480,6 +479,11 @@ const NewHeader = () => {
               setUser(u); 
               setShowLogin(false); 
               dispatch(setShowLoginModal(false));
+              const redirect = sessionStorage.getItem('postLoginRedirect');
+              if (redirect) {
+                sessionStorage.removeItem('postLoginRedirect');
+                navigate(redirect);
+              }
             }}
             onSwitchToSignup={() => { 
               setShowLogin(false); 

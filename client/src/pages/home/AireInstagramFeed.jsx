@@ -6,18 +6,7 @@ import { instagramPosts } from '../../data/constant';
 const AireInstagramFeed = () => {
    return (
   <section className="relative min-h-[70vh] lg:h-[calc(100vh-2rem)] lg:max-h-[900px] mx-2 my-2 md:mx-4 md:my-4 rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden flex items-center group bg-[#1a2822]">
-    <style>{`
-      @keyframes scroll {
-        0% { transform: translateX(0); }
-        100% { transform: translateX(-50%); } 
-      }
-      .animate-scroll {
-        animation: scroll 40s linear infinite;
-      }
-      .animate-scroll:hover {
-        animation-play-state: paused;
-      }
-    `}</style>
+    {/* scroll animation defined in index.css */}
 
     <div className="w-full h-full bg-[#2e443c] overflow-hidden relative flex flex-col p-6 md:p-10 top-0 ">
 

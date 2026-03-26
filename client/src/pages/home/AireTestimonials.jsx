@@ -82,31 +82,7 @@ const AireTestimonials = () => {
     // Outer container restricted to viewport height on desktop
     <section className="relative min-h-[97vh] lg:h-[calc(100vh-2rem)] lg:max-h-[900px] mx-2 my-2 md:mx-4 md:my-4 rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden shadow-2xl flex items-center group bg-[#1a2822]">
       
-      {/* --- CORE CSS FOR MARQUEE & CUSTOM SCROLLBAR --- */}
-      <style>{`
-        @keyframes marquee-horizontal {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-        .animate-marquee-horizontal {
-          animation: marquee-horizontal 40s linear infinite;
-          width: max-content;
-        }
-        .animate-marquee-horizontal:hover {
-          animation-play-state: paused;
-        }
-        
-        /* Fades the left and right edges of the scrolling container */
-        .mask-horizontal {
-          -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
-          mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
-        }
-
-        .custom-scrollbar::-webkit-scrollbar { width: 3px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(245, 222, 179, 0.2); border-radius: 10px; }
-        .custom-scrollbar:hover::-webkit-scrollbar-thumb { background: rgba(245, 222, 179, 0.6); }
-      `}</style>
+      {/* --- CORE CSS FOR MARQUEE & CUSTOM SCROLLBAR — defined in index.css --- */}
 
       {/* Main Inner Box */}
       <div className="w-full h-full relative overflow-hidden  bg-[#2e443c] flex items-center ">

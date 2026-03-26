@@ -21,6 +21,7 @@ import {
 } from "../pages/index.js";
 import PaymentProcessing from "../pages/PaymentProcessing.jsx";
 import PaymentFailed from "../pages/PaymentFailed.jsx";
+import IgCheckout from "../pages/IgCheckout.jsx";
 import ProtectedRoute from "../component/ProtectedRoute.jsx";
 
 // Minimal loader for individual route transitions only
@@ -190,6 +191,7 @@ const AppRoutes = () => {
         }
       />
       {/* Catch-all route for 404 - redirect to home */}
+      <Route path="/ig-checkout/:igOrderId" element={<IgCheckout />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

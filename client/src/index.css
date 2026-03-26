@@ -479,3 +479,63 @@
     }
   }
 }
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+/* AireTestimonials marquee */
+@keyframes marquee-horizontal {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.animate-marquee-horizontal {
+  animation: marquee-horizontal 40s linear infinite;
+  width: max-content;
+}
+.animate-marquee-horizontal:hover {
+  animation-play-state: paused;
+}
+.mask-horizontal {
+  -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+  mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+}
+.custom-scrollbar::-webkit-scrollbar { width: 3px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(245, 222, 179, 0.2); border-radius: 10px; }
+.custom-scrollbar:hover::-webkit-scrollbar-thumb { background: rgba(245, 222, 179, 0.6); }
+
+/* AireInstagramFeed scroll */
+@keyframes scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.animate-scroll {
+  animation: scroll 40s linear infinite;
+}
+.animate-scroll:hover {
+  animation-play-state: paused;
+}
+
+/* NewLaunchPopup animations */
+@keyframes shine {
+  100% { transform: translateX(200%); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slideUpZoom {
+  from { opacity: 0; transform: translateY(20px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-backdrop {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+.animate-popup {
+  animation: slideUpZoom 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
