@@ -11,8 +11,12 @@ node_modules
 dist
 dist-ssr
 *.local
-client/.env
-client/.env.production
+
+# Environment files - never track any .env files
+.env
+.env.*
+*.env
+*.env.*
 
 # Editor directories and files
 .vscode/*
