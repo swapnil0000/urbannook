@@ -266,6 +266,7 @@ const ProductDetailPage = () => {
     if (isAuthenticated || hasToken) {
       navigate('/checkout');
     } else {
+      sessionStorage.setItem('postLoginRedirect', '/checkout');
       openLoginModal();
     }
   };

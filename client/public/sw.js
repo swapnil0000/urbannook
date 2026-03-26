@@ -3,7 +3,7 @@
 // and network-first for API calls
 // Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5
 
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const STATIC_CACHE = `urbannook-static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `urbannook-dynamic-${CACHE_VERSION}`;
 const API_CACHE = `urbannook-api-${CACHE_VERSION}`;
@@ -102,7 +102,17 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Cache-first strategy for static resources
+  // Network-first for HTML navigation requests — never serve stale HTML
+  if (request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html')) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => response)
+        .catch(() => caches.match('/') || caches.match(request))
+    );
+    return;
+  }
+
+  // Cache-first strategy for static resources (JS, CSS, images, fonts)
   // Validates: Requirements 5.2, 5.5
   event.respondWith(
     caches.match(request)

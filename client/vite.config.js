@@ -140,7 +140,7 @@ export default defineConfig({
           // Router in separate chunk
           'router-vendor': ['react-router-dom'],
           // Other vendors
-          'utils-vendor': ['axios']
+          'utils-vendor': ['canvas-confetti']
         },
         // Optimize asset file names
         assetFileNames: (assetInfo) => {
