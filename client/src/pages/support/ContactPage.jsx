@@ -39,6 +39,7 @@ const ContactPage = () => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    mobile: '',
     subject: 'Product Inquiry',
     message: ''
   });
@@ -87,6 +88,7 @@ const ContactPage = () => {
       setFormData({
         name: '',
         email: '',
+        mobile: '',
         subject: 'Product Inquiry',
         message: ''
       });
@@ -98,7 +100,8 @@ const ContactPage = () => {
     }
   };
 
-  const isFormValid = formData.name && formData.email && formData.message && Object.keys(errors).length === 0;
+  const isMobileValid = !formData?.mobile || /^[6-9]\d{9}$/.test(formData?.mobile?.trim());
+  const isFormValid = formData?.name && formData?.email && formData?.message && isMobileValid && Object.keys(errors).length === 0;
 
   return (
     <div className="bg-[#2e443c] min-h-screen text-gray-200 font-sans relative selection:bg-[#a89068] selection:text-white overflow-x-hidden">
@@ -217,6 +220,39 @@ const ContactPage = () => {
                                   <p className="text-red-500 text-xs mt-2 ml-1">{errors.email}</p>
                                 )}
                             </div>
+                        </div>
+
+                        {/* Mobile Number */}
+                        <div className="relative group">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-[#a89068] mb-1.5 block ml-1">
+                                Mobile Number <span className="text-gray-400 normal-case tracking-normal font-normal">(optional)</span>
+                            </label>
+                            <input
+                                type="tel"
+                                name="mobile"
+                                value={formData.mobile}
+                                onChange={(e) => {
+                                    const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                                    setFormData({ ...formData, mobile: val });
+                                    if (errors.mobile) clearFieldError('mobile');
+                                }}
+                                onFocus={() => setActiveInput('mobile')}
+                                onBlur={handleBlur}
+                                className={`w-full bg-white border rounded-xl px-5 py-4 text-[#2e443c] focus:outline-none transition-all duration-300 placeholder-gray-300 shadow-sm ${
+                                    formData.mobile && !/^[6-9]\d{9}$/.test(formData.mobile) ? 'border-red-500' : 'border-gray-200 focus:border-[#a89068]'
+                                }`}
+                                placeholder="10-digit mobile number"
+                                id="mobile"
+                                maxLength={10}
+                            />
+                            {formData?.mobile && !/^[6-9]\d{9}$/.test(formData?.mobile) ? (
+                                <p className="text-red-500 text-xs mt-2 ml-1">Please enter a valid 10-digit mobile number</p>
+                            ) : (
+                                <p className="text-gray-400 text-xs mt-2 ml-1 flex items-center gap-1">
+                                    <i className="fa-solid fa-bolt text-[#a89068] text-[9px]"></i>
+                                    Add your mobile number for a quicker response
+                                </p>
+                            )}
                         </div>
 
                         {/* Subject Pills */}

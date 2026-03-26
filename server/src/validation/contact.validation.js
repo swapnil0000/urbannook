@@ -41,6 +41,15 @@ const contactSubmissionSchema = Joi.object({
       'string.min': 'Message must be at least 10 characters',
       'string.max': 'Message cannot exceed 2000 characters',
       'any.required': 'Message is required'
+    }),
+
+  mobile: Joi.string()
+    .trim()
+    .pattern(/^[6-9]\d{9}$/)
+    .optional()
+    .allow('', null)
+    .messages({
+      'string.pattern.base': 'Please provide a valid 10-digit mobile number'
     })
 });
 

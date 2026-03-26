@@ -62,7 +62,7 @@ const CheckoutPage = () => {
 
   const [pricingDetails, setPricingDetails] = useState({
     subtotal: 0,
-    shipping: 50,
+    shipping: 149,
     discount: 0,
   });
 
@@ -189,7 +189,7 @@ const CheckoutPage = () => {
           if (result.success && result.data?.summary) {
             setPricingDetails({
               subtotal: result.data.summary.subtotal || 0,
-              shipping: result.data.summary.shipping || 50,
+              shipping: result.data.summary.shipping || 149,
               discount: result.data.summary.discount || 0,
             });
           }
@@ -204,7 +204,7 @@ const CheckoutPage = () => {
               if (result.success && result.data?.summary) {
                 setPricingDetails({
                   subtotal: result.data.summary.subtotal || 0,
-                  shipping: result.data.summary.shipping || 50,
+                  shipping: result.data.summary.shipping || 149,
                   discount: result.data.summary.discount || 0,
                 });
               }
@@ -250,7 +250,7 @@ const CheckoutPage = () => {
         setAppliedCoupon(couponData.code);
         setPricingDetails({
           subtotal: result.data.summary.subtotal || 0,
-          shipping: result.data.summary.shipping || 50,
+          shipping: result.data.summary.shipping || 149,
           discount: result.data.summary.discount || 0,
         });
         const successMessage = result.message || "Coupon applied successfully!";
@@ -274,7 +274,7 @@ const CheckoutPage = () => {
         setAppliedCoupon(null);
         setPricingDetails({
           subtotal: result.data.summary.subtotal || 0,
-          shipping: result.data.summary.shipping || 50,
+          shipping: result.data.summary.shipping || 149,
           discount: result.data.summary.discount || 0,
         });
         const successMessage = result.message || "Coupon removed";
@@ -478,6 +478,7 @@ const CheckoutPage = () => {
 
     if (!address.trim()) {
       showNotification("Please select a delivery address.", "error");
+      handleScrollToAddress();
       return;
     }
     
@@ -823,7 +824,7 @@ const CheckoutPage = () => {
 
               <button
                 onClick={handlePayment}
-                disabled={isOrdering || !address}
+                disabled={isOrdering}
                 className="hidden lg:flex w-full mt-8 py-4 bg-[#a89068] text-white rounded-xl font-bold uppercase tracking-widest text-[11px] hover:bg-[#2e443c] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg items-center justify-center gap-3"
               >
                 {isOrdering ? (
@@ -837,6 +838,13 @@ const CheckoutPage = () => {
                   </>
                 )}
               </button>
+
+              {!address && (
+                <p className="hidden lg:flex items-center justify-center gap-1.5 mt-3 text-[10px] text-amber-600 font-bold uppercase tracking-widest">
+                  <i className="fa-solid fa-triangle-exclamation text-[9px]"></i>
+                  Please select a delivery address to continue
+                </p>
+              )}
 
               <div className="mt-3 flex justify-center gap-4 opacity-40 text-[#2e443c]">
                 <i className="fa-brands fa-cc-visa text-lg"></i>
@@ -960,13 +968,19 @@ const CheckoutPage = () => {
             {/* Delivery Details (Box Color: #f5f7f8) */}
             <div
               data-section="delivery-details"
-              className={`bg-[#f5f7f8] rounded-[2rem] p-6 md:p-8 border transition-all duration-500 shadow-lg ${!address ? "border-[#a89068]/40" : "border-white/10"}`}
+              className={`bg-[#f5f7f8] rounded-[2rem] p-6 md:p-8 border transition-all duration-500 shadow-lg ${!address ? "border-amber-400/50" : "border-white/10"}`}
             >
               <h2 className="text-lg font-serif text-[#2e443c] mb-6 border-b border-gray-200 pb-4 flex items-center gap-3">
                 <span className="w-6 h-6 rounded-full bg-[#a89068] text-white flex items-center justify-center text-xs font-bold">
                   2
                 </span>
                 Delivery Details
+                {!address && (
+                  <span className="ml-auto flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
+                    <i className="fa-solid fa-triangle-exclamation text-[8px]"></i>
+                    Required
+                  </span>
+                )}
               </h2>
 
               {!address ? (
@@ -1229,6 +1243,12 @@ const CheckoutPage = () => {
                 pricingDetails.discount
               ).toLocaleString()}
             </span>
+            {!address && (
+              <span className="text-[9px] text-amber-400 mt-0.5 flex items-center gap-1">
+                <i className="fa-solid fa-triangle-exclamation text-[8px]"></i>
+                Address required
+              </span>
+            )}
           </div>
           <button
             onClick={!address ? handleScrollToAddress : handlePayment}

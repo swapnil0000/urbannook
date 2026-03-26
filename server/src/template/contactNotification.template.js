@@ -1,5 +1,5 @@
 import env from "../config/envConfigSetup.js";
-const contactNotificationTemplate = ({ name, email, subject, message, timestamp }) => {
+const contactNotificationTemplate = ({ name, email, subject, message, mobile, timestamp }) => {
   const formattedDate = new Date(timestamp).toLocaleString('en-US', {
     dateStyle: 'full',
     timeStyle: 'short'
@@ -72,6 +72,18 @@ const contactNotificationTemplate = ({ name, email, subject, message, timestamp 
                     </tr>
 
                     <!-- Subject -->
+                    <tr>
+                      <td style="padding: 15px 0; border-bottom: 1px solid #e9ecef;">
+                        <p style="margin: 0 0 5px 0; color: #6c757d; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                          Mobile
+                        </p>
+                        <p style="margin: 0; color: #2e443c; font-size: 16px; font-weight: 500;">
+                          ${mobile ? `<a href="tel:${mobile}" style="color: #2e443c; text-decoration: none;">${mobile}</a>` : '<span style="color: #adb5bd; font-style: italic;">Not provided</span>'}
+                        </p>
+                      </td>
+                    </tr>
+
+                    <!-- Inquiry Type -->
                     <tr>
                       <td style="padding: 15px 0; border-bottom: 1px solid #e9ecef;">
                         <p style="margin: 0 0 5px 0; color: #6c757d; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">

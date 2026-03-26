@@ -9,7 +9,6 @@ const AireFeaturedProducts = lazy(() => import('./AireFeaturedProducts'));
 const WhyChooseUs = lazy(() => import('./WhyChooseUs'));
 const AireTestimonials = lazy(() => import('./AireTestimonials'));
 const AireInstagramFeed = lazy(() => import('./AireInstagramFeed'));
-const NewLaunchPopup = lazy(() => import('../../component/NewLaunchPopup'));
 
 const HOME_STRUCTURED_DATA = {
   '@context': 'https://schema.org',
@@ -34,10 +33,7 @@ const HomePage = () => {
         url="/"
         structuredData={HOME_STRUCTURED_DATA}
       />
-      <Suspense fallback={null}>
-        <NewLaunchPopup />
-      </Suspense>
-      {/* Hero loads immediately — critical for LCP */}
+      {/* No Suspense wrapper - components load immediately */}
       <AireHeroBanner />
       {/* Below-fold sections lazy loaded */}
       <Suspense fallback={<div className="mx-2 my-2 md:mx-4 md:my-4 rounded-[2rem] md:rounded-[3rem] min-h-[85vh] bg-[#2e443c]" />}>
