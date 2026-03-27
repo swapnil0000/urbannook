@@ -1,5 +1,7 @@
 import sendAlert from "../utils/alertSystem.js";
 import env from "../config/envConfigSetup.js";
+import multer from "multer";
+
 /**
  * Global Error Handler Middleware
  * This is the final error handler - it catches all errors and sends response
@@ -7,6 +9,21 @@ import env from "../config/envConfigSetup.js";
  * but not used since this is the terminal error handler
  */
 export const errorHandler = async (err, req, res, next) => {
+  // Handle Multer Errors specifically for better user feedback
+  if (err instanceof multer.MulterError) {
+    let message = "File upload error";
+    if (err.code === "LIMIT_FILE_SIZE") message = "File size too large. Max limit is 5MB.";
+    if (err.code === "LIMIT_FILE_COUNT") message = "Too many files. Max limit is 3 images.";
+    if (err.code === "LIMIT_UNEXPECTED_FILE") message = "Unexpected file field.";
+
+    return res.status(400).json({
+      success: false,
+      message,
+      data: null,
+      statusCode: 400,
+    });
+  }
+
   // Log error with context
   console.error(
     `[ERROR] Request error - Method: ${req.method}, URL: ${req.url}, UserId: ${req.user?.userId || "N/A"}, StatusCode: ${err.statusCode || 500}:`,

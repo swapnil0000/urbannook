@@ -69,8 +69,10 @@ const updateProductReview = asyncHandler(async (req, res) => {
 // GET /specific/review?productId=xxx - get approved reviews for a product
 const getProductReviews = asyncHandler(async (req, res) => {
   const { productId } = req.query;
+  const userId = req.user?.userId; // Optional userId from token if logged in
+
   if (!productId) throw new ValidationError("productId is required");
-  const result = await getProductReviewsService(productId);
+  const result = await getProductReviewsService(productId, userId);
   return res.status(result.statusCode).json(new ApiRes(result.statusCode, result.message, result.data, result.success));
 });
 

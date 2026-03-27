@@ -3,6 +3,8 @@ import { ValidationError } from "../utils/errors.js";
 import ProductReview from "../model/product.specific.testimonial.model.js";
 import { uploadReviewImageToS3 } from "../utils/s3.utils.js";
 import User from "../model/user.model.js";
+import Order from "../model/order.model.js";
+
 const getApprovedTestimonialsService = async () => {
   const testimonials = await Testimonial.find({ isApproved: true })
     .sort({ createdAt: -1 })
@@ -158,10 +160,22 @@ const createProductSpecificTestimonialService = async ({
     return { success: false, statusCode: 400, message: "Review must be between 10 and 500 characters", data: null };
   }
 
-  // Check if user already reviewed this product
+  // 1. Check if user already reviewed this product (CHECK THIS FIRST)
   const existing = await ProductReview.findOne({ userId, productId });
   if (existing) {
     return { success: false, statusCode: 400, message: "You have already submitted a review for this product", data: null };
+  }
+
+  // 2. CHECK PURCHASE: User must have a PAID/DELIVERED etc. order for this product
+  // Use case-insensitive or trimmed match if needed, but schema says String.
+  const hasPurchased = await Order.findOne({
+    userId: userId, // Exact match on userId string
+    status: { $in: ["PAID", "CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED"] },
+    "items.productId": productId
+  }).lean();
+
+  if (!hasPurchased) {
+    return { success: false, statusCode: 403, message: "You can only review products you have purchased", data: null };
   }
 
   // Get user name
@@ -210,26 +224,53 @@ const createProductSpecificTestimonialService = async ({
   };
 };
 
-const getProductReviewsService = async (productId) => {
+const getProductReviewsService = async (productId, userId = null) => {
   if (!productId) {
     return { success: false, statusCode: 400, message: "productId is required", data: null };
   }
 
-  const reviews = await ProductReview.find({ productId, isApproved: true })
+  // Find all approved reviews OR reviews that belong to the current user (even if not approved)
+  const query = {
+    productId,
+    $or: [{ isApproved: true }],
+  };
+
+  if (userId) {
+    query.$or.push({ userId, isApproved: false });
+  }
+
+  const reviews = await ProductReview.find(query)
     .sort({ createdAt: -1 })
     .select("-__v")
     .lean();
 
-  // Calculate average rating
-  const avgRating = reviews.length
-    ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
+  // Calculate average rating (only for approved reviews)
+  const approvedReviews = reviews.filter((r) => r.isApproved);
+  const avgRating = approvedReviews.length
+    ? (approvedReviews.reduce((sum, r) => sum + r.rating, 0) / approvedReviews.length).toFixed(1)
     : null;
+
+  // Check if current user can review (has purchased AND hasn't reviewed yet)
+  let canReview = false;
+  if (userId) {
+    const hasPurchased = await Order.findOne({
+      userId,
+      status: { $in: ["PAID", "CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED"] },
+      "items.productId": productId
+    }).lean();
+
+    const alreadyReviewed = await ProductReview.findOne({ userId, productId }).lean();
+    
+    if (hasPurchased && !alreadyReviewed) {
+      canReview = true;
+    }
+  }
 
   return {
     success: true,
     statusCode: 200,
     message: "Reviews fetched",
-    data: { reviews, avgRating, totalReviews: reviews.length },
+    data: { reviews, avgRating, totalReviews: approvedReviews.length, canReview },
   };
 };
 
@@ -255,7 +296,14 @@ const approveReviewService = async (reviewId, approve) => {
 const updateProductReviewService = async ({ reviewId, userId, desc, rating, imageBuffers, imageMimeTypes }) => {
   const review = await ProductReview.findById(reviewId);
   if (!review) return { success: false, statusCode: 404, message: "Review not found", data: null };
-  if (review.userId !== userId) return { success: false, statusCode: 403, message: "Not authorized", data: null };
+  
+  // Authorization check: Must be the owner
+  if (review.userId !== userId) {
+    return { success: false, statusCode: 403, message: "Not authorized to edit this review", data: null };
+  }
+
+  // Note: No need to re-verify purchase here because the review 
+  // couldn't have been created without passing the purchase check initially.
 
   if (desc !== undefined) {
     const trimmed = desc.trim();
@@ -290,7 +338,7 @@ const updateProductReviewService = async ({ reviewId, userId, desc, rating, imag
   return {
     success: true,
     statusCode: 200,
-    message: "Review updated. It will be visible after admin approval.",
+    message: "Review updated successfully. It will be visible after admin approval.",
     data: { reviewId: review._id },
   };
 };
