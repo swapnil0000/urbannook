@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense, useMemo } from "react";
+import { useState, useEffect, lazy, Suspense, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { useCookies } from "react-cookie";
@@ -13,6 +13,7 @@ import {
   useAddToWishlistMutation,
   useRemoveFromWishlistMutation,
 } from "../../store/api/userApi";
+import { useGetProductReviewsQuery, useSubmitProductReviewMutation, useUpdateProductReviewMutation } from "../../store/api/testimonialsApi";
 import {
   addToWishlistLocal,
   removeFromWishlistLocal,
@@ -56,6 +57,30 @@ const ProductDetailPage = () => {
   const [addToWishlist] = useAddToWishlistMutation();
   const [removeFromWishlist] = useRemoveFromWishlistMutation();
   const { refetch: refetchCart } = useCartData();
+
+  // Reviews
+  const { data: reviewsData, refetch: refetchReviews } = useGetProductReviewsQuery(productId);
+  const [submitProductReview, { isLoading: isSubmittingReview }] = useSubmitProductReviewMutation();
+  const [updateProductReview, { isLoading: isUpdatingReview }] = useUpdateProductReviewMutation();
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [editingReviewId, setEditingReviewId] = useState(null); // null = new, string = editing
+  const [reviewForm, setReviewForm] = useState({ rating: 5, desc: "" });
+  const [reviewImages, setReviewImages] = useState([]); // up to 3 File objects
+  const [reviewImagePreviews, setReviewImagePreviews] = useState([]); // preview URLs
+  const reviewImageRef = useRef(null);
+
+  const currentUserId = useSelector((state) => state.auth.user?.userId);
+
+  // Listen for post-login callback to open review form
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.detail?.callback === 'openReviewForm') {
+        setShowReviewForm(true);
+      }
+    };
+    window.addEventListener('loginSuccess', handler);
+    return () => window.removeEventListener('loginSuccess', handler);
+  }, []);
 
   const product = productResponse?.data;
   const galleryImages = useMemo(() => {
@@ -258,8 +283,60 @@ const ProductDetailPage = () => {
     }
   };
 
-  const handleCheckoutClick = () => {
-    const hasToken = !!localStorage.getItem('authToken');
+  const handleSubmitReview = async () => {
+    const hasToken = !!localStorage.getItem("authToken");
+    if (!isAuthenticated && !hasToken) { openLoginModal('openReviewForm'); return; }
+    if (!reviewForm.desc.trim()) { showNotification("Please write a review", "error"); return; }
+
+    const formData = new FormData();
+    formData.append("productId", productId);
+    formData.append("desc", reviewForm.desc);
+    formData.append("rating", reviewForm.rating);
+    reviewImages.forEach(img => formData.append("images", img));
+
+    try {
+      if (editingReviewId) {
+        await updateProductReview({ reviewId: editingReviewId, formData }).unwrap();
+        showNotification("Review updated! It will appear after admin approval.", "success");
+      } else {
+        await submitProductReview(formData).unwrap();
+        showNotification("Review submitted! It will appear after admin approval.", "success");
+      }
+      setShowReviewForm(false);
+      setEditingReviewId(null);
+      setReviewForm({ rating: 5, desc: "" });
+      setReviewImages([]);
+      setReviewImagePreviews([]);
+    } catch (err) {
+      showNotification(err?.data?.message || "Failed to submit review", "error");
+    }
+  };
+
+  const handleEditReview = (review) => {
+    setEditingReviewId(review._id);
+    setReviewForm({ rating: review.rating, desc: review.desc });
+    setReviewImages([]);
+    setReviewImagePreviews(review.imageUrls?.length ? review.imageUrls : (review.imageUrl ? [review.imageUrl] : []));
+    setShowReviewForm(true);
+    // Scroll to review form
+    setTimeout(() => document.getElementById('review-form-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+  };
+
+  const handleAddReviewImage = (e) => {
+    const files = Array.from(e.target.files || []);
+    const remaining = 3 - reviewImages.length;
+    const toAdd = files.slice(0, remaining);
+    setReviewImages(prev => [...prev, ...toAdd]);
+    setReviewImagePreviews(prev => [...prev, ...toAdd.map(f => URL.createObjectURL(f))]);
+    e.target.value = '';
+  };
+
+  const handleRemoveReviewImage = (idx) => {
+    setReviewImages(prev => prev.filter((_, i) => i !== idx));
+    setReviewImagePreviews(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleCheckoutClick = () => {    const hasToken = !!localStorage.getItem('authToken');
 
     if (isAuthenticated || hasToken) {
       navigate('/checkout');
@@ -690,6 +767,180 @@ const ProductDetailPage = () => {
             </div>
           </div>
         </div>
+
+        {/* ===== REVIEWS SECTION ===== */}
+        <div className="mt-16 pt-12 border-t border-[#1c3026]/10">
+
+          {/* Header row */}
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 mb-10">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <span className="h-[1px] w-8 bg-[#F5DEB3]"></span>
+                <span className="text-[#F5DEB3] font-bold tracking-[0.2em] uppercase text-[10px]">Customer Reviews</span>
+              </div>
+              <h2 className="text-3xl lg:text-4xl font-serif text-white">
+                What customers <span className="italic text-[#F5DEB3]">say.</span>
+              </h2>
+            </div>
+
+            <div className="flex items-center gap-4">
+              {reviewsData?.data?.totalReviews > 0 && (
+                <div className="flex items-center gap-3 px-5 py-3 rounded-full border border-[#F5DEB3]/20 bg-white/5">
+                  <span className="text-2xl font-serif text-[#F5DEB3]">{reviewsData.data.avgRating}</span>
+                  <div>
+                    <div className="flex gap-0.5">
+                      {[1,2,3,4,5].map(s => (
+                        <i key={s} className={`fa-star text-[10px] ${s <= Math.round(reviewsData.data.avgRating) ? 'fa-solid text-[#F5DEB3]' : 'fa-regular text-[#F5DEB3]/20'}`}></i>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-0.5">{reviewsData.data.totalReviews} review{reviewsData.data.totalReviews !== 1 ? 's' : ''}</p>
+                  </div>
+                </div>
+              )}
+              <button
+                onClick={() => {
+                  const hasToken = !!localStorage.getItem("authToken");
+                  if (!isAuthenticated && !hasToken) { openLoginModal('openReviewForm'); return; }
+                  setEditingReviewId(null);
+                  setReviewForm({ rating: 5, desc: "" });
+                  setReviewImages([]);
+                  setReviewImagePreviews([]);
+                  setShowReviewForm(v => !v);
+                }}
+                className="px-5 py-3 rounded-full border border-[#F5DEB3]/30 text-[#F5DEB3] text-[10px] font-bold uppercase tracking-widest hover:bg-[#F5DEB3] hover:text-[#1c3026] transition-all flex items-center gap-2"
+              >
+                <i className={`fa-solid ${showReviewForm ? 'fa-xmark' : 'fa-pen'}`}></i>
+                {showReviewForm ? 'Cancel' : 'Write a Review'}
+              </button>
+            </div>
+          </div>
+
+          {/* Review Form */}
+          <div id="review-form-anchor"></div>
+          {showReviewForm && (
+            <div className="mb-10 bg-[#FAF7F2] border border-[#1c3026]/15 rounded-2xl p-6 lg:p-8 max-w-2xl shadow-sm">
+              <h3 className="text-[#1c3026] font-serif text-xl mb-6">
+                {editingReviewId ? 'Edit Your Review' : 'Your Review'}
+              </h3>
+              <div className="mb-5">
+                <p className="text-[10px] uppercase tracking-widest text-[#1c3026]/50 mb-3">Rating</p>
+                <div className="flex gap-3">
+                  {[1,2,3,4,5].map(s => (
+                    <button key={s} onClick={() => setReviewForm(f => ({ ...f, rating: s }))}>
+                      <i className={`fa-star text-2xl transition-all ${s <= reviewForm.rating ? 'fa-solid text-[#C8A96E]' : 'fa-regular text-[#1c3026]/20 hover:text-[#C8A96E]/50'}`}></i>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="mb-5">
+                <p className="text-[10px] uppercase tracking-widest text-[#1c3026]/50 mb-3">Your Experience</p>
+                <textarea
+                  value={reviewForm.desc}
+                  onChange={e => setReviewForm(f => ({ ...f, desc: e.target.value.slice(0, 500) }))}
+                  placeholder="Share your experience with this product..."
+                  rows={4}
+                  className="w-full bg-white border border-[#1c3026]/15 rounded-xl p-4 text-[#1c3026] text-sm placeholder:text-[#1c3026]/30 focus:outline-none focus:border-[#1c3026]/40 resize-none transition-colors"
+                />
+                <p className="text-[10px] text-[#1c3026]/40 mt-1 text-right">{reviewForm.desc.length}/500</p>
+              </div>
+              <div className="mb-6">
+                <p className="text-[10px] uppercase tracking-widest text-[#1c3026]/50 mb-3">
+                  Photos (optional, up to 3)
+                </p>
+                <input ref={reviewImageRef} type="file" accept="image/*" multiple className="hidden"
+                  onChange={handleAddReviewImage}
+                />
+                <div className="flex gap-3 flex-wrap">
+                  {reviewImagePreviews.map((src, idx) => (
+                    <div key={idx} className="relative w-24 h-24">
+                      <img src={src} className="w-24 h-24 object-cover rounded-xl border border-[#1c3026]/15" alt={`preview ${idx + 1}`} />
+                      <button onClick={() => handleRemoveReviewImage(idx)}
+                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">
+                        <i className="fa-solid fa-xmark"></i>
+                      </button>
+                    </div>
+                  ))}
+                  {reviewImagePreviews.length < 3 && (
+                    <button onClick={() => reviewImageRef.current?.click()}
+                      className="w-24 h-24 border border-dashed border-[#1c3026]/20 rounded-xl flex flex-col items-center justify-center gap-1.5 text-[#1c3026]/30 hover:border-[#1c3026]/50 hover:text-[#1c3026]/60 transition-colors">
+                      <i className="fa-solid fa-camera text-xl"></i>
+                      <span className="text-[9px] uppercase tracking-wider">Add Photo</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={handleSubmitReview} disabled={isSubmittingReview || isUpdatingReview}
+                  className="px-8 py-3 bg-[#1c3026] text-[#FAF7F2] rounded-full text-[10px] font-bold uppercase tracking-widest disabled:opacity-50 hover:bg-[#2e443c] transition-colors">
+                  {(isSubmittingReview || isUpdatingReview) ? "Submitting..." : (editingReviewId ? "Update Review" : "Submit Review")}
+                </button>
+                <button onClick={() => { setShowReviewForm(false); setEditingReviewId(null); }}
+                  className="px-6 py-3 border border-[#1c3026]/20 text-[#1c3026]/50 rounded-full text-[10px] font-bold uppercase tracking-widest hover:border-[#1c3026]/40 transition-colors">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Reviews Grid */}
+          {reviewsData?.data?.reviews?.length > 0 ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {reviewsData.data.reviews.map((review) => {
+                const isOwnReview = currentUserId && review.userId === currentUserId;
+                const allImages = review.imageUrls?.length ? review.imageUrls : (review.imageUrl ? [review.imageUrl] : []);
+                return (
+                  <div key={review._id} className="bg-[#FAF7F2] border border-[#1c3026]/10 rounded-2xl p-5 flex flex-col gap-3 shadow-sm">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-[#1c3026] font-medium text-sm">{review.userName}</p>
+                        <p className="text-[#1c3026]/40 text-[10px] mt-0.5">
+                          {new Date(review.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex gap-0.5">
+                          {[1,2,3,4,5].map(s => (
+                            <i key={s} className={`fa-star text-[10px] ${s <= review.rating ? 'fa-solid text-[#C8A96E]' : 'fa-regular text-[#1c3026]/20'}`}></i>
+                          ))}
+                        </div>
+                        {isOwnReview && (
+                          <button
+                            onClick={() => handleEditReview(review)}
+                            className="ml-1 w-6 h-6 flex items-center justify-center rounded-full border border-[#1c3026]/20 text-[#1c3026]/40 hover:border-[#1c3026]/50 hover:text-[#1c3026] transition-colors"
+                            title="Edit your review"
+                          >
+                            <i className="fa-solid fa-pen text-[9px]"></i>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-[#1c3026]/70 text-sm leading-relaxed font-light flex-1">{review.desc}</p>
+                    {allImages.length > 0 && (
+                      <div className="flex gap-2 flex-wrap mt-1">
+                        {allImages.map((url, i) => (
+                          <img
+                            key={i}
+                            src={url}
+                            alt={`Review photo ${i + 1}`}
+                            className="w-20 h-20 object-cover rounded-xl border border-[#1c3026]/10 cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={() => window.open(url, '_blank')}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-16 border border-dashed border-[#1c3026]/10 rounded-2xl">
+              <i className="fa-regular fa-comment-dots text-4xl mb-4 block text-[#1c3026]/20"></i>
+              <p className="text-[#1c3026]/40 text-sm">No reviews yet.</p>
+              <p className="text-[#1c3026]/30 text-xs mt-1">Be the first to share your experience.</p>
+            </div>
+          )}
+        </div>
+
       </main>
 
       {/* Mobile Sticky Bar */}

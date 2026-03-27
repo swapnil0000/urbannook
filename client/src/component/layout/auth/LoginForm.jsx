@@ -63,7 +63,8 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
       const userData = {
         name: result.data?.name || result.user?.name || 'User',
         email: result.data?.email || result.user?.email || '',
-        mobile: result.data?.userMobileNumber || result.user?.mobile || ''
+        mobile: result.data?.userMobileNumber || result.user?.mobile || '',
+        userId: result.data?.userId || result.user?.userId || '',
       };
       if (token) {
         setAuthUser(userData, token);

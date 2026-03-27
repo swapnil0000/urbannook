@@ -36,6 +36,29 @@ export const uploadInvoiceToS3 = async (pdfBuffer, userId, orderId) => {
   }
 };
 
+export const uploadReviewImageToS3 = async (imageBuffer, mimeType, userId, productId) => {
+  const envFolder = env.NODE_ENV === "production" ? "prod" : "dev";
+  const ext = mimeType.split("/")[1] || "jpg";
+  const fileKey = `${envFolder}/reviews/${productId}/${userId}-${Date.now()}.${ext}`;
+
+  const params = {
+    Bucket: env.AWS_BUCKET_NAME,
+    Key: fileKey,
+    Body: imageBuffer,
+    ContentType: mimeType,
+  };
+
+  try {
+    const command = new PutObjectCommand(params);
+    await s3Client.send(command);
+    // Return CDN URL directly
+    return `${env.AWS_CDN_BASE_URL}/${fileKey}`;
+  } catch (error) {
+    console.error("❌ Error uploading review image to S3:", error);
+    throw error;
+  }
+};
+
 export const getInvoicePresignedUrl = async (fileKey) => {
   try {
     const command = new GetObjectCommand({
