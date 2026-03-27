@@ -89,6 +89,7 @@ const loginService = async (email, password) => {
     data: {
       name: res?.name,
       email: res?.email,
+      userId: res?.userId,
       mobileNumber: res?.mobileNumber,
       userAddress: res?.userAddress,
       userPinCode: res?.userPinCode,

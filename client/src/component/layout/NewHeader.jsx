@@ -3,7 +3,7 @@ import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { useGetWishlistQuery,  } from '../../store/api/userApi';
 import { logout as logoutAction } from '../../store/slices/authSlice';
-import { setShowLoginModal } from '../../store/slices/uiSlice';
+import { setShowLoginModal, clearLoginCallback } from '../../store/slices/uiSlice';
 import { useLogoutMutation } from '../../store/api/authApi';
 import { useAuth } from '../../hooks/useRedux';
 import { lazy } from 'react';
@@ -23,6 +23,7 @@ const NewHeader = () => {
   const { items: cartItems, totalQuantity } = useSelector((state) => state.cart);
   const { isAuthenticated, user: authUser } = useAuth();
   const { showLoginModal } = useSelector((state) => state.ui);
+  const { loginCallback } = useSelector((state) => state.ui);
   const wishlistItems = useSelector((state) => state.wishlist.items);
   
   // State declarations
@@ -475,11 +476,17 @@ const NewHeader = () => {
             onClose={() => {
               setShowLogin(false);
               dispatch(setShowLoginModal(false));
+              dispatch(clearLoginCallback());
             }}
             onLoginSuccess={(u) => { 
               setUser(u); 
               setShowLogin(false); 
               dispatch(setShowLoginModal(false));
+              // Fire callback event so other components can react
+              if (loginCallback) {
+                window.dispatchEvent(new CustomEvent('loginSuccess', { detail: { callback: loginCallback } }));
+                dispatch(clearLoginCallback());
+              }
             }}
             onSwitchToSignup={() => { 
               setShowLogin(false); 
