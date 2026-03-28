@@ -797,21 +797,24 @@ const ProductDetailPage = () => {
                   </div>
                 </div>
               )}
-              <button
-                onClick={() => {
-                  const hasToken = !!localStorage.getItem("authToken");
-                  if (!isAuthenticated && !hasToken) { openLoginModal('openReviewForm'); return; }
-                  setEditingReviewId(null);
-                  setReviewForm({ rating: 5, desc: "" });
-                  setReviewImages([]);
-                  setReviewImagePreviews([]);
-                  setShowReviewForm(v => !v);
-                }}
-                className="px-5 py-3 rounded-full border border-[#F5DEB3]/30 text-[#F5DEB3] text-[10px] font-bold uppercase tracking-widest hover:bg-[#F5DEB3] hover:text-[#1c3026] transition-all flex items-center gap-2"
-              >
-                <i className={`fa-solid ${showReviewForm ? 'fa-xmark' : 'fa-pen'}`}></i>
-                {showReviewForm ? 'Cancel' : 'Write a Review'}
-              </button>
+              
+              {(reviewsData?.data?.totalReviews > 0 || reviewsData?.data?.canReview) && (
+                <button
+                  onClick={() => {
+                    const hasToken = !!localStorage.getItem("authToken");
+                    if (!isAuthenticated && !hasToken) { openLoginModal('openReviewForm'); return; }
+                    setEditingReviewId(null);
+                    setReviewForm({ rating: 5, desc: "" });
+                    setReviewImages([]);
+                    setReviewImagePreviews([]);
+                    setShowReviewForm(v => !v);
+                  }}
+                  className="px-5 py-3 rounded-full border border-[#F5DEB3]/30 text-[#F5DEB3] text-[10px] font-bold uppercase tracking-widest hover:bg-[#F5DEB3] hover:text-[#1c3026] transition-all flex items-center gap-2"
+                >
+                  <i className={`fa-solid ${showReviewForm ? 'fa-xmark' : 'fa-pen'}`}></i>
+                  {showReviewForm ? 'Cancel' : 'Write a Review'}
+                </button>
+              )}
             </div>
           </div>
 
@@ -933,10 +936,16 @@ const ProductDetailPage = () => {
               })}
             </div>
           ) : (
-            <div className="text-center py-16 border border-dashed border-[#1c3026]/10 rounded-2xl">
-              <i className="fa-regular fa-comment-dots text-4xl mb-4 block text-[#1c3026]/20"></i>
-              <p className="text-[#1c3026]/40 text-sm">No reviews yet.</p>
-              <p className="text-[#1c3026]/30 text-xs mt-1">Be the first to share your experience.</p>
+            <div className="py-10 border-t border-[#F5DEB3]/10">
+              <p className="text-[#F5DEB3]/30 italic text-sm">No reviews yet for this product.</p>
+              {reviewsData?.data?.canReview && (
+                <button
+                  onClick={() => setShowReviewForm(true)}
+                  className="mt-4 text-[#F5DEB3] text-[10px] font-bold uppercase tracking-widest border-b border-[#F5DEB3]/30 pb-0.5 hover:text-white transition-colors"
+                >
+                  Be the first to review
+                </button>
+              )}
             </div>
           )}
         </div>

@@ -11,7 +11,7 @@ import {
 } from "../controller/testimonial.controller.js";
 import { testimonialRateLimiter } from "../middleware/rateLimiter.middleware.js";
 import { sanitizeTestimonialInput } from "../middleware/sanitization.middleware.js";
-import { authGuardService } from "../services/common.auth.service.js";
+import { authGuardService, optionalAuthGuard } from "../services/common.auth.service.js";
 
 // Memory storage - buffer passed directly to S3
 const upload = multer({
@@ -32,7 +32,7 @@ testimonialRouter.post("/testimonials", testimonialRateLimiter, sanitizeTestimon
 // Product-specific reviews
 testimonialRouter.post("/specific/review", authGuardService("USER"), upload.array("images", 3), submitProductReview);
 testimonialRouter.patch("/specific/review/:reviewId", authGuardService("USER"), upload.array("images", 3), updateProductReview);
-testimonialRouter.get("/specific/review", getProductReviews);
+testimonialRouter.get("/specific/review", optionalAuthGuard("USER"), getProductReviews);
 
 // Admin routes
 testimonialRouter.get("/admin/reviews/pending", authGuardService("Admin"), getPendingReviews);
