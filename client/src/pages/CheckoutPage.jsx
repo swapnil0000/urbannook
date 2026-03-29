@@ -12,6 +12,7 @@ import {
   useDeleteAddressMutation,
   useUpdateCartMutation,
   useUpdateUserProfileMutation,
+  useGetShippingRateMutation,
 } from "../store/api/userApi";
 import { useUI } from "../hooks/useRedux";
 import { logout } from "../store/slices/authSlice";
@@ -62,7 +63,7 @@ const CheckoutPage = () => {
 
   const [pricingDetails, setPricingDetails] = useState({
     subtotal: 0,
-    shipping: 149,
+    shipping: 0,
     discount: 0,
   });
 
@@ -75,10 +76,40 @@ const CheckoutPage = () => {
   const [updateCart] = useUpdateCartMutation();
   const [updateUserProfile] = useUpdateUserProfileMutation();
   const { data: savedAddressData, refetch: refetchAddresses } = useGetSavedAddressesQuery();
+  const [getShippingRate] = useGetShippingRateMutation();
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+
+  useEffect(() => {
+    const fetchShipping = async () => {
+      if (pincode && pincode.length === 6 && cartItems.length > 0) {
+        try {
+          const cartData = cartItems.map(item => ({
+            productId: item.id || item.productId,
+            quant: item.quantity
+          }));
+          
+          const result = await getShippingRate({
+            cartItems: cartData,
+            userPincode: pincode,
+            orderAmount: pricingDetails.subtotal
+          }).unwrap();
+
+          if (result.success) {
+            setPricingDetails(prev => ({
+              ...prev,
+              shipping: result.shippingCharge
+            }));
+          }
+        } catch (error) {
+          console.error("Failed to fetch shipping rate:", error);
+        }
+      }
+    };
+    fetchShipping();
+  }, [pincode, cartItems, getShippingRate]);
 
   useEffect(() => {
     handleSaveAdress();
@@ -101,6 +132,10 @@ const CheckoutPage = () => {
     setPreciseDetails({ landmark: "", flatNo: "" });
     setCurrentAddressId(null);
     setIsEditingMode(false);
+    setPricingDetails(prev => ({
+      ...prev,
+      shipping: 0
+    }));
     showNotification("Shipping details reset", "info");
   };
 
@@ -187,11 +222,11 @@ const CheckoutPage = () => {
             email: userEmail
           }).unwrap();
           if (result.success && result.data?.summary) {
-            setPricingDetails({
+            setPricingDetails(prev => ({
+              ...prev,
               subtotal: result.data.summary.subtotal || 0,
-              shipping: result.data.summary.shipping || 149,
               discount: result.data.summary.discount || 0,
-            });
+            }));
           }
         } catch (error) {
           if (error?.data?.statusCode === 400 && appliedCoupon) {
@@ -202,11 +237,11 @@ const CheckoutPage = () => {
                 email: userEmail
               }).unwrap();
               if (result.success && result.data?.summary) {
-                setPricingDetails({
+                setPricingDetails(prev => ({
+                  ...prev,
                   subtotal: result.data.summary.subtotal || 0,
-                  shipping: result.data.summary.shipping || 149,
                   discount: result.data.summary.discount || 0,
-                });
+                }));
               }
             } catch (retryError) {
               console.error("Failed to recalculate pricing:", retryError);
@@ -248,11 +283,11 @@ const CheckoutPage = () => {
       }).unwrap();
       if (result.success && result.data?.summary) {
         setAppliedCoupon(couponData.code);
-        setPricingDetails({
+        setPricingDetails(prev => ({
+          ...prev,
           subtotal: result.data.summary.subtotal || 0,
-          shipping: result.data.summary.shipping || 149,
           discount: result.data.summary.discount || 0,
-        });
+        }));
         const successMessage = result.message || "Coupon applied successfully!";
         showNotification(successMessage, "success");
         setShowCouponModal(false);
@@ -272,11 +307,11 @@ const CheckoutPage = () => {
       }).unwrap();
       if (result.success && result.data?.summary) {
         setAppliedCoupon(null);
-        setPricingDetails({
+        setPricingDetails(prev => ({
+          ...prev,
           subtotal: result.data.summary.subtotal || 0,
-          shipping: result.data.summary.shipping || 149,
           discount: result.data.summary.discount || 0,
-        });
+        }));
         const successMessage = result.message || "Coupon removed";
         showNotification(successMessage, "success");
       }
@@ -777,7 +812,13 @@ const CheckoutPage = () => {
                 <div className="flex justify-between text-gray-500">
                   <span>Shipping</span>
                   <span className="text-gray-800 font-medium">
-                    ₹{pricingDetails.shipping.toLocaleString()}
+                    {!address ? (
+                      <span className="text-[10px] text-amber-600 font-bold uppercase tracking-tight">Select address</span>
+                    ) : pricingDetails.shipping === 0 ? (
+                      <span className="text-green-600">FREE</span>
+                    ) : (
+                      `₹${pricingDetails.shipping.toLocaleString()}`
+                    )}
                   </span>
                 </div>
 
@@ -1284,3 +1325,4 @@ const CheckoutPage = () => {
 };
 
 export default CheckoutPage;
+

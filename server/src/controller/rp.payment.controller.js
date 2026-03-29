@@ -165,7 +165,6 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
         productCategory: product.productCategory,
         productSubCategory: product.productSubCategory,
         priceAtPurchase: product.sellingPrice,
-        shipping: String(summary?.shipping ?? ""),
         selectedColor: item.color || "N/A",
       },
     };
