@@ -5,6 +5,7 @@ const initialState = {
   showCartModal: false,
   showAuthModal: false,
   showLoginModal: false,
+  loginCallback: null, // action to run after successful login
   notification: null,
 };
 
@@ -23,6 +24,14 @@ const uiSlice = createSlice({
     },
     setShowLoginModal: (state, action) => {
       state.showLoginModal = action.payload;
+      if (!action.payload) state.loginCallback = null;
+    },
+    setLoginCallback: (state, action) => {
+      // Store a string key — functions can't go in Redux state
+      state.loginCallback = action.payload;
+    },
+    clearLoginCallback: (state) => {
+      state.loginCallback = null;
     },
     setNotification: (state, action) => {
       state.notification = action.payload;
@@ -38,6 +47,8 @@ export const {
   toggleCartModal, 
   toggleAuthModal, 
   setShowLoginModal,
+  setLoginCallback,
+  clearLoginCallback,
   setNotification, 
   clearNotification 
 } = uiSlice.actions;

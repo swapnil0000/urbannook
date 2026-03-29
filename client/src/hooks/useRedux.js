@@ -1,7 +1,7 @@
 import { useSelector, useDispatch } from 'react-redux';
 import { addItem, removeItem, updateQuantity, clearCart } from '../store/slices/cartSlice';
 import { setCredentials, logout } from '../store/slices/authSlice';
-import { toggleCartModal, toggleAuthModal, setShowLoginModal, setNotification, clearNotification } from '../store/slices/uiSlice';
+import { toggleCartModal, toggleAuthModal, setShowLoginModal, setLoginCallback, clearLoginCallback, setNotification, clearNotification } from '../store/slices/uiSlice';
 
 // Cart hooks
 export const useCart = () => {
@@ -38,11 +38,15 @@ export const useUI = () => {
     ...ui,
     toggleCart: () => dispatch(toggleCartModal()),
     toggleAuth: () => dispatch(toggleAuthModal()),
-    openLoginModal: () => dispatch(setShowLoginModal(true)),
+    // callback: optional string key to identify what to do after login
+    openLoginModal: (callback) => {
+      if (callback) dispatch(setLoginCallback(callback));
+      dispatch(setShowLoginModal(true));
+    },
     closeLoginModal: () => dispatch(setShowLoginModal(false)),
+    clearLoginCallback: () => dispatch(clearLoginCallback()),
     showNotification: (message, type = 'info') => {
       dispatch(setNotification({ message, type }));
-      // Auto clear after 3 seconds
       setTimeout(() => dispatch(clearNotification()), 3000);
     },
     clearNotification: () => dispatch(clearNotification()),

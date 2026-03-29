@@ -37,6 +37,7 @@ const userLogin = asyncHandler(async (req, res) => {
         role: result.data.role,
         name: result.data.name,
         email: result.data.email,
+        userId: result.data.userId,
         userMobileNumber: result.data.mobileNumber,
         userAccessToken: result.data.userAccessToken,
       }, true)

@@ -453,8 +453,49 @@ const resetPasswordService = async (userId, currentPassword, newPassword) => {
     success: true,
   };
 };
+const optionalAuthGuard = (role) => {
+  return async (req, res, next) => {
+    try {
+      let token =
+        role === "Admin"
+          ? req.cookies?.adminAccessToken
+          : req.cookies?.userAccessToken;
+      if (!token && req.headers.authorization?.startsWith("Bearer ")) {
+        token = req.headers.authorization.split(" ")[1];
+      }
+      if (!token) {
+        return next(); // No token, just proceed
+      }
+      const secret =
+        role === "Admin"
+          ? env.ADMIN_ACCESS_TOKEN_SECRET
+          : env.USER_ACCESS_TOKEN_SECRET;
+      
+      const decodedToken = jwt.verify(token, secret);
+
+      // For USER role, check suspension
+      if (role === "USER") {
+        const user = await User.findOne({ userId: decodedToken.userId }).select("isSuspended").lean();
+        if (user?.isSuspended) {
+          // If suspended, we might still want to let them see public reviews, 
+          // but for now let's just not attach req.user
+          return next();
+        }
+      }
+
+      req.user = decodedToken;
+      req.authRole = role;
+      next();
+    } catch (error) {
+      // If token is invalid/expired, just proceed as unauthenticated
+      next();
+    }
+  };
+};
+
 export {
   authGuardService,
+  optionalAuthGuard,
   logoutService,
   profileFetchService,
   regenerateTokenService,
