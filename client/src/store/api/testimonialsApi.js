@@ -18,8 +18,8 @@ export const testimonialsApi = apiSlice.injectEndpoints({
 
     // Product-specific reviews
     getProductReviews: builder.query({
-      query: (productId) => `specific/review?productId=${productId}`,
-      providesTags: (_, __, productId) => [{ type: 'ProductReviews', id: productId }],
+      query: ({ productId, userId }) => `specific/review?productId=${productId}`,
+      providesTags: (_, __, { productId }) => [{ type: 'ProductReviews', id: productId }],
     }),
     submitProductReview: builder.mutation({
       query: (formData) => ({
