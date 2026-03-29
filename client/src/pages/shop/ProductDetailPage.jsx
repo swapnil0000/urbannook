@@ -59,7 +59,8 @@ const ProductDetailPage = () => {
   const { refetch: refetchCart } = useCartData();
 
   // Reviews
-  const { data: reviewsData, refetch: refetchReviews } = useGetProductReviewsQuery(productId);
+  const currentUserId = useSelector((state) => state.auth.user?.userId);
+  const { data: reviewsData, refetch: refetchReviews } = useGetProductReviewsQuery({ productId, userId: currentUserId });
   const [submitProductReview, { isLoading: isSubmittingReview }] = useSubmitProductReviewMutation();
   const [updateProductReview, { isLoading: isUpdatingReview }] = useUpdateProductReviewMutation();
   const [showReviewForm, setShowReviewForm] = useState(false);
@@ -68,8 +69,6 @@ const ProductDetailPage = () => {
   const [reviewImages, setReviewImages] = useState([]); // up to 3 File objects
   const [reviewImagePreviews, setReviewImagePreviews] = useState([]); // preview URLs
   const reviewImageRef = useRef(null);
-
-  const currentUserId = useSelector((state) => state.auth.user?.userId);
 
   // Listen for post-login callback to open review form
   useEffect(() => {
@@ -798,7 +797,7 @@ const ProductDetailPage = () => {
                 </div>
               )}
               
-              {(reviewsData?.data?.totalReviews > 0 || reviewsData?.data?.canReview) && (
+              {(!(isAuthenticated || localStorage.getItem("authToken")) || reviewsData?.data?.canReview) && (
                 <button
                   onClick={() => {
                     const hasToken = !!localStorage.getItem("authToken");
@@ -900,7 +899,7 @@ const ProductDetailPage = () => {
                           {new Date(review.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-3 shrink-0">
                         <div className="flex gap-0.5">
                           {[1,2,3,4,5].map(s => (
                             <i key={s} className={`fa-star text-[10px] ${s <= review.rating ? 'fa-solid text-[#C8A96E]' : 'fa-regular text-[#1c3026]/20'}`}></i>
@@ -909,10 +908,10 @@ const ProductDetailPage = () => {
                         {isOwnReview && (
                           <button
                             onClick={() => handleEditReview(review)}
-                            className="ml-1 w-6 h-6 flex items-center justify-center rounded-full border border-[#1c3026]/20 text-[#1c3026]/40 hover:border-[#1c3026]/50 hover:text-[#1c3026] transition-colors"
+                            className="flex items-center justify-center w-8 h-8 rounded-full bg-[#1c3026]/5 border border-[#1c3026]/10 text-[#1c3026]/60 hover:bg-[#1c3026] hover:text-[#F5DEB3] transition-all active:scale-90"
                             title="Edit your review"
                           >
-                            <i className="fa-solid fa-pen text-[9px]"></i>
+                            <i className="fa-solid fa-pen text-[11px]"></i>
                           </button>
                         )}
                       </div>

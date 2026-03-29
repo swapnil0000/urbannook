@@ -5,7 +5,7 @@ const OpenInBrowserBanner = () => {
   const [showBanner, setShowBanner] = useState(false);
 
   const headlines = [
-    "🚚 SHIPPING ₹149 ALL OVER INDIA",
+    "🚚 FAST PAN INDIA SHIPPING AVAILABLE",
     "🌿 WAITLIST MEMBERS: USE CODE WLUSER FOR EXCLUSIVE DISCOUNT",
   ];
 

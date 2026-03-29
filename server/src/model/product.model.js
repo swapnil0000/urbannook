@@ -52,6 +52,12 @@ const productSchema = mongoose.Schema(
       breadth: Number,
       height: Number,
     },
+    boxDimensionsAndWeight: {
+      l: Number,
+      b: Number,
+      h: Number,
+      w: Number,
+    },
     productStatus: {
       type: String,
       enum: ["in_stock", "out_of_stock", "discontinued"],

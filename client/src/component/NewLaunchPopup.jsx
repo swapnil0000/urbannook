@@ -69,7 +69,7 @@ const NewLaunchPopup = memo(() => {
           <div className="flex flex-col gap-3 md:gap-4 mb-5 md:mb-8 w-full max-w-sm">
             <p className="text-white/80 text-[10px] md:text-sm font-light leading-relaxed">
               <span className="mr-1.5 md:mr-2 text-sm md:text-base">🚚</span> 
-              <span className="font-medium text-white">₹149 SHIPPING</span> ACROSS INDIA
+              <span className="font-medium text-white">LOWEST SHIPPING RATES</span> PAN INDIA
             </p>
             
             <p className="text-white/80 text-[10px] md:text-sm font-light leading-relaxed flex items-center justify-center flex-wrap gap-1">

@@ -21,7 +21,7 @@ const applyCouponCodeService = async ({ userId, couponCodeName, email }) => {
   }
 
   const { cartSubtotal, availableItems } = cartRes.data;
-  const SHIPPING_CHARGES = 149;
+  const SHIPPING_CHARGES = 0;
 
   let discountAmount = 0;
 
@@ -34,9 +34,8 @@ const applyCouponCodeService = async ({ userId, couponCodeName, email }) => {
       isApplied: false,
       summary: {
         subtotal: cartSubtotal,
-        shipping: SHIPPING_CHARGES,
         discount: 0,
-        grandTotal: cartSubtotal + SHIPPING_CHARGES,
+        grandTotal: cartSubtotal,
       },
     };
 
@@ -110,7 +109,6 @@ if (cartSubtotal < coupon.minCartValue) {
     isApplied: true,
     summary: {
       subtotal: cartSubtotal,
-      shipping: SHIPPING_CHARGES,
       discount: discountAmount,
       grandTotal: grandTotal,
     },

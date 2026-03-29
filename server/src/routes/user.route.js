@@ -87,6 +87,7 @@ import {
   razorpayWebHookController,
 } from "../controller/rp.payment.controller.js";
 import userBulkEmailWaitlistController from "../controller/user.bulk.email.waitlist.controller.js";
+import spRateCal from "../controller/sp.rate.controller.js";
 
 const userRouter = Router();
 const authLimiter = rateLimit({
@@ -106,7 +107,7 @@ const authLimiter = rateLimit({
    Provides CSRF token to authenticated users
 ================================================================ */
 
-userRouter.post('/send/bulk',userBulkEmailWaitlistController)
+userRouter.post("/send/bulk", userBulkEmailWaitlistController);
 
 userRouter.get(
   "/csrf-token",
@@ -116,9 +117,9 @@ userRouter.get(
     res.status(200).json({
       success: true,
       csrfToken: req.csrfToken,
-      message: "CSRF token generated successfully"
+      message: "CSRF token generated successfully",
     });
-  }
+  },
 );
 
 userRouter.post(
@@ -200,6 +201,10 @@ userRouter.post(
    Handles cart CRUD operations
 ================================================================ */
 
+// shipping rate cal
+
+userRouter.post("/sp-rate/cal", spRateCal);
+
 /* ===============================================================
    WISHLIST MANAGEMENT (PROTECTED)
 ================================================================ */
@@ -246,7 +251,12 @@ userRouter.delete(
 /* ===============================================================
    SESSION & TOKEN MANAGEMENT
 ================================================================ */
-userRouter.post("/user/logout", authGuardService("USER"), csrfProtection, logoutService);
+userRouter.post(
+  "/user/logout",
+  authGuardService("USER"),
+  csrfProtection,
+  logoutService,
+);
 /* ===============================================================
    RAZORPAY CHECKOUT FLOW (PROTECTED)
    ---------------------------------------------------------------

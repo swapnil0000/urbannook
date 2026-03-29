@@ -232,6 +232,13 @@ export const userApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["Address"],
     }),
+    getShippingRate: builder.mutation({
+      query: (data) => ({
+        url: "sp-rate/cal",
+        method: "POST",
+        body: data,
+      }),
+    }),
   }),
 });
 
@@ -261,4 +268,5 @@ export const {
   useGetSavedAddressesQuery,
   useUpdateAddressMutation,
   useDeleteAddressMutation,
+  useGetShippingRateMutation,
 } = userApi;

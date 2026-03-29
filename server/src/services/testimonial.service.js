@@ -149,7 +149,8 @@ const createProductSpecificTestimonialService = async ({
   if (!userId) errors.push("UserId is unavailable");
   if (!productId) errors.push("productId is unavailable");
   if (!desc || desc.trim().length === 0) errors.push("Review text is required");
-  if (!rating || rating < 1 || rating > 5) errors.push("Rating must be between 1 and 5");
+  if (!rating || rating < 1 || rating > 5)
+    errors.push("Rating must be between 1 and 5");
 
   if (errors.length > 0) {
     return { success: false, statusCode: 400, message: errors[0], data: null };
@@ -157,31 +158,53 @@ const createProductSpecificTestimonialService = async ({
 
   const trimmedDesc = desc.trim();
   if (trimmedDesc.length < 10 || trimmedDesc.length > 500) {
-    return { success: false, statusCode: 400, message: "Review must be between 10 and 500 characters", data: null };
+    return {
+      success: false,
+      statusCode: 400,
+      message: "Review must be between 10 and 500 characters",
+      data: null,
+    };
   }
 
   // 1. Check if user already reviewed this product (CHECK THIS FIRST)
   const existing = await ProductReview.findOne({ userId, productId });
   if (existing) {
-    return { success: false, statusCode: 400, message: "You have already submitted a review for this product", data: null };
+    return {
+      success: false,
+      statusCode: 400,
+      message: "You have already submitted a review for this product",
+      data: null,
+    };
   }
 
   // 2. CHECK PURCHASE: User must have a PAID/DELIVERED etc. order for this product
   // Use case-insensitive or trimmed match if needed, but schema says String.
   const hasPurchased = await Order.findOne({
     userId: userId, // Exact match on userId string
-    status: { $in: ["PAID", "CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED"] },
-    "items.productId": productId
+    status: {
+      $in: ["PAID", "CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED"],
+    },
+    "items.productId": productId,
   }).lean();
 
   if (!hasPurchased) {
-    return { success: false, statusCode: 403, message: "You can only review products you have purchased", data: null };
+    return {
+      success: false,
+      statusCode: 403,
+      message: "You can only review products you have purchased",
+      data: null,
+    };
   }
 
   // Get user name
   const user = await User.findOne({ userId }).select("name").lean();
   if (!user) {
-    return { success: false, statusCode: 404, message: "User not found", data: null };
+    return {
+      success: false,
+      statusCode: 404,
+      message: "User not found",
+      data: null,
+    };
   }
 
   // Upload image to S3 if provided
@@ -189,7 +212,12 @@ const createProductSpecificTestimonialService = async ({
   const imageUrls = [];
   if (imageBuffer && imageMimeType) {
     try {
-      imageUrl = await uploadReviewImageToS3(imageBuffer, imageMimeType, userId, productId);
+      imageUrl = await uploadReviewImageToS3(
+        imageBuffer,
+        imageMimeType,
+        userId,
+        productId,
+      );
       imageUrls.push(imageUrl);
     } catch (err) {
       console.error("[ERROR] Review image upload failed:", err.message);
@@ -198,7 +226,12 @@ const createProductSpecificTestimonialService = async ({
   // Upload extra images (up to 2 more)
   for (let i = 0; i < Math.min(extraImageBuffers.length, 2); i++) {
     try {
-      const url = await uploadReviewImageToS3(extraImageBuffers[i], extraImageMimeTypes[i], userId, `${productId}-img${i + 1}`);
+      const url = await uploadReviewImageToS3(
+        extraImageBuffers[i],
+        extraImageMimeTypes[i],
+        userId,
+        `${productId}-img${i + 1}`,
+      );
       imageUrls.push(url);
     } catch (err) {
       console.error("[ERROR] Extra review image upload failed:", err.message);
@@ -219,14 +252,20 @@ const createProductSpecificTestimonialService = async ({
   return {
     success: true,
     statusCode: 201,
-    message: "Review submitted successfully. It will be visible after admin approval.",
+    message:
+      "Review submitted successfully. It will be visible after admin approval.",
     data: { reviewId: review._id },
   };
 };
 
 const getProductReviewsService = async (productId, userId = null) => {
   if (!productId) {
-    return { success: false, statusCode: 400, message: "productId is required", data: null };
+    return {
+      success: false,
+      statusCode: 400,
+      message: "productId is required",
+      data: null,
+    };
   }
 
   // Find all approved reviews OR reviews that belong to the current user (even if not approved)
@@ -247,7 +286,10 @@ const getProductReviewsService = async (productId, userId = null) => {
   // Calculate average rating (only for approved reviews)
   const approvedReviews = reviews.filter((r) => r.isApproved);
   const avgRating = approvedReviews.length
-    ? (approvedReviews.reduce((sum, r) => sum + r.rating, 0) / approvedReviews.length).toFixed(1)
+    ? (
+        approvedReviews.reduce((sum, r) => sum + r.rating, 0) /
+        approvedReviews.length
+      ).toFixed(1)
     : null;
 
   // Check if current user can review (has purchased AND hasn't reviewed yet)
@@ -255,12 +297,17 @@ const getProductReviewsService = async (productId, userId = null) => {
   if (userId) {
     const hasPurchased = await Order.findOne({
       userId,
-      status: { $in: ["PAID", "CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED"] },
-      "items.productId": productId
+      status: {
+        $in: ["PAID", "CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED"],
+      },
+      "items.productId": productId,
     }).lean();
 
-    const alreadyReviewed = await ProductReview.findOne({ userId, productId }).lean();
-    
+    const alreadyReviewed = await ProductReview.findOne({
+      userId,
+      productId,
+    }).lean();
+
     if (hasPurchased && !alreadyReviewed) {
       canReview = true;
     }
@@ -270,7 +317,12 @@ const getProductReviewsService = async (productId, userId = null) => {
     success: true,
     statusCode: 200,
     message: "Reviews fetched",
-    data: { reviews, avgRating, totalReviews: approvedReviews.length, canReview },
+    data: {
+      reviews,
+      avgRating,
+      totalReviews: approvedReviews.length,
+      canReview,
+    },
   };
 };
 
@@ -279,7 +331,12 @@ const getPendingReviewsService = async () => {
   const reviews = await ProductReview.find({ isApproved: false })
     .sort({ createdAt: -1 })
     .lean();
-  return { success: true, statusCode: 200, message: "Pending reviews", data: reviews };
+  return {
+    success: true,
+    statusCode: 200,
+    message: "Pending reviews",
+    data: reviews,
+  };
 };
 
 // Admin: approve or reject
@@ -289,32 +346,66 @@ const approveReviewService = async (reviewId, approve) => {
   } else {
     await ProductReview.findByIdAndDelete(reviewId);
   }
-  return { success: true, statusCode: 200, message: approve ? "Review approved" : "Review rejected", data: null };
+  return {
+    success: true,
+    statusCode: 200,
+    message: approve ? "Review approved" : "Review rejected",
+    data: null,
+  };
 };
 
 // User: update their own review (resets isApproved to false)
-const updateProductReviewService = async ({ reviewId, userId, desc, rating, imageBuffers, imageMimeTypes }) => {
+const updateProductReviewService = async ({
+  reviewId,
+  userId,
+  desc,
+  rating,
+  imageBuffers,
+  imageMimeTypes,
+}) => {
   const review = await ProductReview.findById(reviewId);
-  if (!review) return { success: false, statusCode: 404, message: "Review not found", data: null };
-  
+  if (!review)
+    return {
+      success: false,
+      statusCode: 404,
+      message: "Review not found",
+      data: null,
+    };
+
   // Authorization check: Must be the owner
   if (review.userId !== userId) {
-    return { success: false, statusCode: 403, message: "Not authorized to edit this review", data: null };
+    return {
+      success: false,
+      statusCode: 403,
+      message: "Not authorized to edit this review",
+      data: null,
+    };
   }
 
-  // Note: No need to re-verify purchase here because the review 
+  // Note: No need to re-verify purchase here because the review
   // couldn't have been created without passing the purchase check initially.
 
   if (desc !== undefined) {
     const trimmed = desc.trim();
     if (trimmed.length < 10 || trimmed.length > 500)
-      return { success: false, statusCode: 400, message: "Review must be between 10 and 500 characters", data: null };
+      return {
+        success: false,
+        statusCode: 400,
+        message: "Review must be between 10 and 500 characters",
+        data: null,
+      };
     review.desc = trimmed;
   }
 
   if (rating !== undefined) {
     const r = Number(rating);
-    if (r < 1 || r > 5) return { success: false, statusCode: 400, message: "Rating must be between 1 and 5", data: null };
+    if (r < 1 || r > 5)
+      return {
+        success: false,
+        statusCode: 400,
+        message: "Rating must be between 1 and 5",
+        data: null,
+      };
     review.rating = r;
   }
 
@@ -323,7 +414,12 @@ const updateProductReviewService = async ({ reviewId, userId, desc, rating, imag
     const urls = [];
     for (let i = 0; i < Math.min(imageBuffers.length, 3); i++) {
       try {
-        const url = await uploadReviewImageToS3(imageBuffers[i], imageMimeTypes[i], userId, review.productId + `-img${i}`);
+        const url = await uploadReviewImageToS3(
+          imageBuffers[i],
+          imageMimeTypes[i],
+          userId,
+          review.productId + `-img${i}`,
+        );
         urls.push(url);
       } catch (err) {
         console.error("[ERROR] Review image upload failed:", err.message);
@@ -338,7 +434,8 @@ const updateProductReviewService = async ({ reviewId, userId, desc, rating, imag
   return {
     success: true,
     statusCode: 200,
-    message: "Review updated successfully. It will be visible after admin approval.",
+    message:
+      "Review updated successfully. It will be visible after admin approval.",
     data: { reviewId: review._id },
   };
 };
