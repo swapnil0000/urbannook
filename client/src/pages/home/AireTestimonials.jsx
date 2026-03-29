@@ -74,29 +74,10 @@ const AireTestimonials = () => {
   const scrollingItems = getScrollingItems();
 
   return (
-    <section className="relative mx-2 my-2 md:mx-4 md:my-4 rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden shadow-2xl group bg-[#FAF7F2]">
-
-      <style>{`
-        @keyframes marquee-horizontal {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-        .animate-marquee-horizontal {
-          animation: marquee-horizontal 40s linear infinite;
-          width: max-content;
-        }
-        .animate-marquee-horizontal:hover {
-          animation-play-state: paused;
-        }
-        .mask-horizontal {
-          -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
-          mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
-        }
-        .custom-scrollbar::-webkit-scrollbar { width: 3px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(28, 48, 38, 0.2); border-radius: 10px; }
-        .custom-scrollbar:hover::-webkit-scrollbar-thumb { background: rgba(28, 48, 38, 0.5); }
-      `}</style>
+    // Outer container restricted to viewport height on desktop
+    <section className="relative min-h-[97vh] lg:h-[calc(100vh-2rem)] lg:max-h-[900px] mx-2 my-2 md:mx-4 md:my-4 rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden shadow-2xl flex items-center group bg-[#1a2822]">
+      
+      {/* --- CORE CSS FOR MARQUEE & CUSTOM SCROLLBAR — defined in index.css --- */}
 
       {/* Background Atmosphere */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">

@@ -78,6 +78,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
     if (isLoggedIn) {
       navigate('/checkout');
     } else {
+      sessionStorage.setItem('postLoginRedirect', '/checkout');
       dispatch(setShowLoginModal(true));
     }
   };

@@ -72,6 +72,11 @@ export const productsApi = apiSlice.injectEndpoints({
       },
       providesTags: ['Product'],
     }),
+    // Get order count for a product
+    getProductOrderCount: builder.query({
+      query: (productId) => `product/${productId}/order-count`,
+      keepUnusedDataFor: 300,
+    }),
   }),
 });
 
@@ -82,4 +87,5 @@ export const {
   useGetFeaturedProductsQuery,
   useGetCategoriesQuery,
   useSearchProductsQuery,
+  useGetProductOrderCountQuery,
 } = productsApi;

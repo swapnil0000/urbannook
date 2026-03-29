@@ -111,33 +111,7 @@ const NewLaunchPopup = memo(() => {
         <div className="absolute inset-0 -translate-x-full group-hover:animate-[shine_2s_ease-in-out_infinite] pointer-events-none bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-[-20deg]"></div>
       </div>
 
-      <style jsx>{`
-        @keyframes shine {
-          100% {
-            transform: translateX(200%);
-          }
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes slideUpZoom {
-          from { 
-            opacity: 0; 
-            transform: translateY(20px) scale(0.95); 
-          }
-          to { 
-            opacity: 1; 
-            transform: translateY(0) scale(1); 
-          }
-        }
-        .animate-backdrop {
-          animation: fadeIn 0.4s ease-out forwards;
-        }
-        .animate-popup {
-          animation: slideUpZoom 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-      `}</style>
+    {/* shine/popup animations defined in index.css */}
     </div>
   );
 });

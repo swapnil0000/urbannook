@@ -10,7 +10,6 @@ import ErrorBoundary from './component/ErrorBoundary';
 import { setCredentials, logout } from './store/slices/authSlice';
 import { fetchCsrfToken } from './store/api/apiSlice';
 import AppRoutes from './store/AppRoutes';
-import NewsTicker from './pages/home/NewsTicker';
 import SEOHead from './component/SEOHead';
 
 const ORG_STRUCTURED_DATA = {
@@ -31,8 +30,9 @@ const ORG_STRUCTURED_DATA = {
   },
 };
 
-// Only lazy load non-critical components
+// Lazy load all non-critical components
 const NewHeader = lazy(() => import('./component/layout/NewHeader'));
+const NewsTicker = lazy(() => import('./pages/home/NewsTicker'));
 const Footer = lazy(() => import('./component/layout/Footer'));
 const Notification = lazy(() => import('./component/Notification'));
 const SocialMediaFAB = lazy(() => import('./component/layout/WhatsAppButton'));
@@ -78,24 +78,10 @@ const SessionManager = ({ children }) => {
       }
     };
 
-    // Periodic check for token removal (catches manual deletion in same tab)
-    const checkAuthInterval = setInterval(() => {
-      const currentToken = localStorage.getItem('authToken');
-      const currentUser = localStorage.getItem('user');
-      const reduxState = store.getState().auth;
-      
-      // If Redux thinks we're authenticated but tokens are missing, force logout
-      if (reduxState.isAuthenticated && (!currentToken || !currentUser)) {
-        console.log('[Auth] Token mismatch detected - forcing logout');
-        dispatch(logout());
-      }
-    }, 1000); // Check every second
-
     window.addEventListener('storage', handleStorageChange);
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
-      clearInterval(checkAuthInterval);
     };
   }, [dispatch]);
 
@@ -121,8 +107,12 @@ function App() {
                 <OpenInBrowserBanner />
               </Suspense>
               <ErrorBoundary>
-                <NewsTicker/>
-                <NewHeader/>
+                <Suspense fallback={<div style={{ height: '36px' }} />}>
+                  <NewsTicker />
+                </Suspense>
+                <Suspense fallback={<div style={{ height: '72px' }} />}>
+                  <NewHeader />
+                </Suspense>
               </ErrorBoundary>
               {/* AppRoutes loaded immediately - no lazy loading for critical routing */}
               <ErrorBoundary>

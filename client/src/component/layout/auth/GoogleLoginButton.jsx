@@ -37,13 +37,13 @@ export default function GoogleLoginButton({
           token,
         }));
 
-        // Call optional onSuccess callback
+        // Call optional onSuccess callback — let caller handle navigation
         if (onSuccess) {
           onSuccess(result.data);
+        } else {
+          // Default: go home only if no callback provided
+          navigate('/');
         }
-
-        // Navigate to home page
-        navigate('/');
       }
     } catch (error) {
       console.error('[Google Login] Error:', error);

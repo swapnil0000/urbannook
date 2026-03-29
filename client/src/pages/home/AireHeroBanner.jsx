@@ -14,20 +14,21 @@ const AireHeroBanner = memo(() => {
       
       {/* --- BACKGROUND IMAGE LAYER --- */}
       <div className="absolute inset-0 z-0">
-        {/* Mobile Image (hero21.webp) */}
-        <img
-          src="/assets/hero2.webp"
-          alt="Hero Background"
-          fetchPriority="high"
-          loading="eager"
-          onError={(e) => {
-            e.target.onerror = null;
-            // Fallback
-            e.target.src = "https://images.unsplash.com/photo-1513519247388-193ad5130246?q=80&w=2500";
-          }}
-          // alt="Hero Background"
-          className="w-full h-full object-cover opacity-80 lg:opacity-70 transition-transform duration-[20s] ease-in-out group-hover:scale-105"
-        />
+        {/* Responsive hero: mobile uses hero21, desktop uses hero2 */}
+        <picture>
+          <source media="(max-width: 768px)" srcSet="/assets/hero21.webp" />
+          <img
+            src="/assets/hero2.webp"
+            alt="Hero Background"
+            fetchPriority="high"
+            loading="eager"
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = "https://images.unsplash.com/photo-1513519247388-193ad5130246?q=80&w=2500";
+            }}
+            className="w-full h-full object-cover opacity-80 lg:opacity-70 transition-transform duration-[20s] ease-in-out group-hover:scale-105"
+          />
+        </picture>
 
         <div className="absolute inset-0 bg-gradient-to-b from-[#2E443C]/20 via-[#2E443C]/60 to-[#1a2822] lg:bg-gradient-to-r lg:from-[#2E443C] lg:via-[#2E443C]/40 lg:to-transparent"></div>
       </div>
