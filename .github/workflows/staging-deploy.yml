@@ -56,7 +56,7 @@ jobs:
       - name: Build Client
         working-directory: client
         run: |
-          npm install
+          npm ci
           npm run build
 
       - name: Configure AWS
@@ -133,7 +133,7 @@ jobs:
         run: |
           ssh ubuntu@${{ secrets.STAGING_HOST }} << 'EOF'
             cd /home/ubuntu/urbannook-staging/server
-            npm install --omit=dev
+            npm ci --omit=dev || npm install --omit=dev
             pm2 reload urbannook-staging --env staging || pm2 start ecosystem.config.cjs --env staging --name urbannook-staging
             pm2 save
           EOF

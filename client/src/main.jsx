@@ -9,19 +9,14 @@ import { initializeFonts } from './utils/initFontLoading.js';
 import { initPerformanceMetrics, onMetricsUpdate } from './utils/performanceMetrics.js';
 import { monitorPerformance } from './utils/performanceValidation.js';
 
-// Initialize performance metrics collection
-// Validates: Requirements 6.1, 6.3, 6.5
 if (typeof window !== 'undefined') {
   initPerformanceMetrics();
   
-  // Monitor and validate performance metrics in development
   if (import.meta.env.DEV) {
     monitorPerformance();
   }
 }
 
-// Initialize optimized font loading with timeout for optional fonts
-// Validates: Requirements 3.1, 3.5
 if (document.fonts) {
   initializeFonts().then((results) => {
     if (results) {

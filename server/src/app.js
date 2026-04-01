@@ -24,7 +24,7 @@ import env from "./config/envConfigSetup.js";
 const app = express();
 app.set("trust proxy", 1);
 app.set("etag", false);
-
+// test
 logCorsConfig();
 
 /* ===============================================================
