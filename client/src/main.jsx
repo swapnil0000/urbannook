@@ -8,7 +8,7 @@ import config from './config/env.js';
 import { initializeFonts } from './utils/initFontLoading.js';
 import { initPerformanceMetrics, onMetricsUpdate } from './utils/performanceMetrics.js';
 import { monitorPerformance } from './utils/performanceValidation.js';
-
+// test
 if (typeof window !== 'undefined') {
   initPerformanceMetrics();
   

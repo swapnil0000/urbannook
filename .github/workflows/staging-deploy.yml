@@ -5,7 +5,6 @@ on:
     branches:
       - staging
 
-# Global Environment to fix Node.js 20 deprecation warnings
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -40,7 +39,6 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.client == 'true'
     runs-on: ubuntu-latest
-    # --- Connects to GitHub Environment 'staging' ---
     environment: staging 
     
     steps:
@@ -51,17 +49,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-
-      # --- Create .env.staging from Environment Secrets ---
-      - name: Create .env.staging
-        working-directory: client
-        run: |
-          echo "VITE_APP_ENV=${{ secrets.VITE_APP_ENV }}" > .env.staging
-          echo "VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}" >> .env.staging
-          echo "VITE_DOMAIN_BASE_URL=${{ secrets.VITE_DOMAIN_BASE_URL }}" >> .env.staging
-          echo "VITE_GOOGLE_CLIENT_ID=${{ secrets.VITE_GOOGLE_CLIENT_ID }}" >> .env.staging
-          echo "DEBUG: .env.staging content follows"
-          cat .env.staging
 
       - name: Cache Client npm
         uses: actions/cache@v4
@@ -75,19 +62,15 @@ jobs:
         working-directory: client
         run: |
           npm install --legacy-peer-deps
-          # Step 1: Create the file (Jo aap kar rahe ho)
-          echo "VITE_APP_ENV=${{ secrets.VITE_APP_ENV }}" > .env.staging
-          echo "VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}" >> .env.staging
-          echo "VITE_DOMAIN_BASE_URL=${{ secrets.VITE_DOMAIN_BASE_URL }}" >> .env.staging
-          echo "VITE_GOOGLE_CLIENT_ID=${{ secrets.VITE_GOOGLE_CLIENT_ID }}" >> .env.staging
           
-          # Step 2: Inject directly into the build command (FOOLPROOF)
+          # Injecting secrets directly as environment variables for the build process
           VITE_APP_ENV="${{ secrets.VITE_APP_ENV }}" \
           VITE_API_BASE_URL="${{ secrets.VITE_API_BASE_URL }}" \
           VITE_DOMAIN_BASE_URL="${{ secrets.VITE_DOMAIN_BASE_URL }}" \
           VITE_GOOGLE_CLIENT_ID="${{ secrets.VITE_GOOGLE_CLIENT_ID }}" \
           npm run build:staging
           
+          # Block indexing for staging site
           echo -e "User-agent: *\nDisallow: /" > dist/robots.txt
 
       - name: Configure AWS
@@ -131,32 +114,17 @@ jobs:
       - name: Check Staging EC2 availability
         id: ec2_check
         run: |
-          if ssh -o ConnectTimeout=10 ubuntu@${{ secrets.STAGING_HOST }} "echo EC2 is running staging" >/dev/null 2>&1; then
+          if ssh -o ConnectTimeout=10 ubuntu@${{ secrets.STAGING_HOST }} "echo EC2 is running" >/dev/null 2>&1; then
             echo "EC2_AVAILABLE=true" >> $GITHUB_ENV
           else
-            echo "EC2_AVAILABLE=false" >> $GITHUB_ENV
             echo "::error::Staging EC2 is unreachable."
             exit 1
           fi
 
-      - name: Cache Server npm
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: staging-server-npm-v1-${{ runner.os }}-${{ hashFiles('server/package-lock.json') }}
-          restore-keys: |
-            staging-server-npm-${{ runner.os }}-
-
-      - name: Install Server Dependencies Locally
-        working-directory: server
-        run: npm install --legacy-peer-deps
-
-      - name: Upload Server to Staging Folder
+      - name: Upload Server to Staging
         run: |
           rsync -avz --delete \
-          --exclude '.env' \
-          --exclude '.env.production' \
-          --exclude '.env.staging' \
+          --exclude '.env*' \
           --exclude 'node_modules' \
           server/ \
           ubuntu@${{ secrets.STAGING_HOST }}:/home/ubuntu/urbannook-staging/server/
@@ -175,4 +143,4 @@ jobs:
     if: needs.detect-changes.outputs.client == 'false' && needs.detect-changes.outputs.server == 'false'
     runs-on: ubuntu-latest
     steps:
-      - run: echo "No changes in client or server folders. Skipping deployment."
+      - run: echo "No changes detected in client or server. Skipping deployment."
