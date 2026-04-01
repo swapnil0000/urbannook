@@ -3,6 +3,7 @@
 const API_URLS = {
   local: 'http://localhost:8000/api/v1',
   development: 'http://localhost:8000/api/v1',
+  staging: 'https://api-staging.urbannook.online/api/v1',
   production: 'https://api.urbannook.in/api/v1',
 };
 
@@ -31,6 +32,18 @@ const getEnvironment = () => {
 
 // Get current API URL
 export const getApiUrl = () => {
+  // Priority 1: Always use local API when running on localhost
+  const hostname = window.location.hostname;
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return API_URLS.local;
+  }
+
+  // Priority 2: Use explicitly configured API base URL from environment variable
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL;
+  }
+  
+  // Priority 3: Use pre-defined environment configuration
   const env = getEnvironment();
   return API_URLS[env] || API_URLS.production;
 };
@@ -38,6 +51,7 @@ export const getApiUrl = () => {
 // Export individual URLs for direct access
 export const API_CONFIG = {
   LOCAL: API_URLS.local,
+  STAGING: API_URLS.staging,
   PRODUCTION: API_URLS.production,
   CURRENT: getApiUrl()
 };
