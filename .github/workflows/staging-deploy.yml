@@ -60,9 +60,10 @@ jobs:
       - name: Build Client
         working-directory: client
         run: |
-          # npm ci try karega, agar lock file sync nahi hui toh install karega
           npm ci --legacy-peer-deps || npm install --legacy-peer-deps
           npm run build
+          echo "User-agent: *" > dist/robots.txt
+          echo "Disallow: /" >> dist/robots.txt
 
       - name: Configure AWS
         uses: aws-actions/configure-aws-credentials@v4
