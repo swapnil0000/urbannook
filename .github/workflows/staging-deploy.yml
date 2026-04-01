@@ -1,9 +1,13 @@
-name: Staging
+name: Staging Deployment
 
 on:
   push:
     branches:
       - staging
+
+# Global Environment to fix Node.js 20 deprecation warnings
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   detect-changes:
@@ -56,7 +60,8 @@ jobs:
       - name: Build Client
         working-directory: client
         run: |
-          npm ci
+          # npm ci try karega, agar lock file sync nahi hui toh install karega
+          npm ci --legacy-peer-deps || npm install --legacy-peer-deps
           npm run build
 
       - name: Configure AWS
@@ -99,11 +104,11 @@ jobs:
       - name: Check Staging EC2 availability
         id: ec2_check
         run: |
-          if ssh -o ConnectTimeout=5 ubuntu@${{ secrets.STAGING_HOST }} "echo EC2 is running staging" >/dev/null 2>&1; then
+          if ssh -o ConnectTimeout=10 ubuntu@${{ secrets.STAGING_HOST }} "echo EC2 is running staging" >/dev/null 2>&1; then
             echo "EC2_AVAILABLE=true" >> $GITHUB_ENV
           else
             echo "EC2_AVAILABLE=false" >> $GITHUB_ENV
-            echo "::error::Staging EC2 is stopped. Deployment failed fast."
+            echo "::error::Staging EC2 is unreachable. Check Security Group Port 22 and IP."
             exit 1
           fi
 
@@ -115,13 +120,15 @@ jobs:
           restore-keys: |
             staging-server-npm-${{ runner.os }}-
 
-      - name: Install Server Dependencies
+      - name: Install Server Dependencies Locally
         working-directory: server
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Upload Server to Staging Folder
         run: |
-          rsync -avz \
+          # rsync will now create the directory path if it doesn't exist on some versions, 
+          # but we already ensured it manually earlier.
+          rsync -avz --delete \
           --exclude '.env' \
           --exclude '.env.production' \
           --exclude '.env.staging' \
@@ -133,7 +140,8 @@ jobs:
         run: |
           ssh ubuntu@${{ secrets.STAGING_HOST }} << 'EOF'
             cd /home/ubuntu/urbannook-staging/server
-            npm ci --omit=dev || npm install --omit=dev
+            npm install --omit=dev --legacy-peer-deps
+            # Reload if exists, else start fresh
             pm2 reload urbannook-staging --env staging || pm2 start ecosystem.config.cjs --env staging --name urbannook-staging
             pm2 save
           EOF
@@ -143,4 +151,4 @@ jobs:
     if: needs.detect-changes.outputs.client == 'false' && needs.detect-changes.outputs.server == 'false'
     runs-on: ubuntu-latest
     steps:
-      - run: echo "No changes in client or server for staging branch."
+      - run: echo "No changes in client or server folders. Skipping deployment."
