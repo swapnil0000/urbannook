@@ -21,10 +21,9 @@ import { errorHandler } from "./middleware/errorHandler.middleware.js";
 import { sanitizeRequestBody } from "./middleware/sanitization.middleware.js";
 import env from "./config/envConfigSetup.js";
 
-
 const app = express();
 app.set("trust proxy", 1);
-app.set("etag", false); // Disable ETags — prevents browser returning stale 304 for dynamic API responses
+app.set("etag", false);
 
 logCorsConfig();
 
@@ -37,120 +36,114 @@ logCorsConfig();
    - MIME-type sniffing
    - Man-in-the-middle attacks
 ================================================================ */
-app.use(helmet({
-  // Content Security Policy - Controls what resources can load
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      
-      // Scripts: Allow own domain + Razorpay + Google Sign-In
-      scriptSrc: [
-        "'self'",
-        "https://checkout.razorpay.com",
-        "https://accounts.google.com",
-        "https://apis.google.com",
-        "'unsafe-inline'", // Required for Razorpay inline scripts
-        "'unsafe-eval'"    // Required for Razorpay
-      ],
-      
-      // Styles: Allow own domain + Google Fonts + inline styles (for React)
-      styleSrc: [
-        "'self'",
-        "https://fonts.googleapis.com",
-        "https://cdn.jsdelivr.net",
-        "'unsafe-inline'" // Required for inline styles in React
-      ],
-      
-      // Images: Allow own domain + any HTTPS source (for product images)
-      imgSrc: [
-        "'self'",
-        "data:",
-        "https:",
-        "blob:"
-      ],
-      
-      // API Connections: Allow own domain + Razorpay + Google
-      connectSrc: [
-        "'self'",
-        "https://api.razorpay.com",
-        "https://accounts.google.com",
-        "https://apis.google.com",
-        env.NODE_ENV === "development" ? "http://localhost:*" : "",
-        env.NODE_ENV === "development" ? "ws://localhost:*" : "" // For Vite HMR
-      ].filter(Boolean),
-      
-      // Fonts: Allow own domain + Google Fonts + CDN
-      fontSrc: [
-        "'self'",
-        "https://fonts.gstatic.com",
-        "https://cdn.jsdelivr.net",
-        "data:"
-      ],
-      
-      // Frames/iframes: Only allow Razorpay + Google
-      frameSrc: [
-        "https://api.razorpay.com",
-        "https://accounts.google.com"
-      ],
-      
-      // Object/Embed: Block all
-      objectSrc: ["'none'"],
-      
-      // Base URI: Restrict to own domain
-      baseUri: ["'self'"],
-      
-      // Form actions: Allow own domain + Razorpay
-      formAction: [
-        "'self'",
-        "https://api.razorpay.com"
-      ],
-      
-      // Frame ancestors: Prevent clickjacking
-      frameAncestors: ["'none'"],
-      
-      // Upgrade insecure requests in production
-      ...(env.NODE_ENV === "production" && {
-        upgradeInsecureRequests: []
-      })
-    }
-  },
-  
-  // HTTP Strict Transport Security - Force HTTPS
-  hsts: {
-    maxAge: 31536000,        // 1 year in seconds
-    includeSubDomains: true, // Apply to all subdomains
-    preload: true            // Submit to browser preload list
-  },
-  
-  // Prevent clickjacking by disabling iframes
-  frameguard: {
-    action: 'deny'
-  },
-  
-  // Prevent MIME-type sniffing
-  noSniff: true,
-  
-  // Enable XSS filter in older browsers
-  xssFilter: true,
-  
-  // Hide X-Powered-By header (don't reveal Express)
-  hidePoweredBy: true,
-  
-  // Referrer Policy - Control referrer information
-  referrerPolicy: {
-    policy: 'strict-origin-when-cross-origin'
-  },
-  
-  // Permissions Policy - Control browser features
-  permittedCrossDomainPolicies: {
-    permittedPolicies: 'none'
-  },
-  
-  // Cross-Origin-Opener-Policy - Allow Google OAuth popup
-  crossOriginOpenerPolicy: {
-    policy: env.NODE_ENV === "development" ? "unsafe-none" : "same-origin-allow-popups"
-  }
-}));
+app.use(
+  helmet({
+    // Content Security Policy - Controls what resources can load
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+
+        // Scripts: Allow own domain + Razorpay + Google Sign-In
+        scriptSrc: [
+          "'self'",
+          "https://checkout.razorpay.com",
+          "https://accounts.google.com",
+          "https://apis.google.com",
+          "'unsafe-inline'", // Required for Razorpay inline scripts
+          "'unsafe-eval'", // Required for Razorpay
+        ],
+
+        // Styles: Allow own domain + Google Fonts + inline styles (for React)
+        styleSrc: [
+          "'self'",
+          "https://fonts.googleapis.com",
+          "https://cdn.jsdelivr.net",
+          "'unsafe-inline'", // Required for inline styles in React
+        ],
+
+        // Images: Allow own domain + any HTTPS source (for product images)
+        imgSrc: ["'self'", "data:", "https:", "blob:"],
+
+        // API Connections: Allow own domain + Razorpay + Google
+        connectSrc: [
+          "'self'",
+          "https://api.razorpay.com",
+          "https://accounts.google.com",
+          "https://apis.google.com",
+          env.NODE_ENV === "development" ? "http://localhost:*" : "",
+          env.NODE_ENV === "development" ? "ws://localhost:*" : "", // For Vite HMR
+        ].filter(Boolean),
+
+        // Fonts: Allow own domain + Google Fonts + CDN
+        fontSrc: [
+          "'self'",
+          "https://fonts.gstatic.com",
+          "https://cdn.jsdelivr.net",
+          "data:",
+        ],
+
+        // Frames/iframes: Only allow Razorpay + Google
+        frameSrc: ["https://api.razorpay.com", "https://accounts.google.com"],
+
+        // Object/Embed: Block all
+        objectSrc: ["'none'"],
+
+        // Base URI: Restrict to own domain
+        baseUri: ["'self'"],
+
+        // Form actions: Allow own domain + Razorpay
+        formAction: ["'self'", "https://api.razorpay.com"],
+
+        // Frame ancestors: Prevent clickjacking
+        frameAncestors: ["'none'"],
+
+        // Upgrade insecure requests in production
+        ...(env.NODE_ENV === "production" && {
+          upgradeInsecureRequests: [],
+        }),
+      },
+    },
+
+    // HTTP Strict Transport Security - Force HTTPS
+    hsts: {
+      maxAge: 31536000, // 1 year in seconds
+      includeSubDomains: true, // Apply to all subdomains
+      preload: true, // Submit to browser preload list
+    },
+
+    // Prevent clickjacking by disabling iframes
+    frameguard: {
+      action: "deny",
+    },
+
+    // Prevent MIME-type sniffing
+    noSniff: true,
+
+    // Enable XSS filter in older browsers
+    xssFilter: true,
+
+    // Hide X-Powered-By header (don't reveal Express)
+    hidePoweredBy: true,
+
+    // Referrer Policy - Control referrer information
+    referrerPolicy: {
+      policy: "strict-origin-when-cross-origin",
+    },
+
+    // Permissions Policy - Control browser features
+    permittedCrossDomainPolicies: {
+      permittedPolicies: "none",
+    },
+
+    // Cross-Origin-Opener-Policy - Allow Google OAuth popup
+    crossOriginOpenerPolicy: {
+      policy:
+        env.NODE_ENV === "development"
+          ? "unsafe-none"
+          : "same-origin-allow-popups",
+    },
+  }),
+);
 
 /* Health Route */
 app.use("/health", healthRouter);

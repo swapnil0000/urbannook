@@ -12,7 +12,7 @@ import { fetchCsrfToken } from './store/api/apiSlice';
 import AppRoutes from './store/AppRoutes';
 import NewsTicker from './pages/home/NewsTicker';
 import SEOHead from './component/SEOHead';
-
+// check
 const ORG_STRUCTURED_DATA = {
   '@context': 'https://schema.org',
   '@type': 'Organization',
