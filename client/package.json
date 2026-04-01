@@ -7,6 +7,7 @@
     "dev": "vite",
     "dev:prod": "vite --mode production",
     "build": "vite build",
+    "build:staging": "vite build --mode staging",
     "build:prod": "vite build --mode production",
     "preview": "vite preview",
     "preview:prod": "vite preview --mode production",
