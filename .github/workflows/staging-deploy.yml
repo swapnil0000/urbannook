@@ -1,9 +1,12 @@
-name: Staging
+name: Staging Deployment
 
 on:
   push:
     branches:
       - staging
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   detect-changes:
@@ -36,6 +39,8 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.client == 'true'
     runs-on: ubuntu-latest
+    environment: staging 
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -56,8 +61,17 @@ jobs:
       - name: Build Client
         working-directory: client
         run: |
-          npm ci
-          npm run build
+          npm install --legacy-peer-deps
+          
+          # Injecting secrets directly as environment variables for the build process
+          VITE_APP_ENV="${{ secrets.VITE_APP_ENV }}" \
+          VITE_API_BASE_URL="${{ secrets.VITE_API_BASE_URL }}" \
+          VITE_DOMAIN_BASE_URL="${{ secrets.VITE_DOMAIN_BASE_URL }}" \
+          VITE_GOOGLE_CLIENT_ID="${{ secrets.VITE_GOOGLE_CLIENT_ID }}" \
+          npm run build:staging
+          
+          # Block indexing for staging site
+          echo -e "User-agent: *\nDisallow: /" > dist/robots.txt
 
       - name: Configure AWS
         uses: aws-actions/configure-aws-credentials@v4
@@ -80,6 +94,7 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.server == 'true'
     runs-on: ubuntu-latest
+    environment: staging
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -99,32 +114,17 @@ jobs:
       - name: Check Staging EC2 availability
         id: ec2_check
         run: |
-          if ssh -o ConnectTimeout=5 ubuntu@${{ secrets.STAGING_HOST }} "echo EC2 is running staging" >/dev/null 2>&1; then
+          if ssh -o ConnectTimeout=10 ubuntu@${{ secrets.STAGING_HOST }} "echo EC2 is running" >/dev/null 2>&1; then
             echo "EC2_AVAILABLE=true" >> $GITHUB_ENV
           else
-            echo "EC2_AVAILABLE=false" >> $GITHUB_ENV
-            echo "::error::Staging EC2 is stopped. Deployment failed fast."
+            echo "::error::Staging EC2 is unreachable."
             exit 1
           fi
 
-      - name: Cache Server npm
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: staging-server-npm-v1-${{ runner.os }}-${{ hashFiles('server/package-lock.json') }}
-          restore-keys: |
-            staging-server-npm-${{ runner.os }}-
-
-      - name: Install Server Dependencies
-        working-directory: server
-        run: npm install
-
-      - name: Upload Server to Staging Folder
+      - name: Upload Server to Staging
         run: |
-          rsync -avz \
-          --exclude '.env' \
-          --exclude '.env.production' \
-          --exclude '.env.staging' \
+          rsync -avz --delete \
+          --exclude '.env*' \
           --exclude 'node_modules' \
           server/ \
           ubuntu@${{ secrets.STAGING_HOST }}:/home/ubuntu/urbannook-staging/server/
@@ -133,7 +133,7 @@ jobs:
         run: |
           ssh ubuntu@${{ secrets.STAGING_HOST }} << 'EOF'
             cd /home/ubuntu/urbannook-staging/server
-            npm ci --omit=dev || npm install --omit=dev
+            npm install --omit=dev --legacy-peer-deps
             pm2 reload urbannook-staging --env staging || pm2 start ecosystem.config.cjs --env staging --name urbannook-staging
             pm2 save
           EOF
@@ -143,4 +143,4 @@ jobs:
     if: needs.detect-changes.outputs.client == 'false' && needs.detect-changes.outputs.server == 'false'
     runs-on: ubuntu-latest
     steps:
-      - run: echo "No changes in client or server for staging branch."
+      - run: echo "No changes detected in client or server. Skipping deployment."

@@ -1,0 +1,16 @@
+{
+  "name": "urban-nook",
+  "version": "1.0.0",
+  "description": "This document exists **to avoid confusion forever**.\r If you are new to this repository, **read this fully before pushing or merging anything**.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepare": "husky install"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "husky": "^9.1.7"
+  }
+}
