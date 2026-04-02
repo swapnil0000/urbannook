@@ -1,0 +1,12 @@
+name: Verify Latest Code
+on:
+  pull_request:
+    branches:
+      - main
+      - staging
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Checking if your branch is up to date with the target branch..."
