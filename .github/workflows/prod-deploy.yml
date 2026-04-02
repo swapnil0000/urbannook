@@ -36,6 +36,7 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.client == 'true'
     runs-on: ubuntu-latest
+    environment: production
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
@@ -46,6 +47,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
+
+      - name: Create .env file for Client
+        working-directory: client
+        run: |
+          echo "VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}" >> .env
+          echo "VITE_APP_ENV=${{ secrets.VITE_APP_ENV }}" >> .env
+          echo "VITE_DOMAIN_BASE_URL=${{ secrets.VITE_DOMAIN_BASE_URL }}" >> .env
+          echo "VITE_GOOGLE_CLIENT_ID=${{ secrets.VITE_GOOGLE_CLIENT_ID }}" >> .env
 
       - name: Build Frontend
         working-directory: client
@@ -62,13 +71,14 @@ jobs:
 
       - name: S3 Sync & CloudFront Invalidation
         run: |
-          aws s3 sync client/dist/ s3://${{ secrets.S3_BUCKET }} --delete --only-show-errors
-          aws cloudfront create-invalidation --distribution-id ${{ secrets.CLOUDFRONT_DIST_ID }} --paths "/*"
+          aws s3 sync client/dist/ s3://${{ secrets.AWS_S3_FRONTEND_BUCKET }} --delete --only-show-errors
+          aws cloudfront create-invalidation --distribution-id ${{ secrets.AWS_CLOUDFRONT_ID }} --paths "/*"
 
   deploy-server:
     needs: detect-changes
     if: needs.detect-changes.outputs.server == 'true'
     runs-on: ubuntu-latest
+    environment: production
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
@@ -82,20 +92,19 @@ jobs:
 
       - name: Install Server Dependencies
         working-directory: server
-        # --legacy-peer-deps is enough once package versions are aligned
         run: npm install --legacy-peer-deps
 
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/id_rsa
+          echo "${{ secrets.AWS_EC2_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.PROD_SSH_HOST }} >> ~/.ssh/known_hosts || true
+          ssh-keyscan -H ${{ secrets.AWS_EC2_IP }} >> ~/.ssh/known_hosts || true
 
       - name: Check Prod EC2 availability
         id: check_ec2
         run: |
-          if ssh -o ConnectTimeout=15 ubuntu@${{ secrets.PROD_SSH_HOST }} "echo EC2_OK" > /dev/null 2>&1; then
+          if ssh -o ConnectTimeout=15 ubuntu@${{ secrets.AWS_EC2_IP }} "echo EC2_OK" > /dev/null 2>&1; then
             echo "available=true" >> $GITHUB_OUTPUT
           else
             echo "available=false" >> $GITHUB_OUTPUT
@@ -110,23 +119,14 @@ jobs:
           --exclude 'node_modules' \
           --exclude '.git' \
           server/ \
-          ubuntu@${{ secrets.PROD_SSH_HOST }}:/home/ubuntu/urbannook-prod/server/
+          ubuntu@${{ secrets.AWS_EC2_IP }}:/home/ubuntu/urbannook-prod/server/
 
       - name: Restart Production Backend
         if: steps.check_ec2.outputs.available == 'true'
         run: |
-          ssh ubuntu@${{ secrets.PROD_SSH_HOST }} << 'EOF'
+          ssh ubuntu@${{ secrets.AWS_EC2_IP }} << 'EOF'
             cd /home/ubuntu/urbannook-prod/server
-            # CI approach for clean install
             npm install --omit=dev --legacy-peer-deps
             pm2 reload urbannook-server --env production || pm2 start ecosystem.config.cjs --env production
             pm2 save
           EOF
-
-  nothing-to-deploy:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.client == 'false' && needs.detect-changes.outputs.server == 'false'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Nothing to deploy
-        run: echo "No changes detected."
