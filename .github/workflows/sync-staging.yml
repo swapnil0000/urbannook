@@ -1,0 +1,18 @@
+name: Auto-Sync Main to Staging
+on:
+  push:
+    branches:
+      - main # Runs whenever new code is merged into the main branch
+
+jobs:
+  create-sync-pr:
+    runs-on: ubuntu-latest
+    permissions: write-all
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Create PR from Main to Staging
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr create --base staging --head main --title "🔄 Sync: Main to Staging" --body "The \`main\` branch has been updated with new commits. Please review and merge this PR to keep the \`staging\` environment perfectly synced with production." || echo "A Pull Request for this sync already exists, or there are no new changes to merge."
