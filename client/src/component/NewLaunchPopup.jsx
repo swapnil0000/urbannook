@@ -78,8 +78,7 @@ const NewLaunchPopup = memo(() => {
             </p>
             
             <p className="text-white/80 text-[10px] md:text-sm font-light leading-relaxed flex items-center justify-center flex-wrap gap-1">
-              <span className="mr-1 md:mr-2 text-sm md:text-base">�</span>
-              NEW CUSTOMER CODE: 
+              WAITLIST USER CODE: 
               <button 
                 onClick={handleCopyCode}
                 title="Click to copy code"
