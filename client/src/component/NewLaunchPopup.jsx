@@ -70,9 +70,6 @@ const NewLaunchPopup = memo(() => {
             Welcome to <span className="italic text-[#F5DEB3]">UrbanNook</span>
           </h2>
 
-          <p className="text-white/60 text-[10px] md:text-sm mb-5 md:mb-6 font-light">
-            New here? Get an exclusive discount on your first order
-          </p>
 
           <div className="flex flex-col gap-3 md:gap-4 mb-5 md:mb-8 w-full max-w-sm">
             <p className="text-white/80 text-[10px] md:text-sm font-light leading-relaxed">
