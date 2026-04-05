@@ -1,25 +1,28 @@
 import { useState, memo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import useTimer from '../hooks/useTimer';
+import config from '../config/env';
 
 const NewLaunchPopup = memo(() => {
   const [isVisible, setIsVisible] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const navigate = useNavigate();
+  const timeLeft = useTimer(config.offerEndDate);
 
   useEffect(() => {
-    // Only show once per session
-    if (sessionStorage.getItem('launchPopupShown')) return;
+    // Only show once per session and if timer is not expired
+    if (sessionStorage.getItem('launchPopupShown') || timeLeft.isExpired) return;
 
     const timer = setTimeout(() => {
       setIsVisible(true);
       sessionStorage.setItem('launchPopupShown', 'true');
     }, 1000);
     return () => clearTimeout(timer);
-  }, []);
+  }, [timeLeft.isExpired]);
 
   const handleClose = useCallback(() => setIsVisible(false), []);
 
-  if (!isVisible) return null;
+  if (!isVisible || timeLeft.isExpired) return null;
 
   const handleNavigate = () => {
     navigate('/products');
@@ -57,13 +60,35 @@ const NewLaunchPopup = memo(() => {
           {/* Badge */}
           <div className="flex items-center gap-2 md:gap-3 mb-3 md:mb-4">
             <span className="h-[1px] w-4 md:w-6 bg-[#F5DEB3]"></span>
-            <span className="text-[#F5DEB3] font-bold tracking-[0.2em] md:tracking-[0.3em] uppercase text-[8px] md:text-[10px]">Launch Offer</span>
+            <span className="text-[#fafaf9] font-bold tracking-[0.2em] md:tracking-[0.3em] uppercase text-[8px] md:text-[10px]">Launch Offer</span>
             <span className="h-[1px] w-4 md:w-6 bg-[#F5DEB3]"></span>
           </div>
 
-          {/* Urgency banner */}
-          <div className="bg-red-500/20 border border-red-400/30 rounded-lg px-3 py-1.5 md:px-4 md:py-2 mb-4 md:mb-6 flex items-center gap-2">
-            <span className="text-red-400 text-[9px] md:text-xs font-bold uppercase tracking-wider animate-pulse">⏰ Launch offer ending soon</span>
+          {/* Urgency Timer */}
+          <div className="flex flex-col items-center gap-3 mb-6 md:mb-8">
+            <div className="flex gap-2 md:gap-3">
+              {[
+                { label: 'Hours', value: timeLeft.hours },
+                { label: 'Mins', value: timeLeft.minutes },
+                { label: 'Secs', value: timeLeft.seconds }
+              ].map((item, idx) => (
+                <div key={item.label} className="flex items-center gap-2 md:gap-3">
+                  <div className="flex flex-col items-center">
+                    <div className="bg-white/5 backdrop-blur-md rounded-xl p-2 md:p-3 min-w-[50px] md:min-w-[65px] border border-white/10 shadow-inner">
+                      <span className="text-xl md:text-3xl font-bold text-[#F5DEB3] font-mono tracking-tighter">{item.value}</span>
+                    </div>
+                    <span className="text-[7px] md:text-[9px] uppercase tracking-[0.2em] text-[#F5DEB3]/60 mt-1.5 font-bold">{item.label}</span>
+                  </div>
+                  {idx < 2 && (
+                    <span className="text-xl md:text-3xl font-light text-white/20 self-start mt-1.5 md:mt-2">:</span>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="bg-red-500/10 border border-red-500/20 rounded-full px-4 py-1.5 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+              <span className="text-red-400 text-[9px] md:text-[11px] font-bold uppercase tracking-[0.1em]">⚠️ LAUNCH OFFER ENDING: PRICES RISING SOON!</span>
+            </div>
           </div>
 
           <h2 className="text-3xl md:text-5xl font-serif text-white leading-tight mb-3 md:mb-4">
