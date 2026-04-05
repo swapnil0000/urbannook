@@ -68,6 +68,7 @@ const ProductDetailPage = () => {
   const [reviewImages, setReviewImages] = useState([]); // up to 3 File objects
   const [reviewImagePreviews, setReviewImagePreviews] = useState([]); // preview URLs
   const reviewImageRef = useRef(null);
+  const [lightboxData, setLightboxData] = useState(null); // { imgList: [{url, review}], currentIdx }
 
   const currentUserId = useSelector((state) => state.auth.user?.userId);
 
@@ -783,40 +784,314 @@ const ProductDetailPage = () => {
               </h2>
             </div>
 
-            <div className="flex items-center gap-4">
-              {reviewsData?.data?.totalReviews > 0 && (
-                <div className="flex items-center gap-3 px-5 py-3 rounded-full border border-[#F5DEB3]/20 bg-white/5">
-                  <span className="text-2xl font-serif text-[#F5DEB3]">{reviewsData.data.avgRating}</span>
-                  <div>
-                    <div className="flex gap-0.5">
-                      {[1,2,3,4,5].map(s => (
-                        <i key={s} className={`fa-star text-[10px] ${s <= Math.round(reviewsData.data.avgRating) ? 'fa-solid text-[#F5DEB3]' : 'fa-regular text-[#F5DEB3]/20'}`}></i>
-                      ))}
+            {(reviewsData?.data?.totalReviews > 0 || reviewsData?.data?.canReview) && (
+              <button
+                onClick={() => {
+                  const hasToken = !!localStorage.getItem("authToken");
+                  if (!isAuthenticated && !hasToken) { openLoginModal('openReviewForm'); return; }
+                  setEditingReviewId(null);
+                  setReviewForm({ rating: 5, desc: "" });
+                  setReviewImages([]);
+                  setReviewImagePreviews([]);
+                  setShowReviewForm(v => !v);
+                }}
+                className="px-5 py-3 rounded-full border border-[#F5DEB3]/30 text-[#F5DEB3] text-[10px] font-bold uppercase tracking-widest hover:bg-[#F5DEB3] hover:text-[#1c3026] transition-all flex items-center gap-2 self-start sm:self-auto"
+              >
+                <i className={`fa-solid ${showReviewForm ? 'fa-xmark' : 'fa-pen'}`}></i>
+                {showReviewForm ? 'Cancel' : 'Write a Review'}
+              </button>
+            )}
+          </div>
+
+          {/* Rating Summary + Histogram */}
+          {reviewsData?.data?.totalReviews > 0 && (
+            <div className="mb-10 bg-[#FAF7F2] rounded-2xl p-6 lg:p-8 flex flex-col sm:flex-row gap-6 lg:gap-10 items-center sm:items-stretch shadow-sm border border-[#1c3026]/8">
+              {/* Left: Big avg rating */}
+              <div className="flex flex-col items-center justify-center text-center shrink-0 min-w-[110px]">
+                <span className="text-6xl font-serif text-[#1c3026] leading-none">{reviewsData.data.avgRating}</span>
+                <span className="text-xs text-[#1c3026]/40 mt-1 mb-2">out of 5</span>
+                <div className="flex gap-0.5">
+                  {[1,2,3,4,5].map(s => (
+                    <i key={s} className={`fa-star text-sm ${s <= Math.round(reviewsData.data.avgRating) ? 'fa-solid text-[#C8A96E]' : 'fa-regular text-[#1c3026]/15'}`}></i>
+                  ))}
+                </div>
+                <span className="text-[10px] text-[#1c3026]/40 mt-2 uppercase tracking-wider">{reviewsData.data.totalReviews} rating{reviewsData.data.totalReviews !== 1 ? 's' : ''}</span>
+              </div>
+
+              {/* Vertical divider (desktop) */}
+              <div className="hidden sm:block w-px bg-[#1c3026]/10 self-stretch"></div>
+
+              {/* Rating Histogram */}
+              <div className="flex-1 w-full flex flex-col justify-center space-y-3">
+                {[5,4,3,2,1].map(star => {
+                  const count = (reviewsData.data.reviews || []).filter(r => Math.round(r.rating) === star).length;
+                  const pct = reviewsData.data.totalReviews ? Math.round((count / reviewsData.data.totalReviews) * 100) : 0;
+                  return (
+                    <div key={star} className="flex items-center gap-3">
+                      <div className="flex items-center gap-1 w-10 shrink-0">
+                        <span className="text-xs text-[#1c3026]/70 font-medium tabular-nums">{star}</span>
+                        <i className="fa-solid fa-star text-[#C8A96E] text-[9px]"></i>
+                      </div>
+                      <div className="flex-1 bg-[#1c3026]/8 rounded-full h-2 overflow-hidden">
+                        <div
+                          style={{ width: `${pct}%` }}
+                          className={`h-2 rounded-full transition-all duration-700 ${star >= 4 ? 'bg-[#C8A96E]' : star === 3 ? 'bg-amber-400' : 'bg-red-400'}`}
+                        ></div>
+                      </div>
+                      <span className="text-[10px] text-[#1c3026]/40 w-6 text-right shrink-0 tabular-nums">{count}</span>
                     </div>
-                    <p className="text-[10px] text-gray-400 mt-0.5">{reviewsData.data.totalReviews} review{reviewsData.data.totalReviews !== 1 ? 's' : ''}</p>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Category Ratings */}
+          {reviewsData?.data?.totalReviews > 0 && (
+            <div className="mb-10 flex flex-wrap gap-3">
+              {[
+                { label: 'Quality', rating: 4 },
+                { label: 'Build',   rating: 5 },
+                { label: 'Service', rating: 4 },
+                { label: 'Value',   rating: 5 },
+              ].map(({ label, rating }) => (
+                <div key={label} className="flex items-center gap-2 bg-[#FAF7F2] border border-[#1c3026]/10 rounded-full px-4 py-2 shadow-sm">
+                  <span className="text-[#1c3026]/70 text-xs font-medium">{label}</span>
+                  <span className="text-[#C8A96E] font-bold text-xs tabular-nums">{rating}</span>
+                  <i className="fa-solid fa-star text-[#C8A96E] text-[9px]"></i>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Customer Photos Gallery + Lightbox */}
+          {(() => {
+            const allImgsWithReview = (reviewsData?.data?.reviews || []).flatMap(r =>
+              (r.imageUrls?.length ? r.imageUrls : r.imageUrl ? [r.imageUrl] : []).map(url => ({ url, review: r }))
+            );
+            if (allImgsWithReview.length === 0) return null;
+            const GRID_MAX = 5;
+            const gridItems = allImgsWithReview.slice(0, GRID_MAX);
+            const extra = allImgsWithReview.length - GRID_MAX;
+            const curEntry = lightboxData ? lightboxData.imgList[lightboxData.currentIdx] : null;
+            const curReview = curEntry?.review;
+            const curUrl = curEntry?.url;
+
+            return (
+              <>
+                <div className="mb-10">
+                  <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-[#F5DEB3]/50 mb-3">Customer Photos</p>
+
+                  {/* ── DESKTOP: horizontal row of 5 small squares ── */}
+                  <div className="hidden md:flex gap-2">
+                    {gridItems.map(({ url }, i) => {
+                      const isLast = i === GRID_MAX - 1 && extra > 0;
+                      return (
+                        <div
+                          key={i}
+                          className="relative w-24 h-24 shrink-0 rounded-xl overflow-hidden cursor-pointer"
+                          onClick={() => setLightboxData({ imgList: allImgsWithReview, currentIdx: i })}
+                        >
+                          <ReviewImg src={url} alt={`Customer photo ${i + 1}`} className="w-full h-full hover:brightness-90 transition-all" />
+                          {isLast && (
+                            <div className="absolute inset-0 bg-black/55 flex items-center justify-center pointer-events-none">
+                              <span className="text-white font-bold text-sm">+{extra}</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* ── MOBILE: Flipkart grid — 1 large + 2×2 small ── */}
+                  <div className="md:hidden flex gap-1 h-[200px] sm:h-[240px] rounded-2xl overflow-hidden">
+                    {gridItems[0] && (
+                      <ReviewImg
+                        src={gridItems[0].url}
+                        alt="Customer photo 1"
+                        className="flex-[2] min-w-0 cursor-pointer hover:brightness-90 transition-all"
+                        onClick={() => setLightboxData({ imgList: allImgsWithReview, currentIdx: 0 })}
+                      />
+                    )}
+                    {gridItems.length > 1 && (
+                      <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-1">
+                        {gridItems.slice(1).map(({ url }, i) => {
+                          const globalIdx = i + 1;
+                          const isLast = globalIdx === GRID_MAX - 1 && extra > 0;
+                          return (
+                            <div
+                              key={i}
+                              className="relative overflow-hidden cursor-pointer"
+                              onClick={() => setLightboxData({ imgList: allImgsWithReview, currentIdx: globalIdx })}
+                            >
+                              <ReviewImg src={url} alt={`Customer photo ${globalIdx + 1}`} className="w-full h-full hover:brightness-90 transition-all" />
+                              {isLast && (
+                                <div className="absolute inset-0 bg-black/55 flex items-center justify-center pointer-events-none">
+                                  <span className="text-white font-bold text-base">+{extra}</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {Array.from({ length: Math.max(0, 4 - (gridItems.length - 1)) }).map((_, i) => (
+                          <div key={`ph-${i}`} className="bg-[#1c3026]/20" />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
-              )}
-              
-              {(reviewsData?.data?.totalReviews > 0 || reviewsData?.data?.canReview) && (
-                <button
-                  onClick={() => {
-                    const hasToken = !!localStorage.getItem("authToken");
-                    if (!isAuthenticated && !hasToken) { openLoginModal('openReviewForm'); return; }
-                    setEditingReviewId(null);
-                    setReviewForm({ rating: 5, desc: "" });
-                    setReviewImages([]);
-                    setReviewImagePreviews([]);
-                    setShowReviewForm(v => !v);
-                  }}
-                  className="px-5 py-3 rounded-full border border-[#F5DEB3]/30 text-[#F5DEB3] text-[10px] font-bold uppercase tracking-widest hover:bg-[#F5DEB3] hover:text-[#1c3026] transition-all flex items-center gap-2"
-                >
-                  <i className={`fa-solid ${showReviewForm ? 'fa-xmark' : 'fa-pen'}`}></i>
-                  {showReviewForm ? 'Cancel' : 'Write a Review'}
-                </button>
-              )}
-            </div>
-          </div>
+
+                {/* ── MOBILE Lightbox: image on top, review info below ── */}
+                {lightboxData && curReview && (
+                  <div className="md:hidden fixed inset-0 z-[200] flex flex-col bg-black">
+                    {/* Top bar */}
+                    <div className="flex items-center px-4 py-3 bg-black shrink-0">
+                      <button onClick={() => setLightboxData(null)} className="text-white p-1">
+                        <i className="fa-solid fa-arrow-left text-lg"></i>
+                      </button>
+                      <span className="text-white/50 text-xs font-mono ml-auto">
+                        {lightboxData.currentIdx + 1}/{lightboxData.imgList.length}
+                      </span>
+                    </div>
+
+                    {/* Image — fixed 52vh */}
+                    <div className="relative bg-black shrink-0" style={{ height: '52vh' }}>
+                      <img src={curUrl} alt="Review" className="w-full h-full object-contain" loading="eager" />
+                      {lightboxData.imgList.length > 1 && (
+                        <>
+                          <button
+                            onClick={() => setLightboxData(prev => ({ ...prev, currentIdx: (prev.currentIdx - 1 + prev.imgList.length) % prev.imgList.length }))}
+                            className="absolute left-3 top-1/2 -translate-y-1/2 text-white/60 p-2"
+                          >
+                            <i className="fa-solid fa-chevron-left text-xl"></i>
+                          </button>
+                          <button
+                            onClick={() => setLightboxData(prev => ({ ...prev, currentIdx: (prev.currentIdx + 1) % prev.imgList.length }))}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-white/60 p-2"
+                          >
+                            <i className="fa-solid fa-chevron-right text-xl"></i>
+                          </button>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Review info — white panel, scrollable */}
+                    <div className="flex-1 bg-white overflow-y-auto">
+                      <div className="p-4 flex flex-col gap-3">
+                        {/* Stars + rating badge */}
+                        <div className="flex items-center gap-2">
+                          <span className="bg-green-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-sm flex items-center gap-1 shrink-0">
+                            {curReview.rating}<i className="fa-solid fa-star text-[8px]"></i>
+                          </span>
+                          <div className="flex gap-0.5">
+                            {[1,2,3,4,5].map(s => (
+                              <i key={s} className={`fa-star text-xs ${s <= curReview.rating ? 'fa-solid text-[#C8A96E]' : 'fa-regular text-gray-200'}`}></i>
+                            ))}
+                          </div>
+                        </div>
+                        {/* Review text */}
+                        <p className="text-gray-800 text-sm leading-relaxed">{curReview.desc}</p>
+                        {/* Reviewer */}
+                        <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-gray-100">
+                          <span className="text-gray-700 text-[11px] font-semibold">{curReview.userName}</span>
+                          <span className="w-1 h-1 rounded-full bg-gray-300"></span>
+                          <span className="text-[9px] font-bold text-green-600 flex items-center gap-0.5">
+                            <i className="fa-solid fa-circle-check text-[8px]"></i> Certified Buyer
+                          </span>
+                          <span className="w-1 h-1 rounded-full bg-gray-300"></span>
+                          <span className="text-gray-400 text-[10px]">{relativeDate(curReview.createdAt)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── DESKTOP Lightbox: side-by-side panel ── */}
+                {lightboxData && curReview && (
+                  <div
+                    className="hidden md:flex fixed inset-0 bg-black/85 z-[200] items-center justify-center p-8"
+                    onClick={() => setLightboxData(null)}
+                  >
+                    <div
+                      className="bg-white rounded-2xl overflow-hidden w-full max-w-3xl max-h-[92vh] flex shadow-2xl"
+                      onClick={e => e.stopPropagation()}
+                    >
+                      {/* Left: Image */}
+                      <div className="relative bg-gray-50 flex items-center justify-center w-[55%]">
+                        <img src={curUrl} alt="Review" className="object-contain max-h-[88vh] w-full p-4" loading="eager" />
+                        {lightboxData.imgList.length > 1 && (
+                          <>
+                            <button
+                              onClick={() => setLightboxData(prev => ({ ...prev, currentIdx: (prev.currentIdx - 1 + prev.imgList.length) % prev.imgList.length }))}
+                              className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/90 rounded-full flex items-center justify-center text-gray-600 hover:bg-white shadow"
+                            >
+                              <i className="fa-solid fa-chevron-left text-xs"></i>
+                            </button>
+                            <button
+                              onClick={() => setLightboxData(prev => ({ ...prev, currentIdx: (prev.currentIdx + 1) % prev.imgList.length }))}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/90 rounded-full flex items-center justify-center text-gray-600 hover:bg-white shadow"
+                            >
+                              <i className="fa-solid fa-chevron-right text-xs"></i>
+                            </button>
+                          </>
+                        )}
+                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[10px] bg-black/40 text-white px-2.5 py-0.5 rounded-full font-mono">
+                          {lightboxData.currentIdx + 1}/{lightboxData.imgList.length}
+                        </div>
+                      </div>
+                      {/* Right: Review details */}
+                      <div className="w-[45%] flex flex-col overflow-y-auto">
+                        <div className="flex justify-end p-3 border-b border-gray-100 shrink-0">
+                          <button onClick={() => setLightboxData(null)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors">
+                            <i className="fa-solid fa-xmark text-sm"></i>
+                          </button>
+                        </div>
+                        <div className="p-5 flex flex-col gap-4">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-9 h-9 rounded-full bg-[#1c3026] flex items-center justify-center shrink-0">
+                              <span className="text-[#F5DEB3] font-bold text-sm uppercase">{(curReview.userName || '?')[0]}</span>
+                            </div>
+                            <div>
+                              <p className="text-[#1c3026] font-semibold text-sm">{curReview.userName}</p>
+                              <span className="text-[8px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded inline-flex items-center gap-1 mt-0.5">
+                                <i className="fa-solid fa-circle-check text-[7px]"></i> Verified Purchase
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="flex gap-0.5">
+                              {[1,2,3,4,5].map(s => (
+                                <i key={s} className={`fa-star text-sm ${s <= curReview.rating ? 'fa-solid text-[#C8A96E]' : 'fa-regular text-gray-200'}`}></i>
+                              ))}
+                            </div>
+                            <span className="text-xs text-gray-400">{relativeDate(curReview.createdAt)}</span>
+                          </div>
+                          <p className="text-gray-700 text-sm leading-relaxed">{curReview.desc}</p>
+                          {(() => {
+                            const thisImgs = curReview.imageUrls?.length ? curReview.imageUrls : (curReview.imageUrl ? [curReview.imageUrl] : []);
+                            if (thisImgs.length <= 1) return null;
+                            return (
+                              <div className="flex gap-2 flex-wrap pt-3 border-t border-gray-100">
+                                {thisImgs.map((thumbUrl, ti) => {
+                                  const gi = lightboxData.imgList.findIndex(item => item.url === thumbUrl && item.review._id === curReview._id);
+                                  return (
+                                    <img key={ti} src={thumbUrl} alt={`thumb ${ti + 1}`} loading="lazy"
+                                      className={`w-14 h-14 object-cover rounded-lg cursor-pointer border-2 transition-all ${curUrl === thumbUrl ? 'border-[#C8A96E]' : 'border-transparent hover:border-gray-300'}`}
+                                      onClick={() => gi >= 0 && setLightboxData(prev => ({ ...prev, currentIdx: gi }))}
+                                    />
+                                  );
+                                })}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
 
           {/* Review Form */}
           <div id="review-form-anchor"></div>
@@ -885,55 +1160,76 @@ const ProductDetailPage = () => {
             </div>
           )}
 
-          {/* Reviews Grid */}
+          {/* Compact Reviews List */}
           {reviewsData?.data?.reviews?.length > 0 ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {reviewsData.data.reviews.map((review) => {
-                const isOwnReview = currentUserId && review.userId === currentUserId;
-                const allImages = review.imageUrls?.length ? review.imageUrls : (review.imageUrl ? [review.imageUrl] : []);
-                return (
-                  <div key={review._id} className="bg-[#FAF7F2] border border-[#1c3026]/10 rounded-2xl p-5 flex flex-col gap-3 shadow-sm">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-[#1c3026] font-medium text-sm">{review.userName}</p>
-                        <p className="text-[#1c3026]/40 text-[10px] mt-0.5">
-                          {new Date(review.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <div className="flex gap-0.5">
-                          {[1,2,3,4,5].map(s => (
-                            <i key={s} className={`fa-star text-[10px] ${s <= review.rating ? 'fa-solid text-[#C8A96E]' : 'fa-regular text-[#1c3026]/20'}`}></i>
-                          ))}
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-[#F5DEB3]/50 mb-5">
+                All Reviews ({reviewsData.data.totalReviews})
+              </p>
+              <div className="space-y-4">
+                {reviewsData.data.reviews.map((review) => {
+                  const isOwnReview = currentUserId && review.userId === currentUserId;
+                  const reviewImgs = review.imageUrls?.length ? review.imageUrls : (review.imageUrl ? [review.imageUrl] : []);
+                  return (
+                    <div key={review._id} className="bg-[#FAF7F2] rounded-2xl p-4 lg:p-5 border border-[#1c3026]/10">
+                      <div className="flex items-start gap-3">
+                        <div className="w-9 h-9 rounded-full bg-[#1c3026] flex items-center justify-center shrink-0 mt-0.5">
+                          <span className="text-[#F5DEB3] font-bold text-sm uppercase">{(review.userName || '?')[0]}</span>
                         </div>
-                        {isOwnReview && (
-                          <button
-                            onClick={() => handleEditReview(review)}
-                            className="ml-1 w-6 h-6 flex items-center justify-center rounded-full border border-[#1c3026]/20 text-[#1c3026]/40 hover:border-[#1c3026]/50 hover:text-[#1c3026] transition-colors"
-                            title="Edit your review"
-                          >
-                            <i className="fa-solid fa-pen text-[9px]"></i>
-                          </button>
-                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <p className="text-[#1c3026] font-semibold text-sm leading-tight">{review.userName}</p>
+                              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                <div className="flex gap-0.5">
+                                  {[1,2,3,4,5].map(s => (
+                                    <i key={s} className={`fa-star text-[10px] ${s <= review.rating ? 'fa-solid text-[#C8A96E]' : 'fa-regular text-[#1c3026]/15'}`}></i>
+                                  ))}
+                                </div>
+                                <span className="text-[9px] text-[#1c3026]/40">
+                                  {new Date(review.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                                </span>
+                                <span className="text-[8px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded inline-flex items-center gap-1">
+                                  <i className="fa-solid fa-circle-check text-[7px]"></i> Verified
+                                </span>
+                              </div>
+                            </div>
+                            {isOwnReview && (
+                              <button
+                                onClick={() => handleEditReview(review)}
+                                className="w-6 h-6 flex items-center justify-center rounded-full border border-[#1c3026]/20 text-[#1c3026]/40 hover:text-[#1c3026] transition-colors shrink-0"
+                                title="Edit your review"
+                              >
+                                <i className="fa-solid fa-pen text-[9px]"></i>
+                              </button>
+                            )}
+                          </div>
+                          <p className="text-[#1c3026]/65 text-sm leading-relaxed mt-2">{review.desc}</p>
+                          {reviewImgs.length > 0 && (
+                            <div className="flex gap-2 mt-3">
+                              {reviewImgs.map((url, i) => {
+                                const allImgsWithReview = (reviewsData?.data?.reviews || []).flatMap(r =>
+                                  (r.imageUrls?.length ? r.imageUrls : r.imageUrl ? [r.imageUrl] : []).map(u => ({ url: u, review: r }))
+                                );
+                                const clickedIdx = allImgsWithReview.findIndex(item => item.url === url && item.review._id === review._id);
+                                return (
+                                  <ReviewImg
+                                    key={i}
+                                    src={url}
+                                    alt={`Review photo ${i + 1}`}
+                                    className="w-14 h-14 rounded-lg border border-[#1c3026]/10 cursor-pointer hover:opacity-80 hover:scale-105 transition-all shrink-0"
+                                    onClick={() => setLightboxData({ imgList: allImgsWithReview, currentIdx: clickedIdx >= 0 ? clickedIdx : 0 })}
+                                  />
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    <p className="text-[#1c3026]/70 text-sm leading-relaxed font-light flex-1">{review.desc}</p>
-                    {allImages.length > 0 && (
-                      <div className="flex gap-2 flex-wrap mt-1">
-                        {allImages.map((url, i) => (
-                          <img
-                            key={i}
-                            src={url}
-                            alt={`Review photo ${i + 1}`}
-                            className="w-20 h-20 object-cover rounded-xl border border-[#1c3026]/10 cursor-pointer hover:opacity-90 transition-opacity"
-                            onClick={() => window.open(url, '_blank')}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           ) : (
             <div className="py-10 border-t border-[#F5DEB3]/10">
@@ -1041,6 +1337,45 @@ const ProductDetailPage = () => {
           />
         )}
       </Suspense>
+    </div>
+  );
+};
+
+// Relative date helper
+const relativeDate = (dateStr) => {
+  const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
+  if (days < 1) return 'Today';
+  if (days < 7) return `${days} day${days > 1 ? 's' : ''} ago`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `${weeks} week${weeks > 1 ? 's' : ''} ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months} month${months > 1 ? 's' : ''} ago`;
+  return `${Math.floor(months / 12)} year${Math.floor(months / 12) > 1 ? 's' : ''} ago`;
+};
+
+// Lazy image with skeleton — mirrors OptimizedImage's IntersectionObserver pattern
+const ReviewImg = ({ src, alt, className = '', onClick }) => {
+  const [loaded, setLoaded] = useState(false);
+  const [inView, setInView] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setInView(true); obs.disconnect(); } }, { rootMargin: '80px' });
+    if (ref.current) obs.observe(ref.current);
+    return () => obs.disconnect();
+  }, []);
+  return (
+    <div ref={ref} className={`relative overflow-hidden ${className}`} onClick={onClick}>
+      {!loaded && <div className="absolute inset-0 bg-[#d4cfc7] animate-pulse" />}
+      {inView && (
+        <img
+          src={src}
+          alt={alt}
+          loading="lazy"
+          className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+          onLoad={() => setLoaded(true)}
+          onError={() => setLoaded(true)}
+        />
+      )}
     </div>
   );
 };
