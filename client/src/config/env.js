@@ -43,6 +43,8 @@ const config = {
   appEnv: env.VITE_APP_ENV || 'development',
   port: env.VITE_PORT || 3000,
   domainBaseUrl: env.VITE_DOMAIN_BASE_URL || 'http://localhost:3000',
+  specialProductId: env.VITE_SPECIAL_PRODUCT_ID || '019cb45b-99c2-76c4-ae22-e85ce7c17b13',
+  offerEndDate: '2026-04-06T23:59:59',
   
   // Feature Flags (optional)
   features: {
