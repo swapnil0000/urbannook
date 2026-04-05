@@ -1,9 +1,60 @@
-import { useState, useEffect, lazy, Suspense, useMemo, useRef } from "react";
+import { useState, useEffect, lazy, Suspense, useMemo, useRef, memo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { useCookies } from "react-cookie";
 import confetti from "canvas-confetti";
 import SEOHead from "../../component/SEOHead";
+import useTimer from "../../hooks/useTimer";
+import config from "../../config/env";
+
+// Timer Component for Product Page
+const ProductTimer = memo(({ timeLeft }) => {
+  if (timeLeft.isExpired) return null;
+
+  return (
+    <div className="mb-6 bg-gradient-to-br from-[#1c3026] to-[#121f19] border border-[#F5DEB3]/30 rounded-2xl p-4 md:p-5 shadow-2xl relative overflow-hidden group">
+      {/* Background decoration */}
+      <div className="absolute top-0 right-0 w-32 h-32 bg-[#F5DEB3]/5 rounded-full -mr-16 -mt-16 blur-2xl group-hover:bg-[#F5DEB3]/10 transition-colors"></div>
+      
+      <div className="relative flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex flex-col items-center sm:items-start text-center sm:text-left">
+          <div className="flex items-center gap-2 mb-2 bg-gradient-to-r from-red-500/20 to-orange-500/20 border border-red-500/30 px-3 py-1 rounded-full w-fit backdrop-blur-sm">
+            <i className="fa-solid fa-bolt-lightning text-red-500 text-[10px] animate-pulse"></i>
+            <span className="text-red-500 text-[9px] md:text-[10px] font-bold uppercase tracking-[0.2em]">Flash Offer Ending</span>
+          </div>
+          <p className="text-[#F5DEB3]/90 text-xs md:text-sm font-light italic">
+            Don't miss out! <span className="text-[#F5DEB3] font-bold underline decoration-[#F5DEB3]/30 underline-offset-4 uppercase tracking-wider ml-1">Prices are rising soon</span>
+          </p>
+        </div>
+
+        <div className="flex gap-2 md:gap-3 items-center">
+          {[
+            { label: 'Hrs', value: timeLeft.hours },
+            { label: 'Min', value: timeLeft.minutes },
+            { label: 'Sec', value: timeLeft.seconds }
+          ].map((item, idx) => (
+            <div key={item.label} className="flex items-center gap-2">
+              <div className="flex flex-col items-center">
+                <div className="bg-white/5 backdrop-blur-md rounded-xl px-2.5 py-1.5 md:px-3.5 md:py-2.5 min-w-[45px] md:min-w-[55px] border border-white/10 flex items-center justify-center shadow-inner">
+                  <span className="text-lg md:text-2xl font-bold text-[#F5DEB3] font-mono tracking-tighter tabular-nums leading-none">
+                    {item.value}
+                  </span>
+                </div>
+                <span className="text-[7px] md:text-[8px] uppercase tracking-[0.2em] text-[#F5DEB3]/50 mt-1.5 font-bold">{item.label}</span>
+              </div>
+              {idx < 2 && (
+                <span className="text-lg md:text-2xl font-light text-white/10 self-start mt-1.5 md:mt-2">:</span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      {/* Shine effect */}
+      <div className="absolute inset-0 -translate-x-full group-hover:animate-[shine_3s_ease-in-out_infinite] pointer-events-none bg-gradient-to-r from-transparent via-white/5 to-transparent skew-x-[-20deg]"></div>
+    </div>
+  );
+});
 
 // API & Redux imports
 import { useGetProductByIdQuery } from "../../store/api/productsApi";
@@ -70,6 +121,7 @@ const ProductDetailPage = () => {
   const reviewImageRef = useRef(null);
 
   const currentUserId = useSelector((state) => state.auth.user?.userId);
+  const timeLeft = useTimer(config.offerEndDate);
 
   // Listen for post-login callback to open review form
   useEffect(() => {
@@ -521,7 +573,10 @@ const ProductDetailPage = () => {
             </div>
           </div>
 
-<div className="lg:col-span-5 flex flex-col ml-auto w-full lg:max-w-[calc(100%-530px)]">
+            <div className="lg:col-span-5 flex flex-col ml-auto w-full lg:max-w-[calc(100%-530px)]">
+            {productId === config.specialProductId && (
+              <ProductTimer timeLeft={timeLeft} />
+            )}
             <div className="mb-1 lg:mb-2 border-b border-[#F5DEB3]/10 pb-2 lg:pb-3">
               <div className="flex justify-between items-start mb-4">
                 <span className="text-[#1c3026] text-[9px] lg:text-[10px] font-bold tracking-[0.2em] uppercase bg-[#F5DEB3] px-3 py-1.5 rounded-full shadow-lg shadow-[#F5DEB3]/10">

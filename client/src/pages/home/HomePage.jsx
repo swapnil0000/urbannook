@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import SEOHead from '../../component/SEOHead';
+import NewLaunchPopup from '../../component/NewLaunchPopup';
 
 // Import components directly for faster loading
 import WhyChooseUs from './WhyChooseUs';
@@ -27,6 +28,7 @@ const HomePage = () => {
     }, []);
   return (
     <div className="min-h-screen">
+      <NewLaunchPopup />
       <SEOHead
         url="/"
         structuredData={HOME_STRUCTURED_DATA}
