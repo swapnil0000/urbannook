@@ -68,6 +68,7 @@ const NewLaunchPopup = memo(() => {
           <div className="flex flex-col items-center gap-3 mb-6 md:mb-8">
             <div className="flex gap-2 md:gap-3">
               {[
+                { label: 'Days', value: timeLeft.days },
                 { label: 'Hours', value: timeLeft.hours },
                 { label: 'Mins', value: timeLeft.minutes },
                 { label: 'Secs', value: timeLeft.seconds }
@@ -79,7 +80,7 @@ const NewLaunchPopup = memo(() => {
                     </div>
                     <span className="text-[7px] md:text-[9px] uppercase tracking-[0.2em] text-[#F5DEB3]/60 mt-1.5 font-bold">{item.label}</span>
                   </div>
-                  {idx < 2 && (
+                  {idx < 3 && (
                     <span className="text-xl md:text-3xl font-light text-white/20 self-start mt-1.5 md:mt-2">:</span>
                   )}
                 </div>
