@@ -29,6 +29,7 @@ const ProductTimer = memo(({ timeLeft }) => {
 
         <div className="flex gap-2 md:gap-3 items-center">
           {[
+            { label: 'Days', value: timeLeft.days },
             { label: 'Hrs', value: timeLeft.hours },
             { label: 'Min', value: timeLeft.minutes },
             { label: 'Sec', value: timeLeft.seconds }
