@@ -110,6 +110,9 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       "Receiver mobile number must be exactly 10 digits",
     );
   }
+  
+  // Fetch cart once for pricing and image mapping
+  const cart = await Cart.findOne({ userId }).lean();
 
   // Handle pricing logic
   let finalAmount;
@@ -120,12 +123,9 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   let summary = {};
 
   if (isPreBook) {
-    finalAmount = 299;
+    finalAmount = 199;
     summary = { shipping: 149 };
   } else {
-    // Fetch cart to get the calculated grand total from applyCoupon API
-    const cart = await Cart.findOne({ userId }).lean();
-
     if (!cart) {
       throw new ValidationError("Cart not found. Please add items to your cart.");
     }
@@ -178,7 +178,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
         productName: product.productName,
         productCategory: product.productCategory,
         productSubCategory: product.productSubCategory,
-        priceAtPurchase: isPreBook ? 299 : product.sellingPrice, // Record 299 if pre-booked
+        priceAtPurchase: isPreBook ? 199 : product.sellingPrice, // Record 199 if pre-booked
         shipping: String(summary?.shipping ?? ""),
         selectedColor: item.color || "N/A",
       },

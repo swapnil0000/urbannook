@@ -843,7 +843,7 @@ const CheckoutPage = () => {
                     <i className="fa-solid fa-crown text-[10px] text-white"></i>
                   </div>
                   <p className="text-[10px] text-[#a89068] font-bold uppercase tracking-wider leading-relaxed">
-                    Full payment orders receive priority dispatch. <span className="opacity-70 font-medium">Complete your payment now to skip the fulfillment queue.</span>
+                    Full payment orders receive priority dispatch. <span className="opacity-70 font-medium">Pre book orders will be dispatched after 17th April</span>
                   </p>
                 </div>
               </div>
@@ -880,7 +880,7 @@ const CheckoutPage = () => {
                       </>
                     ) : (
                       <>
-                        Pre Book @ ₹299 <i className="fa-solid fa-star text-[10px]"></i>
+                        Pre Book @ ₹199 <i className="fa-solid fa-star text-[10px]"></i>
                       </>
                     )}
                   </button>
