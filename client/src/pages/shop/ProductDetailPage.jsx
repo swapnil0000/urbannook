@@ -50,6 +50,18 @@ const ProductTimer = memo(({ timeLeft }) => {
           ))}
         </div>
       </div>
+
+      <div className="mt-4 pt-4 border-t border-[#F5DEB3]/10 flex flex-col sm:flex-row items-center justify-center gap-3">
+        <div className="flex items-center gap-2 bg-[#a89068]/20 border border-[#a89068]/30 px-4 py-2 rounded-xl animate-pulse">
+          <i className="fa-solid fa-crown text-[#a89068] text-xs"></i>
+          <span className="text-[#a89068] text-[10px] md:text-[11px] font-bold uppercase tracking-wider">
+            Pre-book @ ₹199 — orders dispatched after 17th April
+          </span>
+        </div>
+        <p className="text-[#F5DEB3]/60 text-[9px] md:text-[10px] uppercase tracking-[0.1em] font-medium">
+          Full payment orders receive priority dispatch.
+        </p>
+      </div>
       
       {/* Shine effect */}
       <div className="absolute inset-0 -translate-x-full group-hover:animate-[shine_3s_ease-in-out_infinite] pointer-events-none bg-gradient-to-r from-transparent via-white/5 to-transparent skew-x-[-20deg]"></div>
@@ -389,6 +401,21 @@ const ProductDetailPage = () => {
     setReviewImagePreviews(prev => prev.filter((_, i) => i !== idx));
   };
 
+  const handlePreBookClick = async () => {
+    if (!product) return;
+    
+    const hasToken = !!localStorage.getItem("authToken");
+    if (!isAuthenticated && !hasToken) {
+      openLoginModal();
+      return;
+    }
+
+    if (!isInCart) {
+      await handleInitialAddToCart();
+    }
+    navigate('/checkout', { state: { preBook: true } });
+  };
+
   const handleCheckoutClick = () => {    const hasToken = !!localStorage.getItem('authToken');
 
     if (isAuthenticated || hasToken) {
@@ -663,45 +690,57 @@ const ProductDetailPage = () => {
             )}
 
             <div className="hidden lg:block bg-white/5 backdrop-blur-sm p-8 rounded-[2rem] max-w-[420px] border border-[#F5DEB3]/10 mb-10">
-              <div className="flex flex-row gap-4">
-                {!isInCart ? (
-                  <button
-                    onClick={handleInitialAddToCart}
-                    disabled={product.productStatus !== 'in_stock' || isAdding}
-                    className="flex-1 h-14 bg-[#F5DEB3] text-[#1c3026] rounded-full font-bold uppercase tracking-[0.2em] text-xs hover:bg-white transition-all shadow-xl shadow-[#F5DEB3]/10"
-                  >
-                    {isAdding ? 'Adding...' : 'Add to Collection'}
-                  </button>
-                ) : (
-                  <>
-                    <div className="flex items-center bg-[#1c3026] border border-[#F5DEB3]/20 rounded-full h-14 px-4 gap-4">
-                      <button onClick={() => handleUpdateQty(currentCartQty - 1)} className="text-[#F5DEB3] px-2">
-                        <i className="fa-solid fa-minus"></i>
-                      </button>
-                      <span className="font-serif text-[#F5DEB3] text-lg">{currentCartQty}</span>
-                      <button onClick={() => handleUpdateQty(currentCartQty + 1)} className="text-[#F5DEB3] px-2">
-                        <i className="fa-solid fa-plus"></i>
-                      </button>
-                    </div>
-                    <button 
-                      onClick={handleCheckoutClick} 
-                      className="flex-1 h-14 bg-[#F5DEB3] text-[#1c3026] rounded-full font-bold uppercase tracking-[0.2em] text-xs hover:bg-white transition-all"
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-row gap-4">
+                  {!isInCart ? (
+                    <button
+                      onClick={handleInitialAddToCart}
+                      disabled={product.productStatus !== 'in_stock' || isAdding}
+                      className="flex-1 h-14 bg-[#F5DEB3] text-[#1c3026] rounded-full font-bold uppercase tracking-[0.2em] text-xs hover:bg-white transition-all shadow-xl shadow-[#F5DEB3]/10"
                     >
-                      Checkout
+                      {isAdding ? 'Adding...' : 'Add to Collection'}
                     </button>
-                  </>
-                )}
+                  ) : (
+                    <>
+                      <div className="flex items-center bg-[#1c3026] border border-[#F5DEB3]/20 rounded-full h-14 px-4 gap-4">
+                        <button onClick={() => handleUpdateQty(currentCartQty - 1)} className="text-[#F5DEB3] px-2">
+                          <i className="fa-solid fa-minus"></i>
+                        </button>
+                        <span className="font-serif text-[#F5DEB3] text-lg">{currentCartQty}</span>
+                        <button onClick={() => handleUpdateQty(currentCartQty + 1)} className="text-[#F5DEB3] px-2">
+                          <i className="fa-solid fa-plus"></i>
+                        </button>
+                      </div>
+                      <button 
+                        onClick={handleCheckoutClick} 
+                        className="flex-1 h-14 bg-white text-[#1c3026] rounded-full font-bold uppercase tracking-[0.2em] text-xs hover:bg-[#F5DEB3] transition-all"
+                      >
+                        Checkout
+                      </button>
+                    </>
+                  )}
 
-                <button
-                  onClick={handleWishlistToggle}
-                  className={`w-14 h-14 border rounded-full flex items-center justify-center transition-all ${
-                    isInWishlist
-                      ? 'bg-red-500 border-red-500 text-white'
-                      : 'border-[#F5DEB3]/20 text-[#F5DEB3] hover:bg-[#F5DEB3] hover:text-[#1c3026]'
-                  }`}
-                >
-                  <i className={`${isInWishlist ? 'fa-solid' : 'fa-regular'} fa-heart`}></i>
-                </button>
+                  <button
+                    onClick={handleWishlistToggle}
+                    className={`w-14 h-14 border rounded-full flex items-center justify-center transition-all ${
+                      isInWishlist
+                        ? 'bg-red-500 border-red-500 text-white'
+                        : 'border-[#F5DEB3]/20 text-[#F5DEB3] hover:bg-[#F5DEB3] hover:text-[#1c3026]'
+                    }`}
+                  >
+                    <i className={`${isInWishlist ? 'fa-solid' : 'fa-regular'} fa-heart`}></i>
+                  </button>
+                </div>
+
+                {productId === config.specialProductId && (
+                  <button
+                    onClick={handlePreBookClick}
+                    disabled={product.productStatus !== 'in_stock' || isAdding}
+                    className="w-full h-14 bg-[#a89068] text-white rounded-full font-bold uppercase tracking-[0.2em] text-xs hover:bg-[#967d56] transition-all shadow-xl flex items-center justify-center gap-3"
+                  >
+                    Pre-book @ ₹199 <i className="fa-solid fa-star text-[10px]"></i>
+                  </button>
+                )}
               </div>
 
               {/* Delivery reassurance */}
@@ -1013,6 +1052,15 @@ const ProductDetailPage = () => {
         </div>
         <div className="flex gap-4 items-center p-4 px-6">
         <div className="flex-1">
+          {productId === config.specialProductId && (
+            <button
+              onClick={handlePreBookClick}
+              disabled={product.productStatus !== 'in_stock' || isAdding}
+              className="w-full h-10 mb-2 bg-[#a89068] text-white rounded-full font-bold uppercase tracking-widest text-[10px] shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2"
+            >
+              Pre-book @ ₹199 <i className="fa-solid fa-star text-[8px]"></i>
+            </button>
+          )}
           {!isInCart ? (
             <button
               onClick={handleInitialAddToCart}

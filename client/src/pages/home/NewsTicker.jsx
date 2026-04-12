@@ -7,6 +7,7 @@ const NewsTicker = () => {
   const headlines = [
     "🚚 SHIPPING ₹149 ALL OVER INDIA",
     "🌿 WAITLIST MEMBERS: USE CODE WLUSER FOR EXCLUSIVE DISCOUNT",
+    "✨ PRE-BOOK @ ₹199 — ORDERS DISPATCHED AFTER 17TH APRIL",
   ];
 
   return (

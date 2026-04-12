@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 
 import {
@@ -34,6 +34,9 @@ const CheckoutPage = () => {
   const { isAuthenticated } = useSelector((state) => state.auth);
   const paymentCompletedRef = useRef(false);
   const cartLoadedRef = useRef(false);
+
+  const location = useLocation();
+  const preBookIntent = location.state?.preBook || false;
 
   const [userProfile, setUserProfile] = useState(null);
   const [address, setAddress] = useState("");
@@ -843,7 +846,7 @@ const CheckoutPage = () => {
                     <i className="fa-solid fa-crown text-[10px] text-white"></i>
                   </div>
                   <p className="text-[10px] text-[#a89068] font-bold uppercase tracking-wider leading-relaxed">
-                    Full payment orders receive priority dispatch. <span className="opacity-70 font-medium">Pre book orders will be dispatched after 17th April</span>
+                    Full payment orders receive priority dispatch. <span className="opacity-70 font-medium">Pre-book @ ₹199 — orders dispatched after 17th April</span>
                   </p>
                 </div>
               </div>
@@ -1275,71 +1278,73 @@ const CheckoutPage = () => {
       )}
 
       {/* Mobile Sticky Footer */}
-      <div
-        className="fixed bottom-0 left-0 right-0 bg-[#2e443c] border-t border-white/10 p-4 px-6 z-50 lg:hidden shadow-[0_-10px_30px_rgba(0,0,0,0.4)]"
-      >
-        <div className="flex items-center justify-around gap-5 max-w-[1200px] mx-auto">
-          <div className="flex flex-col">
-            <span className="text-[9px] text-[#a89068] uppercase tracking-widest font-bold">
-              Total Payable
-            </span>
-            <span className="text-2xl font-serif text-white">
-              ₹
-              {(
-                pricingDetails.subtotal +
-                pricingDetails.shipping -
-                pricingDetails.discount
-              ).toLocaleString()}
-            </span>
-            {!address && (
-              <span className="text-[9px] text-amber-400 mt-0.5 flex items-center gap-1">
-                <i className="fa-solid fa-triangle-exclamation text-[8px]"></i>
-                Address required
+      <div className="fixed bottom-0 left-0 right-0 bg-[#2e443c] border-t border-white/10 p-4 px-6 z-50 lg:hidden shadow-[0_-10px_30px_rgba(0,0,0,0.4)]">
+        <div className="flex flex-col gap-3 max-w-[1200px] mx-auto">
+          {/* Price and Note Row */}
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col">
+              <span className="text-[9px] text-[#a89068] uppercase tracking-widest font-bold">
+                {hasLampProduct && address ? "Payable Now" : "Total Payable"}
+              </span>
+              <span className="text-xl font-serif text-white">
+                ₹{(pricingDetails.subtotal + pricingDetails.shipping - pricingDetails.discount).toLocaleString()}
+              </span>
+            </div>
+            
+            {hasLampProduct && (
+              <div className="flex flex-col items-end">
+                <span className="text-[9px] text-[#a89068] uppercase tracking-widest font-bold">Pre-book @</span>
+                <span className="text-xl font-serif text-[#a89068]">₹199</span>
+              </div>
+            )}
+
+            {!address && !hasLampProduct && (
+              <span className="text-[9px] text-amber-400 font-bold uppercase flex items-center gap-1">
+                <i className="fa-solid fa-triangle-exclamation"></i> Address Required
               </span>
             )}
           </div>
-          <div className="flex gap-2 w-full max-w-[200px]">
+          
+          <div className="flex gap-2 w-full">
             <button
               onClick={!address ? handleScrollToAddress : () => handlePayment(false)}
-              disabled={isOrdering || showMobileModal}
-              className={`flex-1 h-10 rounded-xl font-bold uppercase tracking-widest text-[11px] shadow-lg active:scale-95 transition-all flex items-center justify-center gap-3 ${
-                showMobileModal
-                  ? "bg-gray-400 text-white cursor-not-allowed opacity-60"
-                  : !address
-                  ? "bg-[#a89068] text-white border border-[#a89068] hover:bg-[#a89068]/90"
+              disabled={isOrdering || (isOrdering && processingType === "prebook")}
+              className={`flex-1 h-12 rounded-xl font-bold uppercase tracking-widest text-[10px] shadow-lg transition-all flex items-center justify-center gap-2 ${
+                !address 
+                  ? "bg-[#a89068] text-white" 
                   : "bg-[#2e443c] text-white border border-white/20"
-              }`}
+              } disabled:opacity-50`}
             >
               {isOrdering && processingType === "full" ? (
                 <>
-                  <div className="w-2 h-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>{" "}
+                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>{" "}
                   Proc...
                 </>
               ) : !address ? (
-                <>
-                  <i className="fa-solid fa-map-pin text-[12px]"></i>
-                  Set Address
-                </>
+                "Pay Full"
               ) : (
                 <>
-                  Full <i className="fa-solid fa-lock text-[10px]"></i>
+                  Pay Full <i className="fa-solid fa-lock text-[10px]"></i>
                 </>
               )}
             </button>
 
-            {hasLampProduct && address && (
+            {hasLampProduct && (
               <button
-                onClick={() => handlePayment(true)}
+                onClick={!address ? handleScrollToAddress : () => handlePayment(true)}
                 disabled={isOrdering}
-                className="flex-1 h-10 rounded-xl font-bold uppercase tracking-widest text-[11px] bg-[#a89068] text-white shadow-lg active:scale-95 transition-all flex items-center justify-center"
+                className="flex-1 h-12 rounded-xl font-bold uppercase tracking-widest text-[10px] bg-[#a89068] text-white shadow-lg relative overflow-hidden group active:scale-95 transition-transform flex items-center justify-center"
               >
+                <div className="absolute inset-0 bg-white/10 animate-pulse"></div>
                 {isOrdering && processingType === "prebook" ? (
                   <>
-                    <div className="w-2 h-2 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
                     Proc...
                   </>
+                ) : !address ? (
+                  "Pre Book @ ₹199"
                 ) : (
-                  "Pre Book"
+                  "Confirm Pre Book"
                 )}
               </button>
             )}
