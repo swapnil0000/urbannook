@@ -65,6 +65,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     receiverMobile,
     addressId,
     deliveryAddress: clientAddress,
+    isPreBook = false,
   } = req.body;
   const { userId } = req.user;
   if (!items || !Array.isArray(items) || items.length === 0) {
@@ -109,23 +110,42 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       "Receiver mobile number must be exactly 10 digits",
     );
   }
-
-  // Fetch cart to get the calculated grand total from applyCoupon API
+  
+  // Fetch cart once for pricing and image mapping
   const cart = await Cart.findOne({ userId }).lean();
 
-  if (!cart) {
-    throw new ValidationError("Cart not found. Please add items to your cart.");
+  // Handle pricing logic
+  let finalAmount;
+  let couponCodeId = null;
+  let couponCodeName = null;
+  let discountAmount = 0;
+  let isApplied = false;
+  let summary = {};
+
+  if (isPreBook) {
+    finalAmount = 199;
+    summary = { shipping: 149 };
+  } else {
+    if (!cart) {
+      throw new ValidationError("Cart not found. Please add items to your cart.");
+    }
+
+    // Check if pricing has been calculated (appliedCoupon.summary must exist with a valid grandTotal)
+    const grandTotal = cart?.appliedCoupon?.summary?.grandTotal;  
+    if (grandTotal == null || grandTotal <= 0) {
+      throw new ValidationError(
+        "Cart pricing not calculated. Please refresh the page.",
+      );
+    }
+
+    finalAmount = grandTotal;
+    couponCodeId = cart.appliedCoupon?.couponCodeId || null;
+    couponCodeName = cart.appliedCoupon?.name || null;
+    discountAmount = cart.appliedCoupon?.discountValue || 0;
+    isApplied = cart.appliedCoupon?.isApplied || false;
+    summary = cart.appliedCoupon?.summary || {};
   }
 
-  // Check if pricing has been calculated (appliedCoupon.summary must exist with a valid grandTotal)
-  const grandTotal = cart?.appliedCoupon?.summary?.grandTotal;  
-  if (grandTotal == null || grandTotal <= 0) {
-    throw new ValidationError(
-      "Cart pricing not calculated. Please refresh the page.",
-    );
-  }
-
-  const finalAmount = grandTotal;
   const productIds = items.map((i) => i.productId);
   const uniqueProductIds = [...new Set(productIds)]; // Get unique IDs
 
@@ -137,12 +157,6 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   if (products.length !== uniqueProductIds.length) {
     throw new ValidationError("One or more products unavailable");
   }
-
-  const couponCodeId = cart.appliedCoupon?.couponCodeId || null;
-  const couponCodeName = cart.appliedCoupon?.name || null;
-  const discountAmount = cart.appliedCoupon?.discountValue || 0;
-  const isApplied = cart.appliedCoupon?.isApplied || false;
-  const summary = cart.appliedCoupon?.summary || {};
 
   const orderItems = items.map((item) => {
     const product = products.find((p) => p.productId === item.productId);
@@ -164,7 +178,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
         productName: product.productName,
         productCategory: product.productCategory,
         productSubCategory: product.productSubCategory,
-        priceAtPurchase: product.sellingPrice,
+        priceAtPurchase: isPreBook ? 199 : product.sellingPrice, // Record 199 if pre-booked
         shipping: String(summary?.shipping ?? ""),
         selectedColor: item.color || "N/A",
       },
@@ -221,6 +235,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     userMobile: deliveryAddressSnapshot.mobileNumber,
     items: orderItems,
     amount: finalAmount,
+    isPreBook,
     senderMobile: finalSenderMobile,
     receiverMobile: finalReceiverMobile,
     deliveryAddress: deliveryAddressSnapshot,
@@ -232,7 +247,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       discountAmount,
       isApplied,
     },
-    note: "Amount is the final amount paid by the user",
+    note: isPreBook ? "Pre-book amount paid" : "Amount is the final amount paid by the user",
   });
 
   return res.status(200).json(

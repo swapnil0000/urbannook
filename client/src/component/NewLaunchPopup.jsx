@@ -90,6 +90,17 @@ const NewLaunchPopup = memo(() => {
               <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
               <span className="text-red-400 text-[9px] md:text-[11px] font-bold uppercase tracking-[0.1em]">⚠️ LAUNCH OFFER ENDING: PRICES RISING SOON!</span>
             </div>
+            <div className="mt-2 flex flex-col items-center gap-1">
+              <div className="flex items-center gap-1.5 bg-[#a89068]/20 border border-[#a89068]/30 px-3 py-1 rounded-lg">
+                <i className="fa-solid fa-crown text-[#a89068] text-[8px]"></i>
+                <span className="text-[#a89068] text-[8px] md:text-[9px] font-bold uppercase tracking-wider">
+                  Pre-book @ ₹199 — orders dispatched after 17th April
+                </span>
+              </div>
+              <p className="text-[#F5DEB3]/40 text-[7px] md:text-[8px] uppercase tracking-[0.1em]">
+                Full payment orders receive priority dispatch.
+              </p>
+            </div>
           </div>
 
           <h2 className="text-3xl md:text-5xl font-serif text-white leading-tight mb-3 md:mb-4">

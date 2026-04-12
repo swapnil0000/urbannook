@@ -32,6 +32,7 @@ const orderSchema = new mongoose.Schema(
       s3FileKey: { type: String, default: null },
     },
     amount: { type: Number, required: true },
+    isPreBook: { type: Boolean, default: false },
     coupon: {
       couponCodeId: { type: String, default: null },
       couponCodeName: { type: String, default: null },
