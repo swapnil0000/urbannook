@@ -29,6 +29,7 @@ const ProductTimer = memo(({ timeLeft }) => {
 
         <div className="flex gap-2 md:gap-3 items-center">
           {[
+            { label: 'Days', value: timeLeft.days },
             { label: 'Hrs', value: timeLeft.hours },
             { label: 'Min', value: timeLeft.minutes },
             { label: 'Sec', value: timeLeft.seconds }
@@ -607,22 +608,6 @@ const ProductDetailPage = () => {
             <p className="text-gray-300 leading-relaxed mb-8 font-light text-sm lg:text-md">
               {product.productSubDes}
             </p>
-
-            {product?.productCategory?.toLowerCase().includes('lamp') && (
-              <div className="mb-8 rounded-2xl border border-[#F5DEB3]/30 bg-[#F5DEB3]/8 px-5 py-4 flex gap-3 items-start">
-                <div className="relative flex-shrink-0 mt-0.5">
-                  <i className="fa-solid fa-bell text-[#F5DEB3] text-base"></i>
-                  <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
-                  <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400"></span>
-                </div>
-                <div>
-                  <p className="text-[#F5DEB3] text-xs font-bold uppercase tracking-widest mb-1">Notice</p>
-                  <p className="text-[#F5DEB3]/80 text-sm leading-relaxed font-light">
-                    We're overwhelmed by the response! Our lamps are currently at their production limit — shipping for new orders starts after <span className="text-[#F5DEB3] font-medium">April 5th</span>. If you're happy to wait for a little extra glow, we'd love for you to place your order!
-                  </p>
-                </div>
-              </div>
-            )}
 
             {product?.color && product.color.length > 0 && (
               <div className="mb-8 bg-white/5 p-5 rounded-2xl border border-[#F5DEB3]/10">
