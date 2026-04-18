@@ -22,6 +22,7 @@ import { ComponentLoader } from "../component/layout/LoadingSpinner";
 // Lazy load heavy components
 const CouponList = lazy(() => import("../component/CouponList"));
 const MapModal = lazy(() => import("../component/MapModal"));
+const AddressFormModal = lazy(() => import("../component/AddressFormModal")); // TODO: swap with MapModal when ready
 const MobileNumberModal = lazy(() => import("../component/MobileNumberModal"));
 
 const CheckoutPage = () => {
@@ -88,9 +89,10 @@ const CheckoutPage = () => {
     setShowMapModal(true);
   };
 
-  const handleAddressConfirm = (suggestion, addressId) => {
-    setAddress(suggestion.formattedAddress);
-    setPincode(suggestion.pinCode.toString());
+  const handleAddressConfirm = (suggestion, addressId, deliveryAddressFull) => {
+    // Show deliveryAddressFull (user-typed) if available, else fall back to Ola Maps formattedAddress
+    setAddress(deliveryAddressFull || suggestion.formattedAddress);
+    setPincode(String(suggestion.pinCode || ""));
     setCurrentAddressId(addressId);
     refetchAddresses();
   };
@@ -423,8 +425,8 @@ const CheckoutPage = () => {
   };
 
   const selectSavedAddress = (addr) => {
-    setAddress(addr.formattedAddress);
-    setPincode(addr.pinCode.toString());
+    setAddress(addr.deliveryAddressFull || addr.formattedAddress);
+    setPincode(String(addr.pinCode || ""));
     setCurrentAddressId(addr.addressId);
     setPreciseDetails({
       landmark: addr.landmark || "",
@@ -1164,14 +1166,24 @@ const CheckoutPage = () => {
                   </div>
                 }
               >
-                <MapModal
+                {/* <MapModal
                   showMapModal={showMapModal}
                   setShowMapModal={setShowMapModal}
                   preciseDetails={preciseDetails}
                   setPreciseDetails={setPreciseDetails}
                   onAddressConfirm={handleAddressConfirm}
                   showNotification={showNotification}
+                /> */}
+                {/* TODO: uncomment below + comment MapModal above to switch to new address form */}
+                <AddressFormModal
+                  isOpen={showMapModal}
+                  onClose={() => setShowMapModal(false)}
+                  onAddressConfirm={handleAddressConfirm}
+                  showNotification={showNotification}
+                  prefillName={userProfile?.userName || userProfile?.name || ""}
+                  prefillPhone={userProfile?.mobileNumber || senderMobile || ""}
                 />
+               
               </Suspense>
 
               {/* Mobile Number Modal */}
@@ -1226,9 +1238,9 @@ const CheckoutPage = () => {
         </div>
       )}
 
-      {/* Mobile Sticky Footer */}
+      {/* Mobile Sticky Footer — hidden when address modal is open so it doesn't cover Save button */}
       <div
-        className="fixed bottom-0 left-0 right-0 bg-[#2e443c] border-t border-white/10 p-4 px-6 z-50 lg:hidden shadow-[0_-10px_30px_rgba(0,0,0,0.4)]"
+        className={`fixed bottom-0 left-0 right-0 bg-[#2e443c] border-t border-white/10 p-4 px-6 z-50 lg:hidden shadow-[0_-10px_30px_rgba(0,0,0,0.4)] transition-transform duration-300 ${showMapModal ? "translate-y-full" : "translate-y-0"}`}
       >
         <div className="flex items-center justify-around gap-5 max-w-[1200px] mx-auto">
           <div className="flex flex-col">
@@ -1251,7 +1263,7 @@ const CheckoutPage = () => {
             )}
           </div>
           <button
-            onClick={!address ? handleScrollToAddress : handlePayment}
+            onClick={!address ? handleOpenMap : handlePayment}
             disabled={isOrdering || showMobileModal}
             className={`flex-1 h-10 max-w-[150px] rounded-xl font-bold uppercase tracking-widest text-[11px] shadow-lg active:scale-95 transition-all flex items-center justify-center gap-3 ${
               showMobileModal

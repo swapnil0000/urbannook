@@ -33,12 +33,25 @@ const addressSchema = mongoose.Schema(
 
     addressType: {
       type: String,
-      enum: ["Home", "Work", "Other"],
+      enum: ["Home", "Work", "Hotel", "Other"],
       default: "Home",
     },
 
     landmark: String,
     flatOrFloorNumber: String,
+
+    // --- v2 address fields (AddressFormModal) ---
+    buildingName: String,   // "House No. / Building"
+    street: String,         // "Street / Colony"
+    floor: String,          // "Floor"
+    tower: String,          // "Tower / Wing"
+    fullName: String,       // contact name for delivery
+    mobileNumber: String,   // contact phone for delivery
+    // -------------------------------------------
+
+    // Canonical delivery string built from user-typed fields.
+    // Use THIS for couriers (ShipMozo etc.) — pinCode is always the Number field.
+    deliveryAddressFull: String,
 
     isDefault: {
       type: Boolean,

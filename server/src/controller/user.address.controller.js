@@ -68,6 +68,13 @@ const userCreateAddress = asyncHandler(async (req, res) => {
     flatOrFloorNumber,
     addressType,
     isDefault,
+    // v2 fields
+    buildingName,
+    street,
+    floor,
+    tower,
+    fullName,
+    mobileNumber,
   } = req.body || {};
 
   const result = await createAddressService({
@@ -83,6 +90,12 @@ const userCreateAddress = asyncHandler(async (req, res) => {
     flatOrFloorNumber,
     addressType,
     isDefault,
+    buildingName,
+    street,
+    floor,
+    tower,
+    fullName,
+    mobileNumber,
   });
 
   return res
