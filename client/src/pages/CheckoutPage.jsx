@@ -24,6 +24,8 @@ const CouponList = lazy(() => import("../component/CouponList"));
 const MapModal = lazy(() => import("../component/MapModal"));
 const AddressFormModal = lazy(() => import("../component/AddressFormModal")); // TODO: swap with MapModal when ready
 const MobileNumberModal = lazy(() => import("../component/MobileNumberModal"));
+// Add this:
+const GoogleAddressFormModal = lazy(() => import("../component/GoogleAddressFormModal"));
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
@@ -514,6 +516,7 @@ const CheckoutPage = () => {
           fullName: userProfile?.userName || userProfile?.name || "",
           mobileNumber: useDifferentDeliveryContact && deliveryMobileStr ? deliveryMobileStr : senderMobileStr,
           formattedAddress: address,
+          deliveryAddressFull: address,
           pinCode: pincode ? parseInt(pincode, 10) : null,
           landmark: preciseDetails.landmark,
           flatOrFloorNumber: preciseDetails.flatNo,
@@ -675,32 +678,42 @@ const CheckoutPage = () => {
                         className="w-full h-full object-contain mix-blend-multiply"
                       />
                     </div>
-                    
+
                     <div className="flex-1 min-w-0">
                       <h3 className="font-medium text-sm text-[#2e443c] truncate mb-1">
                         {item.name}
                       </h3>
-                      
+
                       {/* --- NAYA: COLOR DISPLAY --- */}
                       {(() => {
-                        const itemColor = item.selectedColor !== 'N/A' ? item.selectedColor : 
-                                          (cartSelections[item.id]?.color || cartSelections[item.mongoId]?.color);
-                                          
-                        if (!itemColor || itemColor === 'N/A') return null;
-                        
+                        const itemColor =
+                          item.selectedColor !== "N/A"
+                            ? item.selectedColor
+                            : cartSelections[item.id]?.color ||
+                              cartSelections[item.mongoId]?.color;
+
+                        if (!itemColor || itemColor === "N/A") return null;
+
                         return (
                           <div className="flex items-center gap-1.5 mb-1.5 mt-1">
-                            <span className="text-[9px] text-gray-400 uppercase tracking-widest">Color:</span>
-                            <div 
+                            <span className="text-[9px] text-gray-400 uppercase tracking-widest">
+                              Color:
+                            </span>
+                            <div
                               className="w-3 h-3 rounded-full border border-gray-300 shadow-sm"
                               style={{
-                                background: itemColor.toLowerCase() === 'rainbow' 
-                                  ? 'linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)' 
-                                  : itemColor.replace(/\s+/g, '').toLowerCase()
+                                background:
+                                  itemColor.toLowerCase() === "rainbow"
+                                    ? "linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)"
+                                    : itemColor
+                                        .replace(/\s+/g, "")
+                                        .toLowerCase(),
                               }}
                               title={itemColor}
                             ></div>
-                            <span className="text-[10px] font-medium text-[#a89068]">{itemColor}</span>
+                            <span className="text-[10px] font-medium text-[#a89068]">
+                              {itemColor}
+                            </span>
                           </div>
                         );
                       })()}
@@ -794,8 +807,12 @@ const CheckoutPage = () => {
                     <i className="fa-solid fa-truck text-[#F5DEB3] text-[10px]"></i>
                   </div>
                   <div>
-                    <p className="text-[11px] font-bold text-[#2e443c] uppercase tracking-wider">Estimated Delivery: 5–7 Business Days</p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">AWB number shared once order is shipped</p>
+                    <p className="text-[11px] font-bold text-[#2e443c] uppercase tracking-wider">
+                      Estimated Delivery: 5–7 Business Days
+                    </p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">
+                      AWB number shared once order is shipped
+                    </p>
                   </div>
                 </div>
 
@@ -887,18 +904,20 @@ const CheckoutPage = () => {
                     {userProfile?.userEmail || userProfile?.email || "N/A"}
                   </div>
                 </div>
-                
+
                 {/* Mobile Number Field - Display Only with Edit */}
                 <div className="space-y-1.5 md:col-span-2">
                   <label className="text-[9px] uppercase tracking-widest text-[#a89068] font-bold ml-1">
                     Mobile NO. (Required for payment)
                   </label>
-                  
+
                   {/* Display with Edit button */}
                   <div className="space-y-2">
                     <div className="flex gap-2 items-center">
                       <div className="flex-1 bg-white border border-gray-200 rounded-xl p-4 text-sm text-[#2e443c] font-medium">
-                        {senderMobile && senderMobile !== "N/A" ? senderMobile : "Not added"}
+                        {senderMobile && senderMobile !== "N/A"
+                          ? senderMobile
+                          : "Not added"}
                       </div>
                       <button
                         onClick={() => setShowMobileModal(true)}
@@ -933,10 +952,10 @@ const CheckoutPage = () => {
                       className="w-4 h-4 rounded border-gray-300 text-[#a89068] focus:ring-[#a89068] cursor-pointer"
                     />
                     <span className="text-[10px] uppercase tracking-widest text-[#a89068] font-bold">
-                     Ordering For Someone Else
+                      Ordering For Someone Else
                     </span>
                   </label>
-                  
+
                   {useDifferentDeliveryContact && (
                     <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
                       <input
@@ -954,7 +973,7 @@ const CheckoutPage = () => {
                         placeholder="Enter 10-digit delivery contact number"
                       />
                       <p className="text-[10px] text-gray-500 ml-1">
-                        This number will be used for delivery coordination 
+                        This number will be used for delivery coordination
                       </p>
                       {deliveryMobileErrors && (
                         <p className="text-[10px] text-red-500 ml-1">
@@ -1175,7 +1194,16 @@ const CheckoutPage = () => {
                   showNotification={showNotification}
                 /> */}
                 {/* TODO: uncomment below + comment MapModal above to switch to new address form */}
-                <AddressFormModal
+                {/* <AddressFormModal
+                  isOpen={showMapModal}
+                  onClose={() => setShowMapModal(false)}
+                  onAddressConfirm={handleAddressConfirm}
+                  showNotification={showNotification}
+                  prefillName={userProfile?.userName || userProfile?.name || ""}
+                  prefillPhone={userProfile?.mobileNumber || senderMobile || ""}
+                /> */}
+                {/* GoogleAddressFormModal */}
+                <GoogleAddressFormModal
                   isOpen={showMapModal}
                   onClose={() => setShowMapModal(false)}
                   onAddressConfirm={handleAddressConfirm}
@@ -1183,7 +1211,6 @@ const CheckoutPage = () => {
                   prefillName={userProfile?.userName || userProfile?.name || ""}
                   prefillPhone={userProfile?.mobileNumber || senderMobile || ""}
                 />
-               
               </Suspense>
 
               {/* Mobile Number Modal */}
@@ -1231,7 +1258,10 @@ const CheckoutPage = () => {
             </div>
             <div className="p-6 overflow-y-auto max-h-[calc(80vh-88px)] custom-scrollbar">
               <Suspense fallback={<ComponentLoader />}>
-                <CouponList onCouponApplied={handleCouponApplied} userId={userProfile?.userId} />
+                <CouponList
+                  onCouponApplied={handleCouponApplied}
+                  userId={userProfile?.userId}
+                />
               </Suspense>
             </div>
           </div>
@@ -1269,8 +1299,8 @@ const CheckoutPage = () => {
               showMobileModal
                 ? "bg-gray-400 text-white cursor-not-allowed opacity-60"
                 : !address
-                ? "bg-[#a89068] text-white border border-[#a89068] hover:bg-[#a89068]/90"
-                : "bg-[#a89068] text-white hover:bg-[#a89068]/90"
+                  ? "bg-[#a89068] text-white border border-[#a89068] hover:bg-[#a89068]/90"
+                  : "bg-[#a89068] text-white hover:bg-[#a89068]/90"
             }`}
           >
             {isOrdering ? (

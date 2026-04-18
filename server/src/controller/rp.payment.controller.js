@@ -198,6 +198,8 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     pinCode: clientAddress?.pinCode || selectedAddr?.pinCode || null,
     formattedAddress:
       clientAddress?.formattedAddress || selectedAddr?.formattedAddress || "",
+    deliveryAddressFull:
+      clientAddress?.deliveryAddressFull || selectedAddr?.deliveryAddressFull || "",
     landmark: clientAddress?.landmark || selectedAddr?.landmark || "",
     flatOrFloorNumber:
       clientAddress?.flatOrFloorNumber || selectedAddr?.flatOrFloorNumber || "",
