@@ -52,12 +52,6 @@ const AllProductsPage = () => {
           
           {/* LEFT SIDE: Heading & Description */}
           <div >
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 backdrop-blur-md border border-white/10 mb-4 md:mb-6">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#F5DEB3] animate-pulse"></span>
-              <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-[0.25em] text-[#F5DEB3]">
-                Products Series
-              </span>
-            </div>
             <h1 className="text-4xl sm:text-6xl md:text-7xl font-serif text-white leading-[0.9] mb-2">
               Curated{' '}
               <span className="italic font-light text-[#F5DEB3]">Atmospheres.</span>
