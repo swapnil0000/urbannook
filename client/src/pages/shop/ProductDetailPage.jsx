@@ -1516,26 +1516,11 @@ const ProductDetailPage = () => {
                                 {relativeDate(review.createdAt)}
                               </span>
                             </div>
-                            {/* Review text — truncated to 3 lines */}
-                            <div>
-                              <p
-                                className={`text-[#1c3026] text-sm leading-snug ${
-                                  expandedReviews.has(review._id) ? "" : "line-clamp-3"
-                                }`}
-                              >
+                            {/* Review text — fixed height, scrollable */}
+                            <div className="h-[130px] overflow-y-auto pr-2" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(28, 48, 38, 0.2) transparent' }}>
+                              <p className="text-[#1c3026] text-sm leading-snug">
                                 {review.desc}
                               </p>
-                              {!expandedReviews.has(review._id) && (review.desc?.length ?? 0) > 120 && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setExpandedReviews((prev) => new Set([...prev, review._id]));
-                                  }}
-                                  className="text-[#1c3026]/50 text-xs font-semibold mt-0.5"
-                                >
-                                  …view more
-                                </button>
-                              )}
                             </div>
                             {/* Name + verified */}
                             <div className="mt-auto pt-2 border-t border-[#1c3026]/8">
