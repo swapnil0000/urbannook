@@ -34,6 +34,10 @@ const requiredEnvVarsLocal = [
   "AWS_BUCKET_REGION",
   "AWS_BUCKET_NAME",
   "AWS_CDN_BASE_URL",
+
+  // Shipping Configuration
+  "SHIPMOZO_PRIVATE_KEY",
+  "SHIPMOZO_PUBLIC_KEY",
 ];
 const requiredEnvVarsStaging = [
   // Server Configuration
@@ -64,6 +68,10 @@ const requiredEnvVarsStaging = [
   "AWS_BUCKET_REGION",
   "AWS_BUCKET_NAME",
   "AWS_CDN_BASE_URL",
+
+  // Shipping Configuration
+  "SHIPMOZO_PRIVATE_KEY",
+  "SHIPMOZO_PUBLIC_KEY",
 ];
 const requiredEnvVarsProd = [
   // Server Configuration
@@ -94,6 +102,10 @@ const requiredEnvVarsProd = [
   "AWS_BUCKET_REGION",
   "AWS_BUCKET_NAME",
   "AWS_CDN_BASE_URL",
+
+  // Shipping Configuration
+  "SHIPMOZO_PRIVATE_KEY",
+  "SHIPMOZO_PUBLIC_KEY",
 ];
 /**
  * Validates that all required environment variables are present

@@ -12,6 +12,7 @@ import {
   useDeleteAddressMutation,
   useUpdateCartMutation,
   useUpdateUserProfileMutation,
+  useCalculateShippingMutation,
 } from "../store/api/userApi";
 import { useUI } from "../hooks/useRedux";
 import { logout } from "../store/slices/authSlice";
@@ -62,7 +63,7 @@ const CheckoutPage = () => {
 
   const [pricingDetails, setPricingDetails] = useState({
     subtotal: 0,
-    shipping: 149,
+    shipping: null,
     discount: 0,
   });
 
@@ -75,10 +76,55 @@ const CheckoutPage = () => {
   const [updateCart] = useUpdateCartMutation();
   const [updateUserProfile] = useUpdateUserProfileMutation();
   const { data: savedAddressData, refetch: refetchAddresses } = useGetSavedAddressesQuery();
+  const [calculateShipping, { isLoading: isCalculatingShipping }] = useCalculateShippingMutation();
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+
+  // Dynamic Shipping Calculation Logic
+  useEffect(() => {
+    const fetchShippingRate = async () => {
+      if (pincode && pincode.toString().length === 6 && cartItems.length > 0) {
+        try {
+          const formattedCartItems = cartItems.map(item => ({
+            productId: item.mongoId || item.id.split(':')[0],
+            quant: item.quantity
+          }));
+
+          const result = await calculateShipping({
+            deliveryPinCode: parseInt(pincode, 10),
+            cartItems: formattedCartItems
+          }).unwrap();
+
+          if (result.success && result.data?.total_charges !== undefined) {
+            setPricingDetails(prev => ({
+              ...prev,
+              shipping: parseFloat(result.data.total_charges)
+            }));
+          } else {
+            setPricingDetails(prev => ({
+              ...prev,
+              shipping: "N/A"
+            }));
+          }
+        } catch (error) {
+          console.error("Failed to calculate shipping:", error);
+          setPricingDetails(prev => ({
+            ...prev,
+            shipping: "Error"
+          }));
+        }
+      } else {
+        setPricingDetails(prev => ({
+          ...prev,
+          shipping: null
+        }));
+      }
+    };
+
+    fetchShippingRate();
+  }, [pincode, cartItems, calculateShipping]);
 
   useEffect(() => {
     handleSaveAdress();
@@ -90,7 +136,8 @@ const CheckoutPage = () => {
 
   const handleAddressConfirm = (suggestion, addressId) => {
     setAddress(suggestion.formattedAddress);
-    setPincode(suggestion.pinCode.toString());
+    const newPincode = suggestion.pinCode.toString();
+    setPincode(newPincode);
     setCurrentAddressId(addressId);
     refetchAddresses();
   };
@@ -187,11 +234,13 @@ const CheckoutPage = () => {
             email: userEmail
           }).unwrap();
           if (result.success && result.data?.summary) {
-            setPricingDetails({
+            setPricingDetails(prev => ({
+              ...prev,
               subtotal: result.data.summary.subtotal || 0,
-              shipping: result.data.summary.shipping || 149,
               discount: result.data.summary.discount || 0,
-            });
+              // Keep our dynamic shipping if we have it
+              shipping: prev.shipping || null
+            }));
           }
         } catch (error) {
           if (error?.data?.statusCode === 400 && appliedCoupon) {
@@ -202,11 +251,12 @@ const CheckoutPage = () => {
                 email: userEmail
               }).unwrap();
               if (result.success && result.data?.summary) {
-                setPricingDetails({
+                setPricingDetails(prev => ({
+                  ...prev,
                   subtotal: result.data.summary.subtotal || 0,
-                  shipping: result.data.summary.shipping || 149,
                   discount: result.data.summary.discount || 0,
-                });
+                  shipping: prev.shipping || null
+                }));
               }
             } catch (retryError) {
               console.error("Failed to recalculate pricing:", retryError);
@@ -248,11 +298,12 @@ const CheckoutPage = () => {
       }).unwrap();
       if (result.success && result.data?.summary) {
         setAppliedCoupon(couponData.code);
-        setPricingDetails({
+        setPricingDetails(prev => ({
+          ...prev,
           subtotal: result.data.summary.subtotal || 0,
-          shipping: result.data.summary.shipping || 149,
           discount: result.data.summary.discount || 0,
-        });
+          shipping: prev.shipping || null
+        }));
         const successMessage = result.message || "Coupon applied successfully!";
         showNotification(successMessage, "success");
         setShowCouponModal(false);
@@ -272,11 +323,12 @@ const CheckoutPage = () => {
       }).unwrap();
       if (result.success && result.data?.summary) {
         setAppliedCoupon(null);
-        setPricingDetails({
+        setPricingDetails(prev => ({
+          ...prev,
           subtotal: result.data.summary.subtotal || 0,
-          shipping: result.data.summary.shipping || 149,
           discount: result.data.summary.discount || 0,
-        });
+          shipping: prev.shipping || null
+        }));
         const successMessage = result.message || "Coupon removed";
         showNotification(successMessage, "success");
       }
@@ -776,8 +828,21 @@ const CheckoutPage = () => {
                 </div>
                 <div className="flex justify-between text-gray-500">
                   <span>Shipping</span>
-                  <span className="text-gray-800 font-medium">
-                    ₹{pricingDetails.shipping.toLocaleString()}
+                  <span className="text-gray-800 font-medium text-right">
+                    {isCalculatingShipping ? (
+                       <span className="text-[10px] text-[#a89068] font-bold uppercase tracking-wider animate-pulse flex items-center gap-2">
+                         <div className="w-2 h-2 border border-[#a89068] border-t-transparent rounded-full animate-spin"></div>
+                         Calculating shipping...
+                       </span>
+                    ) : pricingDetails.shipping === null ? (
+                      <span className="text-[10px] text-amber-600 font-bold uppercase tracking-wider">
+                         Select address to calculate
+                      </span>
+                    ) : typeof pricingDetails.shipping === "number" ? (
+                      `₹${Math.ceil(pricingDetails.shipping).toLocaleString()}`
+                    ) : (
+                      <span className="text-red-500 text-[10px] uppercase">{pricingDetails.shipping}</span>
+                    )}
                   </span>
                 </div>
 
@@ -811,11 +876,11 @@ const CheckoutPage = () => {
                   <span className="text-xs uppercase tracking-widest text-[#a89068] font-bold">
                     Total To Pay
                   </span>
-                  <span className="text-3xl font-serif text-[#2e443c]">
+                  <span className="text-3xl font-serif text-white">
                     ₹
                     {(
                       pricingDetails.subtotal +
-                      pricingDetails.shipping -
+                      (typeof pricingDetails.shipping === "number" ? pricingDetails.shipping : 0) -
                       pricingDetails.discount
                     ).toLocaleString()}
                   </span>
@@ -824,13 +889,22 @@ const CheckoutPage = () => {
 
               <button
                 onClick={handlePayment}
-                disabled={isOrdering}
+                disabled={isOrdering || isCalculatingShipping || typeof pricingDetails.shipping !== "number"}
                 className="hidden lg:flex w-full mt-8 py-4 bg-[#a89068] text-white rounded-xl font-bold uppercase tracking-widest text-[11px] hover:bg-[#2e443c] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg items-center justify-center gap-3"
               >
                 {isOrdering ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>{" "}
                     Processing...
+                  </>
+                ) : isCalculatingShipping ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>{" "}
+                    Calculating Shipping...
+                  </>
+                ) : typeof pricingDetails.shipping !== "number" ? (
+                  <>
+                    Shipping Not Ready <i className="fa-solid fa-clock"></i>
                   </>
                 ) : (
                   <>
@@ -839,10 +913,15 @@ const CheckoutPage = () => {
                 )}
               </button>
 
-              {!address && (
-                <p className="hidden lg:flex items-center justify-center gap-1.5 mt-3 text-[10px] text-amber-600 font-bold uppercase tracking-widest">
+              {!address ? (
+                <p className="hidden lg:flex items-center justify-center gap-1.5 mt-3 text-[10px] text-amber-600 font-bold uppercase tracking-widest text-center">
                   <i className="fa-solid fa-triangle-exclamation text-[9px]"></i>
-                  Please select a delivery address to continue
+                  Add your delivery address to see the final price.
+                </p>
+              ) : typeof pricingDetails.shipping !== "number" && !isCalculatingShipping && (
+                 <p className="hidden lg:flex items-center justify-center gap-1.5 mt-3 text-[10px] text-red-500 font-bold uppercase tracking-widest text-center">
+                  <i className="fa-solid fa-circle-xmark text-[9px]"></i>
+                  Unable to ship to this location.
                 </p>
               )}
 
@@ -1239,7 +1318,7 @@ const CheckoutPage = () => {
               ₹
               {(
                 pricingDetails.subtotal +
-                pricingDetails.shipping -
+                (typeof pricingDetails.shipping === "number" ? pricingDetails.shipping : 0) -
                 pricingDetails.discount
               ).toLocaleString()}
             </span>

@@ -13,6 +13,7 @@ import {
   couponCodeRouter,
   testimonialRouter,
   contactRouter,
+  dynamicShippingRouter,
 } from "./routes/index.js";
 import cookieParser from "cookie-parser";
 import healthRouter from "./routes/health.route.js";
@@ -190,6 +191,7 @@ app.use(
   couponCodeRouter,
   testimonialRouter,
   contactRouter,
+  dynamicShippingRouter,
 );
 
 app.use(errorHandler);
