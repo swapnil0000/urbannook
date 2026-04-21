@@ -148,8 +148,11 @@ const createAddressService = async ({
     throw new AuthenticationError("Unauthorized");
   }
 
-  if (!placeId || !formattedAddress) {
-    throw new ValidationError("Please select a valid address from suggestions");
+  // placeId is optional — manual form submissions send "N/A" or nothing
+  const resolvedPlaceId = placeId || "N/A";
+
+  if (!formattedAddress) {
+    throw new ValidationError("Address details are required");
   }
 
   let userAddress = await UserAddress.findOne({ userId });
@@ -163,6 +166,7 @@ const createAddressService = async ({
 
   const numLat = Number(lat);
   const numLong = Number(long);
+  const hasRealCoords = numLat !== 0 || numLong !== 0;
   const normalizedFlat = flatOrFloorNumber?.trim() || "";
   const normalizedLandmark = landmark?.trim() || "";
 
@@ -177,12 +181,12 @@ const createAddressService = async ({
   let existingUserAddress = await Address.findOne({
     addressId: { $in: userAddressIds },
     $or: [
-      { placeId: { $ne: "N/A", $eq: placeId } },
+      { placeId: { $ne: "N/A", $eq: resolvedPlaceId } },
       { formattedAddress: { $regex: new RegExp(`^${escapedFormatted}$`, "i") } },
     ],
   });
 
-  if (!existingUserAddress) {
+  if (!existingUserAddress && hasRealCoords) {
     existingUserAddress = await Address.findOne({
       addressId: { $in: userAddressIds },
       location: {
@@ -212,7 +216,7 @@ const createAddressService = async ({
       {
         $set: {
           location: { type: "Point", coordinates: [numLong, numLat] },
-          placeId,
+          placeId: resolvedPlaceId,
           formattedAddress,
           city,
           state,
@@ -244,7 +248,7 @@ const createAddressService = async ({
     $and: [
       {
         $or: [
-          { placeId: { $ne: "N/A", $eq: placeId } },
+          { placeId: { $ne: "N/A", $eq: resolvedPlaceId } },
           { formattedAddress: { $regex: new RegExp(`^${escapedFormatted}$`, "i") } },
         ],
       },
@@ -253,7 +257,7 @@ const createAddressService = async ({
     ],
   });
 
-  if (!siblingAddress) {
+  if (!siblingAddress && hasRealCoords) {
     siblingAddress = await Address.findOne({
       location: {
         $near: {
@@ -308,7 +312,7 @@ const createAddressService = async ({
   const addressToSave = {
     addressId: uuidv7(),
     location: { type: "Point", coordinates: [numLong, numLat] },
-    placeId,
+    placeId: resolvedPlaceId,
     formattedAddress,
     addressType: addressType || "Home",
     landmark: cleanLandmark,
