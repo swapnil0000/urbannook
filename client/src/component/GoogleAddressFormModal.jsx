@@ -455,29 +455,33 @@ const GoogleAddressFormModal = ({
 
   const validate = () => {
     const errs = {};
-    if (!locationSummary)         errs.location     = "Please pin your location on the map first";
-    if (!form.pinCode?.trim())    errs.pinCode      = "Pincode is required";
-    if (!form.city?.trim())       errs.city         = "City / District is required";
+    // locationSummary is NOT required — user can fill form manually without map
+    if (!form.pinCode?.trim())      errs.pinCode      = "Pincode is required";
+    if (!form.city?.trim())         errs.city         = "City / District is required";
     if (!form.buildingName?.trim()) errs.buildingName = "House No. / Building is required";
-    if (!form.street?.trim())     errs.street       = "Street / Colony is required";
-    if (!form.fullName?.trim())   errs.fullName     = "Name is required";
+    if (!form.street?.trim())       errs.street       = "Street / Colony is required";
+    if (!form.fullName?.trim())     errs.fullName     = "Name is required";
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
   // ── Submit ─────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
-    if (!validate()) {
-      if (!locationSummary) showNotification("Please pin your delivery location on the map", "error");
-      return;
-    }
+    if (!validate()) return;
     setIsSubmitting(true);
     try {
+      // Build fallback formattedAddress from typed fields if user didn't use the map
+      const manualAddress = [
+        form.buildingName, form.street, form.tower,
+        form.landmark ? `Near ${form.landmark}` : "",
+        form.city, form.state, form.pinCode,
+      ].filter(Boolean).join(", ");
+
       const payload = {
-        lat:              locationSummary.lat,
-        long:             locationSummary.long,
-        placeId:          locationSummary.placeId,
-        formattedAddress: locationSummary.formattedAddress,
+        lat:              locationSummary?.lat  ?? 0,
+        long:             locationSummary?.long ?? 0,
+        placeId:          locationSummary?.placeId          || "N/A",
+        formattedAddress: locationSummary?.formattedAddress || manualAddress,
         city:             form.city,
         state:            form.state,
         pinCode:          form.pinCode,
@@ -508,7 +512,17 @@ const GoogleAddressFormModal = ({
           form.pinCode,
         ].filter(Boolean).join(", ");
 
-        onAddressConfirm(locationSummary, result.data?.addressId, deliveryAddressFull);
+        // Build a minimal locationSummary for manual-entry case (no map used)
+        const summaryForParent = locationSummary || {
+          placeId: "N/A",
+          formattedAddress: manualAddress,
+          city: form.city,
+          state: form.state,
+          pinCode: form.pinCode,
+          lat: 0,
+          long: 0,
+        };
+        onAddressConfirm(summaryForParent, result.data?.addressId, deliveryAddressFull);
         onClose();
         showNotification(result.message || "Address saved successfully", "success");
       }
