@@ -90,28 +90,29 @@ const LocationSummaryCard = ({ deliveryAddressFull }) => {
 };
 
 // ─── Helper: extract structured fields from Google geocode address_components ──
+// Supports both old API (long_name) and new Places API (longText)
 const extractFromComponents = (addressComponents = [], formattedAddress = "") => {
   const d = {
     city: "", state: "", pinCode: "", locality: "",
     building: "", streetNumber: "", route: "", sublocality: "",
   };
   addressComponents.forEach((comp) => {
-    const t = comp.types;
-    if      (t.includes("administrative_area_level_1")) d.state        = comp.long_name;
-    else if (t.includes("locality"))                    d.city         = comp.long_name;
-    else if (t.includes("administrative_area_level_3")) d.city         = d.city || comp.long_name;
-    else if (t.includes("administrative_area_level_2")) d.city         = d.city || comp.long_name;
-    else if (t.includes("postal_code"))                 d.pinCode      = comp.long_name;
-    else if (t.includes("premise") || t.includes("subpremise")) d.building = d.building || comp.long_name;
-    else if (t.includes("street_number"))               d.streetNumber = comp.long_name;
-    else if (t.includes("route"))                       d.route        = comp.long_name;
-    else if (t.includes("sublocality_level_1"))         d.sublocality  = comp.long_name;
-    else if (t.includes("sublocality"))                 d.sublocality  = d.sublocality || comp.long_name;
-    else if (t.includes("neighborhood"))                d.sublocality  = d.sublocality || comp.long_name;
+    const t    = comp.types || [];
+    const name = comp.longText || comp.long_name || ""; // new API uses longText
+    if      (t.includes("administrative_area_level_1")) d.state        = name;
+    else if (t.includes("locality"))                    d.city         = name;
+    else if (t.includes("administrative_area_level_3")) d.city         = d.city || name;
+    else if (t.includes("administrative_area_level_2")) d.city         = d.city || name;
+    else if (t.includes("postal_code"))                 d.pinCode      = name;
+    else if (t.includes("premise") || t.includes("subpremise")) d.building = d.building || name;
+    else if (t.includes("street_number"))               d.streetNumber = name;
+    else if (t.includes("route"))                       d.route        = name;
+    else if (t.includes("sublocality_level_1"))         d.sublocality  = name;
+    else if (t.includes("sublocality"))                 d.sublocality  = d.sublocality || name;
+    else if (t.includes("neighborhood"))                d.sublocality  = d.sublocality || name;
   });
   d.locality = d.sublocality;
-  // Build a usable street string: "42 MG Road" or just "MG Road" or sublocality fallback
-  d.street = [d.streetNumber, d.route].filter(Boolean).join(" ") || d.sublocality;
+  d.street   = [d.streetNumber, d.route].filter(Boolean).join(" ") || d.sublocality;
   return { ...d, formattedAddress };
 };
 
@@ -133,13 +134,12 @@ const GoogleAddressFormModal = ({
   });
 
   // ── Refs ───────────────────────────────────────────────────────────────────
-  const mapRef              = useRef(null);  // google.maps.Map instance
-  const geocoderRef         = useRef(null);  // google.maps.Geocoder
-  const autocompleteRef     = useRef(null);  // google.maps.places.AutocompleteService
-  const placesServiceRef    = useRef(null);  // google.maps.places.PlacesService
-  const isProgrammaticMove  = useRef(false); // blocks onIdle during panTo animations
-  const searchDebounce      = useRef(null);
-  const initDoneRef         = useRef(false); // prevents double-init on StrictMode
+  const mapRef             = useRef(null);  // google.maps.Map instance
+  const geocoderRef        = useRef(null);  // google.maps.Geocoder (not deprecated)
+  const sessionTokenRef    = useRef(null);  // AutocompleteSessionToken for billing grouping
+  const isProgrammaticMove = useRef(false); // blocks onIdle during panTo animations
+  const searchDebounce     = useRef(null);
+  const initDoneRef        = useRef(false); // prevents double-init on StrictMode
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [searchQuery,    setSearchQuery]    = useState("");
@@ -225,9 +225,8 @@ const GoogleAddressFormModal = ({
   const onMapLoad = useCallback((map) => {
     mapRef.current = map;
     if (window.google) {
-      geocoderRef.current      = new window.google.maps.Geocoder();
-      autocompleteRef.current  = new window.google.maps.places.AutocompleteService();
-      placesServiceRef.current = new window.google.maps.places.PlacesService(map);
+      geocoderRef.current   = new window.google.maps.Geocoder();
+      sessionTokenRef.current = new window.google.maps.places.AutocompleteSessionToken();
     }
 
     if (initDoneRef.current) return;
@@ -290,101 +289,109 @@ const GoogleAddressFormModal = ({
     if (searchDebounce.current) clearTimeout(searchDebounce.current);
     if (val.length < 2) { setSearchResults([]); setIsSearching(false); return; }
     setIsSearching(true);
-    searchDebounce.current = setTimeout(() => {
-      if (!autocompleteRef.current || !window.google) { setIsSearching(false); return; }
-      // No types restriction — lets Google return PGs, shops, bylanes, everything
-      autocompleteRef.current.getPlacePredictions(
-        {
-          input: val,
-          componentRestrictions: { country: "in" },
-          language: "en",
-        },
-        (predictions, status) => {
-          setIsSearching(false);
-          const OK = window.google.maps.places.PlacesServiceStatus.OK;
-          setSearchResults(status === OK && predictions?.length ? predictions : []);
-        },
-      );
+    searchDebounce.current = setTimeout(async () => {
+      if (!window.google?.maps?.places?.AutocompleteSuggestion) {
+        setIsSearching(false);
+        return;
+      }
+      try {
+        // Refresh session token for each new search session
+        if (!sessionTokenRef.current) {
+          sessionTokenRef.current = new window.google.maps.places.AutocompleteSessionToken();
+        }
+        const { suggestions } = await window.google.maps.places.AutocompleteSuggestion
+          .fetchAutocompleteSuggestions({
+            input: val,
+            includedRegionCodes: ["in"],
+            language: "en",
+            sessionToken: sessionTokenRef.current,
+          });
+        setSearchResults(suggestions || []);
+      } catch (err) {
+        console.error("[Search] AutocompleteSuggestion error:", err);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
     }, 400);
   };
 
   // ── Search result click ────────────────────────────────────────────────────
-  const handleSelectResult = (item) => {
-    if (!placesServiceRef.current || !window.google) return;
+  const handleSelectResult = async (item) => {
+    if (!window.google?.maps?.places?.Place) return;
     setSearchResults([]);
     setSearchQuery("");
 
-    const mainText      = item.structured_formatting?.main_text      || item.description || "";
-    const secondaryText = item.structured_formatting?.secondary_text || "";
-    const streetHint    = secondaryText.split(",")[0]?.trim()        || "";
+    // New API: item is a Suggestion, prediction lives in item.placePrediction
+    const pred        = item.placePrediction;
+    const mainText    = pred?.mainText?.text    || pred?.text?.text    || "";
+    const secondary   = pred?.secondaryText?.text                      || "";
+    const placeId     = pred?.placeId                                  || "";
+    const fullDesc    = pred?.text?.text        || mainText            || "";
+    const streetHint  = secondary.split(",")[0]?.trim()                || "";
 
-    // Immediately clear old location data so stale city/state/pinCode never bleeds through
+    // Clear old fields immediately — no stale bleed-through
     setLocationSummary({
-      placeId:          item.place_id,
-      formattedAddress: item.description || mainText,
+      placeId,
+      formattedAddress: fullDesc,
       name:             mainText,
-      locality:         secondaryText,
-      city:             "",
-      state:            "",
-      pinCode:          "",
-      lat:              null,
-      long:             null,
+      locality:         secondary,
+      city: "", state: "", pinCode: "", lat: null, long: null,
     });
     setForm(f => ({
       ...f,
       buildingName: mainText   || f.buildingName,
       street:       streetHint || f.street,
-      city:         "",
-      state:        "",
-      pinCode:      "",
+      city: "", state: "", pinCode: "",
     }));
 
-    // Fetch full place details — lat/lng + accurate address components
-    placesServiceRef.current.getDetails(
-      {
-        placeId: item.place_id,
-        fields: ["geometry", "formatted_address", "address_components", "name"],
-      },
-      (place, status) => {
-        if (
-          status !== window.google.maps.places.PlacesServiceStatus.OK ||
-          !place?.geometry?.location
-        ) return;
+    try {
+      // Use Place (New API) to fetch details
+      const place = new window.google.maps.places.Place({ id: placeId });
+      await place.fetchFields({
+        fields: ["displayName", "formattedAddress", "addressComponents", "location"],
+        sessionToken: sessionTokenRef.current, // groups autocomplete + details for billing
+      });
 
-        const lat = place.geometry.location.lat();
-        const lng = place.geometry.location.lng();
-        const d   = extractFromComponents(
-          place.address_components || [],
-          place.formatted_address  || item.description || mainText,
-        );
+      // Session token consumed — create a fresh one for next search
+      sessionTokenRef.current = new window.google.maps.places.AutocompleteSessionToken();
 
-        // Block onIdle during programmatic pan
-        isProgrammaticMove.current = true;
-        setTimeout(() => { isProgrammaticMove.current = false; }, 2000);
-        mapRef.current?.panTo({ lat, lng });
-        mapRef.current?.setZoom(17);
+      const lat = place.location?.lat();
+      const lng = place.location?.lng();
+      if (lat == null || lng == null) return;
 
-        setLocationSummary({
-          placeId:          item.place_id,
-          formattedAddress: place.formatted_address || item.description || mainText,
-          name:             place.name || mainText,
-          locality:         d.locality || secondaryText,
-          city:             d.city,
-          state:            d.state,
-          pinCode:          d.pinCode,
-          lat,
-          long:             lng,
-        });
-        setForm(f => ({
-          ...f,
-          buildingName: place.name || mainText || f.buildingName,
-          street:       d.street   || streetHint || f.street,
-          city:         d.city,
-          state:        d.state,
-          pinCode:      d.pinCode,
-        }));
-      },
-    );
+      const d = extractFromComponents(
+        place.addressComponents || [],
+        place.formattedAddress  || fullDesc,
+      );
+
+      isProgrammaticMove.current = true;
+      setTimeout(() => { isProgrammaticMove.current = false; }, 2000);
+      mapRef.current?.panTo({ lat, lng });
+      mapRef.current?.setZoom(17);
+
+      setLocationSummary({
+        placeId,
+        formattedAddress: place.formattedAddress || fullDesc,
+        name:             place.displayName      || mainText,
+        locality:         d.locality             || secondary,
+        city:             d.city,
+        state:            d.state,
+        pinCode:          d.pinCode,
+        lat,
+        long: lng,
+      });
+      setForm(f => ({
+        ...f,
+        buildingName: place.displayName || mainText || f.buildingName,
+        street:       d.street          || streetHint || f.street,
+        city:         d.city,
+        state:        d.state,
+        pinCode:      d.pinCode,
+      }));
+    } catch (err) {
+      console.error("[handleSelectResult] Place.fetchFields error:", err);
+    }
   };
 
   // ── "Go to current location" ───────────────────────────────────────────────
@@ -448,29 +455,33 @@ const GoogleAddressFormModal = ({
 
   const validate = () => {
     const errs = {};
-    if (!locationSummary)         errs.location     = "Please pin your location on the map first";
-    if (!form.pinCode?.trim())    errs.pinCode      = "Pincode is required";
-    if (!form.city?.trim())       errs.city         = "City / District is required";
+    // locationSummary is NOT required — user can fill form manually without map
+    if (!form.pinCode?.trim())      errs.pinCode      = "Pincode is required";
+    if (!form.city?.trim())         errs.city         = "City / District is required";
     if (!form.buildingName?.trim()) errs.buildingName = "House No. / Building is required";
-    if (!form.street?.trim())     errs.street       = "Street / Colony is required";
-    if (!form.fullName?.trim())   errs.fullName     = "Name is required";
+    if (!form.street?.trim())       errs.street       = "Street / Colony is required";
+    if (!form.fullName?.trim())     errs.fullName     = "Name is required";
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
   // ── Submit ─────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
-    if (!validate()) {
-      if (!locationSummary) showNotification("Please pin your delivery location on the map", "error");
-      return;
-    }
+    if (!validate()) return;
     setIsSubmitting(true);
     try {
+      // Build fallback formattedAddress from typed fields if user didn't use the map
+      const manualAddress = [
+        form.buildingName, form.street, form.tower,
+        form.landmark ? `Near ${form.landmark}` : "",
+        form.city, form.state, form.pinCode,
+      ].filter(Boolean).join(", ");
+
       const payload = {
-        lat:              locationSummary.lat,
-        long:             locationSummary.long,
-        placeId:          locationSummary.placeId,
-        formattedAddress: locationSummary.formattedAddress,
+        lat:              locationSummary?.lat  ?? 0,
+        long:             locationSummary?.long ?? 0,
+        placeId:          locationSummary?.placeId          || "N/A",
+        formattedAddress: locationSummary?.formattedAddress || manualAddress,
         city:             form.city,
         state:            form.state,
         pinCode:          form.pinCode,
@@ -501,7 +512,17 @@ const GoogleAddressFormModal = ({
           form.pinCode,
         ].filter(Boolean).join(", ");
 
-        onAddressConfirm(locationSummary, result.data?.addressId, deliveryAddressFull);
+        // Build a minimal locationSummary for manual-entry case (no map used)
+        const summaryForParent = locationSummary || {
+          placeId: "N/A",
+          formattedAddress: manualAddress,
+          city: form.city,
+          state: form.state,
+          pinCode: form.pinCode,
+          lat: 0,
+          long: 0,
+        };
+        onAddressConfirm(summaryForParent, result.data?.addressId, deliveryAddressFull);
         onClose();
         showNotification(result.message || "Address saved successfully", "success");
       }
@@ -565,24 +586,30 @@ const GoogleAddressFormModal = ({
                 <span className="text-xs">Searching...</span>
               </div>
             ) : searchResults.length > 0 ? (
-              searchResults.map((item, i) => (
-                <button
-                  key={item.place_id || i}
-                  type="button"
-                  onClick={() => handleSelectResult(item)}
-                  className="w-full text-left p-3 hover:bg-gray-50 border-b border-gray-100 last:border-0 flex items-start gap-3 group"
-                >
-                  <i className="fa-solid fa-location-dot text-gray-300 group-hover:text-[#a89068] text-xs mt-1 shrink-0 transition-colors" />
-                  <div className="min-w-0">
-                    <p className="text-sm text-[#2e443c] font-medium truncate group-hover:text-[#a89068] transition-colors">
-                      {item.structured_formatting?.main_text || item.description}
-                    </p>
-                    <p className="text-[11px] text-gray-400 truncate mt-0.5">
-                      {item.structured_formatting?.secondary_text}
-                    </p>
-                  </div>
-                </button>
-              ))
+              searchResults.map((item, i) => {
+                const pred      = item.placePrediction;
+                const mainText  = pred?.mainText?.text  || pred?.text?.text || "";
+                const subText   = pred?.secondaryText?.text                 || "";
+                const key       = pred?.placeId || i;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => handleSelectResult(item)}
+                    className="w-full text-left p-3 hover:bg-gray-50 border-b border-gray-100 last:border-0 flex items-start gap-3 group"
+                  >
+                    <i className="fa-solid fa-location-dot text-gray-300 group-hover:text-[#a89068] text-xs mt-1 shrink-0 transition-colors" />
+                    <div className="min-w-0">
+                      <p className="text-sm text-[#2e443c] font-medium truncate group-hover:text-[#a89068] transition-colors">
+                        {mainText}
+                      </p>
+                      {subText && (
+                        <p className="text-[11px] text-gray-400 truncate mt-0.5">{subText}</p>
+                      )}
+                    </div>
+                  </button>
+                );
+              })
             ) : (
               <div className="p-4 text-center text-sm text-gray-400">
                 No results found
