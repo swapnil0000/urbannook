@@ -40,12 +40,13 @@ const orderSchema = new mongoose.Schema(
     },
     deliveryAddress: {
       addressId: String,
-      fullName: String, 
-      mobileNumber: String, 
-      addressLine: String, 
-      city: String, 
-      state: String, 
+      fullName: String,
+      mobileNumber: String,
+      addressLine: String,
+      city: String,
+      state: String,
       formattedAddress: String,
+      deliveryAddressFull: String, // canonical user-built string for ShipMozo/couriers
       lat: Number,
       long: Number,
       landmark: String,
