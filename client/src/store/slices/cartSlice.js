@@ -46,7 +46,7 @@ const initialState = {
   items: persistedItems,
   totalQuantity: persistedItems.reduce((t, i) => t + (i.quantity || 0), 0),
   totalAmount: persistedItems.reduce((t, i) => t + ((i.price || 0) * (i.quantity || 0)), 0),
-  selections: {}, // Managed by productId: { quantity, color }
+  selections: {}, // Managed by productId: { quantity, variant }
 };
 
 const cartSlice = createSlice({
@@ -54,18 +54,20 @@ const cartSlice = createSlice({
   initialState,
   reducers: {
     updateSelection: (state, action) => {
-      const { productId, quantity, color } = action.payload;
+      const { productId, quantity, variant, color } = action.payload;
       state.selections[productId] = {
         quantity: quantity || 1,
-        color: color || 'N/A'
+        variant: variant || color || 'N/A'
       };
     },
 
     addItem: (state, action) => {
-      const { id, name, price, image, quantity = 1, mongoId, selectedColor } = action.payload;
+      const { id, name, price, image, quantity = 1, mongoId, selectedVariant, selectedColor } = action.payload;
+      const effectiveVariant = selectedVariant || selectedColor || 'N/A';
+      
       const existingItem = state.items.find(item => 
         item.id === id && 
-        (item.selectedColor || 'N/A') === (selectedColor || 'N/A')
+        (item.selectedVariant || item.selectedColor || 'N/A') === (effectiveVariant)
       );
 
       if (existingItem) {
@@ -78,7 +80,7 @@ const cartSlice = createSlice({
           price,
           image,
           quantity,
-          selectedColor: selectedColor || 'N/A'
+          selectedVariant: effectiveVariant
         });
       }
 
@@ -96,19 +98,20 @@ const cartSlice = createSlice({
     },
 
     removeItem: (state, action) => {
-      const { id, selectedColor } = action.payload;
+      const { id, selectedVariant, selectedColor } = action.payload;
+      const effectiveVariant = selectedVariant || selectedColor || 'N/A';
       
-      // FIX: Check both ID and color to remove correct variant
+      // FIX: Check both ID and variant to remove correct variant
       const existingItem = state.items.find(item => 
         item.id === id && 
-        (item.selectedColor || 'N/A') === (selectedColor || 'N/A')
+        (item.selectedVariant || item.selectedColor || 'N/A') === (effectiveVariant)
       );
 
       if (existingItem) {
         state.totalQuantity -= existingItem.quantity;
         state.totalAmount -= existingItem.price * existingItem.quantity;
         state.items = state.items.filter(item => 
-          !(item.id === id && (item.selectedColor || 'N/A') === (selectedColor || 'N/A'))
+          !(item.id === id && (item.selectedVariant || item.selectedColor || 'N/A') === (effectiveVariant))
         );
       }
 
@@ -118,12 +121,13 @@ const cartSlice = createSlice({
     },
 
     updateQuantity: (state, action) => {
-      const { id, quantity, selectedColor } = action.payload;
+      const { id, quantity, selectedVariant, selectedColor } = action.payload;
+      const effectiveVariant = selectedVariant || selectedColor || 'N/A';
       
-      // FIX: Check both ID and color to update correct variant
+      // FIX: Check both ID and variant to update correct variant
       const existingItem = state.items.find(item => 
         item.id === id && 
-        (item.selectedColor || 'N/A') === (selectedColor || 'N/A')
+        (item.selectedVariant || item.selectedColor || 'N/A') === (effectiveVariant)
       );
 
       if (existingItem && quantity > 0) {
@@ -163,7 +167,7 @@ const cartSlice = createSlice({
           price: typeof item.price === 'number' ? item.price : (item.sellingPrice || item.productPrice || 0),
           image: item.productImage || item.image || item.productImg,
           quantity,
-          selectedColor: item.selectedColor || 'N/A'
+          selectedVariant: item.selectedVariant || item.selectedColor || 'N/A'
         };
       });
 
@@ -213,7 +217,7 @@ const cartSlice = createSlice({
           price,
           image: item.image || item.productImage || item.productImg,
           quantity,
-          selectedColor: item.selectedColor || 'N/A'
+          selectedVariant: item.selectedVariant || item.selectedColor || 'N/A'
         };
       });
 

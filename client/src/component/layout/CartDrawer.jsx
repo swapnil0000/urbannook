@@ -33,9 +33,10 @@ const CartDrawer = ({ isOpen, onClose }) => {
     }
   }, [isOpen]);
 
-  const handleQuantityChange = async (productId, selectedColor, newQuantity, mongoId, currentQty, image) => {
+  const handleQuantityChange = async (productId, selectedVariant, selectedColor, newQuantity, mongoId, currentQty, image) => {
+    const effectiveVariant = selectedVariant || selectedColor || 'N/A';
     if (newQuantity <= 0) {
-      handleRemoveItem(productId, selectedColor, mongoId);
+      handleRemoveItem(productId, effectiveVariant, mongoId);
       return;
     }
 
@@ -45,29 +46,30 @@ const CartDrawer = ({ isOpen, onClose }) => {
     if (isLoggedIn) {
       try {
         const action = newQuantity > currentQty ? 'add' : 'sub';
-        await updateCart({ productId: mongoId || productId, quantity: 1, action, color: selectedColor, image }).unwrap();
+        await updateCart({ productId: mongoId || productId, quantity: 1, action, variant: effectiveVariant, image }).unwrap();
       } catch (error) {
         console.error('Failed to update cart:', error);
         window.location.reload();
       }
     } else {
-      dispatch(updateQuantity({ id: productId, quantity: newQuantity, selectedColor }));
+      dispatch(updateQuantity({ id: productId, quantity: newQuantity, selectedVariant: effectiveVariant }));
     }
   };
 
-  const handleRemoveItem = async (productId, selectedColor, mongoId) => {
+  const handleRemoveItem = async (productId, selectedVariant, selectedColor, mongoId) => {
+    const effectiveVariant = selectedVariant || selectedColor || 'N/A';
     const hasToken = !!localStorage.getItem('authToken');
     const isLoggedIn = isAuthenticated || hasToken;
 
     if (isLoggedIn) {
       try {
-        await updateCart({ productId: mongoId || productId, quantity: 1, action: 'remove', color: selectedColor }).unwrap();
+        await updateCart({ productId: mongoId || productId, quantity: 1, action: 'remove', variant: effectiveVariant }).unwrap();
       } catch (error) {
         console.error('Failed to remove item:', error);
         window.location.reload();
       }
     } else {
-      dispatch(removeItem({ id: productId, selectedColor }));
+      dispatch(removeItem({ id: productId, selectedVariant: effectiveVariant }));
     }
   };
   
@@ -157,7 +159,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
                   const itemColor = item.selectedColor || 'N/A';
 
                   return (
-                    <div key={`${item.id}-${itemColor}`} className="flex items-stretch gap-4 group relative pb-6 border-b border-gray-50 last:border-0 last:pb-0">
+                    <div key={`${item.id}-${item.selectedVariant || item.selectedColor || 'N/A'}`} className="flex items-stretch gap-4 group relative pb-6 border-b border-gray-50 last:border-0 last:pb-0">
                       
                       {/* Image */}
                       <div className="w-[85px] h-[85px] bg-gray-50 rounded-2xl overflow-hidden shrink-0 relative border border-gray-100 flex items-center justify-center">
@@ -181,7 +183,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
                               {item.name}
                             </h4>
                             <button 
-                              onClick={() => handleRemoveItem(item.id, itemColor, item.mongoId)}
+                              onClick={() => handleRemoveItem(item.id, item.selectedVariant, item.selectedColor, item.mongoId)}
                               className="text-gray-300 hover:text-red-500 transition-colors p-1 -mt-1 -mr-1 shrink-0"
                               title="Remove Item"
                             >
@@ -193,27 +195,32 @@ const CartDrawer = ({ isOpen, onClose }) => {
                             {item.category || "Standard Variant"}
                           </p>
 
-                          {/* Color Selection (If Exists) */}
-                          {item.selectedColor && item.selectedColor !== 'N/A' && (
-                            <div className="flex items-center gap-1.5 mb-2">
-                              <div 
-                                className="w-2.5 h-2.5 rounded-full border border-gray-200 shadow-sm"
-                                style={{ 
-                                  background: item.selectedColor.toLowerCase() === 'rainbow' 
-                                    ? 'linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)' 
-                                    : item.selectedColor.replace(/\s+/g, '').toLowerCase() 
-                                }}
-                              ></div>
-                              <span className="text-xs text-gray-400 mt-1 font-medium tracking-wide">{item.selectedColor}</span>
-                            </div>
-                          )}
+                          {/* Variant Selection (If Exists) */}
+                          {(() => {
+                            const itemVariant = item.selectedVariant || item.selectedColor || 'N/A';
+                            if (!itemVariant || itemVariant === 'N/A') return null;
+
+                            return (
+                              <div className="flex items-center gap-1.5 mb-2">
+                                <div 
+                                  className="w-2.5 h-2.5 rounded-full border border-gray-200 shadow-sm"
+                                  style={{ 
+                                    background: itemVariant.toLowerCase() === 'rainbow' 
+                                      ? 'linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)' 
+                                      : itemVariant.replace(/\s+/g, '').toLowerCase() 
+                                  }}
+                                ></div>
+                                <span className="text-xs text-gray-400 mt-1 font-medium tracking-wide">{itemVariant}</span>
+                              </div>
+                            );
+                          })()}
                         </div>
 
                         <div className="flex items-center justify-between mt-2">
                           {/* Quantity Controls - Exact match to your screenshot inspector */}
                           <div className="flex items-center gap-4 bg-white border border-gray-200 rounded-full h-8 px-3 shadow-sm">
                             <button 
-                              onClick={() => handleQuantityChange(item.id, itemColor, Math.max(0, itemQty - 1), item.mongoId, itemQty, item.image)}
+                              onClick={() => handleQuantityChange(item.id, item.selectedVariant, item.selectedColor, Math.max(0, itemQty - 1), item.mongoId, itemQty, item.image)}
                               className="w-4 h-full flex items-center justify-center text-gray-400 hover:text-[#0a110e] transition-colors"
                             >
                               <i className="fa-solid fa-minus text-[10px]"></i>
@@ -222,7 +229,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
                               {itemQty}
                             </span>
                             <button 
-                              onClick={() => handleQuantityChange(item.id, itemColor, itemQty + 1, item.mongoId, itemQty, item.image)}
+                              onClick={() => handleQuantityChange(item.id, item.selectedVariant, item.selectedColor, itemQty + 1, item.mongoId, itemQty, item.image)}
                               className="w-4 h-full flex items-center justify-center text-gray-400 hover:text-[#0a110e] transition-colors"
                             >
                               <i className="fa-solid fa-plus text-[10px]"></i>

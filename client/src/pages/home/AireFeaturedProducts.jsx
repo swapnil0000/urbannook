@@ -132,7 +132,7 @@ const AireFeaturedProducts = memo(() => {
                 <div className="relative rounded-[2.5rem] overflow-hidden border border-white/10 bg-[#121212] shadow-2xl aspect-square">
                     <Suspense fallback={<div className="w-full h-full bg-gray-200 animate-pulse rounded-[2.5rem]"></div>}>
                       <OptimizedImage 
-                          src={featuredProduct.productImg} 
+                          src={featuredProduct.variantDetails?.[0]?.variantImage?.[0] || "https://urbannook.in/assets/logo.webp"} 
                           alt={featuredProduct.productName}
                           className="w-full h-full object-cover transform transition-transform duration-[1.5s] ease-out group-hover:scale-110"
                           loading="eager"

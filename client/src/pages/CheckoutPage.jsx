@@ -16,13 +16,17 @@ import {
 import { useUI } from "../hooks/useRedux";
 import { logout } from "../store/slices/authSlice";
 import { clearCart } from "../store/slices/cartSlice";
+import { fetchCsrfToken, getCsrfToken } from "../store/api/apiSlice";
 import CouponInput from "../component/CouponInput";
 import { ComponentLoader } from "../component/layout/LoadingSpinner";
 
 // Lazy load heavy components
 const CouponList = lazy(() => import("../component/CouponList"));
 const MapModal = lazy(() => import("../component/MapModal"));
+const AddressFormModal = lazy(() => import("../component/AddressFormModal")); // TODO: swap with MapModal when ready
 const MobileNumberModal = lazy(() => import("../component/MobileNumberModal"));
+// Add this:
+const GoogleAddressFormModal = lazy(() => import("../component/GoogleAddressFormModal"));
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
@@ -79,6 +83,8 @@ const CheckoutPage = () => {
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    // Fetch CSRF token for checkout actions
+    fetchCsrfToken().catch(err => console.warn('[Checkout] CSRF fetch failed:', err));
   }, []);
 
   useEffect(() => {
@@ -89,9 +95,10 @@ const CheckoutPage = () => {
     setShowMapModal(true);
   };
 
-  const handleAddressConfirm = (suggestion, addressId) => {
-    setAddress(suggestion.formattedAddress);
-    setPincode(suggestion.pinCode.toString());
+  const handleAddressConfirm = (suggestion, addressId, deliveryAddressFull) => {
+    // Show deliveryAddressFull (user-typed) if available, else fall back to Ola Maps formattedAddress
+    setAddress(deliveryAddressFull || suggestion.formattedAddress);
+    setPincode(String(suggestion.pinCode || ""));
     setCurrentAddressId(addressId);
     refetchAddresses();
   };
@@ -290,10 +297,11 @@ const CheckoutPage = () => {
     }
   };
 
-  const handleRemoveItem = async (productId, selectedColor) => {
+  const handleRemoveItem = async (productId, selectedVariant, selectedColor) => {
     try {
+      const effectiveVariant = selectedVariant || selectedColor || 'N/A';
       const item = cartItems.find(
-        (item) => item.id === productId && (item.selectedColor || 'N/A') === (selectedColor || 'N/A')
+        (item) => item.id === productId && (item.selectedVariant || item.selectedColor || 'N/A') === (effectiveVariant)
       );
       const mongoId = item?.mongoId || productId;
       const itemImage = item?.image || "";
@@ -302,7 +310,7 @@ const CheckoutPage = () => {
         productId: mongoId,
         quantity: 1,
         action: "remove",
-        color: selectedColor,
+        variant: effectiveVariant,
         image: itemImage,
       }).unwrap();
 
@@ -424,8 +432,8 @@ const CheckoutPage = () => {
   };
 
   const selectSavedAddress = (addr) => {
-    setAddress(addr.formattedAddress);
-    setPincode(addr.pinCode.toString());
+    setAddress(addr.deliveryAddressFull || addr.formattedAddress);
+    setPincode(String(addr.pinCode || ""));
     setCurrentAddressId(addr.addressId);
     setPreciseDetails({
       landmark: addr.landmark || "",
@@ -488,15 +496,6 @@ const CheckoutPage = () => {
       return;
     }
     
-    const authToken = localStorage.getItem('authToken');
-    if (!authToken) {
-      showNotification("Your session has expired. Please login again.", "error");
-      dispatch(logout());
-      openLoginModal();
-      navigate("/");
-      return;
-    }
-    
     setPaymentError(null);
     setProcessingType(isPreBook ? "prebook" : "full");
     const selectedFullAddr = savedAddress.find(a => a.addressId === currentAddressId);
@@ -504,12 +503,17 @@ const CheckoutPage = () => {
     try {
       const razorpayKey = razorpayKeyData?.data;      
       const orderData = {
-        items: cartItems.map((i) => ({
-          productId: i.mongoId || i.id.split(':')[0], // Extract raw productId
-          quantity: i.quantity,
-          color: (i.selectedColor && i.selectedColor !== 'N/A') ? i.selectedColor : 
-                 (cartSelections[i.id]?.color || cartSelections[i.mongoId]?.color || "") 
-        })),
+        items: cartItems.map((i) => {
+          const effectiveVariant = (i.selectedVariant && i.selectedVariant !== 'N/A') ? i.selectedVariant : 
+                                   (i.selectedColor && i.selectedColor !== 'N/A' ? i.selectedColor :
+                                   (cartSelections[i.id]?.variant || cartSelections[i.id]?.color || "N/A"));
+          return {
+            productId: i.mongoId || i.id.split(':')[0],
+            quantity: i.quantity,
+            variant: effectiveVariant,
+            color: effectiveVariant // Send both for double safety
+          };
+        }),
         senderMobile: senderMobileStr,
         userEmail: userProfile?.email,
         receiverMobile: useDifferentDeliveryContact && deliveryMobileStr ? deliveryMobileStr : senderMobileStr,
@@ -520,6 +524,7 @@ const CheckoutPage = () => {
           fullName: userProfile?.userName || userProfile?.name || "",
           mobileNumber: useDifferentDeliveryContact && deliveryMobileStr ? deliveryMobileStr : senderMobileStr,
           formattedAddress: address,
+          deliveryAddressFull: address,
           pinCode: pincode ? parseInt(pincode, 10) : null,
           landmark: preciseDetails.landmark,
           flatOrFloorNumber: preciseDetails.flatNo,
@@ -603,10 +608,15 @@ const CheckoutPage = () => {
 
       paymentObject.open();
     } catch (error) {
+      console.error("Payment initialization error:", error);
+      
       const errorMessage =
         error.data?.message ||
         error.message ||
         "Failed to initialize payment. Please try again.";
+        console.log( error.data?.message,
+        error.message);
+        
       showNotification(errorMessage, "error");
       setPaymentError(errorMessage);
       setShowRetry(true);
@@ -665,14 +675,14 @@ const CheckoutPage = () => {
               <div className="space-y-3 max-h-[220px] overflow-y-auto pr-2 custom-scrollbar">
                 {cartItems.map((item) => (
                   <div
-                    key={item.id}
+                    key={`${item.id}-${item.selectedVariant || item.selectedColor || 'default'}`}
                     className="relative flex gap-4 items-center bg-white p-3 rounded-xl border border-gray-200 hover:border-[#a89068]/40 transition-colors group"
                   >
                     {/* Remove button - top right corner */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleRemoveItem(item?.id, item?.selectedColor);
+                        handleRemoveItem(item?.id, item?.selectedVariant, item?.selectedColor);
                       }}
                       className="absolute top-2 right-2 w-4 h-4 rounded-full bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 flex items-center justify-center transition-all opacity-100"
                       title="Remove item"
@@ -687,32 +697,46 @@ const CheckoutPage = () => {
                         className="w-full h-full object-contain mix-blend-multiply"
                       />
                     </div>
-                    
+
                     <div className="flex-1 min-w-0">
                       <h3 className="font-medium text-sm text-[#2e443c] truncate mb-1">
                         {item.name}
                       </h3>
-                      
-                      {/* --- NAYA: COLOR DISPLAY --- */}
+
+                      {/* --- NAYA: VARIANT DISPLAY --- */}
                       {(() => {
-                        const itemColor = item.selectedColor !== 'N/A' ? item.selectedColor : 
-                                          (cartSelections[item.id]?.color || cartSelections[item.mongoId]?.color);
-                                          
-                        if (!itemColor || itemColor === 'N/A') return null;
-                        
+                        const itemVariant =
+                          (item.selectedVariant && item.selectedVariant !== "N/A")
+                            ? item.selectedVariant
+                            : (item.selectedColor && item.selectedColor !== "N/A"
+                               ? item.selectedColor
+                               : (cartSelections[item.id]?.variant || 
+                                  cartSelections[item.id]?.color || 
+                                  cartSelections[item.mongoId]?.variant || 
+                                  cartSelections[item.mongoId]?.color));
+
+                        if (!itemVariant || itemVariant === "N/A") return null;
+
                         return (
                           <div className="flex items-center gap-1.5 mb-1.5 mt-1">
-                            <span className="text-[9px] text-gray-400 uppercase tracking-widest">Color:</span>
-                            <div 
+                            <span className="text-[9px] text-gray-400 uppercase tracking-widest">
+                              Variant:
+                            </span>
+                            <div
                               className="w-3 h-3 rounded-full border border-gray-300 shadow-sm"
                               style={{
-                                background: itemColor.toLowerCase() === 'rainbow' 
-                                  ? 'linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)' 
-                                  : itemColor.replace(/\s+/g, '').toLowerCase()
+                                background:
+                                  itemVariant.toLowerCase() === "rainbow"
+                                    ? "linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)"
+                                    : itemVariant
+                                        .replace(/\s+/g, "")
+                                        .toLowerCase(),
                               }}
-                              title={itemColor}
+                              title={itemVariant}
                             ></div>
-                            <span className="text-[10px] font-medium text-[#a89068]">{itemColor}</span>
+                            <span className="text-[10px] font-medium text-[#a89068]">
+                              {itemVariant}
+                            </span>
                           </div>
                         );
                       })()}
@@ -806,8 +830,12 @@ const CheckoutPage = () => {
                     <i className="fa-solid fa-truck text-[#F5DEB3] text-[10px]"></i>
                   </div>
                   <div>
-                    <p className="text-[11px] font-bold text-[#2e443c] uppercase tracking-wider">Estimated Delivery: 5–7 Business Days</p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">AWB number shared once order is shipped</p>
+                    <p className="text-[11px] font-bold text-[#2e443c] uppercase tracking-wider">
+                      Estimated Delivery: 5–7 Business Days
+                    </p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">
+                      AWB number shared once order is shipped
+                    </p>
                   </div>
                 </div>
 
@@ -933,18 +961,20 @@ const CheckoutPage = () => {
                     {userProfile?.userEmail || userProfile?.email || "N/A"}
                   </div>
                 </div>
-                
+
                 {/* Mobile Number Field - Display Only with Edit */}
                 <div className="space-y-1.5 md:col-span-2">
                   <label className="text-[9px] uppercase tracking-widest text-[#a89068] font-bold ml-1">
                     Mobile NO. (Required for payment)
                   </label>
-                  
+
                   {/* Display with Edit button */}
                   <div className="space-y-2">
                     <div className="flex gap-2 items-center">
                       <div className="flex-1 bg-white border border-gray-200 rounded-xl p-4 text-sm text-[#2e443c] font-medium">
-                        {senderMobile && senderMobile !== "N/A" ? senderMobile : "Not added"}
+                        {senderMobile && senderMobile !== "N/A"
+                          ? senderMobile
+                          : "Not added"}
                       </div>
                       <button
                         onClick={() => setShowMobileModal(true)}
@@ -979,10 +1009,10 @@ const CheckoutPage = () => {
                       className="w-4 h-4 rounded border-gray-300 text-[#a89068] focus:ring-[#a89068] cursor-pointer"
                     />
                     <span className="text-[10px] uppercase tracking-widest text-[#a89068] font-bold">
-                     Ordering For Someone Else
+                      Ordering For Someone Else
                     </span>
                   </label>
-                  
+
                   {useDifferentDeliveryContact && (
                     <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
                       <input
@@ -1000,7 +1030,7 @@ const CheckoutPage = () => {
                         placeholder="Enter 10-digit delivery contact number"
                       />
                       <p className="text-[10px] text-gray-500 ml-1">
-                        This number will be used for delivery coordination 
+                        This number will be used for delivery coordination
                       </p>
                       {deliveryMobileErrors && (
                         <p className="text-[10px] text-red-500 ml-1">
@@ -1212,13 +1242,31 @@ const CheckoutPage = () => {
                   </div>
                 }
               >
-                <MapModal
+                {/* <MapModal
                   showMapModal={showMapModal}
                   setShowMapModal={setShowMapModal}
                   preciseDetails={preciseDetails}
                   setPreciseDetails={setPreciseDetails}
                   onAddressConfirm={handleAddressConfirm}
                   showNotification={showNotification}
+                /> */}
+                {/* TODO: uncomment below + comment MapModal above to switch to new address form */}
+                {/* <AddressFormModal
+                  isOpen={showMapModal}
+                  onClose={() => setShowMapModal(false)}
+                  onAddressConfirm={handleAddressConfirm}
+                  showNotification={showNotification}
+                  prefillName={userProfile?.userName || userProfile?.name || ""}
+                  prefillPhone={userProfile?.mobileNumber || senderMobile || ""}
+                /> */}
+                {/* GoogleAddressFormModal */}
+                <GoogleAddressFormModal
+                  isOpen={showMapModal}
+                  onClose={() => setShowMapModal(false)}
+                  onAddressConfirm={handleAddressConfirm}
+                  showNotification={showNotification}
+                  prefillName={userProfile?.userName || userProfile?.name || ""}
+                  prefillPhone={userProfile?.mobileNumber || senderMobile || ""}
                 />
               </Suspense>
 
@@ -1267,16 +1315,19 @@ const CheckoutPage = () => {
             </div>
             <div className="p-6 overflow-y-auto max-h-[calc(80vh-88px)] custom-scrollbar">
               <Suspense fallback={<ComponentLoader />}>
-                <CouponList onCouponApplied={handleCouponApplied} userId={userProfile?.userId} />
+                <CouponList
+                  onCouponApplied={handleCouponApplied}
+                  userId={userProfile?.userId}
+                />
               </Suspense>
             </div>
           </div>
         </div>
       )}
 
-      {/* Mobile Sticky Footer */}
+      {/* Mobile Sticky Footer — hidden when address modal is open so it doesn't cover Save button */}
       <div
-        className="fixed bottom-0 left-0 right-0 bg-[#2e443c] border-t border-white/10 p-4 px-6 z-50 lg:hidden shadow-[0_-10px_30px_rgba(0,0,0,0.4)]"
+        className={`fixed bottom-0 left-0 right-0 bg-[#2e443c] border-t border-white/10 p-4 px-6 z-50 lg:hidden shadow-[0_-10px_30px_rgba(0,0,0,0.4)] transition-transform duration-300 ${showMapModal ? "translate-y-full" : "translate-y-0"}`}
       >
         <div className="flex items-center justify-around gap-5 max-w-[1200px] mx-auto">
           <div className="flex flex-col">

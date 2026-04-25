@@ -15,13 +15,13 @@ const cookieOptions = {
   path: "/",
 };
 
-// Refresh token cookie — longer lived, httpOnly, only sent to /refresh-token
+// Refresh token cookie — longer lived, httpOnly
 const refreshCookieOptions = {
   httpOnly: true,
   secure: useSecureCookies,
   sameSite: useSecureCookies ? "None" : "Lax",
   maxAge: 10 * 24 * 60 * 60 * 1000, // 10 days (matches refresh token expiry)
-  path: "/api/v1/refresh-token",     // only sent to the refresh endpoint
+  path: "/",                        // Broadened path for better reliability
 };
 
 export default cookieOptions;
