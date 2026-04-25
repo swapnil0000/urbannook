@@ -29,6 +29,14 @@ export const corsOptions = {
     // Check if origin is in whitelist
     if (allowedOrigins.some(o => o === cleanOrigin)) {
       callback(null, true);
+    } else if (
+      cleanOrigin.endsWith(".urbannook.online") || 
+      cleanOrigin.endsWith(".urbannook.in") ||
+      cleanOrigin.endsWith("urbannook.online") ||
+      cleanOrigin.endsWith("urbannook.in")
+    ) {
+      // Allow any urbannook subdomain in staging/production for better reliability
+      callback(null, true);
     } else {
       // In non-production, log rejection for debugging
       if (mode !== "production") {
@@ -47,8 +55,20 @@ export const corsOptions = {
   },
   credentials: true, // Allow cookies and authentication headers
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Accept-Language", "Origin", "X-CSRF-Token"],
-  exposedHeaders: ["Set-Cookie"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "x-requested-with",
+    "Accept",
+    "Accept-Language",
+    "Origin",
+    "X-CSRF-Token",
+    "x-csrf-token",
+    "X-XSRF-TOKEN",
+    "x-xsrf-token"
+  ],
+  exposedHeaders: ["Set-Cookie", "X-CSRF-Token", "x-csrf-token"],
   optionsSuccessStatus: 200, // Some legacy browsers choke on 204
   maxAge: 86400, // Cache preflight requests for 24 hours
 };

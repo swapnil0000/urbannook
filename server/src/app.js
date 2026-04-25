@@ -24,6 +24,10 @@ import env from "./config/envConfigSetup.js";
 const app = express();
 app.set("trust proxy", 1);
 app.set("etag", false);
+
+// Apply CORS first
+app.use(cors(corsOptions));
+
 // test
 logCorsConfig();
 
@@ -130,25 +134,21 @@ app.use(
       policy: "strict-origin-when-cross-origin",
     },
 
+    // Resource Policy - Allow cross-origin requests
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    
+    // Opener Policy - Allow cross-origin popups
+    crossOriginOpenerPolicy: { policy: "unsafe-none" },
+
     // Permissions Policy - Control browser features
     permittedCrossDomainPolicies: {
       permittedPolicies: "none",
-    },
-
-    // Cross-Origin-Opener-Policy - Allow Google OAuth popup
-    crossOriginOpenerPolicy: {
-      policy:
-        env.NODE_ENV === "development"
-          ? "unsafe-none"
-          : "same-origin-allow-popups",
     },
   }),
 );
 
 /* Health Route */
 app.use("/health", healthRouter);
-app.use(cors(corsOptions));
-app.options(/.*/, cors(corsOptions));
 
 /*Explicity for webhook because it requires rp webhook requires raw not json */
 app.use("/api/v1", (req, res, next) => {
