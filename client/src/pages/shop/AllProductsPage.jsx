@@ -109,15 +109,16 @@ const AllProductsPage = () => {
                   >
                     
                     <div className="relative w-full aspect-square bg-[#f8f8f5] overflow-hidden">
-                      {product.productImg ? (
-                        <img 
-                          src={product.productImg} 
-                          alt={product.productName} 
-                          className="w-full h-full object-cover mix-blend-multiply transition-transform duration-[1.5s] group-hover:scale-110" 
-                          
-                        />
-                      ) : null}
-                   
+                      {(() => {
+                        const thumbnail = (product?.variantDetails && product.variantDetails[0]?.variantImage?.[0]) || "/placeholder.jpg";
+                        return (
+                          <img 
+                            src={thumbnail} 
+                            alt={product.productName} 
+                            className="w-full h-full object-cover mix-blend-multiply transition-transform duration-[1.5s] group-hover:scale-110" 
+                          />
+                        );
+                      })()}
                     </div>
 
                     {/* 2. TEXT & CTA SECTION */}
@@ -135,36 +136,44 @@ const AllProductsPage = () => {
                       <div className="flex justify-between items-end pt-2 border-t border-[#F5DEB3]/10] mt-auto">
                         <div className="flex flex-col">
                           
-                          {/* --- Available Colors Section --- */}
-                          {product?.color && product.color.length > 0 && (
-                            <div className="mb-3">
-                              <span className="text-[10px] uppercase tracking-widest text-gray-500 mb-1.5 block">
-                                Available Colors
-                              </span>
-                              <div className="flex flex-wrap gap-1.5 items-center">
-                                {/* Sirf pehle 5 colors dikhayenge */}
-                                {product.color.slice(0, 5).map((colorName, idx) => (
-                                  <div
-                                    key={idx}
-                                    title={colorName}
-                                    className="w-4 h-4 rounded-full border border-[#d1d5db] shadow-sm transition-transform hover:scale-110"
-                                    style={
-                                      colorName.toLowerCase() === 'rainbow'
-                                        ? { background: 'linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)' }
-                                        : { backgroundColor: colorName.replace(/\s+/g, '').toLowerCase() }
-                                    }
-                                  ></div>
-                                ))}
-                                
-                                {/* 5 se zyada hone par +X dikhayenge */}
-                                {product.color.length > 5 && (
-                                  <span className="text-[10px] font-medium text-gray-500 ml-1">
-                                    +{product.color.length - 5}
-                                  </span>
-                                )}
+                          {/* --- Available Variants Section --- */}
+                          {(() => {
+                            const availableVariants = (product?.variantDetails && product.variantDetails.length > 0)
+                              ? product.variantDetails.map(v => v.variantName)
+                              : (product?.color || []);
+
+                            if (availableVariants.length === 0) return null;
+
+                            return (
+                              <div className="mb-3">
+                                <span className="text-[10px] uppercase tracking-widest text-gray-500 mb-1.5 block">
+                                  Available Variants
+                                </span>
+                                <div className="flex flex-wrap gap-1.5 items-center">
+                                  {/* Sirf pehle 5 variants dikhayenge */}
+                                  {availableVariants.slice(0, 5).map((variantName, idx) => (
+                                    <div
+                                      key={idx}
+                                      title={variantName}
+                                      className="w-4 h-4 rounded-full border border-[#d1d5db] shadow-sm transition-transform hover:scale-110"
+                                      style={
+                                        variantName.toLowerCase() === 'rainbow'
+                                          ? { background: 'linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)' }
+                                          : { backgroundColor: variantName.replace(/\s+/g, '').toLowerCase() }
+                                      }
+                                    ></div>
+                                  ))}
+                                  
+                                  {/* 5 se zyada hone par +X dikhayenge */}
+                                  {availableVariants.length > 5 && (
+                                    <span className="text-[10px] font-medium text-gray-500 ml-1">
+                                      +{availableVariants.length - 5}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          )}
+                            );
+                          })()}
 
                           <span className="text-[10px] uppercase tracking-widest text-gray-500 mb-1 block">
                             Pricing

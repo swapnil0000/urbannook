@@ -16,6 +16,7 @@ import {
 import { useUI } from "../hooks/useRedux";
 import { logout } from "../store/slices/authSlice";
 import { clearCart } from "../store/slices/cartSlice";
+import { fetchCsrfToken, getCsrfToken } from "../store/api/apiSlice";
 import CouponInput from "../component/CouponInput";
 import { ComponentLoader } from "../component/layout/LoadingSpinner";
 
@@ -81,6 +82,8 @@ const CheckoutPage = () => {
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    // Fetch CSRF token for checkout actions
+    fetchCsrfToken().catch(err => console.warn('[Checkout] CSRF fetch failed:', err));
   }, []);
 
   useEffect(() => {
@@ -293,10 +296,11 @@ const CheckoutPage = () => {
     }
   };
 
-  const handleRemoveItem = async (productId, selectedColor) => {
+  const handleRemoveItem = async (productId, selectedVariant, selectedColor) => {
     try {
+      const effectiveVariant = selectedVariant || selectedColor || 'N/A';
       const item = cartItems.find(
-        (item) => item.id === productId && (item.selectedColor || 'N/A') === (selectedColor || 'N/A')
+        (item) => item.id === productId && (item.selectedVariant || item.selectedColor || 'N/A') === (effectiveVariant)
       );
       const mongoId = item?.mongoId || productId;
       const itemImage = item?.image || "";
@@ -305,7 +309,7 @@ const CheckoutPage = () => {
         productId: mongoId,
         quantity: 1,
         action: "remove",
-        color: selectedColor,
+        variant: effectiveVariant,
         image: itemImage,
       }).unwrap();
 
@@ -486,27 +490,23 @@ const CheckoutPage = () => {
       return;
     }
     
-    const authToken = localStorage.getItem('authToken');
-    if (!authToken) {
-      showNotification("Your session has expired. Please login again.", "error");
-      dispatch(logout());
-      openLoginModal();
-      navigate("/");
-      return;
-    }
-    
     setPaymentError(null);
     const selectedFullAddr = savedAddress.find(a => a.addressId === currentAddressId);
     
     try {
       const razorpayKey = razorpayKeyData?.data;      
       const orderData = {
-        items: cartItems.map((i) => ({
-          productId: i.mongoId || i.id.split(':')[0], // Extract raw productId
-          quantity: i.quantity,
-          color: (i.selectedColor && i.selectedColor !== 'N/A') ? i.selectedColor : 
-                 (cartSelections[i.id]?.color || cartSelections[i.mongoId]?.color || "") 
-        })),
+        items: cartItems.map((i) => {
+          const effectiveVariant = (i.selectedVariant && i.selectedVariant !== 'N/A') ? i.selectedVariant : 
+                                   (i.selectedColor && i.selectedColor !== 'N/A' ? i.selectedColor :
+                                   (cartSelections[i.id]?.variant || cartSelections[i.id]?.color || "N/A"));
+          return {
+            productId: i.mongoId || i.id.split(':')[0],
+            quantity: i.quantity,
+            variant: effectiveVariant,
+            color: effectiveVariant // Send both for double safety
+          };
+        }),
         senderMobile: senderMobileStr,
         userEmail: userProfile?.email,
         receiverMobile: useDifferentDeliveryContact && deliveryMobileStr ? deliveryMobileStr : senderMobileStr,
@@ -595,10 +595,15 @@ const CheckoutPage = () => {
 
       paymentObject.open();
     } catch (error) {
+      console.error("Payment initialization error:", error);
+      
       const errorMessage =
         error.data?.message ||
         error.message ||
         "Failed to initialize payment. Please try again.";
+        console.log( error.data?.message,
+        error.message);
+        
       showNotification(errorMessage, "error");
       setPaymentError(errorMessage);
       setShowRetry(true);
@@ -656,14 +661,14 @@ const CheckoutPage = () => {
               <div className="space-y-3 max-h-[220px] overflow-y-auto pr-2 custom-scrollbar">
                 {cartItems.map((item) => (
                   <div
-                    key={item.id}
+                    key={`${item.id}-${item.selectedVariant || item.selectedColor || 'default'}`}
                     className="relative flex gap-4 items-center bg-white p-3 rounded-xl border border-gray-200 hover:border-[#a89068]/40 transition-colors group"
                   >
                     {/* Remove button - top right corner */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleRemoveItem(item?.id, item?.selectedColor);
+                        handleRemoveItem(item?.id, item?.selectedVariant, item?.selectedColor);
                       }}
                       className="absolute top-2 right-2 w-4 h-4 rounded-full bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 flex items-center justify-center transition-all opacity-100"
                       title="Remove item"
@@ -684,35 +689,39 @@ const CheckoutPage = () => {
                         {item.name}
                       </h3>
 
-                      {/* --- NAYA: COLOR DISPLAY --- */}
+                      {/* --- NAYA: VARIANT DISPLAY --- */}
                       {(() => {
-                        const itemColor =
-                          item.selectedColor !== "N/A"
-                            ? item.selectedColor
-                            : cartSelections[item.id]?.color ||
-                              cartSelections[item.mongoId]?.color;
+                        const itemVariant =
+                          (item.selectedVariant && item.selectedVariant !== "N/A")
+                            ? item.selectedVariant
+                            : (item.selectedColor && item.selectedColor !== "N/A"
+                               ? item.selectedColor
+                               : (cartSelections[item.id]?.variant || 
+                                  cartSelections[item.id]?.color || 
+                                  cartSelections[item.mongoId]?.variant || 
+                                  cartSelections[item.mongoId]?.color));
 
-                        if (!itemColor || itemColor === "N/A") return null;
+                        if (!itemVariant || itemVariant === "N/A") return null;
 
                         return (
                           <div className="flex items-center gap-1.5 mb-1.5 mt-1">
                             <span className="text-[9px] text-gray-400 uppercase tracking-widest">
-                              Color:
+                              Variant:
                             </span>
                             <div
                               className="w-3 h-3 rounded-full border border-gray-300 shadow-sm"
                               style={{
                                 background:
-                                  itemColor.toLowerCase() === "rainbow"
+                                  itemVariant.toLowerCase() === "rainbow"
                                     ? "linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)"
-                                    : itemColor
+                                    : itemVariant
                                         .replace(/\s+/g, "")
                                         .toLowerCase(),
                               }}
-                              title={itemColor}
+                              title={itemVariant}
                             ></div>
                             <span className="text-[10px] font-medium text-[#a89068]">
-                              {itemColor}
+                              {itemVariant}
                             </span>
                           </div>
                         );
