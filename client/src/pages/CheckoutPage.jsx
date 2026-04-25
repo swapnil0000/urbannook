@@ -1122,7 +1122,7 @@ const CheckoutPage = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div className="space-y-1.5">
                       <label className="text-[9px] uppercase tracking-widest text-[#a89068] font-bold ml-1">
                         Flat / Floor No. (Optional)
@@ -1155,7 +1155,7 @@ const CheckoutPage = () => {
                         }
                       />
                     </div>
-                  </div>
+                  </div> */}
 
                   <button
                     onClick={

@@ -101,8 +101,9 @@ const NewHeader = () => {
   useEffect(() => {
     const threshold = 10;
     const handleScroll = () => {
+      if (document.body.classList.contains("address-modal-open")) return;
       const currentScrollY = window.scrollY;
-      
+
       if (Math.abs(currentScrollY - lastScrollY.current) < threshold) {
         return;
       }
@@ -120,6 +121,19 @@ const NewHeader = () => {
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, [isMenuOpen]);
+
+  // Hide header immediately when address modal opens
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      if (document.body.classList.contains("address-modal-open")) {
+        setShowHeader(false);
+      } else {
+        setShowHeader(true);
+      }
+    });
+    observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
 
   const handleLogout = async () => {
     try {
