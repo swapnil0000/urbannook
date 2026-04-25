@@ -14,19 +14,17 @@ const productSchema = mongoose.Schema(
     color: {
       type: [String],
     },
+    // New Generic Variant Structure
+    variantDetails: [
+      {
+        variantName: String,
+        variantImage: [String], // Specific images for this variant
+      }
+    ],
     uiProductId: {
       type: String,
       required: [true, "uiProductId is required"],
       unique: true,
-    },
-    productImg: {
-      type: String,
-      required: [true, "productImg is required"],
-      unique: true,
-    },
-    secondaryImages: {
-      type: [String],
-      default: [],
     },
     productDes: {
       type: String,
@@ -76,7 +74,7 @@ const productSchema = mongoose.Schema(
   },
 );
 // Indexes for performance optimization
-// Note: productId, productName, uiProductId, productImg already have unique indexes from schema
+// Note: productId, productName, uiProductId already have unique indexes from schema
 productSchema.index({ productCategory: 1 });
 productSchema.index({ productStatus: 1 });
 productSchema.index({ productCategory: 1, productStatus: 1 }); // Compound index for filtering

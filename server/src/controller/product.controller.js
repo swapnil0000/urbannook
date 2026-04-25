@@ -65,6 +65,7 @@ const productListing = asyncHandler(async (req, res) => {
   };
 
   const result = await apiCache.handle(req.query, fetcher);
+
   return res
     .status(200)
     .json(
@@ -96,6 +97,7 @@ const specificProductDetails = asyncHandler(async (req, res) => {
   };
 
   const result = await apiCache.handle(req.params, fetcher);
+
   return res.status(200).json(new ApiRes(200, `Product Details`, result, true));
 });
 
@@ -112,7 +114,7 @@ const getProductsByTag = asyncHandler(async (_, res) => {
           productName: 1,
           productId: 1,
           uiProductId: 1,
-          productImg: 1,
+          variantDetails: 1,
           sellingPrice: 1,
           _id: 0,
           tags: 1,
@@ -131,7 +133,6 @@ const getProductsByTag = asyncHandler(async (_, res) => {
   };
 
   const result = await apiCache.handle("products_by_tags", fetcher);
-
   return res.status(200).json(new ApiRes(200, `productDetails`, result, true));
 });
 

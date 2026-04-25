@@ -148,12 +148,46 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     const product = products.find((p) => p.productId === item.productId);
     
     // Find the cart item to get its specific image
-    let itemImage = product.productImg;
-    const cartKey = `${item.productId}:${item.color || "N/A"}`;
-    if (cart.products && cart.products[cartKey] && cart.products[cartKey].image) {
-      itemImage = cart.products[cartKey].image;
-    } else if (cart.products && cart.products[item.productId] && cart.products[item.productId].image) {
-      itemImage = cart.products[item.productId].image;
+    let itemImage = null;
+    const itemVariant = item.variant || item.color || "N/A";
+    const cartKey = `${item.productId}:${itemVariant}`;
+    
+    // 1. Try to get image from Cart Snapshot (Most accurate for what user saw)
+    const getCartProduct = (key) => {
+      if (!cart.products) return null;
+      if (typeof cart.products.get === "function") return cart.products.get(key);
+      return cart.products[key];
+    };
+
+    const cartProductByVariant = getCartProduct(cartKey);
+    const cartProductById = getCartProduct(item.productId);
+
+    if (cartProductByVariant && cartProductByVariant.image) {
+      itemImage = cartProductByVariant.image;
+    } else if (cartProductById && cartProductById.image) {
+      itemImage = cartProductById.image;
+    }
+
+    // 2. Fallback to Product Variant Details (if snapshot fails or is empty)
+    if (!itemImage && product.variantDetails && product.variantDetails.length > 0) {
+      const variant = product.variantDetails.find(v => 
+        v.variantName === itemVariant || 
+        v.variantName === item.variant || 
+        v.variantName === item.color
+      );
+      if (variant && variant.variantImage && variant.variantImage.length > 0) {
+        itemImage = variant.variantImage[0];
+      }
+    }
+
+    // 3. Fallback to top-level product image (Legacy/Compatibility)
+    if (!itemImage) {
+      itemImage = product.productImg;
+    }
+
+    // 4. Final safety check: Ensure itemImage is not empty for validation
+    if (!itemImage) {
+      itemImage = "https://urbannook.in/assets/logo.webp"; // placeholder if everything fails
     }
 
     return {
@@ -166,7 +200,8 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
         productSubCategory: product.productSubCategory,
         priceAtPurchase: product.sellingPrice,
         shipping: String(summary?.shipping ?? ""),
-        selectedColor: item.color || "N/A",
+        selectedColor: itemVariant, // Legacy support
+        selectedVariant: itemVariant,
       },
     };
   });

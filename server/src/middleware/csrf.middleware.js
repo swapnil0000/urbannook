@@ -60,8 +60,14 @@ export const csrfTokenGenerator = (req, res, next) => {
     // Generate new token
     const token = generateCsrfToken();
     
-    // Get user ID from authenticated request
-    const userId = req.user?.userId || req.user?.email || 'anonymous';
+    // CRITICAL: Must match authGuard structure
+    const userId = req.user?.userId;
+    
+    if (!userId) {
+      return res.status(401).json(
+        new ApiError(401, 'Authentication required for CSRF generation', null, false)
+      );
+    }
     
     // Store token
     storeToken(userId, token);
@@ -90,9 +96,11 @@ export const csrfProtection = (req, res, next) => {
     }
     
     // Get user ID
-    const userId = req.user?.userId || req.user?.email;
+    const userId = req.user?.userId;
+    console.log(`[CSRF DEBUG] Validating for User: ${userId}, Path: ${req.path}`);
     
     if (!userId) {
+      console.error('[CSRF DEBUG] No userId in req.user. AuthGuard might have failed silently or role mismatch.');
       return res.status(401).json(
         new ApiError(401, 'Authentication required for CSRF validation', null, false)
       );
@@ -103,6 +111,8 @@ export const csrfProtection = (req, res, next) => {
     const tokenFromBody = req.body?._csrf;
     const token = tokenFromHeader || tokenFromBody;
     
+    console.log(`[CSRF DEBUG] Token from Header: ${tokenFromHeader ? 'Present' : 'Missing'}`);
+    
     if (!token) {
       console.warn(`[CSRF] Token missing for user: ${userId}, method: ${req.method}, path: ${req.path}`);
       return res.status(403).json(
@@ -111,6 +121,14 @@ export const csrfProtection = (req, res, next) => {
     }
     
     // Validate token
+    const stored = csrfTokenStore.get(userId);
+    console.log(`[CSRF DEBUG] Stored Token Found: ${stored ? 'Yes' : 'No'}`);
+    
+    if (stored) {
+      console.log(`[CSRF DEBUG] Stored Token Match: ${stored.token === token}`);
+      console.log(`[CSRF DEBUG] Token Expired: ${Date.now() > stored.expiresAt}`);
+    }
+
     const isValid = validateToken(userId, token);
     
     if (!isValid) {

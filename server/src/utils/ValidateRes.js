@@ -42,11 +42,6 @@ const productUpdateFieldMissing = (presentProductDetailsToUpdate) => {
       : presentProductDetailsToUpdate?.uiProductId?.length > 0
         ? presentProductDetailsToUpdate?.uiProductId
         : "",
-    productImg: !presentProductDetailsToUpdate?.productImg
-      ? null
-      : presentProductDetailsToUpdate?.productImg > 0
-        ? presentProductDetailsToUpdate?.productImg
-        : "",
     productDes: !presentProductDetailsToUpdate?.productDes
       ? null
       : presentProductDetailsToUpdate?.productDes?.length > 0
@@ -102,18 +97,6 @@ const productUpdateFieldMissing = (presentProductDetailsToUpdate) => {
     return {
       statusCode: 404,
       message: `${presentProductDetailsToUpdate?.uiProductId} is missing`,
-      data: [],
-      success: true,
-    };
-  }
-
-  if (
-    presentProductDetailsToUpdate?.productImg &&
-    productFieldsBasicCheck?.productImg == ""
-  ) {
-    return {
-      statusCode: 404,
-      message: `${presentProductDetailsToUpdate?.productImg} is missing`,
       data: [],
       success: true,
     };
