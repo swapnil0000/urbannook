@@ -204,6 +204,22 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       itemImage = "https://urbannook.in/assets/logo.webp"; // placeholder if everything fails
     }
 
+    // Find the variant specific price
+    let priceAtPurchase = 0;
+    if (product.variantDetails && product.variantDetails.length > 0) {
+      const variant = product.variantDetails.find(v => 
+        v.variantName === itemVariant || 
+        v.variantName === item.variant || 
+        v.variantName === item.color
+      );
+      if (variant && variant.variantPrice) {
+        priceAtPurchase = variant.variantPrice;
+      } else {
+        // Default to first variant's price if no match or no price on match
+        priceAtPurchase = product.variantDetails[0].variantPrice || 0;
+      }
+    }
+
     return {
       productId: product.productId,
       productSnapshot: {
@@ -212,9 +228,8 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
         productName: product.productName,
         productCategory: product.productCategory,
         productSubCategory: product.productSubCategory,
-        priceAtPurchase: isPreBook ? 299 : product.sellingPrice, // Record 299 if pre-booked
+        priceAtPurchase: priceAtPurchase,
         shipping: String(summary?.shipping ?? ""),
-        selectedColor: itemVariant, // Legacy support
         selectedVariant: itemVariant,
       },
     };

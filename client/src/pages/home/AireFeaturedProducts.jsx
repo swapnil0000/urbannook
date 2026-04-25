@@ -108,13 +108,8 @@ const AireFeaturedProducts = memo(() => {
                 
                 <div className="flex flex-col">
                     <div className="flex items-baseline gap-2">
-                      <span className="text-white text-lg md:text-xl font-serif">₹{featuredProduct.sellingPrice?.toLocaleString()}</span>
-                      {/* <span className="text-sm text-[#F5DEB3]/50 line-through">₹{(featuredProduct.listedPrice || featuredProduct.sellingPrice * 1.18).toFixed(0)}</span> */}
+                      <span className="text-white text-lg md:text-xl font-serif">₹{(featuredProduct.variantDetails?.[0]?.variantPrice || 0).toLocaleString()}</span>
                     </div>
-                    {/* <span className="text-[10px] text-[#F5DEB3]/80 uppercase tracking-widest font-bold">
-                      {featuredProduct.productStatus === 'in_stock' ? 'In Stock' : 'Limited Stock'}
-                    </span>
-                    <span className="text-[8px] text-[#F5DEB3]/60 uppercase tracking-wider">+ ₹50 shipping</span> */}
                 </div>
              </div>
           </div>

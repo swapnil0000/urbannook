@@ -65,7 +65,6 @@ const productListing = asyncHandler(async (req, res) => {
   };
 
   const result = await apiCache.handle(req.query, fetcher);
-
   return res
     .status(200)
     .json(
@@ -115,7 +114,6 @@ const getProductsByTag = asyncHandler(async (_, res) => {
           productId: 1,
           uiProductId: 1,
           variantDetails: 1,
-          sellingPrice: 1,
           _id: 0,
           tags: 1,
         },

@@ -47,20 +47,15 @@ const productUpdateFieldMissing = (presentProductDetailsToUpdate) => {
       : presentProductDetailsToUpdate?.productDes?.length > 0
         ? presentProductDetailsToUpdate?.productDes
         : "",
-    sellingPrice: !presentProductDetailsToUpdate?.sellingPrice
-      ? null
-      : presentProductDetailsToUpdate?.sellingPrice >= 10
-        ? presentProductDetailsToUpdate?.sellingPrice
-        : 0,
     productCategory: !presentProductDetailsToUpdate?.productCategory
       ? null
       : presentProductDetailsToUpdate?.productCategory?.length > 0
         ? presentProductDetailsToUpdate?.productCategory
         : "",
-    productQuantity: !presentProductDetailsToUpdate?.productName
+    productQuantity: !presentProductDetailsToUpdate?.productQuantity
       ? null
-      : presentProductDetailsToUpdate?.productName > 0
-        ? presentProductDetailsToUpdate?.productName
+      : presentProductDetailsToUpdate?.productQuantity > 0
+        ? presentProductDetailsToUpdate?.productQuantity
         : 0,
     productStatus: !presentProductDetailsToUpdate?.productName
       ? null
@@ -109,18 +104,6 @@ const productUpdateFieldMissing = (presentProductDetailsToUpdate) => {
     return {
       statusCode: 404,
       message: `${presentProductDetailsToUpdate?.productDes} is missing`,
-      data: [],
-      success: true,
-    };
-  }
-
-  if (
-    presentProductDetailsToUpdate?.sellingPrice &&
-    productFieldsBasicCheck?.sellingPrice == 0
-  ) {
-    return {
-      statusCode: 404,
-      message: `${presentProductDetailsToUpdate?.sellingPrice} is missing`,
       data: [],
       success: true,
     };

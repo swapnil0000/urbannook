@@ -160,11 +160,21 @@ const cartSlice = createSlice({
         } else if (item.quantity !== null && typeof item.quantity === 'object') {
           quantity = typeof item.quantity.quantity === 'number' ? item.quantity.quantity : 1;
         }
+        const getPrice = () => {
+          if (typeof item.price === 'number') return item.price;
+          if (item.variantDetails && item.variantDetails.length > 0) {
+            const selectedVariant = item.selectedVariant || item.selectedColor || 'N/A';
+            const variant = item.variantDetails.find(v => v.variantName === selectedVariant);
+            return variant?.variantPrice || item.variantDetails[0].variantPrice || 0;
+          }
+          return 0;
+        };
+
         return {
           id: item.productId || item._id,
           mongoId: item.productId || item._id,
           name: item.productName || item.name,
-          price: typeof item.price === 'number' ? item.price : (item.sellingPrice || item.productPrice || 0),
+          price: getPrice(),
           image: item.productImage || item.image || item.productImg,
           quantity,
           selectedVariant: item.selectedVariant || item.selectedColor || 'N/A'
