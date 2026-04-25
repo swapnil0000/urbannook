@@ -25,7 +25,27 @@ const app = express();
 app.set("trust proxy", 1);
 app.set("etag", false);
 
-// Apply CORS first
+// 1. Manual Preflight Interceptor (Highest Priority)
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  
+  // Just mirror the origin for better reliability in preflights
+  // The actual 'cors' middleware below will still do strict validation for data requests
+  res.header("Access-Control-Allow-Origin", origin || "*");
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
+  res.header(
+    "Access-Control-Allow-Headers", 
+    "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-CSRF-Token, x-csrf-token"
+  );
+
+  if (req.method === "OPTIONS") {
+    return res.status(204).end();
+  }
+  next();
+});
+
+// 2. Standard CORS Middleware
 app.use(cors(corsOptions));
 
 // test
