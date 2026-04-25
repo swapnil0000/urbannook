@@ -75,7 +75,7 @@ const getWishListService = async (userId) => {
   const productDetails = await Product.find({
     productId: { $in: wishList.products },
   }).select(
-    "productId productName variantDetails productCategory sellingPrice productStatus -_id",
+    "productId productName variantDetails productCategory productStatus -_id",
   );
 
   return {

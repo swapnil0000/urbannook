@@ -4,7 +4,7 @@ function getAllowedOrigins() {
 
   const origins = whitelistFromEnv
     .split(",")
-    .map((origin) => origin.trim())
+    .map((origin) => origin.trim().replace(/\/$/, "")) // Remove trailing slash
     .filter((origin) => origin.length > 0);
 
   return origins;
@@ -17,24 +17,29 @@ export const corsOptions = {
   origin: function (origin, callback) {
     const allowedOrigins = getAllowedOrigins();
     const mode = env.NODE_ENV;
+    
     // Allow requests with no origin (mobile apps, Postman, server-to-server)
     if (!origin) {
       return callback(null, true);
     }
 
+    // Clean current origin for comparison
+    const cleanOrigin = origin.replace(/\/$/, "");
+
     // Check if origin is in whitelist
-    if (allowedOrigins.includes(origin)) {
+    if (allowedOrigins.some(o => o === cleanOrigin)) {
       callback(null, true);
     } else {
-      // Log rejected origin for debugging
-      console.warn(`⚠️  CORS: Rejected request from origin: ${origin}`);
-      console.warn(`   Allowed origins: ${allowedOrigins.join(", ")}`);
+      // In non-production, log rejection for debugging
+      if (mode !== "production") {
+        console.warn(`[CORS DEBUG] Origin: ${origin}`);
+        console.warn(`[CORS DEBUG] Allowed: ${allowedOrigins.join(", ")}`);
+      }
 
       if (mode === "development") {
-        console.warn("   (Allowed because NODE_ENV is development)");
         return callback(null, true);
       }
-      console.error(`   ❌ Access Denied in ${mode} mode`);
+      
       callback(
         new Error(`CORS Error: Origin ${origin} not allowed in ${mode} mode`),
       );

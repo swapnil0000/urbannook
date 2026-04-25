@@ -170,7 +170,7 @@ const WishlistPage = () => {
                         <div className="flex flex-col">
                           <span className="text-[10px] uppercase tracking-widest text-gray-500 mb-1">Pricing</span>
                           <span className="text-lg md:text-xl font-semibold text-[#a89068]">
-                            ₹{item.sellingPrice?.toLocaleString()}
+                            ₹{(item.variantDetails?.[0]?.variantPrice || 0).toLocaleString()}
                           </span>
                         </div>
 

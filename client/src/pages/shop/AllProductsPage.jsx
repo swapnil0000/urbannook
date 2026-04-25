@@ -25,9 +25,16 @@ const AllProductsPage = () => {
   const products = productsResponse?.data?.products || productsResponse?.data?.listofPublishedProducts || [];
 
   const displayProducts = useMemo(() => {
-    let sorted = [...products];
-    if (sortBy === 'price-low') sorted.sort((a, b) => a.sellingPrice - b.sellingPrice);
-    if (sortBy === 'price-high') sorted.sort((a, b) => b.sellingPrice - a.sellingPrice);
+    let sorted = products.map(p => {
+      const firstVariantPrice = p.variantDetails?.[0]?.variantPrice || 0;
+      return {
+        ...p,
+        effectivePrice: firstVariantPrice
+      };
+    });
+
+    if (sortBy === 'price-low') sorted.sort((a, b) => a.effectivePrice - b.effectivePrice);
+    if (sortBy === 'price-high') sorted.sort((a, b) => b.effectivePrice - a.effectivePrice);
     return sorted;
   }, [products, sortBy]);
 
@@ -180,10 +187,10 @@ const AllProductsPage = () => {
                           </span>
                           <div className="flex items-baseline gap-2">
                             <span className="text-lg md:text-xl font-semibold text-[#a89068]">
-                              ₹{product.sellingPrice?.toLocaleString()}
+                              ₹{product.effectivePrice?.toLocaleString()}
                             </span>
                             <span className="text-xs text-gray-400 line-through">
-                              ₹{(product.listedPrice || product.sellingPrice * 1.18).toFixed(0)}
+                              ₹{(product.effectivePrice * 1.18).toFixed(0).toLocaleString()}
                             </span>
                           </div>
                            

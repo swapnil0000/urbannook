@@ -105,6 +105,12 @@ const LoginForm = lazy(() => import("../../component/layout/auth/LoginForm"));
 const SignupForm = lazy(() => import("../../component/layout/auth/SignupForm"));
 
 const ProductDetailPage = () => {
+  // Helper to safely extract quantity
+  const itemQty = (q) => {
+    if (typeof q === "object" && q !== null) return q.quantity || 0;
+    return q || 0;
+  };
+
   const { productId } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -153,10 +159,7 @@ const ProductDetailPage = () => {
   const mobileReviewScrollRef = useRef(null);
   const [mobileReviewScrollEnd, setMobileReviewScrollEnd] = useState(false);
   const [expandedReviews, setExpandedReviews] = useState(new Set());
-  const curEntry = lightboxData ? lightboxData.imgList[lightboxData.currentIdx] : null;
-  const curReview = curEntry?.review;
-  const curUrl = curEntry?.url;
-
+  
   const currentUserId = useSelector((state) => state.auth.user?.userId);
   const timeLeft = useTimer(config.offerEndDate);
 
@@ -172,6 +175,20 @@ const ProductDetailPage = () => {
   }, []);
 
   const product = productResponse?.data;
+
+  const currentPrice = useMemo(() => {
+    if (!product) return 0;
+    if (product.variantDetails && product.variantDetails.length > 0) {
+      const selectedDetail = product.variantDetails.find(v => v.variantName === selectedVariant);
+      if (selectedDetail && selectedDetail.variantPrice) {
+        return selectedDetail.variantPrice;
+      }
+      // Default to first variant's price if no specific variant is matched/priced
+      return product.variantDetails[0].variantPrice || 0;
+    }
+    return 0;
+  }, [product, selectedVariant]);
+
   const availableVariants = useMemo(() => {
     if (!product || !product.variantDetails) return [];
     return product.variantDetails.map(v => v.variantName);
@@ -198,7 +215,7 @@ const ProductDetailPage = () => {
   }, [product, selectedVariant]);
 
   useEffect(() => {
-    if (availableVariants.length > 0) {
+    if (availableVariants.length > 0 && product) {
       const savedSelection = cartSelections[product.productId];
       let initialVariant = availableVariants[0];
 
@@ -211,10 +228,10 @@ const ProductDetailPage = () => {
       }
       setSelectedVariant(initialVariant);
       setCurrentImageIndex(0);
-    } else {
-      setSelectedVariant("");
+    } else if (!product) {
+       setSelectedVariant("");
     }
-  }, [product?.productId, availableVariants, cartSelections]);
+  }, [product?.productId, availableVariants, cartSelections, product]);
 
   // NAYA: Variant change hone par image index hamesha reset hoga
   useEffect(() => {
@@ -237,18 +254,13 @@ const ProductDetailPage = () => {
     });
   }, [cartItems, product, selectedVariant, availableVariants]);
 
-  const isInCart = !!cartItem;
-  const currentCartQty = cartItem ? Number(itemQty(cartItem.quantity)) || 0 : 0;
-
-  function itemQty(q) {
-    if (typeof q === "object" && q !== null) return q.quantity || 0;
-    return q || 0;
-  }
-
   const wishlistItems = useSelector((state) => state.wishlist.items);
-  const isInWishlist = wishlistItems.some(
-    (item) => item.productId === product?.productId || item.productName === product?.productName,
-  );
+  const isInWishlist = useMemo(() => {
+    if (!product) return false;
+    return wishlistItems.some(
+        (item) => item.productId === product.productId || item.productName === product.productName,
+    );
+  }, [wishlistItems, product]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -328,7 +340,7 @@ const ProductDetailPage = () => {
           id: product?.productId,
           mongoId: product?.productId,
           name: product?.productName,
-          price: product?.sellingPrice || product?.price,
+          price: currentPrice,
           image: selectedImage,
           quantity: 1,
           selectedVariant: effectiveVariant,
@@ -533,6 +545,12 @@ const ProductDetailPage = () => {
     }
   };
 
+  const curEntry = lightboxData ? lightboxData.imgList[lightboxData.currentIdx] : null;
+  const curReview = curEntry?.review;
+  const curUrl = curEntry?.url;
+  const isInCart = !!cartItem;
+  const currentCartQty = cartItem ? Number(itemQty(cartItem.quantity)) || 0 : 0;
+
   if (isLoading)
     return (
       <div className="h-screen flex items-center justify-center bg-[#1c3026]">
@@ -565,7 +583,7 @@ const ProductDetailPage = () => {
       "@type": "Offer",
       url: `https://www.urbannook.in/product/${product.productId}`,
       priceCurrency: "INR",
-      price: product.sellingPrice,
+      price: currentPrice,
       availability:
         product.productStatus === "in_stock"
           ? "https://schema.org/InStock"
@@ -733,12 +751,10 @@ const ProductDetailPage = () => {
 
               <div className="flex items-baseline gap-4 mb-2">
                 <p className="text-2xl lg:text-3xl font-light text-white">
-                  ₹{product.sellingPrice?.toLocaleString()}
+                  ₹{currentPrice.toLocaleString()}
                 </p>
                 <p className="text-sm text-gray-500 line-through">
-                  ₹
-                  {product.listedPrice?.toLocaleString() ||
-                    (product.sellingPrice * 1.18).toFixed(0)}
+                  ₹{(currentPrice * 1.18).toFixed(0).toLocaleString()}
                 </p>
               </div>
             </div>
@@ -1976,7 +1992,7 @@ const ProductDetailPage = () => {
               >
                 {isAdding ? "Adding..." : "Add to Cart"}
                 <span className="w-1 h-1 bg-[#1c3026] rounded-full"></span>
-                <span>₹{product.sellingPrice?.toLocaleString()}</span>
+                <span>₹{currentPrice.toLocaleString()}</span>
               </button>
             ) : (
               <div className="flex gap-3 w-full">

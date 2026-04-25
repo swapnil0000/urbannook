@@ -19,6 +19,7 @@ const productSchema = mongoose.Schema(
       {
         variantName: String,
         variantImage: [String], // Specific images for this variant
+        variantPrice: Number,
       }
     ],
     uiProductId: {
@@ -29,14 +30,6 @@ const productSchema = mongoose.Schema(
     productDes: {
       type: String,
       required: [true, "productDes is required"],
-    },
-    sellingPrice: {
-      type: Number,
-      required: [true, "sellingPrice is required"],
-    },
-    listedPrice: {
-      type: Number,
-      required: [true, "listedPrice is required"],
     },
     productCategory: {
       type: String,

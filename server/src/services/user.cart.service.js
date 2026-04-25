@@ -138,16 +138,52 @@ const getCartService = async ({ userId }) => {
         productId: "$product.productId",
         cartKey: "$items.k", // Keep full key for updates
         name: "$product.productName",
-        price: "$product.sellingPrice",
+        price: {
+          $let: {
+            vars: {
+              variantMatch: {
+                $filter: {
+                  input: { $ifNull: ["$product.variantDetails", []] },
+                  as: "vd",
+                  cond: { 
+                    $or: [
+                      { $eq: ["$$vd.variantName", { $ifNull: ["$items.v.selectedVariant", ""] }] },
+                      { $eq: ["$$vd.variantName", { $ifNull: ["$items.v.selectedColor", ""] }] }
+                    ]
+                  }
+                }
+              }
+            },
+            in: {
+              $cond: {
+                if: { $gt: [{ $size: "$$variantMatch" }, 0] },
+                then: { $ifNull: [{ $arrayElemAt: ["$$variantMatch.variantPrice", 0] }, 0] },
+                else: { 
+                  $ifNull: [
+                    { $arrayElemAt: ["$product.variantDetails.variantPrice", 0] }, 
+                    0 
+                  ]
+                }
+              }
+            }
+          }
+        },
         image: {
           $cond: {
             if: { $and: [{ $not: { $isNumber: "$items.v" } }, { $ifNull: ["$items.v.image", false] }] },
             then: "$items.v.image",
             else: {
-              $ifNull: [
-                { $arrayElemAt: [{ $arrayElemAt: ["$product.variantDetails.variantImage", 0] }, 0] },
-                "https://urbannook.in/assets/logo.webp"
-              ]
+              $let: {
+                vars: {
+                  firstVariant: { $arrayElemAt: [{ $ifNull: ["$product.variantDetails", []] }, 0] }
+                },
+                in: {
+                  $ifNull: [
+                    { $arrayElemAt: [{ $ifNull: ["$$firstVariant.variantImage", []] }, 0] },
+                    "https://urbannook.in/assets/logo.webp"
+                  ]
+                }
+              }
             }
           }
         },
