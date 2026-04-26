@@ -68,7 +68,12 @@ const addToCartService = async ({ userId, productId, productQuanity, variant, im
     cart = new Cart({ userId, products: {} });
   }
 
-  if (cart.products && cart.products instanceof Map ? cart.products.has(cartKey) : cart.products[cartKey]) {
+  // Check if item already exists with this key
+  const existingItem = (cart.products instanceof Map) 
+    ? cart.products.get(cartKey) 
+    : cart.products[cartKey];
+
+  if (existingItem) {
     return {
       statusCode: 200,
       message: "Already in cart",
@@ -77,20 +82,21 @@ const addToCartService = async ({ userId, productId, productQuanity, variant, im
     };
   }
 
+  // STRICT: only save selectedVariant, never selectedColor
   const newItem = { 
     quantity: productQuanity || 1, 
-    selectedVariant, 
+    selectedVariant: selectedVariant, 
     image: selectedImage 
   };
 
-  if (cart.products && cart.products instanceof Map) {
+  if (cart.products instanceof Map) {
     cart.products.set(cartKey, newItem);
   } else {
     if (!cart.products) cart.products = {};
     cart.products[cartKey] = newItem;
-    cart.markModified('products');
   }
   
+  cart.markModified('products');
   await cart.save();
 
   return {
@@ -115,7 +121,6 @@ const getCartService = async ({ userId }) => {
         extractedProductId: {
           $arrayElemAt: [{ $split: ["$items.k", ":"] }, 0],
         },
-        // NEW: Extract variant directly from the composite key for 100% accuracy
         variantFromKey: {
           $let: {
             vars: {
@@ -156,20 +161,41 @@ const getCartService = async ({ userId }) => {
         selectedVariant: {
           $let: {
             vars: {
-              rawVariant: { $ifNull: ["$items.v.selectedVariant", { $ifNull: ["$items.v.selectedColor", "$variantFromKey"] }] }
+              rawVariant: { 
+                $ifNull: [
+                  "$items.v.selectedVariant", 
+                  { $ifNull: ["$items.v.selectedColor", "$variantFromKey"] }
+                ] 
+              }
             },
-            in: { $cond: [{ $eq: ["$$rawVariant", ""] }, "N/A", "$$rawVariant"] }
+            in: { 
+              $cond: [
+                { $or: [{ $eq: ["$$rawVariant", ""] }, { $not: ["$$rawVariant"] }] }, 
+                "N/A", 
+                "$$rawVariant"
+              ] 
+            }
           }
         },
         price: {
           $let: {
             vars: {
-              currentVariant: { $ifNull: ["$items.v.selectedVariant", { $ifNull: ["$items.v.selectedColor", "$variantFromKey"] }] },
+              currentVariant: { 
+                $ifNull: [
+                  "$items.v.selectedVariant", 
+                  { $ifNull: ["$items.v.selectedColor", "$variantFromKey"] }
+                ] 
+              },
               variantMatch: {
                 $filter: {
                   input: { $ifNull: ["$product.variantDetails", []] },
                   as: "vd",
-                  cond: { $eq: ["$$vd.variantName", { $ifNull: ["$items.v.selectedVariant", { $ifNull: ["$items.v.selectedColor", "$variantFromKey"] }] }] }
+                  cond: { 
+                    $eq: [
+                      "$$vd.variantName", 
+                      { $ifNull: ["$items.v.selectedVariant", { $ifNull: ["$items.v.selectedColor", "$variantFromKey"] }] }
+                    ] 
+                  }
                 }
               }
             },
@@ -304,8 +330,8 @@ const cartQuantityService = async ({ userId, productId, quantity, action, varian
     throw new AuthenticationError("Unauthorized");
   }
 
-  if (!productId || quantity === undefined || !action) {
-    throw new ValidationError("productId, quantity and action are required");
+  if (!productId || !action) {
+    throw new ValidationError("productId and action are required");
   }
 
   const cartDetails = await Cart.findOne({ userId });
@@ -315,31 +341,32 @@ const cartQuantityService = async ({ userId, productId, quantity, action, varian
   }
 
   const productQuanityMap = cartDetails.products;
+  const requestedVariant = variant || "N/A";
   
-  let selectedVariant = variant || "N/A";
-  let cartKey = `${productId}:${selectedVariant}`;
+  // Robust Key Selection: Try exact match first, then legacy
+  let cartKey = `${productId}:${requestedVariant}`;
   
   if (!productQuanityMap.has(cartKey)) {
     if (productQuanityMap.has(String(productId))) {
       cartKey = String(productId);
     } else {
-      throw new ValidationError(`Product variant ${selectedVariant} not in cart`);
+      throw new ValidationError(`Product ${productId} variant ${requestedVariant} not in cart`);
     }
   }
 
   let itemData = productQuanityMap.get(cartKey);
-  let currentQty = typeof itemData === "object" ? itemData.quantity : itemData;
+  let currentQty = (typeof itemData === "object" && itemData !== null) ? itemData.quantity : itemData;
 
   switch (action) {
     case "add":
-      currentQty += quantity;
+      currentQty += (quantity || 1);
       break;
     case "sub":
-      if (currentQty <= quantity) {
+      if (currentQty <= (quantity || 1)) {
         productQuanityMap.delete(cartKey);
         action = "remove";
       } else {
-        currentQty -= quantity;
+        currentQty -= (quantity || 1);
       }
       break;
     case "remove":
@@ -350,12 +377,18 @@ const cartQuantityService = async ({ userId, productId, quantity, action, varian
   }
 
   if (action !== "remove") {
-    // Force selectedVariant and remove selectedColor
+    // FORCE MIGRATE: remove selectedColor, use selectedVariant
     const updatedItemData = { 
         quantity: currentQty,
-        selectedVariant: (typeof itemData === "object" ? (itemData.selectedVariant || itemData.selectedColor) : null) || selectedVariant,
-        image: (typeof itemData === "object" ? itemData.image : null) || image 
+        selectedVariant: requestedVariant, 
+        image: (typeof itemData === "object" && itemData !== null ? itemData.image : null) || image 
     };
+    
+    // If the old key was legacy or different, delete it and use the new correct key
+    if (cartKey !== `${productId}:${requestedVariant}`) {
+        productQuanityMap.delete(cartKey);
+        cartKey = `${productId}:${requestedVariant}`;
+    }
     
     productQuanityMap.set(cartKey, updatedItemData);
   }
@@ -481,9 +514,10 @@ const mergeGuestCartService = async ({ userId, guestItems }) => {
         selectedImage = "https://urbannook.in/assets/logo.webp";
       }
 
-      if (cart.products && cart.products instanceof Map ? cart.products.has(cartKey) : cart.products[cartKey]) {
-        const existingData = cart.products instanceof Map ? cart.products.get(cartKey) : cart.products[cartKey];
-        const existingQty = typeof existingData === "object" ? existingData.quantity : existingData;
+      const existingData = (cart.products instanceof Map) ? cart.products.get(cartKey) : cart.products[cartKey];
+
+      if (existingData) {
+        const existingQty = (typeof existingData === "object" && existingData !== null) ? existingData.quantity : existingData;
         const newQty = existingQty + guestQuantity;
 
         const updatedItem = {
@@ -517,7 +551,6 @@ const mergeGuestCartService = async ({ userId, guestItems }) => {
           cart.products.set(cartKey, newItem);
         } else {
           cart.products[cartKey] = newItem;
-          cart.markModified('products');
         }
 
         syncedItems.push({
@@ -536,6 +569,7 @@ const mergeGuestCartService = async ({ userId, guestItems }) => {
     }
   }
 
+  cart.markModified('products');
   await cart.save();
 
   return {
