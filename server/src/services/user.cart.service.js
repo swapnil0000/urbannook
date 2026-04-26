@@ -9,10 +9,6 @@ import {
   AuthenticationError,
 } from "../utils/errors.js";
 
-/**
- * GENERIC ADD TO CART LOGIC
- * Works for any product structure (Lamp, Pen Stand, etc.)
- */
 const addToCartService = async ({ userId, productId, productQuanity, variant, color, image }) => {
   const validation = cartDetailsMissing(userId, productId);
   if (!validation?.success) throw new ValidationError(validation?.message);
@@ -20,13 +16,13 @@ const addToCartService = async ({ userId, productId, productQuanity, variant, co
   const product = await Product.findOne({ productId }).lean();
   if (!product) throw new NotFoundError("Product not found");
 
-  // 1. DETERMINE VARIANT (Generic Fallback)
+  // 1. DETERMINE VARIANT (Strict Fallback)
   let vName = variant || color;
   if (!vName || vName === "N/A" || vName === "") {
     vName = product.variantDetails?.[0]?.variantName || product.color?.[0] || "Standard Variant";
   }
 
-  // 2. DETERMINE IMAGE (Generic Fallback)
+  // 2. DETERMINE IMAGE
   let vImage = image;
   if (!vImage) {
     const matchedV = product.variantDetails?.find(v => v.variantName === vName);
@@ -37,11 +33,23 @@ const addToCartService = async ({ userId, productId, productQuanity, variant, co
   let cart = await Cart.findOne({ userId });
   if (!cart) cart = new Cart({ userId, products: {} });
 
-  const existing = (cart.products instanceof Map) ? cart.products.get(cartKey) : cart.products[cartKey];
-  if (existing) return { statusCode: 200, message: "Already in cart", success: true };
+  // SELF-HEALING: If an old N/A entry exists for this product, delete it to prevent collision
+  if (vName !== "N/A") {
+      const oldNaKey = `${productId}:N/A`;
+      if (cart.products.has(oldNaKey)) {
+          cart.products.delete(oldNaKey);
+      }
+  }
 
-  // 3. SAVE CLEAN STRUCTURE (No selectedColor)
-  const item = { quantity: Number(productQuanity) || 1, selectedVariant: vName, image: vImage };
+  const existing = (cart.products instanceof Map) ? cart.products.get(cartKey) : cart.products[cartKey];
+  if (existing) return { statusCode: 200, message: `Product variant (${vName}) already in cart`, success: true };
+
+  // 3. SAVE STRICT STRUCTURE (Only selectedVariant)
+  const item = { 
+      quantity: Number(productQuanity) || 1, 
+      selectedVariant: vName, 
+      image: vImage 
+  };
   
   if (cart.products instanceof Map) cart.products.set(cartKey, item);
   else {
@@ -51,13 +59,9 @@ const addToCartService = async ({ userId, productId, productQuanity, variant, co
   
   cart.markModified('products');
   await cart.save();
-  return { statusCode: 200, message: `Added to cart (${vName})`, success: true };
+  return { statusCode: 200, message: `Added ${vName} to collection successfully`, success: true };
 };
 
-/**
- * GENERIC CART PREVIEW LOGIC
- * Extracts price and image from matching variantDetails automatically
- */
 const getCartService = async ({ userId }) => {
   if (!userId) throw new AuthenticationError("Unauthorized");
 
@@ -85,7 +89,7 @@ const getCartService = async ({ userId }) => {
         productId: "$p.productId",
         cartKey: "$items.k",
         name: "$p.productName",
-        // GENERIC VARIANT NAME (Self-Healing)
+        // SELF-HEALING VARIANT NAME
         selectedVariant: {
           $let: {
             vars: {
@@ -95,51 +99,59 @@ const getCartService = async ({ userId }) => {
             in: { $cond: [{ $or: [{ $eq: ["$$rawV", "N/A"] }, { $not: ["$$rawV"] }] }, "$$fallbackV", "$$rawV"] }
           }
         },
-        // GENERIC PRICE MATCHING
+        // BULLETPROOF PRICE LOGIC
         price: {
           $let: {
             vars: {
-              targetV: { $ifNull: ["$items.v.selectedVariant", "$vFromKey"] },
-              vMatch: {
-                $filter: {
-                  input: { $ifNull: ["$p.variantDetails", []] },
-                  as: "vd",
-                  cond: { $eq: ["$$vd.variantName", { $ifNull: ["$items.v.selectedVariant", "$vFromKey"] }] }
-                }
-              }
+              currentV: { $ifNull: ["$items.v.selectedVariant", "$vFromKey"] },
+              vDetails: { $ifNull: ["$p.variantDetails", []] }
             },
             in: {
-              $cond: [
-                { $gt: [{ $size: "$$vMatch" }, 0] },
-                { $arrayElemAt: ["$$vMatch.variantPrice", 0] },
-                { $ifNull: [{ $arrayElemAt: ["$p.variantDetails.variantPrice", 0] }, { $ifNull: ["$p.price", 0] }] }
-              ]
+              $let: {
+                vars: {
+                  matched: {
+                    $filter: {
+                      input: "$$vDetails",
+                      as: "vd",
+                      cond: { $eq: ["$$vd.variantName", "$$currentV"] }
+                    }
+                  }
+                },
+                in: {
+                  $cond: [
+                    { $gt: [{ $size: "$$matched" }, 0] },
+                    { $arrayElemAt: ["$$matched.variantPrice", 0] },
+                    { $ifNull: [{ $arrayElemAt: ["$$vDetails.variantPrice", 0] }, { $ifNull: ["$p.price", 299] }] }
+                  ]
+                }
+              }
             }
           }
         },
-        // GENERIC IMAGE MATCHING
+        // BULLETPROOF IMAGE LOGIC
         image: {
-          $let: {
-            vars: {
-              targetV: { $ifNull: ["$items.v.selectedVariant", "$vFromKey"] },
-              vMatch: {
-                $filter: {
-                  input: { $ifNull: ["$p.variantDetails", []] },
-                  as: "vd",
-                  cond: { $eq: ["$$vd.variantName", { $ifNull: ["$items.v.selectedVariant", "$vFromKey"] }] }
-                }
-              }
-            },
-            in: {
-                $let: {
-                    vars: {
-                        mImg: { $arrayElemAt: [{ $arrayElemAt: ["$$vMatch.variantImage", 0] }, 0] },
-                        pImg: "$p.productImg"
-                    },
-                    in: { $ifNull: ["$items.v.image", { $ifNull: ["$$mImg", { $ifNull: ["$$pImg", "https://urbannook.in/assets/logo.webp"] }] }] }
+            $let: {
+                vars: {
+                    currentV: { $ifNull: ["$items.v.selectedVariant", "$vFromKey"] },
+                    vDetails: { $ifNull: ["$p.variantDetails", []] }
+                },
+                in: {
+                    $let: {
+                        vars: {
+                            matched: { $filter: { input: "$$vDetails", as: "vd", cond: { $eq: ["$$vd.variantName", "$$currentV"] } } }
+                        },
+                        in: {
+                            $let: {
+                                vars: {
+                                    mImg: { $arrayElemAt: [{ $arrayElemAt: ["$$matched.variantImage", 0] }, 0] },
+                                    pImg: "$p.productImg"
+                                },
+                                in: { $ifNull: ["$items.v.image", { $ifNull: ["$$mImg", { $ifNull: ["$$pImg", "https://urbannook.in/assets/logo.webp"] }] }] }
+                            }
+                        }
+                    }
                 }
             }
-          }
         },
         quantity: { $cond: [{ $isNumber: "$items.v" }, "$items.v", { $ifNull: ["$items.v.quantity", 1] }] },
         stock: "$p.productQuantity",
@@ -197,7 +209,6 @@ const cartQuantityService = async ({ userId, productId, quantity, action, varian
   } else if (action === "remove") cart.products.delete(cartKey);
 
   if (action !== "remove") {
-      // Always upgrade to new variant-only structure
       const updated = { quantity: qty, selectedVariant: vName, image: (typeof item === 'object' ? item.image : null) || image };
       if (cartKey !== `${productId}:${vName}`) cart.products.delete(cartKey);
       cart.products.set(`${productId}:${vName}`, updated);
@@ -222,8 +233,11 @@ const mergeGuestCartService = async ({ userId, guestItems }) => {
         const pId = item.mongoId || item.id || item.productId;
         let vName = item.selectedVariant || "Standard Variant";
         const qty = Number(item.quantity) || 1;
-
         const key = `${pId}:${vName}`;
+        
+        // Anti-NA during merge
+        if (vName === "N/A") continue;
+
         const existing = cart.products.get(key);
         const currentQty = (existing ? (typeof existing === 'object' ? existing.quantity : existing) : 0);
         
