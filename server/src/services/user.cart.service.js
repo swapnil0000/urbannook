@@ -135,6 +135,7 @@ const getCartService = async ({ userId }) => {
     {
       $project: {
         _id: 0,
+        mongoId: "$product._id",
         productId: "$product.productId",
         cartKey: "$items.k", // Keep full key for updates
         name: "$product.productName",
@@ -161,7 +162,7 @@ const getCartService = async ({ userId }) => {
                 else: { 
                   $ifNull: [
                     { $arrayElemAt: ["$product.variantDetails.variantPrice", 0] }, 
-                    0 
+                    { $ifNull: ["$product.price", 0] }
                   ]
                 }
               }
