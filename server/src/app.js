@@ -24,6 +24,12 @@ import env from "./config/envConfigSetup.js";
 
 const app = express();
 
+// HARDCODED DEPLOYMENT TRACKER
+app.use((req, res, next) => {
+  res.setHeader("X-Deployment-Status", "V2.1.0-STRICT-ACTIVE");
+  next();
+});
+
 // Set essential app settings
 app.set("trust proxy", 1);
 app.set("etag", false);

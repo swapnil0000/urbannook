@@ -113,9 +113,13 @@ jobs:
       - name: Restart Production Backend
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_EC2_IP }} << 'EOF'
+            echo "--- STARTING DEPLOY RESTART ---"
             cd /home/ubuntu/urbannook-prod/server
             npm install --omit=dev --legacy-peer-deps
-            # Restart existing process or start fresh if not running
-            pm2 restart urbannook-server --env production || pm2 start index.js --name urbannook-server --env production
+            # Force clean start to ensure latest code in memory
+            pm2 stop urbannook-server || true
+            pm2 delete urbannook-server || true
+            pm2 start ecosystem.config.cjs --env production
             pm2 save
+            echo "--- DEPLOY RESTART FINISHED ---"
           EOF
