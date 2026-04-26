@@ -247,10 +247,10 @@ const ProductDetailPage = () => {
         String(item.productId) === String(product?.productId);
 
       if (!isIdMatch) return false;
-      if (availableVariants.length === 0) return true;
-
+      
+      const effectiveVariant = selectedVariant || (availableVariants[0] || "N/A");
       const itemVariant = item.selectedVariant || "N/A";
-      return (itemVariant) === (selectedVariant || "N/A");
+      return itemVariant === effectiveVariant;
     });
   }, [cartItems, product, selectedVariant, availableVariants]);
 
@@ -306,6 +306,7 @@ const ProductDetailPage = () => {
           image: selectedImage,
         }).unwrap();
 
+        // Update local selection for persistence
         dispatch(
           updateSelection({
             productId: product.productId,
@@ -314,6 +315,9 @@ const ProductDetailPage = () => {
           }),
         );
 
+        // Force an immediate refetch and wait for it
+        await refetchCart().unwrap();
+
         confetti({
           particleCount: 150,
           spread: 80,
@@ -321,7 +325,6 @@ const ProductDetailPage = () => {
           colors: ["#F5DEB3", "#1c3026", "#a89068", "#ffffff"],
         });
 
-        await refetchCart();
         setSelectedVariant(effectiveVariant);
 
         setFeedbackMessage(

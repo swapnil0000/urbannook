@@ -115,6 +115,21 @@ const getCartService = async ({ userId }) => {
         extractedProductId: {
           $arrayElemAt: [{ $split: ["$items.k", ":"] }, 0],
         },
+        // NEW: Extract variant directly from the composite key for 100% accuracy
+        variantFromKey: {
+          $let: {
+            vars: {
+              parts: { $split: ["$items.k", ":"] }
+            },
+            in: {
+              $cond: {
+                if: { $gt: [{ $size: "$$parts" }, 1] },
+                then: { $arrayElemAt: ["$$parts", 1] },
+                else: "N/A"
+              }
+            }
+          }
+        }
       },
     },
     {
@@ -138,16 +153,23 @@ const getCartService = async ({ userId }) => {
         productId: "$product.productId",
         cartKey: "$items.k",
         name: "$product.productName",
+        selectedVariant: {
+          $let: {
+            vars: {
+              rawVariant: { $ifNull: ["$items.v.selectedVariant", { $ifNull: ["$items.v.selectedColor", "$variantFromKey"] }] }
+            },
+            in: { $cond: [{ $eq: ["$$rawVariant", ""] }, "N/A", "$$rawVariant"] }
+          }
+        },
         price: {
           $let: {
             vars: {
+              currentVariant: { $ifNull: ["$items.v.selectedVariant", { $ifNull: ["$items.v.selectedColor", "$variantFromKey"] }] },
               variantMatch: {
                 $filter: {
                   input: { $ifNull: ["$product.variantDetails", []] },
                   as: "vd",
-                  cond: { 
-                    $eq: ["$$vd.variantName", { $ifNull: ["$items.v.selectedVariant", { $ifNull: ["$items.v.selectedColor", ""] }] }]
-                  }
+                  cond: { $eq: ["$$vd.variantName", { $ifNull: ["$items.v.selectedVariant", { $ifNull: ["$items.v.selectedColor", "$variantFromKey"] }] }] }
                 }
               }
             },
@@ -197,18 +219,6 @@ const getCartService = async ({ userId }) => {
             }
           }
         },
-        selectedVariant: {
-          $cond: {
-            if: { $isNumber: "$items.v" },
-            then: "N/A",
-            else: { 
-              $ifNull: [
-                "$items.v.selectedVariant", 
-                { $ifNull: ["$items.v.selectedColor", "N/A"] }
-              ] 
-            },
-          },
-        },
         stock: "$product.productQuantity",
         productStatus: "$product.productStatus",
         productFound: 1,
@@ -233,12 +243,7 @@ const getCartService = async ({ userId }) => {
         cartSubtotal: {
           $sum: {
             $cond: [
-              {
-                $and: [
-                  "$isEligibleForCalc",
-                  { $gt: ["$quantity", 0] },
-                ],
-              },
+              { $eq: ["$isEligibleForCalc", true] },
               { $multiply: [{ $ifNull: ["$price", 0] }, { $ifNull: ["$quantity", 0] }] },
               0,
             ],
