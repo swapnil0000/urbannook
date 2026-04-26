@@ -62,12 +62,11 @@ export const useCartSync = () => {
         const doMerge = async () => {
           isMergingRef.current = true;
           try {
-            await mergeGuestCartAPI({ guestItems }).unwrap();
-            clearGuestCart();
+            const result = await mergeGuestCartAPI({ guestItems }).unwrap();
           } catch (e) {
-            console.error('[useCartSync] Merge failed, guest cart preserved for retry:', e);
           } finally {
             isMergingRef.current = false;
+            clearGuestCart();
             const fresh = await refetch();
             const freshItems = fresh?.data?.data?.availableItems || [];
             dispatch(freshItems.length > 0 ? setCartItems(fresh.data.data) : clearCart());

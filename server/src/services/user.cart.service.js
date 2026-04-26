@@ -135,6 +135,7 @@ const getCartService = async ({ userId }) => {
     {
       $project: {
         _id: 0,
+        mongoId: "$product._id",
         productId: "$product.productId",
         cartKey: "$items.k", // Keep full key for updates
         name: "$product.productName",
@@ -210,6 +211,13 @@ const getCartService = async ({ userId }) => {
                 { $ifNull: ["$items.v.selectedColor", "N/A"] }
               ] 
             },
+          },
+        },
+        selectedColor: {
+          $cond: {
+            if: { $isNumber: "$items.v" },
+            then: "N/A",
+            else: { $ifNull: ["$items.v.selectedColor", "N/A"] },
           },
         },
         stock: "$product.productQuantity",
@@ -349,13 +357,17 @@ const cartQuantityService = async ({ userId, productId, quantity, action, color,
   }
 
   if (action !== "remove") {
-    const storedVariant = typeof itemData === "object"
-      ? (itemData.selectedVariant || itemData.selectedColor || selectedVariant)
-      : selectedVariant;
-    const storedImage = typeof itemData === "object"
-      ? (image || itemData.image)
-      : image;
-    productQuanityMap.set(cartKey, { quantity: currentQty, selectedVariant: storedVariant, image: storedImage });
+    if (typeof itemData === "object") {
+      const updatedItemData = { 
+        ...itemData, 
+        quantity: currentQty,
+        selectedVariant: itemData.selectedVariant || itemData.selectedColor || selectedVariant,
+        image: image || itemData.image 
+      };
+      productQuanityMap.set(cartKey, updatedItemData);
+    } else {
+      productQuanityMap.set(cartKey, { quantity: currentQty, selectedVariant, image });
+    }
   }
 
   await cartDetails.save();
