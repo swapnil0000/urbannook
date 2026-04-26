@@ -22,33 +22,15 @@ import { sanitizeRequestBody } from "./middleware/sanitization.middleware.js";
 import env from "./config/envConfigSetup.js";
 
 const app = express();
+
+// Set essential app settings
 app.set("trust proxy", 1);
 app.set("etag", false);
 
-// 1. Manual Preflight Interceptor (Highest Priority)
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  
-  // Just mirror the origin for better reliability in preflights
-  // The actual 'cors' middleware below will still do strict validation for data requests
-  res.header("Access-Control-Allow-Origin", origin || "*");
-  res.header("Access-Control-Allow-Credentials", "true");
-  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
-  res.header(
-    "Access-Control-Allow-Headers", 
-    "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-CSRF-Token, x-csrf-token"
-  );
-
-  if (req.method === "OPTIONS") {
-    return res.status(204).end();
-  }
-  next();
-});
-
-// 2. Standard CORS Middleware
+// 1. HANDEL CORS (Must be the very first middleware)
 app.use(cors(corsOptions));
 
-// test
+// Log config on startup
 logCorsConfig();
 
 /* ===============================================================
@@ -94,6 +76,8 @@ app.use(
           "https://api.razorpay.com",
           "https://accounts.google.com",
           "https://apis.google.com",
+          "https://api-staging.urbannook.online",
+          "https://api.urbannook.in",
           env.NODE_ENV === "development" ? "http://localhost:*" : "",
           env.NODE_ENV === "development" ? "ws://localhost:*" : "", // For Vite HMR
         ].filter(Boolean),
@@ -157,8 +141,10 @@ app.use(
     // Resource Policy - Allow cross-origin requests
     crossOriginResourcePolicy: { policy: "cross-origin" },
     
-    // Opener Policy - Allow cross-origin popups
-    crossOriginOpenerPolicy: { policy: "unsafe-none" },
+    // Opener Policy - Allow Google OAuth popup
+    crossOriginOpenerPolicy: { 
+        policy: env.NODE_ENV === "development" ? "unsafe-none" : "same-origin-allow-popups" 
+    },
 
     // Permissions Policy - Control browser features
     permittedCrossDomainPolicies: {
