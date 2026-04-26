@@ -10,7 +10,6 @@ const OptimizedImage = lazy(() => import('../OptimizedImage'));
 const CartDrawer = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  // fix to check the changes
   const [mounted, setMounted] = useState(false);
   
   // Get cart items from Redux store
