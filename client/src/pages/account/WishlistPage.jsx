@@ -43,10 +43,15 @@ const WishlistPage = () => {
 
     setAddingItems(prev => new Set(prev).add(item.productId));
 
+    const firstVariant = item.variantDetails?.[0]?.variantName || (item.color?.[0]) || "Standard Variant";
+    const selectedImage = item.variantDetails?.[0]?.variantImage?.[0] || "https://urbannook.in/assets/logo.webp";
+
     try {
       await addToCart({
         productId: item.productId || item._id,
-        quantity: 1
+        quantity: 1,
+        variant: firstVariant,
+        image: selectedImage
       }).unwrap();
 
       setAddingItems(prev => {

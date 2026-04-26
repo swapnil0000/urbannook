@@ -2,7 +2,7 @@
 // Implements versioned caching with cache-first for static assets
 // and strictly NO caching for API calls to prevent cart/price sync issues
 
-const CACHE_VERSION = 'v3'; // Incremented version to force update
+const CACHE_VERSION = 'v4'; // Incremented to force update
 const STATIC_CACHE = `urbannook-static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `urbannook-dynamic-${CACHE_VERSION}`;
 

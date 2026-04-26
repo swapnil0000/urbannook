@@ -281,10 +281,12 @@ const ProductDetailPage = () => {
 
     const effectiveVariant =
       selectedVariant ||
-      (availableVariants && availableVariants.length > 0 ? availableVariants[0] : "N/A");
+      (availableVariants && availableVariants.length > 0 
+        ? availableVariants[0] 
+        : (product.color && product.color.length > 0 ? product.color[0] : "Standard Variant"));
     
     // Get image for the selected variant
-    let selectedImage = "https://urbannook.in/assets/logo.webp";
+    let selectedImage = product.productImg || "https://urbannook.in/assets/logo.webp";
     if (product.variantDetails && product.variantDetails.length > 0) {
       const variant = product.variantDetails.find(v => v.variantName === effectiveVariant);
       if (variant && variant.variantImage && variant.variantImage.length > 0) {
