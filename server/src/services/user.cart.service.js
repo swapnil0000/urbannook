@@ -29,26 +29,46 @@ const addToCartService = async ({ userId, productId, productQuanity, color, imag
 
   const productDetails = await Product.findOne(
     { productId },
-    { productName: 1, color: 1, productImg: 1 },
+    { productName: 1, color: 1, variantDetails: 1 },
   ).lean();
 
   if (!productDetails) {
     throw new NotFoundError(`productDetails not found with ${productId}`);
   }
 
-  // Determine the effective color
-  let selectedColor = color;
-  if (!selectedColor || selectedColor === "N/A") {
-    selectedColor =
-      productDetails.color && productDetails.color.length > 0
-        ? productDetails.color[0]
+  // Determine the effective variant
+  let selectedVariant = color; // Incoming 'color' might actually be the variant
+  if (!selectedVariant || selectedVariant === "N/A") {
+    const availableVariants = (productDetails.variantDetails && productDetails.variantDetails.length > 0)
+      ? productDetails.variantDetails.map(v => v.variantName)
+      : productDetails.color;
+
+    selectedVariant =
+      availableVariants && availableVariants.length > 0
+        ? availableVariants[0]
         : "N/A";
   }
 
-  const selectedImage = image || productDetails.productImg;
+  // 1. Try image from request
+  // 2. Try image from variantDetails
+  // 3. Placeholder
+  let selectedImage = image;
+  
+  if (!selectedImage && productDetails.variantDetails) {
+    const variant = productDetails.variantDetails.find(v => v.variantName === selectedVariant);
+    if (variant && variant.variantImage && variant.variantImage.length > 0) {
+      selectedImage = variant.variantImage[0];
+    } else if (productDetails.variantDetails[0]?.variantImage?.[0]) {
+       selectedImage = productDetails.variantDetails[0].variantImage[0];
+    }
+  }
 
-  // Composite Key for Map: productId:color
-  const cartKey = `${productId}:${selectedColor}`;
+  if (!selectedImage) {
+    selectedImage = "https://urbannook.in/assets/logo.webp";
+  }
+
+  // Composite Key for Map: productId:variant
+  const cartKey = `${productId}:${selectedVariant}`;
   const key = `products.${cartKey}`;
 
   const cart = await Cart.findOne({ userId }).lean();
@@ -57,7 +77,7 @@ const addToCartService = async ({ userId, productId, productQuanity, color, imag
     return {
       statusCode: 200,
       message: "Already in cart",
-      data: `User - ${userDetails.name}, Product - ${productDetails.productName} (${selectedColor})`,
+      data: `User - ${userDetails.name}, Product - ${productDetails.productName} (${selectedVariant})`,
       success: true,
     };
   }
@@ -67,7 +87,7 @@ const addToCartService = async ({ userId, productId, productQuanity, color, imag
     {
       $setOnInsert: { userId },
       $set: {
-        [key]: { quantity: productQuanity || 1, selectedColor, image: selectedImage },
+        [key]: { quantity: productQuanity || 1, selectedVariant, image: selectedImage },
       },
     },
     { upsert: true },
@@ -76,7 +96,7 @@ const addToCartService = async ({ userId, productId, productQuanity, color, imag
   return {
     statusCode: 200,
     message: `Added to cart`,
-    data: `User - ${userDetails?.name}, Product: ${productDetails.productName} (${selectedColor})`,
+    data: `User - ${userDetails?.name}, Product: ${productDetails.productName} (${selectedVariant})`,
     success: true,
   };
 };
@@ -118,12 +138,53 @@ const getCartService = async ({ userId }) => {
         productId: "$product.productId",
         cartKey: "$items.k", // Keep full key for updates
         name: "$product.productName",
-        price: "$product.sellingPrice",
+        price: {
+          $let: {
+            vars: {
+              variantMatch: {
+                $filter: {
+                  input: { $ifNull: ["$product.variantDetails", []] },
+                  as: "vd",
+                  cond: { 
+                    $or: [
+                      { $eq: ["$$vd.variantName", { $ifNull: ["$items.v.selectedVariant", ""] }] },
+                      { $eq: ["$$vd.variantName", { $ifNull: ["$items.v.selectedColor", ""] }] }
+                    ]
+                  }
+                }
+              }
+            },
+            in: {
+              $cond: {
+                if: { $gt: [{ $size: "$$variantMatch" }, 0] },
+                then: { $ifNull: [{ $arrayElemAt: ["$$variantMatch.variantPrice", 0] }, 0] },
+                else: { 
+                  $ifNull: [
+                    { $arrayElemAt: ["$product.variantDetails.variantPrice", 0] }, 
+                    0 
+                  ]
+                }
+              }
+            }
+          }
+        },
         image: {
           $cond: {
             if: { $and: [{ $not: { $isNumber: "$items.v" } }, { $ifNull: ["$items.v.image", false] }] },
             then: "$items.v.image",
-            else: "$product.productImg"
+            else: {
+              $let: {
+                vars: {
+                  firstVariant: { $arrayElemAt: [{ $ifNull: ["$product.variantDetails", []] }, 0] }
+                },
+                in: {
+                  $ifNull: [
+                    { $arrayElemAt: [{ $ifNull: ["$$firstVariant.variantImage", []] }, 0] },
+                    "https://urbannook.in/assets/logo.webp"
+                  ]
+                }
+              }
+            }
           }
         },
         quantity: {
@@ -138,6 +199,18 @@ const getCartService = async ({ userId }) => {
               }
             }
           }
+        },
+        selectedVariant: {
+          $cond: {
+            if: { $isNumber: "$items.v" },
+            then: "N/A",
+            else: { 
+              $ifNull: [
+                "$items.v.selectedVariant", 
+                { $ifNull: ["$items.v.selectedColor", "N/A"] }
+              ] 
+            },
+          },
         },
         selectedColor: {
           $cond: {
@@ -250,11 +323,11 @@ const cartQuantityService = async ({ userId, productId, quantity, action, color,
   const productQuanityMap = cartDetails.products;
   
   // Try to find by composite key first, fallback to plain productId
-  let selectedColor = color || "N/A";
-  let cartKey = `${productId}:${selectedColor}`;
+  let selectedVariant = color || "N/A";
+  let cartKey = `${productId}:${selectedVariant}`;
   
   if (!productQuanityMap.has(cartKey)) {
-    // Fallback check if it was stored without color (legacy)
+    // Fallback check if it was stored without variant (legacy)
     if (productQuanityMap.has(String(productId))) {
       cartKey = String(productId);
     } else {
@@ -287,11 +360,12 @@ const cartQuantityService = async ({ userId, productId, quantity, action, color,
       const updatedItemData = { 
         ...itemData, 
         quantity: currentQty,
+        selectedVariant: itemData.selectedVariant || itemData.selectedColor || selectedVariant,
         image: image || itemData.image 
       };
       productQuanityMap.set(cartKey, updatedItemData);
     } else {
-      productQuanityMap.set(cartKey, { quantity: currentQty, selectedColor, image });
+      productQuanityMap.set(cartKey, { quantity: currentQty, selectedVariant, image });
     }
   }
 
@@ -367,13 +441,13 @@ const mergeGuestCartService = async ({ userId, guestItems }) => {
   for (const guestItem of guestItems) {
     try {
       const productId = guestItem.mongoId || guestItem.id;
-      const selectedColor = guestItem.selectedColor || 'N/A';
+      const selectedVariant = guestItem.selectedVariant || guestItem.selectedColor || 'N/A';
       const guestQuantity = guestItem.quantity || 1;
 
       // Validate product exists
       const productDetails = await Product.findOne(
         { productId },
-        { productName: 1, color: 1 },
+        { productName: 1, color: 1, variantDetails: 1 },
       ).lean();
 
       if (!productDetails) {
@@ -384,17 +458,35 @@ const mergeGuestCartService = async ({ userId, guestItems }) => {
         continue;
       }
 
-      // Determine effective color
-      let effectiveColor = selectedColor;
-      if (!effectiveColor || effectiveColor === "N/A") {
-        effectiveColor =
-          productDetails.color && productDetails.color.length > 0
-            ? productDetails.color[0]
+      // Determine effective variant
+      let effectiveVariant = selectedVariant;
+      if (!effectiveVariant || effectiveVariant === "N/A") {
+        const availableVariants = (productDetails.variantDetails && productDetails.variantDetails.length > 0)
+          ? productDetails.variantDetails.map(v => v.variantName)
+          : productDetails.color;
+
+        effectiveVariant =
+          availableVariants && availableVariants.length > 0
+            ? availableVariants[0]
             : "N/A";
       }
 
-      const cartKey = `${productId}:${effectiveColor}`;
-      const selectedImage = guestItem.image || productDetails.productImg;
+      const cartKey = `${productId}:${effectiveVariant}`;
+      
+      // Select image for guest item
+      let selectedImage = guestItem.image;
+      if (!selectedImage && productDetails.variantDetails) {
+        const variant = productDetails.variantDetails.find(v => v.variantName === effectiveVariant);
+        if (variant && variant.variantImage && variant.variantImage.length > 0) {
+          selectedImage = variant.variantImage[0];
+        } else if (productDetails.variantDetails[0]?.variantImage?.[0]) {
+          selectedImage = productDetails.variantDetails[0].variantImage[0];
+        }
+      }
+
+      if (!selectedImage) {
+        selectedImage = "https://urbannook.in/assets/logo.webp";
+      }
 
       // Check if item already exists in cart
       if (cart.products.has(cartKey)) {
@@ -405,13 +497,13 @@ const mergeGuestCartService = async ({ userId, guestItems }) => {
 
         cart.products.set(cartKey, {
           quantity: newQty,
-          selectedColor: effectiveColor,
+          selectedVariant: effectiveVariant,
           image: selectedImage
         });
 
         syncedItems.push({
           productId,
-          color: effectiveColor,
+          variant: effectiveVariant,
           action: 'merged',
           previousQty: existingQty,
           addedQty: guestQuantity,
@@ -421,13 +513,13 @@ const mergeGuestCartService = async ({ userId, guestItems }) => {
         // Item doesn't exist - add it
         cart.products.set(cartKey, {
           quantity: guestQuantity,
-          selectedColor: effectiveColor,
+          selectedVariant: effectiveVariant,
           image: selectedImage
         });
 
         syncedItems.push({
           productId,
-          color: effectiveColor,
+          variant: effectiveVariant,
           action: 'added',
           quantity: guestQuantity
         });

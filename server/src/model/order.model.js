@@ -24,6 +24,7 @@ const orderSchema = new mongoose.Schema(
           priceAtPurchase: { type: Number, required: true },
           shipping: String,
           selectedColor: { type: String, default: "N/A" },
+          selectedVariant: { type: String, default: "N/A" },
         },
       },
     ],
@@ -32,7 +33,6 @@ const orderSchema = new mongoose.Schema(
       s3FileKey: { type: String, default: null },
     },
     amount: { type: Number, required: true },
-    isPreBook: { type: Boolean, default: false },
     coupon: {
       couponCodeId: { type: String, default: null },
       couponCodeName: { type: String, default: null },

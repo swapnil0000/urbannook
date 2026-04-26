@@ -12,11 +12,18 @@ let csrfToken = null;
  */
 export const fetchCsrfToken = async () => {
   try {
+    const token = localStorage.getItem('authToken');
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const response = await fetch(`${getApiUrl()}/csrf-token`, {
       credentials: 'include', // Send cookies
-      headers: {
-        'Content-Type': 'application/json',
-      }
+      headers
     });
     
     if (response.ok) {
@@ -56,9 +63,10 @@ const baseQuery = fetchBaseQuery({
       headers.set('authorization', `Bearer ${token}`);
     }
     
-    // Add CSRF token to headers for state-changing requests
-    if (csrfToken) {
-      headers.set('X-CSRF-Token', csrfToken);
+    // Use the latest CSRF token from memory
+    const currentCsrfToken = getCsrfToken();
+    if (currentCsrfToken) {
+      headers.set('X-CSRF-Token', currentCsrfToken);
     }
     
     return headers;
@@ -91,7 +99,7 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
     if (status === 401 && !isAuthEndpoint) {
       // Try to refresh the token
       const refreshResult = await baseQuery(
-        { url: '/refresh-token', method: 'POST' },
+        { url: 'refresh-token', method: 'POST' },
         api,
         extraOptions
       );

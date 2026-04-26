@@ -65,7 +65,6 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     receiverMobile,
     addressId,
     deliveryAddress: clientAddress,
-    isPreBook = false,
   } = req.body;
   const { userId } = req.user;
   if (!items || !Array.isArray(items) || items.length === 0) {
@@ -119,32 +118,27 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   let isApplied = false;
   let summary = {};
 
-  if (isPreBook) {
-    finalAmount = 299;
-    summary = { shipping: 149 };
-  } else {
-    // Fetch cart to get the calculated grand total from applyCoupon API
-    const cart = await Cart.findOne({ userId }).lean();
+  // Fetch cart to get the calculated grand total from applyCoupon API
+  const cart = await Cart.findOne({ userId }).lean();
 
-    if (!cart) {
-      throw new ValidationError("Cart not found. Please add items to your cart.");
-    }
-
-    // Check if pricing has been calculated (appliedCoupon.summary must exist with a valid grandTotal)
-    const grandTotal = cart?.appliedCoupon?.summary?.grandTotal;  
-    if (grandTotal == null || grandTotal <= 0) {
-      throw new ValidationError(
-        "Cart pricing not calculated. Please refresh the page.",
-      );
-    }
-
-    finalAmount = grandTotal;
-    couponCodeId = cart.appliedCoupon?.couponCodeId || null;
-    couponCodeName = cart.appliedCoupon?.name || null;
-    discountAmount = cart.appliedCoupon?.discountValue || 0;
-    isApplied = cart.appliedCoupon?.isApplied || false;
-    summary = cart.appliedCoupon?.summary || {};
+  if (!cart) {
+    throw new ValidationError("Cart not found. Please add items to your cart.");
   }
+
+  // Check if pricing has been calculated (appliedCoupon.summary must exist with a valid grandTotal)
+  const grandTotal = cart?.appliedCoupon?.summary?.grandTotal;  
+  if (grandTotal == null || grandTotal <= 0) {
+    throw new ValidationError(
+      "Cart pricing not calculated. Please refresh the page.",
+    );
+  }
+
+  finalAmount = grandTotal;
+  couponCodeId = cart.appliedCoupon?.couponCodeId || null;
+  couponCodeName = cart.appliedCoupon?.name || null;
+  discountAmount = cart.appliedCoupon?.discountValue || 0;
+  isApplied = cart.appliedCoupon?.isApplied || false;
+  summary = cart.appliedCoupon?.summary || {};
 
   const productIds = items.map((i) => i.productId);
   const uniqueProductIds = [...new Set(productIds)]; // Get unique IDs
@@ -162,12 +156,62 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     const product = products.find((p) => p.productId === item.productId);
     
     // Find the cart item to get its specific image
-    let itemImage = product.productImg;
-    const cartKey = `${item.productId}:${item.color || "N/A"}`;
-    if (cart.products && cart.products[cartKey] && cart.products[cartKey].image) {
-      itemImage = cart.products[cartKey].image;
-    } else if (cart.products && cart.products[item.productId] && cart.products[item.productId].image) {
-      itemImage = cart.products[item.productId].image;
+    let itemImage = null;
+    const itemVariant = item.variant || item.color || "N/A";
+    const cartKey = `${item.productId}:${itemVariant}`;
+    
+    // 1. Try to get image from Cart Snapshot (Most accurate for what user saw)
+    const getCartProduct = (key) => {
+      if (!cart.products) return null;
+      if (typeof cart.products.get === "function") return cart.products.get(key);
+      return cart.products[key];
+    };
+
+    const cartProductByVariant = getCartProduct(cartKey);
+    const cartProductById = getCartProduct(item.productId);
+
+    if (cartProductByVariant && cartProductByVariant.image) {
+      itemImage = cartProductByVariant.image;
+    } else if (cartProductById && cartProductById.image) {
+      itemImage = cartProductById.image;
+    }
+
+    // 2. Fallback to Product Variant Details (if snapshot fails or is empty)
+    if (!itemImage && product.variantDetails && product.variantDetails.length > 0) {
+      const variant = product.variantDetails.find(v => 
+        v.variantName === itemVariant || 
+        v.variantName === item.variant || 
+        v.variantName === item.color
+      );
+      if (variant && variant.variantImage && variant.variantImage.length > 0) {
+        itemImage = variant.variantImage[0];
+      }
+    }
+
+    // 3. Fallback to top-level product image (Legacy/Compatibility)
+    if (!itemImage) {
+      itemImage = product.productImg;
+    }
+
+    // 4. Final safety check: Ensure itemImage is not empty for validation
+    if (!itemImage) {
+      itemImage = "https://urbannook.in/assets/logo.webp"; // placeholder if everything fails
+    }
+
+    // Find the variant specific price
+    let priceAtPurchase = 0;
+    if (product.variantDetails && product.variantDetails.length > 0) {
+      const variant = product.variantDetails.find(v => 
+        v.variantName === itemVariant || 
+        v.variantName === item.variant || 
+        v.variantName === item.color
+      );
+      if (variant && variant.variantPrice) {
+        priceAtPurchase = variant.variantPrice;
+      } else {
+        // Default to first variant's price if no match or no price on match
+        priceAtPurchase = product.variantDetails[0].variantPrice || 0;
+      }
     }
 
     return {
@@ -178,9 +222,9 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
         productName: product.productName,
         productCategory: product.productCategory,
         productSubCategory: product.productSubCategory,
-        priceAtPurchase: isPreBook ? 299 : product.sellingPrice, // Record 299 if pre-booked
+        priceAtPurchase: priceAtPurchase,
         shipping: String(summary?.shipping ?? ""),
-        selectedColor: item.color || "N/A",
+        selectedVariant: itemVariant,
       },
     };
   });
@@ -237,7 +281,6 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     userMobile: deliveryAddressSnapshot.mobileNumber,
     items: orderItems,
     amount: finalAmount,
-    isPreBook,
     senderMobile: finalSenderMobile,
     receiverMobile: finalReceiverMobile,
     deliveryAddress: deliveryAddressSnapshot,
@@ -249,7 +292,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       discountAmount,
       isApplied,
     },
-    note: isPreBook ? "Pre-book amount paid" : "Amount is the final amount paid by the user",
+    note: "Amount is the final amount paid by the user",
   });
 
   return res.status(200).json(

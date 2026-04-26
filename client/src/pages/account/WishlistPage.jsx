@@ -147,7 +147,7 @@ const WishlistPage = () => {
                       )}
                       <Suspense fallback={<div className="w-full h-full bg-gray-200 animate-pulse"></div>}>
                         <img
-                          src={item.productImg || '/placeholder.jpg'}
+                          src={item.variantDetails?.[0]?.variantImage?.[0] || '/placeholder.jpg'}
                           alt={item.productName}
                           className="w-full h-full object-cover mix-blend-multiply transition-transform duration-[1.5s] group-hover:scale-110"
                         />
@@ -170,7 +170,7 @@ const WishlistPage = () => {
                         <div className="flex flex-col">
                           <span className="text-[10px] uppercase tracking-widest text-gray-500 mb-1">Pricing</span>
                           <span className="text-lg md:text-xl font-semibold text-[#a89068]">
-                            ₹{item.sellingPrice?.toLocaleString()}
+                            ₹{(item.variantDetails?.[0]?.variantPrice || 0).toLocaleString()}
                           </span>
                         </div>
 

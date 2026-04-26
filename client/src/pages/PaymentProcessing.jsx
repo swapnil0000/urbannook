@@ -21,11 +21,15 @@ const PaymentProcessing = () => {
 
     const checkStatus = async () => {
       try {
+        const token = localStorage.getItem("authToken");
         const res = await fetch(
           `${import.meta.env.VITE_API_BASE_URL}/user/order/status/${orderId}`,
           {
             method: "GET",
             credentials: "include",
+            headers: {
+              ...(token && { "Authorization": `Bearer ${token}` }),
+            },
           }
         );
 

@@ -69,9 +69,9 @@ self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
   if (request.method !== 'GET') return;
   
-  // Network-first strategy for API calls
-  // Validates: Requirements 5.3
-  if (url.pathname.startsWith('/api/')) {
+  // Network-first strategy for API calls (same-origin only)
+  // Cross-origin API calls (e.g. api-staging.urbannook.online) must NOT be intercepted
+  if (url.origin === self.location.origin && url.pathname.startsWith('/api/')) {
     event.respondWith(
       fetch(request)
         .then((response) => {
