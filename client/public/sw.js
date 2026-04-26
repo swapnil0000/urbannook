@@ -1,15 +1,12 @@
 // Service Worker for Urban Nook
 // Implements versioned caching with cache-first for static assets
-// and network-first for API calls
-// Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5
+// and strictly NO caching for API calls to prevent cart/price sync issues
 
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3'; // Incremented version to force update
 const STATIC_CACHE = `urbannook-static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `urbannook-dynamic-${CACHE_VERSION}`;
-const API_CACHE = `urbannook-api-${CACHE_VERSION}`;
 
 // Static assets to cache immediately on install
-// Includes hero images, fonts, and logo for optimal performance
 const STATIC_ASSETS = [
   '/',
   '/assets/hero21.webp',
@@ -18,7 +15,6 @@ const STATIC_ASSETS = [
 ];
 
 // Install event - cache static assets
-// Validates: Requirements 5.1, 5.2
 self.addEventListener('install', (event) => {
   console.log('🛠️ SW: Installing version', CACHE_VERSION);
   event.waitUntil(
@@ -37,15 +33,14 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Activate event - clean up old cache versions
-// Validates: Requirements 5.4
+// Activate event - clean up ALL old cache versions
 self.addEventListener('activate', (event) => {
   console.log('🔄 SW: Activating version', CACHE_VERSION);
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          // Delete any cache that doesn't match current version
+          // Delete ANY old cache to ensure fresh start
           if (cacheName.startsWith('urbannook-') && !cacheName.includes(CACHE_VERSION)) {
             console.log('🗑️ SW: Deleting old cache:', cacheName);
             return caches.delete(cacheName);
@@ -60,50 +55,19 @@ self.addEventListener('activate', (event) => {
 });
 
 // Fetch event - implement caching strategies
-// Cache-first for static resources (Requirement 5.2)
-// Network-first for API calls (Requirement 5.3)
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
   
-  // Skip non-GET requests
-  if (request.method !== 'GET') return;
-  
-  // Network-first strategy for API calls (same-origin only)
-  // Cross-origin API calls (e.g. api-staging.urbannook.online) must NOT be intercepted
-  if (url.origin === self.location.origin && url.pathname.startsWith('/api/')) {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          // Clone and cache successful API responses
-          if (response && response.status === 200) {
-            const responseToCache = response.clone();
-            caches.open(API_CACHE).then((cache) => {
-              cache.put(request, responseToCache);
-            });
-          }
-          return response;
-        })
-        .catch(() => {
-          // Fallback to cache if network fails
-          return caches.match(request).then((cachedResponse) => {
-            if (cachedResponse) {
-              console.log('💾 SW: Serving API from cache (offline):', url.pathname);
-              return cachedResponse;
-            }
-            // Return a basic error response if no cache available
-            return new Response(JSON.stringify({ error: 'Offline and no cached data' }), {
-              status: 503,
-              headers: { 'Content-Type': 'application/json' }
-            });
-          });
-        })
-    );
-    return;
+  // CRITICAL: NEVER cache API calls. Dynamic data (Cart, Price, User) must always come from network.
+  if (url.pathname.includes('/api/') || url.hostname.includes('api.')) {
+    return; // Let browser handle network request normally
   }
 
-  // Cache-first strategy for static resources
-  // Validates: Requirements 5.2, 5.5
+  // Skip non-GET requests
+  if (request.method !== 'GET') return;
+
+  // Cache-first strategy for static resources ONLY
   event.respondWith(
     caches.match(request)
       .then((cachedResponse) => {
@@ -111,14 +75,13 @@ self.addEventListener('fetch', (event) => {
           return cachedResponse;
         }
 
-        // Fetch from network and cache if it's a static asset
         return fetch(request).then((response) => {
           // Don't cache if not a valid response
           if (!response || response.status !== 200 || response.type === 'error') {
             return response;
           }
 
-          // Cache static assets (JS, CSS, images, fonts)
+          // Cache only static assets (JS, CSS, images, fonts)
           if (url.pathname.match(/\.(js|css|png|jpg|jpeg|webp|svg|woff2?)$/)) {
             const responseToCache = response.clone();
             caches.open(DYNAMIC_CACHE).then((cache) => {
@@ -128,8 +91,7 @@ self.addEventListener('fetch', (event) => {
 
           return response;
         }).catch((error) => {
-          console.error('❌ SW: Fetch failed:', url.pathname, error);
-          // Return cached response if available, even for failed requests
+          // Silent fail for network errors in static assets
           return caches.match(request);
         });
       })
