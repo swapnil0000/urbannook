@@ -54,21 +54,21 @@ const cartSlice = createSlice({
   initialState,
   reducers: {
     updateSelection: (state, action) => {
-      const { productId, quantity, variant, color } = action.payload;
+      const { productId, quantity, variant } = action.payload;
       state.selections[productId] = {
         quantity: quantity || 1,
-        variant: variant || color || 'N/A'
+        variant: variant || 'N/A'
       };
     },
 
     addItem: (state, action) => {
-      const { id, name, price, image, quantity = 1, mongoId, selectedVariant, selectedColor } = action.payload;
-      const effectiveVariant = selectedVariant || selectedColor || 'N/A';
+      const { id, name, price, image, quantity = 1, mongoId, selectedVariant } = action.payload;
+      const effectiveVariant = selectedVariant || 'N/A';
       const itemId = mongoId || id;
       
       const existingItem = state.items.find(item => 
         (item.mongoId === itemId || item.id === itemId) && 
-        (item.selectedVariant || item.selectedColor || 'N/A') === (effectiveVariant)
+        (item.selectedVariant || 'N/A') === (effectiveVariant)
       );
 
       if (existingItem) {
@@ -97,20 +97,19 @@ const cartSlice = createSlice({
     },
 
     removeItem: (state, action) => {
-      const { id, selectedVariant, selectedColor } = action.payload;
-      const effectiveVariant = selectedVariant || selectedColor || 'N/A';
+      const { id, selectedVariant } = action.payload;
+      const effectiveVariant = selectedVariant || 'N/A';
       
-      // FIX: Check both ID and variant to remove correct variant
       const existingItem = state.items.find(item => 
         (item.id === id || item.mongoId === id) && 
-        (item.selectedVariant || item.selectedColor || 'N/A') === (effectiveVariant)
+        (item.selectedVariant || 'N/A') === (effectiveVariant)
       );
 
       if (existingItem) {
         state.totalQuantity -= existingItem.quantity;
         state.totalAmount -= (Number(existingItem.price) || 0) * existingItem.quantity;
         state.items = state.items.filter(item => 
-          !((item.id === id || item.mongoId === id) && (item.selectedVariant || item.selectedColor || 'N/A') === (effectiveVariant))
+          !((item.id === id || item.mongoId === id) && (item.selectedVariant || 'N/A') === (effectiveVariant))
         );
       }
 
@@ -120,13 +119,12 @@ const cartSlice = createSlice({
     },
 
     updateQuantity: (state, action) => {
-      const { id, quantity, selectedVariant, selectedColor } = action.payload;
-      const effectiveVariant = selectedVariant || selectedColor || 'N/A';
+      const { id, quantity, selectedVariant } = action.payload;
+      const effectiveVariant = selectedVariant || 'N/A';
       
-      // FIX: Check both ID and variant to update correct variant
       const existingItem = state.items.find(item => 
         (item.id === id || item.mongoId === id) && 
-        (item.selectedVariant || item.selectedColor || 'N/A') === (effectiveVariant)
+        (item.selectedVariant || 'N/A') === (effectiveVariant)
       );
 
       if (existingItem && quantity > 0) {
@@ -146,8 +144,6 @@ const cartSlice = createSlice({
       state.totalQuantity = 0;
       state.totalAmount = 0;
       state.selections = {};
-      // Clear guest cart from localStorage on logout or order completion
-      // clearGuestCart();
     },
 
     syncCartFromProfile: (state, action) => {
@@ -162,7 +158,7 @@ const cartSlice = createSlice({
         const getPrice = () => {
           if (typeof item.price === 'number') return item.price;
           if (item.variantDetails && item.variantDetails.length > 0) {
-            const selectedVariant = item.selectedVariant || item.selectedColor || 'N/A';
+            const selectedVariant = item.selectedVariant || 'N/A';
             const variant = item.variantDetails.find(v => v.variantName === selectedVariant);
             return Number(variant?.variantPrice) || Number(item.variantDetails[0].variantPrice) || 0;
           }
@@ -176,7 +172,7 @@ const cartSlice = createSlice({
           price: getPrice(),
           image: item.productImage || item.image || item.productImg,
           quantity,
-          selectedVariant: item.selectedVariant || item.selectedColor || 'N/A'
+          selectedVariant: item.selectedVariant || 'N/A'
         };
       });
 
@@ -227,7 +223,7 @@ const cartSlice = createSlice({
           price,
           image: item.image || item.productImage || item.productImg,
           quantity,
-          selectedVariant: item.selectedVariant || item.selectedColor || 'N/A'
+          selectedVariant: item.selectedVariant || 'N/A'
         };
       });
 

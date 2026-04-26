@@ -27,7 +27,7 @@ const userAddToCart = asyncHandler(async (req, res) => {
     userId,
     productId,
     productQuanity: productQuanity || quantity || 1,
-    color: variant || color,
+    variant: variant || color,
     image,
   });
 
@@ -68,7 +68,7 @@ const userUpdateCartQuantity = asyncHandler(async (req, res) => {
     productId,
     quantity: quantity || 1,
     action,
-    color: variant || color,
+    variant: variant || color,
     image,
   });
 
