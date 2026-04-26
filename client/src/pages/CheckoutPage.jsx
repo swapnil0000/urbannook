@@ -63,7 +63,6 @@ const CheckoutPage = () => {
   const [useDifferentDeliveryContact, setUseDifferentDeliveryContact] = useState(false);
   const [deliveryMobile, setDeliveryMobile] = useState("");
   const [deliveryMobileErrors, setDeliveryMobileErrors] = useState("");
-  const [processingType, setProcessingType] = useState(null); // 'full' or 'prebook'
 
   const [pricingDetails, setPricingDetails] = useState({
     subtotal: 0,
@@ -453,12 +452,7 @@ const CheckoutPage = () => {
     });
   };
 
-  const hasLampProduct = cartItems.some(item => {
-    const rawId = item.mongoId || (item.id && typeof item.id === 'string' ? item.id.split(':')[0] : item.id);
-    return rawId === import.meta.env.VITE_SPECIAL_PRODUCT_ID;
-  });
-
-  const handlePayment = async (isPreBook = false) => {
+  const handlePayment = async () => {
     const senderMobileStr = String(senderMobile || "").trim();
     
     if (!senderMobileStr || senderMobileStr === "N/A") {
@@ -497,7 +491,6 @@ const CheckoutPage = () => {
     }
     
     setPaymentError(null);
-    setProcessingType(isPreBook ? "prebook" : "full");
     const selectedFullAddr = savedAddress.find(a => a.addressId === currentAddressId);
     
     try {
@@ -518,7 +511,6 @@ const CheckoutPage = () => {
         userEmail: userProfile?.email,
         receiverMobile: useDifferentDeliveryContact && deliveryMobileStr ? deliveryMobileStr : senderMobileStr,
         addressId: currentAddressId,
-        isPreBook,
         deliveryAddress: {
           addressId: currentAddressId,
           fullName: userProfile?.userName || userProfile?.name || "",
@@ -536,7 +528,6 @@ const CheckoutPage = () => {
       const orderResult = await createOrder(orderData).unwrap();
       const res = await loadRazorpay();
       if (!res) {
-        setProcessingType(null);
         return;
       }
 
@@ -545,7 +536,7 @@ const CheckoutPage = () => {
         amount: orderResult.data?.amount || orderResult.amount,
         currency: "INR",
         name: "Urban Nook",
-        description: isPreBook ? "Pre-book order for Urban Nook" : "Purchase from Urban Nook",
+        description: "Purchase from Urban Nook",
         image: "/assets/logo.jpeg",
         order_id:
           orderResult.data?.razorpayOrderId ||
@@ -561,7 +552,6 @@ const CheckoutPage = () => {
               "Payment verification failed. Please contact support if amount was debited.",
             );
             setShowRetry(false);
-            setProcessingType(null);
           }
         },
         prefill: {
@@ -569,7 +559,7 @@ const CheckoutPage = () => {
           email: userProfile?.userEmail || userProfile?.email || "",
           contact: senderMobileStr,
         },
-        notes: { address: address, pincode: pincode, isPreBook: isPreBook.toString() },
+        notes: { address: address, pincode: pincode },
         theme: { color: "#2E443C" },
         modal: {
           ondismiss: function () {
@@ -577,7 +567,6 @@ const CheckoutPage = () => {
               "Payment was cancelled. Your cart has been preserved. You can retry when ready.",
             );
             setShowRetry(true);
-            setProcessingType(null);
           },
           escape: false,
           confirm_close: true,
@@ -603,7 +592,6 @@ const CheckoutPage = () => {
 
         setPaymentError(userMessage);
         setShowRetry(true);
-        setProcessingType(null);
       });
 
       paymentObject.open();
@@ -620,7 +608,6 @@ const CheckoutPage = () => {
       showNotification(errorMessage, "error");
       setPaymentError(errorMessage);
       setShowRetry(true);
-      setProcessingType(null);
     }
   };
 
@@ -864,55 +851,24 @@ const CheckoutPage = () => {
                 </div>
               </div>
 
-              {/* Priority Notice Box */}
-              <div className="mt-6 p-4 bg-[#a89068]/10 border border-[#a89068]/20 rounded-2xl animate-in fade-in zoom-in duration-700">
-                <div className="flex items-start gap-3">
-                  <div className="w-5 h-5 rounded-full bg-[#a89068] flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
-                    <i className="fa-solid fa-crown text-[10px] text-white"></i>
-                  </div>
-                  <p className="text-[10px] text-[#a89068] font-bold uppercase tracking-wider leading-relaxed">
-                    Full payment orders receive priority dispatch. <span className="opacity-70 font-medium">Complete your payment now to skip the fulfillment queue.</span>
-                  </p>
-                </div>
-              </div>
 
               <div className="flex flex-col gap-3 mt-6">
                 <button
-                  onClick={() => handlePayment(false)}
+                  onClick={() => handlePayment()}
                   disabled={isOrdering}
                   className="hidden lg:flex w-full py-4 bg-[#2e443c] text-white rounded-xl font-bold uppercase tracking-widest text-[11px] hover:bg-[#1a2822] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg items-center justify-center gap-3"
                 >
-                  {isOrdering && processingType === "full" ? (
+                  {isOrdering ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>{" "}
                       Processing...
                     </>
                   ) : (
                     <>
-                      Proceed to Pay Full <i className="fa-solid fa-lock"></i>
+                      Proceed to Pay <i className="fa-solid fa-lock"></i>
                     </>
                   )}
                 </button>
-
-                {hasLampProduct && (
-                  <button
-                    onClick={() => handlePayment(true)}
-                    disabled={isOrdering}
-                    className="hidden lg:flex w-full py-4 bg-[#a89068] text-white rounded-xl font-bold uppercase tracking-widest text-[11px] hover:bg-[#967d56] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg items-center justify-center gap-3 relative overflow-hidden group"
-                  >
-                    <div className="absolute inset-0 bg-white/10 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
-                    {isOrdering && processingType === "prebook" ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>{" "}
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        Pre Book @ ₹299 <i className="fa-solid fa-star text-[10px]"></i>
-                      </>
-                    )}
-                  </button>
-                )}
               </div>
 
               {!address && (
@@ -1351,7 +1307,7 @@ const CheckoutPage = () => {
           </div>
           <div className="flex gap-2 w-full max-w-[200px]">
             <button
-              onClick={!address ? handleScrollToAddress : () => handlePayment(false)}
+              onClick={!address ? handleScrollToAddress : () => handlePayment()}
               disabled={isOrdering || showMobileModal}
               className={`flex-1 h-10 rounded-xl font-bold uppercase tracking-widest text-[11px] shadow-lg active:scale-95 transition-all flex items-center justify-center gap-3 ${
                 showMobileModal
@@ -1361,7 +1317,7 @@ const CheckoutPage = () => {
                   : "bg-[#2e443c] text-white border border-white/20"
               }`}
             >
-              {isOrdering && processingType === "full" ? (
+              {isOrdering ? (
                 <>
                   <div className="w-2 h-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>{" "}
                   Proc...
@@ -1373,27 +1329,10 @@ const CheckoutPage = () => {
                 </>
               ) : (
                 <>
-                  Full <i className="fa-solid fa-lock text-[10px]"></i>
+                  Pay Now <i className="fa-solid fa-lock text-[10px]"></i>
                 </>
               )}
             </button>
-
-            {hasLampProduct && address && (
-              <button
-                onClick={() => handlePayment(true)}
-                disabled={isOrdering}
-                className="flex-1 h-10 rounded-xl font-bold uppercase tracking-widest text-[11px] bg-[#a89068] text-white shadow-lg active:scale-95 transition-all flex items-center justify-center"
-              >
-                {isOrdering && processingType === "prebook" ? (
-                  <>
-                    <div className="w-2 h-2 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                    Proc...
-                  </>
-                ) : (
-                  "Pre Book"
-                )}
-              </button>
-            )}
           </div>
         </div>
       </div>
