@@ -29,4 +29,4 @@ client/.env.production
 *.njsproj
 *.sln
 *.sw?
-# test staging job
+# test staging job with pr
