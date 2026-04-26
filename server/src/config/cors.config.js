@@ -49,7 +49,7 @@ export const corsOptions = {
     "x-xsrf-token",
     "X-Auth-Token"
   ],
-  exposedHeaders: ["Set-Cookie", "X-CSRF-Token", "x-csrf-token"],
+  exposedHeaders: ["Set-Cookie", "X-CSRF-Token", "x-csrf-token", "X-Server-Version"],
   optionsSuccessStatus: 204,
   preflightContinue: false
 };

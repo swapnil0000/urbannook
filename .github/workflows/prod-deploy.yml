@@ -9,28 +9,21 @@ jobs:
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
-      client: ${{ steps.changes.outputs.client }}
-      server: ${{ steps.changes.outputs.server }}
+      client: ${{ steps.filter.outputs.client }}
+      server: ${{ steps.filter.outputs.server }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Path Filter
+        uses: dorny/paths-filter@v3
+        id: filter
         with:
-          fetch-depth: 0
-
-      - name: Detect changed paths
-        id: changes
-        run: |
-          if git diff --name-only origin/main~1..origin/main | grep '^client/'; then
-            echo "client=true" >> $GITHUB_OUTPUT
-          else
-            echo "client=false" >> $GITHUB_OUTPUT
-          fi
-
-          if git diff --name-only origin/main~1..origin/main | grep '^server/'; then
-            echo "server=true" >> $GITHUB_OUTPUT
-          else
-            echo "server=false" >> $GITHUB_OUTPUT
-          fi
+          filters: |
+            client:
+              - 'client/**'
+            server:
+              - 'server/**'
 
   deploy-client:
     needs: detect-changes
@@ -128,6 +121,6 @@ jobs:
           ssh ubuntu@${{ secrets.AWS_EC2_IP }} << 'EOF'
             cd /home/ubuntu/urbannook-prod/server
             npm install --omit=dev --legacy-peer-deps
-            pm2 reload urbannook-server --env production || pm2 start ecosystem.config.cjs --env production
+            pm2 restart urbannook-server --env production || pm2 start ecosystem.config.cjs --env production
             pm2 save
           EOF
