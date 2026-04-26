@@ -12,7 +12,6 @@ const CartDrawer = ({ isOpen, onClose }) => {
   const dispatch = useDispatch();
   const [mounted, setMounted] = useState(false);
   
-  // Get cart items from Redux store
   const { items: cartItems, totalAmount } = useSelector((state) => state.cart);
   const { isAuthenticated } = useSelector((state) => state.auth);
   

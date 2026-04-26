@@ -88,21 +88,17 @@ jobs:
         working-directory: server
         run: npm install --legacy-peer-deps
 
-      # --- NEW ROBUST SSH AGENT SETUP ---
-      - name: Install SSH Key
-        uses: shimataro/ssh-key-action@v2
-        with:
-          key: ${{ secrets.AWS_EC2_SSH_KEY }}
-          known_hosts: "temporary-placeholder" # Hum niche scan karenge
-          if_key_exists: replace
-
-      - name: Adding Known Hosts
-        run: ssh-keyscan -H ${{ secrets.AWS_EC2_IP }} >> ~/.ssh/known_hosts
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AWS_EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.AWS_EC2_IP }} >> ~/.ssh/known_hosts
 
       - name: Upload Server to EC2
         run: |
           rsync -avz --delete \
-          -e "ssh -o StrictHostKeyChecking=no" \
+          -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" \
           --exclude '.env' \
           --exclude '.env.production' \
           --exclude 'node_modules' \
@@ -112,11 +108,11 @@ jobs:
 
       - name: Restart Production Backend
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_EC2_IP }} << 'EOF'
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_EC2_IP }} << 'EOF'
             echo "--- STARTING DEPLOY RESTART ---"
             cd /home/ubuntu/urbannook-prod/server
             npm install --omit=dev --legacy-peer-deps
-            # Force clean start to ensure latest code in memory
+            # Clean start for fresh code in memory
             pm2 stop urbannook-server || true
             pm2 delete urbannook-server || true
             pm2 start ecosystem.config.cjs --env production
