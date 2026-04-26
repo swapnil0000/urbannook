@@ -65,7 +65,6 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     receiverMobile,
     addressId,
     deliveryAddress: clientAddress,
-    isPreBook = false,
   } = req.body;
   const { userId } = req.user;
   if (!items || !Array.isArray(items) || items.length === 0) {
@@ -119,32 +118,27 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   let isApplied = false;
   let summary = {};
 
-  if (isPreBook) {
-    finalAmount = 299;
-    summary = { shipping: 149 };
-  } else {
-    // Fetch cart to get the calculated grand total from applyCoupon API
-    const cart = await Cart.findOne({ userId }).lean();
+  // Fetch cart to get the calculated grand total from applyCoupon API
+  const cart = await Cart.findOne({ userId }).lean();
 
-    if (!cart) {
-      throw new ValidationError("Cart not found. Please add items to your cart.");
-    }
-
-    // Check if pricing has been calculated (appliedCoupon.summary must exist with a valid grandTotal)
-    const grandTotal = cart?.appliedCoupon?.summary?.grandTotal;  
-    if (grandTotal == null || grandTotal <= 0) {
-      throw new ValidationError(
-        "Cart pricing not calculated. Please refresh the page.",
-      );
-    }
-
-    finalAmount = grandTotal;
-    couponCodeId = cart.appliedCoupon?.couponCodeId || null;
-    couponCodeName = cart.appliedCoupon?.name || null;
-    discountAmount = cart.appliedCoupon?.discountValue || 0;
-    isApplied = cart.appliedCoupon?.isApplied || false;
-    summary = cart.appliedCoupon?.summary || {};
+  if (!cart) {
+    throw new ValidationError("Cart not found. Please add items to your cart.");
   }
+
+  // Check if pricing has been calculated (appliedCoupon.summary must exist with a valid grandTotal)
+  const grandTotal = cart?.appliedCoupon?.summary?.grandTotal;  
+  if (grandTotal == null || grandTotal <= 0) {
+    throw new ValidationError(
+      "Cart pricing not calculated. Please refresh the page.",
+    );
+  }
+
+  finalAmount = grandTotal;
+  couponCodeId = cart.appliedCoupon?.couponCodeId || null;
+  couponCodeName = cart.appliedCoupon?.name || null;
+  discountAmount = cart.appliedCoupon?.discountValue || 0;
+  isApplied = cart.appliedCoupon?.isApplied || false;
+  summary = cart.appliedCoupon?.summary || {};
 
   const productIds = items.map((i) => i.productId);
   const uniqueProductIds = [...new Set(productIds)]; // Get unique IDs
@@ -287,7 +281,6 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     userMobile: deliveryAddressSnapshot.mobileNumber,
     items: orderItems,
     amount: finalAmount,
-    isPreBook,
     senderMobile: finalSenderMobile,
     receiverMobile: finalReceiverMobile,
     deliveryAddress: deliveryAddressSnapshot,
@@ -299,7 +292,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       discountAmount,
       isApplied,
     },
-    note: isPreBook ? "Pre-book amount paid" : "Amount is the final amount paid by the user",
+    note: "Amount is the final amount paid by the user",
   });
 
   return res.status(200).json(

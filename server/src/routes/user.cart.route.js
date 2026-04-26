@@ -14,7 +14,7 @@ const userCartRouter = Router();
 
 userCartRouter.post("/user/cart/add", authGuardService("USER"), csrfProtection, userAddToCart);
 userCartRouter.get("/user/cart/get", authGuardService("USER"), userGetCart);
-userCartRouter.patch(
+userCartRouter.post(
   "/user/cart/update",
   authGuardService("USER"),
   csrfProtection,
