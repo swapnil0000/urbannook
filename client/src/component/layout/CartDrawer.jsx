@@ -157,9 +157,10 @@ const CartDrawer = ({ isOpen, onClose }) => {
                   // Mongoose bug safe extraction
                   const itemQty = typeof item.quantity === 'object' ? Number(item.quantity?.quantity || 0) : Number(item.quantity || 0);
                   const itemColor = item.selectedColor || 'N/A';
+                  const itemId = item.mongoId || item.productId || item.id;
 
                   return (
-                    <div key={`${item.id}-${item.selectedVariant || item.selectedColor || 'N/A'}`} className="flex items-stretch gap-4 group relative pb-6 border-b border-gray-50 last:border-0 last:pb-0">
+                    <div key={`${itemId}-${item.selectedVariant || item.selectedColor || 'N/A'}`} className="flex items-stretch gap-4 group relative pb-6 border-b border-gray-50 last:border-0 last:pb-0">
                       
                       {/* Image */}
                       <div className="w-[85px] h-[85px] bg-gray-50 rounded-2xl overflow-hidden shrink-0 relative border border-gray-100 flex items-center justify-center">
@@ -183,7 +184,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
                               {item.name}
                             </h4>
                             <button 
-                              onClick={() => handleRemoveItem(item.id, item.selectedVariant, item.selectedColor, item.mongoId)}
+                              onClick={() => handleRemoveItem(itemId, item.selectedVariant, item.selectedColor, item.mongoId)}
                               className="text-gray-300 hover:text-red-500 transition-colors p-1 -mt-1 -mr-1 shrink-0"
                               title="Remove Item"
                             >
@@ -220,7 +221,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
                           {/* Quantity Controls - Exact match to your screenshot inspector */}
                           <div className="flex items-center gap-4 bg-white border border-gray-200 rounded-full h-8 px-3 shadow-sm">
                             <button 
-                              onClick={() => handleQuantityChange(item.id, item.selectedVariant, item.selectedColor, Math.max(0, itemQty - 1), item.mongoId, itemQty, item.image)}
+                              onClick={() => handleQuantityChange(itemId, item.selectedVariant, item.selectedColor, Math.max(0, itemQty - 1), item.mongoId, itemQty, item.image)}
                               className="w-4 h-full flex items-center justify-center text-gray-400 hover:text-[#0a110e] transition-colors"
                             >
                               <i className="fa-solid fa-minus text-[10px]"></i>
@@ -229,7 +230,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
                               {itemQty}
                             </span>
                             <button 
-                              onClick={() => handleQuantityChange(item.id, item.selectedVariant, item.selectedColor, itemQty + 1, item.mongoId, itemQty, item.image)}
+                              onClick={() => handleQuantityChange(itemId, item.selectedVariant, item.selectedColor, itemQty + 1, item.mongoId, itemQty, item.image)}
                               className="w-4 h-full flex items-center justify-center text-gray-400 hover:text-[#0a110e] transition-colors"
                             >
                               <i className="fa-solid fa-plus text-[10px]"></i>
@@ -237,7 +238,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
                           </div>
 
                           {/* Price */}
-                          <p className="text-sm font-bold text-[#0a110e]">₹{item.price?.toLocaleString()}</p>
+                          <p className="text-sm font-bold text-[#0a110e]">₹{(Number(item.price) || 0).toLocaleString()}</p>
                         </div>
 
                       </div>
@@ -255,11 +256,11 @@ const CartDrawer = ({ isOpen, onClose }) => {
             <div className="space-y-3 mb-6">
                 <div className="flex justify-between items-center text-[11px] font-bold text-gray-400 uppercase tracking-widest">
                     <span>Subtotal</span>
-                    <span className="font-medium text-[#0a110e]">₹{subtotal?.toLocaleString()}</span>
+                    <span className="font-medium text-[#0a110e]">₹{(Number(subtotal) || 0).toLocaleString()}</span>
                 </div>
                 <div className="pt-3 border-t border-gray-100 flex justify-between items-center">
                     <span className="text-base font-serif text-[#0a110e]">Total</span>
-                    <span className="text-xl font-bold text-[#0a110e]">₹{subtotal?.toLocaleString()}</span>
+                    <span className="text-xl font-bold text-[#0a110e]">₹{(Number(subtotal) || 0).toLocaleString()}</span>
                 </div>
             </div>
 

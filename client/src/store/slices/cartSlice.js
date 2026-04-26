@@ -64,9 +64,10 @@ const cartSlice = createSlice({
     addItem: (state, action) => {
       const { id, name, price, image, quantity = 1, mongoId, selectedVariant, selectedColor } = action.payload;
       const effectiveVariant = selectedVariant || selectedColor || 'N/A';
+      const itemId = mongoId || id;
       
       const existingItem = state.items.find(item => 
-        item.id === id && 
+        (item.mongoId === itemId || item.id === itemId) && 
         (item.selectedVariant || item.selectedColor || 'N/A') === (effectiveVariant)
       );
 
@@ -74,10 +75,10 @@ const cartSlice = createSlice({
         existingItem.quantity += quantity;
       } else {
         state.items.push({
-          id,
-          mongoId: mongoId || id,
+          id: itemId,
+          mongoId: itemId,
           name,
-          price,
+          price: Number(price) || 0,
           image,
           quantity,
           selectedVariant: effectiveVariant
@@ -85,15 +86,13 @@ const cartSlice = createSlice({
       }
 
       state.totalQuantity += quantity;
-      state.totalAmount += price * quantity;
+      state.totalAmount += (Number(price) || 0) * quantity;
 
       // Persist to localStorage for guest users so cart survives refresh
       const isGuestUser = isGuest();
       if (isGuestUser) {
         getOrCreateGuestId();
         saveGuestCart(state.items);
-      } else {
-        console.log('[cartSlice] User is logged in, not saving to guest cart');
       }
     },
 
@@ -103,15 +102,15 @@ const cartSlice = createSlice({
       
       // FIX: Check both ID and variant to remove correct variant
       const existingItem = state.items.find(item => 
-        item.id === id && 
+        (item.id === id || item.mongoId === id) && 
         (item.selectedVariant || item.selectedColor || 'N/A') === (effectiveVariant)
       );
 
       if (existingItem) {
         state.totalQuantity -= existingItem.quantity;
-        state.totalAmount -= existingItem.price * existingItem.quantity;
+        state.totalAmount -= (Number(existingItem.price) || 0) * existingItem.quantity;
         state.items = state.items.filter(item => 
-          !(item.id === id && (item.selectedVariant || item.selectedColor || 'N/A') === (effectiveVariant))
+          !((item.id === id || item.mongoId === id) && (item.selectedVariant || item.selectedColor || 'N/A') === (effectiveVariant))
         );
       }
 
@@ -126,7 +125,7 @@ const cartSlice = createSlice({
       
       // FIX: Check both ID and variant to update correct variant
       const existingItem = state.items.find(item => 
-        item.id === id && 
+        (item.id === id || item.mongoId === id) && 
         (item.selectedVariant || item.selectedColor || 'N/A') === (effectiveVariant)
       );
 
@@ -134,7 +133,7 @@ const cartSlice = createSlice({
         const diff = quantity - existingItem.quantity;
         existingItem.quantity = quantity;
         state.totalQuantity += diff;
-        state.totalAmount += diff * existingItem.price;
+        state.totalAmount += diff * (Number(existingItem.price) || 0);
       }
 
       if (isGuest()) {
@@ -165,9 +164,9 @@ const cartSlice = createSlice({
           if (item.variantDetails && item.variantDetails.length > 0) {
             const selectedVariant = item.selectedVariant || item.selectedColor || 'N/A';
             const variant = item.variantDetails.find(v => v.variantName === selectedVariant);
-            return variant?.variantPrice || item.variantDetails[0].variantPrice || 0;
+            return Number(variant?.variantPrice) || Number(item.variantDetails[0].variantPrice) || 0;
           }
-          return 0;
+          return Number(item.price) || 0;
         };
 
         return {
@@ -212,13 +211,14 @@ const cartSlice = createSlice({
 
       state.items = cartItems.map(item => {
         let quantity = 1;
-        if (typeof item.quantity === 'number') {
-          quantity = item.quantity;
-        } else if (item.quantity !== null && typeof item.quantity === 'object') {
-          quantity = typeof item.quantity.quantity === 'number' ? item.quantity.quantity : 1;
+        const rawQty = item.quantity;
+        if (typeof rawQty === 'number') {
+          quantity = rawQty;
+        } else if (rawQty !== null && typeof rawQty === 'object') {
+          quantity = typeof rawQty.quantity === 'number' ? rawQty.quantity : 1;
         }
 
-        const price = typeof item.price === 'number' ? item.price : (item.price?.price ?? 0);
+        const price = typeof item.price === 'number' ? item.price : (Number(item.price?.price) || 0);
 
         return {
           id: item.productId || item._id,
