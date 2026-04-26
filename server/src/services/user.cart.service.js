@@ -34,15 +34,14 @@ const addToCartService = async ({ userId, productId, productQuanity, variant, im
 
   // Determine the effective variant
   let selectedVariant = variant;
-  if (!selectedVariant || selectedVariant === "N/A") {
-    const availableVariants = (productDetails.variantDetails && productDetails.variantDetails.length > 0)
-      ? productDetails.variantDetails.map(v => v.variantName)
-      : productDetails.color;
-
-    selectedVariant =
-      availableVariants && availableVariants.length > 0
-        ? availableVariants[0]
-        : "N/A";
+  if (!selectedVariant || selectedVariant === "N/A" || selectedVariant === "") {
+    if (productDetails.variantDetails && productDetails.variantDetails.length > 0) {
+      selectedVariant = productDetails.variantDetails[0].variantName;
+    } else if (productDetails.color && productDetails.color.length > 0) {
+      selectedVariant = productDetails.color[0];
+    } else {
+      selectedVariant = "N/A";
+    }
   }
 
   let selectedImage = image;
