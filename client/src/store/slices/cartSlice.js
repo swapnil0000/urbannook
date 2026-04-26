@@ -170,8 +170,8 @@ const cartSlice = createSlice({
         };
 
         return {
-          id: item.productId,
-          mongoId: item.productId,
+          id: item.productId || item._id,
+          mongoId: item.productId || item._id,
           name: item.productName || item.name,
           price: getPrice(),
           image: item.productImage || item.image || item.productImg,
@@ -221,8 +221,8 @@ const cartSlice = createSlice({
         const price = typeof item.price === 'number' ? item.price : (Number(item.price?.price) || 0);
 
         return {
-          id: item.productId,
-          mongoId: item.productId,
+          id: item.productId || item._id,
+          mongoId: item.productId || item._id,
           name: item.name || item.productName,
           price,
           image: item.image || item.productImage || item.productImg,

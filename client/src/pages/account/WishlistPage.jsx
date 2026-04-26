@@ -45,7 +45,7 @@ const WishlistPage = () => {
 
     try {
       await addToCart({
-        productId: item.productId,
+        productId: item.productId || item._id,
         quantity: 1
       }).unwrap();
 
