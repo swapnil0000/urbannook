@@ -1,4 +1,5 @@
 import env from "./envConfigSetup.js";
+// force-redeploy: x-csrf-token allowed
 
 const getAllowedOrigins = () => {
   const whitelist = (env.WHITE_LIST_CLIENT_URI || "")
