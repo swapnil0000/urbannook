@@ -9,7 +9,7 @@ import {
   AuthenticationError,
 } from "../utils/errors.js";
 
-const addToCartService = async ({ userId, productId, productQuanity, color, image }) => {
+const addToCartService = async ({ userId, productId, productQuanity, variant, image }) => {
   const userAndProductIdValidation = cartDetailsMissing(userId, productId);
   if (!userAndProductIdValidation?.success) {
     throw new ValidationError(
@@ -17,10 +17,6 @@ const addToCartService = async ({ userId, productId, productQuanity, color, imag
       userAndProductIdValidation?.data,
     );
   }
-
-  /* `.lean()` is used here because we only need raw data for validation and checks.
-    It returns a plain JavaScript object instead of a full Mongoose document,
-   which improves performance and reduces memory usage. */
 
   const userDetails = await User.findOne({ userId }).lean();
   if (!userDetails) {
@@ -37,7 +33,7 @@ const addToCartService = async ({ userId, productId, productQuanity, color, imag
   }
 
   // Determine the effective variant
-  let selectedVariant = color; // Incoming 'color' might actually be the variant
+  let selectedVariant = variant;
   if (!selectedVariant || selectedVariant === "N/A") {
     const availableVariants = (productDetails.variantDetails && productDetails.variantDetails.length > 0)
       ? productDetails.variantDetails.map(v => v.variantName)
@@ -49,15 +45,12 @@ const addToCartService = async ({ userId, productId, productQuanity, color, imag
         : "N/A";
   }
 
-  // 1. Try image from request
-  // 2. Try image from variantDetails
-  // 3. Placeholder
   let selectedImage = image;
   
   if (!selectedImage && productDetails.variantDetails) {
-    const variant = productDetails.variantDetails.find(v => v.variantName === selectedVariant);
-    if (variant && variant.variantImage && variant.variantImage.length > 0) {
-      selectedImage = variant.variantImage[0];
+    const variantObj = productDetails.variantDetails.find(v => v.variantName === selectedVariant);
+    if (variantObj && variantObj.variantImage && variantObj.variantImage.length > 0) {
+      selectedImage = variantObj.variantImage[0];
     } else if (productDetails.variantDetails[0]?.variantImage?.[0]) {
        selectedImage = productDetails.variantDetails[0].variantImage[0];
     }
@@ -69,11 +62,13 @@ const addToCartService = async ({ userId, productId, productQuanity, color, imag
 
   // Composite Key for Map: productId:variant
   const cartKey = `${productId}:${selectedVariant}`;
-  const key = `products.${cartKey}`;
 
-  const cart = await Cart.findOne({ userId }).lean();
+  let cart = await Cart.findOne({ userId });
+  if (!cart) {
+    cart = new Cart({ userId, products: {} });
+  }
 
-  if (cart && cart.products && cart.products[cartKey]) {
+  if (cart.products && cart.products instanceof Map ? cart.products.has(cartKey) : cart.products[cartKey]) {
     return {
       statusCode: 200,
       message: "Already in cart",
@@ -82,16 +77,21 @@ const addToCartService = async ({ userId, productId, productQuanity, color, imag
     };
   }
 
-  await Cart.findOneAndUpdate(
-    { userId },
-    {
-      $setOnInsert: { userId },
-      $set: {
-        [key]: { quantity: productQuanity || 1, selectedVariant, image: selectedImage },
-      },
-    },
-    { upsert: true },
-  );
+  const newItem = { 
+    quantity: productQuanity || 1, 
+    selectedVariant, 
+    image: selectedImage 
+  };
+
+  if (cart.products && cart.products instanceof Map) {
+    cart.products.set(cartKey, newItem);
+  } else {
+    if (!cart.products) cart.products = {};
+    cart.products[cartKey] = newItem;
+    cart.markModified('products');
+  }
+  
+  await cart.save();
 
   return {
     statusCode: 200,
@@ -112,7 +112,6 @@ const getCartService = async ({ userId }) => {
     { $unwind: "$items" },
     {
       $addFields: {
-        // Composite key split: productId:color
         extractedProductId: {
           $arrayElemAt: [{ $split: ["$items.k", ":"] }, 0],
         },
@@ -137,7 +136,7 @@ const getCartService = async ({ userId }) => {
         _id: 0,
         mongoId: "$product._id",
         productId: "$product.productId",
-        cartKey: "$items.k", // Keep full key for updates
+        cartKey: "$items.k",
         name: "$product.productName",
         price: {
           $let: {
@@ -147,10 +146,7 @@ const getCartService = async ({ userId }) => {
                   input: { $ifNull: ["$product.variantDetails", []] },
                   as: "vd",
                   cond: { 
-                    $or: [
-                      { $eq: ["$$vd.variantName", { $ifNull: ["$items.v.selectedVariant", ""] }] },
-                      { $eq: ["$$vd.variantName", { $ifNull: ["$items.v.selectedColor", ""] }] }
-                    ]
+                    $eq: ["$$vd.variantName", { $ifNull: ["$items.v.selectedVariant", { $ifNull: ["$items.v.selectedColor", ""] }] }]
                   }
                 }
               }
@@ -213,13 +209,6 @@ const getCartService = async ({ userId }) => {
             },
           },
         },
-        selectedColor: {
-          $cond: {
-            if: { $isNumber: "$items.v" },
-            then: "N/A",
-            else: { $ifNull: ["$items.v.selectedColor", "N/A"] },
-          },
-        },
         stock: "$product.productQuantity",
         productStatus: "$product.productStatus",
         productFound: 1,
@@ -247,7 +236,6 @@ const getCartService = async ({ userId }) => {
               {
                 $and: [
                   "$isEligibleForCalc",
-                  { $isNumber: "$price" },
                   { $gt: ["$quantity", 0] },
                 ],
               },
@@ -306,7 +294,7 @@ const getCartService = async ({ userId }) => {
   };
 };
 
-const cartQuantityService = async ({ userId, productId, quantity, action, color, image }) => {
+const cartQuantityService = async ({ userId, productId, quantity, action, variant, image }) => {
   if (!userId) {
     throw new AuthenticationError("Unauthorized");
   }
@@ -323,16 +311,14 @@ const cartQuantityService = async ({ userId, productId, quantity, action, color,
 
   const productQuanityMap = cartDetails.products;
   
-  // Try to find by composite key first, fallback to plain productId
-  let selectedVariant = color || "N/A";
+  let selectedVariant = variant || "N/A";
   let cartKey = `${productId}:${selectedVariant}`;
   
   if (!productQuanityMap.has(cartKey)) {
-    // Fallback check if it was stored without variant (legacy)
     if (productQuanityMap.has(String(productId))) {
       cartKey = String(productId);
     } else {
-      throw new ValidationError("Product variant not in cart");
+      throw new ValidationError(`Product variant ${selectedVariant} not in cart`);
     }
   }
 
@@ -345,9 +331,11 @@ const cartQuantityService = async ({ userId, productId, quantity, action, color,
       break;
     case "sub":
       if (currentQty <= quantity) {
-        throw new ValidationError("Cannot reduce below 1. Use remove instead.");
+        productQuanityMap.delete(cartKey);
+        action = "remove";
+      } else {
+        currentQty -= quantity;
       }
-      currentQty -= quantity;
       break;
     case "remove":
       productQuanityMap.delete(cartKey);
@@ -357,19 +345,17 @@ const cartQuantityService = async ({ userId, productId, quantity, action, color,
   }
 
   if (action !== "remove") {
-    if (typeof itemData === "object") {
-      const updatedItemData = { 
-        ...itemData, 
+    // Force selectedVariant and remove selectedColor
+    const updatedItemData = { 
         quantity: currentQty,
-        selectedVariant: itemData.selectedVariant || itemData.selectedColor || selectedVariant,
-        image: image || itemData.image 
-      };
-      productQuanityMap.set(cartKey, updatedItemData);
-    } else {
-      productQuanityMap.set(cartKey, { quantity: currentQty, selectedVariant, image });
-    }
+        selectedVariant: (typeof itemData === "object" ? (itemData.selectedVariant || itemData.selectedColor) : null) || selectedVariant,
+        image: (typeof itemData === "object" ? itemData.image : null) || image 
+    };
+    
+    productQuanityMap.set(cartKey, updatedItemData);
   }
 
+  cartDetails.markModified('products');
   await cartDetails.save();
 
   if (cartDetails.appliedCoupon && cartDetails.appliedCoupon.isApplied) {
@@ -416,14 +402,18 @@ const clearCartService = async ({ userId }) => {
   };
 };
 
-// NEW: Dedicated merge service for guest cart items
 const mergeGuestCartService = async ({ userId, guestItems }) => {
   if (!userId) {
     throw new AuthenticationError("Unauthorized");
   }
 
   if (!Array.isArray(guestItems) || guestItems.length === 0) {
-    throw new ValidationError("guestItems must be a non-empty array");
+    return {
+      statusCode: 200,
+      message: "No guest items to merge",
+      data: { syncedItems: [], failedItems: [], totalSynced: 0, totalFailed: 0 },
+      success: true
+    };
   }
 
   const userDetails = await User.findOne({ userId }).lean();
@@ -441,11 +431,10 @@ const mergeGuestCartService = async ({ userId, guestItems }) => {
 
   for (const guestItem of guestItems) {
     try {
-      const productId = guestItem.mongoId || guestItem.id;
+      const productId = guestItem.mongoId || guestItem.id || guestItem.productId;
       const selectedVariant = guestItem.selectedVariant || guestItem.selectedColor || 'N/A';
       const guestQuantity = guestItem.quantity || 1;
 
-      // Validate product exists
       const productDetails = await Product.findOne(
         { productId },
         { productName: 1, color: 1, variantDetails: 1 },
@@ -459,7 +448,6 @@ const mergeGuestCartService = async ({ userId, guestItems }) => {
         continue;
       }
 
-      // Determine effective variant
       let effectiveVariant = selectedVariant;
       if (!effectiveVariant || effectiveVariant === "N/A") {
         const availableVariants = (productDetails.variantDetails && productDetails.variantDetails.length > 0)
@@ -474,12 +462,11 @@ const mergeGuestCartService = async ({ userId, guestItems }) => {
 
       const cartKey = `${productId}:${effectiveVariant}`;
       
-      // Select image for guest item
       let selectedImage = guestItem.image;
       if (!selectedImage && productDetails.variantDetails) {
-        const variant = productDetails.variantDetails.find(v => v.variantName === effectiveVariant);
-        if (variant && variant.variantImage && variant.variantImage.length > 0) {
-          selectedImage = variant.variantImage[0];
+        const variantObj = productDetails.variantDetails.find(v => v.variantName === effectiveVariant);
+        if (variantObj && variantObj.variantImage && variantObj.variantImage.length > 0) {
+          selectedImage = variantObj.variantImage[0];
         } else if (productDetails.variantDetails[0]?.variantImage?.[0]) {
           selectedImage = productDetails.variantDetails[0].variantImage[0];
         }
@@ -489,18 +476,22 @@ const mergeGuestCartService = async ({ userId, guestItems }) => {
         selectedImage = "https://urbannook.in/assets/logo.webp";
       }
 
-      // Check if item already exists in cart
-      if (cart.products.has(cartKey)) {
-        // Item exists - add guest quantity to existing quantity
-        const existingData = cart.products.get(cartKey);
+      if (cart.products && cart.products instanceof Map ? cart.products.has(cartKey) : cart.products[cartKey]) {
+        const existingData = cart.products instanceof Map ? cart.products.get(cartKey) : cart.products[cartKey];
         const existingQty = typeof existingData === "object" ? existingData.quantity : existingData;
         const newQty = existingQty + guestQuantity;
 
-        cart.products.set(cartKey, {
+        const updatedItem = {
           quantity: newQty,
           selectedVariant: effectiveVariant,
           image: selectedImage
-        });
+        };
+
+        if (cart.products instanceof Map) {
+          cart.products.set(cartKey, updatedItem);
+        } else {
+          cart.products[cartKey] = updatedItem;
+        }
 
         syncedItems.push({
           productId,
@@ -511,12 +502,18 @@ const mergeGuestCartService = async ({ userId, guestItems }) => {
           newQty: newQty
         });
       } else {
-        // Item doesn't exist - add it
-        cart.products.set(cartKey, {
+        const newItem = {
           quantity: guestQuantity,
           selectedVariant: effectiveVariant,
           image: selectedImage
-        });
+        };
+
+        if (cart.products instanceof Map) {
+          cart.products.set(cartKey, newItem);
+        } else {
+          cart.products[cartKey] = newItem;
+          cart.markModified('products');
+        }
 
         syncedItems.push({
           productId,
@@ -534,7 +531,6 @@ const mergeGuestCartService = async ({ userId, guestItems }) => {
     }
   }
 
-  // Save cart
   await cart.save();
 
   return {

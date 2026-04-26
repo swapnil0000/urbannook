@@ -249,7 +249,7 @@ const ProductDetailPage = () => {
       if (!isIdMatch) return false;
       if (availableVariants.length === 0) return true;
 
-      const itemVariant = item.selectedVariant || item.selectedColor || "N/A";
+      const itemVariant = item.selectedVariant || "N/A";
       return (itemVariant) === (selectedVariant || "N/A");
     });
   }, [cartItems, product, selectedVariant, availableVariants]);
