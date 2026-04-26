@@ -16,6 +16,7 @@ import {
 import { useUI } from "../hooks/useRedux";
 import { logout } from "../store/slices/authSlice";
 import { clearCart } from "../store/slices/cartSlice";
+import { fetchCsrfToken, getCsrfToken } from "../store/api/apiSlice";
 import CouponInput from "../component/CouponInput";
 import { ComponentLoader } from "../component/layout/LoadingSpinner";
 
@@ -81,6 +82,8 @@ const CheckoutPage = () => {
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    // Fetch CSRF token for checkout actions
+    fetchCsrfToken().catch(err => console.warn('[Checkout] CSRF fetch failed:', err));
   }, []);
 
   useEffect(() => {
@@ -293,10 +296,11 @@ const CheckoutPage = () => {
     }
   };
 
-  const handleRemoveItem = async (productId, selectedColor) => {
+  const handleRemoveItem = async (productId, selectedVariant, selectedColor) => {
     try {
+      const effectiveVariant = selectedVariant || selectedColor || 'N/A';
       const item = cartItems.find(
-        (item) => item.id === productId && (item.selectedColor || 'N/A') === (selectedColor || 'N/A')
+        (item) => item.id === productId && (item.selectedVariant || item.selectedColor || 'N/A') === (effectiveVariant)
       );
       const mongoId = item?.mongoId || productId;
       const itemImage = item?.image || "";
@@ -305,7 +309,7 @@ const CheckoutPage = () => {
         productId: mongoId,
         quantity: 1,
         action: "remove",
-        color: selectedColor,
+        variant: effectiveVariant,
         image: itemImage,
       }).unwrap();
 
@@ -486,27 +490,23 @@ const CheckoutPage = () => {
       return;
     }
     
-    const authToken = localStorage.getItem('authToken');
-    if (!authToken) {
-      showNotification("Your session has expired. Please login again.", "error");
-      dispatch(logout());
-      openLoginModal();
-      navigate("/");
-      return;
-    }
-    
     setPaymentError(null);
     const selectedFullAddr = savedAddress.find(a => a.addressId === currentAddressId);
     
     try {
       const razorpayKey = razorpayKeyData?.data;      
       const orderData = {
-        items: cartItems.map((i) => ({
-          productId: i.mongoId || i.id.split(':')[0], // Extract raw productId
-          quantity: i.quantity,
-          color: (i.selectedColor && i.selectedColor !== 'N/A') ? i.selectedColor : 
-                 (cartSelections[i.id]?.color || cartSelections[i.mongoId]?.color || "") 
-        })),
+        items: cartItems.map((i) => {
+          const effectiveVariant = (i.selectedVariant && i.selectedVariant !== 'N/A') ? i.selectedVariant : 
+                                   (i.selectedColor && i.selectedColor !== 'N/A' ? i.selectedColor :
+                                   (cartSelections[i.id]?.variant || cartSelections[i.id]?.color || "N/A"));
+          return {
+            productId: i.mongoId || i.id.split(':')[0],
+            quantity: i.quantity,
+            variant: effectiveVariant,
+            color: effectiveVariant // Send both for double safety
+          };
+        }),
         senderMobile: senderMobileStr,
         userEmail: userProfile?.email,
         receiverMobile: useDifferentDeliveryContact && deliveryMobileStr ? deliveryMobileStr : senderMobileStr,
@@ -524,11 +524,12 @@ const CheckoutPage = () => {
           long: selectedFullAddr?.location?.coordinates?.[0] || selectedFullAddr?.long || 0,
         }
       };
-      console.log(orderData?.items);
       
       const orderResult = await createOrder(orderData).unwrap();
       const res = await loadRazorpay();
-      if (!res) return;
+      if (!res) {
+        return;
+      }
 
       const options = {
         key: razorpayKey,
@@ -595,10 +596,15 @@ const CheckoutPage = () => {
 
       paymentObject.open();
     } catch (error) {
+      console.error("Payment initialization error:", error);
+      
       const errorMessage =
         error.data?.message ||
         error.message ||
         "Failed to initialize payment. Please try again.";
+        console.log( error.data?.message,
+        error.message);
+        
       showNotification(errorMessage, "error");
       setPaymentError(errorMessage);
       setShowRetry(true);
@@ -656,14 +662,14 @@ const CheckoutPage = () => {
               <div className="space-y-3 max-h-[220px] overflow-y-auto pr-2 custom-scrollbar">
                 {cartItems.map((item) => (
                   <div
-                    key={item.id}
+                    key={`${item.id}-${item.selectedVariant || item.selectedColor || 'default'}`}
                     className="relative flex gap-4 items-center bg-white p-3 rounded-xl border border-gray-200 hover:border-[#a89068]/40 transition-colors group"
                   >
                     {/* Remove button - top right corner */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleRemoveItem(item?.id, item?.selectedColor);
+                        handleRemoveItem(item?.id, item?.selectedVariant, item?.selectedColor);
                       }}
                       className="absolute top-2 right-2 w-4 h-4 rounded-full bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 flex items-center justify-center transition-all opacity-100"
                       title="Remove item"
@@ -684,35 +690,39 @@ const CheckoutPage = () => {
                         {item.name}
                       </h3>
 
-                      {/* --- NAYA: COLOR DISPLAY --- */}
+                      {/* --- NAYA: VARIANT DISPLAY --- */}
                       {(() => {
-                        const itemColor =
-                          item.selectedColor !== "N/A"
-                            ? item.selectedColor
-                            : cartSelections[item.id]?.color ||
-                              cartSelections[item.mongoId]?.color;
+                        const itemVariant =
+                          (item.selectedVariant && item.selectedVariant !== "N/A")
+                            ? item.selectedVariant
+                            : (item.selectedColor && item.selectedColor !== "N/A"
+                               ? item.selectedColor
+                               : (cartSelections[item.id]?.variant || 
+                                  cartSelections[item.id]?.color || 
+                                  cartSelections[item.mongoId]?.variant || 
+                                  cartSelections[item.mongoId]?.color));
 
-                        if (!itemColor || itemColor === "N/A") return null;
+                        if (!itemVariant || itemVariant === "N/A") return null;
 
                         return (
                           <div className="flex items-center gap-1.5 mb-1.5 mt-1">
                             <span className="text-[9px] text-gray-400 uppercase tracking-widest">
-                              Color:
+                              Variant:
                             </span>
                             <div
                               className="w-3 h-3 rounded-full border border-gray-300 shadow-sm"
                               style={{
                                 background:
-                                  itemColor.toLowerCase() === "rainbow"
+                                  itemVariant.toLowerCase() === "rainbow"
                                     ? "linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)"
-                                    : itemColor
+                                    : itemVariant
                                         .replace(/\s+/g, "")
                                         .toLowerCase(),
                               }}
-                              title={itemColor}
+                              title={itemVariant}
                             ></div>
                             <span className="text-[10px] font-medium text-[#a89068]">
-                              {itemColor}
+                              {itemVariant}
                             </span>
                           </div>
                         );
@@ -841,22 +851,25 @@ const CheckoutPage = () => {
                 </div>
               </div>
 
-              <button
-                onClick={handlePayment}
-                disabled={isOrdering}
-                className="hidden lg:flex w-full mt-8 py-4 bg-[#a89068] text-white rounded-xl font-bold uppercase tracking-widest text-[11px] hover:bg-[#2e443c] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg items-center justify-center gap-3"
-              >
-                {isOrdering ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>{" "}
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    Proceed to Pay <i className="fa-solid fa-lock"></i>
-                  </>
-                )}
-              </button>
+
+              <div className="flex flex-col gap-3 mt-6">
+                <button
+                  onClick={() => handlePayment()}
+                  disabled={isOrdering}
+                  className="hidden lg:flex w-full py-4 bg-[#2e443c] text-white rounded-xl font-bold uppercase tracking-widest text-[11px] hover:bg-[#1a2822] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg items-center justify-center gap-3"
+                >
+                  {isOrdering ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>{" "}
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      Proceed to Pay <i className="fa-solid fa-lock"></i>
+                    </>
+                  )}
+                </button>
+              </div>
 
               {!address && (
                 <p className="hidden lg:flex items-center justify-center gap-1.5 mt-3 text-[10px] text-amber-600 font-bold uppercase tracking-widest">
@@ -1292,33 +1305,35 @@ const CheckoutPage = () => {
               </span>
             )}
           </div>
-          <button
-            onClick={!address ? handleOpenMap : handlePayment}
-            disabled={isOrdering || showMobileModal}
-            className={`flex-1 h-10 max-w-[150px] rounded-xl font-bold uppercase tracking-widest text-[11px] shadow-lg active:scale-95 transition-all flex items-center justify-center gap-3 ${
-              showMobileModal
-                ? "bg-gray-400 text-white cursor-not-allowed opacity-60"
-                : !address
+          <div className="flex gap-2 w-full max-w-[200px]">
+            <button
+              onClick={!address ? handleScrollToAddress : () => handlePayment()}
+              disabled={isOrdering || showMobileModal}
+              className={`flex-1 h-10 rounded-xl font-bold uppercase tracking-widest text-[11px] shadow-lg active:scale-95 transition-all flex items-center justify-center gap-3 ${
+                showMobileModal
+                  ? "bg-gray-400 text-white cursor-not-allowed opacity-60"
+                  : !address
                   ? "bg-[#a89068] text-white border border-[#a89068] hover:bg-[#a89068]/90"
-                  : "bg-[#a89068] text-white hover:bg-[#a89068]/90"
-            }`}
-          >
-            {isOrdering ? (
-              <>
-                <div className="w-2 h-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>{" "}
-                Proc...
-              </>
-            ) : !address ? (
-              <>
-                <i className="fa-solid fa-map-pin text-[12px]"></i>
-                Set Address
-              </>
-            ) : (
-              <>
-                Pay Now <i className="fa-solid fa-lock text-[10px]"></i>
-              </>
-            )}
-          </button>
+                  : "bg-[#2e443c] text-white border border-white/20"
+              }`}
+            >
+              {isOrdering ? (
+                <>
+                  <div className="w-2 h-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>{" "}
+                  Proc...
+                </>
+              ) : !address ? (
+                <>
+                  <i className="fa-solid fa-map-pin text-[12px]"></i>
+                  Set Address
+                </>
+              ) : (
+                <>
+                  Pay Now <i className="fa-solid fa-lock text-[10px]"></i>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>

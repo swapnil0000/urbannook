@@ -86,6 +86,7 @@ class CacheManager {
     this.cache.clear();
     this.currentMemoryUsage = 0;
   }
+  
 }
 
 export const apiCache = new CacheManager(600, 4);

@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 import path from "path";
+import fs from "fs";
 
 const mode = process.env.NODE_ENV || "development";
 
@@ -11,7 +12,15 @@ const envFiles = {
 
 const envFile = envFiles[mode] || ".env";
 
-const envPath = path.resolve(process.cwd(), envFile);
+// Try current directory first, then fallback to 'server' folder if running from root
+let envPath = path.resolve(process.cwd(), envFile);
+
+if (!fs.existsSync(envPath)) {
+  const fallbackPath = path.resolve(process.cwd(), "server", envFile);
+  if (fs.existsSync(fallbackPath)) {
+    envPath = fallbackPath;
+  }
+}
 
 console.log(`🚀 Mode: ${mode.toUpperCase()}`);
 console.log(`⏳ Loading Environment from: ${envFile}`);

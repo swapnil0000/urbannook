@@ -24,6 +24,7 @@ const orderSchema = new mongoose.Schema(
           priceAtPurchase: { type: Number, required: true },
           shipping: String,
           selectedColor: { type: String, default: "N/A" },
+          selectedVariant: { type: String, default: "N/A" },
         },
       },
     ],

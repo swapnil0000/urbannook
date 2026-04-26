@@ -1,64 +1,61 @@
 import env from "./envConfigSetup.js";
-function getAllowedOrigins() {
-  const whitelistFromEnv = env.WHITE_LIST_CLIENT_URI || "";
+// force-redeploy: x-csrf-token allowed
 
-  const origins = whitelistFromEnv
+const getAllowedOrigins = () => {
+  const whitelist = (env.WHITE_LIST_CLIENT_URI || "")
     .split(",")
-    .map((origin) => origin.trim())
-    .filter((origin) => origin.length > 0);
+    .map(origin => origin.trim().replace(/\/$/, ""));
+  return whitelist;
+};
 
-  return origins;
-}
-
-/**
- * CORS options configuration
- */
 export const corsOptions = {
-  origin: function (origin, callback) {
+  origin: (origin, callback) => {
+    // 1. Allow non-browser requests (Postman, mobile)
+    if (!origin) return callback(null, true);
+
     const allowedOrigins = getAllowedOrigins();
-    const mode = env.NODE_ENV;
-    // Allow requests with no origin (mobile apps, Postman, server-to-server)
-    if (!origin) {
+    const cleanOrigin = origin.replace(/\/$/, "");
+
+    // 2. Allow if in explicit whitelist
+    if (allowedOrigins.includes(cleanOrigin)) {
       return callback(null, true);
     }
 
-    // Check if origin is in whitelist
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      // Log rejected origin for debugging
-      console.warn(`⚠️  CORS: Rejected request from origin: ${origin}`);
-      console.warn(`   Allowed origins: ${allowedOrigins.join(", ")}`);
+    // 3. Allow any subdomains of urbannook.online or urbannook.in
+    const isUrbanNookDomain = 
+      cleanOrigin.includes("urbannook.online") || 
+      cleanOrigin.endsWith("urbannook.online") ||
+      cleanOrigin.includes("urbannook.in") ||
+      cleanOrigin.endsWith("urbannook.in");
 
-      if (mode === "development") {
-        console.warn("   (Allowed because NODE_ENV is development)");
-        return callback(null, true);
-      }
-      console.error(`   ❌ Access Denied in ${mode} mode`);
-      callback(
-        new Error(`CORS Error: Origin ${origin} not allowed in ${mode} mode`),
-      );
+    if (isUrbanNookDomain || env.NODE_ENV === "development") {
+      return callback(null, true);
     }
+
+    // 4. Deny others
+    callback(new Error(`CORS Error: Origin ${origin} not allowed`));
   },
-  credentials: true, // Allow cookies and authentication headers
+  credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Accept-Language", "Origin", "X-CSRF-Token"],
-  exposedHeaders: ["Set-Cookie"],
-  optionsSuccessStatus: 200, // Some legacy browsers choke on 204
-  maxAge: 86400, // Cache preflight requests for 24 hours
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "Accept",
+    "Origin",
+    "X-CSRF-Token",
+    "x-csrf-token",
+    "X-XSRF-TOKEN",
+    "x-xsrf-token",
+    "X-Auth-Token"
+  ],
+  exposedHeaders: ["Set-Cookie", "X-CSRF-Token", "x-csrf-token"],
+  optionsSuccessStatus: 204,
+  preflightContinue: false
 };
 
-/**
- * Log CORS configuration on startup
- */
 export function logCorsConfig() {
-  const allowedOrigins = getAllowedOrigins();
-
-  console.log("\n🔒 CORS Configuration:");
-  console.log(`   Environment: ${env.NODE_ENV}`);
-  console.log(`   Allowed Origins (${allowedOrigins.length}):`);
-  allowedOrigins.forEach((origin) => console.log(`     - ${origin}`));
-  console.log("");
+  console.log("🔒 CORS Whitelist:", getAllowedOrigins());
 }
 
 export default corsOptions;

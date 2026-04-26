@@ -105,6 +105,12 @@ const LoginForm = lazy(() => import("../../component/layout/auth/LoginForm"));
 const SignupForm = lazy(() => import("../../component/layout/auth/SignupForm"));
 
 const ProductDetailPage = () => {
+  // Helper to safely extract quantity
+  const itemQty = (q) => {
+    if (typeof q === "object" && q !== null) return q.quantity || 0;
+    return q || 0;
+  };
+
   const { productId } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -121,7 +127,7 @@ const ProductDetailPage = () => {
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showSignup, setShowSignup] = useState(false);
-  const [selectedColor, setSelectedColor] = useState("");
+  const [selectedVariant, setSelectedVariant] = useState("");
 
   // 3. API Hooks
   const {
@@ -153,10 +159,7 @@ const ProductDetailPage = () => {
   const mobileReviewScrollRef = useRef(null);
   const [mobileReviewScrollEnd, setMobileReviewScrollEnd] = useState(false);
   const [expandedReviews, setExpandedReviews] = useState(new Set());
-  const curEntry = lightboxData ? lightboxData.imgList[lightboxData.currentIdx] : null;
-  const curReview = curEntry?.review;
-  const curUrl = curEntry?.url;
-
+  
   const currentUserId = useSelector((state) => state.auth.user?.userId);
   const timeLeft = useTimer(config.offerEndDate);
 
@@ -172,50 +175,68 @@ const ProductDetailPage = () => {
   }, []);
 
   const product = productResponse?.data;
-  const galleryImages = useMemo(() => {
-    if (!product) return [];
-    if (
-      product.secondaryImages?.length === product.color?.length &&
-      product.color?.length > 0
-    ) {
-      return product.secondaryImages;
-    }
 
-    const all = [product.productImg, ...(product.secondaryImages || [])].filter(
-      Boolean,
-    );
-    // Remove duplicate URLs
-    return all.filter((url, index) => all.indexOf(url) === index);
+  const currentPrice = useMemo(() => {
+    if (!product) return 0;
+    if (product.variantDetails && product.variantDetails.length > 0) {
+      const selectedDetail = product.variantDetails.find(v => v.variantName === selectedVariant);
+      if (selectedDetail && selectedDetail.variantPrice) {
+        return selectedDetail.variantPrice;
+      }
+      // Default to first variant's price if no specific variant is matched/priced
+      return product.variantDetails[0].variantPrice || 0;
+    }
+    return 0;
+  }, [product, selectedVariant]);
+
+  const availableVariants = useMemo(() => {
+    if (!product || !product.variantDetails) return [];
+    return product.variantDetails.map(v => v.variantName);
   }, [product]);
 
+  const galleryImages = useMemo(() => {
+    if (!product) return [];
+
+    // 1. Agar variant select kiya hai, toh wahi images dikhayenge
+    if (product.variantDetails && product.variantDetails.length > 0) {
+      const selectedDetail = product.variantDetails.find(v => v.variantName === selectedVariant);
+      if (selectedDetail && selectedDetail.variantImage && selectedDetail.variantImage.length > 0) {
+        return selectedDetail.variantImage;
+      }
+      
+      // If selected variant has no image, try the first variant's image
+      if (product.variantDetails[0].variantImage && product.variantDetails[0].variantImage.length > 0) {
+        return product.variantDetails[0].variantImage;
+      }
+    }
+
+    // 2. Fallback: Placeholder
+    return ["https://urbannook.in/assets/logo.webp"];
+  }, [product, selectedVariant]);
+
   useEffect(() => {
-    if (product?.color && product.color.length > 0) {
+    if (availableVariants.length > 0 && product) {
       const savedSelection = cartSelections[product.productId];
-      let initialColor = product.color[0];
+      let initialVariant = availableVariants[0];
 
       if (
         savedSelection &&
-        savedSelection.color &&
-        product.color.includes(savedSelection.color)
+        savedSelection.variant &&
+        availableVariants.includes(savedSelection.variant)
       ) {
-        initialColor = savedSelection.color;
+        initialVariant = savedSelection.variant;
       }
-      setSelectedColor(initialColor);
-      const colorIdx = product.color.indexOf(initialColor);
-      if (colorIdx !== -1 && galleryImages[colorIdx]) {
-        setCurrentImageIndex(colorIdx);
-      }
-    } else {
-      setSelectedColor("");
+      setSelectedVariant(initialVariant);
+      setCurrentImageIndex(0);
+    } else if (!product) {
+       setSelectedVariant("");
     }
-  }, [product, cartSelections, galleryImages]);
+  }, [product?.productId, availableVariants, cartSelections, product]);
 
+  // NAYA: Variant change hone par image index hamesha reset hoga
   useEffect(() => {
-    if (!product?.color || product.color.length === 0) return;
-    if (product.color[currentImageIndex]) {
-      setSelectedColor(product.color[currentImageIndex]);
-    }
-  }, [currentImageIndex, product]);
+    setCurrentImageIndex(0);
+  }, [selectedVariant]);
 
   const cartItem = useMemo(() => {
     if (!product) return null;
@@ -226,27 +247,20 @@ const ProductDetailPage = () => {
         String(item.productId) === String(product?.productId);
 
       if (!isIdMatch) return false;
+      if (availableVariants.length === 0) return true;
 
-      if (!product?.color || product.color.length === 0) {
-        return true;
-      }
-
-      return (item.selectedColor || "N/A") === (selectedColor || "N/A");
+      const itemVariant = item.selectedVariant || item.selectedColor || "N/A";
+      return (itemVariant) === (selectedVariant || "N/A");
     });
-  }, [cartItems, product, selectedColor]);
-
-  const isInCart = !!cartItem;
-  const currentCartQty = cartItem ? Number(itemQty(cartItem.quantity)) || 0 : 0;
-
-  function itemQty(q) {
-    if (typeof q === "object" && q !== null) return q.quantity || 0;
-    return q || 0;
-  }
+  }, [cartItems, product, selectedVariant, availableVariants]);
 
   const wishlistItems = useSelector((state) => state.wishlist.items);
-  const isInWishlist = wishlistItems.some(
-    (item) => item.productName === product?.productName,
-  );
+  const isInWishlist = useMemo(() => {
+    if (!product) return false;
+    return wishlistItems.some(
+        (item) => item.productId === product.productId || item.productName === product.productName,
+    );
+  }, [wishlistItems, product]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -265,11 +279,20 @@ const ProductDetailPage = () => {
   const handleInitialAddToCart = async () => {
     if (!product) return;
 
-    const effectiveColor =
-      selectedColor ||
-      (product.color && product.color.length > 0 ? product.color[0] : "N/A");
-    const colorIdx = product.color?.indexOf(effectiveColor) || 0;
-    const selectedImage = galleryImages[colorIdx] || product.productImg;
+    const effectiveVariant =
+      selectedVariant ||
+      (availableVariants && availableVariants.length > 0 ? availableVariants[0] : "N/A");
+    
+    // Get image for the selected variant
+    let selectedImage = "https://urbannook.in/assets/logo.webp";
+    if (product.variantDetails && product.variantDetails.length > 0) {
+      const variant = product.variantDetails.find(v => v.variantName === effectiveVariant);
+      if (variant && variant.variantImage && variant.variantImage.length > 0) {
+        selectedImage = variant.variantImage[0];
+      } else if (product.variantDetails[0].variantImage?.[0]) {
+        selectedImage = product.variantDetails[0].variantImage[0];
+      }
+    }
 
     const hasToken = !!localStorage.getItem("authToken");
     const isLoggedIn = isAuthenticated || hasToken;
@@ -279,7 +302,7 @@ const ProductDetailPage = () => {
         await addToCartAPI({
           productId: product?.productId,
           quantity: 1,
-          color: effectiveColor,
+          variant: effectiveVariant,
           image: selectedImage,
         }).unwrap();
 
@@ -287,7 +310,7 @@ const ProductDetailPage = () => {
           updateSelection({
             productId: product.productId,
             quantity: 1,
-            color: effectiveColor,
+            variant: effectiveVariant,
           }),
         );
 
@@ -299,11 +322,11 @@ const ProductDetailPage = () => {
         });
 
         await refetchCart();
-        setSelectedColor(effectiveColor);
+        setSelectedVariant(effectiveVariant);
 
         setFeedbackMessage(
-          effectiveColor !== "N/A"
-            ? `Added ${effectiveColor} to Cart`
+          effectiveVariant !== "N/A"
+            ? `Added ${effectiveVariant} to Cart`
             : "Added to Cart",
         );
         setTimeout(() => setFeedbackMessage(""), 2000);
@@ -317,14 +340,14 @@ const ProductDetailPage = () => {
           id: product?.productId,
           mongoId: product?.productId,
           name: product?.productName,
-          price: product?.sellingPrice || product?.price,
+          price: currentPrice,
           image: selectedImage,
           quantity: 1,
-          selectedColor: effectiveColor,
+          selectedVariant: effectiveVariant,
         }),
       );
 
-      setSelectedColor(effectiveColor);
+      setSelectedVariant(effectiveVariant);
       setFeedbackMessage("Added");
       setTimeout(() => setFeedbackMessage(""), 2000);
     }
@@ -336,8 +359,15 @@ const ProductDetailPage = () => {
     const hasToken = !!localStorage.getItem("authToken");
     const isLoggedIn = isAuthenticated || hasToken;
 
-    const colorIdx = product.color?.indexOf(selectedColor) || 0;
-    const selectedImage = galleryImages[colorIdx] || product.productImg;
+    let selectedImage = "https://urbannook.in/assets/logo.webp";
+    if (product.variantDetails && product.variantDetails.length > 0) {
+      const variant = product.variantDetails.find(v => v.variantName === selectedVariant);
+      if (variant && variant.variantImage && variant.variantImage.length > 0) {
+        selectedImage = variant.variantImage[0];
+      } else if (product.variantDetails[0].variantImage?.[0]) {
+        selectedImage = product.variantDetails[0].variantImage[0];
+      }
+    }
 
     if (newQuantity < 1) {
       if (isLoggedIn) {
@@ -346,7 +376,7 @@ const ProductDetailPage = () => {
             productId: product.productId,
             quantity: 1,
             action: "remove",
-            color: selectedColor || undefined,
+            variant: selectedVariant || undefined,
             image: selectedImage,
           }).unwrap();
 
@@ -359,7 +389,7 @@ const ProductDetailPage = () => {
         dispatch(
           removeItem({
             id: product?.productId,
-            selectedColor: selectedColor || "N/A",
+            selectedVariant: selectedVariant || "N/A",
           }),
         );
       }
@@ -373,7 +403,7 @@ const ProductDetailPage = () => {
           productId: product.productId,
           quantity: 1,
           action,
-          color: selectedColor || undefined,
+          variant: selectedVariant || undefined,
           image: selectedImage,
         }).unwrap();
 
@@ -387,7 +417,7 @@ const ProductDetailPage = () => {
         updateQuantity({
           id: product.productId,
           quantity: newQuantity,
-          selectedColor: selectedColor || "N/A",
+          selectedVariant: selectedVariant || "N/A",
         }),
       );
     }
@@ -515,6 +545,12 @@ const ProductDetailPage = () => {
     }
   };
 
+  const curEntry = lightboxData ? lightboxData.imgList[lightboxData.currentIdx] : null;
+  const curReview = curEntry?.review;
+  const curUrl = curEntry?.url;
+  const isInCart = !!cartItem;
+  const currentCartQty = cartItem ? Number(itemQty(cartItem.quantity)) || 0 : 0;
+
   if (isLoading)
     return (
       <div className="h-screen flex items-center justify-center bg-[#1c3026]">
@@ -539,7 +575,7 @@ const ProductDetailPage = () => {
     "@context": "https://schema.org",
     "@type": "Product",
     name: product.productName,
-    image: [product.image, ...(product.secondaryImages || [])].filter(Boolean),
+    image: galleryImages,
     description: product.productSubDes,
     sku: product.productId,
     brand: { "@type": "Brand", name: "UrbanNook" },
@@ -547,7 +583,7 @@ const ProductDetailPage = () => {
       "@type": "Offer",
       url: `https://www.urbannook.in/product/${product.productId}`,
       priceCurrency: "INR",
-      price: product.sellingPrice,
+      price: currentPrice,
       availability:
         product.productStatus === "in_stock"
           ? "https://schema.org/InStock"
@@ -569,7 +605,7 @@ const ProductDetailPage = () => {
           product.productSubDes ||
           `Buy ${product.productName} at UrbanNook. Premium quality, fast pan-India delivery.`
         }
-        image={product.image}
+        image={galleryImages[0]}
         url={`/product/${product.productId}`}
         type="product"
         structuredData={productStructuredData}
@@ -654,8 +690,10 @@ const ProductDetailPage = () => {
                     key={idx}
                     onClick={() => {
                       setCurrentImageIndex(idx);
-                      if (product.color?.[idx])
-                        setSelectedColor(product.color[idx]);
+                      // Only sync variant to image index for legacy products (no variantDetails)
+                      if (!product.variantDetails?.length && availableVariants?.[idx]) {
+                        setSelectedVariant(availableVariants[idx]);
+                      }
                     }}
                     className={`w-16 h-16 lg:w-20 lg:h-20 rounded-xl border bg-[#e8e6e1] overflow-hidden transition-all flex-shrink-0 relative group ${
                       currentImageIndex === idx
@@ -713,12 +751,10 @@ const ProductDetailPage = () => {
 
               <div className="flex items-baseline gap-4 mb-2">
                 <p className="text-2xl lg:text-3xl font-light text-white">
-                  ₹{product.sellingPrice?.toLocaleString()}
+                  ₹{currentPrice.toLocaleString()}
                 </p>
                 <p className="text-sm text-gray-500 line-through">
-                  ₹
-                  {product.listedPrice?.toLocaleString() ||
-                    (product.sellingPrice * 1.18).toFixed(0)}
+                  ₹{(currentPrice * 1.18).toFixed(0).toLocaleString()}
                 </p>
               </div>
             </div>
@@ -727,56 +763,109 @@ const ProductDetailPage = () => {
               {product.productSubDes}
             </p>
 
-            {product?.color && product.color.length > 0 && (
+            {availableVariants && availableVariants.length > 0 && (
               <div className="mb-8 bg-white/5 p-5 rounded-2xl border border-[#F5DEB3]/10">
                 <div className="flex justify-between items-baseline mb-3">
                   <span className="text-[10px] uppercase tracking-[0.2em] text-[#F5DEB3]/70 font-bold">
-                    Choose Color
+                    Choose Variant
                   </span>
                   <span className="text-xs text-gray-400">
                     Selected:{" "}
                     <strong className="text-white font-medium">
-                      {selectedColor}
+                      {selectedVariant}
                     </strong>
                   </span>
                 </div>
 
                 <div className="flex flex-wrap gap-3 items-center">
-                  {product.color.map((colorName, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => {
-                        setSelectedColor(colorName);
-                        if (galleryImages[idx]) {
-                          setCurrentImageIndex(idx);
-                        }
-                      }}
-                      title={colorName}
-                      className={`w-8 h-8 rounded-full transition-all duration-300 ${
-                        selectedColor === colorName
-                          ? "border-[3px] border-[#F5DEB3] scale-110 shadow-[0_0_15px_rgba(245,222,179,0.4)]"
-                          : "border-2 border-transparent shadow-md hover:scale-110"
-                      }`}
-                      style={
-                        colorName.toLowerCase() === "rainbow"
-                          ? {
-                              background:
-                                "linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)",
-                            }
-                          : {
-                              backgroundColor: colorName
-                                .replace(/\s+/g, "")
-                                .toLowerCase(),
-                            }
+                  {availableVariants.map((variantName, idx) => {
+                    const isSelected = selectedVariant === variantName;
+                    const lowerName = variantName.toLowerCase();
+                    const isBrand = lowerName.includes('bmw') || lowerName.includes('porsche');
+                    
+                    // Helper to get logo or color
+                    const getVariantIcon = (name) => {
+                      if (isBrand) {
+                        const isBmw = lowerName.includes('bmw');
+                        return (
+                          <img 
+                            src={isBmw ? "https://upload.wikimedia.org/wikipedia/commons/4/44/BMW.svg" : "https://pngimg.com/uploads/porsche_logo/porsche_logo_PNG1.png"} 
+                            alt={name} 
+                            className={`${isBmw ? 'w-4 h-4' : 'w-5 h-5'} object-contain ${isSelected ? '' : 'grayscale opacity-60'}`} 
+                          />
+                        );
                       }
-                    ></button>
-                  ))}
-                </div>
+                      
+                      const colorMap = {
+                        'rainbow': 'linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)',
+                        'sky blue': '#87CEEB',
+                        'white': '#FFFFFF',
+                        'black': '#000000',
+                        'red': '#FF0000',
+                        'blue': '#0000FF',
+                        'yellow': '#FFFF00',
+                        'orange': '#FFA500',
+                        'grey': '#808080',
+                        'purple': '#800080'
+                      };
 
-                <p className="text-[10px] text-[#F5DEB3] mt-3 italic font-light">
-                  * By default <strong>{product.color[0]}</strong> is selected
-                  if you don't choose one.
-                </p>
+                      return (
+                        <div 
+                          className="w-full h-full rounded-full border border-white/10" 
+                          style={{ 
+                            background: colorMap[lowerName] || lowerName.replace(/\s+/g, '') 
+                          }}
+                        />
+                      );
+                    };
+
+                    if (isBrand) {
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            setSelectedVariant(variantName);
+                            if (galleryImages[idx]) setCurrentImageIndex(idx);
+                          }}
+                          className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border transition-all duration-300 ${
+                            isSelected
+                              ? "bg-[#F5DEB3] border-[#F5DEB3] text-[#1c3026] shadow-lg scale-105"
+                              : "bg-white/5 border-white/10 text-gray-400 hover:border-white/30"
+                          }`}
+                        >
+                          {getVariantIcon(variantName)}
+                          <div className="flex flex-col items-start leading-none">
+                            <span className={`text-[10px] font-bold uppercase tracking-wider ${isSelected ? 'text-[#1c3026]' : 'text-gray-300'}`}>
+                              {variantName}
+                            </span>
+                            <span className={`text-[6px] uppercase tracking-tighter ${isSelected ? 'text-[#1c3026]/60' : 'text-gray-500'} font-bold mt-0.5`}>
+                              Inspired
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    }
+
+                    // Standard Color Dot for Pen Stand etc.
+                    return (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          setSelectedVariant(variantName);
+                          if (galleryImages[idx]) setCurrentImageIndex(idx);
+                        }}
+                        className={`relative w-6 h-6 rounded-full transition-all duration-300 ${
+                          isSelected
+                            ? "ring-2 ring-offset-2 ring-offset-[#1c3026] ring-[#F5DEB3] scale-110"
+                            : "hover:scale-110 opacity-70 hover:opacity-100"
+                        }`}
+                        title={variantName}
+                      >
+                        {getVariantIcon(variantName)}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
@@ -863,6 +952,20 @@ const ProductDetailPage = () => {
             </div>
 
             <div className="border-t border-[#F5DEB3]/10">
+              {product.productDes && (
+                <AccordionItem
+                  title="Description"
+                  isOpen={activeAccordion === "description"}
+                  onClick={() =>
+                    setActiveAccordion(
+                      activeAccordion === "description" ? "" : "description",
+                    )
+                  }
+                >
+                  <p className="whitespace-pre-line">{product.productDes}</p>
+                </AccordionItem>
+              )}
+
               {product.specifications && product.specifications.length > 0 && (
                 <AccordionItem
                   title="Specifications"
@@ -893,7 +996,7 @@ const ProductDetailPage = () => {
                 </AccordionItem>
               )}
 
-              {product?.warranty && (
+              {product.warranty && (
                 <AccordionItem
                   title="Warranty"
                   isOpen={activeAccordion === "warranty"}
@@ -903,59 +1006,62 @@ const ProductDetailPage = () => {
                     )
                   }
                 >
-                  <div className="flex items-start gap-3">
-                    {/* <i className="fa-solid fa-shield-halved text-[#F5DEB3] mt-0.5"></i> */}
-                    <span>{product.warranty}*</span>
-                  </div>
+                  <p>{product.warranty}</p>
                 </AccordionItem>
               )}
 
-              {product.dimensions &&
-                (product.dimensions.length ||
-                  product.dimensions.breadth ||
-                  product.dimensions.height) && (
-                  <AccordionItem
-                    title="Dimensions"
-                    isOpen={activeAccordion === "dimensions"}
-                    onClick={() =>
-                      setActiveAccordion(
-                        activeAccordion === "dimensions" ? "" : "dimensions",
-                      )
-                    }
-                  >
-                    <div className="flex justify-between items-center py-2">
+              {product.dimensions && (
+                <AccordionItem
+                  title="Dimensions"
+                  isOpen={activeAccordion === "dimensions"}
+                  onClick={() =>
+                    setActiveAccordion(
+                      activeAccordion === "dimensions" ? "" : "dimensions",
+                    )
+                  }
+                >
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-[#F5DEB3]/60 text-xs uppercase tracking-wider font-medium">
+                      Dimensions (L × B × H)
+                    </span>
+                    <span className="text-gray-200 text-sm">
+                      {product.dimensions.length || 0} × {product.dimensions.breadth || 0} × {product.dimensions.height || 0} cm
+                    </span>
+                  </div>
+                  {product.boxDimensionsAndWeight && (
+                    <div className="flex justify-between items-center py-2 border-t border-[#F5DEB3]/5">
                       <span className="text-[#F5DEB3]/60 text-xs uppercase tracking-wider font-medium">
-                        Size
+                        Weight
                       </span>
                       <span className="text-gray-200 text-sm">
-                        {[
-                          product.dimensions.length &&
-                            `${product.dimensions.length}L`,
-                          product.dimensions.breadth &&
-                            `${product.dimensions.breadth}B`,
-                          product.dimensions.height &&
-                            `${product.dimensions.height}H`,
-                        ]
-                          .filter(Boolean)
-                          .join(" × ")}{" "}
-                        cm
+                        {product.boxDimensionsAndWeight.w || 0}g
                       </span>
                     </div>
-                  </AccordionItem>
-                )}
+                  )}
+                </AccordionItem>
+              )}
 
               {product.materialAndCare && (
                 <AccordionItem
                   title="Materials & Care"
+                  noBorder={true}
                   isOpen={activeAccordion === "care"}
                   onClick={() =>
                     setActiveAccordion(activeAccordion === "care" ? "" : "care")
                   }
                 >
-                  {product.materialAndCare}
+                  <p className="whitespace-pre-line">{product.materialAndCare}</p>
                 </AccordionItem>
               )}
             </div>
+
+            {/* Standalone Disclaimer Section */}
+              <p className="text-[12px] leading-relaxed text-gray-400 italic font-light">
+                <strong className="text-[#F5DEB3]/70 not-italic mr-1">Disclaimer:</strong> 
+                This product is an aftermarket decorative lamp inspired by automotive brake disc designs. 
+                Urbannook is not affiliated with, endorsed by, or connected to BMW, Porsche, 
+                or any other automotive brand.
+              </p>
           </div>
         </div>
 
@@ -1886,7 +1992,7 @@ const ProductDetailPage = () => {
               >
                 {isAdding ? "Adding..." : "Add to Cart"}
                 <span className="w-1 h-1 bg-[#1c3026] rounded-full"></span>
-                <span>₹{product.sellingPrice?.toLocaleString()}</span>
+                <span>₹{currentPrice.toLocaleString()}</span>
               </button>
             ) : (
               <div className="flex gap-3 w-full">
@@ -2016,8 +2122,8 @@ const ReviewImg = ({ src, alt, className = "", onClick }) => {
   );
 };
 
-const AccordionItem = ({ title, isOpen, onClick, children }) => (
-  <div className="border-b border-[#F5DEB3]/10">
+const AccordionItem = ({ title, isOpen, onClick, children, noBorder = false }) => (
+  <div className={`${noBorder ? "" : "border-b border-[#F5DEB3]/10"}`}>
     <button
       onClick={onClick}
       className="w-full py-5 flex justify-between items-center text-left hover:text-[#F5DEB3] text-[#F5DEB3]/70 transition-colors group"
