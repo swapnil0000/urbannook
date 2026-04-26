@@ -1,3 +1,4 @@
+// Server Version: 2.1.0 - Strict Variant & Image Logic Live
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";

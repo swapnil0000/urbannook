@@ -70,6 +70,8 @@ jobs:
 
   deploy-server:
     needs: detect-changes
+    # Note: Agar change server folder ke bahar hai toh ye job skip hoga. 
+    # Humesha deploy karna hai toh niche waali 'if' line delete kar dein.
     if: needs.detect-changes.outputs.server == 'true'
     runs-on: ubuntu-latest
     environment: production
@@ -95,19 +97,10 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.AWS_EC2_IP }} >> ~/.ssh/known_hosts || true
 
-      - name: Check Prod EC2 availability
-        id: check_ec2
-        run: |
-          if ssh -o ConnectTimeout=15 ubuntu@${{ secrets.AWS_EC2_IP }} "echo EC2_OK" > /dev/null 2>&1; then
-            echo "available=true" >> $GITHUB_OUTPUT
-          else
-            echo "available=false" >> $GITHUB_OUTPUT
-          fi
-
       - name: Upload Server to EC2
-        if: steps.check_ec2.outputs.available == 'true'
         run: |
           rsync -avz --delete \
+          -e "ssh -o StrictHostKeyChecking=no" \
           --exclude '.env' \
           --exclude '.env.production' \
           --exclude 'node_modules' \
@@ -116,9 +109,8 @@ jobs:
           ubuntu@${{ secrets.AWS_EC2_IP }}:/home/ubuntu/urbannook-prod/server/
 
       - name: Restart Production Backend
-        if: steps.check_ec2.outputs.available == 'true'
         run: |
-          ssh ubuntu@${{ secrets.AWS_EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_EC2_IP }} << 'EOF'
             cd /home/ubuntu/urbannook-prod/server
             npm install --omit=dev --legacy-peer-deps
             pm2 restart urbannook-server --env production || pm2 start ecosystem.config.cjs --env production
