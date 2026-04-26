@@ -23,9 +23,9 @@ export const corsOptions = {
 
     // 3. Allow any subdomains of urbannook.online or urbannook.in
     const isUrbanNookDomain = 
-      cleanOrigin.endsWith(".urbannook.online") || 
-      cleanOrigin.endsWith(".urbannook.in") ||
+      cleanOrigin.includes("urbannook.online") || 
       cleanOrigin.endsWith("urbannook.online") ||
+      cleanOrigin.includes("urbannook.in") ||
       cleanOrigin.endsWith("urbannook.in");
 
     if (isUrbanNookDomain || env.NODE_ENV === "development") {
@@ -46,7 +46,8 @@ export const corsOptions = {
     "X-CSRF-Token",
     "x-csrf-token",
     "X-XSRF-TOKEN",
-    "x-xsrf-token"
+    "x-xsrf-token",
+    "X-Auth-Token"
   ],
   exposedHeaders: ["Set-Cookie", "X-CSRF-Token", "x-csrf-token"],
   optionsSuccessStatus: 204,
