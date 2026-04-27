@@ -1,60 +1,85 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 
 const OpenInBrowserBanner = () => {
   const [showBanner, setShowBanner] = useState(false);
-
-  const headlines = [
-    "🚚 SHIPPING ₹149 ALL OVER INDIA",
-    "🌿 WAITLIST MEMBERS: USE CODE WLUSER FOR EXCLUSIVE DISCOUNT",
-  ];
+  const [isIOS, setIsIOS] = useState(false);
 
   useEffect(() => {
-    const ua = navigator.userAgent || navigator.vendor || window.opera;
-    const isInAppBrowser = /Instagram|FBAN|FBAV|TikTok|Line|WeChat/.test(ua);
-    setShowBanner(isInAppBrowser);
+    const ua = navigator.userAgent || '';
+    const isInApp = /Instagram|FBAN|FBAV|TikTok|Line|WeChat|Snapchat/i.test(ua);
+    const ios = /iPhone|iPad|iPod/i.test(ua);
+    setIsIOS(ios);
+
+    if (!isInApp) return;
+
+    // Already dismissed this session
+    if (sessionStorage.getItem('inAppBannerDismissed')) return;
+
+    const url = window.location.href;
+
+    // Android: auto-redirect to Chrome
+    if (!ios) {
+      window.location.href = `intent://${url.replace(/^https?:\/\//, '')}#Intent;scheme=https;package=com.android.chrome;end`;
+      // Fallback: if intent didn't work after 2s, show banner
+      setTimeout(() => setShowBanner(true), 2000);
+      return;
+    }
+
+    // iOS: can't auto-redirect, show banner
+    setShowBanner(true);
   }, []);
+
+  const handleDismiss = () => {
+    sessionStorage.setItem('inAppBannerDismissed', 'true');
+    setShowBanner(false);
+  };
+
+  const handleOpenAndroid = () => {
+    const url = window.location.href;
+    window.location.href = `intent://${url.replace(/^https?:\/\//, '')}#Intent;scheme=https;package=com.android.chrome;end`;
+  };
 
   if (!showBanner) return null;
 
   return (
-    <Link 
-      to="/products"
-      className="fixed top-0 left-0 right-0 bg-[#a89068] text-white z-[9999] shadow-lg overflow-hidden block h-9 sm:h-10"
-    >
-      <style>{`
-        @keyframes marquee-banner {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-        .animate-marquee-banner {
-          animation: marquee-banner 25s linear infinite;
-        }
-      `}</style>
+    <div className="fixed top-0 left-0 right-0 bg-[#2e443c] text-white px-3 py-3 z-[9999] shadow-lg border-b border-[#a89068]/30">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          <div className="w-8 h-8 rounded-full bg-[#a89068]/20 flex items-center justify-center shrink-0">
+            <i className="fa-solid fa-arrow-up-right-from-square text-[#F5DEB3] text-xs"></i>
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] sm:text-xs font-bold leading-tight">
+              {isIOS ? 'Open in Safari' : 'Open in Chrome'}
+            </p>
+            <p className="text-[9px] sm:text-[10px] text-white/60 leading-tight mt-0.5">
+              {isIOS
+                ? 'Tap ••• below → Open in Safari'
+                : 'For Google login & best experience'}
+            </p>
+          </div>
+        </div>
 
-      <div className="relative flex items-center h-full">
-        <div className="flex whitespace-nowrap animate-marquee-banner">
-          {[...headlines, ...headlines, ...headlines].map((headline, index) => (
-            <div key={index} className="flex items-center px-8">
-              <span className="text-[10px] sm:text-xs font-bold tracking-[0.1em] uppercase">
-                {headline}
-              </span>
-              <span className="ml-8 text-white/30">
-                <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z" />
-                </svg>
-              </span>
-            </div>
-          ))}
+        <div className="flex items-center gap-2 shrink-0">
+          {!isIOS && (
+            <button
+              onClick={handleOpenAndroid}
+              className="bg-[#a89068] text-white px-3.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-[#bfa884] transition-all"
+            >
+              Open
+            </button>
+          )}
+          <button
+            onClick={handleDismiss}
+            className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+            aria-label="Dismiss"
+          >
+            <i className="fa-solid fa-xmark text-[10px] text-white/70"></i>
+          </button>
         </div>
       </div>
-      
-      {/* Subtle close hint or indicator if needed, but here we just make it a link */}
-      <div className="absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-[#a89068] to-transparent z-10 pointer-events-none"></div>
-      <div className="absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-[#a89068] to-transparent z-10 pointer-events-none"></div>
-    </Link>
+    </div>
   );
 };
 
 export default OpenInBrowserBanner;
-
