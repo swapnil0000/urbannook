@@ -9,28 +9,21 @@ jobs:
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
-      client: ${{ steps.changes.outputs.client }}
-      server: ${{ steps.changes.outputs.server }}
+      client: ${{ steps.filter.outputs.client }}
+      server: ${{ steps.filter.outputs.server }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Path Filter
+        uses: dorny/paths-filter@v3
+        id: filter
         with:
-          fetch-depth: 0
-
-      - name: Detect changed paths
-        id: changes
-        run: |
-          if git diff --name-only origin/main~1..origin/main | grep '^client/'; then
-            echo "client=true" >> $GITHUB_OUTPUT
-          else
-            echo "client=false" >> $GITHUB_OUTPUT
-          fi
-
-          if git diff --name-only origin/main~1..origin/main | grep '^server/'; then
-            echo "server=true" >> $GITHUB_OUTPUT
-          else
-            echo "server=false" >> $GITHUB_OUTPUT
-          fi
+          filters: |
+            client:
+              - 'client/**'
+            server:
+              - 'server/**'
 
   deploy-client:
     needs: detect-changes
@@ -100,21 +93,12 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.AWS_EC2_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.AWS_EC2_IP }} >> ~/.ssh/known_hosts || true
-
-      - name: Check Prod EC2 availability
-        id: check_ec2
-        run: |
-          if ssh -o ConnectTimeout=15 ubuntu@${{ secrets.AWS_EC2_IP }} "echo EC2_OK" > /dev/null 2>&1; then
-            echo "available=true" >> $GITHUB_OUTPUT
-          else
-            echo "available=false" >> $GITHUB_OUTPUT
-          fi
+          ssh-keyscan -H ${{ secrets.AWS_EC2_IP }} >> ~/.ssh/known_hosts
 
       - name: Upload Server to EC2
-        if: steps.check_ec2.outputs.available == 'true'
         run: |
           rsync -avz --delete \
+          -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" \
           --exclude '.env' \
           --exclude '.env.production' \
           --exclude 'node_modules' \
@@ -123,11 +107,15 @@ jobs:
           ubuntu@${{ secrets.AWS_EC2_IP }}:/home/ubuntu/urbannook-prod/server/
 
       - name: Restart Production Backend
-        if: steps.check_ec2.outputs.available == 'true'
         run: |
-          ssh ubuntu@${{ secrets.AWS_EC2_IP }} << 'EOF'
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_EC2_IP }} << 'EOF'
+            echo "--- STARTING DEPLOY RESTART ---"
             cd /home/ubuntu/urbannook-prod/server
             npm install --omit=dev --legacy-peer-deps
-            pm2 reload urbannook-server --env production || pm2 start ecosystem.config.cjs --env production
+            # Clean start for fresh code in memory
+            pm2 stop urbannook-server || true
+            pm2 delete urbannook-server || true
+            pm2 start ecosystem.config.cjs --env production
             pm2 save
+            echo "--- DEPLOY RESTART FINISHED ---"
           EOF
