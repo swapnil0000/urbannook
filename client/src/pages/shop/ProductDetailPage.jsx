@@ -14,6 +14,7 @@ import confetti from "canvas-confetti";
 import SEOHead from "../../component/SEOHead";
 import useTimer from "../../hooks/useTimer";
 import config from "../../config/env";
+import { trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist } from "../../utils/analytics";
 
 // Timer Component for Product Page
 const ProductTimer = memo(({ timeLeft }) => {
@@ -238,6 +239,19 @@ const ProductDetailPage = () => {
     setCurrentImageIndex(0);
   }, [selectedVariant]);
 
+  // Track product view when product loads or variant changes
+  useEffect(() => {
+    if (product && selectedVariant) {
+      trackViewItem({
+        itemId: product.productId,
+        itemName: product.productName,
+        itemVariant: selectedVariant,
+        price: currentPrice,
+        quantity: 1,
+      });
+    }
+  }, [product?.productId, selectedVariant, currentPrice]);
+
   const cartItem = useMemo(() => {
     if (!product) return null;
     return cartItems.find((item) => {
@@ -335,6 +349,14 @@ const ProductDetailPage = () => {
             : "Added to Cart",
         );
         setTimeout(() => setFeedbackMessage(""), 2000);
+
+        trackAddToCart({
+          itemId: product.productId,
+          itemName: product.productName,
+          itemVariant: effectiveVariant,
+          price: currentPrice,
+          quantity: 1,
+        });
       } catch (err) {
         console.error("Add to cart failed:", err);
         showNotification(err.data?.message || "Something went wrong", "error");
@@ -355,6 +377,14 @@ const ProductDetailPage = () => {
       setSelectedVariant(effectiveVariant);
       setFeedbackMessage("Added");
       setTimeout(() => setFeedbackMessage(""), 2000);
+
+      trackAddToCart({
+        itemId: product.productId,
+        itemName: product.productName,
+        itemVariant: effectiveVariant,
+        price: currentPrice,
+        quantity: 1,
+      });
     }
   };
 
@@ -398,6 +428,15 @@ const ProductDetailPage = () => {
           }),
         );
       }
+
+      trackRemoveFromCart({
+        itemId: product.productId,
+        itemName: product.productName,
+        itemVariant: selectedVariant,
+        price: currentPrice,
+        quantity: currentCartQty || 1,
+      });
+
       return;
     }
 
@@ -542,6 +581,13 @@ const ProductDetailPage = () => {
         await addToWishlist({ productId: product.productId }).unwrap();
         dispatch(addToWishlistLocal(product.productName));
         setFeedbackMessage("Added to wishlist");
+
+        trackAddToWishlist({
+          itemId: product.productId,
+          itemName: product.productName,
+          itemVariant: selectedVariant,
+          price: currentPrice,
+        });
       }
       setTimeout(() => setFeedbackMessage(""), 2000);
     } catch (error) {

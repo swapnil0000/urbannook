@@ -85,8 +85,21 @@ function bundleSizeMonitor() {
   };
 }
 
+/**
+ * HTML Environment Variable Replace Plugin
+ * Replaces %VITE_GTM_ID% placeholder in index.html with the actual GTM container ID
+ */
+function htmlEnvReplace() {
+  return {
+    name: 'html-env-replace',
+    transformIndexHtml(html) {
+      return html.replace(/%VITE_GTM_ID%/g, process.env.VITE_GTM_ID || 'GTM-XXXXXXX');
+    }
+  };
+}
+
 export default defineConfig({
-  plugins: [react(), bundleSizeMonitor()],
+  plugins: [react(), bundleSizeMonitor(), htmlEnvReplace()],
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
