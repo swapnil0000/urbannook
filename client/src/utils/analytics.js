@@ -29,7 +29,7 @@ export function trackViewItem({ itemId, itemName, itemVariant, price, quantity =
       },
     });
   } catch (error) {
-    console.warn('[Analytics]', 'trackViewItem:', error);
+    console.warn('[Analytics]', 'tr:', error);
   }
 }
 
