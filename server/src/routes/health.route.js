@@ -8,6 +8,7 @@ const healthRouter = express.Router();
 healthRouter.get("/", (_, res) => {
   return res.status(200).json({
     status: "OK",
+    version: "Strict-Variant-V2.1-LIVE",
     uptime: process.uptime(),
     timestamp: Date.now(),
     checks: {

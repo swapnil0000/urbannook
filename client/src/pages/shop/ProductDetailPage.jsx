@@ -14,6 +14,7 @@ import confetti from "canvas-confetti";
 import SEOHead from "../../component/SEOHead";
 import useTimer from "../../hooks/useTimer";
 import config from "../../config/env";
+import { trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist } from "../../utils/analytics";
 
 // Timer Component for Product Page
 const ProductTimer = memo(({ timeLeft }) => {
@@ -238,6 +239,19 @@ const ProductDetailPage = () => {
     setCurrentImageIndex(0);
   }, [selectedVariant]);
 
+  // Track product view when product loads or variant changes
+  useEffect(() => {
+    if (product && selectedVariant) {
+      trackViewItem({
+        itemId: product.productId,
+        itemName: product.productName,
+        itemVariant: selectedVariant,
+        price: currentPrice,
+        quantity: 1,
+      });
+    }
+  }, [product?.productId, selectedVariant, currentPrice]);
+
   const cartItem = useMemo(() => {
     if (!product) return null;
     return cartItems.find((item) => {
@@ -247,10 +261,10 @@ const ProductDetailPage = () => {
         String(item.productId) === String(product?.productId);
 
       if (!isIdMatch) return false;
-      if (availableVariants.length === 0) return true;
-
-      const itemVariant = item.selectedVariant || item.selectedColor || "N/A";
-      return (itemVariant) === (selectedVariant || "N/A");
+      
+      const effectiveVariant = selectedVariant || (availableVariants[0] || "N/A");
+      const itemVariant = item.selectedVariant || "N/A";
+      return itemVariant === effectiveVariant;
     });
   }, [cartItems, product, selectedVariant, availableVariants]);
 
@@ -281,10 +295,12 @@ const ProductDetailPage = () => {
 
     const effectiveVariant =
       selectedVariant ||
-      (availableVariants && availableVariants.length > 0 ? availableVariants[0] : "N/A");
+      (availableVariants && availableVariants.length > 0 
+        ? availableVariants[0] 
+        : (product.color && product.color.length > 0 ? product.color[0] : "Standard Variant"));
     
     // Get image for the selected variant
-    let selectedImage = "https://urbannook.in/assets/logo.webp";
+    let selectedImage = product.productImg || "https://urbannook.in/assets/logo.webp";
     if (product.variantDetails && product.variantDetails.length > 0) {
       const variant = product.variantDetails.find(v => v.variantName === effectiveVariant);
       if (variant && variant.variantImage && variant.variantImage.length > 0) {
@@ -306,6 +322,7 @@ const ProductDetailPage = () => {
           image: selectedImage,
         }).unwrap();
 
+        // Update local selection for persistence
         dispatch(
           updateSelection({
             productId: product.productId,
@@ -314,6 +331,9 @@ const ProductDetailPage = () => {
           }),
         );
 
+        // Force an immediate refetch and wait for it
+        await refetchCart().unwrap();
+
         confetti({
           particleCount: 150,
           spread: 80,
@@ -321,7 +341,6 @@ const ProductDetailPage = () => {
           colors: ["#F5DEB3", "#1c3026", "#a89068", "#ffffff"],
         });
 
-        await refetchCart();
         setSelectedVariant(effectiveVariant);
 
         setFeedbackMessage(
@@ -330,6 +349,14 @@ const ProductDetailPage = () => {
             : "Added to Cart",
         );
         setTimeout(() => setFeedbackMessage(""), 2000);
+
+        trackAddToCart({
+          itemId: product.productId,
+          itemName: product.productName,
+          itemVariant: effectiveVariant,
+          price: currentPrice,
+          quantity: 1,
+        });
       } catch (err) {
         console.error("Add to cart failed:", err);
         showNotification(err.data?.message || "Something went wrong", "error");
@@ -350,6 +377,14 @@ const ProductDetailPage = () => {
       setSelectedVariant(effectiveVariant);
       setFeedbackMessage("Added");
       setTimeout(() => setFeedbackMessage(""), 2000);
+
+      trackAddToCart({
+        itemId: product.productId,
+        itemName: product.productName,
+        itemVariant: effectiveVariant,
+        price: currentPrice,
+        quantity: 1,
+      });
     }
   };
 
@@ -393,6 +428,15 @@ const ProductDetailPage = () => {
           }),
         );
       }
+
+      trackRemoveFromCart({
+        itemId: product.productId,
+        itemName: product.productName,
+        itemVariant: selectedVariant,
+        price: currentPrice,
+        quantity: currentCartQty || 1,
+      });
+
       return;
     }
 
@@ -537,6 +581,13 @@ const ProductDetailPage = () => {
         await addToWishlist({ productId: product.productId }).unwrap();
         dispatch(addToWishlistLocal(product.productName));
         setFeedbackMessage("Added to wishlist");
+
+        trackAddToWishlist({
+          itemId: product.productId,
+          itemName: product.productName,
+          itemVariant: selectedVariant,
+          price: currentPrice,
+        });
       }
       setTimeout(() => setFeedbackMessage(""), 2000);
     } catch (error) {
@@ -678,6 +729,111 @@ const ProductDetailPage = () => {
               )}
             </div>
 
+            {/* NAYA: Variant Selection Block - Ab yahan aayega (Badi image ke neeche aur thumbnails se pehle) */}
+            {availableVariants && availableVariants.length > 0 && (
+              <div className="w-full max-w-[500px] mt-8 bg-white/5 p-5 rounded-2xl border border-[#F5DEB3]/10">
+                <div className="flex justify-between items-baseline mb-3">
+                  <span className="text-[10px] uppercase tracking-[0.2em] text-[#F5DEB3]/70 font-bold">
+                    Choose Variant
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    Selected:{" "}
+                    <strong className="text-white font-medium">
+                      {selectedVariant}
+                    </strong>
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap gap-3 items-center">
+                  {availableVariants.map((variantName, idx) => {
+                    const isSelected = selectedVariant === variantName;
+                    const lowerName = variantName.toLowerCase();
+                    const isBrand = lowerName.includes('bmw') || lowerName.includes('porsche');
+                    
+                    const getVariantIcon = (name) => {
+                      if (isBrand) {
+                        const isBmw = lowerName.includes('bmw');
+                        return (
+                          <img 
+                            src={isBmw ? "https://upload.wikimedia.org/wikipedia/commons/4/44/BMW.svg" : "https://pngimg.com/uploads/porsche_logo/porsche_logo_PNG1.png"} 
+                            alt={name} 
+                            className={`${isBmw ? 'w-4 h-4' : 'w-5 h-5'} object-contain ${isSelected ? '' : 'grayscale opacity-60'}`} 
+                          />
+                        );
+                      }
+                      
+                      const colorMap = {
+                        'rainbow': 'linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)',
+                        'sky blue': '#87CEEB',
+                        'white': '#FFFFFF',
+                        'black': '#000000',
+                        'red': '#FF0000',
+                        'blue': '#0000FF',
+                        'yellow': '#FFFF00',
+                        'orange': '#FFA500',
+                        'grey': '#808080',
+                        'purple': '#800080'
+                      };
+
+                      return (
+                        <div 
+                          className="w-full h-full rounded-full border border-white/10" 
+                          style={{ 
+                            background: colorMap[lowerName] || lowerName.replace(/\s+/g, '') 
+                          }}
+                        />
+                      );
+                    };
+
+                    if (isBrand) {
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            setSelectedVariant(variantName);
+                            if (galleryImages[idx]) setCurrentImageIndex(idx);
+                          }}
+                          className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border transition-all duration-300 ${
+                            isSelected
+                              ? "bg-[#F5DEB3] border-[#F5DEB3] text-[#1c3026] shadow-lg scale-105"
+                              : "bg-white/5 border-white/10 text-gray-400 hover:border-white/30"
+                          }`}
+                        >
+                          {getVariantIcon(variantName)}
+                          <div className="flex flex-col items-start leading-none">
+                            <span className={`text-[10px] font-bold uppercase tracking-wider ${isSelected ? 'text-[#1c3026]' : 'text-gray-300'}`}>
+                              {variantName}
+                            </span>
+                            <span className={`text-[6px] uppercase tracking-tighter ${isSelected ? 'text-[#1c3026]/60' : 'text-gray-500'} font-bold mt-0.5`}>
+                              Inspired
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    }
+
+                    return (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          setSelectedVariant(variantName);
+                          if (galleryImages[idx]) setCurrentImageIndex(idx);
+                        }}
+                        className={`relative w-6 h-6 rounded-full transition-all duration-300 ${
+                          isSelected
+                            ? "ring-2 ring-offset-2 ring-offset-[#1c3026] ring-[#F5DEB3] scale-110"
+                            : "hover:scale-110 opacity-70 hover:opacity-100"
+                        }`}
+                        title={variantName}
+                      >
+                        {getVariantIcon(variantName)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Gallery Thumbnails with Carousel Indicator */}
             <div className="w-full max-w-[500px] mt-6 relative">
               {/* Scroll Container */}
@@ -762,112 +918,6 @@ const ProductDetailPage = () => {
             <p className="text-gray-300 leading-relaxed mb-8 font-light text-sm lg:text-md">
               {product.productSubDes}
             </p>
-
-            {availableVariants && availableVariants.length > 0 && (
-              <div className="mb-8 bg-white/5 p-5 rounded-2xl border border-[#F5DEB3]/10">
-                <div className="flex justify-between items-baseline mb-3">
-                  <span className="text-[10px] uppercase tracking-[0.2em] text-[#F5DEB3]/70 font-bold">
-                    Choose Variant
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    Selected:{" "}
-                    <strong className="text-white font-medium">
-                      {selectedVariant}
-                    </strong>
-                  </span>
-                </div>
-
-                <div className="flex flex-wrap gap-3 items-center">
-                  {availableVariants.map((variantName, idx) => {
-                    const isSelected = selectedVariant === variantName;
-                    const lowerName = variantName.toLowerCase();
-                    const isBrand = lowerName.includes('bmw') || lowerName.includes('porsche');
-                    
-                    // Helper to get logo or color
-                    const getVariantIcon = (name) => {
-                      if (isBrand) {
-                        const isBmw = lowerName.includes('bmw');
-                        return (
-                          <img 
-                            src={isBmw ? "https://upload.wikimedia.org/wikipedia/commons/4/44/BMW.svg" : "https://pngimg.com/uploads/porsche_logo/porsche_logo_PNG1.png"} 
-                            alt={name} 
-                            className={`${isBmw ? 'w-4 h-4' : 'w-5 h-5'} object-contain ${isSelected ? '' : 'grayscale opacity-60'}`} 
-                          />
-                        );
-                      }
-                      
-                      const colorMap = {
-                        'rainbow': 'linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)',
-                        'sky blue': '#87CEEB',
-                        'white': '#FFFFFF',
-                        'black': '#000000',
-                        'red': '#FF0000',
-                        'blue': '#0000FF',
-                        'yellow': '#FFFF00',
-                        'orange': '#FFA500',
-                        'grey': '#808080',
-                        'purple': '#800080'
-                      };
-
-                      return (
-                        <div 
-                          className="w-full h-full rounded-full border border-white/10" 
-                          style={{ 
-                            background: colorMap[lowerName] || lowerName.replace(/\s+/g, '') 
-                          }}
-                        />
-                      );
-                    };
-
-                    if (isBrand) {
-                      return (
-                        <button
-                          key={idx}
-                          onClick={() => {
-                            setSelectedVariant(variantName);
-                            if (galleryImages[idx]) setCurrentImageIndex(idx);
-                          }}
-                          className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border transition-all duration-300 ${
-                            isSelected
-                              ? "bg-[#F5DEB3] border-[#F5DEB3] text-[#1c3026] shadow-lg scale-105"
-                              : "bg-white/5 border-white/10 text-gray-400 hover:border-white/30"
-                          }`}
-                        >
-                          {getVariantIcon(variantName)}
-                          <div className="flex flex-col items-start leading-none">
-                            <span className={`text-[10px] font-bold uppercase tracking-wider ${isSelected ? 'text-[#1c3026]' : 'text-gray-300'}`}>
-                              {variantName}
-                            </span>
-                            <span className={`text-[6px] uppercase tracking-tighter ${isSelected ? 'text-[#1c3026]/60' : 'text-gray-500'} font-bold mt-0.5`}>
-                              Inspired
-                            </span>
-                          </div>
-                        </button>
-                      );
-                    }
-
-                    // Standard Color Dot for Pen Stand etc.
-                    return (
-                      <button
-                        key={idx}
-                        onClick={() => {
-                          setSelectedVariant(variantName);
-                          if (galleryImages[idx]) setCurrentImageIndex(idx);
-                        }}
-                        className={`relative w-6 h-6 rounded-full transition-all duration-300 ${
-                          isSelected
-                            ? "ring-2 ring-offset-2 ring-offset-[#1c3026] ring-[#F5DEB3] scale-110"
-                            : "hover:scale-110 opacity-70 hover:opacity-100"
-                        }`}
-                        title={variantName}
-                      >
-                        {getVariantIcon(variantName)}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
 
             <div className="hidden lg:block bg-white/5 backdrop-blur-sm p-8 rounded-[2rem] max-w-[420px] border border-[#F5DEB3]/10 mb-10">
               <div className="flex flex-row gap-4">

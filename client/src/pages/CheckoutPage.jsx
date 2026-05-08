@@ -19,6 +19,7 @@ import { clearCart } from "../store/slices/cartSlice";
 import { fetchCsrfToken, getCsrfToken } from "../store/api/apiSlice";
 import CouponInput from "../component/CouponInput";
 import { ComponentLoader } from "../component/layout/LoadingSpinner";
+import { trackBeginCheckout, trackPurchase } from "../utils/analytics";
 
 // Lazy load heavy components
 const CouponList = lazy(() => import("../component/CouponList"));
@@ -232,6 +233,22 @@ const CheckoutPage = () => {
     fetchInitialPricing();
   }, [cartItemsLength, applyCouponMutation, appliedCoupon, userEmail]);
 
+  // Track begin_checkout event on mount when cart has items
+  useEffect(() => {
+    if (cartItems.length > 0) {
+      trackBeginCheckout({
+        items: cartItems.map((item) => ({
+          itemId: item.mongoId || item.id,
+          itemName: item.name,
+          itemVariant: item.selectedVariant || 'N/A',
+          price: item.price,
+          quantity: item.quantity,
+        })),
+        value: pricingDetails.subtotal,
+      });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (userProfile) {
       if (userProfile.userAddress && !address) {
@@ -296,11 +313,11 @@ const CheckoutPage = () => {
     }
   };
 
-  const handleRemoveItem = async (productId, selectedVariant, selectedColor) => {
+  const handleRemoveItem = async (productId, selectedVariant) => {
     try {
-      const effectiveVariant = selectedVariant || selectedColor || 'N/A';
+      const effectiveVariant = selectedVariant || 'N/A';
       const item = cartItems.find(
-        (item) => item.id === productId && (item.selectedVariant || item.selectedColor || 'N/A') === (effectiveVariant)
+        (item) => item.id === productId && (item.selectedVariant || 'N/A') === (effectiveVariant)
       );
       const mongoId = item?.mongoId || productId;
       const itemImage = item?.image || "";
@@ -498,13 +515,11 @@ const CheckoutPage = () => {
       const orderData = {
         items: cartItems.map((i) => {
           const effectiveVariant = (i.selectedVariant && i.selectedVariant !== 'N/A') ? i.selectedVariant : 
-                                   (i.selectedColor && i.selectedColor !== 'N/A' ? i.selectedColor :
-                                   (cartSelections[i.id]?.variant || cartSelections[i.id]?.color || "N/A"));
+                                   (cartSelections[i.id]?.variant || "N/A");
           return {
             productId: i.mongoId || i.id.split(':')[0],
             quantity: i.quantity,
-            variant: effectiveVariant,
-            color: effectiveVariant // Send both for double safety
+            variant: effectiveVariant
           };
         }),
         senderMobile: senderMobileStr,
@@ -546,6 +561,19 @@ const CheckoutPage = () => {
         handler: async function (response) {
           try {
             const orderId = response.razorpay_order_id;
+            trackPurchase({
+              transactionId: orderId,
+              value: pricingDetails.subtotal + pricingDetails.shipping - pricingDetails.discount,
+              shipping: pricingDetails.shipping,
+              tax: 0,
+              items: cartItems.map((item) => ({
+                itemId: item.mongoId || item.id,
+                itemName: item.name,
+                itemVariant: item.selectedVariant || 'N/A',
+                price: item.price,
+                quantity: item.quantity,
+              })),
+            });
             navigate(`/payment-processing/${orderId}`)
           } catch (verifyError) {
             console.error("Payment handler error:", verifyError);
@@ -663,14 +691,14 @@ const CheckoutPage = () => {
               <div className="space-y-3 max-h-[220px] overflow-y-auto pr-2 custom-scrollbar">
                 {cartItems.map((item) => (
                   <div
-                    key={`${item.id}-${item.selectedVariant || item.selectedColor || 'default'}`}
+                    key={`${item.id}-${item.selectedVariant || 'default'}`}
                     className="relative flex gap-4 items-center bg-white p-3 rounded-xl border border-gray-200 hover:border-[#a89068]/40 transition-colors group"
                   >
                     {/* Remove button - top right corner */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleRemoveItem(item?.id, item?.selectedVariant, item?.selectedColor);
+                        handleRemoveItem(item?.id, item?.selectedVariant);
                       }}
                       className="absolute top-2 right-2 w-4 h-4 rounded-full bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 flex items-center justify-center transition-all opacity-100"
                       title="Remove item"
@@ -696,12 +724,8 @@ const CheckoutPage = () => {
                         const itemVariant =
                           (item.selectedVariant && item.selectedVariant !== "N/A")
                             ? item.selectedVariant
-                            : (item.selectedColor && item.selectedColor !== "N/A"
-                               ? item.selectedColor
-                               : (cartSelections[item.id]?.variant || 
-                                  cartSelections[item.id]?.color || 
-                                  cartSelections[item.mongoId]?.variant || 
-                                  cartSelections[item.mongoId]?.color));
+                            : (cartSelections[item.id]?.variant || 
+                               cartSelections[item.mongoId]?.variant || "N/A");
 
                         if (!itemVariant || itemVariant === "N/A") return null;
 

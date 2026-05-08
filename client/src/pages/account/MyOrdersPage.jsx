@@ -344,9 +344,9 @@ const MyOrdersPage = () => {
                                 <h4 className="text-[#2e443c] font-medium text-xs md:text-sm truncate">{item.productSnapshot?.productName || "Product"}</h4>
                                 <div className="flex items-center gap-2 mt-1">
                                 <div className="px-2 py-0.5 rounded bg-gray-50 border border-gray-100 text-[9px] text-gray-500 font-bold">Qty: {item.quantity}</div>
-                                {(item.productSnapshot?.selectedVariant || item.productSnapshot?.selectedColor) && (
+                                {item.productSnapshot?.selectedVariant && item.productSnapshot.selectedVariant !== 'N/A' && (
                                   <div className="px-2 py-0.5 rounded bg-gray-50 border border-gray-100 text-[9px] text-[#a89068] font-bold">
-                                    Variant: {item.productSnapshot.selectedVariant || item.productSnapshot.selectedColor}
+                                    Variant: {item.productSnapshot.selectedVariant}
                                   </div>
                                 )}
                                 </div>                              </div>
