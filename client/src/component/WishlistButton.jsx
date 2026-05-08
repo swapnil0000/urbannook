@@ -2,6 +2,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useAddToWishlistMutation, useRemoveFromWishlistMutation } from '../store/api/userApi';
 import { setNotification } from '../store/slices/uiSlice';
 import { useUI } from '../hooks/useRedux';
+import { trackAddToWishlist } from '../utils/analytics';
 
 const WishlistButton = ({ productId, className = "", size = "md" }) => {
   const dispatch = useDispatch();
@@ -35,6 +36,7 @@ const WishlistButton = ({ productId, className = "", size = "md" }) => {
         }));
       } else {
         const response = await addToWishlist({ productId }).unwrap();
+        trackAddToWishlist({ itemId: productId });
         dispatch(setNotification({
           message: response?.message || 'Added to wishlist',
           type: 'success'

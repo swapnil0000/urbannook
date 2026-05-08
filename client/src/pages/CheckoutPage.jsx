@@ -19,6 +19,7 @@ import { clearCart } from "../store/slices/cartSlice";
 import { fetchCsrfToken, getCsrfToken } from "../store/api/apiSlice";
 import CouponInput from "../component/CouponInput";
 import { ComponentLoader } from "../component/layout/LoadingSpinner";
+import { trackBeginCheckout, trackPurchase } from "../utils/analytics";
 
 // Lazy load heavy components
 const CouponList = lazy(() => import("../component/CouponList"));
@@ -231,6 +232,22 @@ const CheckoutPage = () => {
     };
     fetchInitialPricing();
   }, [cartItemsLength, applyCouponMutation, appliedCoupon, userEmail]);
+
+  // Track begin_checkout event on mount when cart has items
+  useEffect(() => {
+    if (cartItems.length > 0) {
+      trackBeginCheckout({
+        items: cartItems.map((item) => ({
+          itemId: item.mongoId || item.id,
+          itemName: item.name,
+          itemVariant: item.selectedVariant || 'N/A',
+          price: item.price,
+          quantity: item.quantity,
+        })),
+        value: pricingDetails.subtotal,
+      });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (userProfile) {
@@ -543,6 +560,19 @@ const CheckoutPage = () => {
         handler: async function (response) {
           try {
             const orderId = response.razorpay_order_id;
+            trackPurchase({
+              transactionId: orderId,
+              value: pricingDetails.subtotal + pricingDetails.shipping - pricingDetails.discount,
+              shipping: pricingDetails.shipping,
+              tax: 0,
+              items: cartItems.map((item) => ({
+                itemId: item.mongoId || item.id,
+                itemName: item.name,
+                itemVariant: item.selectedVariant || 'N/A',
+                price: item.price,
+                quantity: item.quantity,
+              })),
+            });
             navigate(`/payment-processing/${orderId}`)
           } catch (verifyError) {
             console.error("Payment handler error:", verifyError);
