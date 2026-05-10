@@ -748,16 +748,27 @@ const ProductDetailPage = () => {
                   {availableVariants.map((variantName, idx) => {
                     const isSelected = selectedVariant === variantName;
                     const lowerName = variantName.toLowerCase();
-                    const isBrand = lowerName.includes('bmw') || lowerName.includes('porsche');
+                    const isBrand = lowerName.includes('bmw') || lowerName.includes('porsche') || lowerName.includes('lambo');
                     
                     const getVariantIcon = (name) => {
                       if (isBrand) {
-                        const isBmw = lowerName.includes('bmw');
+                        let logoSrc = "";
+                        let logoClass = "w-5 h-5";
+                        
+                        if (lowerName.includes('bmw')) {
+                          logoSrc = "https://upload.wikimedia.org/wikipedia/commons/4/44/BMW.svg";
+                          logoClass = "w-4 h-4";
+                        } else if (lowerName.includes('porsche')) {
+                          logoSrc = "https://pngimg.com/uploads/porsche_logo/porsche_logo_PNG1.png";
+                        } else if (lowerName.includes('lambo')) {
+                          logoSrc = "https://upload.wikimedia.org/wikipedia/en/d/df/Lamborghini_Logo.svg";
+                        }
+                        
                         return (
                           <img 
-                            src={isBmw ? "https://upload.wikimedia.org/wikipedia/commons/4/44/BMW.svg" : "https://pngimg.com/uploads/porsche_logo/porsche_logo_PNG1.png"} 
+                            src={logoSrc} 
                             alt={name} 
-                            className={`${isBmw ? 'w-4 h-4' : 'w-5 h-5'} object-contain ${isSelected ? '' : 'grayscale opacity-60'}`} 
+                            className={`${logoClass} object-contain ${isSelected ? '' : 'grayscale opacity-60'}`} 
                           />
                         );
                       }
@@ -1109,7 +1120,7 @@ const ProductDetailPage = () => {
               <p className="text-[12px] leading-relaxed text-gray-400 italic font-light">
                 <strong className="text-[#F5DEB3]/70 not-italic mr-1">Disclaimer:</strong> 
                 This product is an aftermarket decorative lamp inspired by automotive brake disc designs. 
-                Urbannook is not affiliated with, endorsed by, or connected to BMW, Porsche, 
+                Urbannook is not affiliated with, endorsed by, or connected to BMW, Porsche, Lamborghini, 
                 or any other automotive brand.
               </p>
           </div>
