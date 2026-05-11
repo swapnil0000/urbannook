@@ -64,7 +64,6 @@ const SessionManager = ({ children }) => {
       }
     }
 
-    // Listen for manual token removal (storage events from same tab or other tabs)
     const handleStorageChange = (e) => {
       // Detect when authToken is removed
       if (e.key === 'authToken' && e.newValue === null) {

@@ -5,7 +5,7 @@ module.exports = {
       script: "./src/server.js",
       watch: false,
 
-      // Local (default)
+      // Local (default setup)
       env: {
         NODE_ENV: "development",
       },
