@@ -9,9 +9,9 @@ If you are new to this repository, **read this fully before pushing or merging a
 
 > **`main` is the ONLY source of truth**
 
-* `pre-prod` is **NOT** a source branch
-* `pre-prod` is **ONLY for testing / staging / QA**
-* **`pre-prod` must NEVER be merged into `main`** ❌
+* `staging` is **NOT** a source branch
+* `staging` is **ONLY for testing / staging / QA**
+* **`staging` must NEVER be merged into `main`** ❌
 
 If this rule is broken → unstable code can reach production.
 
@@ -22,8 +22,8 @@ If this rule is broken → unstable code can reach production.
 | Branch      | Purpose                    | Merge Rules                          |
 | ----------- | -------------------------- | ------------------------------------ |
 | `main`      | Production-ready, stable   | Only via PR from `feature/*`         |
-| `pre-prod`  | Staging / QA / testing     | Receives code from `feature/*`       |
-| `feature/*` | Actual development work    | Can merge into `pre-prod` and `main` |
+| `staging`  | Staging / QA / testing     | Receives code from `feature/*`       |
+| `feature/*` | Actual development work    | Can merge into `staging` and `main` |
 | `hotfix/*`  | Emergency production fixes | Direct PR to `main`                  |
 
 ---
@@ -57,23 +57,23 @@ git push origin feature/<feature-name>
 
 ---
 
-### 3️⃣ Testing on pre-prod (STAGING)
+### 3️⃣ Testing on staging (STAGING)
 
 Once feature is ready for testing:
 
 ```bash
-git checkout pre-prod
-git pull origin pre-prod
+git checkout staging
+git pull origin staging
 git merge feature/<feature-name>
-git push origin pre-prod
+git push origin staging
 ```
 
 OR (Preferred):
 
-> Raise a PR: `feature/<feature-name>` → `pre-prod`
+> Raise a PR: `feature/<feature-name>` → `staging`
 
 🔍 QA / Testing happens here
-🌐 Deployed on **pre-prod domain**
+🌐 Deployed on **staging domain**
 
 ---
 
@@ -90,12 +90,12 @@ feature/<feature-name> → main
 ❌ NEVER DO THIS:
 
 ```
-pre-prod → main
+staging → main
 ```
 
 Why?
 
-* `pre-prod` may contain test commits
+* `staging` may contain test commits
 * rollback commits
 * logs / experiments
 
@@ -114,7 +114,7 @@ Why?
 
 ```bash
 git checkout main
-git merge pre-prod   # ❌ NEVER DO THIS
+git merge staging   # ❌ NEVER DO THIS
 ```
 
 If you see this in history → **STOP AND FIX IMMEDIATELY**
@@ -131,7 +131,7 @@ If you see this in history → **STOP AND FIX IMMEDIATELY**
 * ❌ No direct push
 * ❌ No force push
 
-### `pre-prod`
+### `staging`
 
 * ✅ PR preferred
 * ⚠️ Direct push allowed only for testing
@@ -140,7 +140,7 @@ If you see this in history → **STOP AND FIX IMMEDIATELY**
 
 ## ⚙️ GitHub Actions (CI/CD) Behavior
 
-* `pre-prod` branch → deploys to **pre-prod environment**
+* `staging` branch → deploys to **staging environment**
 * `main` branch → deploys to **production environment**
 
 ⚠️ If EC2 is stopped:
@@ -170,10 +170,10 @@ This is the same workflow used in:
 
 * ✅ Start from `main`
 * ✅ Develop on `feature/*`
-* ✅ Test on `pre-prod`
+* ✅ Test on `staging`
 * ✅ Merge **feature → main** after verification
 
-❌ Never merge `pre-prod` into `main`
+❌ Never merge `staging` into `main`
 
 ---
 
