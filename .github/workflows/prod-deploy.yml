@@ -1,11 +1,13 @@
 name: Prod Deploy
 
+# This workflow triggers automatically whenever code is pushed to the 'main' branch
 on:
   push:
     branches:
       - main
 
 jobs:
+  # JOB 1: Detect which parts of the codebase were modified
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
@@ -15,6 +17,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Uses path filters to check if changes happened in the client or server folder
       - name: Path Filter
         uses: dorny/paths-filter@v3
         id: filter
@@ -25,6 +28,7 @@ jobs:
             server:
               - 'server/**'
 
+  # JOB 2: Build and Deploy the Frontend (React/Vite) to AWS S3 & CloudFront
   deploy-client:
     needs: detect-changes
     if: needs.detect-changes.outputs.client == 'true'
@@ -41,6 +45,7 @@ jobs:
         with:
           node-version: 24
 
+      # Creates the .env file dynamically using GitHub Secrets
       - name: Create .env file for Client
         working-directory: client
         run: |
@@ -52,12 +57,14 @@ jobs:
           echo "VITE_GTM_ID=${{ secrets.VITE_GTM_ID }}" >> .env
           echo "VITE_ENABLE_ANALYTICS=${{ secrets.VITE_ENABLE_ANALYTICS }}" >> .env
 
+      # Installs dependencies and builds the production-ready static files
       - name: Build Frontend
         working-directory: client
         run: |
           npm install --legacy-peer-deps
           npm run build:prod
 
+      # Authenticates with AWS using the provided IAM credentials
       - name: Configure AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -65,11 +72,25 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_S3_BUCKET_REGION }}
 
+      # Uploads the build to S3 and clears the CloudFront cache
       - name: S3 Sync & CloudFront Invalidation
         run: |
-          aws s3 sync client/dist/ s3://${{ secrets.AWS_S3_FRONTEND_BUCKET }} --delete --only-show-errors
+          # Step 2a: Sync all assets (JS, CSS, Images) allowing them to cache for better performance. 
+          # We explicitly exclude index.html and sw.js from this bulk upload.
+          aws s3 sync client/dist/ s3://${{ secrets.AWS_S3_FRONTEND_BUCKET }} --delete --exclude "index.html" --exclude "sw.js" --only-show-errors
+          
+          # Step 2b: Upload index.html with strict NO-CACHE headers. 
+          # This forces browsers to always fetch the latest version, preventing "Chunk Load / Oops" errors.
+          aws s3 cp client/dist/index.html s3://${{ secrets.AWS_S3_FRONTEND_BUCKET }}/index.html --metadata-directive REPLACE --cache-control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
+          
+          # Step 2c: Upload the Service Worker (if it exists) with the same NO-CACHE headers.
+          if [ -f "client/dist/sw.js" ]; then
+            aws s3 cp client/dist/sw.js s3://${{ secrets.AWS_S3_FRONTEND_BUCKET }}/sw.js --metadata-directive REPLACE --cache-control "no-store, no-cache, must-revalidate, max-age=0"
+          fi
+          
           aws cloudfront create-invalidation --distribution-id ${{ secrets.AWS_CLOUDFRONT_ID }} --paths "/*"
 
+  # JOB 3: Deploy the Backend (Node.js/Express) to AWS EC2
   deploy-server:
     needs: detect-changes
     if: needs.detect-changes.outputs.server == 'true'
@@ -86,10 +107,12 @@ jobs:
         with:
           node-version: 24
 
+      # Installs backend dependencies
       - name: Install Server Dependencies
         working-directory: server
         run: npm install --legacy-peer-deps
 
+      # Sets up the SSH key to securely connect to the EC2 instance
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
@@ -97,6 +120,7 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.AWS_EC2_IP }} >> ~/.ssh/known_hosts
 
+      # Uses rsync to copy the backend code to the EC2 server, excluding unnecessary files
       - name: Upload Server to EC2
         run: |
           rsync -avz --delete \
@@ -108,6 +132,7 @@ jobs:
           server/ \
           ubuntu@${{ secrets.AWS_EC2_IP }}:/home/ubuntu/urbannook-prod/server/
 
+      # Connects to EC2 via SSH to install prod dependencies and restart the PM2 process
       - name: Restart Production Backend
         run: |
           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_EC2_IP }} << 'EOF'
