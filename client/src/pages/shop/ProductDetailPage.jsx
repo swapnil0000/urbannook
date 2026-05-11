@@ -681,9 +681,8 @@ const ProductDetailPage = () => {
         <div className="flex flex-col md:flex-row items-start">
           <div
             className="lg:col-span-6 max-w-[500px] w-full lg:sticky lg:top-24 flex flex-col items-start"
-            style={{ maxHeight: "calc(100vh - 6rem)" }}
           >
-            <div className="relative max-w-[500px] h-[400px] lg:h-[520px] rounded-2xl overflow-hidden shadow-2xl group w-full">
+            <div className="relative max-w-[500px] aspect-square md:aspect-auto md:h-[520px] rounded-2xl overflow-hidden shadow-2xl group w-full bg-[#e8e6e1]">
               <div className="w-full h-full relative cursor-pointer flex items-center justify-center">
                 <Suspense
                   fallback={
