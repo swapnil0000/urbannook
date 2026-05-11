@@ -1,37 +1,34 @@
 name: Prod Deploy
 
+# This workflow triggers automatically whenever code is pushed to the 'main' branch
 on:
   push:
     branches:
       - main
 
 jobs:
+  # JOB 1: Detect which parts of the codebase were modified
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
-      client: ${{ steps.changes.outputs.client }}
-      server: ${{ steps.changes.outputs.server }}
+      client: ${{ steps.filter.outputs.client }}
+      server: ${{ steps.filter.outputs.server }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      # Uses path filters to check if changes happened in the client or server folder
+      - name: Path Filter
+        uses: dorny/paths-filter@v3
+        id: filter
         with:
-          fetch-depth: 0
+          filters: |
+            client:
+              - 'client/**'
+            server:
+              - 'server/**'
 
-      - name: Detect changed paths
-        id: changes
-        run: |
-          if git diff --name-only origin/main~1..origin/main | grep '^client/'; then
-            echo "client=true" >> $GITHUB_OUTPUT
-          else
-            echo "client=false" >> $GITHUB_OUTPUT
-          fi
-
-          if git diff --name-only origin/main~1..origin/main | grep '^server/'; then
-            echo "server=true" >> $GITHUB_OUTPUT
-          else
-            echo "server=false" >> $GITHUB_OUTPUT
-          fi
-
+  # JOB 2: Build and Deploy the Frontend (React/Vite) to AWS S3 & CloudFront
   deploy-client:
     needs: detect-changes
     if: needs.detect-changes.outputs.client == 'true'
@@ -48,6 +45,7 @@ jobs:
         with:
           node-version: 24
 
+      # Creates the .env file dynamically using GitHub Secrets
       - name: Create .env file for Client
         working-directory: client
         run: |
@@ -56,13 +54,17 @@ jobs:
           echo "VITE_DOMAIN_BASE_URL=${{ secrets.VITE_DOMAIN_BASE_URL }}" >> .env
           echo "VITE_GOOGLE_CLIENT_ID=${{ secrets.VITE_GOOGLE_CLIENT_ID }}" >> .env
           echo "VITE_GOOGLE_MAPS_API_KEY=${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}" >> .env
+          echo "VITE_GTM_ID=${{ secrets.VITE_GTM_ID }}" >> .env
+          echo "VITE_ENABLE_ANALYTICS=${{ secrets.VITE_ENABLE_ANALYTICS }}" >> .env
 
+      # Installs dependencies and builds the production-ready static files
       - name: Build Frontend
         working-directory: client
         run: |
           npm install --legacy-peer-deps
           npm run build:prod
 
+      # Authenticates with AWS using the provided IAM credentials
       - name: Configure AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -70,11 +72,25 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_S3_BUCKET_REGION }}
 
+      # Uploads the build to S3 and clears the CloudFront cache
       - name: S3 Sync & CloudFront Invalidation
         run: |
-          aws s3 sync client/dist/ s3://${{ secrets.AWS_S3_FRONTEND_BUCKET }} --delete --only-show-errors
+          # Step 2a: Sync all assets (JS, CSS, Images) allowing them to cache for better performance. 
+          # We explicitly exclude index.html and sw.js from this bulk upload.
+          aws s3 sync client/dist/ s3://${{ secrets.AWS_S3_FRONTEND_BUCKET }} --delete --exclude "index.html" --exclude "sw.js" --only-show-errors
+          
+          # Step 2b: Upload index.html with strict NO-CACHE headers. 
+          # This forces browsers to always fetch the latest version, preventing "Chunk Load / Oops" errors.
+          aws s3 cp client/dist/index.html s3://${{ secrets.AWS_S3_FRONTEND_BUCKET }}/index.html --metadata-directive REPLACE --cache-control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
+          
+          # Step 2c: Upload the Service Worker (if it exists) with the same NO-CACHE headers.
+          if [ -f "client/dist/sw.js" ]; then
+            aws s3 cp client/dist/sw.js s3://${{ secrets.AWS_S3_FRONTEND_BUCKET }}/sw.js --metadata-directive REPLACE --cache-control "no-store, no-cache, must-revalidate, max-age=0"
+          fi
+          
           aws cloudfront create-invalidation --distribution-id ${{ secrets.AWS_CLOUDFRONT_ID }} --paths "/*"
 
+  # JOB 3: Deploy the Backend (Node.js/Express) to AWS EC2
   deploy-server:
     needs: detect-changes
     if: needs.detect-changes.outputs.server == 'true'
@@ -91,30 +107,24 @@ jobs:
         with:
           node-version: 24
 
+      # Installs backend dependencies
       - name: Install Server Dependencies
         working-directory: server
         run: npm install --legacy-peer-deps
 
+      # Sets up the SSH key to securely connect to the EC2 instance
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.AWS_EC2_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.AWS_EC2_IP }} >> ~/.ssh/known_hosts || true
+          ssh-keyscan -H ${{ secrets.AWS_EC2_IP }} >> ~/.ssh/known_hosts
 
-      - name: Check Prod EC2 availability
-        id: check_ec2
-        run: |
-          if ssh -o ConnectTimeout=15 ubuntu@${{ secrets.AWS_EC2_IP }} "echo EC2_OK" > /dev/null 2>&1; then
-            echo "available=true" >> $GITHUB_OUTPUT
-          else
-            echo "available=false" >> $GITHUB_OUTPUT
-          fi
-
+      # Uses rsync to copy the backend code to the EC2 server, excluding unnecessary files
       - name: Upload Server to EC2
-        if: steps.check_ec2.outputs.available == 'true'
         run: |
           rsync -avz --delete \
+          -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" \
           --exclude '.env' \
           --exclude '.env.production' \
           --exclude 'node_modules' \
@@ -122,12 +132,17 @@ jobs:
           server/ \
           ubuntu@${{ secrets.AWS_EC2_IP }}:/home/ubuntu/urbannook-prod/server/
 
+      # Connects to EC2 via SSH to install prod dependencies and restart the PM2 process
       - name: Restart Production Backend
-        if: steps.check_ec2.outputs.available == 'true'
         run: |
-          ssh ubuntu@${{ secrets.AWS_EC2_IP }} << 'EOF'
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_EC2_IP }} << 'EOF'
+            echo "--- STARTING DEPLOY RESTART ---"
             cd /home/ubuntu/urbannook-prod/server
             npm install --omit=dev --legacy-peer-deps
-            pm2 reload urbannook-server --env production || pm2 start ecosystem.config.cjs --env production
+            # Clean start for fresh code in memory
+            pm2 stop urbannook-server || true
+            pm2 delete urbannook-server || true
+            pm2 start ecosystem.config.cjs --env production
             pm2 save
+            echo "--- DEPLOY RESTART FINISHED ---"
           EOF

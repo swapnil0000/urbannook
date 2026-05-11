@@ -26,11 +26,12 @@ const userAddToCart = asyncHandler(async (req, res) => {
   const result = await addToCartService({
     userId,
     productId,
-    productQuanity: productQuanity || quantity || 1,
-    color: variant || color,
+    productQuanity: Number(productQuanity || quantity || 1),
+    variant: variant || color || "N/A", 
     image,
   });
 
+  res.setHeader("X-Server-Version", "2.0-Strict-Variant");
   return res
     .status(result.statusCode)
     .json(
@@ -47,6 +48,7 @@ const userGetCart = asyncHandler(async (req, res) => {
   const { userId } = req.user;
   const result = await getCartService({ userId });
 
+  res.setHeader("X-Server-Version", "2.0-Strict-Variant");
   return res
     .status(result.statusCode)
     .json(
@@ -68,7 +70,7 @@ const userUpdateCartQuantity = asyncHandler(async (req, res) => {
     productId,
     quantity: quantity || 1,
     action,
-    color: variant || color,
+    variant: variant || color,
     image,
   });
 

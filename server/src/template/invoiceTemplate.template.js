@@ -69,9 +69,9 @@ export const generateInvoiceHtmlTemplate = (order) => {
               <tr>
                 <td>
                   ${item.productSnapshot.productName}
-                  ${(item.productSnapshot.selectedVariant || item.productSnapshot.selectedColor) && (item.productSnapshot.selectedVariant !== 'N/A' || item.productSnapshot.selectedColor !== 'N/A')
-                    ? `<br/><small style="color: #666;">Variant: ${item.productSnapshot.selectedVariant || item.productSnapshot.selectedColor}</small>`
-                    : ""
+                  ${item.productSnapshot.selectedVariant && item.productSnapshot.selectedVariant !== 'N/A'
+                   ? `<br/><small style="color: #666;">Variant: ${item.productSnapshot.selectedVariant}</small>`
+                   : ''}
                   }
                 <td class="center">${item.productSnapshot.quantity}</td>
                 <td class="center">₹${item.productSnapshot.priceAtPurchase}</td>
