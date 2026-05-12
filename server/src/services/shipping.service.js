@@ -30,14 +30,23 @@ const calculateShippingRate = async ({ pincode, cartItems }) => {
   }
 
   const productIds = cartItems.map((item) => item.productId);
-  
-  const products = await Product.find({ productId: { $in: productIds } })
-    .select("productId weight sellingPrice dimensions")
+  const dbProducts = await Product.find({ productId: { $in: productIds } })
+    .select("productId weight sellingPrice dimensions ")
     .lean();
 
-  if (products.length === 0) {
-    throw new NotFoundError("Products not found");
+  if (dbProducts.length === 0) {
+    throw new NotFoundError("Products not found in database");
   }
+  const finalOrderItems = cartItems.map((cartItem) => {
+    const productDetail = dbProducts.find(p => p.productId === cartItem.productId);
+
+    return {
+        ...productDetail,          
+        price: cartItem.price,    
+        variant: cartItem.selectedVariant, 
+        quantity: cartItem.quant   
+    };
+}).filter(item => item !== null)
 
   let totalWeight = 0;
   let totalAmount = 0;
@@ -49,34 +58,31 @@ const calculateShippingRate = async ({ pincode, cartItems }) => {
     return isNaN(parsed) ? fallback : parsed;
   };
 
-  for (const item of cartItems) {
-    const product = products.find((p) => p.productId === item.productId);
-    if (!product) continue;
-
+  for (const item of finalOrderItems) {
     const quant = safeFloat(item.quant, 1);
     if (quant > 1) hasMultiQuantity = true;
     
     let weightVal = 0;
-    if (typeof product.weight === 'string') {
-        const weightStr = product.weight.toLowerCase();
-        if (weightStr.includes('kg')) {
-            weightVal = safeFloat(weightStr) * 1000;
-        } else {
-            weightVal = safeFloat(weightStr.replace(/[^0-9.]/g, ''));
-        }
+    if (typeof item.weight === "string") {
+      const weightStr = item.weight.toLowerCase();
+      if (weightStr.includes("kg")) {
+        weightVal = safeFloat(weightStr) * 1000;
+      } else {
+        weightVal = safeFloat(weightStr.replace(/[^0-9.]/g, ""));
+      }
     } else {
-        weightVal = safeFloat(product.weight);
+      weightVal = safeFloat(item.weight);
     }
-    
-    totalWeight += weightVal * quant;
-    totalAmount += safeFloat(product.sellingPrice, 0) * quant;
 
-    const dim = product.dimensions || {};
+    totalWeight += weightVal * quant;
+    totalAmount += safeFloat(item?.price, 0) * quant;
+
+    const dim = item.dimensions || {};
     dimensions.push({
       no_of_box: quant.toString(),
-      length: (safeFloat(dim.length)).toString(),
-      width: (safeFloat(dim.breadth)).toString(),
-      height: (safeFloat(dim.height)).toString(),
+      length: safeFloat(dim.length).toString(),
+      width: safeFloat(dim.breadth).toString(),
+      height: safeFloat(dim.height).toString(),
     });
   }
 
@@ -120,19 +126,21 @@ const calculateShippingRate = async ({ pincode, cartItems }) => {
     }
 
     if (selectedService) {
-        let baseCharge = safeFloat(selectedService.total_charges);
-        if (baseCharge <= 0) return null;
-
+      let baseCharge = safeFloat(selectedService.total_charges);
+      if (baseCharge > 0) {
         let finalCharge = Math.ceil(baseCharge);
 
         if (hasMultiQuantity) {
-            finalCharge = Math.ceil(finalCharge * 1.25);
+          finalCharge = Math.ceil(finalCharge * 1.25);
         }
-        
+        finalCharge += 30;
         selectedService.total_charges = finalCharge;
+        return selectedService;
+      }
     }
 
-    return selectedService;
+    // Fallback if no specific service is found or charges are 0
+    return { name: "Standard Shipping", total_charges: 179 };
   } catch (error) {
     console.error("Shipping Service Error:", error.response?.data || error.message);
     return null;

@@ -96,8 +96,10 @@ const CheckoutPage = () => {
         try {
           const formattedCartItems = cartItems.map(item => ({
             productId: item.mongoId || item.id.split(':')[0],
-            quant: item.quantity
-          }));
+            quant: item.quantity,
+            price:item?.price,
+            selectedVariant: item?.selectedVariant
+          }));          
 
           const result = await calculateShipping({
             deliveryPinCode: parseInt(pincode, 10),
@@ -928,7 +930,7 @@ const CheckoutPage = () => {
                   <span className="text-xs uppercase tracking-widest text-[#a89068] font-bold">
                     Total To Pay
                   </span>
-                  <span className="text-3xl font-serif text-white">
+                  <span className="text-3xl font-serif text-[#2e443c]">
                     ₹
                     {(
                       pricingDetails.subtotal +

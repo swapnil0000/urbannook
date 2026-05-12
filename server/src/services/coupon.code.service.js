@@ -21,7 +21,7 @@ const applyCouponCodeService = async ({ userId, couponCodeName, email }) => {
   }
 
   const { cartSubtotal, availableItems } = cartRes.data;
-  const SHIPPING_CHARGES = 149;
+  const SHIPPING_CHARGES = 179;
 
   let discountAmount = 0;
 
