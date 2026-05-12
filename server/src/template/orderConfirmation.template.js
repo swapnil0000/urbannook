@@ -5,6 +5,7 @@ const orderConfirmationTemplate = (orderDetails) => {
     <tr>
       <td style="padding:12px 0; border-bottom:1px solid #E5E5E5; font-family:Arial, Helvetica, sans-serif; font-size:14px; color:#2E443C;">
         ${item.productName || item.name}
+        ${(item.variant || item.color) && (item.variant !== 'N/A' || item.color !== 'N/A') ? `<br/><span style="font-size:11px; color:#666;">Variant: ${item.variant || item.color}</span>` : ''}
       </td>
       <td style="padding:12px 0; border-bottom:1px solid #E5E5E5; font-family:Arial, Helvetica, sans-serif; font-size:14px; color:#2E443C; text-align:center;">
         ${item.quantity}

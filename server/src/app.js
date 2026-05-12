@@ -1,3 +1,4 @@
+// Server Version: 2.1.0 - Strict Variant & Image Logic Live
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -23,9 +24,21 @@ import { sanitizeRequestBody } from "./middleware/sanitization.middleware.js";
 import env from "./config/envConfigSetup.js";
 
 const app = express();
+
+// HARDCODED DEPLOYMENT TRACKER
+app.use((req, res, next) => {
+  res.setHeader("X-Deployment-Status", "V2.1.0-STRICT-ACTIVE");
+  next();
+});
+
+// Set essential app settings
 app.set("trust proxy", 1);
 app.set("etag", false);
-// test
+
+// 1. HANDEL CORS (Must be the very first middleware)
+app.use(cors(corsOptions));
+
+// Log config on startup
 logCorsConfig();
 
 /* ===============================================================
@@ -71,6 +84,8 @@ app.use(
           "https://api.razorpay.com",
           "https://accounts.google.com",
           "https://apis.google.com",
+          "https://api-staging.urbannook.online",
+          "https://api.urbannook.in",
           env.NODE_ENV === "development" ? "http://localhost:*" : "",
           env.NODE_ENV === "development" ? "ws://localhost:*" : "", // For Vite HMR
         ].filter(Boolean),
@@ -131,25 +146,23 @@ app.use(
       policy: "strict-origin-when-cross-origin",
     },
 
+    // Resource Policy - Allow cross-origin requests
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    
+    // Opener Policy - Allow Google OAuth popup
+    crossOriginOpenerPolicy: { 
+        policy: env.NODE_ENV === "development" ? "unsafe-none" : "same-origin-allow-popups" 
+    },
+
     // Permissions Policy - Control browser features
     permittedCrossDomainPolicies: {
       permittedPolicies: "none",
-    },
-
-    // Cross-Origin-Opener-Policy - Allow Google OAuth popup
-    crossOriginOpenerPolicy: {
-      policy:
-        env.NODE_ENV === "development"
-          ? "unsafe-none"
-          : "same-origin-allow-popups",
     },
   }),
 );
 
 /* Health Route */
 app.use("/health", healthRouter);
-app.use(cors(corsOptions));
-app.options(/.*/, cors(corsOptions));
 
 /*Explicity for webhook because it requires rp webhook requires raw not json */
 app.use("/api/v1", (req, res, next) => {

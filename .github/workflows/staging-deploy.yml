@@ -63,7 +63,7 @@ jobs:
         run: |
           npm install --legacy-peer-deps
           
-          # Injecting secrets directly as environment variables for the build process
+          # Injecting secrets directly as environment variables
           VITE_APP_ENV="${{ secrets.VITE_APP_ENV }}" \
           VITE_API_BASE_URL="${{ secrets.VITE_API_BASE_URL }}" \
           VITE_DOMAIN_BASE_URL="${{ secrets.VITE_DOMAIN_BASE_URL }}" \
@@ -82,13 +82,16 @@ jobs:
 
       - name: Deploy Frontend to S3
         run: |
+          # Syncing files to S3
           aws s3 sync client/dist/ s3://${{ secrets.S3_STAGING_BUCKET }} --delete --only-show-errors
-      
-      - name: Invalidate CloudFront
+
+      - name: Purge Cloudflare Cache
+        # CloudFront invalidation replaced with Cloudflare Cache Purge API
         run: |
-          aws cloudfront create-invalidation \
-            --distribution-id ${{ secrets.STAGING_CLOUDFRONT_DIST_ID }} \
-            --paths "/*"
+          curl -X POST "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/purge_cache" \
+          -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+          -H "Content-Type: application/json" \
+          --data '{"purge_everything":true}'
 
   deploy-server:
     needs: detect-changes

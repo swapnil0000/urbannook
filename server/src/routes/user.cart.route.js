@@ -7,7 +7,7 @@ import {
   getOrderStatus,
   userMergeGuestCart,
 } from "../controller/user.cart.controller.js";
-import { authGuardService } from "../services/common.auth.service.js";
+import { authGuardService, optionalAuthGuard } from "../services/common.auth.service.js";
 import { csrfProtection } from "../middleware/csrf.middleware.js";
 
 const userCartRouter = Router();
@@ -21,7 +21,6 @@ userCartRouter.post(
   userUpdateCartQuantity,
 );
 
-// NEW: Merge guest cart items
 userCartRouter.post(
   "/user/cart/merge",
   authGuardService("USER"),

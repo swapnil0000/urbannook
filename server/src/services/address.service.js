@@ -136,13 +136,23 @@ const createAddressService = async ({
   flatOrFloorNumber,
   addressType,
   isDefault,
+  // v2 fields
+  buildingName,
+  street,
+  floor,
+  tower,
+  fullName,
+  mobileNumber,
 }) => {
   if (!userId) {
     throw new AuthenticationError("Unauthorized");
   }
 
-  if (!placeId || !formattedAddress) {
-    throw new ValidationError("Please select a valid address from suggestions");
+  // placeId is optional — manual form submissions send "N/A" or nothing
+  const resolvedPlaceId = placeId || "N/A";
+
+  if (!formattedAddress) {
+    throw new ValidationError("Address details are required");
   }
 
   let userAddress = await UserAddress.findOne({ userId });
@@ -156,23 +166,27 @@ const createAddressService = async ({
 
   const numLat = Number(lat);
   const numLong = Number(long);
+  const hasRealCoords = numLat !== 0 || numLong !== 0;
   const normalizedFlat = flatOrFloorNumber?.trim() || "";
   const normalizedLandmark = landmark?.trim() || "";
 
   // --- DUPLICATE CHECK LOGIC ---
   const userAddressIds = userAddress?.addresses || [];
 
+  // Escape formattedAddress for safe regex use (prevents ReDoS on special chars)
+  const escapedFormatted = formattedAddress.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
   // Step 1: Check if the CURRENT USER already has an address at this location
   // We split this into two queries because MongoDB doesn't allow $near inside $or
   let existingUserAddress = await Address.findOne({
     addressId: { $in: userAddressIds },
     $or: [
-      { placeId: { $ne: "N/A", $eq: placeId } },
-      { formattedAddress: { $regex: new RegExp(`^${formattedAddress.trim()}$`, "i") } },
+      { placeId: { $ne: "N/A", $eq: resolvedPlaceId } },
+      { formattedAddress: { $regex: new RegExp(`^${escapedFormatted}$`, "i") } },
     ],
   });
 
-  if (!existingUserAddress) {
+  if (!existingUserAddress && hasRealCoords) {
     existingUserAddress = await Address.findOne({
       addressId: { $in: userAddressIds },
       location: {
@@ -185,13 +199,24 @@ const createAddressService = async ({
   }
 
   if (existingUserAddress) {
-    // Update the existing record with any new details (flat, landmark, etc.) to keep it current
+    // Build updated deliveryAddressFull from the incoming fields
+    const updatedDeliveryFull = [
+      String(buildingName ?? "").trim(),
+      String(street       ?? "").trim(),
+      String(floor        ?? "").trim(),
+      String(tower        ?? "").trim(),
+      String(landmark     ?? "").trim() ? `Near ${String(landmark ?? "").trim()}` : "",
+      String(city         ?? "").trim(),
+      String(state        ?? "").trim(),
+      String(pinCode      ?? "").trim(),
+    ].filter(Boolean).join(", ");
+
     await Address.updateOne(
       { addressId: existingUserAddress.addressId },
       {
         $set: {
           location: { type: "Point", coordinates: [numLong, numLat] },
-          placeId,
+          placeId: resolvedPlaceId,
           formattedAddress,
           city,
           state,
@@ -199,6 +224,13 @@ const createAddressService = async ({
           landmark: normalizedLandmark,
           flatOrFloorNumber: normalizedFlat,
           addressType: addressType || "Home",
+          ...(buildingName  !== undefined && { buildingName:  String(buildingName  ?? "").trim() }),
+          ...(street        !== undefined && { street:        String(street        ?? "").trim() }),
+          ...(floor         !== undefined && { floor:         String(floor         ?? "").trim() }),
+          ...(tower         !== undefined && { tower:         String(tower         ?? "").trim() }),
+          ...(fullName      !== undefined && { fullName:      String(fullName      ?? "").trim() }),
+          ...(mobileNumber  !== undefined && { mobileNumber:  String(mobileNumber  ?? "").trim() }),
+          ...(updatedDeliveryFull         && { deliveryAddressFull: updatedDeliveryFull }),
         },
       }
     );
@@ -216,8 +248,8 @@ const createAddressService = async ({
     $and: [
       {
         $or: [
-          { placeId: { $ne: "N/A", $eq: placeId } },
-          { formattedAddress: { $regex: new RegExp(`^${formattedAddress.trim()}$`, "i") } },
+          { placeId: { $ne: "N/A", $eq: resolvedPlaceId } },
+          { formattedAddress: { $regex: new RegExp(`^${escapedFormatted}$`, "i") } },
         ],
       },
       { flatOrFloorNumber: normalizedFlat },
@@ -225,7 +257,7 @@ const createAddressService = async ({
     ],
   });
 
-  if (!siblingAddress) {
+  if (!siblingAddress && hasRealCoords) {
     siblingAddress = await Address.findOne({
       location: {
         $near: {
@@ -253,22 +285,52 @@ const createAddressService = async ({
     };
   }
 
-  const newAddress = await Address.create({
+  const cleanBuilding  = String(buildingName  ?? "").trim();
+  const cleanStreet    = String(street        ?? "").trim();
+  const cleanFloor     = String(floor         ?? "").trim();
+  const cleanTower     = String(tower         ?? "").trim();
+  const cleanLandmark  = String(landmark      ?? "").trim();
+  const cleanCity      = String(city          ?? "").trim();
+  const cleanState     = String(state         ?? "").trim();
+  const cleanPin       = String(pinCode       ?? "").trim();
+  const cleanFullName  = String(fullName      ?? "").trim();
+  const cleanMobile    = String(mobileNumber  ?? "").trim();
+
+  // Canonical delivery string — use this for ShipMozo / Shiprocket
+  // pinCode is always the Number field; this string is human-readable fallback only
+  const deliveryAddressFull = [
+    cleanBuilding,
+    cleanStreet,
+    cleanFloor,
+    cleanTower,
+    cleanLandmark ? `Near ${cleanLandmark}` : "",
+    cleanCity,
+    cleanState,
+    cleanPin,
+  ].filter(Boolean).join(", ");
+
+  const addressToSave = {
     addressId: uuidv7(),
-    location: {
-      type: "Point",
-      coordinates: [numLong, numLat],
-    },
-    placeId,
+    location: { type: "Point", coordinates: [numLong, numLat] },
+    placeId: resolvedPlaceId,
     formattedAddress,
     addressType: addressType || "Home",
-    landmark,
+    landmark: cleanLandmark,
     flatOrFloorNumber,
     isDefault: Boolean(isDefault),
-    city,
-    state,
+    city: cleanCity,
+    state: cleanState,
     pinCode: Number(pinCode),
-  });
+    buildingName: cleanBuilding,
+    street: cleanStreet,
+    floor: cleanFloor,
+    tower: cleanTower,
+    fullName: cleanFullName,
+    mobileNumber: cleanMobile,
+    deliveryAddressFull,
+  };
+
+  const newAddress = await Address.create(addressToSave);
 
   // Link new address to the user
   await UserAddress.updateOne(
@@ -382,6 +444,7 @@ const getSavedAddressService = async ({ userId }) => {
       landmark: 1,
       addressId: 1,
       location: 1,
+      deliveryAddressFull: 1,
       _id: 0,
     },
   ).lean();

@@ -30,10 +30,16 @@ const authGuardService = (role) => {
         role === "Admin"
           ? env.ADMIN_ACCESS_TOKEN_SECRET
           : env.USER_ACCESS_TOKEN_SECRET;
+      
+      console.log(`[AUTH DEBUG] Verifying token for role: ${role}`);
+      // console.log(`[AUTH DEBUG] Using Secret (prefix): ${secret?.substring(0, 5)}...`);
+      
       if (!secret) {
         throw new Error("JWT secret missing in env");
       }
+      
       const decodedToken = jwt.verify(token, secret);
+      console.log(`[AUTH DEBUG] Token verified successfully for user: ${decodedToken.userId}`);
 
       /* The verified user data is attached to the request object here,
        so that all subsequent middlewares and controllers can identify

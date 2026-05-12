@@ -110,6 +110,14 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     );
   }
 
+  // Handle pricing logic
+  let finalAmount;
+  let couponCodeId = null;
+  let couponCodeName = null;
+  let discountAmount = 0;
+  let isApplied = false;
+  let summary = {};
+
   // Fetch cart to get the calculated grand total from applyCoupon API
   const cart = await Cart.findOne({ userId }).lean();
 
@@ -125,7 +133,13 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     );
   }
 
-  const finalAmount = grandTotal;
+  finalAmount = grandTotal;
+  couponCodeId = cart.appliedCoupon?.couponCodeId || null;
+  couponCodeName = cart.appliedCoupon?.name || null;
+  discountAmount = cart.appliedCoupon?.discountValue || 0;
+  isApplied = cart.appliedCoupon?.isApplied || false;
+  summary = cart.appliedCoupon?.summary || {};
+
   const productIds = items.map((i) => i.productId);
   const uniqueProductIds = [...new Set(productIds)]; // Get unique IDs
 
@@ -138,22 +152,66 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     throw new ValidationError("One or more products unavailable");
   }
 
-  const couponCodeId = cart.appliedCoupon?.couponCodeId || null;
-  const couponCodeName = cart.appliedCoupon?.name || null;
-  const discountAmount = cart.appliedCoupon?.discountValue || 0;
-  const isApplied = cart.appliedCoupon?.isApplied || false;
-  const summary = cart.appliedCoupon?.summary || {};
-
   const orderItems = items.map((item) => {
     const product = products.find((p) => p.productId === item.productId);
     
     // Find the cart item to get its specific image
-    let itemImage = product.productImg;
-    const cartKey = `${item.productId}:${item.color || "N/A"}`;
-    if (cart.products && cart.products[cartKey] && cart.products[cartKey].image) {
-      itemImage = cart.products[cartKey].image;
-    } else if (cart.products && cart.products[item.productId] && cart.products[item.productId].image) {
-      itemImage = cart.products[item.productId].image;
+    let itemImage = null;
+    const itemVariant = item.variant || item.color || "N/A";
+    const cartKey = `${item.productId}:${itemVariant}`;
+    
+    // 1. Try to get image from Cart Snapshot (Most accurate for what user saw)
+    const getCartProduct = (key) => {
+      if (!cart.products) return null;
+      if (typeof cart.products.get === "function") return cart.products.get(key);
+      return cart.products[key];
+    };
+
+    const cartProductByVariant = getCartProduct(cartKey);
+    const cartProductById = getCartProduct(item.productId);
+
+    if (cartProductByVariant && cartProductByVariant.image) {
+      itemImage = cartProductByVariant.image;
+    } else if (cartProductById && cartProductById.image) {
+      itemImage = cartProductById.image;
+    }
+
+    // 2. Fallback to Product Variant Details (if snapshot fails or is empty)
+    if (!itemImage && product.variantDetails && product.variantDetails.length > 0) {
+      const variant = product.variantDetails.find(v => 
+        v.variantName === itemVariant || 
+        v.variantName === item.variant || 
+        v.variantName === item.color
+      );
+      if (variant && variant.variantImage && variant.variantImage.length > 0) {
+        itemImage = variant.variantImage[0];
+      }
+    }
+
+    // 3. Fallback to top-level product image (Legacy/Compatibility)
+    if (!itemImage) {
+      itemImage = product.productImg;
+    }
+
+    // 4. Final safety check: Ensure itemImage is not empty for validation
+    if (!itemImage) {
+      itemImage = "https://urbannook.in/assets/logo.webp"; // placeholder if everything fails
+    }
+
+    // Find the variant specific price
+    let priceAtPurchase = 0;
+    if (product.variantDetails && product.variantDetails.length > 0) {
+      const variant = product.variantDetails.find(v => 
+        v.variantName === itemVariant || 
+        v.variantName === item.variant || 
+        v.variantName === item.color
+      );
+      if (variant && variant.variantPrice) {
+        priceAtPurchase = variant.variantPrice;
+      } else {
+        // Default to first variant's price if no match or no price on match
+        priceAtPurchase = product.variantDetails[0].variantPrice || 0;
+      }
     }
 
     return {
@@ -164,9 +222,9 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
         productName: product.productName,
         productCategory: product.productCategory,
         productSubCategory: product.productSubCategory,
-        priceAtPurchase: product.sellingPrice,
+        priceAtPurchase: priceAtPurchase,
         shipping: String(summary?.shipping ?? ""),
-        selectedColor: item.color || "N/A",
+        selectedVariant: itemVariant,
       },
     };
   });
@@ -198,6 +256,8 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     pinCode: clientAddress?.pinCode || selectedAddr?.pinCode || null,
     formattedAddress:
       clientAddress?.formattedAddress || selectedAddr?.formattedAddress || "",
+    deliveryAddressFull:
+      clientAddress?.deliveryAddressFull || selectedAddr?.deliveryAddressFull || "",
     landmark: clientAddress?.landmark || selectedAddr?.landmark || "",
     flatOrFloorNumber:
       clientAddress?.flatOrFloorNumber || selectedAddr?.flatOrFloorNumber || "",

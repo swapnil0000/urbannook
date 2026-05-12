@@ -60,8 +60,14 @@ export const csrfTokenGenerator = (req, res, next) => {
     // Generate new token
     const token = generateCsrfToken();
     
-    // Get user ID from authenticated request
-    const userId = req.user?.userId || req.user?.email || 'anonymous';
+    // CRITICAL: Must match authGuard structure
+    const userId = req.user?.userId;
+    
+    if (!userId) {
+      return res.status(401).json(
+        new ApiError(401, 'Authentication required for CSRF generation', null, false)
+      );
+    }
     
     // Store token
     storeToken(userId, token);
@@ -90,7 +96,7 @@ export const csrfProtection = (req, res, next) => {
     }
     
     // Get user ID
-    const userId = req.user?.userId || req.user?.email;
+    const userId = req.user?.userId;
     
     if (!userId) {
       return res.status(401).json(
@@ -102,7 +108,7 @@ export const csrfProtection = (req, res, next) => {
     const tokenFromHeader = req.headers['x-csrf-token'];
     const tokenFromBody = req.body?._csrf;
     const token = tokenFromHeader || tokenFromBody;
-    
+        
     if (!token) {
       console.warn(`[CSRF] Token missing for user: ${userId}, method: ${req.method}, path: ${req.path}`);
       return res.status(403).json(
@@ -111,6 +117,7 @@ export const csrfProtection = (req, res, next) => {
     }
     
     // Validate token
+    const stored = csrfTokenStore.get(userId);
     const isValid = validateToken(userId, token);
     
     if (!isValid) {

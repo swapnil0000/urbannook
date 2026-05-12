@@ -46,7 +46,7 @@ const initialState = {
   items: persistedItems,
   totalQuantity: persistedItems.reduce((t, i) => t + (i.quantity || 0), 0),
   totalAmount: persistedItems.reduce((t, i) => t + ((i.price || 0) * (i.quantity || 0)), 0),
-  selections: {}, // Managed by productId: { quantity, color }
+  selections: {}, // Managed by productId: { quantity, variant }
 };
 
 const cartSlice = createSlice({
@@ -54,61 +54,62 @@ const cartSlice = createSlice({
   initialState,
   reducers: {
     updateSelection: (state, action) => {
-      const { productId, quantity, color } = action.payload;
+      const { productId, quantity, variant } = action.payload;
       state.selections[productId] = {
         quantity: quantity || 1,
-        color: color || 'N/A'
+        variant: variant || 'N/A'
       };
     },
 
     addItem: (state, action) => {
-      const { id, name, price, image, quantity = 1, mongoId, selectedColor } = action.payload;
+      const { id, name, price, image, quantity = 1, mongoId, selectedVariant } = action.payload;
+      const effectiveVariant = selectedVariant || 'N/A';
+      const itemId = mongoId || id;
+      
       const existingItem = state.items.find(item => 
-        item.id === id && 
-        (item.selectedColor || 'N/A') === (selectedColor || 'N/A')
+        (item.mongoId === itemId || item.id === itemId) && 
+        (item.selectedVariant || 'N/A') === (effectiveVariant)
       );
 
       if (existingItem) {
         existingItem.quantity += quantity;
       } else {
         state.items.push({
-          id,
-          mongoId: mongoId || id,
+          id: itemId,
+          mongoId: itemId,
           name,
-          price,
+          price: Number(price) || 0,
           image,
           quantity,
-          selectedColor: selectedColor || 'N/A'
+          selectedVariant: effectiveVariant
         });
       }
 
       state.totalQuantity += quantity;
-      state.totalAmount += price * quantity;
+      state.totalAmount += (Number(price) || 0) * quantity;
 
       // Persist to localStorage for guest users so cart survives refresh
       const isGuestUser = isGuest();
       if (isGuestUser) {
         getOrCreateGuestId();
         saveGuestCart(state.items);
-      } else {
-        console.log('[cartSlice] User is logged in, not saving to guest cart');
       }
     },
 
     removeItem: (state, action) => {
-      const { id, selectedColor } = action.payload;
+      const { id, selectedVariant } = action.payload;
+      const effectiveVariant = selectedVariant || 'N/A';
       
-      // FIX: Check both ID and color to remove correct variant
       const existingItem = state.items.find(item => 
-        item.id === id && 
-        (item.selectedColor || 'N/A') === (selectedColor || 'N/A')
+        (item.id === id || item.mongoId === id) && 
+        (item.selectedVariant || 'N/A') === (effectiveVariant)
       );
 
       if (existingItem) {
         state.totalQuantity -= existingItem.quantity;
-        state.totalAmount -= existingItem.price * existingItem.quantity;
+        state.totalAmount -= (Number(existingItem.price) || 0) * existingItem.quantity;
         state.items = state.items.filter(item => 
-          !(item.id === id && (item.selectedColor || 'N/A') === (selectedColor || 'N/A'))
+          !((item.id === id || item.mongoId === id) && (item.selectedVariant || 'N/A') === (effectiveVariant))
         );
       }
 
@@ -118,19 +119,19 @@ const cartSlice = createSlice({
     },
 
     updateQuantity: (state, action) => {
-      const { id, quantity, selectedColor } = action.payload;
+      const { id, quantity, selectedVariant } = action.payload;
+      const effectiveVariant = selectedVariant || 'N/A';
       
-      // FIX: Check both ID and color to update correct variant
       const existingItem = state.items.find(item => 
-        item.id === id && 
-        (item.selectedColor || 'N/A') === (selectedColor || 'N/A')
+        (item.id === id || item.mongoId === id) && 
+        (item.selectedVariant || 'N/A') === (effectiveVariant)
       );
 
       if (existingItem && quantity > 0) {
         const diff = quantity - existingItem.quantity;
         existingItem.quantity = quantity;
         state.totalQuantity += diff;
-        state.totalAmount += diff * existingItem.price;
+        state.totalAmount += diff * (Number(existingItem.price) || 0);
       }
 
       if (isGuest()) {
@@ -143,8 +144,6 @@ const cartSlice = createSlice({
       state.totalQuantity = 0;
       state.totalAmount = 0;
       state.selections = {};
-      // Clear guest cart from localStorage on logout or order completion
-      // clearGuestCart();
     },
 
     syncCartFromProfile: (state, action) => {
@@ -156,14 +155,24 @@ const cartSlice = createSlice({
         } else if (item.quantity !== null && typeof item.quantity === 'object') {
           quantity = typeof item.quantity.quantity === 'number' ? item.quantity.quantity : 1;
         }
+        const getPrice = () => {
+          if (typeof item.price === 'number') return item.price;
+          if (item.variantDetails && item.variantDetails.length > 0) {
+            const selectedVariant = item.selectedVariant || 'N/A';
+            const variant = item.variantDetails.find(v => v.variantName === selectedVariant);
+            return Number(variant?.variantPrice) || Number(item.variantDetails[0].variantPrice) || 0;
+          }
+          return Number(item.price) || 0;
+        };
+
         return {
           id: item.productId || item._id,
           mongoId: item.productId || item._id,
           name: item.productName || item.name,
-          price: typeof item.price === 'number' ? item.price : (item.sellingPrice || item.productPrice || 0),
+          price: getPrice(),
           image: item.productImage || item.image || item.productImg,
           quantity,
-          selectedColor: item.selectedColor || 'N/A'
+          selectedVariant: item.selectedVariant || 'N/A'
         };
       });
 
@@ -198,13 +207,14 @@ const cartSlice = createSlice({
 
       state.items = cartItems.map(item => {
         let quantity = 1;
-        if (typeof item.quantity === 'number') {
-          quantity = item.quantity;
-        } else if (item.quantity !== null && typeof item.quantity === 'object') {
-          quantity = typeof item.quantity.quantity === 'number' ? item.quantity.quantity : 1;
+        const rawQty = item.quantity;
+        if (typeof rawQty === 'number') {
+          quantity = rawQty;
+        } else if (rawQty !== null && typeof rawQty === 'object') {
+          quantity = typeof rawQty.quantity === 'number' ? rawQty.quantity : 1;
         }
 
-        const price = typeof item.price === 'number' ? item.price : (item.price?.price ?? 0);
+        const price = typeof item.price === 'number' ? item.price : (Number(item.price?.price) || 0);
 
         return {
           id: item.productId || item._id,
@@ -213,7 +223,7 @@ const cartSlice = createSlice({
           price,
           image: item.image || item.productImage || item.productImg,
           quantity,
-          selectedColor: item.selectedColor || 'N/A'
+          selectedVariant: item.selectedVariant || 'N/A'
         };
       });
 
