@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGetProductsQuery } from '../../store/api/productsApi';
 import SEOHead from '../../component/SEOHead';
+import { trackViewItemList } from '../../utils/analytics';
 
 const PlaceholderImage = lazy(() => import('../../component/PlaceholderImage'));
 const WishlistButton = lazy(() => import('../../component/WishlistButton'));
@@ -37,6 +38,22 @@ const AllProductsPage = () => {
     if (sortBy === 'price-high') sorted.sort((a, b) => b.effectivePrice - a.effectivePrice);
     return sorted;
   }, [products, sortBy]);
+
+  useEffect(() => {
+    if (displayProducts.length > 0) {
+      trackViewItemList({
+        listName: 'All Products',
+        listId: 'all_products',
+        items: displayProducts.map((product, index) => ({
+          itemId: product.productId,
+          itemName: product.productName,
+          price: product.variantDetails?.[0]?.variantPrice || 0,
+          itemVariant: product.variantDetails?.[0]?.variantName || '',
+          index,
+        })),
+      });
+    }
+  }, [displayProducts]);
 
   if (error) {
     console.error("API Error:", error);

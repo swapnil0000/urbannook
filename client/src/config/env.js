@@ -39,6 +39,9 @@ const config = {
   // Google OAuth
   googleClientId: env.VITE_GOOGLE_CLIENT_ID,
   
+  // GTM Configuration
+  gtmId: env.VITE_GTM_ID || 'GTM-XXXXXXX',
+
   // App Configuration
   appEnv: env.VITE_APP_ENV || 'development',
   port: env.VITE_PORT || 3000,
