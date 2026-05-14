@@ -592,6 +592,7 @@ const CheckoutPage = () => {
           long: selectedFullAddr?.location?.coordinates?.[0] || selectedFullAddr?.long || 0,
         }
       };
+      console.log(orderData?.items);
       
       const orderResult = await createOrder(orderData).unwrap();
       const res = await loadRazorpay();
