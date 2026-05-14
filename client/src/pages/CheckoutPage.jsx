@@ -842,7 +842,7 @@ const CheckoutPage = () => {
                   </div>
                   <div>
                     <p className="text-[11px] font-bold text-[#2e443c] uppercase tracking-wider">
-                      Estimated Delivery: 5–7 Business Days
+                      Estimated Delivery: 24–48 Hours
                     </p>
                     <p className="text-[10px] text-gray-400 mt-0.5">
                       AWB number shared once order is shipped
