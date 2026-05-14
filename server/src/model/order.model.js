@@ -32,6 +32,12 @@ const orderSchema = new mongoose.Schema(
       s3FileKey: { type: String, default: null },
     },
     amount: { type: Number, required: true },
+    shippingMethod: { type: String, default: "Standard Shipping" },
+    shippingType: { 
+      type: String, 
+      enum: ["DYNAMIC", "FALLBACK"],
+      default: "FALLBACK"
+    },
     coupon: {
       couponCodeId: { type: String, default: null },
       couponCodeName: { type: String, default: null },

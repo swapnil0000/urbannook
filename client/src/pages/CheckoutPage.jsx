@@ -156,6 +156,7 @@ const CheckoutPage = () => {
     setPincode("");
     setPreciseDetails({ landmark: "", flatNo: "" });
     setCurrentAddressId(null);
+    setPricingDetails(prev => ({ ...prev, shipping: null })); // Reset shipping too
     setIsEditingMode(false);
     showNotification("Shipping details reset", "info");
   };

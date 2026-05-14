@@ -35,6 +35,8 @@ const applyCouponCodeService = async ({ userId, couponCodeName, email }) => {
       summary: {
         subtotal: cartSubtotal,
         shipping: SHIPPING_CHARGES,
+        shippingName: "Standard Shipping",
+        shippingType: "FALLBACK",
         discount: 0,
         grandTotal: cartSubtotal + SHIPPING_CHARGES,
       },
@@ -111,6 +113,8 @@ if (cartSubtotal < coupon.minCartValue) {
     summary: {
       subtotal: cartSubtotal,
       shipping: SHIPPING_CHARGES,
+      shippingName: "Standard Shipping",
+      shippingType: "FALLBACK",
       discount: discountAmount,
       grandTotal: grandTotal,
     },

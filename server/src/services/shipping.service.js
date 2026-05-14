@@ -26,7 +26,11 @@ const checkPincodeServiceability = async (deliveryPinCode) => {
 
 const calculateShippingRate = async ({ pincode, cartItems }) => {
   // Define fallback response
-  const FALLBACK_SHIPPING = { name: "Standard Shipping", total_charges: 179 };
+  const FALLBACK_SHIPPING = { 
+    name: "Standard Shipping", 
+    total_charges: 179,
+    shippingType: "FALLBACK"
+  };
 
   if (!pincode || !cartItems || !Array.isArray(cartItems)) {
     return FALLBACK_SHIPPING;
@@ -39,6 +43,7 @@ const calculateShippingRate = async ({ pincode, cartItems }) => {
       .lean();
 
     if (dbProducts.length === 0) {
+      console.log("LOG: Shipping Fallback - No products found in DB");
       return FALLBACK_SHIPPING;
     }
 
@@ -68,26 +73,44 @@ const calculateShippingRate = async ({ pincode, cartItems }) => {
       if (quant > 1) hasMultiQuantity = true;
       
       let weightVal = 0;
-      if (typeof item.weight === "string") {
-        const weightStr = item.weight.toLowerCase();
-        if (weightStr.includes("kg")) {
-          weightVal = safeFloat(weightStr) * 1000;
+      if (item.weight) {
+        if (typeof item.weight === "string") {
+          const weightStr = item.weight.toLowerCase();
+          if (weightStr.includes("kg")) {
+            weightVal = safeFloat(weightStr) * 1000;
+          } else {
+            weightVal = safeFloat(weightStr.replace(/[^0-9.]/g, ""));
+          }
         } else {
-          weightVal = safeFloat(weightStr.replace(/[^0-9.]/g, ""));
+          weightVal = safeFloat(item.weight);
         }
-      } else {
-        weightVal = safeFloat(item.weight);
+      }
+
+      // If weight is missing or zero, trigger immediate fallback
+      if (weightVal <= 0) {
+        console.log(`LOG: Shipping Fallback - Missing weight for product ${item.productId}`);
+        return FALLBACK_SHIPPING;
       }
 
       totalWeight += weightVal * quant;
       totalAmount += safeFloat(item?.price, 0) * quant;
 
       const dim = item.dimensions || {};
+      const L = safeFloat(dim.length);
+      const W = safeFloat(dim.breadth);
+      const H = safeFloat(dim.height);
+
+      // If dimensions are missing or zero, trigger immediate fallback
+      if (L <= 0 || W <= 0 || H <= 0) {
+        console.log(`LOG: Shipping Fallback - Missing dimensions for product ${item.productId}`);
+        return FALLBACK_SHIPPING;
+      }
+
       dimensions.push({
         no_of_box: quant.toString(),
-        length: safeFloat(dim.length, 10).toString(),
-        width: safeFloat(dim.breadth, 10).toString(),
-        height: safeFloat(dim.height, 10).toString(),
+        length: L.toString(),
+        width: W.toString(),
+        height: H.toString(),
       });
     }
 
@@ -113,6 +136,7 @@ const calculateShippingRate = async ({ pincode, cartItems }) => {
     );
 
     if (!response.data || !response.data.data || !Array.isArray(response.data.data)) {
+      console.log("LOG: Shipping Fallback - API returned no data");
       return FALLBACK_SHIPPING;
     }
 
@@ -121,7 +145,10 @@ const calculateShippingRate = async ({ pincode, cartItems }) => {
       el.name.toLowerCase().includes("surface")
     );
     
-    if (surfaceServices.length === 0) return FALLBACK_SHIPPING;
+    if (surfaceServices.length === 0) {
+      console.log("LOG: Shipping Fallback - No surface services available for this pincode");
+      return FALLBACK_SHIPPING;
+    }
 
     let selectedService = surfaceServices.find(el => el.name.startsWith("DTDC Surface"));
     
@@ -143,13 +170,15 @@ const calculateShippingRate = async ({ pincode, cartItems }) => {
         }
         finalCharge += 30;
         selectedService.total_charges = finalCharge;
+        selectedService.shippingType = "DYNAMIC"; // Mark as dynamic
         return selectedService;
       }
     }
 
+    console.log("LOG: Shipping Fallback - Selected service had 0 charges");
     return FALLBACK_SHIPPING;
   } catch (error) {
-    console.error("Shipping Service Error:", error.response?.data || error.message);
+    console.error("LOG: Shipping Fallback - API Error:", error.response?.data || error.message);
     return FALLBACK_SHIPPING;
   }
 };

@@ -292,6 +292,8 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       discountAmount,
       isApplied,
     },
+    shippingMethod: cart?.appliedCoupon?.summary?.shippingName || "Standard Shipping",
+    shippingType: cart?.appliedCoupon?.summary?.shippingType || "FALLBACK",
     note: "Amount is the final amount paid by the user",
   });
 
