@@ -1,7 +1,8 @@
 import { GoogleLogin } from '@react-oauth/google';
 import { useGoogleLoginMutation } from '../../../store/api/authApi';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { setCredentials } from '../../../store/slices/authSlice';
+import { clearLoginCallback } from '../../../store/slices/uiSlice';
 import { useNavigate } from 'react-router-dom';
 
 export default function GoogleLoginButton({ 
@@ -16,6 +17,7 @@ export default function GoogleLoginButton({
   const [googleLogin, { isLoading }] = useGoogleLoginMutation();
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const { loginCallback } = useSelector((state) => state.ui);
 
   const handleSuccess = async (credentialResponse) => {
     try {
@@ -42,8 +44,12 @@ export default function GoogleLoginButton({
           onSuccess(result.data);
         }
 
-        // Navigate to home page
-        navigate('/');
+        // Navigate to intended destination or stay on current page
+        if (loginCallback && loginCallback.startsWith('navigate:')) {
+          const path = loginCallback.replace('navigate:', '');
+          dispatch(clearLoginCallback());
+          navigate(path);
+        }
       }
     } catch (error) {
       console.error('[Google Login] Error:', error);
