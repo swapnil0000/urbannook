@@ -10,6 +10,7 @@ import couponCodeRouter from "./coupon.code.route.js";
 import testimonialRouter from "./testimonial.route.js";
 import contactRouter from "./contact.route.js";
 import statsRouter from "./stats.route.js";
+import dynamicShippingRouter from "./dynamic.shipping.route.js";
 export {
   userRouter,
   productRouter,
@@ -23,4 +24,5 @@ export {
   testimonialRouter,
   contactRouter,
   statsRouter,
+  dynamicShippingRouter,
 };
