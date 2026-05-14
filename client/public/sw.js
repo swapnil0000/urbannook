@@ -2,7 +2,7 @@
 // Implements versioned caching with cache-first for static assets
 // and strictly NO caching for API calls to prevent cart/price sync issues
 
-const CACHE_VERSION = 'v4'; // Incremented to force update
+const CACHE_VERSION = 'v5'; // Incremented to force update
 const STATIC_CACHE = `urbannook-static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `urbannook-dynamic-${CACHE_VERSION}`;
 
@@ -58,6 +58,9 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
+
+  // Only handle http/https requests — skip chrome-extension, data:, etc.
+  if (!url.protocol.startsWith('http')) return;
   
   // CRITICAL: NEVER cache API calls. Dynamic data (Cart, Price, User) must always come from network.
   if (url.pathname.includes('/api/') || url.hostname.includes('api.')) {
@@ -78,6 +81,12 @@ self.addEventListener('fetch', (event) => {
         return fetch(request).then((response) => {
           // Don't cache if not a valid response
           if (!response || response.status !== 200 || response.type === 'error') {
+            return response;
+          }
+
+          // Don't cache if response is HTML (prevents caching SPA fallback for missing JS chunks)
+          const contentType = response.headers.get('content-type') || '';
+          if (contentType.includes('text/html')) {
             return response;
           }
 
