@@ -112,6 +112,13 @@ const orderSchema = new mongoose.Schema(
       trackingNumber: { type: String, default: null },
       estimatedDelivery: { type: Date, default: null },
     },
+
+    isGuestOrder: { type: Boolean, default: false },
+    guestInfo: {
+      name: { type: String, default: null },
+      email: { type: String, default: null },
+      mobile: { type: String, default: null },
+    },
   },
   { timestamps: true },
 );
