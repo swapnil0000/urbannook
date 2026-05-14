@@ -190,6 +190,18 @@ const ProductDetailPage = () => {
     return 0;
   }, [product, selectedVariant]);
 
+  // Calculate the max variant price (acts as MRP) and discount percentage
+  const { maxVariantPrice, discountPercent } = useMemo(() => {
+    if (!product || !product.variantDetails || product.variantDetails.length === 0) {
+      return { maxVariantPrice: 0, discountPercent: 0 };
+    }
+    const maxPrice = Math.max(...product.variantDetails.map(v => v.variantPrice || 0));
+    const discount = maxPrice > currentPrice
+      ? Math.round(((maxPrice - currentPrice) / maxPrice) * 100)
+      : 0;
+    return { maxVariantPrice: maxPrice, discountPercent: discount };
+  }, [product, currentPrice]);
+
   const availableVariants = useMemo(() => {
     if (!product || !product.variantDetails) return [];
     return product.variantDetails.map(v => v.variantName);
@@ -559,7 +571,7 @@ const ProductDetailPage = () => {
     if (isAuthenticated || hasToken) {
       navigate("/checkout");
     } else {
-      openLoginModal();
+      openLoginModal("navigate:/checkout");
     }
   };
 
@@ -681,9 +693,8 @@ const ProductDetailPage = () => {
         <div className="flex flex-col md:flex-row items-start">
           <div
             className="lg:col-span-6 max-w-[500px] w-full lg:sticky lg:top-24 flex flex-col items-start"
-            style={{ maxHeight: "calc(100vh - 6rem)" }}
           >
-            <div className="relative max-w-[500px] h-[400px] lg:h-[520px] rounded-2xl overflow-hidden shadow-2xl group w-full">
+            <div className="relative max-w-[500px] aspect-square md:aspect-auto md:h-[520px] rounded-2xl overflow-hidden shadow-2xl group w-full bg-[#e8e6e1]">
               <div className="w-full h-full relative cursor-pointer flex items-center justify-center">
                 <Suspense
                   fallback={
@@ -748,16 +759,27 @@ const ProductDetailPage = () => {
                   {availableVariants.map((variantName, idx) => {
                     const isSelected = selectedVariant === variantName;
                     const lowerName = variantName.toLowerCase();
-                    const isBrand = lowerName.includes('bmw') || lowerName.includes('porsche');
+                    const isBrand = lowerName.includes('bmw') || lowerName.includes('porsche') || lowerName.includes('lambo');
                     
                     const getVariantIcon = (name) => {
                       if (isBrand) {
-                        const isBmw = lowerName.includes('bmw');
+                        let logoSrc = "";
+                        let logoClass = "w-5 h-5";
+                        
+                        if (lowerName.includes('bmw')) {
+                          logoSrc = "https://upload.wikimedia.org/wikipedia/commons/4/44/BMW.svg";
+                          logoClass = "w-4 h-4";
+                        } else if (lowerName.includes('porsche')) {
+                          logoSrc = "https://pngimg.com/uploads/porsche_logo/porsche_logo_PNG1.png";
+                        } else if (lowerName.includes('lambo')) {
+                          logoSrc = "https://upload.wikimedia.org/wikipedia/en/d/df/Lamborghini_Logo.svg";
+                        }
+                        
                         return (
                           <img 
-                            src={isBmw ? "https://upload.wikimedia.org/wikipedia/commons/4/44/BMW.svg" : "https://pngimg.com/uploads/porsche_logo/porsche_logo_PNG1.png"} 
+                            src={logoSrc} 
                             alt={name} 
-                            className={`${isBmw ? 'w-4 h-4' : 'w-5 h-5'} object-contain ${isSelected ? '' : 'grayscale opacity-60'}`} 
+                            className={`${logoClass} object-contain ${isSelected ? '' : 'grayscale opacity-60'}`} 
                           />
                         );
                       }
@@ -894,10 +916,10 @@ const ProductDetailPage = () => {
                   {product.productCategory || "Featured"}
                 </span>
                 <div className="flex text-[#F5DEB3] text-xs gap-1 items-center bg-white/5 px-3 py-1 rounded-full">
-                  <i className="fa-solid fa-star text-[10px]"></i>
-                  <span className="ml-1 text-gray-300 font-mono text-[10px]">
+                  {/* <i className="fa-solid fa-star text-[10px]"></i> */}
+                  {/* <span className="ml-1 text-gray-300 font-mono text-[10px]">
                     4.8
-                  </span>
+                  </span> */}
                 </div>
               </div>
 
@@ -909,9 +931,18 @@ const ProductDetailPage = () => {
                 <p className="text-2xl lg:text-3xl font-light text-white">
                   ₹{currentPrice.toLocaleString()}
                 </p>
-                <p className="text-sm text-gray-500 line-through">
-                  ₹{(currentPrice * 1.18).toFixed(0).toLocaleString()}
-                </p>
+                {discountPercent > 0 && (
+                  <>
+                    <p className="text-sm text-gray-500 line-through">
+                      ₹{maxVariantPrice.toLocaleString()}
+                    </p>
+                    <span className="text-xs font-bold text-green-400 bg-green-400/10 px-2.5 py-1 rounded-full flex items-center gap-1.5">
+                      <i className="fa-solid fa-bolt-lightning text-[9px]"></i>
+                      {discountPercent}% OFF
+                      <span className="text-[9px] text-green-300/80 font-medium">• Limited Time</span>
+                    </span>
+                  </>
+                )}
               </div>
             </div>
 
@@ -977,7 +1008,7 @@ const ProductDetailPage = () => {
                   <i className="fa-solid fa-truck text-[#F5DEB3] text-sm"></i>
                   <span className="text-[9px] text-[#F5DEB3]/70 uppercase tracking-wider font-bold leading-tight">
                     {" "}
-                    5–7 Business Days
+                    24–48 Hours
                     <br />
                     Delivery
                   </span>
@@ -1109,7 +1140,7 @@ const ProductDetailPage = () => {
               <p className="text-[12px] leading-relaxed text-gray-400 italic font-light">
                 <strong className="text-[#F5DEB3]/70 not-italic mr-1">Disclaimer:</strong> 
                 This product is an aftermarket decorative lamp inspired by automotive brake disc designs. 
-                Urbannook is not affiliated with, endorsed by, or connected to BMW, Porsche, 
+                Urbannook is not affiliated with, endorsed by, or connected to BMW, Porsche, Lamborghini, 
                 or any other automotive brand.
               </p>
           </div>
@@ -2019,7 +2050,7 @@ const ProductDetailPage = () => {
         <div className="flex items-center bg-white justify-center gap-4 px-4 py-2 border-b border-[#F5DEB3]/10">
           <span className="flex items-center gap-1.5 text-[9px] text-[#2e443c]/70 uppercase tracking-wider font-bold">
             <i className="fa-solid fa-truck text-[#2e443c] text-[9px]"></i>
-            5–7 Business Days
+            24–48 Hours
           </span>
           <span className="w-1 h-1 rounded-full bg-[#F5DEB3]/20"></span>
           <span className="flex items-center gap-1.5 text-[9px] text-[#2e443c]/70 uppercase tracking-wider font-bold">

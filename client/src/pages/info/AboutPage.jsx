@@ -1,8 +1,12 @@
 import React, { useEffect } from 'react';
 import { aboutValues } from '../../data/constant';
 import SEOHead from '../../component/SEOHead';
+import { useGetPublicStatsQuery } from '../../store/api/statsApi';
 
 const AboutPage = () => {
+    const { data: statsData } = useGetPublicStatsQuery();
+    const totalOrders = statsData?.data?.totalOrders || 150;
+
     useEffect(() => {
       window.scrollTo(0, 0);
     }, []);
@@ -99,10 +103,10 @@ const AboutPage = () => {
                 <div className="bg-[#f5f7f8] p-8 md:p-10 rounded-[2rem] border border-white/10 shadow-xl hover:translate-y-[-5px] transition-transform duration-300">
                     <div className="flex items-center gap-4 mb-4">
                         <i className="fa-solid fa-box-open text-2xl text-[#a89068]"></i>
-                        <p className="text-4xl font-serif text-[#2e443c]">10+</p>
+                        <p className="text-4xl font-serif text-[#2e443c]">{totalOrders + 350}+</p>
                     </div>
                     <p className="text-sm uppercase tracking-widest text-[#a89068] font-bold">Successful Deliveries</p>
-                    <p className="text-xs text-gray-500 mt-3 border-t border-gray-200 pt-3">Trusted by Many homes across India.</p>
+                    <p className="text-xs text-gray-500 mt-3 border-t border-gray-200 pt-3">Trusted by hundreds of homes across India.</p>
                 </div>
 
                 {/* Metric Card 2 */}

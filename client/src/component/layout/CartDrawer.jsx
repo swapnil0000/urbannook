@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { useUpdateCartMutation } from '../../store/api/userApi';
 import { updateQuantity, removeItem } from '../../store/slices/cartSlice';
-import { setShowLoginModal } from '../../store/slices/uiSlice';
+import { setShowLoginModal, setLoginCallback } from '../../store/slices/uiSlice';
 
 const OptimizedImage = lazy(() => import('../OptimizedImage'));
 
@@ -77,6 +77,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
     if (isLoggedIn) {
       navigate('/checkout');
     } else {
+      dispatch(setLoginCallback('navigate:/checkout'));
       dispatch(setShowLoginModal(true));
     }
   };

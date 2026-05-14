@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import ForgotPassword from './ForgotPassword';
 import OTPVerification from './OTPVerification';
 import { useLoginMutation } from '../../../store/api/authApi';
 import { useAuth, useUI } from '../../../hooks/useRedux';
-import { setShowLoginModal } from '../../../store/slices/uiSlice';
+import { setShowLoginModal, clearLoginCallback } from '../../../store/slices/uiSlice';
 import GoogleLoginButton from './GoogleLoginButton';
 import useFormValidation from '../../../hooks/useFormValidation';
 
@@ -20,6 +20,7 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
   const [login, { isLoading }] = useLoginMutation();
   const { login: setAuthUser } = useAuth();
   const { showNotification } = useUI();
+  const { loginCallback } = useSelector((state) => state.ui);
 
   // Use validation hook with custom rules for login (password without pattern validation)
   const { 
@@ -110,7 +111,12 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
         onSuccess={() => {
           showNotification('Email verified! You are now logged in.');
           onClose();
-          navigate('/');
+          // Navigate to intended destination or stay on current page
+          if (loginCallback && loginCallback.startsWith('navigate:')) {
+            const path = loginCallback.replace('navigate:', '');
+            dispatch(clearLoginCallback());
+            navigate(path);
+          }
         }}
       />
     );
