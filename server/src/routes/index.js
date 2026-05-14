@@ -24,7 +24,6 @@ export {
   couponCodeRouter,
   testimonialRouter,
   contactRouter,
-  dynamicShippingRouter,
   statsRouter,
   dynamicShippingRouter,
 };
