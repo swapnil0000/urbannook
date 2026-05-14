@@ -10,7 +10,7 @@ const Faq = () => {
     {
       category: "Orders & Shipping",
       items: [
-        { q: "How long does shipping take?", a: "Standard shipping takes 5-7 business days. Metro cities usually receive orders within 3-4 days." },
+        { q: "How long does shipping take?", a: "We offer express shipping with delivery within 24-48 hours across India." },
         { q: "Can I track my order?", a: "Yes, once your order is shipped, you will receive a tracking link via email and SMS." },
         { q: "Do you ship internationally?", a: "Currently, we only ship within India. International shipping is coming soon!" }
       ]

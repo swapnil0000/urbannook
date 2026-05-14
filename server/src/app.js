@@ -14,6 +14,7 @@ import {
   couponCodeRouter,
   testimonialRouter,
   contactRouter,
+  statsRouter,
   dynamicShippingRouter,
 } from "./routes/index.js";
 import cookieParser from "cookie-parser";
@@ -204,6 +205,7 @@ app.use(
   couponCodeRouter,
   testimonialRouter,
   contactRouter,
+  statsRouter,
   dynamicShippingRouter,
 );
 
