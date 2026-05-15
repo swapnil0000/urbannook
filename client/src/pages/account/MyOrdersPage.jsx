@@ -361,7 +361,7 @@ const MyOrdersPage = () => {
                       {/* Footer Total */}
                       <div className="mt-6 px-5 py-4 bg-white rounded-2xl border border-gray-200 shadow-sm flex flex-col gap-2.5">
                         <div className="flex justify-between items-center text-[9px] text-gray-400 font-bold uppercase tracking-widest">
-                          <span>Shipping</span><span>₹{(order.items?.[0]?.productSnapshot?.shipping || 0).toLocaleString()}</span>
+                          <span>₹{(order.items?.[0]?.productSnapshot?.shipping || 0).toLocaleString()}</span>
                         </div>
                         <div className="flex justify-between items-center text-[9px] text-gray-400 font-bold uppercase tracking-widest">
                           <span>Discount</span><span className="text-[#a89068]">-₹{order.coupon?.discountAmount?.toLocaleString() || 0}</span>

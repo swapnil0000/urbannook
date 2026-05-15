@@ -17,17 +17,13 @@ import {
 import { useUI } from "../hooks/useRedux";
 import { logout } from "../store/slices/authSlice";
 import { clearCart } from "../store/slices/cartSlice";
-import { fetchCsrfToken, getCsrfToken } from "../store/api/apiSlice";
+import { fetchCsrfToken } from "../store/api/apiSlice";
 import CouponInput from "../component/CouponInput";
 import { ComponentLoader } from "../component/layout/LoadingSpinner";
 import { trackBeginCheckout, trackPurchase } from "../utils/analytics";
 
-// Lazy load heavy components
 const CouponList = lazy(() => import("../component/CouponList"));
-const MapModal = lazy(() => import("../component/MapModal"));
-const AddressFormModal = lazy(() => import("../component/AddressFormModal")); // TODO: swap with MapModal when ready
 const MobileNumberModal = lazy(() => import("../component/MobileNumberModal"));
-// Add this:
 const GoogleAddressFormModal = lazy(() => import("../component/GoogleAddressFormModal"));
 
 const CheckoutPage = () => {
@@ -59,7 +55,6 @@ const CheckoutPage = () => {
   const [currentAddressId, setCurrentAddressId] = useState(null);
   const [isEditingMode, setIsEditingMode] = useState(false);
   const [senderMobile, setSenderMobile] = useState("");
-  const [mobileErrors, setMobileErrors] = useState("");
   const [showAllAddresses, setShowAllAddresses] = useState(false);
   const [isSavingMobile, setIsSavingMobile] = useState(false);
   const [useDifferentDeliveryContact, setUseDifferentDeliveryContact] = useState(false);
@@ -85,11 +80,9 @@ const CheckoutPage = () => {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    // Fetch CSRF token for checkout actions
     fetchCsrfToken().catch(err => console.warn('[Checkout] CSRF fetch failed:', err));
   }, []);
 
-  // Dynamic Shipping Calculation Logic
   useEffect(() => {
     const fetchShippingRate = async () => {
       if (pincode && pincode.toString().length === 6 && cartItems.length > 0) {
@@ -97,7 +90,7 @@ const CheckoutPage = () => {
           const formattedCartItems = cartItems.map(item => ({
             productId: item.mongoId || item.id.split(':')[0],
             quant: item.quantity,
-            price:item?.price,
+            price: item?.price,
             selectedVariant: item?.selectedVariant
           }));          
 
@@ -111,18 +104,9 @@ const CheckoutPage = () => {
               ...prev,
               shipping: parseFloat(result.data.total_charges)
             }));
-          } else {
-            setPricingDetails(prev => ({
-              ...prev,
-              shipping: "N/A"
-            }));
           }
         } catch (error) {
-          console.error("Failed to calculate shipping:", error);
-          setPricingDetails(prev => ({
-            ...prev,
-            shipping: "Error"
-          }));
+          // No hardcoded fallback here, wait for server
         }
       } else {
         setPricingDetails(prev => ({
@@ -133,7 +117,7 @@ const CheckoutPage = () => {
     };
 
     fetchShippingRate();
-  }, [pincode, cartItems, calculateShipping]);
+  }, [pincode, JSON.stringify(cartItems), calculateShipping]);
 
   useEffect(() => {
     handleSaveAdress();
@@ -144,9 +128,10 @@ const CheckoutPage = () => {
   };
 
   const handleAddressConfirm = (suggestion, addressId, deliveryAddressFull) => {
-    // Show deliveryAddressFull (user-typed) if available, else fall back to Ola Maps formattedAddress
     setAddress(deliveryAddressFull || suggestion.formattedAddress);
-    setPincode(String(suggestion.pinCode || ""));
+    const newPincode = String(suggestion.pinCode || "");
+    setPincode(newPincode);
+    setPricingDetails(prev => ({ ...prev, shipping: null }));
     setCurrentAddressId(addressId);
     refetchAddresses();
   };
@@ -156,16 +141,14 @@ const CheckoutPage = () => {
     setPincode("");
     setPreciseDetails({ landmark: "", flatNo: "" });
     setCurrentAddressId(null);
-    setPricingDetails(prev => ({ ...prev, shipping: null })); // Reset shipping too
+    setPricingDetails(prev => ({ ...prev, shipping: null }));
     setIsEditingMode(false);
     showNotification("Shipping details reset", "info");
   };
 
   const handleScrollToAddress = () => {
-    // Find the Delivery Details section and scroll to it
     const deliverySection = document.querySelector('[data-section="delivery-details"]');
     if (deliverySection) {
-      // Add a small delay to ensure the DOM is ready
       setTimeout(() => {
         deliverySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
@@ -199,7 +182,6 @@ const CheckoutPage = () => {
         refetchAddresses();
       }
     } catch (err) {
-      console.error("Failed to sync precise details:", err);
       showNotification("Failed to update details", "error");
     }
   };
@@ -248,7 +230,6 @@ const CheckoutPage = () => {
               ...prev,
               subtotal: result.data.summary.subtotal || 0,
               discount: result.data.summary.discount || 0,
-              // Keep our dynamic shipping if we have it
               shipping: prev.shipping || null
             }));
           }
@@ -269,11 +250,9 @@ const CheckoutPage = () => {
                 }));
               }
             } catch (retryError) {
-              console.error("Failed to recalculate pricing:", retryError);
               showNotification("Failed to recalculate pricing:", "error");
             }
           } else {
-            console.error("Failed to fetch initial pricing:", error);
             showNotification(
               "Failed to load pricing. Please refresh the page.",
               "error",
@@ -285,7 +264,6 @@ const CheckoutPage = () => {
     fetchInitialPricing();
   }, [cartItemsLength, applyCouponMutation, appliedCoupon, userEmail]);
 
-  // Track begin_checkout event on mount when cart has items
   useEffect(() => {
     if (cartItems.length > 0) {
       trackBeginCheckout({
@@ -299,7 +277,7 @@ const CheckoutPage = () => {
         value: pricingDetails.subtotal,
       });
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); 
 
   useEffect(() => {
     if (userProfile) {
@@ -390,13 +368,10 @@ const CheckoutPage = () => {
         navigate("/products");
       }
     } catch (error) {
-      console.error("Failed to remove item:", error);
       const errorMessage = error?.data?.message || "Failed to remove item";
       showNotification(errorMessage, "error");
     }
   };
-
-  const finalTotal = pricingDetails.grandTotal;
 
   const handleSaveAdress = () => {
     if (savedAddressData?.success) {
@@ -447,14 +422,12 @@ const CheckoutPage = () => {
 
       if (result.success) {
         setSenderMobile(strippedValue);
-        setMobileErrors("");
         showNotification("Mobile number saved successfully!", "success");
         refetchProfile();
       } else {
         throw result.message || "Failed to save mobile number";
       }
     } catch (error) {
-      console.error("Failed to save mobile number:", error);
       const errorMessage = error?.data?.message || error?.message || error || "Failed to save mobile number. Please try again.";
       throw errorMessage;
     } finally {
@@ -481,7 +454,7 @@ const CheckoutPage = () => {
     }
 
     try {
-      const result = await deleteAddress(addressId).unwrap();
+      await deleteAddress(addressId).unwrap();
 
       setSavedAddress((prev) =>
         prev.filter((addr) => addr?.addressId !== addressId),
@@ -494,7 +467,6 @@ const CheckoutPage = () => {
       showNotification("Address deleted successfully", "success");
       refetchAddresses();
     } catch (err) {
-      console.error("Delete API Error:", err);
       const errorMessage =
         err.data?.message || err.message || "Failed to delete address";
       showNotification(errorMessage, "error");
@@ -531,7 +503,6 @@ const CheckoutPage = () => {
         "Please enter your contact number to proceed with checkout",
         "error",
       );
-      // Open mobile modal instead of scrolling
       setShowMobileModal(true);
       return;
     }
@@ -593,7 +564,6 @@ const CheckoutPage = () => {
           long: selectedFullAddr?.location?.coordinates?.[0] || selectedFullAddr?.long || 0,
         }
       };
-      console.log(orderData?.items);
       
       const orderResult = await createOrder(orderData).unwrap();
       const res = await loadRazorpay();
@@ -617,8 +587,8 @@ const CheckoutPage = () => {
             const orderId = response.razorpay_order_id;
             trackPurchase({
               transactionId: orderId,
-              value: pricingDetails.subtotal + pricingDetails.shipping - pricingDetails.discount,
-              shipping: pricingDetails.shipping,
+              value: pricingDetails.subtotal + (pricingDetails.shipping || 179) - pricingDetails.discount,
+              shipping: pricingDetails.shipping || 179,
               tax: 0,
               items: cartItems.map((item) => ({
                 itemId: item.mongoId || item.id,
@@ -630,7 +600,6 @@ const CheckoutPage = () => {
             });
             navigate(`/payment-processing/${orderId}`)
           } catch (verifyError) {
-            console.error("Payment handler error:", verifyError);
             setPaymentError(
               "Payment verification failed. Please contact support if amount was debited.",
             );
@@ -679,14 +648,10 @@ const CheckoutPage = () => {
 
       paymentObject.open();
     } catch (error) {
-      console.error("Payment initialization error:", error);
-      
       const errorMessage =
         error.data?.message ||
         error.message ||
         "Failed to initialize payment. Please try again.";
-        console.log( error.data?.message,
-        error.message);
         
       showNotification(errorMessage, "error");
       setPaymentError(errorMessage);
@@ -711,11 +676,9 @@ const CheckoutPage = () => {
         .custom-scrollbar:hover::-webkit-scrollbar-thumb { background: rgba(168, 144, 104, 0.6); }
       `}</style>
 
-      {/* Background Gradient Overlay */}
       <div className="fixed top-0 left-0 w-full h-[400px] bg-gradient-to-b from-[#1a2822] to-transparent pointer-events-none opacity-60 z-0"></div>
 
       <main className="max-w-[1200px] mx-auto pt-24 lg:pt-36 px-4 lg:px-8 relative z-10">
-        {/* Header Section */}
         <div className="mb-8 lg:mb-12 text-center lg:text-left">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#a89068]/20 border border-[#a89068]/30 mb-3">
             <span className="w-1.5 h-1.5 rounded-full bg-[#a89068] animate-pulse"></span>
@@ -729,9 +692,7 @@ const CheckoutPage = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
-          {/* Left Column: Items, Coupon, Payment Summary */}
           <div className="lg:col-span-5 lg:sticky lg:top-32 order-1 lg:order-2 flex flex-col gap-6">
-            {/* Items Card (Box Color: #f5f7f8) */}
             <div className="bg-[#f5f7f8] rounded-[2rem] p-6 border border-white/10 shadow-lg">
               <div className="flex justify-between items-center mb-5">
                 <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a89068]">
@@ -748,7 +709,6 @@ const CheckoutPage = () => {
                     key={`${item.id}-${item.selectedVariant || 'default'}`}
                     className="relative flex gap-4 items-center bg-white p-3 rounded-xl border border-gray-200 hover:border-[#a89068]/40 transition-colors group"
                   >
-                    {/* Remove button - top right corner */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -773,7 +733,6 @@ const CheckoutPage = () => {
                         {item.name}
                       </h3>
 
-                      {/* --- NAYA: VARIANT DISPLAY --- */}
                       {(() => {
                         const itemVariant =
                           (item.selectedVariant && item.selectedVariant !== "N/A")
@@ -806,7 +765,6 @@ const CheckoutPage = () => {
                           </div>
                         );
                       })()}
-                      {/* ------------------------- */}
 
                       <div className="flex justify-between items-center">
                         <p className="text-[10px] text-gray-500 uppercase tracking-widest">
@@ -822,7 +780,6 @@ const CheckoutPage = () => {
               </div>
             </div>
 
-            {/* Coupon Card (Box Color: #f5f7f8) */}
             <div className="relative group">
               <div className="absolute -inset-[1px] bg-gradient-to-r from-[#a89068]/40 to-[#a89068]/10 rounded-[2rem] blur-[2px] opacity-70 group-hover:opacity-100 transition-opacity duration-500"></div>
 
@@ -865,7 +822,6 @@ const CheckoutPage = () => {
               </div>
             </div>
 
-            {/* Payment Summary (Box Color: #f5f7f8) */}
             <div className="bg-[#f5f7f8] rounded-[2rem] p-6 md:p-8 md:mb-4 shadow-xl border border-white/10 relative z-10">
               <h3 className="font-serif text-[#2e443c] text-xl mb-5">
                 Payment Summary
@@ -893,7 +849,7 @@ const CheckoutPage = () => {
                     ) : typeof pricingDetails.shipping === "number" ? (
                       `₹${Math.ceil(pricingDetails.shipping).toLocaleString()}`
                     ) : (
-                      <span className="text-red-500 text-[10px] uppercase">{pricingDetails.shipping}</span>
+                      `₹179`
                     )}
                   </span>
                 </div>
@@ -903,7 +859,6 @@ const CheckoutPage = () => {
                   GST (18%) included in product prices
                 </div>
 
-                {/* Delivery info */}
                 <div className="flex items-center gap-3 bg-[#2e443c]/8 border border-[#2e443c]/15 rounded-xl p-3">
                   <div className="w-8 h-8 rounded-full bg-[#2e443c] flex items-center justify-center shrink-0">
                     <i className="fa-solid fa-truck text-[#F5DEB3] text-[10px]"></i>
@@ -932,11 +887,11 @@ const CheckoutPage = () => {
                   <span className="text-xs uppercase tracking-widest text-[#a89068] font-bold">
                     Total To Pay
                   </span>
-                  <span className="text-3xl font-serif text-[#2e443c]">
+                  <span className="text-3xl font-serif text-white">
                     ₹
                     {(
                       pricingDetails.subtotal +
-                      (typeof pricingDetails.shipping === "number" ? pricingDetails.shipping : 0) -
+                      (typeof pricingDetails.shipping === "number" ? pricingDetails.shipping : 179) -
                       pricingDetails.discount
                     ).toLocaleString()}
                   </span>
@@ -963,15 +918,10 @@ const CheckoutPage = () => {
                 </button>
               </div>
 
-              {!address ? (
+              {!address && (
                 <p className="hidden lg:flex items-center justify-center gap-1.5 mt-3 text-[10px] text-amber-600 font-bold uppercase tracking-widest text-center">
                   <i className="fa-solid fa-triangle-exclamation text-[9px]"></i>
                   Add your delivery address to see the final price.
-                </p>
-              ) : typeof pricingDetails.shipping !== "number" && !isCalculatingShipping && (
-                 <p className="hidden lg:flex items-center justify-center gap-1.5 mt-3 text-[10px] text-red-500 font-bold uppercase tracking-widest text-center">
-                  <i className="fa-solid fa-circle-xmark text-[9px]"></i>
-                  Unable to ship to this location.
                 </p>
               )}
 
@@ -984,9 +934,7 @@ const CheckoutPage = () => {
             </div>
           </div>
 
-          {/* Right Column: Contact & Delivery */}
           <div className="lg:col-span-7 space-y-6 order-2 lg:order-1 mb-4">
-            {/* Contact Info (Box Color: #f5f7f8) */}
             <div
               className="bg-[#f5f7f8] rounded-[2rem] p-6 md:p-8 border border-white/10 shadow-lg"
               style={{ marginBottom: "1rem" }}
@@ -1015,13 +963,11 @@ const CheckoutPage = () => {
                   </div>
                 </div>
 
-                {/* Mobile Number Field - Display Only with Edit */}
                 <div className="space-y-1.5 md:col-span-2">
                   <label className="text-[9px] uppercase tracking-widest text-[#a89068] font-bold ml-1">
                     Mobile NO. (Required for payment)
                   </label>
 
-                  {/* Display with Edit button */}
                   <div className="space-y-2">
                     <div className="flex gap-2 items-center">
                       <div className="flex-1 bg-white border border-gray-200 rounded-xl p-4 text-sm text-[#2e443c] font-medium">
@@ -1046,7 +992,6 @@ const CheckoutPage = () => {
                   </div>
                 </div>
 
-                {/* Optional: Different Delivery Contact */}
                 <div className="space-y-2 md:col-span-2">
                   <label className="flex items-center gap-3 cursor-pointer">
                     <input
@@ -1096,7 +1041,6 @@ const CheckoutPage = () => {
               </div>
             </div>
 
-            {/* Delivery Details (Box Color: #f5f7f8) */}
             <div
               data-section="delivery-details"
               className={`bg-[#f5f7f8] rounded-[2rem] p-6 md:p-8 border transition-all duration-500 shadow-lg ${!address ? "border-amber-400/50" : "border-white/10"}`}
@@ -1166,7 +1110,6 @@ const CheckoutPage = () => {
                             onClick={() => selectSavedAddress(addr)}
                             className="w-full text-left bg-white border border-gray-200 hover:border-[#a89068]/40 hover:shadow-md p-4 rounded-2xl transition-all group cursor-pointer"
                           >
-                            {/* Top Section */}
                             <div className="flex justify-between items-center mb-2">
                               <span className="text-[8px] bg-[#a89068]/10 text-[#a89068] px-2 py-0.5 rounded-md border border-[#a89068]/20 font-bold uppercase tracking-tighter">
                                 {addr.addressType}
@@ -1188,10 +1131,6 @@ const CheckoutPage = () => {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                console.log(
-                                  "Deleting address with ID:",
-                                  addr.addressId,
-                                ); // Debug log
                                 handleDeleteAddress(addr.addressId);
                               }}
                               className="mt-3 w-full flex items-center justify-center gap-2 text-[10px] font-semibold tracking-wide uppercase bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 hover:border-red-500/40 hover:text-red-300 py-2 rounded-xl transition-all duration-300"
@@ -1287,7 +1226,6 @@ const CheckoutPage = () => {
                 </div>
               )}
 
-              {/* Map Modal */}
               <Suspense
                 fallback={
                   <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60">
@@ -1295,24 +1233,6 @@ const CheckoutPage = () => {
                   </div>
                 }
               >
-                {/* <MapModal
-                  showMapModal={showMapModal}
-                  setShowMapModal={setShowMapModal}
-                  preciseDetails={preciseDetails}
-                  setPreciseDetails={setPreciseDetails}
-                  onAddressConfirm={handleAddressConfirm}
-                  showNotification={showNotification}
-                /> */}
-                {/* TODO: uncomment below + comment MapModal above to switch to new address form */}
-                {/* <AddressFormModal
-                  isOpen={showMapModal}
-                  onClose={() => setShowMapModal(false)}
-                  onAddressConfirm={handleAddressConfirm}
-                  showNotification={showNotification}
-                  prefillName={userProfile?.userName || userProfile?.name || ""}
-                  prefillPhone={userProfile?.mobileNumber || senderMobile || ""}
-                /> */}
-                {/* GoogleAddressFormModal */}
                 <GoogleAddressFormModal
                   isOpen={showMapModal}
                   onClose={() => setShowMapModal(false)}
@@ -1323,7 +1243,6 @@ const CheckoutPage = () => {
                 />
               </Suspense>
 
-              {/* Mobile Number Modal */}
               <Suspense
                 fallback={
                   <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60">
@@ -1345,7 +1264,6 @@ const CheckoutPage = () => {
         </div>
       </main>
 
-      {/* Coupon Modal */}
       {showCouponModal && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4"
@@ -1378,7 +1296,6 @@ const CheckoutPage = () => {
         </div>
       )}
 
-      {/* Mobile Sticky Footer — hidden when address modal is open so it doesn't cover Save button */}
       <div
         className={`fixed bottom-0 left-0 right-0 bg-[#2e443c] border-t border-white/10 p-4 px-6 z-50 lg:hidden shadow-[0_-10px_30px_rgba(0,0,0,0.4)] transition-transform duration-300 ${showMapModal ? "translate-y-full" : "translate-y-0"}`}
       >
@@ -1391,7 +1308,7 @@ const CheckoutPage = () => {
               ₹
               {(
                 pricingDetails.subtotal +
-                (typeof pricingDetails.shipping === "number" ? pricingDetails.shipping : 0) -
+                (typeof pricingDetails.shipping === "number" ? pricingDetails.shipping : 179) -
                 pricingDetails.discount
               ).toLocaleString()}
             </span>

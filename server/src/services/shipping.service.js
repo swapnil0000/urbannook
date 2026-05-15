@@ -1,6 +1,6 @@
 import axios from "axios";
 import Product from "../model/product.model.js";
-import { ValidationError, NotFoundError } from "../utils/errors.js";
+import { ValidationError } from "../utils/errors.js";
 
 const checkPincodeServiceability = async (deliveryPinCode) => {
   if (!deliveryPinCode) {
@@ -25,7 +25,6 @@ const checkPincodeServiceability = async (deliveryPinCode) => {
 };
 
 const calculateShippingRate = async ({ pincode, cartItems }) => {
-  // Define fallback response
   const FALLBACK_SHIPPING = { 
     name: "Standard Shipping", 
     total_charges: 179,
@@ -43,7 +42,6 @@ const calculateShippingRate = async ({ pincode, cartItems }) => {
       .lean();
 
     if (dbProducts.length === 0) {
-      console.log("LOG: Shipping Fallback - No products found in DB");
       return FALLBACK_SHIPPING;
     }
 
@@ -86,13 +84,11 @@ const calculateShippingRate = async ({ pincode, cartItems }) => {
         }
       }
 
-      // If weight is missing or zero, trigger immediate fallback
       if (weightVal <= 0) {
-        console.log(`LOG: Shipping Fallback - Missing weight for product ${item.productId}`);
         return FALLBACK_SHIPPING;
       }
 
-      totalWeight += weightVal * quant;
+      totalWeight += (weightVal * quant);
       totalAmount += safeFloat(item?.price, 0) * quant;
 
       const dim = item.dimensions || {};
@@ -100,9 +96,7 @@ const calculateShippingRate = async ({ pincode, cartItems }) => {
       const W = safeFloat(dim.breadth);
       const H = safeFloat(dim.height);
 
-      // If dimensions are missing or zero, trigger immediate fallback
       if (L <= 0 || W <= 0 || H <= 0) {
-        console.log(`LOG: Shipping Fallback - Missing dimensions for product ${item.productId}`);
         return FALLBACK_SHIPPING;
       }
 
@@ -114,19 +108,23 @@ const calculateShippingRate = async ({ pincode, cartItems }) => {
       });
     }
 
+    const totalWeightInKg = totalWeight / 1000;
+
+    const payload = {
+      pickup_pincode: 122018,
+      delivery_pincode: pincode,
+      payment_type: "PREPAID",
+      shipment_type: "FORWARD",
+      order_amount: Math.ceil(totalAmount),
+      type_of_package: "SPS",
+      rov_type: "ROV_OWNER",
+      weight: totalWeightInKg,
+      dimensions: dimensions,
+    };
+
     const response = await axios.post(
       `https://shipping-api.com/app/api/v1/rate-calculator`,
-      {
-        pickup_pincode: 122018,
-        delivery_pincode: pincode,
-        payment_type: "PREPAID",
-        shipment_type: "FORWARD",
-        order_amount: Math.ceil(totalAmount),
-        type_of_package: "SPS",
-        rov_type: "ROV_OWNER",
-        weight: Math.ceil(totalWeight),
-        dimensions: dimensions,
-      },
+      payload,
       {
         headers: {
           "private-key": process.env.SHIPMOZO_PRIVATE_KEY,
@@ -136,7 +134,6 @@ const calculateShippingRate = async ({ pincode, cartItems }) => {
     );
 
     if (!response.data || !response.data.data || !Array.isArray(response.data.data)) {
-      console.log("LOG: Shipping Fallback - API returned no data");
       return FALLBACK_SHIPPING;
     }
 
@@ -146,18 +143,31 @@ const calculateShippingRate = async ({ pincode, cartItems }) => {
     );
     
     if (surfaceServices.length === 0) {
-      console.log("LOG: Shipping Fallback - No surface services available for this pincode");
       return FALLBACK_SHIPPING;
     }
 
-    let selectedService = surfaceServices.find(el => el.name.startsWith("DTDC Surface"));
+    const getSlabWeight = (service) => {
+      const slabStr = service.minimum_chargeable_weight || "0";
+      const match = slabStr.match(/([\d.]+)/);
+      return match ? parseFloat(match[1]) : 0;
+    };
+
+    let validServices = surfaceServices.filter(s => getSlabWeight(s) >= totalWeightInKg);
+
+    if (validServices.length === 0) {
+      validServices = surfaceServices.sort((a, b) => getSlabWeight(b) - getSlabWeight(a));
+    } else {
+      validServices.sort((a, b) => a.total_charges - b.total_charges);
+    }
+
+    let selectedService = validServices.find(el => el.name.toUpperCase().includes("DTDC"));
     
     if (!selectedService) {
-      selectedService = surfaceServices.find(el => el.name.startsWith("Delhivery Surface"));
+      selectedService = validServices.find(el => el.name.toUpperCase().includes("DELHIVERY"));
     }
 
     if (!selectedService) {
-      selectedService = surfaceServices[0];
+      selectedService = validServices[0];
     }
 
     if (selectedService) {
@@ -170,15 +180,13 @@ const calculateShippingRate = async ({ pincode, cartItems }) => {
         }
         finalCharge += 30;
         selectedService.total_charges = finalCharge;
-        selectedService.shippingType = "DYNAMIC"; // Mark as dynamic
+        selectedService.shippingType = "DYNAMIC"; 
         return selectedService;
       }
     }
 
-    console.log("LOG: Shipping Fallback - Selected service had 0 charges");
     return FALLBACK_SHIPPING;
   } catch (error) {
-    console.error("LOG: Shipping Fallback - API Error:", error.response?.data || error.message);
     return FALLBACK_SHIPPING;
   }
 };
