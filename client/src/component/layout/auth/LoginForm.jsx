@@ -79,9 +79,16 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
       
       // Reset Redux login modal state
       dispatch(setShowLoginModal(false));
-      
+
       if (onClose) {
         onClose();
+      }
+
+      // Honour post-login navigation callback (e.g. redirect to /orders after guest payment)
+      if (loginCallback && loginCallback.startsWith('navigate:')) {
+        const path = loginCallback.replace('navigate:', '');
+        dispatch(clearLoginCallback());
+        navigate(path);
       }
     } catch (error) {
       const errorData = error?.data?.data;

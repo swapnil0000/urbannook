@@ -19,7 +19,7 @@ const MobileNumberModal = ({
   }, [showMobileModal]);
 
   const validateMobileNumber = (mobile) => {
-    const mobileRegex = /^[0-9]{10}$/;
+    const mobileRegex = /^[6-9][0-9]{9}$/;
     return mobileRegex.test(mobile.trim());
   };
 
@@ -48,7 +48,7 @@ const MobileNumberModal = ({
     }
 
     if (!validateMobileNumber(strippedValue)) {
-      setErrors("Mobile number must be exactly 10 digits");
+      setErrors("Please enter a valid Indian mobile number (starts with 6-9)");
       return;
     }
 

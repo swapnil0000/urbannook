@@ -128,6 +128,13 @@ export const userApi = apiSlice.injectEndpoints({
         body: data,
       }),
     }),
+    createGuestOrder: builder.mutation({
+      query: (data) => ({
+        url: "guest/create-order",
+        method: "POST",
+        body: data,
+      }),
+    }),
 
     // Contact APIs
     submitContact: builder.mutation({
@@ -252,6 +259,7 @@ export const {
   useGetAvailableCouponsQuery,
   useGetRazorpayKeyQuery,
   useCreateOrderMutation,
+  useCreateGuestOrderMutation,
   useJoinCommunityMutation,
   useSubmitContactMutation,
   useGenerateInvoiceMutation,

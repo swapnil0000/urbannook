@@ -70,11 +70,9 @@ const AppRoutes = () => {
       <Route
         path="/checkout"
         element={
-          <ProtectedRoute>
-            <Suspense fallback={<MinimalLoader />}>
-              <CheckoutPage />
-            </Suspense>
-          </ProtectedRoute>
+          <Suspense fallback={<MinimalLoader />}>
+            <CheckoutPage />
+          </Suspense>
         }
       />
       <Route
@@ -87,22 +85,8 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/payment-processing/:orderId"
-        element={
-          <ProtectedRoute>
-            <PaymentProcessing />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/payment-failed"
-        element={
-          <ProtectedRoute>
-            <PaymentFailed />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/payment-processing/:orderId" element={<PaymentProcessing />} />
+      <Route path="/payment-failed" element={<PaymentFailed />} />
       <Route
         path="/orders"
         element={

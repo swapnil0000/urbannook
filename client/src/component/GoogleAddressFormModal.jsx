@@ -126,6 +126,7 @@ const GoogleAddressFormModal = ({
   prefillName  = "",
   prefillPhone = "",
   defaultCoords = null, // { lat, long }
+  isGuest = false,
 }) => {
   // Load Google Maps JS SDK once — must not be called conditionally
   const { isLoaded, loadError } = useLoadScript({
@@ -460,7 +461,7 @@ const GoogleAddressFormModal = ({
     if (!form.city?.trim())         errs.city         = "City / District is required";
     if (!form.buildingName?.trim()) errs.buildingName = "House No. / Building is required";
     if (!form.street?.trim())       errs.street       = "Street / Colony is required";
-    if (!form.fullName?.trim())     errs.fullName     = "Name is required";
+    if (!isGuest && !form.fullName?.trim()) errs.fullName = "Name is required";
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -476,6 +477,36 @@ const GoogleAddressFormModal = ({
         form.landmark ? `Near ${form.landmark}` : "",
         form.city, form.state, form.pinCode,
       ].filter(Boolean).join(", ");
+
+      const deliveryAddressFull = [
+        form.buildingName,
+        form.street,
+        form.floor,
+        form.tower,
+        form.landmark ? `Near ${form.landmark}` : "",
+        form.city,
+        form.state,
+        form.pinCode,
+      ].filter(Boolean).join(", ");
+
+      const summaryForParent = locationSummary || {
+        placeId: "N/A",
+        formattedAddress: manualAddress,
+        city: form.city,
+        state: form.state,
+        pinCode: form.pinCode,
+        lat: 0,
+        long: 0,
+      };
+
+      // For guest users, skip API call and just pass address data back
+      if (isGuest) {
+        onAddressConfirm(summaryForParent, null, deliveryAddressFull);
+        showNotification("Address added successfully", "success");
+        setIsSubmitting(false);
+        onClose();
+        return;
+      }
 
       const payload = {
         lat:              locationSummary?.lat  ?? 0,
@@ -501,27 +532,6 @@ const GoogleAddressFormModal = ({
 
       const result = await createAddress(payload).unwrap();
       if (result.success) {
-        const deliveryAddressFull = [
-          form.buildingName,
-          form.street,
-          form.floor,
-          form.tower,
-          form.landmark ? `Near ${form.landmark}` : "",
-          form.city,
-          form.state,
-          form.pinCode,
-        ].filter(Boolean).join(", ");
-
-        // Build a minimal locationSummary for manual-entry case (no map used)
-        const summaryForParent = locationSummary || {
-          placeId: "N/A",
-          formattedAddress: manualAddress,
-          city: form.city,
-          state: form.state,
-          pinCode: form.pinCode,
-          lat: 0,
-          long: 0,
-        };
         onAddressConfirm(summaryForParent, result.data?.addressId, deliveryAddressFull);
         onClose();
         showNotification(result.message || "Address saved successfully", "success");
