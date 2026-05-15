@@ -22,8 +22,12 @@ import CouponInput from "../component/CouponInput";
 import { ComponentLoader } from "../component/layout/LoadingSpinner";
 import { trackBeginCheckout, trackPurchase } from "../utils/analytics";
 
+// Lazy load heavy components
 const CouponList = lazy(() => import("../component/CouponList"));
+const MapModal = lazy(() => import("../component/MapModal"));
+const AddressFormModal = lazy(() => import("../component/AddressFormModal")); // TODO: swap with MapModal when ready
 const MobileNumberModal = lazy(() => import("../component/MobileNumberModal"));
+// Add this:
 const GoogleAddressFormModal = lazy(() => import("../component/GoogleAddressFormModal"));
 
 const CheckoutPage = () => {
