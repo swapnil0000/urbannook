@@ -96,7 +96,13 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
     
     // Handle 401 (Unauthorized) - token might be expired
     // BUT: Don't try to refresh on auth endpoints (login, register, google-login)
+    // AND: Don't try to refresh for guest users (no session to refresh)
     if (status === 401 && !isAuthEndpoint) {
+      const isAuthenticated = api.getState().auth.isAuthenticated;
+      if (!isAuthenticated) {
+        // Guest user — no session to refresh, return the 401 as-is
+        return result;
+      }
       // Try to refresh the token
       const refreshResult = await baseQuery(
         { url: 'refresh-token', method: 'POST' },

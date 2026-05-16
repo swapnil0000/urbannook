@@ -13,6 +13,7 @@ import {
   useDeleteAddressMutation,
   useUpdateCartMutation,
   useUpdateUserProfileMutation,
+  useCalculateShippingMutation,
 } from "../store/api/userApi";
 import { setShowLoginModal, setLoginCallback } from "../store/slices/uiSlice";
 import { useUI } from "../hooks/useRedux";
@@ -77,7 +78,13 @@ const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, it
     </div>
     <div className="flex justify-between items-center text-sm">
       <span className="text-gray-500">Delivery</span>
-      <span className="font-medium text-gray-800">₹{shipping.toLocaleString()}</span>
+      <span className="font-medium text-gray-800">
+        {shipping === null
+          ? <span className="text-[10px] text-amber-600 font-bold uppercase tracking-wider">Enter address</span>
+          : typeof shipping === "number"
+          ? `₹${Math.ceil(shipping).toLocaleString()}`
+          : <span className="text-[10px] text-red-500 uppercase">{shipping}</span>}
+      </span>
     </div>
     {appliedCoupon && discount > 0 && (
       <div className="flex justify-between items-center text-sm font-semibold text-emerald-600 bg-emerald-50 rounded-xl px-3.5 py-2.5 -mx-1">
@@ -136,8 +143,8 @@ const CheckoutPage = () => {
   const [useDifferentDeliveryContact, setUseDifferentDeliveryContact] = useState(false);
   const [deliveryMobile, setDeliveryMobile] = useState("");
   const [deliveryMobileErrors, setDeliveryMobileErrors] = useState("");
-  const [appliedCoupon, setAppliedCoupon] = useState(null);
-  const [pricingDetails, setPricingDetails] = useState({ subtotal: 0, shipping: 149, discount: 0 });
+  const [appliedCoupon, setAppliedCoupon] = useState(savedCheckout.current.appliedCoupon || null);
+  const [pricingDetails, setPricingDetails] = useState({ subtotal: 0, shipping: null, discount: 0 });
   const [paymentError, setPaymentError] = useState(null);
   const [showRetry, setShowRetry] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
@@ -145,9 +152,9 @@ const CheckoutPage = () => {
   const [showMobileModal, setShowMobileModal] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
 
-  const [guestName, setGuestName] = useState("");
-  const [guestEmail, setGuestEmail] = useState("");
-  const [guestMobile, setGuestMobile] = useState("");
+  const [guestName, setGuestName] = useState(savedCheckout.current.guestName || "");
+  const [guestEmail, setGuestEmail] = useState(savedCheckout.current.guestEmail || "");
+  const [guestMobile, setGuestMobile] = useState(savedCheckout.current.guestMobile || "");
   const [guestErrors, setGuestErrors] = useState({});
 
   const { data: userProfileData, isLoading: profileLoading, refetch: refetchProfile } =
@@ -163,11 +170,78 @@ const CheckoutPage = () => {
   const [updateUserProfile] = useUpdateUserProfileMutation();
   const { data: savedAddressData, refetch: refetchAddresses } =
     useGetSavedAddressesQuery(undefined, { skip: isGuest });
+  const [calculateShipping, { isLoading: isCalculatingShipping }] = useCalculateShippingMutation();
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    fetchCsrfToken().catch((e) => console.warn("[Checkout] CSRF fetch failed:", e));
-  }, []);
+    if (!isGuest) {
+      fetchCsrfToken().catch((e) => console.warn("[Checkout] CSRF fetch failed:", e));
+    }
+  }, [isGuest]);
+
+  // Persist checkout progress to sessionStorage on every relevant state change
+  useEffect(() => {
+    try {
+      sessionStorage.setItem("checkoutState", JSON.stringify({
+        currentStep,
+        address,
+        pincode,
+        preciseDetails,
+        currentAddressId,
+        senderMobile,
+        appliedCoupon,
+        guestName,
+        guestEmail,
+        guestMobile,
+      }));
+    } catch (_) {}
+  }, [currentStep, address, pincode, preciseDetails, currentAddressId, senderMobile, appliedCoupon, guestName, guestEmail, guestMobile]);
+
+  // Dynamic Shipping Calculation Logic
+  useEffect(() => {
+    const fetchShippingRate = async () => {
+      if (pincode && pincode.toString().length === 6 && cartItems.length > 0) {
+        try {
+          const formattedCartItems = cartItems.map(item => ({
+            productId: item.mongoId || item.id.split(':')[0],
+            quant: item.quantity,
+            price:item?.price,
+            selectedVariant: item?.selectedVariant
+          }));          
+
+          const result = await calculateShipping({
+            deliveryPinCode: parseInt(pincode, 10),
+            cartItems: formattedCartItems
+          }).unwrap();
+
+          if (result.success && result.data?.total_charges !== undefined) {
+            setPricingDetails(prev => ({
+              ...prev,
+              shipping: parseFloat(result.data.total_charges)
+            }));
+          } else {
+            setPricingDetails(prev => ({
+              ...prev,
+              shipping: "N/A"
+            }));
+          }
+        } catch (error) {
+          console.error("Failed to calculate shipping:", error);
+          setPricingDetails(prev => ({
+            ...prev,
+            shipping: "Error"
+          }));
+        }
+      } else {
+        setPricingDetails(prev => ({
+          ...prev,
+          shipping: null
+        }));
+      }
+    };
+
+    fetchShippingRate();
+  }, [pincode, cartItems, calculateShipping]);
 
   useEffect(() => {
     if (savedAddressData?.success) {
@@ -202,7 +276,7 @@ const CheckoutPage = () => {
       if (userProfile.userAddress && !address) setAddress(userProfile.userAddress);
       if (userProfile.userPinCode && !pincode) setPincode(userProfile.userPinCode);
       if ((userProfile?.mobileNumber || userProfile?.mobile) && !senderMobile)
-        setSenderMobile(String(userProfile.mobileNumber || userProfile.mobile));
+        setSenderMobile(stripCC(String(userProfile.mobileNumber || userProfile.mobile)));
     }
   }, [userProfile]);
 
@@ -212,7 +286,7 @@ const CheckoutPage = () => {
 
   useEffect(() => {
     if (isGuest) {
-      setPricingDetails({ subtotal: cartTotalAmount, shipping: 149, discount: 0 });
+      setPricingDetails(prev => ({ ...prev, subtotal: cartTotalAmount, discount: 0 }));
       return;
     }
     const fetchPricing = async () => {
@@ -220,14 +294,14 @@ const CheckoutPage = () => {
       try {
         const r = await applyCouponMutation({ couponCode: appliedCoupon || null, email: userEmail }).unwrap();
         if (r.success && r.data?.summary)
-          setPricingDetails({ subtotal: r.data.summary.subtotal || 0, shipping: r.data.summary.shipping || 149, discount: r.data.summary.discount || 0 });
+          setPricingDetails(prev => ({ ...prev, subtotal: r.data.summary.subtotal || 0, discount: r.data.summary.discount || 0 }));
       } catch (err) {
         if (err?.data?.statusCode === 400 && appliedCoupon) {
           setAppliedCoupon(null);
           try {
             const r2 = await applyCouponMutation({ couponCode: null, email: userEmail }).unwrap();
             if (r2.success && r2.data?.summary)
-              setPricingDetails({ subtotal: r2.data.summary.subtotal || 0, shipping: r2.data.summary.shipping || 149, discount: r2.data.summary.discount || 0 });
+              setPricingDetails(prev => ({ ...prev, subtotal: r2.data.summary.subtotal || 0, discount: r2.data.summary.discount || 0 }));
           } catch (_) {}
         }
       }
@@ -243,7 +317,7 @@ const CheckoutPage = () => {
       });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const validateMobile = (m) => /^[0-9]{10}$/.test(String(m).trim());
+  const validateMobile = (m) => /^[6-9][0-9]{9}$/.test(String(m).trim());
   const stripCC = (m) => {
     const t = String(m || "").trim();
     if (t.startsWith("+91")) return t.substring(3);
@@ -335,7 +409,7 @@ const CheckoutPage = () => {
       const r = await applyCouponMutation({ couponCode: couponData.code, email: userEmail }).unwrap();
       if (r.success && r.data?.summary) {
         setAppliedCoupon(couponData.code);
-        setPricingDetails({ subtotal: r.data.summary.subtotal || 0, shipping: r.data.summary.shipping || 149, discount: r.data.summary.discount || 0 });
+        setPricingDetails(prev => ({ ...prev, subtotal: r.data.summary.subtotal || 0, discount: r.data.summary.discount || 0 }));
         showNotification(r.message || "Coupon applied!", "success");
         setShowCouponModal(false);
       }
@@ -347,7 +421,7 @@ const CheckoutPage = () => {
       const r = await applyCouponMutation({ couponCode: null, email: userEmail }).unwrap();
       if (r.success && r.data?.summary) {
         setAppliedCoupon(null);
-        setPricingDetails({ subtotal: r.data.summary.subtotal || 0, shipping: r.data.summary.shipping || 149, discount: r.data.summary.discount || 0 });
+        setPricingDetails(prev => ({ ...prev, subtotal: r.data.summary.subtotal || 0, discount: r.data.summary.discount || 0 }));
         showNotification("Coupon removed", "success");
       }
     } catch (e) { showNotification(e?.data?.message || "Failed to remove coupon", "error"); }
@@ -358,7 +432,7 @@ const CheckoutPage = () => {
       const errors = {};
       if (!guestName.trim()) errors.name = "Full name is required";
       if (!guestEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail.trim())) errors.email = "Valid email is required";
-      if (!/^[0-9]{10}$/.test(guestMobile.trim())) errors.mobile = "Valid 10-digit number required";
+      if (!/^[6-9][0-9]{9}$/.test(guestMobile.trim())) errors.mobile = "Enter a valid 10-digit mobile number (must start with 6–9)";
       if (Object.keys(errors).length) { setGuestErrors(errors); return; }
       setGuestErrors({});
     } else {
@@ -448,8 +522,8 @@ const CheckoutPage = () => {
           formattedAddress: address, deliveryAddressFull: address,
           pinCode: pincode ? parseInt(pincode, 10) : null,
           landmark: preciseDetails.landmark, flatOrFloorNumber: preciseDetails.flatNo,
-          lat: selectedFullAddr?.location?.coordinates?.[1] || 0,
-          long: selectedFullAddr?.location?.coordinates?.[0] || 0,
+          lat: selectedFullAddr?.location?.coordinates?.[1] || selectedFullAddr?.lat || 0,
+          long: selectedFullAddr?.location?.coordinates?.[0] || selectedFullAddr?.long || 0,
         },
       }).unwrap();
       if (!await loadRazorpay()) { showNotification("Could not load payment.", "error"); return; }
@@ -484,7 +558,7 @@ const CheckoutPage = () => {
     }
   };
 
-  const totalToPay = pricingDetails.subtotal + pricingDetails.shipping - pricingDetails.discount;
+  const totalToPay = pricingDetails.subtotal + (typeof pricingDetails.shipping === "number" ? pricingDetails.shipping : 0) - pricingDetails.discount;
   const userName = isGuest ? guestName : (userProfile?.userName || userProfile?.name || "");
   const userInitials = userName ? userName.split(" ").filter(Boolean).map((w) => w[0]).join("").toUpperCase().slice(0, 2) : "?";
 
@@ -568,29 +642,11 @@ const CheckoutPage = () => {
                 <p className="text-sm text-gray-400 mt-2">Sign in for a faster checkout or continue as a guest</p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Sign In option */}
-                <button
-                  onClick={() => { dispatch(setLoginCallback('navigate:/checkout')); dispatch(setShowLoginModal(true)); }}
-                  className="group bg-white rounded-2xl border-2 border-[#2e443c]/15 hover:border-[#2e443c]/40 p-6 sm:p-8 text-left transition-all hover:shadow-lg"
-                >
-                  <div className="w-12 h-12 rounded-2xl bg-[#2e443c]/8 flex items-center justify-center mb-4 group-hover:bg-[#2e443c]/15 transition-colors">
-                    <i className="fa-solid fa-user text-[#2e443c] text-lg" />
-                  </div>
-                  <h3 className="text-base font-bold text-gray-900 mb-1">Sign In / Sign Up</h3>
-                  <p className="text-xs text-gray-400 leading-relaxed">Track orders, save addresses, and get exclusive offers</p>
-                  <div className="mt-4 flex items-center gap-1.5 text-xs font-bold text-[#2e443c] uppercase tracking-wider">
-                    Recommended <i className="fa-solid fa-arrow-right text-[9px]" />
-                  </div>
-                </button>
-
-
-                <p className="text-center"> OR </p>
-
+              <div className="flex flex-col sm:flex-row items-stretch gap-0">
                 {/* Guest option */}
                 <button
                   onClick={() => goToStep(contactStep)}
-                  className="group bg-white rounded-2xl border-2 border-gray-100 hover:border-[#a89068]/40 p-6 sm:p-8 text-left transition-all hover:shadow-lg"
+                  className="group flex-1 bg-white rounded-2xl border-2 border-gray-100 hover:border-[#a89068]/40 p-6 sm:p-8 text-left transition-all hover:shadow-lg"
                 >
                   <div className="w-12 h-12 rounded-2xl bg-[#a89068]/8 flex items-center justify-center mb-4 group-hover:bg-[#a89068]/15 transition-colors">
                     <i className="fa-solid fa-bolt text-[#a89068] text-lg" />
@@ -599,6 +655,28 @@ const CheckoutPage = () => {
                   <p className="text-xs text-gray-400 leading-relaxed">We'll send your login details to your email.</p>
                   <div className="mt-4 flex items-center gap-1.5 text-xs font-bold text-[#a89068] uppercase tracking-wider">
                     No account needed <i className="fa-solid fa-arrow-right text-[9px]" />
+                  </div>
+                </button>
+
+                {/* OR divider — horizontal on mobile, vertical on desktop */}
+                <div className="flex sm:flex-col items-center justify-center px-4 py-3 sm:py-6 shrink-0">
+                  <div className="flex-1 h-px sm:h-full sm:w-px bg-gray-200" />
+                  <span className="px-3 sm:px-0 sm:py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest shrink-0">or</span>
+                  <div className="flex-1 h-px sm:h-full sm:w-px bg-gray-200" />
+                </div>
+
+                {/* Sign In option */}
+                <button
+                  onClick={() => { dispatch(setLoginCallback('navigate:/checkout')); dispatch(setShowLoginModal(true)); }}
+                  className="group flex-1 bg-white rounded-2xl border-2 border-[#2e443c]/15 hover:border-[#2e443c]/40 p-6 sm:p-8 text-left transition-all hover:shadow-lg"
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-[#2e443c]/8 flex items-center justify-center mb-4 group-hover:bg-[#2e443c]/15 transition-colors">
+                    <i className="fa-solid fa-user text-[#2e443c] text-lg" />
+                  </div>
+                  <h3 className="text-base font-bold text-gray-900 mb-1">Sign In / Sign Up</h3>
+                  <p className="text-xs text-gray-400 leading-relaxed">Track orders, save addresses, and get exclusive offers</p>
+                  <div className="mt-4 flex items-center gap-1.5 text-xs font-bold text-[#2e443c] uppercase tracking-wider">
+                    Recommended <i className="fa-solid fa-arrow-right text-[9px]" />
                   </div>
                 </button>
               </div>
@@ -617,7 +695,7 @@ const CheckoutPage = () => {
           {currentStep === contactStep && (
             <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
 
-              <div className="flex items-start justify-between gap-4">
+              {/* <div className="flex items-start justify-between gap-4">
                 <div>
                   <h1 className="text-2xl sm:text-3xl font-serif text-gray-900 leading-tight">
                     {isGuest ? "How can we reach you?" : "Your contact details"}
@@ -635,24 +713,8 @@ const CheckoutPage = () => {
                     Sign in
                   </button>
                 )}
-              </div>
+              </div> */}
 
-              {/* Guest notice */}
-              {isGuest && (
-                <div className="rounded-2xl overflow-hidden border border-amber-200/60 bg-gradient-to-br from-amber-50 to-orange-50/40">
-                  <div className="flex items-start gap-4 p-5">
-                    <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
-                      <i className="fa-solid fa-user-astronaut text-amber-500 text-base" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-amber-900">Continuing as Guest</p>
-                      <p className="text-xs text-amber-700/80 mt-1 leading-relaxed">
-                        No account needed! After payment, we'll auto-create a free account and email you the login details so you can track your order anytime.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Auth: logged-in card */}
               {!isGuest && userProfile && (
@@ -708,7 +770,7 @@ const CheckoutPage = () => {
                           <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                             <span className="text-sm text-gray-400 font-medium">+91</span>
                           </div>
-                          <input type="tel" value={guestMobile} onChange={(e) => { setGuestMobile(e.target.value.replace(/\D/g, "").slice(0, 10)); setGuestErrors((p) => ({ ...p, mobile: "" })); }} placeholder="Enter mobile number" className={`${inputCls(guestErrors.mobile)} pl-12`} />
+                          <input type="tel" maxLength={10} value={guestMobile} onChange={(e) => { setGuestMobile(e.target.value.replace(/\D/g, "").slice(0, 10)); setGuestErrors((p) => ({ ...p, mobile: "" })); }} placeholder="Enter mobile number" className={`${inputCls(guestErrors.mobile)} pl-12`} />
                         </div>
                       )
                       : (
@@ -718,6 +780,7 @@ const CheckoutPage = () => {
                           </div>
                           <input
                             type="tel"
+                            maxLength={10}
                             value={senderMobile && senderMobile !== "N/A" ? senderMobile : ""}
                             onChange={(e) => setSenderMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
                             placeholder="Enter mobile number"
@@ -747,9 +810,9 @@ const CheckoutPage = () => {
                         <div className="animate-in fade-in slide-in-from-top-1 duration-200 pl-8">
                           <Field label="Recipient's Mobile" required error={deliveryMobileErrors}>
                             {iconInput("fa-mobile-screen-button",
-                              <input type="tel" value={deliveryMobile}
+                              <input type="tel" maxLength={10} value={deliveryMobile}
                                 onChange={(e) => setDeliveryMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                                onBlur={() => { if (deliveryMobile && !validateMobile(deliveryMobile)) setDeliveryMobileErrors("Must be exactly 10 digits"); else setDeliveryMobileErrors(""); }}
+                                onBlur={() => { if (deliveryMobile && !validateMobile(deliveryMobile)) setDeliveryMobileErrors("Enter a valid 10-digit mobile number (must start with 6–9)"); else setDeliveryMobileErrors(""); }}
                                 placeholder="Recipient's mobile"
                                 className={`${inputCls(deliveryMobileErrors)} pl-10`}
                               />

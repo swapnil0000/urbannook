@@ -54,7 +54,7 @@ const AddressTypeChips = ({ value, onChange }) => (
 
 // ─── Sub-component: FormField ────────────────────────────────────────────────
 
-const FormField = ({ label, required, placeholder, value, onChange, readOnly, icon, hint }) => (
+const FormField = ({ label, required, placeholder, value, onChange, readOnly, icon, hint, maxLength }) => (
   <div>
     <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">
       {label} {required && <span className="text-red-400">*</span>}
@@ -69,6 +69,7 @@ const FormField = ({ label, required, placeholder, value, onChange, readOnly, ic
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
         readOnly={readOnly}
+        maxLength={maxLength}
         className={`w-full border rounded-xl px-3 py-3 text-sm transition-all outline-none ${
           icon ? "pl-9" : ""
         } ${
@@ -652,7 +653,8 @@ const AddressFormModal = ({
                 required
                 placeholder="6-digit pincode"
                 value={form.pinCode}
-                onChange={setField("pinCode")}
+                maxLength={6}
+                onChange={(val) => setField("pinCode")(val.replace(/\D/g, "").slice(0, 6))}
                 // icon="fa-hashtag"
               />
               {errors.pinCode && (

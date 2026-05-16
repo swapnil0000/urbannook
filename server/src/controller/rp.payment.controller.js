@@ -71,7 +71,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   if (!items || !Array.isArray(items) || items.length === 0) {
     throw new ValidationError("Items are required");
   }
-  if (!addressId) throw new ValidationError("Delivery address is required");
+  if (!addressId && !clientAddress?.formattedAddress?.trim()) throw new ValidationError("Delivery address is required");
 
   const user = await User.findOne({ userId }).lean();
   const stripCountryCode = (mobile) => {

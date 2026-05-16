@@ -2,7 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* CSS Variables for Theme System */
 :root {
   /* Colors - Modern Blue & Teal Palette */
   --color-primary: #3B82F6;    /* Blue */

@@ -48,7 +48,7 @@ const EMPTY_FORM = {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-const FormField = ({ label, required, placeholder, value, onChange, icon }) => (
+const FormField = ({ label, required, placeholder, value, onChange, icon, maxLength }) => (
   <div>
     <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">
       {label} {required && <span className="text-red-400">*</span>}
@@ -62,6 +62,7 @@ const FormField = ({ label, required, placeholder, value, onChange, icon }) => (
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
+        maxLength={maxLength}
         className={`w-full border rounded-xl px-3 py-3 text-sm transition-all outline-none ${
           icon ? "pl-9" : ""
         } bg-white border-gray-200 text-[#2e443c] focus:border-[#a89068] placeholder:text-gray-300`}
@@ -776,7 +777,8 @@ const GoogleAddressFormModal = ({
                 required
                 placeholder="6-digit"
                 value={form.pinCode}
-                onChange={setField("pinCode")}
+                maxLength={6}
+                onChange={(val) => setField("pinCode")(val.replace(/\D/g, "").slice(0, 6))}
               />
               {errors.pinCode && (
                 <p className="text-[11px] text-red-500 mt-1">{errors.pinCode}</p>
