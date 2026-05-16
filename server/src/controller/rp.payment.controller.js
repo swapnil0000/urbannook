@@ -10,6 +10,7 @@ import env from "../config/envConfigSetup.js";
 import {
   sendOrderConfirmation,
   sendPaymentReceipt,
+  sendGuestAccountCreatedEmail,
 } from "../services/email.service.js";
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
 import { ValidationError, NotFoundError } from "../utils/errors.js";
@@ -70,7 +71,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   if (!items || !Array.isArray(items) || items.length === 0) {
     throw new ValidationError("Items are required");
   }
-  if (!addressId) throw new ValidationError("Delivery address is required");
+  if (!addressId && !clientAddress?.formattedAddress?.trim()) throw new ValidationError("Delivery address is required");
 
   const user = await User.findOne({ userId }).lean();
   const stripCountryCode = (mobile) => {
@@ -126,7 +127,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   }
 
   // Check if pricing has been calculated (appliedCoupon.summary must exist with a valid grandTotal)
-  const grandTotal = cart?.appliedCoupon?.summary?.grandTotal;  
+  const grandTotal = cart?.appliedCoupon?.summary?.grandTotal;
   if (grandTotal == null || grandTotal <= 0) {
     throw new ValidationError(
       "Cart pricing not calculated. Please refresh the page.",
@@ -154,12 +155,12 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
 
   const orderItems = items.map((item) => {
     const product = products.find((p) => p.productId === item.productId);
-    
+
     // Find the cart item to get its specific image
     let itemImage = null;
     const itemVariant = item.variant || item.color || "N/A";
     const cartKey = `${item.productId}:${itemVariant}`;
-    
+
     // 1. Try to get image from Cart Snapshot (Most accurate for what user saw)
     const getCartProduct = (key) => {
       if (!cart.products) return null;
@@ -178,9 +179,9 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
 
     // 2. Fallback to Product Variant Details (if snapshot fails or is empty)
     if (!itemImage && product.variantDetails && product.variantDetails.length > 0) {
-      const variant = product.variantDetails.find(v => 
-        v.variantName === itemVariant || 
-        v.variantName === item.variant || 
+      const variant = product.variantDetails.find(v =>
+        v.variantName === itemVariant ||
+        v.variantName === item.variant ||
         v.variantName === item.color
       );
       if (variant && variant.variantImage && variant.variantImage.length > 0) {
@@ -201,9 +202,9 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     // Find the variant specific price
     let priceAtPurchase = 0;
     if (product.variantDetails && product.variantDetails.length > 0) {
-      const variant = product.variantDetails.find(v => 
-        v.variantName === itemVariant || 
-        v.variantName === item.variant || 
+      const variant = product.variantDetails.find(v =>
+        v.variantName === itemVariant ||
+        v.variantName === item.variant ||
         v.variantName === item.color
       );
       if (variant && variant.variantPrice) {
@@ -370,6 +371,56 @@ const razorpayWebHookController = async (req, res) => {
 
           await order.save();
 
+          // Auto-create account for guest orders after successful payment
+          if (order.isGuestOrder && order.guestInfo?.email) {
+            try {
+              const guestEmail = order.guestInfo.email.toLowerCase();
+              const guestName = order.guestInfo.name || "Customer";
+              const guestMobile = order.guestInfo.mobile;
+
+              let accountUser = await User.findOne({ email: guestEmail });
+              let tempPassword = generateTempPassword();
+
+              if (!accountUser) {
+                // Brand-new account
+                accountUser = new User({
+                  userId: uuidv7(),
+                  name: guestName,
+                  email: guestEmail,
+                  password: tempPassword,
+                  mobileNumber: guestMobile ? parseInt(guestMobile, 10) : null,
+                  isVerified: true,
+                  role: "USER",
+                });
+                await accountUser.save();
+                await Cart.create({ userId: accountUser.userId, products: {} });
+              } else {
+                // Existing account — reset password so guest can always log in after payment
+                accountUser.password = tempPassword;
+                await accountUser.save();
+              }
+
+              // Link order to the real user account
+              await Order.updateOne(
+                { _id: order._id },
+                { $set: { userId: accountUser.userId } },
+              );
+
+              // Always send credentials — new account or returning guest
+              await sendGuestAccountCreatedEmail(
+                guestEmail,
+                guestName,
+                tempPassword,
+                order.orderId,
+              ).catch((err) =>
+                console.error("[ERROR] Failed to send guest account email:", err.message),
+              );
+            } catch (guestAccountError) {
+              // Do not fail the webhook — order is already paid
+              console.error("[ERROR] Guest account creation failed:", guestAccountError.message);
+            }
+          }
+
           try {
             await Cart.updateOne(
               { userId: order.userId },
@@ -529,8 +580,126 @@ const razorpayWebHookController = async (req, res) => {
   }
 };
 
+const generateTempPassword = () => {
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$";
+  let password = "";
+  for (let i = 0; i < 10; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return password;
+};
+
+const guestCreateOrderController = asyncHandler(async (req, res) => {
+  const { items, guestInfo, deliveryAddress } = req.body;
+
+  if (!guestInfo?.name?.trim()) throw new ValidationError("Full name is required");
+  if (!guestInfo?.email?.trim()) throw new ValidationError("Email is required");
+  if (!guestInfo?.mobile?.trim()) throw new ValidationError("Mobile number is required");
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(guestInfo.email)) throw new ValidationError("Invalid email address");
+
+  const cleanMobile = stripCountryCode(guestInfo.mobile);
+  if (!/^[0-9]{10}$/.test(cleanMobile)) throw new ValidationError("Valid 10-digit mobile number is required");
+
+  if (!items || !Array.isArray(items) || items.length === 0) throw new ValidationError("Items are required");
+  if (!deliveryAddress?.formattedAddress?.trim()) throw new ValidationError("Delivery address is required");
+  if (!deliveryAddress?.pinCode) throw new ValidationError("Pincode is required");
+
+  const productIds = [...new Set(items.map((i) => i.productId))];
+  const products = await Product.find({ productId: { $in: productIds }, productStatus: "in_stock" });
+
+  if (products.length !== productIds.length) throw new ValidationError("One or more products unavailable");
+
+  let subtotal = 0;
+  const orderItems = items.map((item) => {
+    const product = products.find((p) => p.productId === item.productId);
+    const itemVariant = item.variant || "N/A";
+
+    let priceAtPurchase = 0;
+    if (product.variantDetails && product.variantDetails.length > 0) {
+      const variant = product.variantDetails.find((v) => v.variantName === itemVariant);
+      priceAtPurchase = variant?.variantPrice || product.variantDetails[0].variantPrice || 0;
+    }
+    subtotal += priceAtPurchase * item.quantity;
+
+    let itemImage = null;
+    if (product.variantDetails?.length > 0) {
+      const variant = product.variantDetails.find((v) => v.variantName === itemVariant);
+      if (variant?.variantImage?.length > 0) itemImage = variant.variantImage[0];
+    }
+    if (!itemImage) itemImage = product.productImg || "https://urbannook.in/assets/logo.webp";
+
+    return {
+      productId: product.productId,
+      productSnapshot: {
+        quantity: item.quantity,
+        productImg: itemImage,
+        productName: product.productName,
+        productCategory: product.productCategory,
+        productSubCategory: product.productSubCategory,
+        priceAtPurchase,
+        shipping: "149",
+        selectedVariant: itemVariant,
+      },
+    };
+  });
+
+  const shipping = 149;
+  const finalAmount = subtotal + shipping;
+
+  const razorpayOrder = await razorpayCreateOrderService(finalAmount * 100, "INR");
+
+  const guestEmail = guestInfo.email.toLowerCase().trim();
+  const { v7: uuidv7Local } = await import("uuid");
+
+  const order = await Order.create({
+    orderId: uuidv7(),
+    userEmail: guestEmail,
+    userId: `guest_${uuidv7()}`,
+    userName: guestInfo.name.trim(),
+    userMobile: cleanMobile,
+    items: orderItems,
+    amount: finalAmount,
+    senderMobile: cleanMobile,
+    receiverMobile: cleanMobile,
+    deliveryAddress: {
+      fullName: guestInfo.name.trim(),
+      mobileNumber: cleanMobile,
+      formattedAddress: deliveryAddress.formattedAddress || "",
+      deliveryAddressFull: deliveryAddress.deliveryAddressFull || deliveryAddress.formattedAddress || "",
+      pinCode: deliveryAddress.pinCode ? parseInt(String(deliveryAddress.pinCode), 10) : null,
+      landmark: deliveryAddress.landmark || "",
+      flatOrFloorNumber: deliveryAddress.flatOrFloorNumber || "",
+      lat: deliveryAddress.lat || 0,
+      long: deliveryAddress.long || 0,
+    },
+    payment: { razorpayOrderId: razorpayOrder?.data?.id },
+    status: "CREATED",
+    isGuestOrder: true,
+    guestInfo: { name: guestInfo.name.trim(), email: guestEmail, mobile: cleanMobile },
+  });
+
+  return res.status(200).json(
+    new ApiRes(
+      200,
+      "Guest order created",
+      {
+        orderId: order.orderId,
+        razorpayOrderId: razorpayOrder?.data?.id,
+        amount: finalAmount * 100,
+        currency: "INR",
+        senderMobile: cleanMobile,
+        receiverMobile: cleanMobile,
+      },
+      true,
+    ),
+  );
+});
+
 export {
   razorpayCreateOrderController,
   razorpayKeyGetController,
   razorpayWebHookController,
+  guestCreateOrderController,
 };

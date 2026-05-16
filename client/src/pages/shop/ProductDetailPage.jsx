@@ -566,13 +566,7 @@ const ProductDetailPage = () => {
   };
 
   const handleCheckoutClick = () => {
-    const hasToken = !!localStorage.getItem("authToken");
-
-    if (isAuthenticated || hasToken) {
-      navigate("/checkout");
-    } else {
-      openLoginModal("navigate:/checkout");
-    }
+    navigate("/checkout");
   };
 
   const handleWishlistToggle = async () => {

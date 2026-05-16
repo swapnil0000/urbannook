@@ -85,6 +85,7 @@ import {
   razorpayCreateOrderController,
   razorpayKeyGetController,
   razorpayWebHookController,
+  guestCreateOrderController,
 } from "../controller/rp.payment.controller.js";
 import userBulkEmailWaitlistController from "../controller/user.bulk.email.waitlist.controller.js";
 
@@ -93,6 +94,11 @@ const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
   message: "Too many login attempts, please try again later",
+});
+const guestOrderLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: "Too many guest orders from this IP, please try again later",
 });
 /* ===============================================================
    AUTH ROUTES (PUBLIC)
@@ -254,11 +260,8 @@ userRouter.post("/user/logout", authGuardService("USER"), csrfProtection, logout
    - create-order     → Creates Razorpay order + DB order
    - paymentverification → Client-side signature verification
 ================================================================ */
-userRouter.get(
-  "/rp/get-key",
-  authGuardService("USER"),
-  razorpayKeyGetController,
-);
+// Public — KEY_ID is safe to expose (it is a public credential, not the secret)
+userRouter.get("/rp/get-key", razorpayKeyGetController);
 
 userRouter.post(
   "/user/create-order",
@@ -266,6 +269,9 @@ userRouter.post(
   csrfProtection,
   razorpayCreateOrderController,
 );
+
+// Guest checkout — no auth required, rate limited instead
+userRouter.post("/guest/create-order", guestOrderLimiter, guestCreateOrderController);
 
 /* ===============================================================
    RAZORPAY WEBHOOK (PUBLIC – SERVER TO SERVER)

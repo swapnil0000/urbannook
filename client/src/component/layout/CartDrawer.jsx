@@ -71,15 +71,8 @@ const CartDrawer = ({ isOpen, onClose }) => {
   };
   
   const handleCheckout = () => {
-    const hasToken = !!localStorage.getItem('authToken');
-    const isLoggedIn = isAuthenticated || hasToken;
     onClose();
-    if (isLoggedIn) {
-      navigate('/checkout');
-    } else {
-      dispatch(setLoginCallback('navigate:/checkout'));
-      dispatch(setShowLoginModal(true));
-    }
+    navigate('/checkout');
   };
 
   if (!mounted && !isOpen) return null;
