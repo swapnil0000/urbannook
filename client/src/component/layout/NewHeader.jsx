@@ -496,11 +496,14 @@ const NewHeader = () => {
               setUser(u); 
               setShowLogin(false); 
               dispatch(setShowLoginModal(false));
-              // Fire callback event so other components can react
-              if (loginCallback) {
+              // Handle post-login navigation or callback
+              if (loginCallback && loginCallback.startsWith('navigate:')) {
+                const path = loginCallback.replace('navigate:', '');
+                navigate(path);
+              } else if (loginCallback) {
                 window.dispatchEvent(new CustomEvent('loginSuccess', { detail: { callback: loginCallback } }));
-                dispatch(clearLoginCallback());
               }
+              dispatch(clearLoginCallback());
             }}
             onSwitchToSignup={() => { 
               setShowLogin(false); 
@@ -513,7 +516,16 @@ const NewHeader = () => {
         {showSignup && (
           <SignupForm 
             onClose={() => setShowSignup(false)}
-            onSignupSuccess={(u) => { setUser(u); setShowSignup(false); }}
+            onSignupSuccess={(u) => { 
+              setUser(u); 
+              setShowSignup(false);
+              // Handle post-signup navigation
+              if (loginCallback && loginCallback.startsWith('navigate:')) {
+                const path = loginCallback.replace('navigate:', '');
+                navigate(path);
+              }
+              dispatch(clearLoginCallback());
+            }}
             onSwitchToLogin={() => { setShowSignup(false); setShowLogin(true); }}
           />
         )}
