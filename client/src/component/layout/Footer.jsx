@@ -53,7 +53,7 @@ const Footer = () => {
   return (
     <footer className="w-full bg-[#f5f7f8] selection:bg-[#F5DEB3] selection:text-[#1a1a1a]">
 
-      <div className="mx-auto  relative overflow-hidden  bg-[#faf9f6] text-[#1a1a1a] pt-20 md:pt-24 pb-12 shadow-sm isolate">
+      <div className="mx-auto  relative overflow-hidden  bg-[#faf9f6] text-[#1a1a1a]    shadow-sm isolate">
 
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full pointer-events-none opacity-[0.03] select-none z-0">
           <h1 className="text-[14vw] font-serif font-bold text-center leading-none text-black tracking-tighter uppercase whitespace-nowrap">

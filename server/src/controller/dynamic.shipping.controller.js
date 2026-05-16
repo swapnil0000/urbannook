@@ -1,19 +1,13 @@
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
-import { AuthenticationError } from "../utils/errors.js";
 import { ApiRes } from "../utils/index.js";
-import { 
-  checkPincodeServiceability, 
-  calculateShippingRate 
+import {
+  checkPincodeServiceability,
+  calculateShippingRate
 } from "../services/shipping.service.js";
 
 const pinCodeDeliverableOrNotCheck = asyncHandler(async (req, res) => {
-  const { userId } = req.user;
   const { deliveryPinCode, userPincode } = req.body;
   const pincode = deliveryPinCode || userPincode;
-  
-  if (!userId) {
-    throw new AuthenticationError("Unauthorized");
-  }
 
   const result = await checkPincodeServiceability(pincode);
 
@@ -28,13 +22,8 @@ const pinCodeDeliverableOrNotCheck = asyncHandler(async (req, res) => {
 });
 
 const dynamicShippingCal = asyncHandler(async (req, res) => {
-  const { userId } = req.user;
   const { deliveryPinCode, userPincode, cartItems } = req.body;
   const pincode = deliveryPinCode || userPincode;
-
-  if (!userId) {
-    throw new AuthenticationError("Unauthorized");
-  }
 
   const selectedService = await calculateShippingRate({ pincode, cartItems });
 

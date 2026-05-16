@@ -1,5 +1,4 @@
 import express from "express";
-import { authGuardService } from "../services/common.auth.service.js";
 import {
   pinCodeDeliverableOrNotCheck,
   dynamicShippingCal,
@@ -7,15 +6,8 @@ import {
 
 const dynamicShippingRouter = express.Router();
 
-dynamicShippingRouter.post(
-  "/pincode/check",
-  authGuardService("USER"),
-  pinCodeDeliverableOrNotCheck,
-);
+dynamicShippingRouter.post("/pincode/check", pinCodeDeliverableOrNotCheck);
 
-dynamicShippingRouter.post(
-  "/sp-rate/cal",
-  authGuardService("USER"),
-  dynamicShippingCal,
-);
+dynamicShippingRouter.post("/sp-rate/cal", dynamicShippingCal);
+
 export default dynamicShippingRouter;
