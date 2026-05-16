@@ -82,9 +82,7 @@ const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, it
           ? <span className="inline-block w-16 h-3.5 bg-gray-200 rounded animate-pulse" />
           : shipping === null
           ? <span className="text-[10px] text-amber-600 font-bold uppercase tracking-wider">Enter address</span>
-          : typeof shipping === "number"
-          ? `₹${Math.ceil(shipping).toLocaleString()}`
-          : <span className="text-[10px] text-red-500 uppercase">{shipping}</span>}
+          : `₹${Math.ceil(shipping).toLocaleString()}`}
       </span>
     </div>
     {appliedCoupon && discount > 0 && (
@@ -202,50 +200,59 @@ const CheckoutPage = () => {
   }, [currentStep, address, pincode, preciseDetails, currentAddressId, senderMobile, appliedCoupon, guestName, guestEmail, guestMobile]);
 
   // Dynamic Shipping Calculation Logic
+  const calculateShippingRef = useRef(calculateShipping);
+  useEffect(() => { calculateShippingRef.current = calculateShipping; }, [calculateShipping]);
+
   useEffect(() => {
-    const fetchShippingRate = async () => {
-      if (pincode && pincode.toString().length === 6 && cartItems.length > 0) {
-        try {
-          const formattedCartItems = cartItems.map(item => ({
-            productId: item.mongoId || item.id.split(':')[0],
-            quant: item.quantity,
-            price:item?.price,
-            selectedVariant: item?.selectedVariant
-          }));          
+    const FALLBACK_SHIPPING = 149;
+    let cancelled = false;
 
-          const result = await calculateShipping({
-            deliveryPinCode: parseInt(pincode, 10),
-            cartItems: formattedCartItems
-          }).unwrap();
+    const fetchShippingRate = async (attempt = 1) => {
+      if (cancelled) return;
 
-          if (result.success && result.data?.total_charges !== undefined) {
-            setPricingDetails(prev => ({
-              ...prev,
-              shipping: parseFloat(result.data.total_charges)
-            }));
-          } else {
-            setPricingDetails(prev => ({
-              ...prev,
-              shipping: "N/A"
-            }));
-          }
-        } catch (error) {
-          console.error("Failed to calculate shipping:", error);
-          setPricingDetails(prev => ({
-            ...prev,
-            shipping: "Error"
-          }));
-        }
-      } else {
-        setPricingDetails(prev => ({
-          ...prev,
-          shipping: null
+      if (!pincode || pincode.toString().length !== 6 || cartItems.length === 0) {
+        setPricingDetails(prev => ({ ...prev, shipping: null }));
+        return;
+      }
+
+      try {
+        const formattedCartItems = cartItems.map(item => ({
+          productId: item.mongoId || item.id.split(':')[0],
+          quant: item.quantity,
+          price: item?.price,
+          selectedVariant: item?.selectedVariant,
         }));
+
+        const result = await calculateShippingRef.current({
+          deliveryPinCode: parseInt(pincode, 10),
+          cartItems: formattedCartItems,
+        }).unwrap();
+
+        if (cancelled) return;
+
+        const charges = parseFloat(result?.data?.total_charges);
+        if (result.success && !isNaN(charges)) {
+          setPricingDetails(prev => ({ ...prev, shipping: charges }));
+        } else {
+          // API responded but no valid rate — use fallback
+          setPricingDetails(prev => ({ ...prev, shipping: FALLBACK_SHIPPING }));
+        }
+      } catch (error) {
+        if (cancelled) return;
+        console.error(`[Shipping] Attempt ${attempt} failed:`, error);
+        if (attempt < 3) {
+          // Retry up to 3 times with a short delay
+          setTimeout(() => fetchShippingRate(attempt + 1), 1500 * attempt);
+        } else {
+          // All retries exhausted — fall back to ₹149
+          setPricingDetails(prev => ({ ...prev, shipping: FALLBACK_SHIPPING }));
+        }
       }
     };
 
     fetchShippingRate();
-  }, [pincode, cartItems, calculateShipping]);
+    return () => { cancelled = true; };
+  }, [pincode, cartItems.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (savedAddressData?.success) {
