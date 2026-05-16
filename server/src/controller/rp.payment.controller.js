@@ -367,6 +367,7 @@ const razorpayWebHookController = async (req, res) => {
               const tempPassword = generateTempPassword();
 
               let accountUser = await User.findOne({ email: guestEmail });
+              const isExistingUser = !!accountUser;
 
               if (!accountUser) {
                 accountUser = new User({
@@ -380,19 +381,17 @@ const razorpayWebHookController = async (req, res) => {
                 });
                 await accountUser.save();
                 await Cart.create({ userId: accountUser.userId, products: {} });
-              } else {
-                accountUser.password = tempPassword;
-                await accountUser.save();
               }
+              // Existing user: just link the order — never overwrite their password
 
               await Order.updateOne(
                 { _id: order._id },
-                { $set: { userId: accountUser.userId } },
+                { $set: { userId: accountUser.userId, isNewGuestAccount: !isExistingUser } },
               );
 
-              // Keep credentials in scope for the email sent after order.save()
-              guestCredentials = { guestEmail, guestName, tempPassword };
-              console.log(`[INFO] Guest account ready before PAID mark - Email: ${guestEmail}`);
+              // Only send account-created email for brand-new accounts
+              guestCredentials = isExistingUser ? null : { guestEmail, guestName, tempPassword };
+              console.log(`[INFO] Guest account ready - Email: ${guestEmail}, isNew: ${!isExistingUser}`);
             } catch (guestAccountError) {
               console.error("[ERROR] Guest account creation failed:", guestAccountError.message, guestAccountError.stack);
             }

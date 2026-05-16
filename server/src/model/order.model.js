@@ -114,6 +114,7 @@ const orderSchema = new mongoose.Schema(
     },
 
     isGuestOrder: { type: Boolean, default: false },
+    isNewGuestAccount: { type: Boolean, default: false },
     guestInfo: {
       name: { type: String, default: null },
       email: { type: String, default: null },
