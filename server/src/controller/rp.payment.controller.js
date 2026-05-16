@@ -354,6 +354,51 @@ const razorpayWebHookController = async (req, res) => {
         if (order.status !== "PAID") {
           const wasFailedByCron = order.status === "FAILED";
 
+          // ── STEP 1: Create guest account BEFORE marking PAID ──────────────
+          // This prevents the race condition where the client polling detects
+          // PAID status before the account is created, causing "user not exist"
+          // errors when the user immediately clicks "Login to Track Order".
+          let guestCredentials = null;
+          if (order.isGuestOrder && order.guestInfo?.email) {
+            try {
+              const guestEmail = order.guestInfo.email.toLowerCase();
+              const guestName = order.guestInfo.name || "Customer";
+              const guestMobile = order.guestInfo.mobile;
+              const tempPassword = generateTempPassword();
+
+              let accountUser = await User.findOne({ email: guestEmail });
+
+              if (!accountUser) {
+                accountUser = new User({
+                  userId: uuidv7(),
+                  name: guestName,
+                  email: guestEmail,
+                  password: tempPassword,
+                  mobileNumber: guestMobile ? parseInt(guestMobile, 10) : null,
+                  isVerified: true,
+                  role: "USER",
+                });
+                await accountUser.save();
+                await Cart.create({ userId: accountUser.userId, products: {} });
+              } else {
+                accountUser.password = tempPassword;
+                await accountUser.save();
+              }
+
+              await Order.updateOne(
+                { _id: order._id },
+                { $set: { userId: accountUser.userId } },
+              );
+
+              // Keep credentials in scope for the email sent after order.save()
+              guestCredentials = { guestEmail, guestName, tempPassword };
+              console.log(`[INFO] Guest account ready before PAID mark - Email: ${guestEmail}`);
+            } catch (guestAccountError) {
+              console.error("[ERROR] Guest account creation failed:", guestAccountError.message, guestAccountError.stack);
+            }
+          }
+
+          // ── STEP 2: Mark order as PAID (account already exists at this point) ──
           order.payment.razorpayPaymentId = payment.id;
           order.status = "PAID";
           order.payment.errorCode = null;
@@ -371,54 +416,16 @@ const razorpayWebHookController = async (req, res) => {
 
           await order.save();
 
-          // Auto-create account for guest orders after successful payment
-          if (order.isGuestOrder && order.guestInfo?.email) {
-            try {
-              const guestEmail = order.guestInfo.email.toLowerCase();
-              const guestName = order.guestInfo.name || "Customer";
-              const guestMobile = order.guestInfo.mobile;
-
-              let accountUser = await User.findOne({ email: guestEmail });
-              let tempPassword = generateTempPassword();
-
-              if (!accountUser) {
-                // Brand-new account
-                accountUser = new User({
-                  userId: uuidv7(),
-                  name: guestName,
-                  email: guestEmail,
-                  password: tempPassword,
-                  mobileNumber: guestMobile ? parseInt(guestMobile, 10) : null,
-                  isVerified: true,
-                  role: "USER",
-                });
-                await accountUser.save();
-                await Cart.create({ userId: accountUser.userId, products: {} });
-              } else {
-                // Existing account — reset password so guest can always log in after payment
-                accountUser.password = tempPassword;
-                await accountUser.save();
-              }
-
-              // Link order to the real user account
-              await Order.updateOne(
-                { _id: order._id },
-                { $set: { userId: accountUser.userId } },
-              );
-
-              // Always send credentials — new account or returning guest
-              await sendGuestAccountCreatedEmail(
-                guestEmail,
-                guestName,
-                tempPassword,
-                order.orderId,
-              ).catch((err) =>
-                console.error("[ERROR] Failed to send guest account email:", err.message),
-              );
-            } catch (guestAccountError) {
-              // Do not fail the webhook — order is already paid
-              console.error("[ERROR] Guest account creation failed:", guestAccountError.message);
-            }
+          // ── STEP 3: Send credentials email now that order is confirmed ────
+          if (guestCredentials) {
+            await sendGuestAccountCreatedEmail(
+              guestCredentials.guestEmail,
+              guestCredentials.guestName,
+              guestCredentials.tempPassword,
+              order.orderId,
+            ).catch((err) =>
+              console.error("[ERROR] Failed to send guest account email:", err.message),
+            );
           }
 
           try {

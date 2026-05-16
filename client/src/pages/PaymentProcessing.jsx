@@ -5,7 +5,7 @@ import { clearCart } from "../store/slices/cartSlice";
 import { useClearCartMutation } from "../store/api/userApi";
 import { useUI } from "../hooks/useRedux";
 import { getApiUrl } from "../config/appUrls";
-import { setShowLoginModal, setLoginCallback } from "../store/slices/uiSlice";
+import { setShowLoginModal, setLoginCallback, setLoginPrefillEmail } from "../store/slices/uiSlice";
 
 const PaymentProcessing = () => {
   const { orderId } = useParams();
@@ -17,6 +17,7 @@ const PaymentProcessing = () => {
 
   const [message, setMessage] = useState("Processing your payment...");
   const [guestSuccess, setGuestSuccess] = useState(false);
+  const [guestEmail, setGuestEmail] = useState(null);
   const [clearCartApi] = useClearCartMutation();
 
   useEffect(() => {
@@ -51,7 +52,8 @@ const PaymentProcessing = () => {
           localStorage.removeItem('guestId');
 
           if (isGuest) {
-            // Guest: show success screen, don't redirect to /orders (protected)
+            // Guest: capture the email returned by the server (exists once account is ready)
+            if (data?.data?.guestEmail) setGuestEmail(data.data.guestEmail);
             setGuestSuccess(true);
           } else {
             try {
@@ -110,6 +112,11 @@ const PaymentProcessing = () => {
                 <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
                   We've emailed your order receipt <strong>and</strong> a temporary password for your new Urban Nook account. Check spam if you don't see it.
                 </p>
+                {guestEmail && (
+                  <p className="text-xs text-amber-800 mt-1.5 font-semibold">
+                    Login email: <span className="font-mono bg-amber-100 px-1.5 py-0.5 rounded">{guestEmail}</span>
+                  </p>
+                )}
               </div>
             </div>
 
@@ -134,6 +141,7 @@ const PaymentProcessing = () => {
 
             <button
               onClick={() => {
+                if (guestEmail) dispatch(setLoginPrefillEmail(guestEmail));
                 dispatch(setLoginCallback('navigate:/orders'));
                 dispatch(setShowLoginModal(true));
               }}
