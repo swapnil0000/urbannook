@@ -142,6 +142,7 @@ const GoogleAddressFormModal = ({
   const isProgrammaticMove = useRef(false); // blocks onIdle during panTo animations
   const searchDebounce     = useRef(null);
   const initDoneRef        = useRef(false); // prevents double-init on StrictMode
+  const userEditedPinCode  = useRef(false); // true when user manually typed in pincode — prevent map geocoder from overwriting
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [searchQuery,    setSearchQuery]    = useState("");
@@ -178,6 +179,7 @@ const GoogleAddressFormModal = ({
       setSearchResults([]);
       setErrors({});
       initDoneRef.current = false;
+      userEditedPinCode.current = false;
     }
   }, [isOpen]);
 
@@ -211,7 +213,8 @@ const GoogleAddressFormModal = ({
           ...f,
           city:    d.city    || f.city,
           state:   d.state   || f.state,
-          pinCode: d.pinCode || f.pinCode,
+          // don't overwrite pincode if user manually typed it
+          pinCode: userEditedPinCode.current ? f.pinCode : (d.pinCode || f.pinCode),
           ...(fillAddress && {
             buildingName: d.building || f.buildingName,
             street:       d.street   || f.street,
@@ -333,6 +336,7 @@ const GoogleAddressFormModal = ({
     const streetHint  = secondary.split(",")[0]?.trim()                || "";
 
     // Clear old fields immediately — no stale bleed-through
+    userEditedPinCode.current = false; // Places API result should set pinCode
     setLocationSummary({
       placeId,
       formattedAddress: fullDesc,
@@ -458,7 +462,7 @@ const GoogleAddressFormModal = ({
   const validate = () => {
     const errs = {};
     // locationSummary is NOT required — user can fill form manually without map
-    if (!form.pinCode?.trim())      errs.pinCode      = "Pincode is required";
+    if (!/^\d{6}$/.test(String(form.pinCode || "").trim())) errs.pinCode = "Enter a valid 6-digit pincode";
     if (!form.city?.trim())         errs.city         = "City / District is required";
     if (!form.buildingName?.trim()) errs.buildingName = "House No. / Building is required";
     if (!form.street?.trim())       errs.street       = "Street / Colony is required";
@@ -490,14 +494,18 @@ const GoogleAddressFormModal = ({
         form.pinCode,
       ].filter(Boolean).join(", ");
 
-      const summaryForParent = locationSummary || {
-        placeId: "N/A",
-        formattedAddress: manualAddress,
-        city: form.city,
-        state: form.state,
-        pinCode: form.pinCode,
-        lat: 0,
-        long: 0,
+      const summaryForParent = {
+        ...(locationSummary || {
+          placeId: "N/A",
+          formattedAddress: manualAddress,
+          city: form.city,
+          state: form.state,
+          pinCode: form.pinCode,
+          lat: 0,
+          long: 0,
+        }),
+        landmark: form.landmark || "",
+        flatNo: [form.buildingName, form.street, form.floor, form.tower].filter(Boolean).join(", "),
       };
 
       // For guest users, skip API call and just pass address data back
@@ -778,7 +786,10 @@ const GoogleAddressFormModal = ({
                 placeholder="6-digit"
                 value={form.pinCode}
                 maxLength={6}
-                onChange={(val) => setField("pinCode")(val.replace(/\D/g, "").slice(0, 6))}
+                onChange={(val) => {
+                  userEditedPinCode.current = true;
+                  setField("pinCode")(val.replace(/\D/g, "").slice(0, 6));
+                }}
               />
               {errors.pinCode && (
                 <p className="text-[11px] text-red-500 mt-1">{errors.pinCode}</p>

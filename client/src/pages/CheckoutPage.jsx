@@ -9,7 +9,6 @@ import {
   useCreateGuestOrderMutation,
   useApplyCouponMutation,
   useGetSavedAddressesQuery,
-  useUpdateAddressMutation,
   useDeleteAddressMutation,
   useUpdateCartMutation,
   useUpdateUserProfileMutation,
@@ -70,7 +69,7 @@ const iconInput = (icon, children) => (
   </div>
 );
 
-const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, itemCount }) => (
+const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, itemCount, isLoadingShipping }) => (
   <div className="space-y-3">
     <div className="flex justify-between items-center text-sm">
       <span className="text-gray-500">Subtotal <span className="text-gray-400">({itemCount} item{itemCount !== 1 ? "s" : ""})</span></span>
@@ -79,7 +78,9 @@ const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, it
     <div className="flex justify-between items-center text-sm">
       <span className="text-gray-500">Delivery</span>
       <span className="font-medium text-gray-800">
-        {shipping === null
+        {isLoadingShipping
+          ? <span className="inline-block w-16 h-3.5 bg-gray-200 rounded animate-pulse" />
+          : shipping === null
           ? <span className="text-[10px] text-amber-600 font-bold uppercase tracking-wider">Enter address</span>
           : typeof shipping === "number"
           ? `₹${Math.ceil(shipping).toLocaleString()}`
@@ -144,7 +145,11 @@ const CheckoutPage = () => {
   const [deliveryMobile, setDeliveryMobile] = useState("");
   const [deliveryMobileErrors, setDeliveryMobileErrors] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(savedCheckout.current.appliedCoupon || null);
-  const [pricingDetails, setPricingDetails] = useState({ subtotal: 0, shipping: null, discount: 0 });
+  const [pricingDetails, setPricingDetails] = useState({
+    subtotal: cartItems.reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0),
+    shipping: null,
+    discount: 0,
+  });
   const [paymentError, setPaymentError] = useState(null);
   const [showRetry, setShowRetry] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
@@ -164,7 +169,6 @@ const CheckoutPage = () => {
   const [createGuestOrder, { isLoading: isOrderingGuest }] = useCreateGuestOrderMutation();
   const isOrdering = isGuest ? isOrderingGuest : isOrderingAuth;
   const [applyCouponMutation] = useApplyCouponMutation();
-  const [updateAddressMutation] = useUpdateAddressMutation();
   const [deleteAddressMutation] = useDeleteAddressMutation();
   const [updateCart] = useUpdateCartMutation();
   const [updateUserProfile] = useUpdateUserProfileMutation();
@@ -339,7 +343,9 @@ const CheckoutPage = () => {
     setAddress(deliveryAddressFull || suggestion.formattedAddress);
     setPincode(String(suggestion.pinCode || ""));
     setCurrentAddressId(addressId);
+    setPreciseDetails({ landmark: suggestion.landmark || "", flatNo: suggestion.flatNo || "" });
     if (!isGuest) refetchAddresses();
+    goToStep(reviewStep);
   };
 
   const handleResetAddress = () => {
@@ -354,20 +360,6 @@ const CheckoutPage = () => {
     setCurrentAddressId(addr.addressId);
     setPreciseDetails({ landmark: addr.landmark || "", flatNo: addr.flatOrFloorNumber || "" });
     showNotification("Address selected", "success");
-  };
-
-  const handleUpdateAddressDetails = async () => {
-    if (!currentAddressId || !address) return;
-    try {
-      const a = savedAddress.find((x) => x.addressId === currentAddressId) || {};
-      const r = await updateAddressMutation({
-        addressId: currentAddressId, landmark: preciseDetails.landmark,
-        flatOrFloorNumber: preciseDetails.flatNo, formattedAddress: address, pinCode: pincode,
-        lat: a.location?.coordinates[1] || 0, long: a.location?.coordinates[0] || 0,
-        city: a.city || "", state: a.state || "", placeId: a.placeId || "N/A",
-      }).unwrap();
-      if (r.success) { showNotification("Address saved", "success"); refetchAddresses(); }
-    } catch (_) { showNotification("Failed to update address", "error"); }
   };
 
   const handleDeleteAddress = async (addressId) => {
@@ -575,7 +567,7 @@ const CheckoutPage = () => {
 
 
   return (
-    <div className="min-h-screen bg-[#f5f7f5]">
+    <div className="bg-[#f5f7f5]">
 
       {/* ── Step wizard ────────────────────────────────────────────────── */}
       <div className="bg-white border-b border-gray-100 pt-28 lg:pt-36">
@@ -629,7 +621,7 @@ const CheckoutPage = () => {
       </div>
 
       {/* ── Main ───────────────────────────────────────────────────────── */}
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 lg:py-10 pb-28 lg:pb-14 lg:grid lg:grid-cols-[1fr_360px] lg:gap-10 lg:items-start">
+      <div className={`max-w-5xl mx-auto px-4 sm:px-6 pt-8 lg:pb-14 lg:grid lg:grid-cols-[1fr_360px] lg:gap-10 lg:items-start ${currentStep === reviewStep ? "pb-28" : "pb-8"}`}>
 
         {/* ── Left: form ───────────────────────────────────────────────── */}
         <div className="min-w-0">
@@ -865,19 +857,11 @@ const CheckoutPage = () => {
                         </div>
                         <button onClick={handleResetAddress} className="text-xs font-bold text-red-400 hover:text-red-600 transition-colors">Reset</button>
                       </div>
-                      <div className="p-5 space-y-4">
-                        <div>
-                          <p className="text-sm text-gray-700 leading-relaxed">{address}</p>
-                          {pincode && <p className="text-xs text-gray-400 mt-1.5 font-mono font-medium">PIN — {pincode}</p>}
-                        </div>
-                        <div className="grid grid-cols-2 gap-3 pt-3 border-t border-gray-50">
-                          <Field label="Flat / Floor">
-                            <input value={preciseDetails.flatNo} placeholder="e.g. A-401" onChange={(e) => setPreciseDetails((p) => ({ ...p, flatNo: e.target.value }))} className={inputCls(false)} />
-                          </Field>
-                          <Field label="Landmark">
-                            <input value={preciseDetails.landmark} placeholder="e.g. Near Metro" onChange={(e) => setPreciseDetails((p) => ({ ...p, landmark: e.target.value }))} className={inputCls(false)} />
-                          </Field>
-                        </div>
+                      <div className="p-5">
+                        <p className="text-sm text-gray-700 leading-relaxed">{address}</p>
+                        {pincode && <p className="text-xs text-gray-400 mt-1.5 font-mono font-medium">PIN — {pincode}</p>}
+                        {preciseDetails.flatNo && <p className="text-xs text-gray-500 mt-1">{preciseDetails.flatNo}</p>}
+                        {preciseDetails.landmark && <p className="text-xs text-gray-500 mt-0.5">Near {preciseDetails.landmark}</p>}
                       </div>
                     </div>
                   ) : (
@@ -912,24 +896,11 @@ const CheckoutPage = () => {
                           <button onClick={handleResetAddress} className="text-xs font-bold text-red-400 hover:text-red-600 transition-colors">Reset</button>
                         </div>
                       </div>
-                      <div className="p-5 space-y-4">
-                        <div>
-                          <p className="text-sm text-gray-700 leading-relaxed">{address}</p>
-                          {pincode && <p className="text-xs text-gray-400 mt-1.5 font-mono font-medium">PIN — {pincode}</p>}
-                        </div>
-                        <div className="grid grid-cols-2 gap-3 pt-3 border-t border-gray-50">
-                          <Field label="Flat / Floor">
-                            <input value={preciseDetails.flatNo} placeholder="e.g. A-401" onChange={(e) => setPreciseDetails((p) => ({ ...p, flatNo: e.target.value }))} className={inputCls(false)} />
-                          </Field>
-                          <Field label="Landmark">
-                            <input value={preciseDetails.landmark} placeholder="e.g. Near Metro" onChange={(e) => setPreciseDetails((p) => ({ ...p, landmark: e.target.value }))} className={inputCls(false)} />
-                          </Field>
-                        </div>
-                        {currentAddressId && (
-                          <button onClick={handleUpdateAddressDetails} className="w-full py-2.5 border border-[#2e443c]/15 rounded-xl text-[#2e443c] text-xs font-bold hover:bg-[#2e443c]/5 transition-colors flex items-center justify-center gap-2">
-                            <i className="fa-regular fa-floppy-disk" /> Save address details
-                          </button>
-                        )}
+                      <div className="p-5">
+                        <p className="text-sm text-gray-700 leading-relaxed">{address}</p>
+                        {pincode && <p className="text-xs text-gray-400 mt-1.5 font-mono font-medium">PIN — {pincode}</p>}
+                        {preciseDetails.flatNo && <p className="text-xs text-gray-500 mt-1">{preciseDetails.flatNo}</p>}
+                        {preciseDetails.landmark && <p className="text-xs text-gray-500 mt-0.5">Near {preciseDetails.landmark}</p>}
                       </div>
                     </div>
                   ) : (
@@ -1091,7 +1062,7 @@ const CheckoutPage = () => {
                         </div>
                       ))}
                     </div>
-                    <div className="px-5 py-4 border-t border-gray-50"><PriceRows subtotal={pricingDetails.subtotal} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} /></div>
+                    <div className="px-5 py-4 border-t border-gray-50"><PriceRows subtotal={pricingDetails.subtotal} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} isLoadingShipping={isCalculatingShipping} /></div>
                   </div>
                 )}
               </div>
@@ -1122,7 +1093,7 @@ const CheckoutPage = () => {
               {/* Mobile-only price breakdown */}
               <div className="lg:hidden bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
                 <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">Price Summary</p>
-                <PriceRows subtotal={pricingDetails.subtotal} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} />
+                <PriceRows subtotal={pricingDetails.subtotal} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} isLoadingShipping={isCalculatingShipping} />
               </div>
 
               {/* Payment error */}
@@ -1206,7 +1177,7 @@ const CheckoutPage = () => {
 
             {/* Price */}
             <div className="px-5 py-5 border-t border-gray-100">
-              <PriceRows subtotal={pricingDetails.subtotal} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} />
+              <PriceRows subtotal={pricingDetails.subtotal} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} isLoadingShipping={isCalculatingShipping} />
             </div>
 
             {/* Pay button (review step only) */}
