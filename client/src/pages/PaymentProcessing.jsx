@@ -18,6 +18,7 @@ const PaymentProcessing = () => {
   const [message, setMessage] = useState("Processing your payment...");
   const [guestSuccess, setGuestSuccess] = useState(false);
   const [guestEmail, setGuestEmail] = useState(null);
+  const [isNewGuestAccount, setIsNewGuestAccount] = useState(true);
   const [clearCartApi] = useClearCartMutation();
 
   useEffect(() => {
@@ -52,8 +53,8 @@ const PaymentProcessing = () => {
           localStorage.removeItem('guestId');
 
           if (isGuest) {
-            // Guest: capture the email returned by the server (exists once account is ready)
             if (data?.data?.guestEmail) setGuestEmail(data.data.guestEmail);
+            setIsNewGuestAccount(data?.data?.isNewGuestAccount ?? true);
             setGuestSuccess(true);
           } else {
             try {
@@ -104,38 +105,64 @@ const PaymentProcessing = () => {
 
           <div className="px-8 py-6 space-y-4">
 
-            {/* Credentials email notice */}
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-left flex gap-3">
-              <i className="fa-solid fa-envelope text-amber-500 mt-0.5 shrink-0"></i>
-              <div>
-                <p className="text-sm font-semibold text-amber-900">Check your inbox</p>
-                <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
-                  We've emailed your order receipt <strong>and</strong> a temporary password for your new Urban Nook account. Check spam if you don't see it.
-                </p>
-                {guestEmail && (
-                  <p className="text-xs text-amber-800 mt-1.5 font-semibold">
-                    Login email: <span className="font-mono bg-amber-100 px-1.5 py-0.5 rounded">{guestEmail}</span>
+            {/* Credentials / login notice */}
+            {isNewGuestAccount ? (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-left flex gap-3">
+                <i className="fa-solid fa-envelope text-amber-500 mt-0.5 shrink-0"></i>
+                <div>
+                  <p className="text-sm font-semibold text-amber-900">Account created — check your inbox</p>
+                  <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
+                    We've emailed your order receipt <strong>and</strong> a temporary password for your new Urban Nook account. Check spam if you don't see it.
                   </p>
-                )}
+                  {guestEmail && (
+                    <p className="text-xs text-amber-800 mt-1.5 font-semibold">
+                      Login email: <span className="font-mono bg-amber-100 px-1.5 py-0.5 rounded">{guestEmail}</span>
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-left flex gap-3">
+                <i className="fa-solid fa-circle-info text-blue-500 mt-0.5 shrink-0"></i>
+                <div>
+                  <p className="text-sm font-semibold text-blue-900">You already have an account</p>
+                  <p className="text-xs text-blue-700 mt-0.5 leading-relaxed">
+                    This email is already registered with Urban Nook. Log in with your existing password to track this order.
+                  </p>
+                  {guestEmail && (
+                    <p className="text-xs text-blue-800 mt-1.5 font-semibold">
+                      Your email: <span className="font-mono bg-blue-100 px-1.5 py-0.5 rounded">{guestEmail}</span>
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Step guide */}
             <div className="text-left space-y-2">
               <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">To track your order</p>
               <ol className="space-y-1.5 text-xs text-gray-600">
-                <li className="flex items-start gap-2">
-                  <span className="w-4 h-4 rounded-full bg-[#2e443c] text-white text-[9px] flex items-center justify-center shrink-0 mt-0.5">1</span>
-                  Find the credentials email we sent you
-                </li>
+                {isNewGuestAccount ? (
+                  <li className="flex items-start gap-2">
+                    <span className="w-4 h-4 rounded-full bg-[#2e443c] text-white text-[9px] flex items-center justify-center shrink-0 mt-0.5">1</span>
+                    Find the credentials email we sent you
+                  </li>
+                ) : (
+                  <li className="flex items-start gap-2">
+                    <span className="w-4 h-4 rounded-full bg-[#2e443c] text-white text-[9px] flex items-center justify-center shrink-0 mt-0.5">1</span>
+                    Use your existing Urban Nook password to log in
+                  </li>
+                )}
                 <li className="flex items-start gap-2">
                   <span className="w-4 h-4 rounded-full bg-[#2e443c] text-white text-[9px] flex items-center justify-center shrink-0 mt-0.5">2</span>
                   Click <strong>"Login to Track Order"</strong> below and sign in
                 </li>
-                <li className="flex items-start gap-2">
-                  <span className="w-4 h-4 rounded-full bg-[#a89068] text-white text-[9px] flex items-center justify-center shrink-0 mt-0.5">?</span>
-                  Didn't receive it? Use <strong>"Forgot Password"</strong> in the login form
-                </li>
+                {isNewGuestAccount && (
+                  <li className="flex items-start gap-2">
+                    <span className="w-4 h-4 rounded-full bg-[#a89068] text-white text-[9px] flex items-center justify-center shrink-0 mt-0.5">?</span>
+                    Didn't receive it? Use <strong>"Forgot Password"</strong> in the login form
+                  </li>
+                )}
               </ol>
             </div>
 
