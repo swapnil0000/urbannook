@@ -1,8 +1,13 @@
 name: Auto-Sync Main to Staging
+
 on:
   push:
     branches:
-      - main # Runs whenever new code is merged into the main branch
+      - main # Trigger: Runs whenever new code is merged into the 'main' branch
+
+env:
+  # Suppresses the Node 20 deprecation warning from GitHub Actions
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   create-sync-pr:
@@ -10,9 +15,36 @@ jobs:
     permissions: write-all
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Create PR from Main to Staging
+        with:
+          fetch-depth: 0 # Fetches the entire git history to ensure a smooth merge
+
+      - name: Create and Auto-Merge PR from Main to Staging
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh pr create --base staging --head main --title "🔄 Sync: Main to Staging" --body "The \`main\` branch has been updated with new commits. Please review and merge this PR to keep the \`staging\` environment perfectly synced with production." || echo "A Pull Request for this sync already exists, or there are no new changes to merge."
+          # 1. Fetch the latest staging code and switch to it for comparison
+          git fetch origin staging
+          git checkout staging
+          
+          # 2. Check if 'main' is already fully merged into 'staging'
+          # If true, it exits gracefully without doing anything else
+          if git merge-base --is-ancestor origin/main HEAD; then
+            echo "Staging is already up-to-date with main. Nothing to sync."
+            exit 0
+          fi
+          
+          # 3. If there are new changes, create a Pull Request
+          echo "Creating Pull Request..."
+          PR_URL=$(gh pr create --base staging --head main \
+            --title "🔄 Auto-Sync: Main to Staging" \
+            --body "This PR was automatically created and attempted to auto-merge. If you are seeing this open, it means there are merge conflicts that require manual resolution.")
+          
+          # 4. If the PR is created successfully, attempt to auto-merge it immediately
+          if [ ! -z "$PR_URL" ]; then
+            echo "PR Created successfully: $PR_URL"
+            echo "Attempting to auto-merge..."
+            
+            # This command tries to merge the PR automatically.
+            # If there is a merge conflict, it fails gracefully and leaves the PR open for you to fix.
+            gh pr merge $PR_URL --merge --delete-branch=false || echo "⚠️ CONFLICT DETECTED: Could not auto-merge. Please resolve conflicts manually in the PR link above."
+          fi
