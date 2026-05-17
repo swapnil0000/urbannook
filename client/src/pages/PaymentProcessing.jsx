@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { clearCart } from "../store/slices/cartSlice";
@@ -14,21 +14,21 @@ const PaymentProcessing = () => {
   const [message, setMessage] = useState("Processing your payment...");
   const [clearCartApi] = useClearCartMutation();
 
-  console.log("[PaymentProcessing] ✅ NEW VERSION - component mounted, orderId:", orderId);
+  const clearCartApiRef = useRef(clearCartApi);
+  const showNotificationRef = useRef(showNotification);
+  useEffect(() => { clearCartApiRef.current = clearCartApi; }, [clearCartApi]);
+  useEffect(() => { showNotificationRef.current = showNotification; }, [showNotification]);
 
   useEffect(() => {
-    if (!orderId) {
-      console.log("[PaymentProcessing] ⚠️ No orderId, returning early");
-      return;
-    }
+    if (!orderId) return;
 
-    console.log("[PaymentProcessing] 🔄 Starting status polling for:", orderId);
     let interval;
+    let cancelled = false;
 
     const checkStatus = async () => {
+      if (cancelled) return;
       try {
         const token = localStorage.getItem("authToken");
-        console.log("[PaymentProcessing] 📡 Calling status API, hasToken:", !!token);
 
         const res = await fetch(
           `${getApiUrl()}/user/order/status/${orderId}`,
@@ -42,36 +42,35 @@ const PaymentProcessing = () => {
         );
 
         const data = await res.json();
+        if (cancelled) return;
+
         const status = data?.data?.status;
         const isGuestOrder = data?.data?.isGuestOrder ?? false;
 
-        console.log("[PaymentProcessing] 📦 API response:", { status, isGuestOrder, fullData: data?.data });
         setMessage("Verifying with bank...");
 
         if (status === "PAID") {
-          console.log("[PaymentProcessing] ✅ PAID - clearing cart, isGuestOrder:", isGuestOrder);
           clearInterval(interval);
+          cancelled = true;
           dispatch(clearCart());
           localStorage.removeItem("guestCart");
           localStorage.removeItem("guestId");
 
           if (!isGuestOrder) {
             try {
-              await clearCartApi().unwrap();
-              console.log("[PaymentProcessing] 🛒 Backend cart cleared for auth user");
+              await clearCartApiRef.current().unwrap();
             } catch (_) {
               console.warn("[PaymentProcessing] ⚠️ Backend cart clear failed (non-critical)");
             }
           }
 
-          console.log("[PaymentProcessing] ➡️ Navigating to /order-confirm/", orderId);
           navigate(`/order-confirm/${orderId}`, { replace: true });
         }
 
         if (status === "FAILED") {
-          console.log("[PaymentProcessing] ❌ FAILED - navigating to /payment-failed");
           clearInterval(interval);
-          showNotification("Payment failed. Please try again or contact support.", "error");
+          cancelled = true;
+          showNotificationRef.current("Payment failed. Please try again or contact support.", "error");
           setTimeout(() => navigate("/payment-failed"), 2000);
         }
       } catch (err) {
@@ -83,10 +82,10 @@ const PaymentProcessing = () => {
     interval = setInterval(checkStatus, 2000);
 
     return () => {
-      console.log("[PaymentProcessing] 🧹 Cleanup - clearing interval");
+      cancelled = true;
       if (interval) clearInterval(interval);
     };
-  }, [orderId, dispatch, clearCartApi, navigate, showNotification]);
+  }, [orderId, dispatch, navigate]);
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4">

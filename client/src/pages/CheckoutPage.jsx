@@ -82,7 +82,7 @@ const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, it
       <div className="flex justify-between items-center text-sm">
         <div className="flex flex-col">
           <span className="text-gray-500">Delivery</span>
-          {serviceName && <span className="text-[9px] text-gray-400 font-medium uppercase tracking-tight">{serviceName}</span>}
+          {/* {serviceName && <span className="text-[9px] text-gray-400 font-medium uppercase tracking-tight">{serviceName}</span>} */}
         </div>
         <span className="font-medium text-gray-800">
           {isLoadingShipping
@@ -631,7 +631,10 @@ const CheckoutPage = () => {
     }
   };
 
-  const totalToPay = pricingDetails.subtotal + (typeof pricingDetails.shipping === "number" ? pricingDetails.shipping : 0) - pricingDetails.discount;
+  const shippingAmount = typeof pricingDetails.shipping === "number"
+    ? pricingDetails.shipping
+    : (pricingDetails.shipping?.amount ?? 0);
+  const totalToPay = pricingDetails.subtotal + shippingAmount - pricingDetails.discount;
   const userName = isGuest ? guestName : (userProfile?.userName || userProfile?.name || "");
   const userInitials = userName ? userName.split(" ").filter(Boolean).map((w) => w[0]).join("").toUpperCase().slice(0, 2) : "?";
 
@@ -790,7 +793,7 @@ const CheckoutPage = () => {
 
 
               {/* Auth: logged-in card */}
-              {!isGuest && userProfile && (
+              {/* {!isGuest && userProfile && (
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4">
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#2e443c] to-[#4b7060] flex items-center justify-center text-white font-bold text-base shrink-0">
                     {userInitials}
@@ -804,7 +807,7 @@ const CheckoutPage = () => {
                     <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Signed in</span>
                   </div>
                 </div>
-              )}
+              )} */}
 
               {/* Contact form card */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
