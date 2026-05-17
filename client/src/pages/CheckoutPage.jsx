@@ -69,39 +69,47 @@ const iconInput = (icon, children) => (
   </div>
 );
 
-const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, itemCount, isLoadingShipping }) => (
-  <div className="space-y-3">
-    <div className="flex justify-between items-center text-sm">
-      <span className="text-gray-500">Subtotal <span className="text-gray-400">({itemCount} item{itemCount !== 1 ? "s" : ""})</span></span>
-      <span className="font-medium text-gray-800">₹{subtotal.toLocaleString()}</span>
-    </div>
-    <div className="flex justify-between items-center text-sm">
-      <span className="text-gray-500">Delivery</span>
-      <span className="font-medium text-gray-800">
-        {isLoadingShipping
-          ? <span className="inline-block w-16 h-3.5 bg-gray-200 rounded animate-pulse" />
-          : shipping === null
-          ? <span className="text-[10px] text-amber-600 font-bold uppercase tracking-wider">Enter address</span>
-          : `₹${Math.ceil(shipping).toLocaleString()}`}
-      </span>
-    </div>
-    {appliedCoupon && discount > 0 && (
-      <div className="flex justify-between items-center text-sm font-semibold text-emerald-600 bg-emerald-50 rounded-xl px-3.5 py-2.5 -mx-1">
-        <span className="flex items-center gap-2">
-          <i className="fa-solid fa-tag text-xs" /> {appliedCoupon}
+const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, itemCount, isLoadingShipping }) => {
+  const shippingAmount = typeof shipping === "object" ? shipping?.amount : shipping;
+  const serviceName = typeof shipping === "object" ? shipping?.serviceName : null;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex justify-between items-center text-sm">
+        <span className="text-gray-500">Subtotal <span className="text-gray-400">({itemCount} item{itemCount !== 1 ? "s" : ""})</span></span>
+        <span className="font-medium text-gray-800">₹{subtotal.toLocaleString()}</span>
+      </div>
+      <div className="flex justify-between items-center text-sm">
+        <div className="flex flex-col">
+          <span className="text-gray-500">Delivery</span>
+          {serviceName && <span className="text-[9px] text-gray-400 font-medium uppercase tracking-tight">{serviceName}</span>}
+        </div>
+        <span className="font-medium text-gray-800">
+          {isLoadingShipping
+            ? <span className="inline-block w-16 h-3.5 bg-gray-200 rounded animate-pulse" />
+            : shippingAmount === null || shippingAmount === undefined
+            ? <span className="text-[10px] text-amber-600 font-bold uppercase tracking-wider">Enter address</span>
+            : `₹${Math.ceil(shippingAmount).toLocaleString()}`}
         </span>
-        <span>−₹{discount.toLocaleString()}</span>
       </div>
-    )}
-    <div className="border-t border-gray-100 pt-3 flex justify-between items-center">
-      <span className="font-bold text-gray-900">Total</span>
-      <div className="text-right">
-        <span className="text-2xl font-bold text-[#2e443c]">₹{totalToPay.toLocaleString()}</span>
-        <p className="text-[10px] text-gray-400 mt-0.5">Incl. GST</p>
+      {appliedCoupon && discount > 0 && (
+        <div className="flex justify-between items-center text-sm font-semibold text-emerald-600 bg-emerald-50 rounded-xl px-3.5 py-2.5 -mx-1">
+          <span className="flex items-center gap-2">
+            <i className="fa-solid fa-tag text-xs" /> {appliedCoupon}
+          </span>
+          <span>−₹{discount.toLocaleString()}</span>
+        </div>
+      )}
+      <div className="border-t border-gray-100 pt-3 flex justify-between items-center">
+        <span className="font-bold text-gray-900">Total</span>
+        <div className="text-right">
+          <span className="text-2xl font-bold text-[#2e443c]">₹{totalToPay.toLocaleString()}</span>
+          <p className="text-[10px] text-gray-400 mt-0.5">Incl. GST</p>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
@@ -125,15 +133,22 @@ const CheckoutPage = () => {
 
   // Restore checkout state from sessionStorage on mount
   const savedCheckout = useRef((() => {
-    try { return JSON.parse(sessionStorage.getItem("checkoutState")) || {}; } catch { return {}; }
+    try {
+      const saved = JSON.parse(sessionStorage.getItem("checkoutState")) || {};
+      // Migration: robustly handle pincode key variations
+      const rawPin = saved.pinCode || saved.pincode || saved.userPinCode || "";
+      saved.pinCode = String(rawPin).trim();
+      return saved;
+    } catch { return {}; }
   })());
 
   const [currentStep, setCurrentStep] = useState(savedCheckout.current.currentStep || 1);
   const [userProfile, setUserProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [address, setAddress] = useState(savedCheckout.current.address || "");
-  const [pincode, setPincode] = useState(savedCheckout.current.pincode || "");
+  const [pinCode, setPinCode] = useState(savedCheckout.current.pinCode || "");
   const [preciseDetails, setPreciseDetails] = useState(savedCheckout.current.preciseDetails || { landmark: "", flatNo: "" });
+  const [addressForm, setAddressForm] = useState(savedCheckout.current.addressForm || null);
   const [savedAddress, setSavedAddress] = useState([]);
   const [currentAddressId, setCurrentAddressId] = useState(savedCheckout.current.currentAddressId || null);
   const [showAllAddresses, setShowAllAddresses] = useState(false);
@@ -145,7 +160,7 @@ const CheckoutPage = () => {
   const [appliedCoupon, setAppliedCoupon] = useState(savedCheckout.current.appliedCoupon || null);
   const [pricingDetails, setPricingDetails] = useState({
     subtotal: cartItems.reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0),
-    shipping: null,
+    shipping: null, // this will now store the full shippingInfo object
     discount: 0,
   });
   const [paymentError, setPaymentError] = useState(null);
@@ -183,12 +198,14 @@ const CheckoutPage = () => {
 
   // Persist checkout progress to sessionStorage on every relevant state change
   useEffect(() => {
+    if (paymentCompletedRef.current) return;
     try {
       sessionStorage.setItem("checkoutState", JSON.stringify({
         currentStep,
         address,
-        pincode,
+        pinCode,
         preciseDetails,
+        addressForm,
         currentAddressId,
         senderMobile,
         appliedCoupon,
@@ -196,8 +213,10 @@ const CheckoutPage = () => {
         guestEmail,
         guestMobile,
       }));
-    } catch (_) {}
-  }, [currentStep, address, pincode, preciseDetails, currentAddressId, senderMobile, appliedCoupon, guestName, guestEmail, guestMobile]);
+    } catch (err) {
+      console.error("[Checkout] Failed to save state to session storage:", err);
+    }
+  }, [currentStep, address, pinCode, preciseDetails, addressForm, currentAddressId, senderMobile, appliedCoupon, guestName, guestEmail, guestMobile]);
 
   // Dynamic Shipping Calculation Logic
   const calculateShippingRef = useRef(calculateShipping);
@@ -210,7 +229,7 @@ const CheckoutPage = () => {
     const fetchShippingRate = async (attempt = 1) => {
       if (cancelled) return;
 
-      if (!pincode || pincode.toString().length !== 6 || cartItems.length === 0) {
+      if (!pinCode || pinCode.toString().length !== 6 || cartItems.length === 0) {
         setPricingDetails(prev => ({ ...prev, shipping: null }));
         return;
       }
@@ -224,18 +243,23 @@ const CheckoutPage = () => {
         }));
 
         const result = await calculateShippingRef.current({
-          deliveryPinCode: parseInt(pincode, 10),
+          deliveryPinCode: parseInt(pinCode, 10),
           cartItems: formattedCartItems,
         }).unwrap();
 
         if (cancelled) return;
 
-        const charges = parseFloat(result?.data?.total_charges);
-        if (result.success && !isNaN(charges)) {
-          setPricingDetails(prev => ({ ...prev, shipping: charges }));
+        if (result.success && result.data) {
+          setPricingDetails(prev => ({
+            ...prev,
+            shipping: {
+              ...result.data,
+              amount: parseFloat(result.data.total_charges)
+            }
+          }));
         } else {
           // API responded but no valid rate — use fallback
-          setPricingDetails(prev => ({ ...prev, shipping: FALLBACK_SHIPPING }));
+          setPricingDetails(prev => ({ ...prev, shipping: { amount: FALLBACK_SHIPPING, type: "standard" } }));
         }
       } catch (error) {
         if (cancelled) return;
@@ -245,14 +269,14 @@ const CheckoutPage = () => {
           setTimeout(() => fetchShippingRate(attempt + 1), 1500 * attempt);
         } else {
           // All retries exhausted — fall back to ₹149
-          setPricingDetails(prev => ({ ...prev, shipping: FALLBACK_SHIPPING }));
+          setPricingDetails(prev => ({ ...prev, shipping: { amount: FALLBACK_SHIPPING, type: "standard" } }));
         }
       }
     };
 
     fetchShippingRate();
     return () => { cancelled = true; };
-  }, [pincode, cartItems.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pinCode, cartItems.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (savedAddressData?.success) {
@@ -284,12 +308,16 @@ const CheckoutPage = () => {
 
   useEffect(() => {
     if (userProfile) {
-      if (userProfile.userAddress && !address) setAddress(userProfile.userAddress);
-      if (userProfile.userPinCode && !pincode) setPincode(userProfile.userPinCode);
-      if ((userProfile?.mobileNumber || userProfile?.mobile) && !senderMobile)
-        setSenderMobile(stripCC(String(userProfile.mobileNumber || userProfile.mobile)));
+      const profileAddress = userProfile.userAddress || userProfile.address || "";
+      const profilePin     = userProfile.pinCode || userProfile.userPinCode || userProfile.pincode || "";
+      const profileMobile  = userProfile.mobileNumber || userProfile.mobile || "";
+
+      if (profileAddress && !address) setAddress(profileAddress);
+      // Aggressively fill pincode if missing, even if address was partially restored
+      if (profilePin && (!pinCode || pinCode.length < 6)) setPinCode(String(profilePin));
+      if (profileMobile && !senderMobile) setSenderMobile(stripCC(String(profileMobile)));
     }
-  }, [userProfile]);
+  }, [userProfile, address, pinCode, senderMobile]);
 
   const cartItemsLength = cartItems?.length;
   const cartTotalAmount = cartItems.reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0);
@@ -348,24 +376,55 @@ const CheckoutPage = () => {
 
   const handleAddressConfirm = (suggestion, addressId, deliveryAddressFull) => {
     setAddress(deliveryAddressFull || suggestion.formattedAddress);
-    setPincode(String(suggestion.pinCode || ""));
+    setPinCode(String(suggestion.pinCode || ""));
     setCurrentAddressId(addressId);
     setPreciseDetails({ landmark: suggestion.landmark || "", flatNo: suggestion.flatNo || "" });
+    setAddressForm({
+      ...(suggestion.form || {}),
+      lat: suggestion.lat,
+      long: suggestion.long,
+      placeId: suggestion.placeId,
+      formattedAddress: suggestion.formattedAddress,
+      city: suggestion.city,
+      state: suggestion.state,
+      pinCode: suggestion.pinCode,
+    });
     if (!isGuest) refetchAddresses();
     goToStep(reviewStep);
   };
 
   const handleResetAddress = () => {
-    setAddress(""); setPincode(""); setPreciseDetails({ landmark: "", flatNo: "" });
+    setAddress("");
+    setPinCode("");
+    setPreciseDetails({ landmark: "", flatNo: "" });
     setCurrentAddressId(null);
+    setAddressForm(null);
     showNotification("Address cleared", "info");
+    if (currentStep !== addressStep) goToStep(addressStep);
+    setShowMapModal(true);
   };
 
   const selectSavedAddress = (addr) => {
     setAddress(addr.deliveryAddressFull || addr.formattedAddress);
-    setPincode(String(addr.pinCode || ""));
+    setPinCode(String(addr.pinCode || ""));
     setCurrentAddressId(addr.addressId);
     setPreciseDetails({ landmark: addr.landmark || "", flatNo: addr.flatOrFloorNumber || "" });
+    setAddressForm({
+      buildingName: addr.buildingName || "",
+      street: addr.street || "",
+      floor: addr.floor || "",
+      tower: addr.tower || "",
+      landmark: addr.landmark || "",
+      city: addr.city || "",
+      state: addr.state || "",
+      pinCode: addr.pinCode || "",
+      fullName: addr.fullName || "",
+      mobileNumber: addr.mobileNumber || "",
+      lat: addr.location?.coordinates?.[1] || addr.lat || 0,
+      long: addr.location?.coordinates?.[0] || addr.long || 0,
+      placeId: addr.placeId || "N/A",
+      formattedAddress: addr.formattedAddress || addr.deliveryAddressFull
+    });
     showNotification("Address selected", "success");
   };
 
@@ -447,8 +506,21 @@ const CheckoutPage = () => {
   };
 
   const handleStep2Next = () => {
-    if (!address.trim()) { showNotification("Please enter a delivery address", "error"); return; }
-    if (!pincode.trim()) { showNotification("Please enter your pincode", "error"); return; }
+    const addr = String(address || "").trim();
+    const pin = String(pinCode || "").trim();
+
+    if (!addr) {
+      showNotification("Please enter a delivery address", "error");
+      return;
+    }
+
+    if (!pin || pin.length < 6) {
+      showNotification(pin ? "Pincode must be at least 6 digits" : "Please enter your pincode", "error");
+      // If we have an address but no pin, force the modal open to fix it
+      if (addr) setShowMapModal(true);
+      return;
+    }
+
     goToStep(reviewStep);
   };
 
@@ -465,8 +537,10 @@ const CheckoutPage = () => {
           guestInfo: { name: guestName.trim(), email: guestEmail.trim().toLowerCase(), mobile: guestMobile.trim() },
           deliveryAddress: {
             formattedAddress: address, deliveryAddressFull: address,
-            pinCode: pincode ? parseInt(pincode, 10) : null,
-            landmark: preciseDetails.landmark, flatOrFloorNumber: preciseDetails.flatNo, lat: 0, long: 0,
+            pinCode: pinCode ? parseInt(pinCode, 10) : null,
+            landmark: preciseDetails.landmark, flatOrFloorNumber: preciseDetails.flatNo,
+            lat: addressForm?.lat || 0,
+            long: addressForm?.long || 0,
           },
         }).unwrap();
         if (!await loadRazorpay()) { showNotification("Could not load payment.", "error"); return; }
@@ -483,7 +557,7 @@ const CheckoutPage = () => {
             navigate(`/payment-processing/${response.razorpay_order_id}`);
           },
           prefill: { name: guestName.trim(), email: guestEmail.trim(), contact: guestMobile.trim() },
-          notes: { address, pincode }, theme: { color: "#2E443C" },
+          notes: { address, pinCode }, theme: { color: "#2E443C" },
           modal: { ondismiss: () => { setPaymentError("Payment cancelled. Your cart is safe."); setShowRetry(true); }, escape: false, confirm_close: true },
         });
         rp.on("payment.failed", (r) => {
@@ -519,7 +593,7 @@ const CheckoutPage = () => {
           addressId: currentAddressId, fullName: userProfile?.userName || userProfile?.name || "",
           mobileNumber: useDifferentDeliveryContact && deliveryMobileStr ? deliveryMobileStr : senderMobileStr,
           formattedAddress: address, deliveryAddressFull: address,
-          pinCode: pincode ? parseInt(pincode, 10) : null,
+          pinCode: pinCode ? parseInt(pinCode, 10) : null,
           landmark: preciseDetails.landmark, flatOrFloorNumber: preciseDetails.flatNo,
           lat: selectedFullAddr?.location?.coordinates?.[1] || selectedFullAddr?.lat || 0,
           long: selectedFullAddr?.location?.coordinates?.[0] || selectedFullAddr?.long || 0,
@@ -543,7 +617,7 @@ const CheckoutPage = () => {
           } catch (_) { setPaymentError("Payment verification failed. Contact support if amount was debited."); }
         },
         prefill: { name: userProfile?.userName || userProfile?.name || "", email: userProfile?.email || "", contact: senderMobileStr },
-        notes: { address, pincode }, theme: { color: "#2E443C" },
+        notes: { address, pinCode }, theme: { color: "#2E443C" },
         modal: { ondismiss: () => { setPaymentError("Payment cancelled. Your cart is safe."); setShowRetry(true); }, escape: false, confirm_close: true },
       });
       rp.on("payment.failed", (r) => {
@@ -862,11 +936,15 @@ const CheckoutPage = () => {
                           </div>
                           <span className="text-xs font-bold text-[#2e443c] uppercase tracking-wider">Delivering to this address</span>
                         </div>
-                        <button onClick={handleResetAddress} className="text-xs font-bold text-red-400 hover:text-red-600 transition-colors">Reset</button>
+                        <div className="flex items-center gap-3">
+                          <button onClick={() => setShowMapModal(true)} className="text-xs font-bold text-[#a89068] hover:text-[#2e443c] transition-colors">Edit</button>
+                          <span className="text-gray-200 text-xs">|</span>
+                          <button onClick={handleResetAddress} className="text-xs font-bold text-red-400 hover:text-red-600 transition-colors">Reset</button>
+                        </div>
                       </div>
                       <div className="p-5">
                         <p className="text-sm text-gray-700 leading-relaxed">{address}</p>
-                        {pincode && <p className="text-xs text-gray-400 mt-1.5 font-mono font-medium">PIN — {pincode}</p>}
+                        {pinCode && <p className="text-xs text-gray-400 mt-1.5 font-mono font-medium">PIN — {pinCode}</p>}
                         {preciseDetails.flatNo && <p className="text-xs text-gray-500 mt-1">{preciseDetails.flatNo}</p>}
                         {preciseDetails.landmark && <p className="text-xs text-gray-500 mt-0.5">Near {preciseDetails.landmark}</p>}
                       </div>
@@ -898,14 +976,14 @@ const CheckoutPage = () => {
                           <span className="text-xs font-bold text-[#2e443c] uppercase tracking-wider">Delivering to this address</span>
                         </div>
                         <div className="flex items-center gap-3">
-                          <button onClick={() => setShowMapModal(true)} className="text-xs font-bold text-[#a89068] hover:text-[#2e443c] transition-colors">Change</button>
+                          <button onClick={() => setShowMapModal(true)} className="text-xs font-bold text-[#a89068] hover:text-[#2e443c] transition-colors">Edit</button>
                           <span className="text-gray-200 text-xs">|</span>
                           <button onClick={handleResetAddress} className="text-xs font-bold text-red-400 hover:text-red-600 transition-colors">Reset</button>
                         </div>
                       </div>
                       <div className="p-5">
                         <p className="text-sm text-gray-700 leading-relaxed">{address}</p>
-                        {pincode && <p className="text-xs text-gray-400 mt-1.5 font-mono font-medium">PIN — {pincode}</p>}
+                        {pinCode && <p className="text-xs text-gray-400 mt-1.5 font-mono font-medium">PIN — {pinCode}</p>}
                         {preciseDetails.flatNo && <p className="text-xs text-gray-500 mt-1">{preciseDetails.flatNo}</p>}
                         {preciseDetails.landmark && <p className="text-xs text-gray-500 mt-0.5">Near {preciseDetails.landmark}</p>}
                       </div>
@@ -1023,12 +1101,12 @@ const CheckoutPage = () => {
                       </div>
                       <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Delivery</span>
                     </div>
-                    <button onClick={() => goToStep(addressStep)} className="flex items-center gap-1 text-xs font-bold text-[#a89068] hover:text-[#2e443c] transition-colors">
+                    <button onClick={() => { goToStep(addressStep); setShowMapModal(true); }} className="flex items-center gap-1 text-xs font-bold text-[#a89068] hover:text-[#2e443c] transition-colors">
                       <i className="fa-solid fa-pen text-[9px]" /> Edit
                     </button>
                   </div>
                   <p className="text-xs text-gray-600 leading-relaxed line-clamp-3">{address}</p>
-                  <p className="text-[11px] text-gray-400 mt-1.5 font-mono font-medium">PIN {pincode}</p>
+                  <p className="text-[11px] text-gray-400 mt-1.5 font-mono font-medium">PIN {pinCode}</p>
                   {(preciseDetails.flatNo || preciseDetails.landmark) && (
                     <p className="text-[11px] text-gray-400 mt-0.5">
                       {[preciseDetails.flatNo, preciseDetails.landmark].filter(Boolean).join(" · ")}
@@ -1192,11 +1270,13 @@ const CheckoutPage = () => {
               <div className="px-5 pb-5 space-y-3">
                 <button
                   onClick={handlePayment}
-                  disabled={isOrdering}
+                  disabled={isOrdering || isCalculatingShipping || pricingDetails.shipping === null}
                   className="w-full h-14 bg-[#2e443c] text-white rounded-xl font-bold text-sm hover:bg-[#1a2822] active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 shadow-lg shadow-[#2e443c]/25 disabled:opacity-50"
                 >
                   {isOrdering
                     ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Processing…</>
+                    : isCalculatingShipping
+                    ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Calculating…</>
                     : <><i className="fa-solid fa-lock text-xs opacity-70" /> Pay ₹{totalToPay.toLocaleString()}</>
                   }
                 </button>
@@ -1209,41 +1289,8 @@ const CheckoutPage = () => {
               </div>
             )}
           </div>
-
-                  {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="space-y-1.5">
-                      <label className="text-[9px] uppercase tracking-widest text-[#a89068] font-bold ml-1">
-                        Flat / Floor No. (Optional)
-                      </label>
-                      <input
-                        value={preciseDetails.flatNo}
-                        placeholder="e.g. Apt 4B, 2nd Floor"
-                        className="w-full bg-white border border-gray-200 rounded-xl p-4 text-sm text-[#2e443c] focus:outline-none focus:border-[#a89068] transition-all placeholder:text-gray-400"
-                        onChange={(e) =>
-                          setPreciseDetails((p) => ({
-                            ...p,
-                            flatNo: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[9px] uppercase tracking-widest text-[#a89068] font-bold ml-1">
-                        Landmark (Optional)
-                      </label>
-                      <input
-                        value={preciseDetails.landmark}
-                        placeholder="e.g. Near Metro Station"
-                        className="w-full bg-white border border-gray-200 rounded-xl p-4 text-sm text-[#2e443c] focus:outline-none focus:border-[#a89068] transition-all placeholder:text-gray-400"
-                        onChange={(e) =>
-                          setPreciseDetails((p) => ({
-                            ...p,
-                            landmark: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-                  </div> */}
+        </div>
+      </div>
 
       {/* ── Mobile sticky footer (review step) ────────────────────────────────── */}
       {currentStep === reviewStep && (
@@ -1256,11 +1303,13 @@ const CheckoutPage = () => {
               </div>
               <button
                 onClick={handlePayment}
-                disabled={isOrdering}
+                disabled={isOrdering || isCalculatingShipping || pricingDetails.shipping === null}
                 className="flex-1 h-12 bg-[#2e443c] text-white rounded-xl font-bold text-sm hover:bg-[#1a2822] active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 shadow-lg disabled:opacity-50"
               >
                 {isOrdering
                   ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Processing…</>
+                  : isCalculatingShipping
+                  ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Calculating…</>
                   : <><i className="fa-solid fa-lock text-[10px] opacity-70" /> Pay Now</>
                 }
               </button>
@@ -1281,6 +1330,7 @@ const CheckoutPage = () => {
           prefillName={isGuest ? guestName : (userProfile?.userName || userProfile?.name || "")}
           prefillPhone={isGuest ? guestMobile : (String(userProfile?.mobileNumber || "") || senderMobile || "")}
           isGuest={isGuest}
+          initialData={addressForm}
         />
       </Suspense>
 
@@ -1315,8 +1365,6 @@ const CheckoutPage = () => {
         </div>
       )}
     </div>
-     </div>
-      </div>
   );
 };
 

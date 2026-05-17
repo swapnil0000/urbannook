@@ -53,6 +53,13 @@ const orderSchema = new mongoose.Schema(
       flatOrFloorNumber: String,
       pinCode: Number,
     },
+    shippingInfo: {
+      amount: { type: Number, default: 0 },
+      type: { type: String, enum: ["standard", "dynamic"], default: "standard" },
+      expectedNoOfBoxes: { type: Number, default: 0 },
+      totalWeight: { type: Number, default: 0 }, // in grams
+      serviceName: { type: String, default: null }
+    },
 
     senderMobile: {
       type: String,

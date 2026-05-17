@@ -26,10 +26,16 @@ const checkPincodeServiceability = async (deliveryPinCode) => {
 
 const calculateShippingRate = async ({ pincode, cartItems }) => {
   // Define fallback response
-  const FALLBACK_SHIPPING = { name: "Standard Shipping", total_charges: 179 };
+  const FALLBACK_AMOUNT = 179;
+  const buildFallback = (weight = 0, boxes = 0) => ({
+    total_charges: FALLBACK_AMOUNT,
+    type: "standard",
+    totalWeight: weight,
+    expectedNoOfBoxes: boxes
+  });
 
   if (!pincode || !cartItems || !Array.isArray(cartItems)) {
-    return FALLBACK_SHIPPING;
+    return buildFallback();
   }
 
   try {
@@ -39,7 +45,7 @@ const calculateShippingRate = async ({ pincode, cartItems }) => {
       .lean();
 
     if (dbProducts.length === 0) {
-      return FALLBACK_SHIPPING;
+      return buildFallback();
     }
 
     const finalOrderItems = cartItems.map((cartItem) => {
@@ -55,6 +61,7 @@ const calculateShippingRate = async ({ pincode, cartItems }) => {
 
     let totalWeight = 0;
     let totalAmount = 0;
+    let totalBoxes = 0;
     const dimensions = [];
     let hasMultiQuantity = false;
 
@@ -66,6 +73,7 @@ const calculateShippingRate = async ({ pincode, cartItems }) => {
     for (const item of finalOrderItems) {
       const quant = safeFloat(item.quantity, 1);
       if (quant > 1) hasMultiQuantity = true;
+      totalBoxes += quant;
       
       let weightVal = 0;
       if (typeof item.weight === "string") {
@@ -113,7 +121,7 @@ const calculateShippingRate = async ({ pincode, cartItems }) => {
     );
 
     if (!response.data || !response.data.data || !Array.isArray(response.data.data)) {
-      return FALLBACK_SHIPPING;
+      return buildFallback(totalWeight, totalBoxes);
     }
 
     const allServices = response.data.data;
@@ -121,7 +129,7 @@ const calculateShippingRate = async ({ pincode, cartItems }) => {
       el.name.toLowerCase().includes("surface")
     );
     
-    if (surfaceServices.length === 0) return FALLBACK_SHIPPING;
+    if (surfaceServices.length === 0) return buildFallback(totalWeight, totalBoxes);
 
     let selectedService = surfaceServices.find(el => el.name.startsWith("DTDC Surface"));
     
@@ -142,15 +150,21 @@ const calculateShippingRate = async ({ pincode, cartItems }) => {
           finalCharge = Math.ceil(finalCharge * 1.25);
         }
         finalCharge += 30;
-        selectedService.total_charges = finalCharge;
-        return selectedService;
+        
+        return {
+          total_charges: finalCharge,
+          type: "dynamic",
+          totalWeight: totalWeight,
+          expectedNoOfBoxes: totalBoxes,
+          serviceName: selectedService.name
+        };
       }
     }
 
-    return FALLBACK_SHIPPING;
+    return buildFallback(totalWeight, totalBoxes);
   } catch (error) {
     console.error("Shipping Service Error:", error.response?.data || error.message);
-    return FALLBACK_SHIPPING;
+    return buildFallback();
   }
 };
 
