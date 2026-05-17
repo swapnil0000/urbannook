@@ -5,8 +5,8 @@ const NewsTicker = () => {
   const [isPaused, setIsPaused] = useState(false);
 
   const headlines = [
-    "🚚 SHIPPING ₹149 ALL OVER INDIA",
-    "🌿 WAITLIST MEMBERS: USE CODE WLUSER FOR EXCLUSIVE DISCOUNT",
+    "Limited time offer on selected products",
+    "Ready to ship within 48 hrs",
   ];
 
   return (

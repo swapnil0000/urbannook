@@ -145,6 +145,7 @@ const GoogleAddressFormModal = ({
   const searchRequestId    = useRef(0);     // incremented per-call; stale responses are dropped
   const initDoneRef        = useRef(false); // prevents double-init on StrictMode
   const userEditedPinCode  = useRef(false); // true when user manually typed in pincode — prevent map geocoder from overwriting
+  const searchBarRef       = useRef(null);  // ref to the search bar container for dropdown positioning
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [searchQuery,    setSearchQuery]    = useState("");
@@ -157,6 +158,9 @@ const GoogleAddressFormModal = ({
   const [form,          setForm]          = useState({ ...EMPTY_FORM });
   const [errors,        setErrors]        = useState({});
   const [isSubmitting,  setIsSubmitting]  = useState(false);
+  const [mapCollapsed,  setMapCollapsed]  = useState(false);
+  const [isFetchingPincode, setIsFetchingPincode] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState({});
 
   // ── RTK mutation ───────────────────────────────────────────────────────────
   const [createAddress] = useCreateAddressMutation();
@@ -213,6 +217,7 @@ const GoogleAddressFormModal = ({
       setSearchQuery("");
       setSearchResults([]);
       setErrors({});
+      setMapCollapsed(false);
       initDoneRef.current = false;
       userEditedPinCode.current = false;
     }
@@ -323,8 +328,54 @@ const GoogleAddressFormModal = ({
     reverseGeocode(center.lat(), center.lng());
   }, [reverseGeocode]);
 
+  // Clears the manual-pin-guard when user intentionally drags the map
+  const handleMapDragStart = useCallback(() => {
+    userEditedPinCode.current = false;
+  }, []);
+
+  // Collapses map on mobile when form inputs are focused
+  const handleFormInputFocus = useCallback(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      setMapCollapsed(true);
+    }
+  }, []);
+
+  // Auto-fetch city/state from India Post API when pincode is 6 digits
+  const fetchPincodeData = useCallback(async (pin) => {
+    if (!/^\d{6}$/.test(pin)) return;
+    setIsFetchingPincode(true);
+    try {
+      const res = await fetch(`https://api.postalpincode.in/pincode/${pin}`);
+      const data = await res.json();
+      if (data?.[0]?.Status === "Success" && data[0].PostOffice?.length > 0) {
+        const po = data[0].PostOffice[0];
+        setForm(f => ({
+          ...f,
+          city:  f.city  || po.District || po.Block || "",
+          state: f.state || po.State    || "",
+        }));
+      }
+    } catch { /* silent */ } finally {
+      setIsFetchingPincode(false);
+    }
+  }, []);
+
+  // Calculates where the search dropdown should appear (fixed to viewport)
+  const updateDropdownStyle = useCallback(() => {
+    if (!searchBarRef.current) return;
+    const rect = searchBarRef.current.getBoundingClientRect();
+    setDropdownStyle({
+      position: "fixed",
+      top: rect.bottom + 4,
+      left: rect.left,
+      right: window.innerWidth - rect.right,
+      zIndex: 10000,
+    });
+  }, []);
+
   // ── Search bar ─────────────────────────────────────────────────────────────
   const handleSearch = (val) => {
+    updateDropdownStyle();
     setSearchQuery(val);
     clearTimeout(searchDebounce.current);
 
@@ -493,6 +544,7 @@ const GoogleAddressFormModal = ({
         mapRef.current?.panTo({ lat, lng });
         mapRef.current?.setZoom(17);
 
+        userEditedPinCode.current = false;
         setLocationSummary(prev => ({ ...(prev || {}), lat, long: lng }));
         await reverseGeocode(lat, lng, true);
         setIsLocating(false);
@@ -641,14 +693,11 @@ const GoogleAddressFormModal = ({
             setSearchResults([]);
             setForm({ ...EMPTY_FORM, fullName: prefillName, mobileNumber: prefillPhone });
             setErrors({});
-            initDoneRef.current = false; // Allow re-init/re-locate
+            initDoneRef.current = false;
             userEditedPinCode.current = false;
-            
-            // Reset Autocomplete token for fresh searches
             if (window.google?.maps?.places?.AutocompleteSessionToken) {
               sessionTokenRef.current = new window.google.maps.places.AutocompleteSessionToken();
             }
-
             if (mapRef.current) {
               isProgrammaticMove.current = true;
               mapRef.current.panTo(DEFAULT_CENTER);
@@ -656,80 +705,12 @@ const GoogleAddressFormModal = ({
               setTimeout(() => { isProgrammaticMove.current = false; }, 1200);
             }
           }}
-          className="absolute top-20 right-4 z-[50] bg-white/90 backdrop-blur-sm shadow-xl border border-gray-100 px-3 py-2 rounded-xl text-[10px] font-bold text-red-500 uppercase tracking-widest hover:bg-red-50 transition-all flex items-center gap-2 active:scale-95"
+          className="absolute top-3 right-3 z-[50] bg-white/95 backdrop-blur-sm shadow-lg border border-gray-100 px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-red-500 uppercase tracking-widest hover:bg-red-50 transition-all flex items-center gap-1.5 active:scale-95"
         >
-          <i className="fa-solid fa-location-dot-slash" />
-          Clear Location
+          <i className="fa-solid fa-location-dot-slash text-[9px]" />
+          Clear
         </button>
       )}
-      {/* Search bar */}
-      <div className="p-3 bg-white border-b border-gray-100 relative z-20 shrink-0">
-        <div className="relative">
-          <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs z-10" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => handleSearch(e.target.value)}
-            placeholder="Search area, street, landmark..."
-            className="w-full h-10 bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-9 text-sm text-[#2e443c] focus:border-[#a89068] focus:bg-white outline-none placeholder:text-gray-300 transition-all"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => {
-                setSearchQuery("");
-                setSearchResults([]);
-              }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            >
-              <i className="fa-solid fa-xmark text-xs" />
-            </button>
-          )}
-        </div>
-
-        {/* Search results dropdown — fixed on mobile to avoid overflow-hidden clipping */}
-        {(searchQuery.length > 0 || isSearching) && (
-          <div className="fixed left-4 right-4 md:absolute md:left-3 md:right-3 md:top-[105%] top-[72px] bg-white border border-gray-200 rounded-xl shadow-xl z-[10000] max-h-[220px] overflow-y-auto">
-            {isSearching ? (
-              <div className="p-5 flex items-center justify-center gap-2 text-gray-400">
-                <div className="w-4 h-4 border-2 border-[#a89068] border-t-transparent rounded-full animate-spin" />
-                <span className="text-xs">Searching...</span>
-              </div>
-            ) : searchResults.length > 0 ? (
-              searchResults.map((item, i) => {
-                const pred = item.placePrediction;
-                const mainText = pred?.mainText?.text || pred?.text?.text || "";
-                const subText = pred?.secondaryText?.text || "";
-                const key = pred?.placeId || i;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => handleSelectResult(item)}
-                    className="w-full text-left p-3 hover:bg-gray-50 border-b border-gray-100 last:border-0 flex items-start gap-3 group"
-                  >
-                    <i className="fa-solid fa-location-dot text-gray-300 group-hover:text-[#a89068] text-xs mt-1 shrink-0 transition-colors" />
-                    <div className="min-w-0">
-                      <p className="text-sm text-[#2e443c] font-medium truncate group-hover:text-[#a89068] transition-colors">
-                        {mainText}
-                      </p>
-                      {subText && (
-                        <p className="text-[11px] text-gray-400 truncate mt-0.5">
-                          {subText}
-                        </p>
-                      )}
-                    </div>
-                  </button>
-                );
-              })
-            ) : (
-              <div className="p-4 text-center text-sm text-gray-400">
-                No results found
-              </div>
-            )}
-          </div>
-        )}
-      </div>
 
       {/* Map canvas */}
       <div className="relative flex-1 min-h-0 bg-gray-100">
@@ -798,6 +779,7 @@ const GoogleAddressFormModal = ({
             options={MAP_OPTIONS}
             onLoad={onMapLoad}
             onIdle={handleMapIdle}
+            onDragStart={handleMapDragStart}
           />
         )}
 
@@ -809,33 +791,13 @@ const GoogleAddressFormModal = ({
           </div>
         )}
 
-        {/* "Go to current location" FAB */}
-        {isLoaded && (
-          <button
-            type="button"
-            onClick={handleLocate}
-            disabled={isLocating}
-            title="Go to current location"
-            className="absolute bottom-4 right-4 z-10 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center text-[#a89068] hover:bg-[#a89068] hover:text-white transition-all disabled:opacity-60 border border-gray-200"
-          >
-            <i
-              className={`fa-solid ${isLocating ? "fa-spinner animate-spin" : "fa-location-crosshairs"} text-sm`}
-            />
-          </button>
-        )}
-
         {/* Hint card — shown after map loads, before user sets a location */}
         {isLoaded && !locationSummary && (
-          <div className="absolute bottom-16 left-0 right-0 flex justify-center pointer-events-none z-[5] px-4">
-            <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-lg border border-[#a89068]/20 px-4 py-2.5 flex items-center gap-2.5 max-w-xs">
-              {/* <div className="w-7 h-7 rounded-full bg-[#a89068]/10 flex items-center justify-center shrink-0">
-                <i className="fa-solid fa-location-crosshairs text-[#a89068] text-xs" />
-              </div> */}
-              <p className="text-[11px] text-gray-600 leading-snug">
-                Tap <span className="font-semibold text-[#2e443c]">
-                  <i className="fa-solid fa-location-crosshairs text-[#a89068] text-xs" />
-                </span>{" "}
-                below to auto-fill your address
+          <div className="absolute bottom-4 left-0 right-0 flex justify-center pointer-events-none z-[5] px-4">
+            <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-md border border-[#a89068]/15 px-3.5 py-2 flex items-center gap-2 max-w-xs">
+              <i className="fa-solid fa-hand-pointer text-[#a89068] text-xs shrink-0" />
+              <p className="text-[11px] text-gray-500 leading-snug">
+                Drag the pin or search above to set location
               </p>
             </div>
           </div>
@@ -849,7 +811,7 @@ const GoogleAddressFormModal = ({
 
   // ─── Form Section ──────────────────────────────────────────────────────────
   const FormSection = (
-    <div className="flex flex-col md:h-full md:overflow-y-auto">
+    <div className="flex flex-col pb-6" onFocus={handleFormInputFocus}>
       <div className="p-5 space-y-5">
 
         {/* Location error */}
@@ -863,17 +825,29 @@ const GoogleAddressFormModal = ({
         {/* City / State / Pincode — auto-filled, editable */}
         <div className="space-y-3">
           <div className="grid grid-cols-3 gap-3">
+            {/* Pincode — custom field with inputMode + auto-fetch */}
             <div>
-              <FormField
-                label="Pincode"
-                required
-                placeholder="6-digit"
+              <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">
+                Pincode <span className="text-red-400">*</span>
+                {isFetchingPincode && (
+                  <span className="w-3 h-3 border border-[#a89068] border-t-transparent rounded-full animate-spin inline-block shrink-0" />
+                )}
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
                 value={form.pinCode}
+                placeholder="6-digit"
                 maxLength={6}
-                onChange={(val) => {
+                onChange={(e) => {
+                  const cleaned = e.target.value.replace(/\D/g, "").slice(0, 6);
                   userEditedPinCode.current = true;
-                  setField("pinCode")(val.replace(/\D/g, "").slice(0, 6));
+                  setField("pinCode")(cleaned);
+                  if (cleaned.length === 6) fetchPincodeData(cleaned);
                 }}
+                className={`w-full border rounded-xl px-3 py-3 text-sm transition-all outline-none bg-white text-[#2e443c] focus:border-[#a89068] placeholder:text-gray-300 ${
+                  errors.pinCode ? "border-red-300 focus:border-red-400" : "border-gray-200"
+                }`}
               />
               {errors.pinCode && (
                 <p className="text-[11px] text-red-500 mt-1">{errors.pinCode}</p>
@@ -1012,35 +986,135 @@ const GoogleAddressFormModal = ({
       <div className="bg-white w-full max-w-4xl h-[93dvh] sm:h-[88vh] rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl flex flex-col">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 shrink-0">
           <div>
-            <h3 className="font-serif text-[#2e443c] text-lg leading-tight">
+            <h3 className="font-serif text-[#2e443c] text-base leading-tight">
               Set Delivery Address
             </h3>
-            <p className="text-[10px] text-[#a89068] uppercase tracking-widest font-bold mt-0.5">
-              Pin your location, then fill in the details
-            </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:text-red-500 hover:bg-red-50 transition-colors"
+            className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:text-red-500 hover:bg-red-50 transition-colors"
           >
-            <i className="fa-solid fa-xmark text-base" />
+            <i className="fa-solid fa-xmark text-sm" />
           </button>
         </div>
 
-        {/* Body — mobile: scrollable column, desktop: side-by-side */}
-        <div className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden md:flex md:flex-row">
+        {/* Body — flex col on mobile (map stacked above form), flex row on desktop */}
+        <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
 
-          {/* Map — 310px on mobile, fills left 55% on desktop */}
-          <div className="h-[310px] shrink-0 flex flex-col md:h-full md:w-[55%] md:border-r md:border-gray-100">
+          {/* Map — collapsible on mobile (h-0 = hidden), full height column on desktop */}
+          <div className={`shrink-0 flex flex-col overflow-hidden md:h-full md:w-[55%] md:border-r md:border-gray-100 transition-[height] duration-300 ${mapCollapsed ? "h-0 md:h-full" : "h-[260px]"}`}>
             {MapSection}
           </div>
 
-          {/* Form */}
-          <div className="md:flex-1 md:overflow-y-auto">
-            {FormSection}
+          {/* Form column — fills all remaining height, scrolls independently */}
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden md:flex-1">
+
+            {/* Search bar — sits below map on mobile, top of right panel on desktop */}
+            <div ref={searchBarRef} className="shrink-0 px-3 py-2.5 bg-white border-b border-gray-100">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none z-10">
+                  {isSearching
+                    ? <div className="w-3.5 h-3.5 border-2 border-[#a89068] border-t-transparent rounded-full animate-spin" />
+                    : <i className="fa-solid fa-magnifying-glass text-[#a89068] text-sm" />
+                  }
+                </div>
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  placeholder="Search street, area or landmark…"
+                  autoComplete="off"
+                  className="w-full h-11 bg-[#fdf9f6] border-2 border-[#a89068]/35 rounded-xl pl-10 pr-11 text-sm text-[#2e443c] font-medium focus:border-[#a89068] focus:bg-white focus:shadow-[0_0_0_3px_rgba(168,144,104,0.12)] outline-none placeholder:text-gray-400 placeholder:font-normal transition-all"
+                />
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                  {searchQuery ? (
+                    <button
+                      type="button"
+                      onClick={() => { setSearchQuery(""); setSearchResults([]); }}
+                      className="w-5 h-5 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition-colors"
+                    >
+                      <i className="fa-solid fa-xmark text-[9px] text-gray-600" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleLocate}
+                      disabled={isLocating || !isLoaded}
+                      title="Use my current location"
+                      className="w-7 h-7 rounded-lg bg-[#a89068]/10 hover:bg-[#a89068]/20 flex items-center justify-center text-[#a89068] transition-colors disabled:opacity-40"
+                    >
+                      <i className={`fa-solid ${isLocating ? "fa-spinner animate-spin" : "fa-location-crosshairs"} text-xs`} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Dropdown */}
+              {(searchQuery.length > 0 || isSearching) && (
+                <div className="bg-white border border-gray-200 rounded-xl shadow-2xl max-h-[260px] overflow-y-auto" style={dropdownStyle}>
+                  {isSearching ? (
+                    <div className="p-4 flex items-center justify-center gap-2.5 text-gray-400">
+                      <div className="w-4 h-4 border-2 border-[#a89068] border-t-transparent rounded-full animate-spin shrink-0" />
+                      <span className="text-xs font-medium">Searching…</span>
+                    </div>
+                  ) : searchResults.length > 0 ? (
+                    searchResults.map((item, i) => {
+                      const pred = item.placePrediction;
+                      const mainText = pred?.mainText?.text || pred?.text?.text || "";
+                      const subText = pred?.secondaryText?.text || "";
+                      const key = pred?.placeId || i;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => handleSelectResult(item)}
+                          className="w-full text-left px-4 py-3 active:bg-[#fdf9f6] hover:bg-gray-50 border-b border-gray-100 last:border-0 flex items-center gap-3 group"
+                        >
+                          <div className="w-8 h-8 rounded-full bg-gray-100 group-hover:bg-[#a89068]/10 flex items-center justify-center shrink-0 transition-colors">
+                            <i className="fa-solid fa-location-dot text-gray-400 group-hover:text-[#a89068] text-xs transition-colors" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm text-[#2e443c] font-medium leading-snug group-hover:text-[#a89068] transition-colors">{mainText}</p>
+                            {subText && <p className="text-[11px] text-gray-400 mt-0.5 leading-snug line-clamp-1">{subText}</p>}
+                          </div>
+                          <i className="fa-solid fa-chevron-right text-gray-200 text-[10px] shrink-0 group-hover:text-[#a89068] transition-colors" />
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <div className="px-4 py-5 text-center">
+                      <i className="fa-solid fa-magnifying-glass text-gray-200 text-xl mb-2 block" />
+                      <p className="text-sm text-gray-400 font-medium">No results found</p>
+                      <p className="text-[11px] text-gray-300 mt-0.5">Try a different search term</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Mobile strip — tap to expand map when it's collapsed */}
+            <button
+              type="button"
+              onClick={() => setMapCollapsed(false)}
+              className={`md:hidden shrink-0 w-full flex items-center gap-2.5 px-4 py-2.5 border-b border-[#ede9e3] transition-all ${mapCollapsed ? "bg-[#fdf9f5]" : "pointer-events-none opacity-0 h-0 py-0 border-0 overflow-hidden"}`}
+            >
+              <div className="w-6 h-6 rounded-full bg-[#a89068]/15 flex items-center justify-center shrink-0">
+                <i className="fa-solid fa-map-location-dot text-[#a89068] text-[10px]" />
+              </div>
+              <p className="text-xs text-[#2e443c] font-medium truncate flex-1">
+                {locationSummary?.formattedAddress || deliveryPreview || "Tap to expand map"}
+              </p>
+              <span className="text-[10px] text-[#a89068] font-bold shrink-0 flex items-center gap-1 pl-2">
+                Map <i className="fa-solid fa-chevron-up text-[9px]" />
+              </span>
+            </button>
+            {/* Scrollable form */}
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+              {FormSection}
+            </div>
           </div>
 
         </div>

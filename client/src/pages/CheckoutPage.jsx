@@ -124,6 +124,7 @@ const CheckoutPage = () => {
   const STEPS = isGuest ? GUEST_STEPS : AUTH_STEPS;
   const paymentCompletedRef = useRef(false);
   const cartLoadedRef = useRef(false);
+  const addressManuallyResetRef = useRef(false);
 
   // Helper: get current step label for content rendering
   const getStepLabel = (step) => STEPS[step - 1]?.label || "";
@@ -168,7 +169,6 @@ const CheckoutPage = () => {
   const [showMapModal, setShowMapModal] = useState(false);
   const [showCouponModal, setShowCouponModal] = useState(false);
   const [showMobileModal, setShowMobileModal] = useState(false);
-  const [summaryOpen, setSummaryOpen] = useState(false);
 
   const [guestName, setGuestName] = useState(savedCheckout.current.guestName || "");
   const [guestEmail, setGuestEmail] = useState(savedCheckout.current.guestEmail || "");
@@ -314,7 +314,7 @@ const CheckoutPage = () => {
 
       if (profileAddress && !address) setAddress(profileAddress);
       // Aggressively fill pincode if missing, even if address was partially restored
-      if (profilePin && (!pinCode || pinCode.length < 6)) setPinCode(String(profilePin));
+      if (profilePin && (!pinCode || pinCode.length < 6) && !addressManuallyResetRef.current) setPinCode(String(profilePin));
       if (profileMobile && !senderMobile) setSenderMobile(stripCC(String(profileMobile)));
     }
   }, [userProfile, address, pinCode, senderMobile]);
@@ -375,6 +375,7 @@ const CheckoutPage = () => {
     });
 
   const handleAddressConfirm = (suggestion, addressId, deliveryAddressFull) => {
+    addressManuallyResetRef.current = false;
     setAddress(deliveryAddressFull || suggestion.formattedAddress);
     setPinCode(String(suggestion.pinCode || ""));
     setCurrentAddressId(addressId);
@@ -394,17 +395,20 @@ const CheckoutPage = () => {
   };
 
   const handleResetAddress = () => {
+    addressManuallyResetRef.current = true;
     setAddress("");
     setPinCode("");
     setPreciseDetails({ landmark: "", flatNo: "" });
     setCurrentAddressId(null);
     setAddressForm(null);
+    setPricingDetails(prev => ({ ...prev, shipping: null }));
     showNotification("Address cleared", "info");
     if (currentStep !== addressStep) goToStep(addressStep);
     setShowMapModal(true);
   };
 
   const selectSavedAddress = (addr) => {
+    addressManuallyResetRef.current = false;
     setAddress(addr.deliveryAddressFull || addr.formattedAddress);
     setPinCode(String(addr.pinCode || ""));
     setCurrentAddressId(addr.addressId);
@@ -715,7 +719,7 @@ const CheckoutPage = () => {
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
               <div className="text-center">
                 <h1 className="text-2xl sm:text-3xl font-serif text-gray-900 leading-tight">How would you like to continue?</h1>
-                <p className="text-sm text-gray-400 mt-2">Sign in for a faster checkout or continue as a guest</p>
+                {/* <p className="text-sm text-gray-400 mt-2">Sign in for a faster checkout or continue as a guest</p> */}
               </div>
 
               <div className="flex flex-col sm:flex-row items-stretch gap-0">
@@ -751,9 +755,6 @@ const CheckoutPage = () => {
                   </div>
                   <h3 className="text-base font-bold text-gray-900 mb-1">Sign In / Sign Up</h3>
                   <p className="text-xs text-gray-400 leading-relaxed">Track orders, save addresses, and get exclusive offers</p>
-                  <div className="mt-4 flex items-center gap-1.5 text-xs font-bold text-[#2e443c] uppercase tracking-wider">
-                    Recommended <i className="fa-solid fa-arrow-right text-[9px]" />
-                  </div>
                 </button>
               </div>
 
@@ -1120,7 +1121,7 @@ const CheckoutPage = () => {
 
               {/* Mobile order summary accordion */}
               <div className="lg:hidden bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <button onClick={() => setSummaryOpen((p) => !p)} className="w-full flex items-center justify-between px-5 py-4">
+                <div className="flex items-center justify-between px-5 py-4">
                   <div className="flex items-center gap-3">
                     <div className="w-7 h-7 rounded-lg bg-[#2e443c]/8 flex items-center justify-center">
                       <i className="fa-solid fa-bag-shopping text-[#2e443c] text-xs" />
@@ -1128,31 +1129,26 @@ const CheckoutPage = () => {
                     <span className="text-sm font-bold text-gray-800">Order Summary</span>
                     <span className="text-[10px] bg-[#2e443c] text-white px-2 py-0.5 rounded-md font-bold">{cartItems.length}</span>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-bold text-[#2e443c]">₹{totalToPay.toLocaleString()}</span>
-                    <i className={`fa-solid fa-chevron-${summaryOpen ? "up" : "down"} text-gray-400 text-xs`} />
-                  </div>
-                </button>
-                {summaryOpen && (
-                  <div className="border-t border-gray-50">
-                    <div className="divide-y divide-gray-50 max-h-64 overflow-y-auto">
-                      {cartItems.map((item) => (
-                        <div key={`${item.id}-${item.selectedVariant || "default"}`} className="flex items-center gap-3 px-5 py-3">
-                          <div className="w-10 h-10 rounded-lg bg-gray-50 border border-gray-100 overflow-hidden shrink-0">
-                            <img src={item.image || "/placeholder.jpg"} alt={item.name} className="w-full h-full object-contain mix-blend-multiply" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold text-gray-800 truncate">{item.name}</p>
-                            {item.selectedVariant && item.selectedVariant !== "N/A" && <p className="text-[10px] text-gray-400">{item.selectedVariant}</p>}
-                            <p className="text-[10px] text-gray-400">Qty {item.quantity}</p>
-                          </div>
-                          <p className="text-sm font-bold text-gray-800 shrink-0">₹{(Number(item.price) * Number(item.quantity)).toLocaleString()}</p>
+                  <span className="text-sm font-bold text-[#2e443c]">₹{totalToPay.toLocaleString()}</span>
+                </div>
+                <div className="border-t border-gray-50">
+                  <div className="divide-y divide-gray-50 max-h-64 overflow-y-auto">
+                    {cartItems.map((item) => (
+                      <div key={`${item.id}-${item.selectedVariant || "default"}`} className="flex items-center gap-3 px-5 py-3">
+                        <div className="w-10 h-10 rounded-lg bg-gray-50 border border-gray-100 overflow-hidden shrink-0">
+                          <img src={item.image || "/placeholder.jpg"} alt={item.name} className="w-full h-full object-contain mix-blend-multiply" />
                         </div>
-                      ))}
-                    </div>
-                    <div className="px-5 py-4 border-t border-gray-50"><PriceRows subtotal={pricingDetails.subtotal} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} isLoadingShipping={isCalculatingShipping} /></div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-gray-800 truncate">{item.name}</p>
+                          {item.selectedVariant && item.selectedVariant !== "N/A" && <p className="text-[10px] text-gray-400">{item.selectedVariant}</p>}
+                          <p className="text-[10px] text-gray-400">Qty {item.quantity}</p>
+                        </div>
+                        <p className="text-sm font-bold text-gray-800 shrink-0">₹{(Number(item.price) * Number(item.quantity)).toLocaleString()}</p>
+                      </div>
+                    ))}
                   </div>
-                )}
+                  <div className="px-5 py-4 border-t border-gray-50"><PriceRows subtotal={pricingDetails.subtotal} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} isLoadingShipping={isCalculatingShipping} /></div>
+                </div>
               </div>
 
               {/* Coupon — auth only */}
@@ -1179,10 +1175,10 @@ const CheckoutPage = () => {
               )}
 
               {/* Mobile-only price breakdown */}
-              <div className="lg:hidden bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+              {/* <div className="lg:hidden bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
                 <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">Price Summary</p>
                 <PriceRows subtotal={pricingDetails.subtotal} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} isLoadingShipping={isCalculatingShipping} />
-              </div>
+              </div> */}
 
               {/* Payment error */}
               {paymentError && (
