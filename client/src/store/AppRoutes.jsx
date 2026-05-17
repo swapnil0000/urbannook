@@ -21,6 +21,7 @@ import {
 } from "../pages/index.js";
 import PaymentProcessing from "../pages/PaymentProcessing.jsx";
 import PaymentFailed from "../pages/PaymentFailed.jsx";
+import OrderConfirm from "../pages/OrderConfirm.jsx";
 import ProtectedRoute from "../component/ProtectedRoute.jsx";
 
 // Minimal loader for individual route transitions only
@@ -86,6 +87,7 @@ const AppRoutes = () => {
         }
       />
       <Route path="/payment-processing/:orderId" element={<PaymentProcessing />} />
+      <Route path="/order-confirm/:orderId" element={<OrderConfirm />} />
       <Route path="/payment-failed" element={<PaymentFailed />} />
       <Route
         path="/orders"
