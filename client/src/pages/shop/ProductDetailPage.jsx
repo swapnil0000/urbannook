@@ -773,7 +773,7 @@ const ProductDetailPage = () => {
                           <img 
                             src={logoSrc} 
                             alt={name} 
-                            className={`${logoClass} object-contain ${isSelected ? '' : 'grayscale opacity-60'}`} 
+                            className={`${logoClass} object-contain ${isSelected ? '' : 'grayscale-[40%] opacity-80 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300'}`} 
                           />
                         );
                       }
@@ -793,7 +793,7 @@ const ProductDetailPage = () => {
 
                       return (
                         <div 
-                          className="w-full h-full rounded-full border border-white/10" 
+                          className={`w-full h-full rounded-full border ${isSelected ? 'border-white/20' : 'border-white/10 opacity-80 group-hover:opacity-100 transition-opacity'}`} 
                           style={{ 
                             background: colorMap[lowerName] || lowerName.replace(/\s+/g, '') 
                           }}
@@ -809,18 +809,18 @@ const ProductDetailPage = () => {
                             setSelectedVariant(variantName);
                             if (galleryImages[idx]) setCurrentImageIndex(idx);
                           }}
-                          className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border transition-all duration-300 ${
+                          className={`group flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border transition-all duration-300 ${
                             isSelected
-                              ? "bg-[#F5DEB3] border-[#F5DEB3] text-[#1c3026] shadow-lg scale-105"
-                              : "bg-white/5 border-white/10 text-gray-400 hover:border-white/30"
+                              ? "bg-[#F5DEB3] border-[#F5DEB3] text-[#1c3026] shadow-[0_8px_20px_rgba(245,222,179,0.15)] scale-105"
+                              : "bg-white/10 border-white/20 text-gray-200 hover:bg-white/15 hover:border-white/40 hover:scale-[1.02]"
                           }`}
                         >
                           {getVariantIcon(variantName)}
                           <div className="flex flex-col items-start leading-none">
-                            <span className={`text-[10px] font-bold uppercase tracking-wider ${isSelected ? 'text-[#1c3026]' : 'text-gray-300'}`}>
+                            <span className={`text-[11px] font-bold uppercase tracking-wider ${isSelected ? 'text-[#1c3026]' : 'text-white group-hover:text-[#F5DEB3]'}`}>
                               {variantName}
                             </span>
-                            <span className={`text-[6px] uppercase tracking-tighter ${isSelected ? 'text-[#1c3026]/60' : 'text-gray-500'} font-bold mt-0.5`}>
+                            <span className={`text-[7px] uppercase tracking-tighter ${isSelected ? 'text-[#1c3026]/60' : 'text-gray-400 group-hover:text-[#F5DEB3]/60'} font-bold mt-0.5`}>
                               Inspired
                             </span>
                           </div>
@@ -835,14 +835,16 @@ const ProductDetailPage = () => {
                           setSelectedVariant(variantName);
                           if (galleryImages[idx]) setCurrentImageIndex(idx);
                         }}
-                        className={`relative w-6 h-6 rounded-full transition-all duration-300 ${
+                        className={`group relative w-7 h-7 rounded-full transition-all duration-300 ${
                           isSelected
-                            ? "ring-2 ring-offset-2 ring-offset-[#1c3026] ring-[#F5DEB3] scale-110"
-                            : "hover:scale-110 opacity-70 hover:opacity-100"
+                            ? "ring-2 ring-offset-2 ring-offset-[#1c3026] ring-[#F5DEB3] scale-110 shadow-lg shadow-[#F5DEB3]/20"
+                            : "bg-white/5 hover:scale-110 border border-white/10"
                         }`}
                         title={variantName}
                       >
-                        {getVariantIcon(variantName)}
+                        <div className="w-full h-full p-0.5">
+                          {getVariantIcon(variantName)}
+                        </div>
                       </button>
                     );
                   })}
