@@ -2225,3 +2225,5 @@ const AccordionItem = ({ title, isOpen, onClick, children, noBorder = false }) =
 );
 
 export default ProductDetailPage;
+
+//mergeed with main

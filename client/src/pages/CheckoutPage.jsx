@@ -1210,14 +1210,40 @@ const CheckoutPage = () => {
             )}
           </div>
 
-          {currentStep < reviewStep && (
-            <p className="text-center text-[11px] text-gray-400 mt-4 flex items-center justify-center gap-1.5">
-              <i className="fa-solid fa-shield-halved text-[#a89068]" />
-              Secured by Razorpay · 256-bit SSL
-            </p>
-          )}
-        </div>
-      </div>
+                  {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] uppercase tracking-widest text-[#a89068] font-bold ml-1">
+                        Flat / Floor No. (Optional)
+                      </label>
+                      <input
+                        value={preciseDetails.flatNo}
+                        placeholder="e.g. Apt 4B, 2nd Floor"
+                        className="w-full bg-white border border-gray-200 rounded-xl p-4 text-sm text-[#2e443c] focus:outline-none focus:border-[#a89068] transition-all placeholder:text-gray-400"
+                        onChange={(e) =>
+                          setPreciseDetails((p) => ({
+                            ...p,
+                            flatNo: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] uppercase tracking-widest text-[#a89068] font-bold ml-1">
+                        Landmark (Optional)
+                      </label>
+                      <input
+                        value={preciseDetails.landmark}
+                        placeholder="e.g. Near Metro Station"
+                        className="w-full bg-white border border-gray-200 rounded-xl p-4 text-sm text-[#2e443c] focus:outline-none focus:border-[#a89068] transition-all placeholder:text-gray-400"
+                        onChange={(e) =>
+                          setPreciseDetails((p) => ({
+                            ...p,
+                            landmark: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                  </div> */}
 
       {/* ── Mobile sticky footer (review step) ────────────────────────────────── */}
       {currentStep === reviewStep && (

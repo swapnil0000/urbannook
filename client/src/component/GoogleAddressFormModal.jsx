@@ -141,6 +141,7 @@ const GoogleAddressFormModal = ({
   const sessionTokenRef    = useRef(null);  // AutocompleteSessionToken for billing grouping
   const isProgrammaticMove = useRef(false); // blocks onIdle during panTo animations
   const searchDebounce     = useRef(null);
+  const searchRequestId    = useRef(0);     // incremented per-call; stale responses are dropped
   const initDoneRef        = useRef(false); // prevents double-init on StrictMode
   const userEditedPinCode  = useRef(false); // true when user manually typed in pincode — prevent map geocoder from overwriting
 
@@ -169,6 +170,15 @@ const GoogleAddressFormModal = ({
       }));
     }
   }, [isOpen, prefillName, prefillPhone]);
+
+  // ── Cleanup debounce timer on unmount ─────────────────────────────────────
+  useEffect(() => () => clearTimeout(searchDebounce.current), []);
+
+  // ── Hide navbar while modal is open ───────────────────────────────────────
+  useEffect(() => {
+    document.body.classList.toggle("address-modal-open", isOpen);
+    return () => document.body.classList.remove("address-modal-open");
+  }, [isOpen]);
 
   // ── Reset on close ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -291,34 +301,55 @@ const GoogleAddressFormModal = ({
   // ── Search bar ─────────────────────────────────────────────────────────────
   const handleSearch = (val) => {
     setSearchQuery(val);
-    if (searchDebounce.current) clearTimeout(searchDebounce.current);
-    if (val.length < 2) { setSearchResults([]); setIsSearching(false); return; }
+    clearTimeout(searchDebounce.current);
+
+    const trimmed = val.trim();
+    if (trimmed.length < 2) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    // Only fire when the current word being typed is complete enough.
+    // "last word >= 3 chars" OR input ends with a space (word just finished).
+    const lastWord = trimmed.split(/\s+/).at(-1) ?? "";
+    const wordReady = val.endsWith(" ") || lastWord.length >= 3;
+    if (!wordReady) {
+      setIsSearching(false);
+      return;
+    }
+
+    // Capture id BEFORE the timeout so we can detect stale responses
+    const thisId = ++searchRequestId.current;
     setIsSearching(true);
+
     searchDebounce.current = setTimeout(async () => {
       if (!window.google?.maps?.places?.AutocompleteSuggestion) {
-        setIsSearching(false);
+        if (thisId === searchRequestId.current) setIsSearching(false);
         return;
       }
       try {
-        // Refresh session token for each new search session
         if (!sessionTokenRef.current) {
           sessionTokenRef.current = new window.google.maps.places.AutocompleteSessionToken();
         }
         const { suggestions } = await window.google.maps.places.AutocompleteSuggestion
           .fetchAutocompleteSuggestions({
-            input: val,
+            input: trimmed,
             includedRegionCodes: ["in"],
             language: "en",
             sessionToken: sessionTokenRef.current,
           });
+        // A newer request has already been fired — discard this response
+        if (thisId !== searchRequestId.current) return;
         setSearchResults(suggestions || []);
       } catch (err) {
+        if (thisId !== searchRequestId.current) return;
         console.error("[Search] AutocompleteSuggestion error:", err);
         setSearchResults([]);
       } finally {
-        setIsSearching(false);
+        if (thisId === searchRequestId.current) setIsSearching(false);
       }
-    }, 400);
+    }, 800);
   };
 
   // ── Search result click ────────────────────────────────────────────────────
@@ -581,14 +612,17 @@ const GoogleAddressFormModal = ({
           <input
             type="text"
             value={searchQuery}
-            onChange={e => handleSearch(e.target.value)}
+            onChange={(e) => handleSearch(e.target.value)}
             placeholder="Search area, street, landmark..."
             className="w-full h-10 bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-9 text-sm text-[#2e443c] focus:border-[#a89068] focus:bg-white outline-none placeholder:text-gray-300 transition-all"
           />
           {searchQuery && (
             <button
               type="button"
-              onClick={() => { setSearchQuery(""); setSearchResults([]); }}
+              onClick={() => {
+                setSearchQuery("");
+                setSearchResults([]);
+              }}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
             >
               <i className="fa-solid fa-xmark text-xs" />
@@ -606,10 +640,10 @@ const GoogleAddressFormModal = ({
               </div>
             ) : searchResults.length > 0 ? (
               searchResults.map((item, i) => {
-                const pred      = item.placePrediction;
-                const mainText  = pred?.mainText?.text  || pred?.text?.text || "";
-                const subText   = pred?.secondaryText?.text                 || "";
-                const key       = pred?.placeId || i;
+                const pred = item.placePrediction;
+                const mainText = pred?.mainText?.text || pred?.text?.text || "";
+                const subText = pred?.secondaryText?.text || "";
+                const key = pred?.placeId || i;
                 return (
                   <button
                     key={key}
@@ -623,7 +657,9 @@ const GoogleAddressFormModal = ({
                         {mainText}
                       </p>
                       {subText && (
-                        <p className="text-[11px] text-gray-400 truncate mt-0.5">{subText}</p>
+                        <p className="text-[11px] text-gray-400 truncate mt-0.5">
+                          {subText}
+                        </p>
                       )}
                     </div>
                   </button>
@@ -652,27 +688,42 @@ const GoogleAddressFormModal = ({
           <div className="w-full h-full relative overflow-hidden bg-[#e8eaed]">
             {/* Fake map grid lines */}
             <div className="absolute inset-0 opacity-20">
-              {[20, 40, 60, 80].map(p => (
-                <div key={`h${p}`} className="absolute w-full h-px bg-gray-400" style={{ top: `${p}%` }} />
+              {[20, 40, 60, 80].map((p) => (
+                <div
+                  key={`h${p}`}
+                  className="absolute w-full h-px bg-gray-400"
+                  style={{ top: `${p}%` }}
+                />
               ))}
-              {[20, 40, 60, 80].map(p => (
-                <div key={`v${p}`} className="absolute h-full w-px bg-gray-400" style={{ left: `${p}%` }} />
+              {[20, 40, 60, 80].map((p) => (
+                <div
+                  key={`v${p}`}
+                  className="absolute h-full w-px bg-gray-400"
+                  style={{ left: `${p}%` }}
+                />
               ))}
             </div>
             {/* Shimmer overlay */}
-            <div className="absolute inset-0"
+            <div
+              className="absolute inset-0"
               style={{
-                background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.35) 50%, transparent 100%)",
+                background:
+                  "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.35) 50%, transparent 100%)",
                 backgroundSize: "200% 100%",
                 animation: "skeletonShimmer 1.6s infinite linear",
-              }} />
+              }}
+            />
             {/* Center loading card */}
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
               <div className="bg-white/95 backdrop-blur-sm rounded-2xl px-5 py-3 shadow-lg flex items-center gap-3 border border-white/40">
                 <div className="w-6 h-6 border-[3px] border-[#a89068]/30 border-t-[#a89068] rounded-full animate-spin shrink-0" />
                 <div>
-                  <p className="text-xs font-semibold text-[#2e443c] leading-tight">Loading map…</p>
-                  <p className="text-[10px] text-gray-400 leading-tight">Setting up your location</p>
+                  <p className="text-xs font-semibold text-[#2e443c] leading-tight">
+                    Loading map…
+                  </p>
+                  <p className="text-[10px] text-gray-400 leading-tight">
+                    Setting up your location
+                  </p>
                 </div>
               </div>
             </div>
@@ -710,49 +761,25 @@ const GoogleAddressFormModal = ({
             title="Go to current location"
             className="absolute bottom-4 right-4 z-10 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center text-[#a89068] hover:bg-[#a89068] hover:text-white transition-all disabled:opacity-60 border border-gray-200"
           >
-            <i className={`fa-solid ${isLocating ? "fa-spinner animate-spin" : "fa-location-crosshairs"} text-sm`} />
+            <i
+              className={`fa-solid ${isLocating ? "fa-spinner animate-spin" : "fa-location-crosshairs"} text-sm`}
+            />
           </button>
         )}
 
         {/* Hint card — shown after map loads, before user sets a location */}
         {isLoaded && !locationSummary && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[5] px-4">
-            {/* Mobile: compact horizontal pills row. Desktop: vertical 3-step card */}
-            {/* Mobile hint — 3 icon pills in a row */}
-            <div className="flex md:hidden gap-2 justify-center">
-              {[
-                { icon: "fa-magnifying-glass", label: "Search above" },
-                { icon: "fa-hand-pointer",     label: "Drag pin" },
-                { icon: "fa-location-crosshairs", label: "Use location" },
-              ].map(({ icon, label }) => (
-                <div key={label} className="bg-white/95 backdrop-blur-sm rounded-xl shadow-md border border-[#a89068]/20 px-2.5 py-2 flex flex-col items-center gap-1 min-w-[72px]">
-                  <i className={`fa-solid ${icon} text-[#a89068] text-sm`} />
-                  <p className="text-[9px] font-semibold text-[#2e443c] text-center leading-tight">{label}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Desktop hint — vertical card */}
-            <div className="hidden md:block bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl border border-[#a89068]/20 p-4 w-full max-w-[260px]">
-              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#a89068] text-center mb-3">
-                Set your delivery location
+          <div className="absolute bottom-16 left-0 right-0 flex justify-center pointer-events-none z-[5] px-4">
+            <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-lg border border-[#a89068]/20 px-4 py-2.5 flex items-center gap-2.5 max-w-xs">
+              {/* <div className="w-7 h-7 rounded-full bg-[#a89068]/10 flex items-center justify-center shrink-0">
+                <i className="fa-solid fa-location-crosshairs text-[#a89068] text-xs" />
+              </div> */}
+              <p className="text-[11px] text-gray-600 leading-snug">
+                Tap <span className="font-semibold text-[#2e443c]">
+                  <i className="fa-solid fa-location-crosshairs text-[#a89068] text-xs" />
+                </span>{" "}
+                below to auto-fill your address
               </p>
-              <div className="space-y-2.5">
-                {[
-                  { icon: "fa-magnifying-glass",    label: "Search", desc: "your area, street or landmark above" },
-                  { icon: "fa-hand-pointer",         label: "Drag the map", desc: "to move the pin to your door" },
-                  { icon: "fa-location-crosshairs",  label: "Tap the button", desc: "bottom-right to use your location" },
-                ].map(({ icon, label, desc }) => (
-                  <div key={label} className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-full bg-[#a89068]/10 flex items-center justify-center shrink-0">
-                      <i className={`fa-solid ${icon} text-[#a89068] text-[10px]`} />
-                    </div>
-                    <p className="text-[11px] text-gray-600 leading-tight">
-                      <span className="font-semibold text-[#2e443c]">{label}</span> {desc}
-                    </p>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
         )}
