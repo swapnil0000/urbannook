@@ -18,6 +18,7 @@ import { uploadInvoiceToS3 } from "../utils/s3.utils.js";
 import Address from "../model/address.new.model.js";
 import html_to_pdf from "html-pdf-node";
 import { generateInvoiceHtmlTemplate } from "../template/invoiceTemplate.template.js";
+import { calculateShippingRate } from "../services/shipping.service.js";
 
 const PAYMENT_ERROR_MESSAGES = {
   BAD_REQUEST_ERROR: "Payment failed due to invalid request. Please try again.",
@@ -230,11 +231,6 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     };
   });
 
-  const razorpayOrder = await razorpayCreateOrderService(
-    finalAmount * 100, // Razorpay expects amount in paise
-    "INR",
-  );
-
   const deliveryAddressSnapshot = {
     addressId: addressId,
     fullName:
@@ -274,6 +270,30 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       0,
   };
 
+  // Re-calculate shipping to get enriched data (type, weight, boxes)
+  const shippingResult = await calculateShippingRate({
+    pincode: deliveryAddressSnapshot.pinCode,
+    cartItems: items.map(i => ({
+      productId: i.productId,
+      quantity: i.quantity,
+      price: orderItems.find(oi => oi.productId === i.productId)?.productSnapshot.priceAtPurchase
+    }))
+  });
+
+  const shippingAmount = shippingResult?.total_charges || summary?.shipping || 179;
+  
+  // Recalculate finalAmount if shipping changed or to ensure consistency
+  const subtotal = orderItems.reduce((s, i) => s + (i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity), 0);
+  finalAmount = subtotal + shippingAmount - discountAmount;
+
+  // Sync shipping in snapshots
+  orderItems.forEach(i => { i.productSnapshot.shipping = String(shippingAmount); });
+
+  const razorpayOrder = await razorpayCreateOrderService(
+    finalAmount * 100, // Razorpay expects amount in paise
+    "INR",
+  );
+
   const order = await Order.create({
     orderId: uuidv7(),
     userEmail,
@@ -282,6 +302,13 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     userMobile: deliveryAddressSnapshot.mobileNumber,
     items: orderItems,
     amount: finalAmount,
+    shippingInfo: {
+      amount: shippingAmount,
+      type: shippingResult?.type || "standard",
+      expectedNoOfBoxes: shippingResult?.expectedNoOfBoxes || 0,
+      totalWeight: shippingResult?.totalWeight || 0,
+      serviceName: shippingResult?.serviceName || null
+    },
     senderMobile: finalSenderMobile,
     receiverMobile: finalReceiverMobile,
     deliveryAddress: deliveryAddressSnapshot,
@@ -618,6 +645,8 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   if (products.length !== productIds.length) throw new ValidationError("One or more products unavailable");
 
   let subtotal = 0;
+  const rawItemsForShipping = [];
+
   const orderItems = items.map((item) => {
     const product = products.find((p) => p.productId === item.productId);
     const itemVariant = item.variant || "N/A";
@@ -628,6 +657,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
       priceAtPurchase = variant?.variantPrice || product.variantDetails[0].variantPrice || 0;
     }
     subtotal += priceAtPurchase * item.quantity;
+    rawItemsForShipping.push({ productId: item.productId, quantity: item.quantity, price: priceAtPurchase, selectedVariant: itemVariant });
 
     let itemImage = null;
     if (product.variantDetails?.length > 0) {
@@ -645,14 +675,20 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
         productCategory: product.productCategory,
         productSubCategory: product.productSubCategory,
         priceAtPurchase,
-        shipping: "149",
         selectedVariant: itemVariant,
       },
     };
   });
 
-  const shipping = 149;
-  const finalAmount = subtotal + shipping;
+  const shippingResult = await calculateShippingRate({
+    pincode: deliveryAddress.pinCode,
+    cartItems: rawItemsForShipping
+  });
+  const shippingAmount = shippingResult?.total_charges || 179;
+  const finalAmount = subtotal + shippingAmount;
+
+  // Update orderItems with shipping value now that it's calculated
+  orderItems.forEach(i => { i.productSnapshot.shipping = String(shippingAmount); });
 
   const razorpayOrder = await razorpayCreateOrderService(finalAmount * 100, "INR");
 
@@ -667,6 +703,13 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     userMobile: cleanMobile,
     items: orderItems,
     amount: finalAmount,
+    shippingInfo: {
+      amount: shippingAmount,
+      type: shippingResult?.type || "standard",
+      expectedNoOfBoxes: shippingResult?.expectedNoOfBoxes || 0,
+      totalWeight: shippingResult?.totalWeight || 0,
+      serviceName: shippingResult?.serviceName || null
+    },
     senderMobile: cleanMobile,
     receiverMobile: cleanMobile,
     deliveryAddress: {

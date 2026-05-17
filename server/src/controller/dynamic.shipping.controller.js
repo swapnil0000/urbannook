@@ -34,7 +34,7 @@ const dynamicShippingCal = asyncHandler(async (req, res) => {
   }
 
   return res.status(200).json(
-    new ApiRes(200, "Shipping rate calculated successfully", { total_charges: selectedService.total_charges }, true)
+    new ApiRes(200, "Shipping rate calculated successfully", selectedService, true)
   );
 });
 

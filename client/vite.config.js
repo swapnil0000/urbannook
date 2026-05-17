@@ -93,7 +93,7 @@ function htmlEnvReplace() {
   return {
     name: 'html-env-replace',
     transformIndexHtml(html) {
-      return html.replace(/%VITE_GTM_ID%/g, process.env.VITE_GTM_ID || 'GTM-XXXXXXX');
+      return html.replace(/__VITE_GTM_ID__/g, process.env.VITE_GTM_ID || 'GTM-XXXXXXX');
     }
   };
 }

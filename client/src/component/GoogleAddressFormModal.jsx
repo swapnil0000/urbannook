@@ -128,6 +128,7 @@ const GoogleAddressFormModal = ({
   prefillPhone = "",
   defaultCoords = null, // { lat, long }
   isGuest = false,
+  initialData = null,
 }) => {
   // Load Google Maps JS SDK once — must not be called conditionally
   const { isLoaded, loadError } = useLoadScript({
@@ -163,13 +164,37 @@ const GoogleAddressFormModal = ({
   // ── Pre-fill contact from parent ───────────────────────────────────────────
   useEffect(() => {
     if (isOpen) {
-      setForm(f => ({
-        ...f,
-        fullName:     f.fullName     || prefillName,
-        mobileNumber: f.mobileNumber || prefillPhone,
-      }));
+      if (initialData) {
+        // Create a base form from EMPTY_FORM and merge initialData to ensure all fields exist
+        const updatedForm = {
+          ...EMPTY_FORM,
+          ...initialData,
+          fullName: initialData.fullName || prefillName,
+          mobileNumber: initialData.mobileNumber || prefillPhone,
+        };
+        setForm(updatedForm);
+
+        if (initialData.lat && initialData.long) {
+          setLocationSummary({
+            lat: initialData.lat,
+            long: initialData.long,
+            placeId: initialData.placeId || "N/A",
+            formattedAddress: initialData.formattedAddress || "",
+            city: initialData.city || updatedForm.city || "",
+            state: initialData.state || updatedForm.state || "",
+            pinCode: initialData.pinCode || updatedForm.pinCode || "",
+          });
+          initDoneRef.current = true; // Mark init as done so we don't auto-locate
+        }
+      } else {
+        setForm(f => ({
+          ...f,
+          fullName:     f.fullName     || prefillName,
+          mobileNumber: f.mobileNumber || prefillPhone,
+        }));
+      }
     }
-  }, [isOpen, prefillName, prefillPhone]);
+  }, [isOpen, prefillName, prefillPhone, initialData]);
 
   // ── Cleanup debounce timer on unmount ─────────────────────────────────────
   useEffect(() => () => clearTimeout(searchDebounce.current), []);
@@ -495,6 +520,7 @@ const GoogleAddressFormModal = ({
     // locationSummary is NOT required — user can fill form manually without map
     if (!/^\d{6}$/.test(String(form.pinCode || "").trim())) errs.pinCode = "Enter a valid 6-digit pincode";
     if (!form.city?.trim())         errs.city         = "City / District is required";
+    if (!form.state?.trim())        errs.state        = "State is required";
     if (!form.buildingName?.trim()) errs.buildingName = "House No. / Building is required";
     if (!form.street?.trim())       errs.street       = "Street / Colony is required";
     if (!isGuest && !form.fullName?.trim()) errs.fullName = "Name is required";
@@ -529,14 +555,15 @@ const GoogleAddressFormModal = ({
         ...(locationSummary || {
           placeId: "N/A",
           formattedAddress: manualAddress,
-          city: form.city,
-          state: form.state,
-          pinCode: form.pinCode,
           lat: 0,
           long: 0,
         }),
+        city: form.city,
+        state: form.state,
+        pinCode: form.pinCode,
         landmark: form.landmark || "",
         flatNo: [form.buildingName, form.street, form.floor, form.tower].filter(Boolean).join(", "),
+        form: { ...form }, // Pass the full form for editing later
       };
 
       // For guest users, skip API call and just pass address data back
@@ -604,7 +631,37 @@ const GoogleAddressFormModal = ({
 
   // ─── Map Section ───────────────────────────────────────────────────────────
   const MapSection = (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
+      {locationSummary && (
+        <button
+          type="button"
+          onClick={() => {
+            setLocationSummary(null);
+            setSearchQuery("");
+            setSearchResults([]);
+            setForm({ ...EMPTY_FORM, fullName: prefillName, mobileNumber: prefillPhone });
+            setErrors({});
+            initDoneRef.current = false; // Allow re-init/re-locate
+            userEditedPinCode.current = false;
+            
+            // Reset Autocomplete token for fresh searches
+            if (window.google?.maps?.places?.AutocompleteSessionToken) {
+              sessionTokenRef.current = new window.google.maps.places.AutocompleteSessionToken();
+            }
+
+            if (mapRef.current) {
+              isProgrammaticMove.current = true;
+              mapRef.current.panTo(DEFAULT_CENTER);
+              mapRef.current.setZoom(12);
+              setTimeout(() => { isProgrammaticMove.current = false; }, 1200);
+            }
+          }}
+          className="absolute top-20 right-4 z-[50] bg-white/90 backdrop-blur-sm shadow-xl border border-gray-100 px-3 py-2 rounded-xl text-[10px] font-bold text-red-500 uppercase tracking-widest hover:bg-red-50 transition-all flex items-center gap-2 active:scale-95"
+        >
+          <i className="fa-solid fa-location-dot-slash" />
+          Clear Location
+        </button>
+      )}
       {/* Search bar */}
       <div className="p-3 bg-white border-b border-gray-100 relative z-20 shrink-0">
         <div className="relative">
@@ -834,12 +891,18 @@ const GoogleAddressFormModal = ({
                 <p className="text-[11px] text-red-500 mt-1">{errors.city}</p>
               )}
             </div>
-            <FormField
-              label="State"
-              placeholder="e.g. Karnataka"
-              value={form.state}
-              onChange={setField("state")}
-            />
+            <div>
+              <FormField
+                label="State"
+                required
+                placeholder="e.g. Karnataka"
+                value={form.state}
+                onChange={setField("state")}
+              />
+              {errors.state && (
+                <p className="text-[11px] text-red-500 mt-1">{errors.state}</p>
+              )}
+            </div>
           </div>
         </div>
 
