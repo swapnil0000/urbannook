@@ -14,14 +14,22 @@ const PaymentProcessing = () => {
   const [message, setMessage] = useState("Processing your payment...");
   const [clearCartApi] = useClearCartMutation();
 
-  useEffect(() => {
-    if (!orderId) return;
+  console.log("[PaymentProcessing] ✅ NEW VERSION - component mounted, orderId:", orderId);
 
+  useEffect(() => {
+    if (!orderId) {
+      console.log("[PaymentProcessing] ⚠️ No orderId, returning early");
+      return;
+    }
+
+    console.log("[PaymentProcessing] 🔄 Starting status polling for:", orderId);
     let interval;
 
     const checkStatus = async () => {
       try {
         const token = localStorage.getItem("authToken");
+        console.log("[PaymentProcessing] 📡 Calling status API, hasToken:", !!token);
+
         const res = await fetch(
           `${getApiUrl()}/user/order/status/${orderId}`,
           {
@@ -36,9 +44,12 @@ const PaymentProcessing = () => {
         const data = await res.json();
         const status = data?.data?.status;
         const isGuestOrder = data?.data?.isGuestOrder ?? false;
+
+        console.log("[PaymentProcessing] 📦 API response:", { status, isGuestOrder, fullData: data?.data });
         setMessage("Verifying with bank...");
 
         if (status === "PAID") {
+          console.log("[PaymentProcessing] ✅ PAID - clearing cart, isGuestOrder:", isGuestOrder);
           clearInterval(interval);
           dispatch(clearCart());
           localStorage.removeItem("guestCart");
@@ -47,19 +58,24 @@ const PaymentProcessing = () => {
           if (!isGuestOrder) {
             try {
               await clearCartApi().unwrap();
-            } catch (_) {}
+              console.log("[PaymentProcessing] 🛒 Backend cart cleared for auth user");
+            } catch (_) {
+              console.warn("[PaymentProcessing] ⚠️ Backend cart clear failed (non-critical)");
+            }
           }
 
+          console.log("[PaymentProcessing] ➡️ Navigating to /order-confirm/", orderId);
           navigate(`/order-confirm/${orderId}`, { replace: true });
         }
 
         if (status === "FAILED") {
+          console.log("[PaymentProcessing] ❌ FAILED - navigating to /payment-failed");
           clearInterval(interval);
           showNotification("Payment failed. Please try again or contact support.", "error");
           setTimeout(() => navigate("/payment-failed"), 2000);
         }
       } catch (err) {
-        console.error("Status error:", err);
+        console.error("[PaymentProcessing] 💥 Status check error:", err);
       }
     };
 
@@ -67,6 +83,7 @@ const PaymentProcessing = () => {
     interval = setInterval(checkStatus, 2000);
 
     return () => {
+      console.log("[PaymentProcessing] 🧹 Cleanup - clearing interval");
       if (interval) clearInterval(interval);
     };
   }, [orderId, dispatch, clearCartApi, navigate, showNotification]);

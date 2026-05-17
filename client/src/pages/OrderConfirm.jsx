@@ -14,8 +14,15 @@ const OrderConfirm = () => {
   const [loading, setLoading] = useState(true);
   const [orderData, setOrderData] = useState(null);
 
+  console.log("[OrderConfirm] ✅ NEW VERSION - component mounted, orderId:", orderId);
+
   useEffect(() => {
-    if (!orderId) return;
+    if (!orderId) {
+      console.log("[OrderConfirm] ⚠️ No orderId, returning early");
+      return;
+    }
+
+    console.log("[OrderConfirm] 📡 Fetching order data for:", orderId);
 
     const fetchOrder = async () => {
       try {
@@ -32,11 +39,14 @@ const OrderConfirm = () => {
         );
 
         const data = await res.json();
+        console.log("[OrderConfirm] 📦 Order data received:", data?.data);
+
         if (data?.data) {
           setOrderData(data.data);
+          console.log("[OrderConfirm] 🔑 isGuestOrder:", data.data.isGuestOrder, "| isNewGuestAccount:", data.data.isNewGuestAccount, "| guestEmail:", data.data.guestEmail);
         }
       } catch (err) {
-        console.error("Order fetch error:", err);
+        console.error("[OrderConfirm] 💥 Order fetch error:", err);
         showNotification("Could not load order details.", "error");
       } finally {
         setLoading(false);

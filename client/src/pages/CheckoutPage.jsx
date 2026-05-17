@@ -1315,6 +1315,8 @@ const CheckoutPage = () => {
         </div>
       )}
     </div>
+     </div>
+      </div>
   );
 };
 
