@@ -143,7 +143,11 @@ const CheckoutPage = () => {
     } catch { return {}; }
   })());
 
-  const [currentStep, setCurrentStep] = useState(savedCheckout.current.currentStep || 1);
+  const [currentStep, setCurrentStep] = useState(() => {
+    const saved = savedCheckout.current.currentStep || 1;
+    const steps = !isAuthenticated && !localStorage.getItem("authToken") ? GUEST_STEPS : AUTH_STEPS;
+    return saved > steps.length ? 1 : saved;
+  });
   const [userProfile, setUserProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [address, setAddress] = useState(savedCheckout.current.address || "");
@@ -188,6 +192,12 @@ const CheckoutPage = () => {
   const { data: savedAddressData, refetch: refetchAddresses } =
     useGetSavedAddressesQuery(undefined, { skip: isGuest });
   const [calculateShipping, { isLoading: isCalculatingShipping }] = useCalculateShippingMutation();
+
+  // When user logs in mid-checkout (guest → auth), AUTH_STEPS has fewer steps.
+  // Clamp currentStep so STEPS[currentStep-1] is never undefined.
+  useEffect(() => {
+    if (currentStep > STEPS.length) setCurrentStep(1);
+  }, [isGuest]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -663,10 +673,10 @@ const CheckoutPage = () => {
           {/* breadcrumb */}
           <div className="flex items-center gap-2 text-xs text-gray-400 font-medium mb-6">
             <button onClick={() => currentStep > 1 ? goToStep(currentStep - 1) : navigate(-1)} className="hover:text-[#2e443c] transition-colors flex items-center gap-1.5">
-              <i className="fa-solid fa-chevron-left text-[10px]" /> {currentStep > 1 ? STEPS[currentStep - 2].label : "Cart"}
+              <i className="fa-solid fa-chevron-left text-[10px]" /> {currentStep > 1 ? STEPS[currentStep - 2]?.label : "Cart"}
             </button>
             <span>/</span>
-            <span className="text-[#2e443c] font-semibold">{STEPS[currentStep - 1].label}</span>
+            <span className="text-[#2e443c] font-semibold">{STEPS[currentStep - 1]?.label}</span>
           </div>
 
           {/* Step circles */}
