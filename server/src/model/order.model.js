@@ -120,6 +120,16 @@ const orderSchema = new mongoose.Schema(
       estimatedDelivery: { type: Date, default: null },
     },
 
+    paymentMethod: {
+      type: String,
+      enum: ["PREPAID", "COD"],
+      default: "PREPAID",
+    },
+    codDetails: {
+      partialAmountPaid: { type: Number, default: 0 },
+      remainingAmount: { type: Number, default: 0 },
+    },
+
     isGuestOrder: { type: Boolean, default: false },
     isNewGuestAccount: { type: Boolean, default: false },
     guestInfo: {
