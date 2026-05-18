@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { clearCart } from "../store/slices/cartSlice";
 import { useClearCartMutation } from "../store/api/userApi";
 import { useUI } from "../hooks/useRedux";
@@ -11,6 +11,8 @@ const PaymentProcessing = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { showNotification } = useUI();
+  const { isAuthenticated } = useSelector((s) => s.auth);
+  const fallbackRoute = isAuthenticated ? "/orders" : "/products";
   const [message, setMessage] = useState("Processing your payment...");
   const [clearCartApi] = useClearCartMutation();
 
@@ -22,11 +24,14 @@ const PaymentProcessing = () => {
   useEffect(() => {
     if (!orderId) return;
 
-    let interval;
     let cancelled = false;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 30; // 60 seconds max (30 × 2s)
 
     const checkStatus = async () => {
       if (cancelled) return;
+      attempts++;
+
       try {
         const token = localStorage.getItem("authToken");
 
@@ -50,8 +55,8 @@ const PaymentProcessing = () => {
         setMessage("Verifying with bank...");
 
         if (status === "PAID") {
-          clearInterval(interval);
           cancelled = true;
+          clearInterval(interval);
           dispatch(clearCart());
           localStorage.removeItem("guestCart");
           localStorage.removeItem("guestId");
@@ -65,27 +70,44 @@ const PaymentProcessing = () => {
           }
 
           navigate(`/order-confirm/${orderId}`, { replace: true });
+          return;
         }
 
         if (status === "FAILED") {
-          clearInterval(interval);
           cancelled = true;
+          clearInterval(interval);
           showNotificationRef.current("Payment failed. Please try again or contact support.", "error");
           setTimeout(() => navigate("/payment-failed"), 2000);
+          return;
+        }
+
+        if (attempts >= MAX_ATTEMPTS) {
+          cancelled = true;
+          clearInterval(interval);
+          setMessage("Payment is taking longer than expected. Check your orders page.");
+          showNotificationRef.current("Payment verification timed out. Check your orders for status.", "error");
+          setTimeout(() => navigate(fallbackRoute), 4000);
         }
       } catch (err) {
         console.error("[PaymentProcessing] 💥 Status check error:", err);
+        if (attempts >= MAX_ATTEMPTS) {
+          cancelled = true;
+          clearInterval(interval);
+          setTimeout(() => navigate(fallbackRoute), 4000);
+        }
       }
     };
 
+    // Assign interval BEFORE calling checkStatus so clearInterval(interval)
+    // works correctly even if the first fetch resolves with PAID/FAILED.
+    const interval = setInterval(checkStatus, 2000);
     checkStatus();
-    interval = setInterval(checkStatus, 2000);
 
     return () => {
       cancelled = true;
-      if (interval) clearInterval(interval);
+      clearInterval(interval);
     };
-  }, [orderId, dispatch, navigate]);
+  }, [orderId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
