@@ -2,13 +2,14 @@
 // Implements versioned caching with cache-first for static assets
 // and strictly NO caching for API calls to prevent cart/price sync issues
 
-const CACHE_VERSION = 'v5'; // Incremented to force update
+const CACHE_VERSION = 'v6'; // Incremented to force update
 const STATIC_CACHE = `urbannook-static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `urbannook-dynamic-${CACHE_VERSION}`;
 
 // Static assets to cache immediately on install
+// NOTE: Never cache '/' (index.html) — its JS chunk references change on every deploy.
+// Serving stale index.html after a new deploy causes "wrong MIME type" errors for missing chunks.
 const STATIC_ASSETS = [
-  '/',
   '/assets/hero21.webp',
   '/assets/hero2.webp',
   '/assets/logo.webp'
