@@ -254,7 +254,16 @@ const CartDrawer = ({ isOpen, onClose }) => {
                 </div>
             </div>
 
-            <button 
+            {/* COD availability notice */}
+            <div className="flex items-center gap-2.5 bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3 mb-4">
+              <i className="fa-solid fa-hand-holding-dollar text-amber-500 text-base shrink-0" />
+              <div>
+                <p className="text-[11px] font-bold text-amber-800">Cash on Delivery available</p>
+                <p className="text-[10px] text-amber-600 mt-0.5 leading-snug">Pay a small advance online · rest at your door</p>
+              </div>
+            </div>
+
+            <button
               onClick={handleCheckout}
               className="w-full py-4 bg-[#0a110e] text-white rounded-full font-bold uppercase tracking-[0.15em] text-[10px] hover:bg-[#1a2b24] transition-all duration-300 active:scale-[0.98] flex items-center justify-between px-6"
             >

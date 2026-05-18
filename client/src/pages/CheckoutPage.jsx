@@ -69,9 +69,11 @@ const iconInput = (icon, children) => (
   </div>
 );
 
-const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, itemCount, isLoadingShipping }) => {
+const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, itemCount, isLoadingShipping, paymentMethod }) => {
   const shippingAmount = typeof shipping === "object" ? shipping?.amount : shipping;
-  const serviceName = typeof shipping === "object" ? shipping?.serviceName : null;
+  const isCOD = paymentMethod === "COD";
+  const codPartialAmount = isCOD && shippingAmount ? Math.min(Math.ceil(shippingAmount) * 2, totalToPay) : 0;
+  const codRemainingAmount = isCOD ? Math.max(0, totalToPay - codPartialAmount) : 0;
 
   return (
     <div className="space-y-3">
@@ -80,10 +82,7 @@ const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, it
         <span className="font-medium text-gray-800">₹{subtotal.toLocaleString()}</span>
       </div>
       <div className="flex justify-between items-center text-sm">
-        <div className="flex flex-col">
-          <span className="text-gray-500">Delivery</span>
-          {/* {serviceName && <span className="text-[9px] text-gray-400 font-medium uppercase tracking-tight">{serviceName}</span>} */}
-        </div>
+        <span className="text-gray-500">Delivery</span>
         <span className="font-medium text-gray-800">
           {isLoadingShipping
             ? <span className="inline-block w-16 h-3.5 bg-gray-200 rounded animate-pulse" />
@@ -107,6 +106,33 @@ const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, it
           <p className="text-[10px] text-gray-400 mt-0.5">Incl. GST</p>
         </div>
       </div>
+      {isCOD && shippingAmount > 0 && (
+        <div className="border-t border-dashed border-amber-200 pt-3 space-y-0 rounded-xl bg-amber-50/60 -mx-1 px-3 pb-3 mt-1">
+          <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-amber-600 mb-2.5 flex items-center gap-1.5">
+            <i className="fa-solid fa-receipt text-[8px]" /> COD Breakdown
+          </p>
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-gray-600 flex items-center gap-2">
+                <span className="w-4 h-4 rounded-full bg-[#2e443c] flex items-center justify-center shrink-0">
+                  <i className="fa-solid fa-bolt text-white text-[7px]" />
+                </span>
+                Pay Now
+              </span>
+              <span className="text-sm font-bold text-[#2e443c]">₹{codPartialAmount.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-gray-600 flex items-center gap-2">
+                <span className="w-4 h-4 rounded-full bg-amber-400 flex items-center justify-center shrink-0">
+                  <i className="fa-solid fa-door-open text-white text-[7px]" />
+                </span>
+               Rest Pay at delivery
+              </span>
+              <span className="text-sm font-bold text-amber-700">₹{codRemainingAmount.toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -168,6 +194,7 @@ const CheckoutPage = () => {
     shipping: null, // this will now store the full shippingInfo object
     discount: 0,
   });
+  const [paymentMethod, setPaymentMethod] = useState("PREPAID"); // "PREPAID" | "COD"
   const [paymentError, setPaymentError] = useState(null);
   const [showRetry, setShowRetry] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
@@ -556,12 +583,16 @@ const CheckoutPage = () => {
             lat: addressForm?.lat || 0,
             long: addressForm?.long || 0,
           },
+          paymentMethod,
         }).unwrap();
         if (!await loadRazorpay()) { showNotification("Could not load payment.", "error"); return; }
+        const isCODOrder = orderResult.data?.paymentMethod === "COD";
         const rp = new window.Razorpay({
           key: razorpayKeyData?.data,
           amount: orderResult.data?.amount || orderResult.amount,
-          currency: "INR", name: "Urban Nook", description: "Purchase from Urban Nook", image: "/assets/logo.webp",
+          currency: "INR", name: "Urban Nook",
+          description: isCODOrder ? "COD Advance - Urban Nook" : "Purchase from Urban Nook",
+          image: "/assets/logo.webp",
           order_id: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId,
           handler: (response) => {
             paymentCompletedRef.current = true;
@@ -612,12 +643,16 @@ const CheckoutPage = () => {
           lat: selectedFullAddr?.location?.coordinates?.[1] || selectedFullAddr?.lat || 0,
           long: selectedFullAddr?.location?.coordinates?.[0] || selectedFullAddr?.long || 0,
         },
+        paymentMethod,
       }).unwrap();
       if (!await loadRazorpay()) { showNotification("Could not load payment.", "error"); return; }
+      const isCODOrder = orderResult.data?.paymentMethod === "COD";
       const rp = new window.Razorpay({
         key: razorpayKeyData?.data,
         amount: orderResult.data?.amount || orderResult.amount,
-        currency: "INR", name: "Urban Nook", description: "Purchase from Urban Nook", image: "/assets/logo.webp",
+        currency: "INR", name: "Urban Nook",
+        description: isCODOrder ? "COD Advance - Urban Nook" : "Purchase from Urban Nook",
+        image: "/assets/logo.webp",
         order_id: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId || orderResult.id,
         handler: async (response) => {
           try {
@@ -1157,9 +1192,103 @@ const CheckoutPage = () => {
                       </div>
                     ))}
                   </div>
-                  <div className="px-5 py-4 border-t border-gray-50"><PriceRows subtotal={pricingDetails.subtotal} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} isLoadingShipping={isCalculatingShipping} /></div>
+                  <div className="px-5 py-4 border-t border-gray-50"><PriceRows subtotal={pricingDetails.subtotal} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} isLoadingShipping={isCalculatingShipping} paymentMethod={paymentMethod} /></div>
                 </div>
               </div>
+
+              {/* Payment Method Selection */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-50">
+                  <div className="w-8 h-8 rounded-xl bg-[#2e443c]/8 flex items-center justify-center">
+                    <i className="fa-solid fa-wallet text-[#2e443c] text-sm" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-gray-800">Payment Method</p>
+                    <p className="text-xs text-gray-400">Choose how you'd like to pay</p>
+                  </div>
+                </div>
+                <div className="p-4 space-y-3">
+                  {/* Online Payment */}
+                  <button
+                    onClick={() => setPaymentMethod("PREPAID")}
+                    className={`w-full rounded-xl border-2 text-left transition-all duration-200 overflow-hidden ${
+                      paymentMethod === "PREPAID" ? "border-[#2e443c]" : "border-gray-100 hover:border-gray-200"
+                    }`}
+                  >
+                    <div className={`p-4 flex items-center gap-3.5 transition-colors duration-200 ${paymentMethod === "PREPAID" ? "bg-[#2e443c]/5" : "bg-white"}`}>
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all duration-200 ${
+                        paymentMethod === "PREPAID" ? "bg-[#2e443c] text-white shadow-md shadow-[#2e443c]/20" : "bg-gray-100 text-gray-400"
+                      }`}>
+                        <i className="fa-solid fa-credit-card text-sm" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className={`text-sm font-bold transition-colors ${paymentMethod === "PREPAID" ? "text-[#2e443c]" : "text-gray-800"}`}>
+                            Pay Online
+                          </p>
+                          <span className="text-[9px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                            Recommended
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-0.5">Card · UPI · Net Banking · Wallets</p>
+                      </div>
+                      <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-all duration-200 ${
+                        paymentMethod === "PREPAID" ? "bg-[#2e443c]" : "border-2 border-gray-200"
+                      }`}>
+                        {paymentMethod === "PREPAID" && <i className="fa-solid fa-check text-white text-[9px]" />}
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Cash on Delivery */}
+                  <button
+                    onClick={() => setPaymentMethod("COD")}
+                    disabled={pricingDetails.shipping === null || isCalculatingShipping}
+                    className={`w-full rounded-xl border-2 text-left transition-all duration-200 overflow-hidden disabled:opacity-40 disabled:cursor-not-allowed ${
+                      paymentMethod === "COD" ? "border-[#a89068]" : "border-gray-100 hover:border-gray-200"
+                    }`}
+                  >
+                    <div className={`p-4 flex items-center gap-3.5 transition-colors duration-200 ${paymentMethod === "COD" ? "bg-[#a89068]/6" : "bg-white"}`}>
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all duration-200 ${
+                        paymentMethod === "COD" ? "bg-[#a89068] text-white shadow-md shadow-[#a89068]/20" : "bg-gray-100 text-gray-400"
+                      }`}>
+                        <i className="fa-solid fa-hand-holding-dollar text-sm" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-bold transition-colors ${paymentMethod === "COD" ? "text-[#a89068]" : "text-gray-800"}`}>
+                          Cash on Delivery
+                        </p>
+                        {paymentMethod === "COD" && shippingAmount > 0 ? (
+                          <p className="text-xs text-[#a89068]/80 font-medium mt-0.5">
+                            ₹{Math.min(Math.ceil(shippingAmount) * 2, totalToPay).toLocaleString()} now · ₹{Math.max(0, totalToPay - Math.min(Math.ceil(shippingAmount) * 2, totalToPay)).toLocaleString()} at delivery
+                          </p>
+                        ) : (
+                          <p className="text-xs text-gray-400 mt-0.5">Small advance online · rest at your door</p>
+                        )}
+                      </div>
+                      <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-all duration-200 ${
+                        paymentMethod === "COD" ? "bg-[#a89068]" : "border-2 border-gray-200"
+                      }`}>
+                        {paymentMethod === "COD" && <i className="fa-solid fa-check text-white text-[9px]" />}
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* COD notice — compact, shown only when COD is selected */}
+              {paymentMethod === "COD" && shippingAmount > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 space-y-1.5">
+                  <p className="text-xs text-amber-800 leading-relaxed">
+                    <i className="fa-solid fa-circle-info text-amber-500 mr-1.5" />
+                    Advance of <strong>₹{Math.min(Math.ceil(shippingAmount) * 2, totalToPay).toLocaleString()}</strong> (2× shipping) paid now via Razorpay · <strong>₹{Math.max(0, totalToPay - Math.min(Math.ceil(shippingAmount) * 2, totalToPay)).toLocaleString()}</strong> collected at delivery.
+                  </p>
+                  <p className="text-xs text-red-600">
+                    <i className="fa-solid fa-ban text-red-400 mr-1.5" />
+                    <strong>Non-refundable</strong> if order is cancelled or delivery is refused.
+                  </p>
+                </div>
+              )}
 
               {/* Coupon — auth only */}
               {!isGuest && (
@@ -1271,7 +1400,7 @@ const CheckoutPage = () => {
 
             {/* Price */}
             <div className="px-5 py-5 border-t border-gray-100">
-              <PriceRows subtotal={pricingDetails.subtotal} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} isLoadingShipping={isCalculatingShipping} />
+              <PriceRows subtotal={pricingDetails.subtotal} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} isLoadingShipping={isCalculatingShipping} paymentMethod={paymentMethod} />
             </div>
 
             {/* Pay button (review step only) */}
@@ -1286,6 +1415,8 @@ const CheckoutPage = () => {
                     ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Processing…</>
                     : isCalculatingShipping
                     ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Calculating…</>
+                    : paymentMethod === "COD" && shippingAmount > 0
+                    ? <><i className="fa-solid fa-hand-holding-dollar text-xs opacity-70" /> Pay ₹{Math.min(Math.ceil(shippingAmount) * 2, totalToPay).toLocaleString()} Advance</>
                     : <><i className="fa-solid fa-lock text-xs opacity-70" /> Pay ₹{totalToPay.toLocaleString()}</>
                   }
                 </button>
@@ -1307,8 +1438,15 @@ const CheckoutPage = () => {
           <div className="bg-white/95 backdrop-blur-xl border-t border-gray-100 px-4 py-3 pb-5 shadow-[0_-12px_40px_rgba(0,0,0,0.1)]">
             <div className="max-w-sm mx-auto flex items-center gap-3">
               <div>
-                <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Total</p>
-                <p className="text-lg font-bold text-[#2e443c]">₹{totalToPay.toLocaleString()}</p>
+                <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">
+                  {paymentMethod === "COD" ? "Pay Now" : "Total"}
+                </p>
+                <p className="text-lg font-bold text-[#2e443c]">
+                  ₹{(paymentMethod === "COD" && shippingAmount > 0
+                    ? Math.min(Math.ceil(shippingAmount) * 2, totalToPay)
+                    : totalToPay
+                  ).toLocaleString()}
+                </p>
               </div>
               <button
                 onClick={handlePayment}
@@ -1319,6 +1457,8 @@ const CheckoutPage = () => {
                   ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Processing…</>
                   : isCalculatingShipping
                   ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Calculating…</>
+                  : paymentMethod === "COD" && shippingAmount > 0
+                  ? <><i className="fa-solid fa-hand-holding-dollar text-[10px] opacity-70" /> Pay ₹{Math.min(Math.ceil(shippingAmount) * 2, totalToPay).toLocaleString()} Advance</>
                   : <><i className="fa-solid fa-lock text-[10px] opacity-70" /> Pay Now</>
                 }
               </button>
