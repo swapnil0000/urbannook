@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { clearCart } from "../store/slices/cartSlice";
 import { useClearCartMutation } from "../store/api/userApi";
 import { useUI } from "../hooks/useRedux";
@@ -11,6 +11,8 @@ const PaymentProcessing = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { showNotification } = useUI();
+  const { isAuthenticated } = useSelector((s) => s.auth);
+  const fallbackRoute = isAuthenticated ? "/orders" : "/products";
   const [message, setMessage] = useState("Processing your payment...");
   const [clearCartApi] = useClearCartMutation();
 
@@ -84,14 +86,14 @@ const PaymentProcessing = () => {
           clearInterval(interval);
           setMessage("Payment is taking longer than expected. Check your orders page.");
           showNotificationRef.current("Payment verification timed out. Check your orders for status.", "error");
-          setTimeout(() => navigate("/products"), 4000);
+          setTimeout(() => navigate(fallbackRoute), 4000);
         }
       } catch (err) {
         console.error("[PaymentProcessing] 💥 Status check error:", err);
         if (attempts >= MAX_ATTEMPTS) {
           cancelled = true;
           clearInterval(interval);
-          setTimeout(() => navigate("/products"), 4000);
+          setTimeout(() => navigate(fallbackRoute), 4000);
         }
       }
     };
