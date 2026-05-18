@@ -816,45 +816,6 @@ const CheckoutPage = () => {
           {/* ══════════ STEP — CONTACT ════════════════════════════════ */}
           {currentStep === contactStep && (
             <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
-
-              {/* <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h1 className="text-2xl sm:text-3xl font-serif text-gray-900 leading-tight">
-                    {isGuest ? "How can we reach you?" : "Your contact details"}
-                  </h1>
-                  <p className="text-sm text-gray-400 mt-1.5">
-                    {isGuest ? "We'll send your order confirmation here." : "Review or update your contact info."}
-                  </p>
-                </div>
-                {isGuest && (
-                  <button
-                    onClick={() => { dispatch(setLoginCallback('navigate:/checkout')); dispatch(setShowLoginModal(true)); }}
-                    className="shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-xl border border-[#2e443c]/20 text-[#2e443c] text-xs font-bold hover:bg-[#2e443c]/5 transition-all whitespace-nowrap"
-                  >
-                    <i className="fa-solid fa-arrow-right-to-bracket text-[10px]" />
-                    Sign in
-                  </button>
-                )}
-              </div> */}
-
-
-              {/* Auth: logged-in card */}
-              {/* {!isGuest && userProfile && (
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#2e443c] to-[#4b7060] flex items-center justify-center text-white font-bold text-base shrink-0">
-                    {userInitials}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 text-sm">{userProfile?.userName || userProfile?.name}</p>
-                    <p className="text-xs text-gray-400 mt-0.5 truncate">{userProfile?.email}</p>
-                  </div>
-                  <div className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 rounded-lg">
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                    <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Signed in</span>
-                  </div>
-                </div>
-              )} */}
-
               {/* Contact form card */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-50">
@@ -1121,46 +1082,43 @@ const CheckoutPage = () => {
                 <p className="text-sm text-gray-400 mt-1.5">Almost there — confirm everything looks right</p>
               </div>
 
-              {/* Contact + Address summary row */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Contact */}
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-xl bg-[#a89068]/10 flex items-center justify-center">
-                        <i className="fa-solid fa-user text-[#a89068] text-xs" />
-                      </div>
-                      <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Contact</span>
-                    </div>
-                    <button onClick={() => goToStep(contactStep)} className="flex items-center gap-1 text-xs font-bold text-[#a89068] hover:text-[#2e443c] transition-colors">
-                      <i className="fa-solid fa-pen text-[9px]" /> Edit
-                    </button>
+              {/* Contact + Address combined card */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                {/* Contact row */}
+                <div className="flex items-start gap-3.5 px-5 py-4">
+                  <div className="w-8 h-8 rounded-xl bg-[#a89068]/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <i className="fa-solid fa-user text-[#a89068] text-xs" />
                   </div>
-                  <p className="text-sm font-bold text-gray-800">{isGuest ? guestName : (userProfile?.userName || userProfile?.name)}</p>
-                  <p className="text-xs text-gray-400 mt-1 truncate">{isGuest ? guestEmail : userProfile?.email}</p>
-                  <p className="text-xs text-gray-400 mt-0.5 font-medium">{isGuest ? guestMobile : senderMobile}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-gray-800">{isGuest ? guestName : (userProfile?.userName || userProfile?.name)}</p>
+                    <p className="text-xs text-gray-400 mt-0.5 truncate">{isGuest ? guestEmail : userProfile?.email}</p>
+                    <p className="text-xs text-gray-400 mt-0.5 font-medium">{isGuest ? guestMobile : senderMobile}</p>
+                  </div>
+                  <button onClick={() => goToStep(contactStep)} className="flex items-center gap-1 text-xs font-bold text-[#a89068] hover:text-[#2e443c] transition-colors shrink-0">
+                    <i className="fa-solid fa-pen text-[9px]" /> Edit
+                  </button>
                 </div>
 
-                {/* Address */}
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-xl bg-[#a89068]/10 flex items-center justify-center">
-                        <i className="fa-solid fa-location-dot text-[#a89068] text-xs" />
-                      </div>
-                      <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Delivery</span>
-                    </div>
-                    <button onClick={() => { goToStep(addressStep); setShowMapModal(true); }} className="flex items-center gap-1 text-xs font-bold text-[#a89068] hover:text-[#2e443c] transition-colors">
-                      <i className="fa-solid fa-pen text-[9px]" /> Edit
-                    </button>
+                {/* Divider */}
+                <div className="border-t border-gray-100 mx-5" />
+
+                {/* Address row */}
+                <div className="flex items-start gap-3.5 px-5 py-4">
+                  <div className="w-8 h-8 rounded-xl bg-[#a89068]/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <i className="fa-solid fa-location-dot text-[#a89068] text-xs" />
                   </div>
-                  <p className="text-xs text-gray-600 leading-relaxed line-clamp-3">{address}</p>
-                  <p className="text-[11px] text-gray-400 mt-1.5 font-mono font-medium">PIN {pinCode}</p>
-                  {(preciseDetails.flatNo || preciseDetails.landmark) && (
-                    <p className="text-[11px] text-gray-400 mt-0.5">
-                      {[preciseDetails.flatNo, preciseDetails.landmark].filter(Boolean).join(" · ")}
-                    </p>
-                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-600 leading-relaxed line-clamp-3">{address}</p>
+                    <p className="text-[11px] text-gray-400 mt-1 font-mono font-medium">PIN {pinCode}</p>
+                    {(preciseDetails.flatNo || preciseDetails.landmark) && (
+                      <p className="text-[11px] text-gray-400 mt-0.5">
+                        {[preciseDetails.flatNo, preciseDetails.landmark].filter(Boolean).join(" · ")}
+                      </p>
+                    )}
+                  </div>
+                  <button onClick={() => { goToStep(addressStep); setShowMapModal(true); }} className="flex items-center gap-1 text-xs font-bold text-[#a89068] hover:text-[#2e443c] transition-colors shrink-0">
+                    <i className="fa-solid fa-pen text-[9px]" /> Edit
+                  </button>
                 </div>
               </div>
 
@@ -1226,9 +1184,9 @@ const CheckoutPage = () => {
                           <p className={`text-sm font-bold transition-colors ${paymentMethod === "PREPAID" ? "text-[#2e443c]" : "text-gray-800"}`}>
                             Pay Online
                           </p>
-                          <span className="text-[9px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                          {/* <span className="text-[9px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full uppercase tracking-wider">
                             Recommended
-                          </span>
+                          </span> */}
                         </div>
                         <p className="text-xs text-gray-400 mt-0.5">Card · UPI · Net Banking · Wallets</p>
                       </div>
@@ -1274,21 +1232,11 @@ const CheckoutPage = () => {
                     </div>
                   </button>
                 </div>
+               
               </div>
 
               {/* COD notice — compact, shown only when COD is selected */}
-              {paymentMethod === "COD" && shippingAmount > 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 space-y-1.5">
-                  <p className="text-xs text-amber-800 leading-relaxed">
-                    <i className="fa-solid fa-circle-info text-amber-500 mr-1.5" />
-                    Advance of <strong>₹{Math.min(Math.ceil(shippingAmount) * 2, totalToPay).toLocaleString()}</strong> (2× shipping) paid now via Razorpay · <strong>₹{Math.max(0, totalToPay - Math.min(Math.ceil(shippingAmount) * 2, totalToPay)).toLocaleString()}</strong> collected at delivery.
-                  </p>
-                  <p className="text-xs text-red-600">
-                    <i className="fa-solid fa-ban text-red-400 mr-1.5" />
-                    <strong>Non-refundable</strong> if order is cancelled or delivery is refused.
-                  </p>
-                </div>
-              )}
+          
 
               {/* Coupon — auth only */}
               {!isGuest && (
@@ -1313,12 +1261,7 @@ const CheckoutPage = () => {
                 </div>
               )}
 
-              {/* Mobile-only price breakdown */}
-              {/* <div className="lg:hidden bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">Price Summary</p>
-                <PriceRows subtotal={pricingDetails.subtotal} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} isLoadingShipping={isCalculatingShipping} />
-              </div> */}
-
+              
               {/* Payment error */}
               {paymentError && (
                 <div className="bg-red-50 border border-red-100 rounded-2xl p-5 flex items-start gap-4">
@@ -1458,7 +1401,7 @@ const CheckoutPage = () => {
                   : isCalculatingShipping
                   ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Calculating…</>
                   : paymentMethod === "COD" && shippingAmount > 0
-                  ? <><i className="fa-solid fa-hand-holding-dollar text-[10px] opacity-70" /> Pay ₹{Math.min(Math.ceil(shippingAmount) * 2, totalToPay).toLocaleString()} Advance</>
+                  ? <> Pay Advance</>
                   : <><i className="fa-solid fa-lock text-[10px] opacity-70" /> Pay Now</>
                 }
               </button>

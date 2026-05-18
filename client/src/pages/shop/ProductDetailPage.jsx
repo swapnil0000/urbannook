@@ -942,7 +942,7 @@ const ProductDetailPage = () => {
               </div>
 
               {/* COD availability */}
-              <p className="text-[10px] text-[#F5DEB3]/55 mt-2 flex items-center gap-1.5">
+              <p className="text-[15px] text-[#F5DEB3] mt-2 flex items-center gap-1.5">
                 <i className="fa-solid fa-hand-holding-dollar text-[9px]" />
                 Cash on Delivery available
               </p>
