@@ -2,12 +2,13 @@ import nodemailer from "nodemailer";
 import UserWaistList from "../model/user.waitlist.model.js";
 import bulkEmailWaitlistTemplate from "../template/bulk.email.waitlist.template.js";
 import env from "../config/envConfigSetup.js";
-let transporter = null;
+let singleTransporter = null;
+let bulkTransporter = null;
 
 // Standard transporter for single emails
 const getNodeMailerTransporter = () => {
-  if (!transporter) {
-    transporter = nodemailer.createTransport({
+  if (!singleTransporter) {
+    singleTransporter = nodemailer.createTransport({
       secure: true,
       host: "smtp.zoho.in",
       port: 465,
@@ -17,13 +18,13 @@ const getNodeMailerTransporter = () => {
       },
     });
   }
-  return transporter;
+  return singleTransporter;
 };
 
 // Bulk email transporter with connection pooling and rate limiting
 const getBulkWaitListMailerTransporter = () => {
-  if (!transporter) {
-    transporter = nodemailer.createTransport({
+  if (!bulkTransporter) {
+    bulkTransporter = nodemailer.createTransport({
       secure: true,
       host: "smtp.zoho.in",
       port: 465,
@@ -36,7 +37,7 @@ const getBulkWaitListMailerTransporter = () => {
       rateLimit: 5,
     });
   }
-  return transporter;
+  return bulkTransporter;
 };
 
 // Basic email sending function
@@ -178,6 +179,17 @@ const sendWelcomeEmail = async (userEmail, userName) => {
     userEmail,
     'Welcome to UrbanNook!',
     html
+  );
+};
+
+// Send guest account created email (order confirmed + credentials)
+const sendGuestAccountCreatedEmail = async (userEmail, userName, tempPassword, orderId) => {
+  const { default: guestAccountCreatedTemplate } = await import('../template/guestAccountCreated.template.js');
+  const html = guestAccountCreatedTemplate({ userName, email: userEmail, tempPassword, orderId });
+  return sendEmailWithRetry(
+    userEmail,
+    `Order Confirmed & Your Urban Nook Account — #${orderId}`,
+    html,
   );
 };
 
@@ -324,5 +336,6 @@ export {
   sendOTP,
   sendWelcomeEmail,
   sendOrderStatusUpdate,
+  sendGuestAccountCreatedEmail,
   sendBulkEmailWaitlistService,
 };

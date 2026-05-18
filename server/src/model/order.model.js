@@ -53,6 +53,13 @@ const orderSchema = new mongoose.Schema(
       flatOrFloorNumber: String,
       pinCode: Number,
     },
+    shippingInfo: {
+      amount: { type: Number, default: 0 },
+      type: { type: String, enum: ["standard", "dynamic"], default: "standard" },
+      expectedNoOfBoxes: { type: Number, default: 0 },
+      totalWeight: { type: Number, default: 0 }, // in grams
+      serviceName: { type: String, default: null }
+    },
 
     senderMobile: {
       type: String,
@@ -111,6 +118,14 @@ const orderSchema = new mongoose.Schema(
       carrier: { type: String, default: null },
       trackingNumber: { type: String, default: null },
       estimatedDelivery: { type: Date, default: null },
+    },
+
+    isGuestOrder: { type: Boolean, default: false },
+    isNewGuestAccount: { type: Boolean, default: false },
+    guestInfo: {
+      name: { type: String, default: null },
+      email: { type: String, default: null },
+      mobile: { type: String, default: null },
     },
   },
   { timestamps: true },

@@ -48,7 +48,7 @@ const EMPTY_FORM = {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-const FormField = ({ label, required, placeholder, value, onChange, icon }) => (
+const FormField = ({ label, required, placeholder, value, onChange, icon, maxLength }) => (
   <div>
     <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">
       {label} {required && <span className="text-red-400">*</span>}
@@ -62,6 +62,7 @@ const FormField = ({ label, required, placeholder, value, onChange, icon }) => (
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
+        maxLength={maxLength}
         className={`w-full border rounded-xl px-3 py-3 text-sm transition-all outline-none ${
           icon ? "pl-9" : ""
         } bg-white border-gray-200 text-[#2e443c] focus:border-[#a89068] placeholder:text-gray-300`}
@@ -126,6 +127,8 @@ const GoogleAddressFormModal = ({
   prefillName  = "",
   prefillPhone = "",
   defaultCoords = null, // { lat, long }
+  isGuest = false,
+  initialData = null,
 }) => {
   // Load Google Maps JS SDK once — must not be called conditionally
   const { isLoaded, loadError } = useLoadScript({
@@ -141,6 +144,8 @@ const GoogleAddressFormModal = ({
   const searchDebounce     = useRef(null);
   const searchRequestId    = useRef(0);     // incremented per-call; stale responses are dropped
   const initDoneRef        = useRef(false); // prevents double-init on StrictMode
+  const userEditedPinCode  = useRef(false); // true when user manually typed in pincode — prevent map geocoder from overwriting
+  const searchBarRef       = useRef(null);  // ref to the search bar container for dropdown positioning
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [searchQuery,    setSearchQuery]    = useState("");
@@ -153,6 +158,9 @@ const GoogleAddressFormModal = ({
   const [form,          setForm]          = useState({ ...EMPTY_FORM });
   const [errors,        setErrors]        = useState({});
   const [isSubmitting,  setIsSubmitting]  = useState(false);
+  const [mapCollapsed,  setMapCollapsed]  = useState(false);
+  const [isFetchingPincode, setIsFetchingPincode] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState({});
 
   // ── RTK mutation ───────────────────────────────────────────────────────────
   const [createAddress] = useCreateAddressMutation();
@@ -160,13 +168,37 @@ const GoogleAddressFormModal = ({
   // ── Pre-fill contact from parent ───────────────────────────────────────────
   useEffect(() => {
     if (isOpen) {
-      setForm(f => ({
-        ...f,
-        fullName:     f.fullName     || prefillName,
-        mobileNumber: f.mobileNumber || prefillPhone,
-      }));
+      if (initialData) {
+        // Create a base form from EMPTY_FORM and merge initialData to ensure all fields exist
+        const updatedForm = {
+          ...EMPTY_FORM,
+          ...initialData,
+          fullName: initialData.fullName || prefillName,
+          mobileNumber: initialData.mobileNumber || prefillPhone,
+        };
+        setForm(updatedForm);
+
+        if (initialData.lat && initialData.long) {
+          setLocationSummary({
+            lat: initialData.lat,
+            long: initialData.long,
+            placeId: initialData.placeId || "N/A",
+            formattedAddress: initialData.formattedAddress || "",
+            city: initialData.city || updatedForm.city || "",
+            state: initialData.state || updatedForm.state || "",
+            pinCode: initialData.pinCode || updatedForm.pinCode || "",
+          });
+          initDoneRef.current = true; // Mark init as done so we don't auto-locate
+        }
+      } else {
+        setForm(f => ({
+          ...f,
+          fullName:     f.fullName     || prefillName,
+          mobileNumber: f.mobileNumber || prefillPhone,
+        }));
+      }
     }
-  }, [isOpen, prefillName, prefillPhone]);
+  }, [isOpen, prefillName, prefillPhone, initialData]);
 
   // ── Cleanup debounce timer on unmount ─────────────────────────────────────
   useEffect(() => () => clearTimeout(searchDebounce.current), []);
@@ -185,7 +217,9 @@ const GoogleAddressFormModal = ({
       setSearchQuery("");
       setSearchResults([]);
       setErrors({});
+      setMapCollapsed(false);
       initDoneRef.current = false;
+      userEditedPinCode.current = false;
     }
   }, [isOpen]);
 
@@ -219,7 +253,8 @@ const GoogleAddressFormModal = ({
           ...f,
           city:    d.city    || f.city,
           state:   d.state   || f.state,
-          pinCode: d.pinCode || f.pinCode,
+          // don't overwrite pincode if user manually typed it
+          pinCode: userEditedPinCode.current ? f.pinCode : (d.pinCode || f.pinCode),
           ...(fillAddress && {
             buildingName: d.building || f.buildingName,
             street:       d.street   || f.street,
@@ -293,8 +328,54 @@ const GoogleAddressFormModal = ({
     reverseGeocode(center.lat(), center.lng());
   }, [reverseGeocode]);
 
+  // Clears the manual-pin-guard when user intentionally drags the map
+  const handleMapDragStart = useCallback(() => {
+    userEditedPinCode.current = false;
+  }, []);
+
+  // Collapses map on mobile when form inputs are focused
+  const handleFormInputFocus = useCallback(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      setMapCollapsed(true);
+    }
+  }, []);
+
+  // Auto-fetch city/state from India Post API when pincode is 6 digits
+  const fetchPincodeData = useCallback(async (pin) => {
+    if (!/^\d{6}$/.test(pin)) return;
+    setIsFetchingPincode(true);
+    try {
+      const res = await fetch(`https://api.postalpincode.in/pincode/${pin}`);
+      const data = await res.json();
+      if (data?.[0]?.Status === "Success" && data[0].PostOffice?.length > 0) {
+        const po = data[0].PostOffice[0];
+        setForm(f => ({
+          ...f,
+          city:  f.city  || po.District || po.Block || "",
+          state: f.state || po.State    || "",
+        }));
+      }
+    } catch { /* silent */ } finally {
+      setIsFetchingPincode(false);
+    }
+  }, []);
+
+  // Calculates where the search dropdown should appear (fixed to viewport)
+  const updateDropdownStyle = useCallback(() => {
+    if (!searchBarRef.current) return;
+    const rect = searchBarRef.current.getBoundingClientRect();
+    setDropdownStyle({
+      position: "fixed",
+      top: rect.bottom + 4,
+      left: rect.left,
+      right: window.innerWidth - rect.right,
+      zIndex: 10000,
+    });
+  }, []);
+
   // ── Search bar ─────────────────────────────────────────────────────────────
   const handleSearch = (val) => {
+    updateDropdownStyle();
     setSearchQuery(val);
     clearTimeout(searchDebounce.current);
 
@@ -362,6 +443,7 @@ const GoogleAddressFormModal = ({
     const streetHint  = secondary.split(",")[0]?.trim()                || "";
 
     // Clear old fields immediately — no stale bleed-through
+    userEditedPinCode.current = false; // Places API result should set pinCode
     setLocationSummary({
       placeId,
       formattedAddress: fullDesc,
@@ -462,6 +544,7 @@ const GoogleAddressFormModal = ({
         mapRef.current?.panTo({ lat, lng });
         mapRef.current?.setZoom(17);
 
+        userEditedPinCode.current = false;
         setLocationSummary(prev => ({ ...(prev || {}), lat, long: lng }));
         await reverseGeocode(lat, lng, true);
         setIsLocating(false);
@@ -487,11 +570,12 @@ const GoogleAddressFormModal = ({
   const validate = () => {
     const errs = {};
     // locationSummary is NOT required — user can fill form manually without map
-    if (!form.pinCode?.trim())      errs.pinCode      = "Pincode is required";
+    if (!/^\d{6}$/.test(String(form.pinCode || "").trim())) errs.pinCode = "Enter a valid 6-digit pincode";
     if (!form.city?.trim())         errs.city         = "City / District is required";
+    if (!form.state?.trim())        errs.state        = "State is required";
     if (!form.buildingName?.trim()) errs.buildingName = "House No. / Building is required";
     if (!form.street?.trim())       errs.street       = "Street / Colony is required";
-    if (!form.fullName?.trim())     errs.fullName     = "Name is required";
+    if (!isGuest && !form.fullName?.trim()) errs.fullName = "Name is required";
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -507,6 +591,41 @@ const GoogleAddressFormModal = ({
         form.landmark ? `Near ${form.landmark}` : "",
         form.city, form.state, form.pinCode,
       ].filter(Boolean).join(", ");
+
+      const deliveryAddressFull = [
+        form.buildingName,
+        form.street,
+        form.floor,
+        form.tower,
+        form.landmark ? `Near ${form.landmark}` : "",
+        form.city,
+        form.state,
+        form.pinCode,
+      ].filter(Boolean).join(", ");
+
+      const summaryForParent = {
+        ...(locationSummary || {
+          placeId: "N/A",
+          formattedAddress: manualAddress,
+          lat: 0,
+          long: 0,
+        }),
+        city: form.city,
+        state: form.state,
+        pinCode: form.pinCode,
+        landmark: form.landmark || "",
+        flatNo: [form.buildingName, form.street, form.floor, form.tower].filter(Boolean).join(", "),
+        form: { ...form }, // Pass the full form for editing later
+      };
+
+      // For guest users, skip API call and just pass address data back
+      if (isGuest) {
+        onAddressConfirm(summaryForParent, null, deliveryAddressFull);
+        showNotification("Address added successfully", "success");
+        setIsSubmitting(false);
+        onClose();
+        return;
+      }
 
       const payload = {
         lat:              locationSummary?.lat  ?? 0,
@@ -532,27 +651,6 @@ const GoogleAddressFormModal = ({
 
       const result = await createAddress(payload).unwrap();
       if (result.success) {
-        const deliveryAddressFull = [
-          form.buildingName,
-          form.street,
-          form.floor,
-          form.tower,
-          form.landmark ? `Near ${form.landmark}` : "",
-          form.city,
-          form.state,
-          form.pinCode,
-        ].filter(Boolean).join(", ");
-
-        // Build a minimal locationSummary for manual-entry case (no map used)
-        const summaryForParent = locationSummary || {
-          placeId: "N/A",
-          formattedAddress: manualAddress,
-          city: form.city,
-          state: form.state,
-          pinCode: form.pinCode,
-          lat: 0,
-          long: 0,
-        };
         onAddressConfirm(summaryForParent, result.data?.addressId, deliveryAddressFull);
         onClose();
         showNotification(result.message || "Address saved successfully", "success");
@@ -585,75 +683,34 @@ const GoogleAddressFormModal = ({
 
   // ─── Map Section ───────────────────────────────────────────────────────────
   const MapSection = (
-    <div className="flex flex-col h-full">
-      {/* Search bar */}
-      <div className="p-3 bg-white border-b border-gray-100 relative z-20 shrink-0">
-        <div className="relative">
-          <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs z-10" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => handleSearch(e.target.value)}
-            placeholder="Search area, street, landmark..."
-            className="w-full h-10 bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-9 text-sm text-[#2e443c] focus:border-[#a89068] focus:bg-white outline-none placeholder:text-gray-300 transition-all"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => {
-                setSearchQuery("");
-                setSearchResults([]);
-              }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            >
-              <i className="fa-solid fa-xmark text-xs" />
-            </button>
-          )}
-        </div>
-
-        {/* Search results dropdown — fixed on mobile to avoid overflow-hidden clipping */}
-        {(searchQuery.length > 0 || isSearching) && (
-          <div className="fixed left-4 right-4 md:absolute md:left-3 md:right-3 md:top-[105%] top-[72px] bg-white border border-gray-200 rounded-xl shadow-xl z-[10000] max-h-[220px] overflow-y-auto">
-            {isSearching ? (
-              <div className="p-5 flex items-center justify-center gap-2 text-gray-400">
-                <div className="w-4 h-4 border-2 border-[#a89068] border-t-transparent rounded-full animate-spin" />
-                <span className="text-xs">Searching...</span>
-              </div>
-            ) : searchResults.length > 0 ? (
-              searchResults.map((item, i) => {
-                const pred = item.placePrediction;
-                const mainText = pred?.mainText?.text || pred?.text?.text || "";
-                const subText = pred?.secondaryText?.text || "";
-                const key = pred?.placeId || i;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => handleSelectResult(item)}
-                    className="w-full text-left p-3 hover:bg-gray-50 border-b border-gray-100 last:border-0 flex items-start gap-3 group"
-                  >
-                    <i className="fa-solid fa-location-dot text-gray-300 group-hover:text-[#a89068] text-xs mt-1 shrink-0 transition-colors" />
-                    <div className="min-w-0">
-                      <p className="text-sm text-[#2e443c] font-medium truncate group-hover:text-[#a89068] transition-colors">
-                        {mainText}
-                      </p>
-                      {subText && (
-                        <p className="text-[11px] text-gray-400 truncate mt-0.5">
-                          {subText}
-                        </p>
-                      )}
-                    </div>
-                  </button>
-                );
-              })
-            ) : (
-              <div className="p-4 text-center text-sm text-gray-400">
-                No results found
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+    <div className="flex flex-col h-full relative">
+      {locationSummary && (
+        <button
+          type="button"
+          onClick={() => {
+            setLocationSummary(null);
+            setSearchQuery("");
+            setSearchResults([]);
+            setForm({ ...EMPTY_FORM, fullName: prefillName, mobileNumber: prefillPhone });
+            setErrors({});
+            initDoneRef.current = false;
+            userEditedPinCode.current = false;
+            if (window.google?.maps?.places?.AutocompleteSessionToken) {
+              sessionTokenRef.current = new window.google.maps.places.AutocompleteSessionToken();
+            }
+            if (mapRef.current) {
+              isProgrammaticMove.current = true;
+              mapRef.current.panTo(DEFAULT_CENTER);
+              mapRef.current.setZoom(12);
+              setTimeout(() => { isProgrammaticMove.current = false; }, 1200);
+            }
+          }}
+          className="absolute top-3 right-3 z-[50] bg-white/95 backdrop-blur-sm shadow-lg border border-gray-100 px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-red-500 uppercase tracking-widest hover:bg-red-50 transition-all flex items-center gap-1.5 active:scale-95"
+        >
+          <i className="fa-solid fa-location-dot-slash text-[9px]" />
+          Clear
+        </button>
+      )}
 
       {/* Map canvas */}
       <div className="relative flex-1 min-h-0 bg-gray-100">
@@ -722,6 +779,7 @@ const GoogleAddressFormModal = ({
             options={MAP_OPTIONS}
             onLoad={onMapLoad}
             onIdle={handleMapIdle}
+            onDragStart={handleMapDragStart}
           />
         )}
 
@@ -733,33 +791,13 @@ const GoogleAddressFormModal = ({
           </div>
         )}
 
-        {/* "Go to current location" FAB */}
-        {isLoaded && (
-          <button
-            type="button"
-            onClick={handleLocate}
-            disabled={isLocating}
-            title="Go to current location"
-            className="absolute bottom-4 right-4 z-10 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center text-[#a89068] hover:bg-[#a89068] hover:text-white transition-all disabled:opacity-60 border border-gray-200"
-          >
-            <i
-              className={`fa-solid ${isLocating ? "fa-spinner animate-spin" : "fa-location-crosshairs"} text-sm`}
-            />
-          </button>
-        )}
-
         {/* Hint card — shown after map loads, before user sets a location */}
         {isLoaded && !locationSummary && (
-          <div className="absolute bottom-16 left-0 right-0 flex justify-center pointer-events-none z-[5] px-4">
-            <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-lg border border-[#a89068]/20 px-4 py-2.5 flex items-center gap-2.5 max-w-xs">
-              {/* <div className="w-7 h-7 rounded-full bg-[#a89068]/10 flex items-center justify-center shrink-0">
-                <i className="fa-solid fa-location-crosshairs text-[#a89068] text-xs" />
-              </div> */}
-              <p className="text-[11px] text-gray-600 leading-snug">
-                Tap <span className="font-semibold text-[#2e443c]">
-                  <i className="fa-solid fa-location-crosshairs text-[#a89068] text-xs" />
-                </span>{" "}
-                below to auto-fill your address
+          <div className="absolute bottom-4 left-0 right-0 flex justify-center pointer-events-none z-[5] px-4">
+            <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-md border border-[#a89068]/15 px-3.5 py-2 flex items-center gap-2 max-w-xs">
+              <i className="fa-solid fa-hand-pointer text-[#a89068] text-xs shrink-0" />
+              <p className="text-[11px] text-gray-500 leading-snug">
+                Drag the pin or search above to set location
               </p>
             </div>
           </div>
@@ -773,7 +811,7 @@ const GoogleAddressFormModal = ({
 
   // ─── Form Section ──────────────────────────────────────────────────────────
   const FormSection = (
-    <div className="flex flex-col md:h-full md:overflow-y-auto">
+    <div className="flex flex-col pb-6" onFocus={handleFormInputFocus}>
       <div className="p-5 space-y-5">
 
         {/* Location error */}
@@ -787,13 +825,29 @@ const GoogleAddressFormModal = ({
         {/* City / State / Pincode — auto-filled, editable */}
         <div className="space-y-3">
           <div className="grid grid-cols-3 gap-3">
+            {/* Pincode — custom field with inputMode + auto-fetch */}
             <div>
-              <FormField
-                label="Pincode"
-                required
-                placeholder="6-digit"
+              <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">
+                Pincode <span className="text-red-400">*</span>
+                {isFetchingPincode && (
+                  <span className="w-3 h-3 border border-[#a89068] border-t-transparent rounded-full animate-spin inline-block shrink-0" />
+                )}
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
                 value={form.pinCode}
-                onChange={setField("pinCode")}
+                placeholder="6-digit"
+                maxLength={6}
+                onChange={(e) => {
+                  const cleaned = e.target.value.replace(/\D/g, "").slice(0, 6);
+                  userEditedPinCode.current = true;
+                  setField("pinCode")(cleaned);
+                  if (cleaned.length === 6) fetchPincodeData(cleaned);
+                }}
+                className={`w-full border rounded-xl px-3 py-3 text-sm transition-all outline-none bg-white text-[#2e443c] focus:border-[#a89068] placeholder:text-gray-300 ${
+                  errors.pinCode ? "border-red-300 focus:border-red-400" : "border-gray-200"
+                }`}
               />
               {errors.pinCode && (
                 <p className="text-[11px] text-red-500 mt-1">{errors.pinCode}</p>
@@ -811,12 +865,18 @@ const GoogleAddressFormModal = ({
                 <p className="text-[11px] text-red-500 mt-1">{errors.city}</p>
               )}
             </div>
-            <FormField
-              label="State"
-              placeholder="e.g. Karnataka"
-              value={form.state}
-              onChange={setField("state")}
-            />
+            <div>
+              <FormField
+                label="State"
+                required
+                placeholder="e.g. Karnataka"
+                value={form.state}
+                onChange={setField("state")}
+              />
+              {errors.state && (
+                <p className="text-[11px] text-red-500 mt-1">{errors.state}</p>
+              )}
+            </div>
           </div>
         </div>
 
@@ -926,35 +986,135 @@ const GoogleAddressFormModal = ({
       <div className="bg-white w-full max-w-4xl h-[93dvh] sm:h-[88vh] rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl flex flex-col">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 shrink-0">
           <div>
-            <h3 className="font-serif text-[#2e443c] text-lg leading-tight">
+            <h3 className="font-serif text-[#2e443c] text-base leading-tight">
               Set Delivery Address
             </h3>
-            <p className="text-[10px] text-[#a89068] uppercase tracking-widest font-bold mt-0.5">
-              Pin your location, then fill in the details
-            </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:text-red-500 hover:bg-red-50 transition-colors"
+            className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:text-red-500 hover:bg-red-50 transition-colors"
           >
-            <i className="fa-solid fa-xmark text-base" />
+            <i className="fa-solid fa-xmark text-sm" />
           </button>
         </div>
 
-        {/* Body — mobile: scrollable column, desktop: side-by-side */}
-        <div className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden md:flex md:flex-row">
+        {/* Body — flex col on mobile (map stacked above form), flex row on desktop */}
+        <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
 
-          {/* Map — 310px on mobile, fills left 55% on desktop */}
-          <div className="h-[310px] shrink-0 flex flex-col md:h-full md:w-[55%] md:border-r md:border-gray-100">
+          {/* Map — collapsible on mobile (h-0 = hidden), full height column on desktop */}
+          <div className={`shrink-0 flex flex-col overflow-hidden md:h-full md:w-[55%] md:border-r md:border-gray-100 transition-[height] duration-300 ${mapCollapsed ? "h-0 md:h-full" : "h-[260px]"}`}>
             {MapSection}
           </div>
 
-          {/* Form */}
-          <div className="md:flex-1 md:overflow-y-auto">
-            {FormSection}
+          {/* Form column — fills all remaining height, scrolls independently */}
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden md:flex-1">
+
+            {/* Search bar — sits below map on mobile, top of right panel on desktop */}
+            <div ref={searchBarRef} className="shrink-0 px-3 py-2.5 bg-white border-b border-gray-100">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none z-10">
+                  {isSearching
+                    ? <div className="w-3.5 h-3.5 border-2 border-[#a89068] border-t-transparent rounded-full animate-spin" />
+                    : <i className="fa-solid fa-magnifying-glass text-[#a89068] text-sm" />
+                  }
+                </div>
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  placeholder="Search street, area or landmark…"
+                  autoComplete="off"
+                  className="w-full h-11 bg-[#fdf9f6] border-2 border-[#a89068]/35 rounded-xl pl-10 pr-11 text-sm text-[#2e443c] font-medium focus:border-[#a89068] focus:bg-white focus:shadow-[0_0_0_3px_rgba(168,144,104,0.12)] outline-none placeholder:text-gray-400 placeholder:font-normal transition-all"
+                />
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                  {searchQuery ? (
+                    <button
+                      type="button"
+                      onClick={() => { setSearchQuery(""); setSearchResults([]); }}
+                      className="w-5 h-5 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition-colors"
+                    >
+                      <i className="fa-solid fa-xmark text-[9px] text-gray-600" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleLocate}
+                      disabled={isLocating || !isLoaded}
+                      title="Use my current location"
+                      className="w-7 h-7 rounded-lg bg-[#a89068]/10 hover:bg-[#a89068]/20 flex items-center justify-center text-[#a89068] transition-colors disabled:opacity-40"
+                    >
+                      <i className={`fa-solid ${isLocating ? "fa-spinner animate-spin" : "fa-location-crosshairs"} text-xs`} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Dropdown */}
+              {(searchQuery.length > 0 || isSearching) && (
+                <div className="bg-white border border-gray-200 rounded-xl shadow-2xl max-h-[260px] overflow-y-auto" style={dropdownStyle}>
+                  {isSearching ? (
+                    <div className="p-4 flex items-center justify-center gap-2.5 text-gray-400">
+                      <div className="w-4 h-4 border-2 border-[#a89068] border-t-transparent rounded-full animate-spin shrink-0" />
+                      <span className="text-xs font-medium">Searching…</span>
+                    </div>
+                  ) : searchResults.length > 0 ? (
+                    searchResults.map((item, i) => {
+                      const pred = item.placePrediction;
+                      const mainText = pred?.mainText?.text || pred?.text?.text || "";
+                      const subText = pred?.secondaryText?.text || "";
+                      const key = pred?.placeId || i;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => handleSelectResult(item)}
+                          className="w-full text-left px-4 py-3 active:bg-[#fdf9f6] hover:bg-gray-50 border-b border-gray-100 last:border-0 flex items-center gap-3 group"
+                        >
+                          <div className="w-8 h-8 rounded-full bg-gray-100 group-hover:bg-[#a89068]/10 flex items-center justify-center shrink-0 transition-colors">
+                            <i className="fa-solid fa-location-dot text-gray-400 group-hover:text-[#a89068] text-xs transition-colors" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm text-[#2e443c] font-medium leading-snug group-hover:text-[#a89068] transition-colors">{mainText}</p>
+                            {subText && <p className="text-[11px] text-gray-400 mt-0.5 leading-snug line-clamp-1">{subText}</p>}
+                          </div>
+                          <i className="fa-solid fa-chevron-right text-gray-200 text-[10px] shrink-0 group-hover:text-[#a89068] transition-colors" />
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <div className="px-4 py-5 text-center">
+                      <i className="fa-solid fa-magnifying-glass text-gray-200 text-xl mb-2 block" />
+                      <p className="text-sm text-gray-400 font-medium">No results found</p>
+                      <p className="text-[11px] text-gray-300 mt-0.5">Try a different search term</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Mobile strip — tap to expand map when it's collapsed */}
+            <button
+              type="button"
+              onClick={() => setMapCollapsed(false)}
+              className={`md:hidden shrink-0 w-full flex items-center gap-2.5 px-4 py-2.5 border-b border-[#ede9e3] transition-all ${mapCollapsed ? "bg-[#fdf9f5]" : "pointer-events-none opacity-0 h-0 py-0 border-0 overflow-hidden"}`}
+            >
+              <div className="w-6 h-6 rounded-full bg-[#a89068]/15 flex items-center justify-center shrink-0">
+                <i className="fa-solid fa-map-location-dot text-[#a89068] text-[10px]" />
+              </div>
+              <p className="text-xs text-[#2e443c] font-medium truncate flex-1">
+                {locationSummary?.formattedAddress || deliveryPreview || "Tap to expand map"}
+              </p>
+              <span className="text-[10px] text-[#a89068] font-bold shrink-0 flex items-center gap-1 pl-2">
+                Map <i className="fa-solid fa-chevron-up text-[9px]" />
+              </span>
+            </button>
+            {/* Scrollable form */}
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+              {FormSection}
+            </div>
           </div>
 
         </div>

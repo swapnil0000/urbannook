@@ -56,6 +56,23 @@ if (!config.googleClientId) {
   console.error('❌ Google Client ID not configured. Please set VITE_GOOGLE_CLIENT_ID in your .env file');
 }
 
+// Catch stale Vite chunk errors before React sees them (second layer after ErrorBoundary)
+window.addEventListener('unhandledrejection', (event) => {
+  const msg = event.reason?.message || '';
+  const isChunkError =
+    msg.includes('Failed to fetch dynamically imported module') ||
+    msg.includes('Importing a module script failed') ||
+    msg.includes('error loading dynamically imported module');
+  if (isChunkError) {
+    const RELOAD_KEY = 'vite_chunk_reload_at';
+    const last = Number(sessionStorage.getItem(RELOAD_KEY) || 0);
+    if (Date.now() - last > 60_000) {
+      sessionStorage.setItem(RELOAD_KEY, String(Date.now()));
+      window.location.reload();
+    }
+  }
+});
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <GoogleOAuthProvider clientId={config.googleClientId}>

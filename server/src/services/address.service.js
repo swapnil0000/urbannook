@@ -445,6 +445,13 @@ const getSavedAddressService = async ({ userId }) => {
       addressId: 1,
       location: 1,
       deliveryAddressFull: 1,
+      buildingName: 1,
+      street: 1,
+      floor: 1,
+      tower: 1,
+      fullName: 1,
+      mobileNumber: 1,
+      placeId: 1,
       _id: 0,
     },
   ).lean();

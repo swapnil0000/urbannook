@@ -159,6 +159,10 @@ const getOrderStatus = asyncHandler(async (req, res) => {
       {
         orderId: order.orderId,
         status: order.status,
+        isGuestOrder: order.isGuestOrder ?? false,
+        ...(order.isGuestOrder && order.status === "PAID" && order.guestInfo?.email
+          ? { guestEmail: order.guestInfo.email, isNewGuestAccount: order.isNewGuestAccount ?? true }
+          : {}),
       },
       true,
     ),

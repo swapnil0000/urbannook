@@ -12,15 +12,15 @@ import useFormValidation from '../../../hooks/useFormValidation';
 const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const [formData, setFormData] = useState({ identifier: '', password: '' });
+  const { loginCallback, loginPrefillEmail } = useSelector((state) => state.ui);
+  const [formData, setFormData] = useState({ identifier: loginPrefillEmail || '', password: '' });
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showOTPVerification, setShowOTPVerification] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  
+
   const [login, { isLoading }] = useLoginMutation();
   const { login: setAuthUser } = useAuth();
   const { showNotification } = useUI();
-  const { loginCallback } = useSelector((state) => state.ui);
 
   // Use validation hook with custom rules for login (password without pattern validation)
   const { 
@@ -79,9 +79,16 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
       
       // Reset Redux login modal state
       dispatch(setShowLoginModal(false));
-      
+
       if (onClose) {
         onClose();
+      }
+
+      // Honour post-login navigation callback (e.g. redirect to /orders after guest payment)
+      if (loginCallback && loginCallback.startsWith('navigate:')) {
+        const path = loginCallback.replace('navigate:', '');
+        dispatch(clearLoginCallback());
+        navigate(path);
       }
     } catch (error) {
       const errorData = error?.data?.data;
@@ -204,16 +211,16 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
               
               {/* Identifier Input */}
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Email or Username</label>
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Email Address</label>
                 <input
-                  type="text"
+                  type="email"
                   name="identifier"
                   value={formData.identifier}
                   onChange={handleInputChange}
                   className={`w-full p-4 bg-white border rounded-2xl focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10 transition-all outline-none text-[#1c3026] text-sm ${
                     errors.identifier ? 'border-red-500' : 'border-gray-200'
                   }`}
-                  placeholder="e.g. johndoe"
+                  placeholder="you@example.com"
                 />
                 {errors.identifier && <p className="text-red-500 text-[10px] font-bold ml-2 uppercase">{errors.identifier}</p>}
               </div>

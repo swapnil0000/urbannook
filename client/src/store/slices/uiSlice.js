@@ -6,6 +6,7 @@ const initialState = {
   showAuthModal: false,
   showLoginModal: false,
   loginCallback: null, // action to run after successful login
+  loginPrefillEmail: null, // email to prefill in login form (guest post-payment)
   notification: null,
 };
 
@@ -24,7 +25,10 @@ const uiSlice = createSlice({
     },
     setShowLoginModal: (state, action) => {
       state.showLoginModal = action.payload;
-      if (!action.payload) state.loginCallback = null;
+      if (!action.payload) {
+        state.loginCallback = null;
+        state.loginPrefillEmail = null;
+      }
     },
     setLoginCallback: (state, action) => {
       // Store a string key — functions can't go in Redux state
@@ -32,6 +36,9 @@ const uiSlice = createSlice({
     },
     clearLoginCallback: (state) => {
       state.loginCallback = null;
+    },
+    setLoginPrefillEmail: (state, action) => {
+      state.loginPrefillEmail = action.payload;
     },
     setNotification: (state, action) => {
       state.notification = action.payload;
@@ -42,14 +49,15 @@ const uiSlice = createSlice({
   },
 });
 
-export const { 
-  setLoading, 
-  toggleCartModal, 
-  toggleAuthModal, 
+export const {
+  setLoading,
+  toggleCartModal,
+  toggleAuthModal,
   setShowLoginModal,
   setLoginCallback,
   clearLoginCallback,
-  setNotification, 
-  clearNotification 
+  setLoginPrefillEmail,
+  setNotification,
+  clearNotification
 } = uiSlice.actions;
 export default uiSlice.reducer;

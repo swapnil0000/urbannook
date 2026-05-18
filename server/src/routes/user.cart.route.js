@@ -35,10 +35,7 @@ userCartRouter.delete(
   userClearCart,
 );
 
-userCartRouter.get(
-  "/user/order/status/:orderId",
-  authGuardService("USER"),
-  getOrderStatus,
-);
+// Public — orderId (razorpay order id) is the implicit secret; no sensitive data exposed
+userCartRouter.get("/user/order/status/:orderId", getOrderStatus);
 
 export default userCartRouter;

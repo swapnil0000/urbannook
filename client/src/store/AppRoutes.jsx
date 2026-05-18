@@ -21,6 +21,7 @@ import {
 } from "../pages/index.js";
 import PaymentProcessing from "../pages/PaymentProcessing.jsx";
 import PaymentFailed from "../pages/PaymentFailed.jsx";
+import OrderConfirm from "../pages/OrderConfirm.jsx";
 import ProtectedRoute from "../component/ProtectedRoute.jsx";
 
 // Minimal loader for individual route transitions only
@@ -70,11 +71,9 @@ const AppRoutes = () => {
       <Route
         path="/checkout"
         element={
-          <ProtectedRoute>
-            <Suspense fallback={<MinimalLoader />}>
-              <CheckoutPage />
-            </Suspense>
-          </ProtectedRoute>
+          <Suspense fallback={<MinimalLoader />}>
+            <CheckoutPage />
+          </Suspense>
         }
       />
       <Route
@@ -87,22 +86,9 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/payment-processing/:orderId"
-        element={
-          <ProtectedRoute>
-            <PaymentProcessing />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/payment-failed"
-        element={
-          <ProtectedRoute>
-            <PaymentFailed />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/payment-processing/:orderId" element={<PaymentProcessing />} />
+      <Route path="/order-confirm/:orderId" element={<OrderConfirm />} />
+      <Route path="/payment-failed" element={<PaymentFailed />} />
       <Route
         path="/orders"
         element={

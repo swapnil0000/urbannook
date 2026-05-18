@@ -15,6 +15,7 @@ import {
   testimonialRouter,
   contactRouter,
   statsRouter,
+  dynamicShippingRouter,
 } from "./routes/index.js";
 import cookieParser from "cookie-parser";
 import healthRouter from "./routes/health.route.js";
@@ -205,6 +206,7 @@ app.use(
   testimonialRouter,
   contactRouter,
   statsRouter,
+  dynamicShippingRouter,
 );
 
 app.use(errorHandler);
