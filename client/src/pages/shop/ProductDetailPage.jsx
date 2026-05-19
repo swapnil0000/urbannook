@@ -940,6 +940,12 @@ const ProductDetailPage = () => {
                   </>
                 )}
               </div>
+
+              {/* COD availability */}
+              <p className="text-[15px] text-[#F5DEB3] mt-2 flex items-center gap-1.5">
+                <i className="fa-solid fa-hand-holding-dollar text-[9px]" />
+                Cash on Delivery available
+              </p>
             </div>
 
             <p className="text-gray-300 leading-relaxed mb-8 font-light text-sm lg:text-md">

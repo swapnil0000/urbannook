@@ -4,6 +4,7 @@ import { useDispatch } from "react-redux";
 import { useUI } from "../hooks/useRedux";
 import { getApiUrl } from "../config/appUrls";
 import { setShowLoginModal, setLoginCallback, setLoginPrefillEmail } from "../store/slices/uiSlice";
+import GoogleLoginButton from "../component/layout/auth/GoogleLoginButton";
 
 const OrderConfirm = () => {
   const { orderId } = useParams();
@@ -14,15 +15,8 @@ const OrderConfirm = () => {
   const [loading, setLoading] = useState(true);
   const [orderData, setOrderData] = useState(null);
 
-  console.log("[OrderConfirm] ✅ NEW VERSION - component mounted, orderId:", orderId);
-
   useEffect(() => {
-    if (!orderId) {
-      console.log("[OrderConfirm] ⚠️ No orderId, returning early");
-      return;
-    }
-
-    console.log("[OrderConfirm] 📡 Fetching order data for:", orderId);
+    if (!orderId) return;
 
     const fetchOrder = async () => {
       try {
@@ -39,14 +33,14 @@ const OrderConfirm = () => {
         );
 
         const data = await res.json();
-        console.log("[OrderConfirm] 📦 Order data received:", data?.data);
 
         if (data?.data) {
           setOrderData(data.data);
-          console.log("[OrderConfirm] 🔑 isGuestOrder:", data.data.isGuestOrder, "| isNewGuestAccount:", data.data.isNewGuestAccount, "| guestEmail:", data.data.guestEmail);
+          if (data.data.isGuestOrder) {
+            dispatch(setLoginCallback("navigate:/orders"));
+          }
         }
       } catch (err) {
-        console.error("[OrderConfirm] 💥 Order fetch error:", err);
         showNotification("Could not load order details.", "error");
       } finally {
         setLoading(false);
@@ -54,7 +48,7 @@ const OrderConfirm = () => {
     };
 
     fetchOrder();
-  }, [orderId, showNotification]);
+  }, [orderId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return (
@@ -126,61 +120,39 @@ const OrderConfirm = () => {
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-left flex gap-3">
               <i className="fa-solid fa-envelope text-amber-500 mt-0.5 shrink-0"></i>
               <div>
-                <p className="text-sm font-semibold text-amber-900">Account created — check your inbox</p>
+                <p className="text-sm font-semibold text-amber-900">Check your inbox</p>
                 <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
-                  We&apos;ve emailed your order receipt <strong>and</strong> a temporary password for your new Urban Nook account. Check spam if you don&apos;t see it.
+                  We&apos;ve sent your order receipt and a temporary password to{" "}
+                  {guestEmail ? (
+                    <span className="font-semibold text-amber-900">{guestEmail}</span>
+                  ) : "your email"}
+                  . Check spam if you don&apos;t see it.
                 </p>
-                {guestEmail && (
-                  <p className="text-xs text-amber-800 mt-1.5 font-semibold">
-                    Login email:{" "}
-                    <span className="font-mono bg-amber-100 px-1.5 py-0.5 rounded">{guestEmail}</span>
-                  </p>
-                )}
               </div>
             </div>
           ) : (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-left flex gap-3">
-              <i className="fa-solid fa-circle-info text-blue-500 mt-0.5 shrink-0"></i>
-              <div>
-                <p className="text-sm font-semibold text-blue-900">You&apos;re already our customer!</p>
-                <p className="text-xs text-blue-700 mt-0.5 leading-relaxed">
-                  This email is already registered with Urban Nook. Log in with your existing password to track this order.
-                </p>
-                {guestEmail && (
-                  <p className="text-xs text-blue-800 mt-1.5 font-semibold">
-                    Your email:{" "}
-                    <span className="font-mono bg-blue-100 px-1.5 py-0.5 rounded">{guestEmail}</span>
-                  </p>
-                )}
-              </div>
+            <div className="bg-[#f5f7f5] rounded-xl p-4 text-center">
+              <p className="text-sm text-gray-700 font-medium">Sign in to track your order</p>
+              {guestEmail && (
+                <p className="text-xs text-gray-500 mt-1">{guestEmail}</p>
+              )}
             </div>
           )}
 
-          <div className="text-left space-y-2">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">To track your order</p>
-            <ol className="space-y-1.5 text-xs text-gray-600">
-              {isNewGuestAccount ? (
-                <li className="flex items-start gap-2">
-                  <span className="w-4 h-4 rounded-full bg-[#2e443c] text-white text-[9px] flex items-center justify-center shrink-0 mt-0.5">1</span>
-                  Find the credentials email we sent you
-                </li>
-              ) : (
-                <li className="flex items-start gap-2">
-                  <span className="w-4 h-4 rounded-full bg-[#2e443c] text-white text-[9px] flex items-center justify-center shrink-0 mt-0.5">1</span>
-                  Use your existing Urban Nook password to log in
-                </li>
-              )}
-              <li className="flex items-start gap-2">
-                <span className="w-4 h-4 rounded-full bg-[#2e443c] text-white text-[9px] flex items-center justify-center shrink-0 mt-0.5">2</span>
-                Click <strong>&quot;Login to Track Order&quot;</strong> below and sign in
-              </li>
-              {isNewGuestAccount && (
-                <li className="flex items-start gap-2">
-                  <span className="w-4 h-4 rounded-full bg-[#a89068] text-white text-[9px] flex items-center justify-center shrink-0 mt-0.5">?</span>
-                  Didn&apos;t receive it? Use <strong>&quot;Forgot Password&quot;</strong> in the login form
-                </li>
-              )}
-            </ol>
+          {/* Google login */}
+          <div className="flex flex-col items-center gap-1">
+            <GoogleLoginButton
+              useOneTap={false}
+              size="large"
+              text="continue_with"
+              shape="rectangular"
+            />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px bg-gray-200" />
+            <span className="text-[11px] text-gray-400 uppercase tracking-widest">or</span>
+            <div className="flex-1 h-px bg-gray-200" />
           </div>
 
           <button
@@ -192,8 +164,24 @@ const OrderConfirm = () => {
             className="w-full py-3 bg-[#2E443C] text-white rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-[#1a2822] transition-all"
           >
             <i className="fa-solid fa-arrow-right-to-bracket mr-2 opacity-70" />
-            Login to Track Order
+            {isNewGuestAccount ? "Login with Password" : "Login to Track Order"}
           </button>
+
+          {isNewGuestAccount && (
+            <p className="text-[11px] text-gray-400 text-center">
+              Didn&apos;t receive the email?{" "}
+              <button
+                onClick={() => {
+                  if (guestEmail) dispatch(setLoginPrefillEmail(guestEmail));
+                  dispatch(setLoginCallback("navigate:/orders"));
+                  dispatch(setShowLoginModal(true));
+                }}
+                className="text-[#2E443C] font-semibold underline underline-offset-2"
+              >
+                Use Forgot Password
+              </button>
+            </p>
+          )}
 
           <button
             onClick={() => navigate("/products")}

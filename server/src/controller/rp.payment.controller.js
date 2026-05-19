@@ -67,6 +67,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     receiverMobile,
     addressId,
     deliveryAddress: clientAddress,
+    paymentMethod: reqPaymentMethod,
   } = req.body;
   const { userId } = req.user;
   if (!items || !Array.isArray(items) || items.length === 0) {
@@ -289,8 +290,14 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   // Sync shipping in snapshots
   orderItems.forEach(i => { i.productSnapshot.shipping = String(shippingAmount); });
 
+  // COD: charge 2x shipping upfront via Razorpay, rest collected at delivery
+  const isCOD = reqPaymentMethod === "COD";
+  const codPartialAmount = isCOD ? Math.min(Math.ceil(shippingAmount) * 2, Math.ceil(finalAmount)) : 0;
+  const codRemainingAmount = isCOD ? Math.max(0, Math.ceil(finalAmount) - codPartialAmount) : 0;
+  const razorpayChargeAmount = isCOD ? codPartialAmount : finalAmount;
+
   const razorpayOrder = await razorpayCreateOrderService(
-    finalAmount * 100, // Razorpay expects amount in paise
+    Math.ceil(razorpayChargeAmount * 100), // Razorpay expects integer paise
     "INR",
   );
 
@@ -314,6 +321,8 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     deliveryAddress: deliveryAddressSnapshot,
     payment: { razorpayOrderId: razorpayOrder?.data?.id },
     status: "CREATED",
+    paymentMethod: isCOD ? "COD" : "PREPAID",
+    codDetails: isCOD ? { partialAmountPaid: codPartialAmount, remainingAmount: codRemainingAmount } : undefined,
     coupon: {
       couponCodeId,
       couponCodeName,
@@ -330,8 +339,10 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       {
         orderId: order.orderId,
         razorpayOrderId: razorpayOrder?.data?.id,
-        amount: finalAmount * 100, // Return amount in paise for Razorpay
+        amount: razorpayChargeAmount * 100, // paise for Razorpay (partial for COD)
         currency: "INR",
+        paymentMethod: isCOD ? "COD" : "PREPAID",
+        codDetails: isCOD ? { partialAmountPaid: codPartialAmount, remainingAmount: codRemainingAmount } : null,
         senderMobile: finalSenderMobile,
         receiverMobile: finalReceiverMobile,
       },
@@ -623,7 +634,7 @@ const generateTempPassword = () => {
 };
 
 const guestCreateOrderController = asyncHandler(async (req, res) => {
-  const { items, guestInfo, deliveryAddress } = req.body;
+  const { items, guestInfo, deliveryAddress, paymentMethod: reqPaymentMethod } = req.body;
 
   if (!guestInfo?.name?.trim()) throw new ValidationError("Full name is required");
   if (!guestInfo?.email?.trim()) throw new ValidationError("Email is required");
@@ -690,10 +701,15 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   // Update orderItems with shipping value now that it's calculated
   orderItems.forEach(i => { i.productSnapshot.shipping = String(shippingAmount); });
 
-  const razorpayOrder = await razorpayCreateOrderService(finalAmount * 100, "INR");
+  // COD: charge 2x shipping upfront via Razorpay, rest collected at delivery
+  const isCOD = reqPaymentMethod === "COD";
+  const codPartialAmount = isCOD ? Math.min(Math.ceil(shippingAmount) * 2, Math.ceil(finalAmount)) : 0;
+  const codRemainingAmount = isCOD ? Math.max(0, Math.ceil(finalAmount) - codPartialAmount) : 0;
+  const razorpayChargeAmount = isCOD ? codPartialAmount : finalAmount;
+
+  const razorpayOrder = await razorpayCreateOrderService(Math.ceil(razorpayChargeAmount * 100), "INR");
 
   const guestEmail = guestInfo.email.toLowerCase().trim();
-  const { v7: uuidv7Local } = await import("uuid");
 
   const order = await Order.create({
     orderId: uuidv7(),
@@ -725,6 +741,8 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     },
     payment: { razorpayOrderId: razorpayOrder?.data?.id },
     status: "CREATED",
+    paymentMethod: isCOD ? "COD" : "PREPAID",
+    codDetails: isCOD ? { partialAmountPaid: codPartialAmount, remainingAmount: codRemainingAmount } : undefined,
     isGuestOrder: true,
     guestInfo: { name: guestInfo.name.trim(), email: guestEmail, mobile: cleanMobile },
   });
@@ -736,8 +754,10 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
       {
         orderId: order.orderId,
         razorpayOrderId: razorpayOrder?.data?.id,
-        amount: finalAmount * 100,
+        amount: razorpayChargeAmount * 100, // paise for Razorpay (partial for COD)
         currency: "INR",
+        paymentMethod: isCOD ? "COD" : "PREPAID",
+        codDetails: isCOD ? { partialAmountPaid: codPartialAmount, remainingAmount: codRemainingAmount } : null,
         senderMobile: cleanMobile,
         receiverMobile: cleanMobile,
       },
