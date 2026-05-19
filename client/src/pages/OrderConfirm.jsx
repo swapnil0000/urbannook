@@ -54,7 +54,7 @@ const OrderConfirm = () => {
     };
 
     fetchOrder();
-  }, [orderId, showNotification]);
+  }, [orderId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return (
