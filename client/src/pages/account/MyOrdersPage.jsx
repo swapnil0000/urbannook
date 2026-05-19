@@ -237,7 +237,7 @@ const MyOrdersPage = () => {
                           </span>
                           {order.paymentMethod === "COD" ? (
                             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-[9px] font-bold text-amber-700 uppercase tracking-wide">
-                              <i className="fa-solid fa-hand-holding-dollar text-[8px]"></i> COD
+                              COD
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-[9px] font-bold text-emerald-700 uppercase tracking-wide">
@@ -370,7 +370,7 @@ const MyOrdersPage = () => {
                       {/* Footer Total */}
                       {order.paymentMethod === "COD" && (
                         <div className="mt-6 px-4 py-3 bg-amber-50 rounded-xl border border-amber-200 flex items-start gap-2.5">
-                          <i className="fa-solid fa-hand-holding-dollar text-amber-500 text-xs mt-0.5 shrink-0"></i>
+                          {/* <i className="fa-solid fa-hand-holding-dollar text-amber-500 text-xs mt-0.5 shrink-0"></i> */}
                           <div>
                             <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wide">Cash on Delivery</p>
                             <p className="text-[10px] text-amber-700 mt-0.5 leading-relaxed">
