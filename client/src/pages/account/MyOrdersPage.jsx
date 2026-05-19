@@ -235,6 +235,15 @@ const MyOrdersPage = () => {
                           <span className="text-[10px] md:text-xs text-gray-500">
                             {dateObj.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                           </span>
+                          {order.paymentMethod === "COD" ? (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-[9px] font-bold text-amber-700 uppercase tracking-wide">
+                              <i className="fa-solid fa-hand-holding-dollar text-[8px]"></i> COD
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-[9px] font-bold text-emerald-700 uppercase tracking-wide">
+                              <i className="fa-solid fa-circle-check text-[8px]"></i> Paid
+                            </span>
+                          )}
                         </div>
                         <button
                           onClick={(e) => { e.stopPropagation(); copyToClipboard(order.orderId); }}
@@ -359,7 +368,20 @@ const MyOrdersPage = () => {
                       </div>
 
                       {/* Footer Total */}
-                      <div className="mt-6 px-5 py-4 bg-white rounded-2xl border border-gray-200 shadow-sm flex flex-col gap-2.5">
+                      {order.paymentMethod === "COD" && (
+                        <div className="mt-6 px-4 py-3 bg-amber-50 rounded-xl border border-amber-200 flex items-start gap-2.5">
+                          <i className="fa-solid fa-hand-holding-dollar text-amber-500 text-xs mt-0.5 shrink-0"></i>
+                          <div>
+                            <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wide">Cash on Delivery</p>
+                            <p className="text-[10px] text-amber-700 mt-0.5 leading-relaxed">
+                              {order.codDetails?.partialAmountPaid > 0
+                                ? `₹${order.codDetails.partialAmountPaid.toLocaleString()} paid in advance · ₹${order.codDetails.remainingAmount.toLocaleString()} to be paid on delivery`
+                                : "Payment to be collected at the time of delivery."}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      <div className={`${order.paymentMethod === "COD" ? "mt-2" : "mt-6"} px-5 py-4 bg-white rounded-2xl border border-gray-200 shadow-sm flex flex-col gap-2.5`}>
                         <div className="flex justify-between items-center text-[9px] text-gray-400 font-bold uppercase tracking-widest">
                           <span>Shipping</span><span>₹{(order.items?.[0]?.productSnapshot?.shipping || 0).toLocaleString()}</span>
                         </div>
