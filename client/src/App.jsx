@@ -120,9 +120,6 @@ function App() {
           <SEOHead structuredData={ORG_STRUCTURED_DATA} />
           <SessionManager>
             <SyncProvider>
-              <Suspense fallback={null}>
-                <OpenInBrowserBanner />
-              </Suspense>
               <ErrorBoundary>
                 <NewsTicker/>
                 <NewHeader/>
