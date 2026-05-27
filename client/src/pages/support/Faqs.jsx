@@ -11,14 +11,14 @@ const Faq = () => {
       category: "Orders & Shipping",
       items: [
         { q: "How long does shipping take?", a: "We offer express shipping within 24-48 hours across India." },
-        { q: "Can I track my order?", a: "Yes, once your order is shipped, you will receive a tracking link via email and SMS." },
+        { q: "Can I track my order?", a: "Yes, once your order is shipped, you will receive a tracking link via email." },
         { q: "Do you ship internationally?", a: "Currently, we only ship within India. International shipping is coming soon!" }
       ]
     },
     {
       category: "Product & Care",
       items: [
-        { q: "What materials do you use?", a: "We primarily use PLA+ (a biodegradable thermoplastic) for our 3D printed items, along with vegan leather and recycled fabrics." },
+        { q: "What materials do you use?", a: "We primarily use PLA+ (a biodegradable thermoplastic) and PETG for our 3D printed items, but based on the customer's requirement we also print ABS/TPU and other materials." },
         { q: "Are the products durable?", a: "Yes! Our 3D printed items are designed with high infill density for structural integrity, making them durable for everyday use." },
         { q: "Do you offer customization?", a: "We accept custom orders for bulk corporate gifting. Please contact support for details." }
       ]
@@ -27,7 +27,7 @@ const Faq = () => {
       category: "Payments",
       items: [
         { q: "What payment methods are accepted?", a: "We accept all major Credit/Debit Cards, UPI (GPay, PhonePe), Net Banking, and Wallets via Razorpay." },
-        { q: "Is Cash on Delivery (COD) available?", a: "Yes, COD is available for select pincodes for orders up to ₹2,000." }
+        { q: "Is Cash on Delivery (COD) available?", a: "Yes, COD is available for select products." }
       ]
     }
   ];

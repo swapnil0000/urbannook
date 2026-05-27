@@ -54,11 +54,11 @@ const CancellationPolicy = () => {
           <section>
             <h2 className="text-xl md:text-2xl font-serif text-white mb-4"><span className='text-[#F5DEB3]'> 02.</span> Returns & Replacements</h2>
             <p className="leading-relaxed text-gray-400 mb-4">
-              We have a strict <strong>7-day replacement policy</strong> applicable only for damaged, defective, or incorrect items. Since our products are made-to-order or limited batch, we do not accept returns for "change of mind."
+              We have a strict <strong>3-day replacement policy</strong> applicable only for damaged, defective, or incorrect items. Since our products are made-to-order or limited batch, we do not accept returns for <span className="font-bold text-[#F5DEB3]">"change of mind"</span>.
             </p>
             <ul className="list-disc pl-5 space-y-2 text-gray-400 marker:text-[#F5DEB3]">
-              <li><strong>Damaged/Defective:</strong> If you receive a broken item, please record an unboxing video and send it to us within 48 hours.</li>
-              <li><strong>Wrong Item:</strong> We will arrange a reverse pickup and ship the correct item immediately at no extra cost.</li>
+              <li><strong>Damaged/Defective:</strong> To claim a replacement or return for a damaged or defective item, customers must provide a clear unboxing video in which the product label is clearly visible, and share it with us within the mentioned time window.</li>
+              <li><strong>Wrong Item:</strong> If you receive the wrong item, please share an unboxing video clearly showing the package label within the specified time period for verification. Once confirmed, we will arrange a reverse pickup and send the correct item at no additional cost.</li>
             </ul>
           </section>
 
