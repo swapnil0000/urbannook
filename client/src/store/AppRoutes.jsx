@@ -23,6 +23,7 @@ import PaymentProcessing from "../pages/PaymentProcessing.jsx";
 import PaymentFailed from "../pages/PaymentFailed.jsx";
 import OrderConfirm from "../pages/OrderConfirm.jsx";
 import ProtectedRoute from "../component/ProtectedRoute.jsx";
+import LampDemoPage from "../pages/LampDemoPage.jsx";
 
 // Minimal loader for individual route transitions only
 const MinimalLoader = () => (
@@ -176,6 +177,7 @@ const AppRoutes = () => {
         }
       />
       {/* Catch-all route for 404 - redirect to home */}
+      <Route path="/lamp-demo" element={<LampDemoPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

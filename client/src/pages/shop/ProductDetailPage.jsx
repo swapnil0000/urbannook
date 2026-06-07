@@ -104,6 +104,20 @@ import { useCartData } from "../../hooks/useCartSync";
 const OptimizedImage = lazy(() => import("../../component/OptimizedImage"));
 const LoginForm = lazy(() => import("../../component/layout/auth/LoginForm"));
 const SignupForm = lazy(() => import("../../component/layout/auth/SignupForm"));
+import LampToggle from "../../component/LampToggle";
+
+const LAMP_ON_SOURCES = [
+  "/assets/lamps/bmw-brake-on.webp",
+  "/assets/lamps/bmw-brake-on.png",
+  "/assets/lamps/bmw-brake-on.jpg",
+  "/assets/lamps/bmw-brake-on.jpeg",
+];
+const LAMP_OFF_SOURCES = [
+  "/assets/lamps/bmw-brake-off.webp",
+  "/assets/lamps/bmw-brake-off.png",
+  "/assets/lamps/bmw-brake-off.jpg",
+  "/assets/lamps/bmw-brake-off.jpeg",
+];
 
 const ProductDetailPage = () => {
   // Helper to safely extract quantity
@@ -689,49 +703,13 @@ const ProductDetailPage = () => {
             className="lg:col-span-6 max-w-[500px] w-full lg:sticky lg:top-24 flex flex-col items-start"
           >
             <div className="relative max-w-[500px] aspect-square md:aspect-auto md:h-[520px] rounded-2xl overflow-hidden shadow-2xl group w-full bg-[#e8e6e1]">
-              <div className="w-full h-full relative cursor-pointer flex items-center justify-center">
-                <Suspense
-                  fallback={
-                    <div className="w-full h-full bg-gray-200 animate-pulse rounded-lg"></div>
-                  }
-                >
-                  {galleryImages.map((img, idx) => (
-                    <div
-                      key={idx}
-                      className="absolute inset-0 flex items-center justify-center transition-opacity duration-300"
-                      style={{
-                        opacity: idx === currentImageIndex ? 1 : 0,
-                        pointerEvents:
-                          idx === currentImageIndex ? "auto" : "none",
-                      }}
-                    >
-                      <OptimizedImage
-                        src={img || "/placeholder.jpg"}
-                        alt={product.productName}
-                        className="object-contain"
-                        loading={idx === 0 ? "eager" : "lazy"}
-                      />
-                    </div>
-                  ))}
-                </Suspense>
+              <div className="w-full h-full flex items-center justify-center p-6">
+                <LampToggle
+                  onSrc={LAMP_ON_SOURCES}
+                  offSrc={LAMP_OFF_SOURCES}
+                  alt={product.productName}
+                />
               </div>
-
-              {galleryImages.length > 1 && (
-                <>
-                  <button
-                    onClick={prevImage}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full border border-[#1c3026]/10 flex items-center justify-center text-[#1c3026] bg-white/20 backdrop-blur-sm hover:bg-[#1c3026] hover:text-[#F5DEB3] transition-all z-20"
-                  >
-                    <i className="fa-solid fa-arrow-left text-sm"></i>
-                  </button>
-                  <button
-                    onClick={nextImage}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full border border-[#1c3026]/10 flex items-center justify-center text-[#1c3026] bg-white/20 backdrop-blur-sm hover:bg-[#1c3026] hover:text-[#F5DEB3] transition-all z-20"
-                  >
-                    <i className="fa-solid fa-arrow-right text-sm"></i>
-                  </button>
-                </>
-              )}
             </div>
 
             {/* NAYA: Variant Selection Block - Ab yahan aayega (Badi image ke neeche aur thumbnails se pehle) */}
