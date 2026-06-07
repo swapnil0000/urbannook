@@ -134,4 +134,28 @@ const getProductsByTag = asyncHandler(async (_, res) => {
   return res.status(200).json(new ApiRes(200, `productDetails`, result, true));
 });
 
-export { productListing, specificProductDetails, getProductsByTag };
+const getCategories = asyncHandler(async (_, res) => {
+  const results = await Product.aggregate([
+    { $match: { isPublished: true } },
+    {
+      $group: {
+        _id: "$productCategory",
+        subCategories: { $addToSet: "$productSubCategory" },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
+  const categoryMap = {};
+  results.forEach((r) => {
+    if (r._id) {
+      categoryMap[r._id] = r.subCategories.filter(Boolean).sort();
+    }
+  });
+
+  return res
+    .status(200)
+    .json(new ApiRes(200, "Categories", categoryMap, true));
+});
+
+export { productListing, specificProductDetails, getProductsByTag, getCategories };
