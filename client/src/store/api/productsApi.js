@@ -4,15 +4,16 @@ export const productsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     // Get all products with pagination and filters
     getProducts: builder.query({
-      query: ({ page = 1, limit = 12, category, search, sortBy } = {}) => {
+      query: ({ page = 1, limit = 12, category, subCategory, search, sortBy } = {}) => {
         const params = new URLSearchParams({
           currentPage: page.toString(),
           limit: limit.toString(),
         });
         if (category) params.append('category', category);
+        if (subCategory) params.append('subCategory', subCategory);
         if (search) params.append('search', search);
         if (sortBy) params.append('sortBy', sortBy);
-        
+
         return `products?${params}`;
       },
       providesTags: ['Product'],
