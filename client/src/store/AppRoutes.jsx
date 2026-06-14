@@ -18,6 +18,7 @@ import {
   Faq,
   Return,
   AboutPage,
+  CategoryPage,
 } from "../pages/index.js";
 import PaymentProcessing from "../pages/PaymentProcessing.jsx";
 import PaymentFailed from "../pages/PaymentFailed.jsx";
@@ -65,6 +66,14 @@ const AppRoutes = () => {
         element={
           <Suspense fallback={<MinimalLoader />}>
             <ProductDetailPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/shop/:categorySlug"
+        element={
+          <Suspense fallback={<MinimalLoader />}>
+            <CategoryPage />
           </Suspense>
         }
       />

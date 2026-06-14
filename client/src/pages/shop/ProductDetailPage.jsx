@@ -620,7 +620,7 @@ const ProductDetailPage = () => {
       <div className="h-screen flex flex-col items-center justify-center bg-[#1c3026] text-[#F5DEB3]">
         <h1 className="text-4xl font-serif">Product Not Found</h1>
         <button
-          onClick={() => navigate("/products")}
+          onClick={() => navigate(-1)}
           className="mt-4 border-b border-[#F5DEB3] pb-1 hover:text-white transition-colors"
         >
           Return to Shop
@@ -672,11 +672,11 @@ const ProductDetailPage = () => {
       <main className="mx-auto pt-24 pb-32 lg:pt-36 lg:pb-20 px-4 lg:px-12 relative z-10">
         <nav className="flex items-center text-[10px] tracking-[0.2em] uppercase text-[#F5DEB3]/50 mb-6 lg:mb-12 cursor-pointer">
           <span
-            onClick={() => navigate("/products")}
+            onClick={() => navigate(-1)}
             className="flex items-center gap-2 hover:text-[#F5DEB3] transition-colors"
           >
             <i className="fa-solid fa-arrow-left lg:hidden"></i>
-            <span>Shop</span>
+            <span>Back</span>
           </span>
           <span className="mx-3 text-[#F5DEB3]/20 hidden lg:inline">/</span>
           <span className="text-[#F5DEB3] font-bold border-b border-[#F5DEB3]/30 pb-0.5 hidden lg:inline">

@@ -8,6 +8,7 @@ import AireHeroBanner from './AireHeroBanner';
 import AireFeaturedProducts from './AireFeaturedProducts';
 import AireTestimonials from './AireTestimonials';
 import AireInstagramFeed from './AireInstagramFeed';
+import ShopByCategory from './ShopByCategory';
 
 const HOME_STRUCTURED_DATA = {
   '@context': 'https://schema.org',
@@ -35,6 +36,7 @@ const HomePage = () => {
       />
       {/* No Suspense wrapper - components load immediately */}
       <AireHeroBanner />
+      <ShopByCategory />
       <AireFeaturedProducts />
       <WhyChooseUs />
       <AireTestimonials />
