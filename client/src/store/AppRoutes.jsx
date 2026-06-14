@@ -4,6 +4,7 @@ import {
   HomePage,
   ContactPage,
   AllProductsPage,
+  ShopPage,
   ProductDetailPage,
   CheckoutPage,
   MyProfilePage,
@@ -53,13 +54,15 @@ const AppRoutes = () => {
         }
       />
       <Route
-        path="/products"
+        path="/shop"
         element={
           <Suspense fallback={<MinimalLoader />}>
-            <AllProductsPage />
+            <ShopPage />
           </Suspense>
         }
       />
+      {/* Legacy redirect */}
+      <Route path="/products" element={<Navigate to="/shop" replace />} />
       <Route
         path="/product/:productId"
         element={

@@ -55,8 +55,9 @@ export const productsApi = apiSlice.injectEndpoints({
     
     // Get product categories
     getCategories: builder.query({
-      query: () => 'products/categories',
+      query: () => 'categories',
       providesTags: ['Category'],
+      keepUnusedDataFor: 600,
     }),
     
     // Search products

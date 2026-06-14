@@ -5,6 +5,7 @@ import NewLaunchPopup from '../../component/NewLaunchPopup';
 // Import components directly for faster loading
 import WhyChooseUs from './WhyChooseUs';
 import AireHeroBanner from './AireHeroBanner';
+import ShopByCategory from './ShopByCategory';
 import AireFeaturedProducts from './AireFeaturedProducts';
 import AireTestimonials from './AireTestimonials';
 import AireInstagramFeed from './AireInstagramFeed';
@@ -35,6 +36,7 @@ const HomePage = () => {
       />
       {/* No Suspense wrapper - components load immediately */}
       <AireHeroBanner />
+      <ShopByCategory />
       <AireFeaturedProducts />
       <WhyChooseUs />
       <AireTestimonials />
