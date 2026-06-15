@@ -1011,7 +1011,7 @@ const ProductDetailPage = () => {
                   <i className="fa-solid fa-truck text-[#F5DEB3] text-sm"></i>
                   <span className="text-[9px] text-[#F5DEB3]/70 uppercase tracking-wider font-bold leading-tight">
                     {" "}
-                    24–48 Estimated 
+                  3 to 5 Days Estimated 
                     <br />
                     Shipment
                   </span>
