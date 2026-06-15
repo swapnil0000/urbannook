@@ -348,6 +348,35 @@ const AllProductsPage = () => {
               </div>
             )}
           </div>
+
+          {/* Sub-category pills — shown only when a category is active */}
+          {activeCategory && subCategories.length > 0 && (
+            <div className="flex items-center gap-2 mt-2 overflow-x-auto no-scrollbar px-1">
+              <button
+                onClick={() => setActiveSubCategory('')}
+                className={`shrink-0 px-3 py-1 rounded-full text-[11px] font-semibold transition-all ${
+                  !activeSubCategory
+                    ? 'bg-white/20 text-white'
+                    : 'text-white/50 hover:text-white'
+                }`}
+              >
+                All {activeCategory}
+              </button>
+              {subCategories.map((sub) => (
+                <button
+                  key={sub}
+                  onClick={() => setActiveSubCategory(sub === activeSubCategory ? '' : sub)}
+                  className={`shrink-0 px-3 py-1 rounded-full text-[11px] font-semibold transition-all whitespace-nowrap ${
+                    activeSubCategory === sub
+                      ? 'bg-white/20 text-white'
+                      : 'text-white/50 hover:text-white'
+                  }`}
+                >
+                  {sub}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

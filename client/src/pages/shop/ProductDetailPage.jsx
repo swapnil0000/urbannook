@@ -211,21 +211,31 @@ const ProductDetailPage = () => {
   const galleryImages = useMemo(() => {
     if (!product) return [];
 
-    // 1. Agar variant select kiya hai, toh wahi images dikhayenge
     if (product.variantDetails && product.variantDetails.length > 0) {
+      // 1. Selected variant images
       const selectedDetail = product.variantDetails.find(v => v.variantName === selectedVariant);
-      if (selectedDetail && selectedDetail.variantImage && selectedDetail.variantImage.length > 0) {
+      if (selectedDetail?.variantImage?.length > 0) {
         return selectedDetail.variantImage;
       }
-      
-      // If selected variant has no image, try the first variant's image
-      if (product.variantDetails[0].variantImage && product.variantDetails[0].variantImage.length > 0) {
-        return product.variantDetails[0].variantImage;
+
+      // 2. Any variant that has images
+      const variantWithImages = product.variantDetails.find(v => v.variantImage?.length > 0);
+      if (variantWithImages) {
+        return variantWithImages.variantImage;
       }
     }
 
-    // 2. Fallback: Placeholder
-    return ["https://urbannook.in/assets/logo.webp"];
+    // 3. Top-level productImg
+    if (product.productImg) {
+      return [product.productImg];
+    }
+
+    // 4. Secondary images
+    if (product.secondaryImages?.length > 0) {
+      return product.secondaryImages;
+    }
+
+    return ["/assets/logo.webp"];
   }, [product, selectedVariant]);
 
   useEffect(() => {
