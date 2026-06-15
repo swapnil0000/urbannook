@@ -38,15 +38,16 @@ const SubCategoryProductsPage = () => {
     };
   }, [catData, categorySlug, subCategorySlug, isAll]);
 
-  // Fetch products — pass subCategory only when not "all"
+  // Pass slugs directly — shared key between Category and Product collections.
+  // categoryName / subCategoryName are still used below for display only.
   const { data, isLoading, error } = useGetProductsByCategoryQuery(
     {
-      category: categoryName,
-      subCategory: isAll ? undefined : subCategoryName,
+      category: categorySlug,
+      subCategory: isAll ? undefined : subCategorySlug,
       limit: 200,
     },
     {
-      skip: !categoryName,
+      skip: !categorySlug,
       refetchOnMountOrArgChange: false,
       refetchOnFocus: false,
       refetchOnReconnect: false,

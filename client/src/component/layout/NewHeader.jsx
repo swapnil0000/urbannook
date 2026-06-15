@@ -1,13 +1,12 @@
-import { useState, useEffect, useRef, Suspense, useMemo } from 'react';
+import { useState, useEffect, useRef, Suspense, useMemo, useCallback, lazy } from 'react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { useGetWishlistQuery } from '../../store/api/userApi';
-import { useGetCategoriesQuery } from '../../store/api/productsApi';
+import { useGetCategoriesQuery, useGetProductsQuery } from '../../store/api/productsApi';
 import { logout as logoutAction } from '../../store/slices/authSlice';
 import { setShowLoginModal, clearLoginCallback } from '../../store/slices/uiSlice';
 import { useLogoutMutation } from '../../store/api/authApi';
 import { useAuth } from '../../hooks/useRedux';
-import { lazy } from 'react';
 import GoogleLoginButton from './auth/GoogleLoginButton';
 import { clearCsrfToken } from '../../store/api/apiSlice';
 
@@ -37,13 +36,37 @@ const NewHeader = () => {
   const [user, setUser] = useState(null);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showShopDropdown, setShowShopDropdown] = useState(false);
-  const [mobileShopExpanded, setMobileShopExpanded] = useState(false);
+  const [expandedCats, setExpandedCats] = useState(new Set());
+  const toggleCat = useCallback((slug) => {
+    setExpandedCats((prev) => {
+      const next = new Set(prev);
+      next.has(slug) ? next.delete(slug) : next.add(slug);
+      return next;
+    });
+  }, []);
 
   // Fetch categories for Shop dropdown
   const { data: categoriesData } = useGetCategoriesQuery(undefined, {
     refetchOnMountOrArgChange: false,
   });
   const categories = categoriesData?.data || [];
+
+  const shopOpen = expandedCats.has('__shop__');
+  const { data: shopProductsData } = useGetProductsQuery(
+    { limit: 200 },
+    { skip: !shopOpen, refetchOnMountOrArgChange: false }
+  );
+  const shopProductsByCategory = useMemo(() => {
+    if (!shopOpen) return {};
+    const all = shopProductsData?.data?.listofPublishedProducts || [];
+    const map = {};
+    for (const p of all) {
+      const key = p.categorySlug || p.productCategory?.toLowerCase().replace(/\s+/g, '-') || '__other__';
+      if (!map[key]) map[key] = [];
+      map[key].push(p);
+    }
+    return map;
+  }, [shopProductsData, shopOpen]);
 
   // Get wishlist count from Redux
   const wishlistCount = wishlistItems?.length;
@@ -60,7 +83,7 @@ const NewHeader = () => {
   const getActiveRoute = () => {
     const path = location.pathname;
     if (path === '/') return 'home';
-    if (path.startsWith('/products')) return 'products';
+    if (path.startsWith('/shop')) return 'products';
     if (path === '/contact-us') return 'support';
     if (path === '/about-us') return 'about-us';
     return '';
@@ -69,7 +92,7 @@ const NewHeader = () => {
   // Memoize expensive calculations
   const navLinks = useMemo(() => [
     { name: 'Home', path: '/', key: 'home' },
-    { name: 'Shop', path: '/products', key: 'products' },
+    { name: 'Shop', path: '/shop', key: 'products' },
     { name: 'About Us', path: '/about-us', key: 'about-us' },
     { name: 'Contact Us', path: '/contact-us', key: 'support' },
   ], []);
@@ -263,7 +286,7 @@ const NewHeader = () => {
                               {categories.map((cat) => (
                                 <div key={cat.slug || cat._id?.$oid}>
                                   <Link
-                                    to={`/shop/${cat.slug}`}
+                                    to={`/shop?category=${cat.slug}`}
                                     onClick={() => setShowShopDropdown(false)}
                                     className="text-sm font-bold text-emerald-900 hover:text-emerald-600 transition-colors block mb-2"
                                   >
@@ -273,7 +296,7 @@ const NewHeader = () => {
                                     {cat.subcategories?.map((sub) => (
                                       <li key={sub.slug || sub._id?.$oid}>
                                         <Link
-                                          to={`/shop/${cat.slug}`}
+                                          to={`/shop?category=${cat.slug}&subcategory=${sub.slug}`}
                                           onClick={() => setShowShopDropdown(false)}
                                           className="text-xs text-emerald-700/80 hover:text-emerald-900 transition-colors flex items-center gap-1.5 pl-2 border-l-2 border-emerald-100 hover:border-emerald-400 py-0.5"
                                         >
@@ -368,6 +391,7 @@ const NewHeader = () => {
                 </button>
               )}
 
+
               <button
                 className="relative flex items-center px-5 py-2.5 bg-emerald-800 text-white rounded-full hover:bg-emerald-900 hover:shadow-lg transition-all duration-200 shadow-md"
                 onClick={() => setShowCart(true)}
@@ -397,36 +421,35 @@ const NewHeader = () => {
                 </Link>
               )}
             </div>
-             <div className="lg:hidden w-10"></div> 
           </div>
 
         </div>
       </header>
 
       {/* --- MOBILE SIDEBAR BACKDROP --- */}
-      {isMenuOpen && (
-        <div
-          className="fixed inset-0 z-[59] bg-black/40 backdrop-blur-sm lg:hidden"
-          onClick={() => setIsMenuOpen(false)}
-        />
-      )}
+      <div
+        className={`fixed inset-0 z-[59] bg-black/40 backdrop-blur-sm lg:hidden transition-opacity duration-200 ${
+          isMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={() => setIsMenuOpen(false)}
+      />
 
       {/* --- MOBILE SIDEBAR --- */}
       <aside
-        className={`fixed top-0 left-0 h-full w-[300px] z-[60] lg:hidden flex flex-col bg-[#eaf5d3] shadow-2xl transition-transform duration-300 ease-in-out ${
-          isMenuOpen ? 'translate-x-0' : '-translate-x-full'
+        className={`fixed top-0 left-0 h-full w-[300px] z-[60] lg:hidden flex flex-col bg-[#faf9f6] shadow-2xl transition-all duration-200 ease-in-out ${
+          isMenuOpen ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'
         }`}
       >
         {/* Sidebar Header */}
-        <div className="flex items-center justify-between px-5 pt-10 pb-5 border-b border-emerald-900/10 shrink-0">
+        <div className="flex items-center justify-between px-5 pt-10 pb-5 border-b border-gray-200 shrink-0">
           <Link to="/" onClick={() => setIsMenuOpen(false)}>
             <img src="/assets/logo.webp" alt="UrbanNook" className="h-12 w-auto object-contain rounded-full mix-blend-multiply" />
           </Link>
           <button
             onClick={() => setIsMenuOpen(false)}
-            className="w-9 h-9 flex items-center justify-center rounded-full bg-emerald-900/8 hover:bg-emerald-900/15 transition-colors"
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
           >
-            <i className="fa-solid fa-xmark text-lg text-emerald-900"></i>
+            <i className="fa-solid fa-xmark text-base text-gray-600"></i>
           </button>
         </div>
 
@@ -435,8 +458,8 @@ const NewHeader = () => {
 
           {/* USER SECTION */}
           {user ? (
-            <div className="bg-white/70 rounded-2xl p-4 border border-white/60 shadow-sm relative overflow-hidden">
-              <div className="absolute -right-8 -top-8 w-28 h-28 bg-emerald-200/30 rounded-full blur-2xl pointer-events-none" />
+            <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm relative overflow-hidden">
+              <div className="absolute -right-8 -top-8 w-28 h-28 bg-gray-100/60 rounded-full blur-2xl pointer-events-none" />
               <div
                 onClick={() => handleMobileNav('/profile')}
                 className="flex items-center gap-3 mb-4 cursor-pointer active:opacity-80 relative z-10"
@@ -499,14 +522,14 @@ const NewHeader = () => {
             <div className="space-y-2">
               <button
                 onClick={handleMobileLogin}
-                className="w-full py-3.5 bg-emerald-800 text-white rounded-xl font-bold uppercase tracking-widest text-xs shadow-md flex items-center justify-center gap-2 active:scale-95 transition-all"
+                className="w-full py-3.5 bg-[#2e443c] text-white rounded-xl font-bold uppercase tracking-widest text-xs shadow-md flex items-center justify-center gap-2 active:scale-95 transition-all"
               >
                 <i className="fa-regular fa-user text-sm"></i>
                 Login / Sign Up
               </button>
               <button
                 onClick={handleMobileCart}
-                className="w-full py-3.5 bg-white border border-emerald-200 text-emerald-900 rounded-xl font-bold uppercase tracking-widest text-xs shadow-sm flex items-center justify-center gap-2 active:scale-95 transition-all relative"
+                className="w-full py-3.5 bg-white border border-gray-200 text-gray-800 rounded-xl font-bold uppercase tracking-widest text-xs shadow-sm flex items-center justify-center gap-2 active:scale-95 transition-all relative"
               >
                 <i className="fa-solid fa-cart-shopping text-sm"></i>
                 View Cart
@@ -520,89 +543,120 @@ const NewHeader = () => {
           )}
 
           {/* NAVIGATION */}
-          <nav className="flex flex-col gap-1">
-            {navLinks.map((item) => {
-              const isActive = activeRoute === item.key;
-              const icons = {
-                home: 'fa-house',
-                products: 'fa-bag-shopping',
-                support: 'fa-life-ring',
-                'about-us': 'fa-users',
-                'contact-us': 'fa-envelope',
-              };
+          <nav className="flex flex-col">
 
-              if (item.key === 'products') {
-                return (
-                  <div key={item.key}>
-                    <button
-                      onClick={() => setMobileShopExpanded(!mobileShopExpanded)}
-                      className={`w-full flex items-center justify-between px-3 py-3 rounded-xl transition-all duration-200 ${
-                        mobileShopExpanded ? 'bg-white shadow-sm border border-emerald-100' : 'hover:bg-white/50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${
-                          mobileShopExpanded ? 'bg-emerald-100 text-emerald-800' : 'bg-white/60 text-emerald-900'
-                        }`}>
-                          <i className="fa-solid fa-bag-shopping"></i>
-                        </div>
-                        <span className="font-bold text-sm text-emerald-900">Shop</span>
-                      </div>
-                      <i className={`fa-solid fa-chevron-down text-[10px] text-emerald-600 transition-transform duration-200 ${mobileShopExpanded ? 'rotate-180' : ''}`}></i>
-                    </button>
+            {/* Other top-level links */}
+            {[
+              { path: '/', label: 'Home', icon: 'fa-house' },
+              { path: '/shop', label: 'All Products', icon: 'fa-bag-shopping' },
+            ].map(({ path, label, icon }) => (
+              <Link
+                key={path}
+                to={path}
+                onClick={() => setIsMenuOpen(false)}
+                className="flex items-center gap-3 px-1 py-3.5 border-b border-gray-200/70"
+              >
+                <i className={`fa-solid ${icon} text-sm text-gray-400 w-4 text-center`} />
+                <span className="text-[15px] font-bold text-gray-900">{label}</span>
+              </Link>
+            ))}
 
-                    {mobileShopExpanded && categories.length > 0 && (
-                      <div className="ml-2 mt-1 space-y-1.5 pb-1">
-                        {categories.map((cat) => (
-                          <div key={cat.slug} className="bg-white/60 rounded-xl p-3 border border-emerald-50">
-                            <Link
-                              to={`/shop/${cat.slug}`}
-                              onClick={() => setIsMenuOpen(false)}
-                              className="font-bold text-xs text-[#2e443c] block mb-2 uppercase tracking-wide"
-                            >
-                              {cat.name}
-                            </Link>
-                            <div className="flex flex-wrap gap-1.5">
-                              {cat.subcategories?.map((sub) => (
+            {/* SHOP accordion — contains all categories */}
+            <div className="border-b border-gray-200/70">
+              <button
+                onClick={() => toggleCat('__shop__')}
+                className="w-full flex items-center justify-between px-1 py-3.5 text-left"
+              >
+                <div className="flex items-center gap-3">
+                  <i className="fa-solid fa-store text-sm text-gray-400 w-4 text-center" />
+                  <span className="text-[15px] font-bold text-gray-900">Shop</span>
+                </div>
+                <i className={`fa-solid fa-chevron-down text-[11px] text-gray-400 transition-transform duration-200 ${expandedCats.has('__shop__') ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Category sections inside Shop */}
+              {expandedCats.has('__shop__') && categories.length > 0 && (
+                <div className="pb-3 space-y-4 pt-1">
+                  {categories.map((cat) => {
+                    const products = shopProductsByCategory[cat.slug] || [];
+                    return (
+                      <div key={cat.slug}>
+                        {/* Category heading — tapping navigates to all products */}
+                        <Link
+                          to={`/shop?category=${cat.slug}`}
+                          onClick={() => setIsMenuOpen(false)}
+                          className="flex items-center justify-between px-1 mb-2"
+                        >
+                          <span className="text-sm font-bold text-gray-900">{cat.name}</span>
+                          <i className="fa-solid fa-chevron-right text-[10px] text-gray-400" />
+                        </Link>
+
+                        {/* Horizontal scrollable product cards */}
+                        {products.length > 0 ? (
+                          <div
+                            className="flex gap-2.5 overflow-x-auto pb-1"
+                            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                          >
+                            {products.map((p) => {
+                              const img = p.variantDetails?.[0]?.variantImage?.[0] || p.productImg || null;
+                              return (
                                 <Link
-                                  key={sub.slug}
-                                  to={`/shop/${cat.slug}`}
+                                  key={p.productId}
+                                  to={`/shop?product=${p.productId}`}
                                   onClick={() => setIsMenuOpen(false)}
-                                  className="text-[10px] text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100 hover:bg-emerald-100 transition-colors font-medium"
+                                  className="flex-shrink-0 w-24 flex flex-col rounded-xl overflow-hidden border border-gray-200 bg-white"
                                 >
-                                  {sub.name}
+                                  <div className="w-full aspect-square bg-gray-100 overflow-hidden">
+                                    {img ? (
+                                      <img
+                                        src={img}
+                                        alt={p.productName}
+                                        loading="lazy"
+                                        decoding="async"
+                                        className="w-full h-full object-cover mix-blend-multiply"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center">
+                                        <i className="fa-solid fa-image text-xs text-gray-300" />
+                                      </div>
+                                    )}
+                                  </div>
+                                  {/* <p className="text-[10px] font-medium text-gray-700 px-1.5 py-1 line-clamp-2 leading-tight">
+                                    {p.productName}
+                                  </p> */}
                                 </Link>
-                              ))}
-                            </div>
+                              );
+                            })}
                           </div>
-                        ))}
+                        ) : (
+                          <div className="h-24 flex items-center justify-center">
+                            <div className="w-4 h-4 border-2 border-gray-200 border-t-gray-500 rounded-full animate-spin" />
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                );
-              }
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
-              return (
-                <Link
-                  key={item.key}
-                  to={item.path}
-                  onClick={() => setIsMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 ${
-                    isActive ? 'bg-white shadow-sm border border-emerald-100' : 'hover:bg-white/50'
-                  }`}
-                >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${
-                    isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-white/60 text-emerald-900'
-                  }`}>
-                    <i className={`fa-solid ${icons[item.key] || 'fa-circle'}`}></i>
-                  </div>
-                  <span className={`font-bold text-sm ${isActive ? 'text-emerald-900' : 'text-emerald-900/80'}`}>
-                    {item.name}
-                  </span>
-                  {isActive && <i className="fa-solid fa-circle text-[5px] text-emerald-500 ml-auto"></i>}
-                </Link>
-              );
-            })}
+            {/* Bottom links */}
+            {[
+              { path: '/about-us', label: 'About Us', icon: 'fa-users' },
+              { path: '/contact-us', label: 'Contact', icon: 'fa-envelope' },
+              { path: '/customer-support', label: 'Support', icon: 'fa-life-ring' },
+            ].map(({ path, label, icon }) => (
+              <Link
+                key={path}
+                to={path}
+                onClick={() => setIsMenuOpen(false)}
+                className="flex items-center gap-3 px-1 py-3.5 border-b border-gray-200/70 last:border-b-0"
+              >
+                <i className={`fa-solid ${icon} text-sm text-gray-400 w-4 text-center`} />
+                <span className="text-[15px] font-bold text-gray-900">{label}</span>
+              </Link>
+            ))}
+
           </nav>
         </div>
       </aside>
@@ -658,12 +712,13 @@ const NewHeader = () => {
           />
         )}
 
-        <CartDrawer 
-          isOpen={showCart} 
-          onClose={() => setShowCart(false)} 
-          cartItems={cartItems} 
+        <CartDrawer
+          isOpen={showCart}
+          onClose={() => setShowCart(false)}
+          cartItems={cartItems}
         />
       </Suspense>
+
     </>
   );
 };

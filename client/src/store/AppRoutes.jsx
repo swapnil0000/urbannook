@@ -1,10 +1,8 @@
 import { Routes, Route, Navigate } from "react-router-dom";
-import { Suspense } from "react";
+import { Suspense, lazy } from "react";
 import {
   HomePage,
   ContactPage,
-  AllProductsPage,
-  ProductDetailPage,
   CheckoutPage,
   MyProfilePage,
   MyOrdersPage,
@@ -18,12 +16,12 @@ import {
   Faq,
   Return,
   AboutPage,
-  CategoryPage,
 } from "../pages/index.js";
 import PaymentProcessing from "../pages/PaymentProcessing.jsx";
 import PaymentFailed from "../pages/PaymentFailed.jsx";
 import OrderConfirm from "../pages/OrderConfirm.jsx";
 import ProtectedRoute from "../component/ProtectedRoute.jsx";
+import ShopPage from "../pages/shop/ShopPage.jsx";
 
 // Minimal loader for individual route transitions only
 const MinimalLoader = () => (
@@ -53,27 +51,13 @@ const AppRoutes = () => {
           </Suspense>
         }
       />
+      <Route path="/products" element={<Navigate to="/shop" replace />} />
+      <Route path="/product/:productId" element={<Navigate to="/" replace />} />
       <Route
-        path="/products"
+        path="/shop"
         element={
           <Suspense fallback={<MinimalLoader />}>
-            <AllProductsPage />
-          </Suspense>
-        }
-      />
-      <Route
-        path="/product/:productId"
-        element={
-          <Suspense fallback={<MinimalLoader />}>
-            <ProductDetailPage />
-          </Suspense>
-        }
-      />
-      <Route
-        path="/shop/:categorySlug"
-        element={
-          <Suspense fallback={<MinimalLoader />}>
-            <CategoryPage />
+            <ShopPage />
           </Suspense>
         }
       />

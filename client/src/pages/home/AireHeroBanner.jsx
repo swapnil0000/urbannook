@@ -6,7 +6,7 @@ const AireHeroBanner = memo(() => {
   const navigate = useNavigate();
 
   const handleShopCollection = useCallback(() => {
-    navigate('/products'); 
+    navigate('/shop'); 
   }, [navigate]);
 
   return (

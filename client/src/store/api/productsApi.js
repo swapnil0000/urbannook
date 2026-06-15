@@ -59,17 +59,12 @@ export const productsApi = apiSlice.injectEndpoints({
       keepUnusedDataFor: 600,
     }),
 
-    // Search products
+    // Search products — dedicated endpoint, no cache, backend handles DB query
     searchProducts: builder.query({
-      query: ({ search, page = 1, limit = 12 } = {}) => {
-        const params = new URLSearchParams({
-          currentPage: page.toString(),
-          limit: limit.toString(),
-        });
-        if (search) params.append('search', search);
-        return `products?${params}`;
+      query: ({ search, limit = 8 } = {}) => {
+        const params = new URLSearchParams({ q: search, limit: limit.toString() });
+        return `products/search?${params}`;
       },
-      providesTags: ['Product'],
     }),
   }),
 });

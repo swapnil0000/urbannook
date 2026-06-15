@@ -27,7 +27,7 @@ const AireFeaturedProducts = memo(() => {
   // Memoize handler
   const handleViewProduct = useCallback(() => {
     if (featuredProduct?.productId) {
-      navigate(`/product/${featuredProduct.productId}`);
+      navigate(`/shop?product=${featuredProduct.productId}`);
     }
   }, [navigate, featuredProduct?.productId]);
 

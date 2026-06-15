@@ -125,7 +125,7 @@ const ShopByCategory = memo(() => {
             <h2 className="text-3xl md:text-4xl font-serif text-[#2e443c] leading-tight">Shop by Category</h2>
           </div>
           <button
-            onClick={() => navigate('/products')}
+            onClick={() => navigate('/shop')}
             className="text-xs font-semibold uppercase tracking-widest text-[#2e443c]/55
                        hover:text-[#a89068] flex items-center gap-1.5 transition-colors duration-300"
           >
@@ -159,7 +159,7 @@ const ShopByCategory = memo(() => {
                   key={cat._id}
                   name={cat.name}
                   image={cat.image || null}
-                  onClick={() => navigate(`/shop/${cat.slug}`)}
+                  onClick={() => navigate(`/shop?category=${cat.slug}`)}
                 />
               ))}
             </div>

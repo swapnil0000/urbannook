@@ -7,7 +7,7 @@ import {
   useRef,
   memo,
 } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { useCookies } from "react-cookie";
 import confetti from "canvas-confetti";
@@ -112,7 +112,8 @@ const ProductDetailPage = () => {
     return q || 0;
   };
 
-  const { productId } = useParams();
+  const [searchParams] = useSearchParams();
+  const productId = searchParams.get('product');
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { showNotification, openLoginModal, closeLoginModal } = useUI();
@@ -638,7 +639,7 @@ const ProductDetailPage = () => {
     brand: { "@type": "Brand", name: "UrbanNook" },
     offers: {
       "@type": "Offer",
-      url: `https://www.urbannook.in/product/${product.productId}`,
+      url: `https://www.urbannook.in/shop?product=${product.productId}`,
       priceCurrency: "INR",
       price: currentPrice,
       availability:
@@ -663,7 +664,7 @@ const ProductDetailPage = () => {
           `Buy ${product.productName} at UrbanNook. Premium quality, fast pan-India delivery.`
         }
         image={galleryImages[0]}
-        url={`/product/${product.productId}`}
+        url={`/shop?product=${product.productId}`}
         type="product"
         structuredData={productStructuredData}
       />

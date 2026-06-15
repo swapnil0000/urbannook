@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef, useCallback, memo } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import {
   useGetCategoriesQuery,
   useGetProductsByCategoryQuery,
@@ -7,22 +7,40 @@ import {
 import SEOHead from '../../component/SEOHead';
 import { trackViewItemList } from '../../utils/analytics';
 
-const AUTO_IMAGE_INTERVAL = 2000;
+const AUTO_IMAGE_INTERVAL = 3500; // carousel time
 
 /* ─── Image carousel inside a product card ───────────────────────── */
 const ImageCarousel = memo(({ images, productName }) => {
   const [activeIdx, setActiveIdx] = useState(0);
   const touchStartX = useRef(null);
   const timerRef = useRef(null);
+  const containerRef = useRef(null);
   const total = images.length;
 
   const next = useCallback(() => setActiveIdx((i) => (i + 1) % total), [total]);
   const prev = useCallback(() => setActiveIdx((i) => (i - 1 + total) % total), [total]);
 
+  // IntersectionObserver: only run the timer while the card is visible.
+  // With 200 products on screen, this prevents ~195 redundant setIntervals.
   useEffect(() => {
     if (total <= 1) return;
-    timerRef.current = setInterval(next, AUTO_IMAGE_INTERVAL);
-    return () => clearInterval(timerRef.current);
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          timerRef.current = setInterval(next, AUTO_IMAGE_INTERVAL);
+        } else {
+          clearInterval(timerRef.current);
+        }
+      },
+      { threshold: 0.4 }
+    );
+    observer.observe(el);
+    return () => {
+      clearInterval(timerRef.current);
+      observer.disconnect();
+    };
   }, [next, total]);
 
   const resetTimer = useCallback(() => {
@@ -48,6 +66,7 @@ const ImageCarousel = memo(({ images, productName }) => {
 
   return (
     <div
+      ref={containerRef}
       className="relative w-full aspect-square overflow-hidden bg-[#f8f8f5] select-none rounded-t-2xl"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
@@ -105,14 +124,14 @@ const ProductCard = memo(({ product, onClick }) => {
   return (
     <div
       className="group flex-shrink-0 w-[160px] sm:w-[190px] md:w-[210px] rounded-2xl overflow-hidden
-                 cursor-pointer bg-white/5 border border-white/8
-                 hover:border-[#F5DEB3]/35 hover:shadow-xl transition-all duration-400"
+                 cursor-pointer bg-white/5 border border-[#a89068]/40
+                 hover:border-[#F5DEB3] hover:shadow-xl transition-all duration-400"
       onClick={onClick}
     >
       <ImageCarousel images={images} productName={product.productName} />
-      <div className="px-3 py-2.5">
-        <p className="text-sm font-serif text-white/90 leading-snug line-clamp-2
-                      group-hover:text-[#F5DEB3] transition-colors duration-300">
+      <div className="px-3 py-2.5 bg-[#faf9f6] rounded-b-2xl">
+        <p className="text-sm font-serif text-[#2e443c] leading-snug line-clamp-2
+                      group-hover:text-[#4a6b5d] transition-colors duration-300">
           {product.productName}
         </p>
       </div>
@@ -232,8 +251,9 @@ ProductRow.displayName = 'ProductRow';
 /* ─── Main page ──────────────────────────────────────────────────── */
 const CategoryPage = () => {
   const navigate = useNavigate();
-  const { categorySlug } = useParams();
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchParams] = useSearchParams();
+  const categorySlug = searchParams.get('category');
+  const subCategorySlug = searchParams.get('subcategory');
 
   useEffect(() => { window.scrollTo(0, 0); }, [categorySlug]);
 
@@ -248,10 +268,21 @@ const CategoryPage = () => {
     return all.find((c) => c.slug === categorySlug) || null;
   }, [catData, categorySlug]);
 
+  const subCategory = useMemo(() => {
+    if (!subCategorySlug || !category) return null;
+    return category.subcategories?.find((s) => s.slug === subCategorySlug) || null;
+  }, [category, subCategorySlug]);
+
+  const productsQueryArgs = useMemo(() => {
+    const args = { category: categorySlug, limit: 200 };
+    if (subCategorySlug) args.subCategory = subCategorySlug;
+    return args;
+  }, [categorySlug, subCategorySlug]);
+
   const { data: productsData, isLoading: productsLoading } = useGetProductsByCategoryQuery(
-    { category: category?.name, limit: 200 },
+    productsQueryArgs,
     {
-      skip: !category?.name,
+      skip: !categorySlug,
       refetchOnMountOrArgChange: false,
       refetchOnFocus: false,
       refetchOnReconnect: false,
@@ -263,20 +294,9 @@ const CategoryPage = () => {
     [productsData]
   );
 
-  const filteredProducts = useMemo(() => {
-    if (!searchQuery.trim()) return allProducts;
-    const q = searchQuery.toLowerCase();
-    return allProducts.filter(
-      (p) =>
-        p.productName?.toLowerCase().includes(q) ||
-        p.productSubCategory?.toLowerCase().includes(q) ||
-        p.productDes?.toLowerCase().includes(q)
-    );
-  }, [allProducts, searchQuery]);
-
   const groups = useMemo(() => {
     const map = new Map();
-    for (const p of filteredProducts) {
+    for (const p of allProducts) {
       const key = p.productSubCategory || '__none__';
       if (!map.has(key)) map.set(key, []);
       map.get(key).push(p);
@@ -292,7 +312,7 @@ const CategoryPage = () => {
       ordered.push({ heading: key === '__none__' ? null : key, products });
     }
     return ordered;
-  }, [filteredProducts, category]);
+  }, [allProducts, category]);
 
   useEffect(() => {
     if (allProducts.length > 0) {
@@ -314,9 +334,9 @@ const CategoryPage = () => {
   return (
     <div className="min-h-screen bg-[#2e443c] relative font-sans pb-20">
       <SEOHead
-        title={`${category?.name || categorySlug} — UrbanNook`}
-        description={`Shop ${category?.name || categorySlug} on UrbanNook.`}
-        url={`/shop/${categorySlug}`}
+        title={`${subCategorySlug ? (subCategory?.name || subCategorySlug) : (category?.name || categorySlug)} — UrbanNook`}
+        description={`Shop ${subCategorySlug ? (subCategory?.name || subCategorySlug) : (category?.name || categorySlug)} on UrbanNook.`}
+        url={subCategorySlug ? `/shop?category=${categorySlug}&subcategory=${subCategorySlug}` : `/shop?category=${categorySlug}`}
       />
 
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#F5DEB3]/5 rounded-full blur-[120px] pointer-events-none" />
@@ -328,50 +348,23 @@ const CategoryPage = () => {
           <nav className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.2em] text-white/40 mb-5 flex-wrap">
             <Link to="/" className="hover:text-[#F5DEB3] transition-colors">Home</Link>
             <span>/</span>
-            <span className="text-[#F5DEB3]/70">{category?.name || categorySlug}</span>
+            {subCategorySlug ? (
+              <>
+                <Link to={`/shop?category=${categorySlug}`} className="hover:text-[#F5DEB3] transition-colors">
+                  {category?.name || categorySlug}
+                </Link>
+                <span>/</span>
+                <span className="text-[#F5DEB3]/70">{subCategory?.name || subCategorySlug}</span>
+              </>
+            ) : (
+              <span className="text-[#F5DEB3]/70">{category?.name || categorySlug}</span>
+            )}
           </nav>
 
-          <div className="flex items-center gap-3 mb-2">
-            <span className="w-2 h-2 bg-[#F5DEB3] rounded-full animate-pulse" />
-            <span className="text-[#F5DEB3] font-mono text-xs tracking-[0.3em] uppercase">
-              {allProducts.length > 0 ? `${allProducts.length} Products` : 'Collection'}
-            </span>
-          </div>
-
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-serif text-white leading-[0.95] mb-6">
-            {category?.name || categorySlug}
+            {subCategorySlug ? (subCategory?.name || subCategorySlug) : (category?.name || categorySlug)}
           </h1>
 
-          {/* Search */}
-          <div className="relative max-w-xl">
-            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-              <i className="fa-solid fa-magnifying-glass text-white/30 text-sm" />
-            </div>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={`Search in ${category?.name || 'this category'}…`}
-              className="w-full pl-11 pr-10 py-3.5 rounded-2xl
-                         bg-white/8 border border-white/10 text-white placeholder-white/30
-                         text-sm font-light focus:outline-none focus:border-[#F5DEB3]/40
-                         focus:bg-white/12 transition-all duration-300"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute inset-y-0 right-4 flex items-center text-white/30 hover:text-white/60 transition-colors"
-              >
-                <i className="fa-solid fa-xmark text-sm" />
-              </button>
-            )}
-          </div>
-
-          {searchQuery && (
-            <p className="mt-3 text-xs text-white/40 font-mono">
-              {filteredProducts.length} result{filteredProducts.length !== 1 ? 's' : ''} for &ldquo;{searchQuery}&rdquo;
-            </p>
-          )}
         </div>
       </section>
 
@@ -385,15 +378,11 @@ const CategoryPage = () => {
             </div>
           )}
 
-          {!isLoading && filteredProducts.length === 0 && (
+          {!isLoading && allProducts.length === 0 && (
             <div className="flex flex-col items-center justify-center py-32 bg-black/10 rounded-[2rem] border border-white/5">
               <i className="fa-solid fa-box-open text-4xl text-[#F5DEB3]/40 mb-4" />
-              <h2 className="text-xl font-serif text-white mb-2">
-                {searchQuery ? 'No results found' : 'No products yet'}
-              </h2>
-              <p className="text-white/40 text-sm">
-                {searchQuery ? 'Try a different search term' : 'This collection is being curated.'}
-              </p>
+              <h2 className="text-xl font-serif text-white mb-2">No products yet</h2>
+              <p className="text-white/40 text-sm">This collection is being curated.</p>
             </div>
           )}
 
@@ -414,7 +403,7 @@ const CategoryPage = () => {
               {/* Horizontal scroll row */}
               <ProductRow
                 products={products}
-                onProductClick={(id) => navigate(`/product/${id}`)}
+                onProductClick={(id) => navigate(`/shop?product=${id}`)}
               />
             </div>
           ))}

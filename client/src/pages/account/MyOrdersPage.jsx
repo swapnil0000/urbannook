@@ -199,7 +199,7 @@ const MyOrdersPage = () => {
             </div>
             <h3 className="text-2xl font-serif text-[#2e443c] mb-2">Your collection is empty.</h3>
             <button
-              onClick={() => navigate("/products")}
+              onClick={() => navigate("/shop")}
               className="px-8 py-3 bg-[#a89068] text-white rounded-full font-bold uppercase tracking-widest text-[10px] hover:bg-[#2e443c] hover:scale-105 transition-all duration-300 shadow-lg"
             >
               Browse Collection
