@@ -1,6 +1,5 @@
 [
   {
-    "_id": { "$oid": "6a2d010000000000000000a1" },
     "productName": "Cars Brake Caliper Lamps 2",
     "productId": "test-cars-bcl-0002",
     "uiProductId": "UN-PROD-27",
@@ -10,7 +9,9 @@
     "productQuantity": 10,
     "productStatus": "in_stock",
     "isPublished": true,
-    "tags": ["new_arrival"],
+    "tags": [
+      "new_arrival"
+    ],
     "color": [],
     "warranty": null,
     "categoryCode": "LMP",
@@ -20,11 +21,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d010000000000000000a2" },
         "variantName": "BMW Blue",
         "variantPrice": 1499,
         "sku": "LMPBCL0002-BMW",
@@ -36,7 +41,6 @@
         ]
       },
       {
-        "_id": { "$oid": "6a2d010000000000000000a3" },
         "variantName": "Porsche Red",
         "variantPrice": 1799,
         "sku": "LMPBCL0002-POR",
@@ -48,7 +52,6 @@
         ]
       },
       {
-        "_id": { "$oid": "6a2d010000000000000000a4" },
         "variantName": "Lamborghini Yellow",
         "variantPrice": 1999,
         "sku": "LMPBCL0002-LAM",
@@ -59,13 +62,11 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   },
-
   {
-    "_id": { "$oid": "6a2d010000000000000000b1" },
     "productName": "Cars Brake Caliper Lamps 3",
     "productId": "test-cars-bcl-0003",
     "uiProductId": "UN-PROD-28",
@@ -75,7 +76,9 @@
     "productQuantity": 10,
     "productStatus": "in_stock",
     "isPublished": true,
-    "tags": ["best_seller"],
+    "tags": [
+      "best_seller"
+    ],
     "color": [],
     "warranty": null,
     "categoryCode": "LMP",
@@ -85,11 +88,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d010000000000000000b2" },
         "variantName": "Ferrari Edition",
         "variantPrice": 2199,
         "sku": "LMPBCL0003-FER",
@@ -101,7 +108,6 @@
         ]
       },
       {
-        "_id": { "$oid": "6a2d010000000000000000b3" },
         "variantName": "Audi Sport",
         "variantPrice": 1599,
         "sku": "LMPBCL0003-AUD",
@@ -112,13 +118,11 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   },
-
   {
-    "_id": { "$oid": "6a2d010000000000000000c1" },
     "productName": "Cars Car Accessories 1",
     "productId": "test-cars-acc-0001",
     "uiProductId": "UN-PROD-29",
@@ -128,7 +132,9 @@
     "productQuantity": 10,
     "productStatus": "in_stock",
     "isPublished": true,
-    "tags": ["trending"],
+    "tags": [
+      "trending"
+    ],
     "color": [],
     "warranty": null,
     "categoryCode": "CAR",
@@ -138,11 +144,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d010000000000000000c2" },
         "variantName": "Black",
         "variantPrice": 699,
         "sku": "CARACC0001-BLK",
@@ -154,7 +164,6 @@
         ]
       },
       {
-        "_id": { "$oid": "6a2d010000000000000000c3" },
         "variantName": "Chrome Silver",
         "variantPrice": 899,
         "sku": "CARACC0001-CHR",
@@ -165,13 +174,11 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   },
-
   {
-    "_id": { "$oid": "6a2d010000000000000000d1" },
     "productName": "Cars Car Accessories 2",
     "productId": "test-cars-acc-0002",
     "uiProductId": "UN-PROD-30",
@@ -191,11 +198,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d010000000000000000d2" },
         "variantName": "Standard",
         "variantPrice": 549,
         "sku": "CARACC0002-STD",
@@ -207,13 +218,11 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   },
-
   {
-    "_id": { "$oid": "6a2d010000000000000000e1" },
     "productName": "Cars Car Accessories 3",
     "productId": "test-cars-acc-0003",
     "uiProductId": "UN-PROD-31",
@@ -223,7 +232,9 @@
     "productQuantity": 10,
     "productStatus": "in_stock",
     "isPublished": true,
-    "tags": ["featured"],
+    "tags": [
+      "featured"
+    ],
     "color": [],
     "warranty": null,
     "categoryCode": "CAR",
@@ -233,11 +244,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d010000000000000000e2" },
         "variantName": "Matte Black",
         "variantPrice": 799,
         "sku": "CARACC0003-MTB",
@@ -248,7 +263,6 @@
         ]
       },
       {
-        "_id": { "$oid": "6a2d010000000000000000e3" },
         "variantName": "Racing Red",
         "variantPrice": 999,
         "sku": "CARACC0003-RED",
@@ -260,13 +274,11 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   },
-
   {
-    "_id": { "$oid": "6a2d010000000000000000f1" },
     "productName": "Cars Posters 2",
     "productId": "test-cars-pos-0002",
     "uiProductId": "UN-PROD-32",
@@ -286,11 +298,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d010000000000000000f2" },
         "variantName": "A3 Size",
         "variantPrice": 349,
         "sku": "DECPOS0002-A3",
@@ -302,7 +318,6 @@
         ]
       },
       {
-        "_id": { "$oid": "6a2d010000000000000000f3" },
         "variantName": "A2 Size",
         "variantPrice": 549,
         "sku": "DECPOS0002-A2",
@@ -313,13 +328,11 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   },
-
   {
-    "_id": { "$oid": "6a2d01000000000000000101" },
     "productName": "Cars Posters 3",
     "productId": "test-cars-pos-0003",
     "uiProductId": "UN-PROD-33",
@@ -329,7 +342,9 @@
     "productQuantity": 10,
     "productStatus": "in_stock",
     "isPublished": true,
-    "tags": ["trending"],
+    "tags": [
+      "trending"
+    ],
     "color": [],
     "warranty": null,
     "categoryCode": "DEC",
@@ -339,11 +354,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d01000000000000000102" },
         "variantName": "Glossy",
         "variantPrice": 449,
         "sku": "DECPOS0003-GLO",
@@ -355,7 +374,6 @@
         ]
       },
       {
-        "_id": { "$oid": "6a2d01000000000000000103" },
         "variantName": "Matte",
         "variantPrice": 499,
         "sku": "DECPOS0003-MAT",
@@ -366,13 +384,11 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   },
-
   {
-    "_id": { "$oid": "6a2d01000000000000000111" },
     "productName": "Cars Keychains 2",
     "productId": "test-cars-key-0002",
     "uiProductId": "UN-PROD-34",
@@ -392,11 +408,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d01000000000000000112" },
         "variantName": "BMW Logo",
         "variantPrice": 299,
         "sku": "KEYKYC0002-BMW",
@@ -408,7 +428,6 @@
         ]
       },
       {
-        "_id": { "$oid": "6a2d01000000000000000113" },
         "variantName": "Ferrari Logo",
         "variantPrice": 399,
         "sku": "KEYKYC0002-FER",
@@ -419,7 +438,6 @@
         ]
       },
       {
-        "_id": { "$oid": "6a2d01000000000000000114" },
         "variantName": "Porsche Logo",
         "variantPrice": 449,
         "sku": "KEYKYC0002-POR",
@@ -430,13 +448,11 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   },
-
   {
-    "_id": { "$oid": "6a2d01000000000000000121" },
     "productName": "Cars Keychains 3",
     "productId": "test-cars-key-0003",
     "uiProductId": "UN-PROD-35",
@@ -446,7 +462,9 @@
     "productQuantity": 10,
     "productStatus": "in_stock",
     "isPublished": true,
-    "tags": ["new_arrival"],
+    "tags": [
+      "new_arrival"
+    ],
     "color": [],
     "warranty": null,
     "categoryCode": "KEY",
@@ -456,11 +474,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d01000000000000000122" },
         "variantName": "Lamborghini",
         "variantPrice": 499,
         "sku": "KEYKYC0003-LAM",
@@ -472,13 +494,11 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   },
-
   {
-    "_id": { "$oid": "6a2d01000000000000000201" },
     "productName": "Superheroes Posters 1",
     "productId": "test-sup-pos-0001",
     "uiProductId": "UN-PROD-36",
@@ -488,7 +508,9 @@
     "productQuantity": 10,
     "productStatus": "in_stock",
     "isPublished": true,
-    "tags": ["featured"],
+    "tags": [
+      "featured"
+    ],
     "color": [],
     "warranty": null,
     "categoryCode": "DEC",
@@ -498,11 +520,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d01000000000000000202" },
         "variantName": "A3 Glossy",
         "variantPrice": 399,
         "sku": "DECPOSSUP1-A3G",
@@ -514,7 +540,6 @@
         ]
       },
       {
-        "_id": { "$oid": "6a2d01000000000000000203" },
         "variantName": "A2 Matte",
         "variantPrice": 599,
         "sku": "DECPOSSUP1-A2M",
@@ -525,13 +550,11 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   },
-
   {
-    "_id": { "$oid": "6a2d01000000000000000211" },
     "productName": "Superheroes Posters 2",
     "productId": "test-sup-pos-0002",
     "uiProductId": "UN-PROD-37",
@@ -541,7 +564,9 @@
     "productQuantity": 10,
     "productStatus": "in_stock",
     "isPublished": true,
-    "tags": ["trending"],
+    "tags": [
+      "trending"
+    ],
     "color": [],
     "warranty": null,
     "categoryCode": "DEC",
@@ -551,11 +576,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d01000000000000000212" },
         "variantName": "Iron Man",
         "variantPrice": 449,
         "sku": "DECPOSSUP2-IRM",
@@ -567,7 +596,6 @@
         ]
       },
       {
-        "_id": { "$oid": "6a2d01000000000000000213" },
         "variantName": "Spider-Man",
         "variantPrice": 449,
         "sku": "DECPOSSUP2-SPD",
@@ -578,7 +606,6 @@
         ]
       },
       {
-        "_id": { "$oid": "6a2d01000000000000000214" },
         "variantName": "Batman",
         "variantPrice": 449,
         "sku": "DECPOSSUP2-BAT",
@@ -589,13 +616,11 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   },
-
   {
-    "_id": { "$oid": "6a2d01000000000000000221" },
     "productName": "Superheroes Posters 3",
     "productId": "test-sup-pos-0003",
     "uiProductId": "UN-PROD-38",
@@ -615,11 +640,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d01000000000000000222" },
         "variantName": "Avengers Edition",
         "variantPrice": 699,
         "sku": "DECPOSSUP3-AVG",
@@ -631,13 +660,11 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   },
-
   {
-    "_id": { "$oid": "6a2d01000000000000000301" },
     "productName": "Superheroes Keychains 1",
     "productId": "test-sup-key-0001",
     "uiProductId": "UN-PROD-39",
@@ -647,7 +674,9 @@
     "productQuantity": 10,
     "productStatus": "in_stock",
     "isPublished": true,
-    "tags": ["new_arrival"],
+    "tags": [
+      "new_arrival"
+    ],
     "color": [],
     "warranty": null,
     "categoryCode": "KEY",
@@ -657,11 +686,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d01000000000000000302" },
         "variantName": "Iron Man",
         "variantPrice": 249,
         "sku": "KEYSUP0001-IRM",
@@ -673,7 +706,6 @@
         ]
       },
       {
-        "_id": { "$oid": "6a2d01000000000000000303" },
         "variantName": "Thor",
         "variantPrice": 249,
         "sku": "KEYSUP0001-THR",
@@ -684,7 +716,6 @@
         ]
       },
       {
-        "_id": { "$oid": "6a2d01000000000000000304" },
         "variantName": "Captain America",
         "variantPrice": 249,
         "sku": "KEYSUP0001-CAP",
@@ -695,13 +726,11 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   },
-
   {
-    "_id": { "$oid": "6a2d01000000000000000311" },
     "productName": "Superheroes Keychains 2",
     "productId": "test-sup-key-0002",
     "uiProductId": "UN-PROD-40",
@@ -721,11 +750,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d01000000000000000312" },
         "variantName": "DC Edition",
         "variantPrice": 299,
         "sku": "KEYSUP0002-DC",
@@ -737,13 +770,11 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   },
-
   {
-    "_id": { "$oid": "6a2d01000000000000000321" },
     "productName": "Superheroes Keychains 3",
     "productId": "test-sup-key-0003",
     "uiProductId": "UN-PROD-41",
@@ -753,7 +784,9 @@
     "productQuantity": 10,
     "productStatus": "in_stock",
     "isPublished": true,
-    "tags": ["best_seller"],
+    "tags": [
+      "best_seller"
+    ],
     "color": [],
     "warranty": null,
     "categoryCode": "KEY",
@@ -763,11 +796,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d01000000000000000322" },
         "variantName": "Marvel Pack",
         "variantPrice": 799,
         "sku": "KEYSUP0003-MRV",
@@ -779,13 +816,11 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   },
-
   {
-    "_id": { "$oid": "6a2d01000000000000000401" },
     "productName": "Superheroes Merchandise 1",
     "productId": "test-sup-mer-0001",
     "uiProductId": "UN-PROD-42",
@@ -795,7 +830,9 @@
     "productQuantity": 10,
     "productStatus": "in_stock",
     "isPublished": true,
-    "tags": ["featured"],
+    "tags": [
+      "featured"
+    ],
     "color": [],
     "warranty": null,
     "categoryCode": "MER",
@@ -805,11 +842,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d01000000000000000402" },
         "variantName": "Standard",
         "variantPrice": 599,
         "sku": "MERSUP0001-STD",
@@ -821,7 +862,6 @@
         ]
       },
       {
-        "_id": { "$oid": "6a2d01000000000000000403" },
         "variantName": "Premium",
         "variantPrice": 999,
         "sku": "MERSUP0001-PRE",
@@ -832,13 +872,11 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   },
-
   {
-    "_id": { "$oid": "6a2d01000000000000000411" },
     "productName": "Superheroes Merchandise 2",
     "productId": "test-sup-mer-0002",
     "uiProductId": "UN-PROD-43",
@@ -858,11 +896,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d01000000000000000412" },
         "variantName": "T-Shirt S",
         "variantPrice": 499,
         "sku": "MERSUP0002-TS",
@@ -874,7 +916,6 @@
         ]
       },
       {
-        "_id": { "$oid": "6a2d01000000000000000413" },
         "variantName": "T-Shirt L",
         "variantPrice": 499,
         "sku": "MERSUP0002-TL",
@@ -885,13 +926,11 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   },
-
   {
-    "_id": { "$oid": "6a2d01000000000000000421" },
     "productName": "Superheroes Merchandise 3",
     "productId": "test-sup-mer-0003",
     "uiProductId": "UN-PROD-44",
@@ -901,7 +940,9 @@
     "productQuantity": 10,
     "productStatus": "in_stock",
     "isPublished": true,
-    "tags": ["trending"],
+    "tags": [
+      "trending"
+    ],
     "color": [],
     "warranty": null,
     "categoryCode": "MER",
@@ -911,11 +952,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d01000000000000000422" },
         "variantName": "Mug",
         "variantPrice": 349,
         "sku": "MERSUP0003-MUG",
@@ -927,13 +972,11 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   },
-
   {
-    "_id": { "$oid": "6a2d01000000000000000501" },
     "productName": "Anime Posters 2",
     "productId": "test-ani-pos-0002",
     "uiProductId": "UN-PROD-45",
@@ -943,7 +986,9 @@
     "productQuantity": 10,
     "productStatus": "in_stock",
     "isPublished": true,
-    "tags": ["trending"],
+    "tags": [
+      "trending"
+    ],
     "color": [],
     "warranty": null,
     "categoryCode": "DEC",
@@ -953,11 +998,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d01000000000000000502" },
         "variantName": "Naruto",
         "variantPrice": 349,
         "sku": "DECPOSANI2-NAR",
@@ -969,7 +1018,6 @@
         ]
       },
       {
-        "_id": { "$oid": "6a2d01000000000000000503" },
         "variantName": "Dragon Ball Z",
         "variantPrice": 349,
         "sku": "DECPOSANI2-DBZ",
@@ -980,7 +1028,6 @@
         ]
       },
       {
-        "_id": { "$oid": "6a2d01000000000000000504" },
         "variantName": "One Piece",
         "variantPrice": 399,
         "sku": "DECPOSANI2-OPE",
@@ -991,13 +1038,11 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   },
-
   {
-    "_id": { "$oid": "6a2d01000000000000000511" },
     "productName": "Anime Posters 3",
     "productId": "test-ani-pos-0003",
     "uiProductId": "UN-PROD-46",
@@ -1017,11 +1062,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d01000000000000000512" },
         "variantName": "Attack on Titan",
         "variantPrice": 449,
         "sku": "DECPOSANI3-AOT",
@@ -1033,13 +1082,11 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   },
-
   {
-    "_id": { "$oid": "6a2d01000000000000000601" },
     "productName": "Anime Keychains 2",
     "productId": "test-ani-key-0002",
     "uiProductId": "UN-PROD-47",
@@ -1049,7 +1096,9 @@
     "productQuantity": 10,
     "productStatus": "in_stock",
     "isPublished": true,
-    "tags": ["new_arrival"],
+    "tags": [
+      "new_arrival"
+    ],
     "color": [],
     "warranty": null,
     "categoryCode": "KEY",
@@ -1059,11 +1108,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d01000000000000000602" },
         "variantName": "Naruto",
         "variantPrice": 199,
         "sku": "KEYANM0002-NAR",
@@ -1075,7 +1128,6 @@
         ]
       },
       {
-        "_id": { "$oid": "6a2d01000000000000000603" },
         "variantName": "Demon Slayer",
         "variantPrice": 199,
         "sku": "KEYANM0002-DMS",
@@ -1086,13 +1138,11 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   },
-
   {
-    "_id": { "$oid": "6a2d01000000000000000611" },
     "productName": "Anime Keychains 3",
     "productId": "test-ani-key-0003",
     "uiProductId": "UN-PROD-48",
@@ -1112,11 +1162,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d01000000000000000612" },
         "variantName": "Jujutsu Kaisen",
         "variantPrice": 249,
         "sku": "KEYANM0003-JJK",
@@ -1128,7 +1182,6 @@
         ]
       },
       {
-        "_id": { "$oid": "6a2d01000000000000000613" },
         "variantName": "My Hero Academia",
         "variantPrice": 249,
         "sku": "KEYANM0003-MHA",
@@ -1139,13 +1192,11 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   },
-
   {
-    "_id": { "$oid": "6a2d01000000000000000701" },
     "productName": "Anime Figures 1",
     "productId": "test-ani-fig-0001",
     "uiProductId": "UN-PROD-49",
@@ -1155,7 +1206,10 @@
     "productQuantity": 10,
     "productStatus": "in_stock",
     "isPublished": true,
-    "tags": ["featured", "best_seller"],
+    "tags": [
+      "featured",
+      "best_seller"
+    ],
     "color": [],
     "warranty": null,
     "categoryCode": "FIG",
@@ -1165,11 +1219,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d01000000000000000702" },
         "variantName": "Naruto Uzumaki",
         "variantPrice": 1299,
         "sku": "FIGANM0001-NAR",
@@ -1181,7 +1239,6 @@
         ]
       },
       {
-        "_id": { "$oid": "6a2d01000000000000000703" },
         "variantName": "Goku",
         "variantPrice": 1399,
         "sku": "FIGANM0001-GKU",
@@ -1192,7 +1249,6 @@
         ]
       },
       {
-        "_id": { "$oid": "6a2d01000000000000000704" },
         "variantName": "Luffy",
         "variantPrice": 1199,
         "sku": "FIGANM0001-LUF",
@@ -1204,13 +1260,11 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   },
-
   {
-    "_id": { "$oid": "6a2d01000000000000000711" },
     "productName": "Anime Figures 2",
     "productId": "test-ani-fig-0002",
     "uiProductId": "UN-PROD-50",
@@ -1220,7 +1274,9 @@
     "productQuantity": 10,
     "productStatus": "in_stock",
     "isPublished": true,
-    "tags": ["new_arrival"],
+    "tags": [
+      "new_arrival"
+    ],
     "color": [],
     "warranty": null,
     "categoryCode": "FIG",
@@ -1230,11 +1286,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d01000000000000000712" },
         "variantName": "Tanjiro",
         "variantPrice": 1499,
         "sku": "FIGANM0002-TAN",
@@ -1246,7 +1306,6 @@
         ]
       },
       {
-        "_id": { "$oid": "6a2d01000000000000000713" },
         "variantName": "Zenitsu",
         "variantPrice": 1499,
         "sku": "FIGANM0002-ZEN",
@@ -1257,13 +1316,11 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   },
-
   {
-    "_id": { "$oid": "6a2d01000000000000000721" },
     "productName": "Anime Figures 3",
     "productId": "test-ani-fig-0003",
     "uiProductId": "UN-PROD-51",
@@ -1273,7 +1330,9 @@
     "productQuantity": 10,
     "productStatus": "in_stock",
     "isPublished": true,
-    "tags": ["trending"],
+    "tags": [
+      "trending"
+    ],
     "color": [],
     "warranty": null,
     "categoryCode": "FIG",
@@ -1283,11 +1342,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d01000000000000000722" },
         "variantName": "Levi Ackerman",
         "variantPrice": 1799,
         "sku": "FIGANM0003-LEV",
@@ -1299,13 +1362,11 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   },
-
   {
-    "_id": { "$oid": "6a2d01000000000000000801" },
     "productName": "Anime Merchandise 1",
     "productId": "test-ani-mer-0001",
     "uiProductId": "UN-PROD-52",
@@ -1315,7 +1376,9 @@
     "productQuantity": 10,
     "productStatus": "in_stock",
     "isPublished": true,
-    "tags": ["featured"],
+    "tags": [
+      "featured"
+    ],
     "color": [],
     "warranty": null,
     "categoryCode": "MER",
@@ -1325,11 +1388,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d01000000000000000802" },
         "variantName": "Hoodie S",
         "variantPrice": 899,
         "sku": "MERANM0001-HS",
@@ -1341,7 +1408,6 @@
         ]
       },
       {
-        "_id": { "$oid": "6a2d01000000000000000803" },
         "variantName": "Hoodie XL",
         "variantPrice": 949,
         "sku": "MERANM0001-HXL",
@@ -1352,13 +1418,11 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   },
-
   {
-    "_id": { "$oid": "6a2d01000000000000000811" },
     "productName": "Anime Merchandise 2",
     "productId": "test-ani-mer-0002",
     "uiProductId": "UN-PROD-53",
@@ -1378,11 +1442,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d01000000000000000812" },
         "variantName": "Mug",
         "variantPrice": 399,
         "sku": "MERANM0002-MUG",
@@ -1394,7 +1462,6 @@
         ]
       },
       {
-        "_id": { "$oid": "6a2d01000000000000000813" },
         "variantName": "Poster Pack",
         "variantPrice": 599,
         "sku": "MERANM0002-PPK",
@@ -1405,13 +1472,11 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   },
-
   {
-    "_id": { "$oid": "6a2d01000000000000000821" },
     "productName": "Anime Merchandise 3",
     "productId": "test-ani-mer-0003",
     "uiProductId": "UN-PROD-54",
@@ -1421,7 +1486,9 @@
     "productQuantity": 10,
     "productStatus": "in_stock",
     "isPublished": true,
-    "tags": ["trending"],
+    "tags": [
+      "trending"
+    ],
     "color": [],
     "warranty": null,
     "categoryCode": "MER",
@@ -1431,11 +1498,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d01000000000000000822" },
         "variantName": "Tote Bag",
         "variantPrice": 449,
         "sku": "MERANM0003-TOT",
@@ -1447,13 +1518,11 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   },
-
   {
-    "_id": { "$oid": "6a2d01000000000000000901" },
     "productName": "Desk Accessories Bots 1",
     "productId": "test-desk-bot-0001",
     "uiProductId": "UN-PROD-55",
@@ -1463,7 +1532,10 @@
     "productQuantity": 10,
     "productStatus": "in_stock",
     "isPublished": true,
-    "tags": ["featured", "new_arrival"],
+    "tags": [
+      "featured",
+      "new_arrival"
+    ],
     "color": [],
     "warranty": null,
     "categoryCode": "DSK",
@@ -1473,11 +1545,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d01000000000000000902" },
         "variantName": "Classic White",
         "variantPrice": 1799,
         "sku": "DSKBOT0001-WHT",
@@ -1489,7 +1565,6 @@
         ]
       },
       {
-        "_id": { "$oid": "6a2d01000000000000000903" },
         "variantName": "Matte Black",
         "variantPrice": 1999,
         "sku": "DSKBOT0001-BLK",
@@ -1501,7 +1576,6 @@
         ]
       },
       {
-        "_id": { "$oid": "6a2d01000000000000000904" },
         "variantName": "Neon Blue",
         "variantPrice": 2199,
         "sku": "DSKBOT0001-NEO",
@@ -1512,13 +1586,11 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   },
-
   {
-    "_id": { "$oid": "6a2d01000000000000000911" },
     "productName": "Desk Accessories Bots 2",
     "productId": "test-desk-bot-0002",
     "uiProductId": "UN-PROD-56",
@@ -1528,7 +1600,9 @@
     "productQuantity": 10,
     "productStatus": "in_stock",
     "isPublished": true,
-    "tags": ["trending"],
+    "tags": [
+      "trending"
+    ],
     "color": [],
     "warranty": null,
     "categoryCode": "DSK",
@@ -1538,11 +1612,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d01000000000000000912" },
         "variantName": "Mini Bot",
         "variantPrice": 999,
         "sku": "DSKBOT0002-MIN",
@@ -1554,7 +1632,6 @@
         ]
       },
       {
-        "_id": { "$oid": "6a2d01000000000000000913" },
         "variantName": "Desk Bot Pro",
         "variantPrice": 2499,
         "sku": "DSKBOT0002-PRO",
@@ -1565,13 +1642,11 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   },
-
   {
-    "_id": { "$oid": "6a2d01000000000000000921" },
     "productName": "Desk Accessories Bots 3",
     "productId": "test-desk-bot-0003",
     "uiProductId": "UN-PROD-57",
@@ -1581,7 +1656,9 @@
     "productQuantity": 10,
     "productStatus": "in_stock",
     "isPublished": true,
-    "tags": ["best_seller"],
+    "tags": [
+      "best_seller"
+    ],
     "color": [],
     "warranty": null,
     "categoryCode": "DSK",
@@ -1591,11 +1668,15 @@
     "gstRate": 18,
     "specifications": [],
     "secondaryImages": [],
-    "packagingDimensions": { "length": 0, "breadth": 0, "height": 0, "weight": 0 },
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
     "disableAutoPush": false,
     "variantDetails": [
       {
-        "_id": { "$oid": "6a2d01000000000000000922" },
         "variantName": "Battle Bot",
         "variantPrice": 3499,
         "sku": "DSKBOT0003-BAT",
@@ -1607,7 +1688,6 @@
         ]
       },
       {
-        "_id": { "$oid": "6a2d01000000000000000923" },
         "variantName": "Companion Bot",
         "variantPrice": 2799,
         "sku": "DSKBOT0003-COM",
@@ -1618,8 +1698,8 @@
         ]
       }
     ],
-    "createdAt": { "$date": "2026-06-14T10:00:00.000Z" },
-    "updatedAt": { "$date": "2026-06-14T10:00:00.000Z" },
+    "createdAt": "2026-06-14T10:00:00.000Z",
+    "updatedAt": "2026-06-14T10:00:00.000Z",
     "__v": 0
   }
 ]

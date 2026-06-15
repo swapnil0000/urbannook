@@ -1,4 +1,5 @@
 node_modules
 
 db_seed
-# merged main with pr
+test_seed.json
+# merged main
