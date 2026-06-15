@@ -7,7 +7,7 @@ import {
   useRef,
   memo,
 } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { useCookies } from "react-cookie";
 import confetti from "canvas-confetti";
@@ -112,7 +112,8 @@ const ProductDetailPage = () => {
     return q || 0;
   };
 
-  const { productId } = useParams();
+  const [searchParams] = useSearchParams();
+  const productId = searchParams.get('product');
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { showNotification, openLoginModal, closeLoginModal } = useUI();
@@ -630,7 +631,7 @@ const ProductDetailPage = () => {
       <div className="h-screen flex flex-col items-center justify-center bg-[#1c3026] text-[#F5DEB3]">
         <h1 className="text-4xl font-serif">Product Not Found</h1>
         <button
-          onClick={() => navigate("/products")}
+          onClick={() => navigate(-1)}
           className="mt-4 border-b border-[#F5DEB3] pb-1 hover:text-white transition-colors"
         >
           Return to Shop
@@ -648,7 +649,7 @@ const ProductDetailPage = () => {
     brand: { "@type": "Brand", name: "UrbanNook" },
     offers: {
       "@type": "Offer",
-      url: `https://www.urbannook.in/product/${product.productId}`,
+      url: `https://www.urbannook.in/shop?product=${product.productId}`,
       priceCurrency: "INR",
       price: currentPrice,
       availability:
@@ -673,7 +674,7 @@ const ProductDetailPage = () => {
           `Buy ${product.productName} at UrbanNook. Premium quality, fast pan-India delivery.`
         }
         image={galleryImages[0]}
-        url={`/product/${product.productId}`}
+        url={`/shop?product=${product.productId}`}
         type="product"
         structuredData={productStructuredData}
       />
@@ -682,11 +683,11 @@ const ProductDetailPage = () => {
       <main className="mx-auto pt-24 pb-32 lg:pt-36 lg:pb-20 px-4 lg:px-12 relative z-10">
         <nav className="flex items-center text-[10px] tracking-[0.2em] uppercase text-[#F5DEB3]/50 mb-6 lg:mb-12 cursor-pointer">
           <span
-            onClick={() => navigate("/products")}
+            onClick={() => navigate(-1)}
             className="flex items-center gap-2 hover:text-[#F5DEB3] transition-colors"
           >
             <i className="fa-solid fa-arrow-left lg:hidden"></i>
-            <span>Shop</span>
+            <span>Back</span>
           </span>
           <span className="mx-3 text-[#F5DEB3]/20 hidden lg:inline">/</span>
           <span className="text-[#F5DEB3] font-bold border-b border-[#F5DEB3]/30 pb-0.5 hidden lg:inline">

@@ -327,7 +327,7 @@ const CheckoutPage = () => {
     if (cartItems.length > 0) cartLoadedRef.current = true;
     if (isGuest) {
       // For guests, cart is loaded from localStorage synchronously — if empty, redirect
-      if (cartItems.length === 0 && cartLoadedRef.current && !paymentCompletedRef.current) navigate("/products");
+      if (cartItems.length === 0 && cartLoadedRef.current && !paymentCompletedRef.current) navigate("/shop");
       setIsLoading(false);
       return;
     }
@@ -335,7 +335,7 @@ const CheckoutPage = () => {
     if (profileLoading) return; // Still loading profile/cart data
     if (!userProfileData) { refetchProfile(); return; }
     if (cartItems.length === 0 && cartLoadedRef.current && !paymentCompletedRef.current) {
-      navigate("/products"); return;
+      navigate("/shop"); return;
     }
     if (userProfileData?.data) {
       setUserProfile(userProfileData.data?.data);
@@ -486,7 +486,7 @@ const CheckoutPage = () => {
     try {
       const item = cartItems.find((i) => i.id === productId && (i.selectedVariant || "N/A") === v);
       await updateCart({ productId: item?.mongoId || productId, quantity: 1, action: "remove", variant: v, image: item?.image || "" }).unwrap();
-      if (cartItems.length === 1) navigate("/products");
+      if (cartItems.length === 1) navigate("/shop");
     } catch (e) { showNotification(e?.data?.message || "Failed to remove item", "error"); }
   };
 

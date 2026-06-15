@@ -222,7 +222,40 @@ fbq('track', 'PageView');
   ></noscript>
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=__VITE_GTM_ID__"
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
-  <div id="root"></div>
+  <div id="root">
+    <div id="un-initial-loader" style="
+      position:fixed;inset:0;
+      background:#2e443c;
+      display:flex;flex-direction:column;
+      align-items:center;justify-content:center;
+      z-index:9999;
+    ">
+      <img
+        src="/assets/logo_with_text.webp"
+        alt="UrbanNook"
+        style="width:140px;height:auto;margin-bottom:32px;opacity:0.95;"
+        onerror="this.style.display='none'"
+      />
+      <div style="
+        width:40px;height:40px;
+        border:3px solid rgba(245,222,179,0.2);
+        border-top-color:#F5DEB3;
+        border-radius:50%;
+        animation:un-spin 0.8s linear infinite;
+      "></div>
+      <p style="
+        margin-top:20px;
+        font-family:Georgia,serif;
+        font-size:13px;
+        letter-spacing:0.25em;
+        text-transform:uppercase;
+        color:rgba(245,222,179,0.5);
+      ">Loading…</p>
+    </div>
+    <style>
+      @keyframes un-spin { to { transform:rotate(360deg); } }
+    </style>
+  </div>
   <script type="module" src="/src/main.jsx"></script>
   
   <script>

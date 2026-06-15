@@ -92,7 +92,7 @@ const OrderConfirm = () => {
             </button>
 
             <button
-              onClick={() => navigate("/products")}
+              onClick={() => navigate("/shop")}
               className="w-full py-3 border border-gray-200 text-gray-500 rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-gray-50 transition-all"
             >
               Continue Shopping
@@ -184,7 +184,7 @@ const OrderConfirm = () => {
           )}
 
           <button
-            onClick={() => navigate("/products")}
+            onClick={() => navigate("/shop")}
             className="w-full py-3 border border-gray-200 text-gray-500 rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-gray-50 transition-all"
           >
             Continue Shopping

@@ -1,0 +1,590 @@
+[{
+  "_id": {
+    "$oid": "69abfd4025be5a99bcbce472"
+  },
+  "productName": "Stationery Suit Pen Stand",
+  "productId": "019cc7d5-43a9-7c24-a024-e724e6164115",
+  "uiProductId": "UN-PROD-11",
+  "productDes": "Keep your pens cozy and your workspace aesthetic effortlessly cool.",
+  "productCategory": "Pen Stand",
+  "productQuantity": 100,
+  "dimensions": {
+    "length": 12,
+    "breadth": 7.5,
+    "height": 11
+  },
+  "productStatus": "in_stock",
+  "tags": [
+    "new_arrival",
+    "best_seller",
+    "trending"
+  ],
+  "isPublished": true,
+  "productSubDes": "Add a cozy and creative touch to your desk with this unique 3D printed Stationery Suit Pen Stand. Designed to look like a miniature jacket, this eye-catching organizer keeps your stationery neatly arranged while serving as a stylish decor piece for your workspace. Perfect for home, office, or gifting.",
+  "specifications": [
+    {
+      "key": "Customization",
+      "value": "Available",
+      "_id": {
+        "$oid": "69b028d3a0472a7f57f48458"
+      }
+    },
+    {
+      "key": "Capacity",
+      "value": "6-8 pens",
+      "_id": {
+        "$oid": "69b028d3a0472a7f57f48459"
+      }
+    },
+    {
+      "key": "Finish Type",
+      "value": "3D printed layer texture",
+      "_id": {
+        "$oid": "69b028d3a0472a7f57f4845a"
+      }
+    },
+    {
+      "key": "Base Material",
+      "value": "PLA/PLA+",
+      "_id": {
+        "$oid": "69b028d3a0472a7f57f4845b"
+      }
+    },
+    {
+      "key": "Item Weight",
+      "value": "200gm",
+      "_id": {
+        "$oid": "69b028d3a0472a7f57f4845c"
+      }
+    },
+    {
+      "key": "Colour",
+      "value": "White",
+      "_id": {
+        "$oid": "69b028d3a0472a7f57f4845d"
+      }
+    }
+  ],
+  "createdAt": {
+    "$date": "2026-03-07T10:26:08.494Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-08T18:42:08.562Z"
+  },
+  "__v": 0,
+  "color": [
+    "Purple",
+    "White",
+    "Black",
+    "Blue",
+    "Sky blue",
+    "Grey",
+    "Rainbow",
+    "Yellow",
+    "Red",
+    "Orange"
+  ],
+  "boxDimensionsAndWeight": {
+    "l": 12,
+    "b": 12,
+    "h": 12,
+    "w": 1000
+  },
+  "weight": "200 g",
+  "variantDetails": [
+    {
+      "variantName": "Purple",
+      "variantImage": [
+        "https://d1dhs7xre1cv0d.cloudfront.net/product-images/019cf38f-db85-7c3c-95ae-bb7a237c8fe3.jpeg"
+      ],
+      "variantPrice": 299,
+      "sku": "STRSPSPURS",
+      "isActive": true,
+      "_id": {
+        "$oid": "6a22b8b8f11b348124b8220f"
+      }
+    },
+    {
+      "variantName": "White",
+      "variantImage": [
+        "https://d1dhs7xre1cv0d.cloudfront.net/product-images/019cf390-1037-7593-9173-96d0a8392e86.jpeg"
+      ],
+      "variantPrice": 299,
+      "sku": "STRSPSWHIS",
+      "isActive": true,
+      "_id": {
+        "$oid": "6a22b8b8f11b348124b82210"
+      }
+    },
+    {
+      "variantName": "Black",
+      "variantImage": [
+        "https://d1dhs7xre1cv0d.cloudfront.net/product-images/019cf39b-1014-73a8-81c2-19cdd1210b6a.jpeg"
+      ],
+      "variantPrice": 299,
+      "sku": "STRSPSBLKS",
+      "isActive": true,
+      "_id": {
+        "$oid": "6a22b8b8f11b348124b82211"
+      }
+    },
+    {
+      "variantName": "Blue",
+      "variantImage": [
+        "https://d1dhs7xre1cv0d.cloudfront.net/product-images/019cf39b-5c64-77d7-b8c5-56a732dc3929.jpeg"
+      ],
+      "variantPrice": 299,
+      "sku": "STRSPSBLUS",
+      "isActive": true,
+      "_id": {
+        "$oid": "6a22b8b8f11b348124b82212"
+      }
+    },
+    {
+      "variantName": "Sky blue",
+      "variantImage": [
+        "https://d1dhs7xre1cv0d.cloudfront.net/product-images/019cf39b-99f7-7231-8d97-c87cb9c6f4fd.jpeg"
+      ],
+      "variantPrice": 299,
+      "sku": "STRSPSSKYS",
+      "isActive": true,
+      "_id": {
+        "$oid": "6a22b8b8f11b348124b82213"
+      }
+    },
+    {
+      "variantName": "Grey",
+      "variantImage": [
+        "https://d1dhs7xre1cv0d.cloudfront.net/product-images/019cf39b-b724-7e4b-ae91-f396203ff041.jpeg"
+      ],
+      "variantPrice": 299,
+      "sku": "STRSPSGRYS",
+      "isActive": true,
+      "_id": {
+        "$oid": "6a22b8b8f11b348124b82214"
+      }
+    },
+    {
+      "variantName": "Rainbow",
+      "variantImage": [
+        "https://d1dhs7xre1cv0d.cloudfront.net/product-images/019cf39e-2f25-7989-a4b3-10fff0db8860.jpeg"
+      ],
+      "variantPrice": 299,
+      "sku": "STRSPSRBWS",
+      "isActive": true,
+      "_id": {
+        "$oid": "6a22b8b8f11b348124b82215"
+      }
+    },
+    {
+      "variantName": "Yellow",
+      "variantImage": [
+        "https://d1dhs7xre1cv0d.cloudfront.net/product-images/019cf39e-6fcd-737f-85df-5858bac8e64a.jpeg"
+      ],
+      "variantPrice": 299,
+      "sku": "STRSPSYLWS",
+      "isActive": true,
+      "_id": {
+        "$oid": "6a22b8b8f11b348124b82216"
+      }
+    },
+    {
+      "variantName": "Red",
+      "variantImage": [
+        "https://d1dhs7xre1cv0d.cloudfront.net/product-images/019cf377-5b40-7335-91ed-0d629aae750b.jpeg"
+      ],
+      "variantPrice": 299,
+      "sku": "STRSPSREDS",
+      "isActive": true,
+      "_id": {
+        "$oid": "6a22b8b8f11b348124b82217"
+      }
+    },
+    {
+      "variantName": "Orange",
+      "variantImage": [
+        "https://d1dhs7xre1cv0d.cloudfront.net/product-images/019cf39e-ad06-75d7-a00c-ee747caa7239.jpeg"
+      ],
+      "variantPrice": 299,
+      "sku": "STRSPSORGS",
+      "isActive": true,
+      "_id": {
+        "$oid": "6a22b8b8f11b348124b82218"
+      }
+    }
+  ],
+  "isCodAvailable": true,
+  "categoryCode": "STR",
+  "familyCode": "SPS",
+  "sku": "STRSPSSTDS",
+  "categoryRef": "ae6eb08e-8ff5-42b8-8d17-0cb38350d03e",
+  "genreRef": "e6692bb3-6f31-49ff-885c-177de66b051b"
+},
+{
+  "_id": {
+    "$oid": "69e5022903c5df3cca44770c"
+  },
+  "productName": "Brake Caliper Lamp",
+  "productId": "019da690-729b-7428-8ae1-0273f030d2a8",
+  "uiProductId": "UN-PROD-16",
+  "productDes": "Warm red, fiery ambient light perfect for late-night grinds.",
+  "productCategory": "Lamp",
+  "productQuantity": 69,
+  "dimensions": {
+    "length": 27,
+    "breadth": 6,
+    "height": 27
+  },
+  "productStatus": "in_stock",
+  "tags": [
+    "featured",
+    "new_arrival"
+  ],
+  "isPublished": true,
+  "weight": "1770 g",
+  "productSubDes": "Elevate your daily environment with this striking 3D-printed caliper lamp. The ambient light mimics a red-hot rotor, adding an aggressive yet modern cozy touch to your workspace.",
+  "productSubCategory": "Desktop Lamp",
+  "materialAndCare": "Crafted with premium materials. Wipe clean with a soft and dry cloth.",
+  "specifications": [
+    {
+      "key": "Light Source",
+      "value": "Neon Tube",
+      "_id": {
+        "$oid": "69e5022903c5df3cca44770d"
+      }
+    },
+    {
+      "key": "Power Source",
+      "value": "Adapter (included)",
+      "_id": {
+        "$oid": "69e5022903c5df3cca44770e"
+      }
+    },
+    {
+      "key": "Finish Type",
+      "value": "3D printed layer texture + Glossy resin (bmw logo)",
+      "_id": {
+        "$oid": "69e5022903c5df3cca44770f"
+      }
+    },
+    {
+      "key": "Base Material",
+      "value": "PLA + PETG",
+      "_id": {
+        "$oid": "69e5022903c5df3cca447710"
+      }
+    },
+    {
+      "key": "Shade color",
+      "value": "Translucent Red",
+      "_id": {
+        "$oid": "69e5022903c5df3cca447711"
+      }
+    },
+    {
+      "key": "Wire Length",
+      "value": "2m",
+      "_id": {
+        "$oid": "69e5022903c5df3cca447712"
+      }
+    }
+  ],
+  "createdAt": {
+    "$date": "2026-04-19T16:26:17.675Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-08T18:42:08.679Z"
+  },
+  "__v": 1,
+  "variantDetails": [
+    {
+      "variantName": "BMW",
+      "variantImage": [
+        "https://d1dhs7xre1cv0d.cloudfront.net/product-images/019cb457-16df-70af-be27-204839148bc3.webp",
+        "https://d1dhs7xre1cv0d.cloudfront.net/product-images/019cfd3c-e8ec-7e89-9093-1a588b7a5233.webp",
+        "https://d1dhs7xre1cv0d.cloudfront.net/product-images/019cfd5e-e88d-778e-b07a-6977405cf181.webp"
+      ],
+      "variantPrice": 1599,
+      "sku": "LMPBCLBMWS",
+      "isActive": true,
+      "_id": {
+        "$oid": "6a22b879f11b348124b821e3"
+      }
+    },
+    {
+      "variantName": "Porsche",
+      "variantImage": [
+        "https://d1dhs7xre1cv0d.cloudfront.net/product-images/1.webp",
+        "https://d1dhs7xre1cv0d.cloudfront.net/product-images/2.webp",
+        "https://d1dhs7xre1cv0d.cloudfront.net/product-images/3.webp",
+        "https://d1dhs7xre1cv0d.cloudfront.net/product-images/4.webp",
+        "https://d1dhs7xre1cv0d.cloudfront.net/product-images/5.webp"
+      ],
+      "variantPrice": 1599,
+      "sku": "LMPBCLPORS",
+      "isActive": true,
+      "_id": {
+        "$oid": "6a22b879f11b348124b821e4"
+      }
+    },
+    {
+      "variantName": "Lambo",
+      "variantImage": [
+        "https://d1dhs7xre1cv0d.cloudfront.net/product-images/lambo-1.webp",
+        "https://d1dhs7xre1cv0d.cloudfront.net/product-images/lambo-2.webp",
+        "https://d1dhs7xre1cv0d.cloudfront.net/product-images/lambo-3.webp"
+      ],
+      "variantPrice": 1799,
+      "sku": "LMPBCLLAMS",
+      "isActive": true,
+      "_id": {
+        "$oid": "6a22b879f11b348124b821e5"
+      }
+    }
+  ],
+  "isCodAvailable": true,
+  "giftAddOns": [
+    {
+      "giftProductId": "019cc7d5-43a9-7c24-a024-e724e6164115",
+      "addOnPrice": 99,
+      "label": "Add a matching pen stand",
+      "allowGiftMessage": true,
+      "maxMessageLength": 250
+    }
+  ],
+  "categoryCode": "LMP",
+  "familyCode": "BCL",
+  "sku": "LMPBCLSTDS",
+  "packagingDimensions": {
+    "length": 27,
+    "breadth": 26,
+    "height": 12,
+    "weight": 999.7
+  },
+  "disableAutoPush": false,
+  "categoryRef": "a046bd7e-b6d9-4092-bd89-ba356ef10f8c",
+  "genreRef": "e6692bb3-6f31-49ff-885c-177de66b051b"
+},
+{
+  "_id": {
+    "$oid": "6a254bde37fc2e8d768d7e45"
+  },
+  "productName": "Car Key Chain",
+  "productId": "019ea1b0-5e8c-70ef-ace0-e0abe105cff2",
+  "uiProductId": "UN-PROD-18",
+  "productImg": "https://nfc-img-user-bucket.s3.ap-south-1.amazonaws.com/dev/product-images/019ea1b0-3f15-71fa-ae96-c5df02360db7.jpeg",
+  "secondaryImages": [],
+  "productDes": "demo",
+  "productCategory": "Car Accessories",
+  "productSubCategory": "Keychains",
+  "productSubDes": "demom sub",
+  "productQuantity": 0,
+  "variantDetails": [
+    {
+      "variantName": "",
+      "variantImage": [],
+      "variantPrice": 0,
+      "sku": "",
+      "isActive": true,
+      "_id": {
+        "$oid": "6a254bde37fc2e8d768d7e46"
+      }
+    }
+  ],
+  "color": [],
+  "weight": "10",
+  "productStatus": "in_stock",
+  "tags": [
+    "featured",
+    "new_arrival",
+    "best_seller",
+    "trending"
+  ],
+  "isPublished": true,
+  "materialAndCare": "",
+  "warranty": "",
+  "specifications": [],
+  "categoryCode": "",
+  "familyCode": "",
+  "packagingDimensions": {
+    "length": 0,
+    "breadth": 0,
+    "height": 0,
+    "weight": 0
+  },
+  "disableAutoPush": false,
+  "sku": "",
+  "hsnCode": "",
+  "gstRate": 0,
+  "createdAt": {
+    "$date": "2026-06-07T10:45:50.925Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-08T18:42:08.782Z"
+  },
+  "__v": 0,
+  "categoryRef": "0dfef4d5-aea7-413a-a01f-cdb492bcb80d",
+  "genreRef": "e6692bb3-6f31-49ff-885c-177de66b051b"
+},
+{
+  "_id": {
+    "$oid": "6a28517580361d095b1971c9"
+  },
+  "productName": "test category prod",
+  "productId": "019ead7e-32ba-749c-ba96-3d14e5b86ccf",
+  "uiProductId": "UN-PROD-19",
+  "productImg": "https://nfc-img-user-bucket.s3.ap-south-1.amazonaws.com/dev/product-images/019ead7d-8c12-7b36-af1c-ad12569c3bda.jpg",
+  "secondaryImages": [],
+  "productDes": "category-based-feature",
+  "productCategory": "Car Accessories",
+  "productSubCategory": "Keychains",
+  "productSubDes": "",
+  "productQuantity": 0,
+  "variantDetails": [
+    {
+      "variantName": "",
+      "variantImage": [],
+      "variantPrice": 0,
+      "sku": "",
+      "isActive": true,
+      "_id": {
+        "$oid": "6a28517580361d095b1971ca"
+      }
+    }
+  ],
+  "color": [],
+  "weight": "",
+  "productStatus": "in_stock",
+  "tags": [],
+  "isPublished": true,
+  "materialAndCare": "",
+  "warranty": "",
+  "specifications": [],
+  "categoryCode": "",
+  "familyCode": "",
+  "packagingDimensions": {
+    "length": 0,
+    "breadth": 0,
+    "height": 0,
+    "weight": 0
+  },
+  "disableAutoPush": false,
+  "sku": "",
+  "hsnCode": "",
+  "gstRate": 0,
+  "createdAt": {
+    "$date": "2026-06-09T17:46:29.514Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-09T17:46:34.921Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "6a2851b180361d095b197214"
+  },
+  "productName": "test prod 2",
+  "productId": "019ead7f-1d97-7e4e-aa3c-a8e873d92c19",
+  "uiProductId": "UN-PROD-20",
+  "productImg": "https://nfc-img-user-bucket.s3.ap-south-1.amazonaws.com/dev/product-images/019ead7f-16a4-795d-a30b-ef307fb0f64b.jpg",
+  "secondaryImages": [],
+  "productDes": "category-based-feature",
+  "productCategory": "Anime Accessories",
+  "productSubCategory": "Posters",
+  "productSubDes": "",
+  "productQuantity": 0,
+  "variantDetails": [
+    {
+      "variantName": "",
+      "variantImage": [],
+      "variantPrice": 0,
+      "sku": "",
+      "isActive": true,
+      "_id": {
+        "$oid": "6a2851b180361d095b197215"
+      }
+    }
+  ],
+  "color": [],
+  "weight": "",
+  "productStatus": "in_stock",
+  "tags": [],
+  "isPublished": true,
+  "materialAndCare": "",
+  "warranty": "",
+  "specifications": [],
+  "categoryCode": "",
+  "familyCode": "",
+  "packagingDimensions": {
+    "length": 0,
+    "breadth": 0,
+    "height": 0,
+    "weight": 0
+  },
+  "disableAutoPush": false,
+  "sku": "",
+  "hsnCode": "",
+  "gstRate": 0,
+  "createdAt": {
+    "$date": "2026-06-09T17:47:29.636Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-09T17:47:32.559Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "6a2851d780361d095b19725f"
+  },
+  "productName": "test prod 3",
+  "productId": "019ead7f-afc8-7cee-8cac-c7066e89baf5",
+  "uiProductId": "UN-PROD-21",
+  "productImg": "",
+  "secondaryImages": [],
+  "productDes": "category-based-featurecategory-based-feature",
+  "productCategory": "Lamps",
+  "productSubCategory": "BMW Lamp",
+  "productSubDes": "",
+  "productQuantity": 0,
+  "variantDetails": [
+    {
+      "variantName": "",
+      "variantImage": [],
+      "variantPrice": 0,
+      "sku": "",
+      "isActive": true,
+      "_id": {
+        "$oid": "6a2851d780361d095b197260"
+      }
+    }
+  ],
+  "color": [],
+  "weight": "",
+  "productStatus": "in_stock",
+  "tags": [],
+  "isPublished": true,
+  "materialAndCare": "",
+  "warranty": "",
+  "specifications": [],
+  "categoryCode": "",
+  "familyCode": "",
+  "packagingDimensions": {
+    "length": 0,
+    "breadth": 0,
+    "height": 0,
+    "weight": 0
+  },
+  "disableAutoPush": false,
+  "sku": "",
+  "hsnCode": "",
+  "gstRate": 0,
+  "createdAt": {
+    "$date": "2026-06-09T17:48:07.025Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-09T17:48:08.397Z"
+  },
+  "__v": 0
+}]

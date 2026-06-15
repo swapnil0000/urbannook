@@ -25,7 +25,7 @@ const NewLaunchPopup = memo(() => {
   if (!isVisible || timeLeft.isExpired) return null;
 
   const handleNavigate = () => {
-    navigate('/products');
+    navigate('/shop');
     setIsVisible(false);
   };
 

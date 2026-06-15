@@ -1,0 +1,391 @@
+// catgeories data
+[{
+  "_id": {
+    "$oid": "6a270d00647da4c38098eb90"
+  },
+  "name": "Superheroes",
+  "slug": "superheroes",
+  "categoryId": "ae6eb08e-8ff5-42b8-8d17-0cb38350d03e",
+  "createdAt": {
+    "$date": "2026-06-08T18:42:08.500Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-12T13:00:31.296Z"
+  },
+  "__v": 8,
+  "displayOrder": 4,
+  "image": "",
+  "isActive": true,
+  "subcategories": [
+    {
+      "name": "Posters",
+      "slug": "posters",
+      "_id": {
+        "$oid": "6a2c02d78dcdaea65367a729"
+      }
+    },
+    {
+      "name": "Keychains",
+      "slug": "keychains",
+      "_id": {
+        "$oid": "6a2c02e48dcdaea65367a733"
+      }
+    },
+    {
+      "name": "Merchandise",
+      "slug": "merchandise",
+      "_id": {
+        "$oid": "6a2c02ef8dcdaea65367a748"
+      }
+    }
+  ]
+},
+{
+  "_id": {
+    "$oid": "6a270d00647da4c38098eb98"
+  },
+  "name": "Cars",
+  "slug": "cars",
+  "categoryId": "a046bd7e-b6d9-4092-bd89-ba356ef10f8c",
+  "createdAt": {
+    "$date": "2026-06-08T18:42:08.643Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-12T12:59:04.038Z"
+  },
+  "__v": 5,
+  "displayOrder": 0,
+  "image": "https://d1dhs7xre1cv0d.cloudfront.net/dev/reviews/019ebbe9-5008-7b5e-b07f-5815aaf5bd4b.jpg",
+  "isActive": true,
+  "subcategories": [
+    {
+      "name": "Brake Caliper Lamps",
+      "slug": "brake-caliper-lamps",
+      "_id": {
+        "$oid": "6a2c02868dcdaea65367a6e9"
+      }
+    },
+    {
+      "name": "Car Accessories",
+      "slug": "car-accessories",
+      "_id": {
+        "$oid": "6a2c028b8dcdaea65367a6ef"
+      }
+    },
+    {
+      "name": "Posters",
+      "slug": "posters",
+      "_id": {
+        "$oid": "6a2c02928dcdaea65367a6f6"
+      }
+    },
+    {
+      "name": "Keychains",
+      "slug": "keychains",
+      "_id": {
+        "$oid": "6a2c02988dcdaea65367a6fe"
+      }
+    }
+  ]
+},
+{
+  "_id": {
+    "$oid": "6a270d00647da4c38098eb9c"
+  },
+  "name": "Desk Accessories",
+  "slug": "desk-accessories",
+  "categoryId": "0dfef4d5-aea7-413a-a01f-cdb492bcb80d",
+  "createdAt": {
+    "$date": "2026-06-08T18:42:08.746Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-12T13:01:20.480Z"
+  },
+  "__v": 2,
+  "displayOrder": 5,
+  "image": "",
+  "isActive": true,
+  "subcategories": [
+    {
+      "name": "Bots",
+      "slug": "bots",
+      "_id": {
+        "$oid": "6a2c03208dcdaea65367a75a"
+      }
+    }
+  ]
+},
+{
+  "_id": {
+    "$oid": "6a2c01b78dcdaea65367a652"
+  },
+  "name": "Anime",
+  "slug": "anime",
+  "image": "",
+  "subcategories": [
+    {
+      "name": "Posters",
+      "slug": "posters",
+      "_id": {
+        "$oid": "6a2c01b78dcdaea65367a653"
+      }
+    },
+    {
+      "name": "Keychains",
+      "slug": "keychains",
+      "_id": {
+        "$oid": "6a2c01b78dcdaea65367a654"
+      }
+    },
+    {
+      "name": "Figures",
+      "slug": "figures",
+      "_id": {
+        "$oid": "6a2c01b78dcdaea65367a655"
+      }
+    },
+    {
+      "name": "Merchandise",
+      "slug": "merchandise",
+      "_id": {
+        "$oid": "6a2c01b78dcdaea65367a656"
+      }
+    }
+  ],
+  "displayOrder": 1,
+  "isActive": true,
+  "createdAt": {
+    "$date": "2026-06-12T12:55:19.177Z"
+  },
+  "updatedAt": {
+    "$date": "2026-06-12T12:55:19.177Z"
+  },
+  "__v": 0
+}]
+
+
+// products used right. now data but pls change
+
+[
+  {
+    "_id": {
+      "$oid": "6a2c039d8dcdaea65367a7f2"
+    },
+    "productName": "Brake Caliper Lamp",
+    "productId": "019ebbee-1fa5-722f-8c54-d19854ba44b0",
+    "uiProductId": "UN-PROD-22",
+    "productImg": "https://d1dhs7xre1cv0d.cloudfront.net/dev/reviews/019ebbec-f1cb-78c1-a114-08c6693f10ff.webp",
+    "secondaryImages": [],
+    "productDes": "Since you are planning to run this on an edge device (the Raspberry Pi 4B), QAT is a major advantage for two reasons:",
+    "productCategory": "Cars",
+    "productSubCategory": "Brake Caliper Lamps",
+    "productQuantity": 0,
+    "variantDetails": [
+      {
+        "variantName": "BMW",
+        "variantImage": [],
+        "variantPrice": 1234,
+        "sku": "LMPBCLBMWS",
+        "isActive": true,
+        "_id": {
+          "$oid": "6a2c039d8dcdaea65367a7f3"
+        }
+      },
+      {
+        "variantName": "POR",
+        "variantImage": [],
+        "variantPrice": 1234,
+        "sku": "LMPBCLPORS",
+        "isActive": true,
+        "_id": {
+          "$oid": "6a2c039d8dcdaea65367a7f4"
+        }
+      }
+    ],
+    "color": [],
+    "productStatus": "in_stock",
+    "tags": [],
+    "isPublished": true,
+    "warranty": null,
+    "categoryCode": "LMP",
+    "familyCode": "BCL",
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
+    "disableAutoPush": false,
+    "sku": "LMPBCLSTDS",
+    "hsnCode": "",
+    "gstRate": 0,
+    "specifications": [],
+    "createdAt": {
+      "$date": "2026-06-12T13:03:25.702Z"
+    },
+    "updatedAt": {
+      "$date": "2026-06-12T13:03:25.702Z"
+    },
+    "__v": 0
+  },
+  {
+    "_id": {
+      "$oid": "6a2c043a8dcdaea65367a820"
+    },
+    "productName": "key chain",
+    "productId": "019ebbf0-82ec-7c45-9a39-66adf40b5cbd",
+    "uiProductId": "UN-PROD-23",
+    "productImg": "https://d1dhs7xre1cv0d.cloudfront.net/dev/reviews/019ebbef-3798-75e7-b20f-478c89e174d4.webp",
+    "secondaryImages": [],
+    "productDes": "Shipping API documentaion helps you to integrate API's for your mobile or own web solution. It will help you integrate your system with shipping solution.\n\n",
+    "productCategory": "Cars",
+    "productSubCategory": "Keychains",
+    "productQuantity": 0,
+    "color": [],
+    "productStatus": "in_stock",
+    "tags": [],
+    "isPublished": true,
+    "warranty": null,
+    "categoryCode": "KEY",
+    "familyCode": "KYC",
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
+    "disableAutoPush": false,
+    "sku": "KEYKYCSTDS",
+    "hsnCode": "",
+    "gstRate": 0,
+    "variantDetails": [],
+    "specifications": [],
+    "createdAt": {
+      "$date": "2026-06-12T13:06:02.188Z"
+    },
+    "updatedAt": {
+      "$date": "2026-06-12T13:06:02.188Z"
+    },
+    "__v": 0
+  },
+  {
+    "_id": {
+      "$oid": "6a2c04bd8dcdaea65367a84b"
+    },
+    "productName": "car posters",
+    "productId": "019ebbf2-84dd-7635-b3d6-c792dbb33328",
+    "uiProductId": "UN-PROD-24",
+    "productImg": "https://d1dhs7xre1cv0d.cloudfront.net/dev/reviews/019ebbf1-b4d2-7159-aad0-fd9a3929dc20.jpeg",
+    "secondaryImages": [],
+    "productDes": "Variants\nLeave empty for variantless products — SKU falls back to DECPOSSTD.\n\nNo variants yet. Click \"Add variant\" below — or save with none for a single-design product.",
+    "productCategory": "Cars",
+    "productSubCategory": "Posters",
+    "productQuantity": 0,
+    "color": [],
+    "productStatus": "in_stock",
+    "tags": [],
+    "isPublished": true,
+    "warranty": null,
+    "categoryCode": "DEC",
+    "familyCode": "POS",
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
+    "disableAutoPush": false,
+    "sku": "DECPOSSTDS",
+    "hsnCode": "",
+    "gstRate": 0,
+    "variantDetails": [],
+    "specifications": [],
+    "createdAt": {
+      "$date": "2026-06-12T13:08:13.750Z"
+    },
+    "updatedAt": {
+      "$date": "2026-06-12T13:08:13.750Z"
+    },
+    "__v": 0
+  },
+  {
+    "_id": {
+      "$oid": "6a2c051c8dcdaea65367a876"
+    },
+    "productName": "anime keychains",
+    "productId": "019ebbf3-f5be-7ed4-a032-92c03c0b1ba6",
+    "uiProductId": "UN-PROD-25",
+    "productImg": "https://d1dhs7xre1cv0d.cloudfront.net/dev/reviews/019ebbf3-4dbd-7382-806f-3ce0360343aa.jpeg",
+    "secondaryImages": [],
+    "productDes": "keychainanime",
+    "productCategory": "Anime",
+    "productSubCategory": "Keychains",
+    "productQuantity": 0,
+    "color": [],
+    "productStatus": "in_stock",
+    "tags": [],
+    "isPublished": true,
+    "warranty": null,
+    "categoryCode": "KEY",
+    "familyCode": "ANM",
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
+    "disableAutoPush": false,
+    "sku": "KEYANMSTDS",
+    "hsnCode": "",
+    "gstRate": 0,
+    "variantDetails": [],
+    "specifications": [],
+    "createdAt": {
+      "$date": "2026-06-12T13:09:48.165Z"
+    },
+    "updatedAt": {
+      "$date": "2026-06-12T13:09:48.165Z"
+    },
+    "__v": 0
+  },
+  {
+    "_id": {
+      "$oid": "6a2c05838dcdaea65367a8ae"
+    },
+    "productName": "anime posters",
+    "productId": "019ebbf5-8799-7b00-bac0-7e40c8e60230",
+    "uiProductId": "UN-PROD-26",
+    "productImg": "https://d1dhs7xre1cv0d.cloudfront.net/dev/reviews/019ebbf4-826c-779c-a1bf-b0c00dd4a385.jpeg",
+    "secondaryImages": [],
+    "productDes": "anime psoters",
+    "productCategory": "Anime",
+    "productSubCategory": "Posters",
+    "productQuantity": 0,
+    "color": [],
+    "productStatus": "in_stock",
+    "tags": [],
+    "isPublished": true,
+    "warranty": null,
+    "categoryCode": "DEC",
+    "familyCode": "POS",
+    "packagingDimensions": {
+      "length": 0,
+      "breadth": 0,
+      "height": 0,
+      "weight": 0
+    },
+    "disableAutoPush": false,
+    "sku": "DECPOSANIS",
+    "hsnCode": "",
+    "gstRate": 0,
+    "variantDetails": [],
+    "specifications": [],
+    "createdAt": {
+      "$date": "2026-06-12T13:11:31.060Z"
+    },
+    "updatedAt": {
+      "$date": "2026-06-12T13:11:31.060Z"
+    },
+    "__v": 0
+  }
+]

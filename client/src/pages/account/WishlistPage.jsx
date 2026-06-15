@@ -113,7 +113,7 @@ const WishlistPage = () => {
               <h2 className="text-2xl font-serif text-white mb-2">Your collection is empty</h2>
               <p className="text-green-50/60 mb-6 font-light">Save your favorite pieces to easily find them later.</p>
               <button
-                onClick={() => navigate('/products')}
+                onClick={() => navigate('/shop')}
                 className="bg-[#F5DEB3] text-[#2e443c] px-8 py-3 rounded-full font-bold uppercase tracking-widest text-xs hover:bg-white transition-colors"
               >
                 Explore Collection
@@ -139,7 +139,7 @@ const WishlistPage = () => {
                   {/* Clickable Card Area */}
                   <div
                     className="flex flex-col max-h-[520px] cursor-pointer"
-                    onClick={() => navigate(`/product/${item.productId}`)}
+                    onClick={() => navigate(`/shop?product=${item.productId}`)}
                   >
 
                     <div className="relative w-full aspect-square bg-[#f8f8f5] overflow-hidden">
