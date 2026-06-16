@@ -1,8 +1,8 @@
 // API URL Configuration for different environments
 
 const API_URLS = {
-  local: 'http://localhost:8080/api/v1',
-  development: 'http://localhost:8080/api/v1',
+  local: 'http://localhost:8000/api/v1',
+  development: 'http://localhost:8000/api/v1',
   staging: 'https://api-staging.urbannook.online/api/v1',
   production: 'https://api.urbannook.in/api/v1',
 };
