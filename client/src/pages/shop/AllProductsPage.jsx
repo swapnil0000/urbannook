@@ -158,6 +158,9 @@ const AllProductsPage = () => {
     return () => window.removeEventListener('resize', handler);
   }, []);
 
+  const [activeCategory, setActiveCategory] = useState('');
+  const [activeSubCategory, setActiveSubCategory] = useState('');
+
   const handleSearchChange = useCallback((e) => {
     const val = e.target.value;
     setSearchQuery(val);
@@ -184,6 +187,12 @@ const AllProductsPage = () => {
     refetchOnReconnect: false,
   });
   const categories = useMemo(() => catData?.data || [], [catData]);
+
+  const subCategories = useMemo(() => {
+    if (!activeCategory) return [];
+    const cat = categories.find(c => c.name === activeCategory || c.slug === activeCategory);
+    return (cat?.subcategories || []).map(s => s.name);
+  }, [activeCategory, categories]);
 
   const { data: productsData, isLoading } = useGetProductsQuery(
     { page: 1, limit: 300 },
