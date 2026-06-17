@@ -145,3 +145,5 @@ function App() {
 }
 
 export default App;
+
+// categories not showing 
