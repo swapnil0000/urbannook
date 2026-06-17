@@ -31,3 +31,4 @@ connDB()
   });
 
   // trigger buil
+  // ctaegorie s not showing
