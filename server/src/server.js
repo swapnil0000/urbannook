@@ -30,5 +30,5 @@ connDB()
     process.exit(1);
   });
 
-  // trigger buil
-  // ctaegorie s not showing
+  // trigger build
+  // categories not showing
