@@ -129,7 +129,7 @@ const ProductCard = memo(({ product, onClick }) => {
       onClick={onClick}
     >
       <ImageCarousel images={images} productName={product.productName} />
-      <div className="px-3 py-2.5 bg-[#faf9f6] rounded-b-2xl">
+      <div className="px-3 bg-[#faf9f6] rounded-b-2xl h-[52px] flex items-center">
         <p className="text-sm font-serif text-[#2e443c] leading-snug line-clamp-2
                       group-hover:text-[#4a6b5d] transition-colors duration-300">
           {product.productName}
@@ -372,21 +372,11 @@ const CategoryPage = () => {
       <section className="px-5 md:px-8 relative z-10">
         <div className="max-w-7xl mx-auto space-y-12">
 
-          {isLoading && (
-            <div className="flex justify-center py-32">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#F5DEB3]" />
-            </div>
+          {allProducts.length === 0 && (
+            <p className="text-white/40 text-sm py-10 text-center">No products</p>
           )}
 
-          {!isLoading && allProducts.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-32 bg-black/10 rounded-[2rem] border border-white/5">
-              <i className="fa-solid fa-box-open text-4xl text-[#F5DEB3]/40 mb-4" />
-              <h2 className="text-xl font-serif text-white mb-2">No products yet</h2>
-              <p className="text-white/40 text-sm">This collection is being curated.</p>
-            </div>
-          )}
-
-          {!isLoading && groups.map(({ heading, products }) => (
+          {groups.map(({ heading, products }) => (
             <div key={heading || 'other'}>
               {/* Sub-category heading */}
               {heading && (

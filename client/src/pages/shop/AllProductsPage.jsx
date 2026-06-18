@@ -30,7 +30,7 @@ const SlimCard = memo(({ product, onClick }) => {
           </div>
         )}
       </div>
-      <div className="px-3 py-2.5 bg-[#faf9f6] rounded-b-2xl">
+      <div className="px-3 bg-[#faf9f6] rounded-b-2xl h-[68px] flex flex-col justify-center">
         <p className="text-sm font-serif text-[#2e443c] leading-snug line-clamp-2 group-hover:text-[#4a6b5d] transition-colors duration-300">
           {product.productName}
         </p>
@@ -151,13 +151,6 @@ const AllProductsPage = () => {
 
   useEffect(() => { window.scrollTo(0, 0); }, []);
 
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
-  useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < 1024);
-    window.addEventListener('resize', handler, { passive: true });
-    return () => window.removeEventListener('resize', handler);
-  }, []);
-
   const [activeCategory, setActiveCategory] = useState('');
   const [activeSubCategory, setActiveSubCategory] = useState('');
 
@@ -231,24 +224,7 @@ const AllProductsPage = () => {
         return ai - bi;
       });
 
-      let displayProducts;
-      if (isMobile) {
-        // One product per subcategory, max 3 cards — no scroll needed
-        const seenSub = new Set();
-        displayProducts = [];
-        for (const p of sorted) {
-          const subKey = p.productSubCategory || p.subCategorySlug || '__none__';
-          if (!seenSub.has(subKey)) {
-            seenSub.add(subKey);
-            displayProducts.push(p);
-            if (displayProducts.length === 3) break;
-          }
-        }
-      } else {
-        displayProducts = sorted;
-      }
-
-      groups.push({ cat, products: displayProducts });
+      groups.push({ cat, products: sorted });
       map.delete(cat.slug);
     }
 
@@ -261,7 +237,7 @@ const AllProductsPage = () => {
     }
 
     return groups;
-  }, [allProducts, categories, isMobile]);
+  }, [allProducts, categories]);
 
   return (
     <div className="min-h-screen bg-[#2e443c] relative font-sans pb-20">
@@ -393,21 +369,11 @@ const AllProductsPage = () => {
       <section className="px-5 md:px-8 relative z-10">
         <div className="max-w-7xl mx-auto space-y-14">
 
-          {isLoading && (
-            <div className="flex justify-center py-32">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#F5DEB3]" />
-            </div>
+          {categoryGroups.length === 0 && (
+            <p className="text-white/40 text-sm py-10 text-center">No products</p>
           )}
 
-          {!isLoading && categoryGroups.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-32 bg-black/10 rounded-[2rem] border border-white/5">
-              <i className="fa-solid fa-box-open text-4xl text-[#F5DEB3]/40 mb-4" />
-              <h2 className="text-xl font-serif text-white mb-2">No products yet</h2>
-              <p className="text-white/40 text-sm">This collection is being curated.</p>
-            </div>
-          )}
-
-          {!isLoading && categoryGroups.map(({ cat, products }) => (
+          {categoryGroups.map(({ cat, products }) => (
             <div key={cat.slug || cat._id}>
               {/* Category heading */}
               <div className="flex items-center gap-3 mb-5">
