@@ -10,7 +10,7 @@ const Faq = () => {
     {
       category: "Orders & Shipping",
       items: [
-        { q: "How long does shipping take?", a: "We offer express shipping within 3 to 5 days hours across India." },
+        { q: "How long does shipping take?", a: "We offer express shipping within 24 - 48 hours across India." },
         { q: "Can I track my order?", a: "Yes, once your order is shipped, you will receive a tracking link via email." },
         { q: "Do you ship internationally?", a: "Currently, we only ship within India. International shipping is coming soon!" }
       ]

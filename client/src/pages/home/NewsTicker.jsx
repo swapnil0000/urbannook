@@ -6,6 +6,7 @@ const NewsTicker = () => {
 
   const headlines = [
     "Limited time offer on selected products",
+    "Ready to ship within 48 hrs",
     "Cash on Delivery available",
   ];
 
