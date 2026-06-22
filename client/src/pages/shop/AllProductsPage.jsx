@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGetProductsQuery } from '../../store/api/productsApi';
 import SEOHead from '../../component/SEOHead';
-import { trackViewItemList } from '../../utils/analytics';
+import { trackViewItemList, trackSelectItem } from '../../utils/analytics';
 
 const PlaceholderImage = lazy(() => import('../../component/PlaceholderImage'));
 const WishlistButton = lazy(() => import('../../component/WishlistButton'));
@@ -114,7 +114,7 @@ const AllProductsPage = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-              {displayProducts?.map((product) => (
+              {displayProducts?.map((product, index) => (
                 <div
                   key={product.productId}
                   className="group relative rounded-[2rem] overflow-hidden bg-black/20 border border-white/5 shadow-lg hover:shadow-2xl hover:border-[#F5DEB3]/30 transition-all duration-500 flex flex-col"
@@ -127,9 +127,20 @@ const AllProductsPage = () => {
                   </div>
 
                   {/* Clickable Card Area */}
-                  <div 
+                  <div
                     className="flex flex-col max-h-[520px] cursor-pointer"
-                    onClick={() => navigate(`/product/${product.productId}`)}
+                    onClick={() => {
+                      trackSelectItem({
+                        itemId: product.productId,
+                        itemName: product.productName,
+                        itemVariant: product.variantDetails?.[0]?.variantName,
+                        price: product.effectivePrice,
+                        listId: 'all_products',
+                        listName: 'All Products',
+                        index,
+                      });
+                      navigate(`/product/${product.productId}`);
+                    }}
                   >
                     
                     <div className="relative w-full aspect-square bg-[#f8f8f5] overflow-hidden">

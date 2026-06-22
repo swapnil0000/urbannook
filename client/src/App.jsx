@@ -1,6 +1,6 @@
-import { BrowserRouter as Router } from 'react-router-dom';
+import { BrowserRouter as Router, useLocation } from 'react-router-dom';
 import { Provider } from 'react-redux';
-import { useEffect, lazy, Suspense } from 'react';
+import { useEffect, useRef, lazy, Suspense } from 'react';
 import { useDispatch } from 'react-redux';
 import { HelmetProvider } from 'react-helmet-async';
 import { store } from './store/store';
@@ -12,6 +12,7 @@ import { fetchCsrfToken } from './store/api/apiSlice';
 import AppRoutes from './store/AppRoutes';
 import NewsTicker from './pages/home/NewsTicker';
 import SEOHead from './component/SEOHead';
+import { trackPageView, setUserId, captureAttribution } from './utils/analytics';
 // check
 const ORG_STRUCTURED_DATA = {
   '@context': 'https://schema.org',
@@ -52,6 +53,9 @@ const SessionManager = ({ children }) => {
         const user = JSON.parse(storedUser);
         // Restore session in Redux
         dispatch(setCredentials({ user, token }));
+
+        // Stitch identity into analytics (GA4 user_id) on session restore
+        setUserId(user?.userId || user?.id || user?._id);
         
         // Fetch CSRF token for authenticated user
         fetchCsrfToken().catch(err => {
@@ -101,6 +105,30 @@ const SessionManager = ({ children }) => {
   return children;
 };
 
+// Fires a GA4 page_view on every SPA route change and locks first-touch
+// attribution (utm/gclid/fbclid) before the landing query string is lost.
+const RouteTracker = () => {
+  const location = useLocation();
+  const firstLoad = useRef(true);
+
+  // Capture first-touch UTMs immediately, before any client-side navigation wipes them.
+  useEffect(() => {
+    captureAttribution();
+  }, []);
+
+  useEffect(() => {
+    // The on-page Google tag already counts the landing page_view, so skip the
+    // initial mount and only fire on subsequent SPA navigations (avoids double-count).
+    if (firstLoad.current) {
+      firstLoad.current = false;
+      return;
+    }
+    trackPageView({ pagePath: location.pathname + location.search });
+  }, [location.pathname, location.search]);
+
+  return null;
+};
+
 // Component to handle cart and wishlist sync
 const SyncProvider = ({ children }) => {
   useCartSync();
@@ -118,6 +146,7 @@ function App() {
     <Provider store={store}>
         <Router> 
           <SEOHead structuredData={ORG_STRUCTURED_DATA} />
+          <RouteTracker />
           <SessionManager>
             <SyncProvider>
               <ErrorBoundary>

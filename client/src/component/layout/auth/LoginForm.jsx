@@ -8,6 +8,7 @@ import { useAuth, useUI } from '../../../hooks/useRedux';
 import { setShowLoginModal, clearLoginCallback } from '../../../store/slices/uiSlice';
 import GoogleLoginButton from './GoogleLoginButton';
 import useFormValidation from '../../../hooks/useFormValidation';
+import { trackLogin, trackLoginFailed } from '../../../utils/analytics';
 
 const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
   const navigate = useNavigate();
@@ -72,7 +73,9 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
       }
       
       localStorage.setItem('user', JSON.stringify(userData));
-      
+
+      trackLogin({ method: 'password', userId: userData.userId });
+
       if (onLoginSuccess) {
         onLoginSuccess(userData);
       }
@@ -91,6 +94,7 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
         navigate(path);
       }
     } catch (error) {
+      trackLoginFailed({ method: 'password', errorCode: error?.status });
       const errorData = error?.data?.data;
       const errorMessage = error?.data?.message || 'Login failed. Please check your credentials.';
       

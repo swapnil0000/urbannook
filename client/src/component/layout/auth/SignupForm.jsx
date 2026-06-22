@@ -6,6 +6,7 @@ import { useOtpSentMutation, useRegisterMutation } from '../../../store/api/auth
 import { useUI } from '../../../hooks/useRedux';
 import { setShowLoginModal } from '../../../store/slices/uiSlice';
 import useFormValidation from '../../../hooks/useFormValidation';
+import { trackSignUp, track } from '../../../utils/analytics';
 
 const SignupForm = ({ onClose, onSwitchToLogin }) => {
   const navigate = useNavigate();
@@ -79,6 +80,7 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
 
       // Check if registration was successful
       if (result?.success) {
+        trackSignUp({ method: 'email', userId: result.data?.userId, mobileProvided: !!formData.mobile });
         // If user already exists but unverified, OTP was resent
         if (result.data?.requiresVerification) {
           showNotification(result?.message || 'OTP sent to your email!');
@@ -90,6 +92,7 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
         }
       }
     } catch (error) {
+      track('sign_up_failed', { error_code: error?.status });
       // Handle different error scenarios
       const errorMessage = error?.data?.message || 'Registration failed.';
       const errorData = error.data?.data;

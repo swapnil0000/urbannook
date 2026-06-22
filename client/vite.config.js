@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "node:url";
 import { webcrypto } from "node:crypto";
@@ -89,17 +89,21 @@ function bundleSizeMonitor() {
  * HTML Environment Variable Replace Plugin
  * Replaces %VITE_GTM_ID% placeholder in index.html with the actual GTM container ID
  */
-function htmlEnvReplace() {
+function htmlEnvReplace(gtmId) {
   return {
     name: 'html-env-replace',
     transformIndexHtml(html) {
-      return html.replace(/__VITE_GTM_ID__/g, process.env.VITE_GTM_ID || 'GTM-XXXXXXX');
+      return html.replace(/__VITE_GTM_ID__/g, gtmId || 'GTM-XXXXXXX');
     }
   };
 }
 
-export default defineConfig({
-  plugins: [react(), bundleSizeMonitor(), htmlEnvReplace()],
+export default defineConfig(({ mode }) => {
+  // Vite does NOT auto-populate process.env from .env files, so load them here
+  // and hand the GTM container id to the index.html replace plugin.
+  const env = loadEnv(mode, process.cwd(), '');
+  return {
+  plugins: [react(), bundleSizeMonitor(), htmlEnvReplace(env.VITE_GTM_ID)],
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
@@ -194,4 +198,5 @@ export default defineConfig({
     strictPort: false,
     host: true,
   },
+  };
 });

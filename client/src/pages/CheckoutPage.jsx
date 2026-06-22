@@ -20,7 +20,7 @@ import { clearCart, removeItem } from "../store/slices/cartSlice";
 import { fetchCsrfToken } from "../store/api/apiSlice";
 import CouponInput from "../component/CouponInput";
 import { ComponentLoader } from "../component/layout/LoadingSpinner";
-import { trackBeginCheckout, trackPurchase } from "../utils/analytics";
+import { trackBeginCheckout, trackPurchase, trackAddShippingInfo, trackAddPaymentInfo, trackPaymentFailed, trackPaymentModalDismissed, trackCheckoutStep, trackOrderCreated } from "../utils/analytics";
 
 const CouponList = lazy(() => import("../component/CouponList"));
 const MobileNumberModal = lazy(() => import("../component/MobileNumberModal"));
@@ -402,6 +402,9 @@ const CheckoutPage = () => {
   };
   const goToStep = (n) => { setCurrentStep(n); window.scrollTo({ top: 0, behavior: "smooth" }); };
 
+  const buildTrackItems = () =>
+    cartItems.map((i) => ({ itemId: i.mongoId || i.id, itemName: i.name, itemVariant: i.selectedVariant || "N/A", price: i.price, quantity: i.quantity }));
+
   const loadRazorpay = () =>
     new Promise((res) => {
       if (window.Razorpay) return res(true);
@@ -543,6 +546,7 @@ const CheckoutPage = () => {
         updateUserProfile({ mobileNumber: m }).unwrap().then(() => refetchProfile()).catch(() => {});
       }
     }
+    trackCheckoutStep({ step: 1, stepLabel: "contact", isGuest });
     goToStep(addressStep);
   };
 
@@ -562,11 +566,23 @@ const CheckoutPage = () => {
       return;
     }
 
+    trackAddShippingInfo({
+      items: buildTrackItems(),
+      value: pricingDetails.subtotal,
+      shipping: shippingAmount,
+      pincode: pin,
+      step: "address",
+      isGuest,
+    });
+    trackCheckoutStep({ step: 2, stepLabel: "address", isGuest });
     goToStep(reviewStep);
   };
 
   const handlePayment = async () => {
     setPaymentError(null);
+
+    trackCheckoutStep({ step: currentStep, stepLabel: "payment", isGuest });
+    trackAddPaymentInfo({ items: buildTrackItems(), value: totalToPay, paymentMethod, isGuest });
 
     if (isGuest) {
       try {
@@ -585,6 +601,13 @@ const CheckoutPage = () => {
           },
           paymentMethod,
         }).unwrap();
+
+        trackOrderCreated({
+          orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId,
+          userType: "guest",
+          paymentMethod: orderResult.data?.paymentMethod || paymentMethod,
+        });
+
         if (!await loadRazorpay()) { showNotification("Could not load payment.", "error"); return; }
         const isCODOrder = orderResult.data?.paymentMethod === "COD";
         const rp = new window.Razorpay({
@@ -603,9 +626,10 @@ const CheckoutPage = () => {
           },
           prefill: { name: guestName.trim(), email: guestEmail.trim(), contact: guestMobile.trim() },
           notes: { address, pinCode }, theme: { color: "#2E443C" },
-          modal: { ondismiss: () => { setPaymentError("Payment cancelled. Your cart is safe."); setShowRetry(true); }, escape: false, confirm_close: true },
+          modal: { ondismiss: () => { trackPaymentModalDismissed({ orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId, value: totalToPay }); setPaymentError("Payment cancelled. Your cart is safe."); setShowRetry(true); }, escape: false, confirm_close: true },
         });
         rp.on("payment.failed", (r) => {
+          trackPaymentFailed({ errorCode: r.error?.code, errorDescription: r.error?.description, paymentMethod, value: totalToPay, orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId });
           setPaymentError(r.error.description || "Payment failed. Please try again.");
           setShowRetry(true);
         });
@@ -645,6 +669,13 @@ const CheckoutPage = () => {
         },
         paymentMethod,
       }).unwrap();
+
+      trackOrderCreated({
+        orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId || orderResult.id,
+        userType: "user",
+        paymentMethod: orderResult.data?.paymentMethod || paymentMethod,
+      });
+
       if (!await loadRazorpay()) { showNotification("Could not load payment.", "error"); return; }
       const isCODOrder = orderResult.data?.paymentMethod === "COD";
       const rp = new window.Razorpay({
@@ -667,9 +698,10 @@ const CheckoutPage = () => {
         },
         prefill: { name: userProfile?.userName || userProfile?.name || "", email: userProfile?.email || "", contact: senderMobileStr },
         notes: { address, pinCode }, theme: { color: "#2E443C" },
-        modal: { ondismiss: () => { setPaymentError("Payment cancelled. Your cart is safe."); setShowRetry(true); }, escape: false, confirm_close: true },
+        modal: { ondismiss: () => { trackPaymentModalDismissed({ orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId || orderResult.id, value: totalToPay }); setPaymentError("Payment cancelled. Your cart is safe."); setShowRetry(true); }, escape: false, confirm_close: true },
       });
       rp.on("payment.failed", (r) => {
+        trackPaymentFailed({ errorCode: r.error?.code, errorDescription: r.error?.description, paymentMethod, value: totalToPay, orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId || orderResult.id });
         setPaymentError(r.error.description || "Payment failed. Please try again.");
         setShowRetry(true);
       });
