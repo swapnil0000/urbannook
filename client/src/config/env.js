@@ -53,6 +53,7 @@ const config = {
   features: {
     enableGoogleOAuth: !!env.VITE_GOOGLE_CLIENT_ID,
     enableAnalytics: env.VITE_ENABLE_ANALYTICS === 'true',
+    analyticsDebug: env.VITE_ANALYTICS_DEBUG === 'true',
     enableServiceWorker: env.PROD && env.VITE_ENABLE_SW !== 'false'
   }
 };
