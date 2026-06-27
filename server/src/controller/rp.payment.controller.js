@@ -594,6 +594,7 @@ const razorpayWebHookController = async (req, res) => {
                 email: order.userEmail,
                 phone: order.userMobile || order.senderMobile,
                 firstName: (order.userName || order.guestInfo?.name || "").split(" ")[0],
+                lastName: (order.userName || order.guestInfo?.name || "").split(" ").slice(1).join(" "),
                 externalId: order.userId,
                 fbp: order.metaTracking?.fbp,
                 fbc: order.metaTracking?.fbc,

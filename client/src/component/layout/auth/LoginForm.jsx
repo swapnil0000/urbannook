@@ -74,7 +74,7 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
       
       localStorage.setItem('user', JSON.stringify(userData));
 
-      trackLogin({ method: 'password', userId: userData.userId });
+      trackLogin({ method: 'password', userId: userData.userId, email: userData.email, phone: userData.mobile, name: userData.name });
 
       if (onLoginSuccess) {
         onLoginSuccess(userData);
