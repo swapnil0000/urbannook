@@ -133,6 +133,33 @@ export function setUserId(userId) {
 }
 
 /**
+ * Manual Advanced Matching — pass a logged-in user's identity to the Meta Pixel so
+ * EVERY browser event carries email/phone/name (Meta normalizes + hashes client-side
+ * before sending). Biggest EMQ lever for logged-in sessions. Call on login + session restore.
+ * Note (DPDP): ideally gate behind marketing consent.
+ */
+export function setMetaAdvancedMatching({ email, phone, firstName, lastName, userId } = {}) {
+  if (!enabled()) return;
+  if (typeof window === 'undefined' || typeof window.fbq !== 'function') return;
+  const pixelId = config.metaPixelId;
+  if (!pixelId) return;
+  try {
+    const userData = {};
+    if (email) userData.em = String(email).trim().toLowerCase();
+    if (phone) userData.ph = String(phone).replace(/\D/g, '');
+    if (firstName) userData.fn = String(firstName).trim().toLowerCase();
+    if (lastName) userData.ln = String(lastName).trim().toLowerCase();
+    if (userId) userData.external_id = String(userId);
+    if (Object.keys(userData).length === 0) return;
+    // Re-init with advanced matching data — Meta merges it for subsequent events (no extra PageView).
+    window.fbq('init', pixelId, userData);
+    if (isDebug()) console.log('%c📘 Meta Advanced Matching set', 'color:#7e9cc9;font-weight:bold', Object.keys(userData));
+  } catch (error) {
+    console.warn('[Analytics] setMetaAdvancedMatching:', error);
+  }
+}
+
+/**
  * Capture first-touch marketing attribution (utm_*, gclid, fbclid, referrer).
  * MUST run before the first page_view — in an SPA the landing query string is
  * wiped on the first client-side route change. Idempotent: only the first visit is stored.
@@ -500,18 +527,20 @@ export function trackRefund({ transactionId, value, items = [] }) {
  * Auth & identity events
  * ------------------------------------------------------------------------ */
 
-export function trackLogin({ method, userId, isNewUser }) {
+export function trackLogin({ method, userId, isNewUser, email, phone, name }) {
   try {
     setUserId(userId);
+    setMetaAdvancedMatching({ email, phone, firstName: name ? name.split(' ')[0] : undefined, lastName: name ? name.split(' ').slice(1).join(' ') : undefined, userId });
     track('login', { method, ...(userId ? { user_id: String(userId) } : {}), ...(isNewUser != null ? { is_new_user: isNewUser } : {}) });
   } catch (error) {
     console.warn('[Analytics] trackLogin:', error);
   }
 }
 
-export function trackSignUp({ method, userId, mobileProvided }) {
+export function trackSignUp({ method, userId, mobileProvided, email, phone, name }) {
   try {
     setUserId(userId);
+    setMetaAdvancedMatching({ email, phone, firstName: name ? name.split(' ')[0] : undefined, lastName: name ? name.split(' ').slice(1).join(' ') : undefined, userId });
     track('sign_up', { method, ...(userId ? { user_id: String(userId) } : {}), ...(mobileProvided != null ? { mobile_provided: mobileProvided } : {}) });
     pushPixelEvent('CompleteRegistration', { method });
   } catch (error) {

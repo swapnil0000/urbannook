@@ -80,7 +80,7 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
 
       // Check if registration was successful
       if (result?.success) {
-        trackSignUp({ method: 'email', userId: result.data?.userId, mobileProvided: !!formData.mobile });
+        trackSignUp({ method: 'email', userId: result.data?.userId, mobileProvided: !!formData.mobile, email: formData.email, phone: formData.mobile, name: formData.name });
         // If user already exists but unverified, OTP was resent
         if (result.data?.requiresVerification) {
           showNotification(result?.message || 'OTP sent to your email!');

@@ -41,6 +41,7 @@ const config = {
   
   // GTM Configuration
   gtmId: env.VITE_GTM_ID || 'GTM-XXXXXXX',
+  metaPixelId: env.VITE_META_PIXEL_ID || '',
 
   // App Configuration
   appEnv: env.VITE_APP_ENV || 'development',

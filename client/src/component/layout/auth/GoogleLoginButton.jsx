@@ -40,7 +40,7 @@ export default function GoogleLoginButton({
           token,
         }));
 
-        trackLogin({ method: 'google', userId: result.data.userId });
+        trackLogin({ method: 'google', userId: result.data.userId, email: result.data.email, name: result.data.name });
 
         // Call optional onSuccess callback
         if (onSuccess) {

@@ -12,7 +12,7 @@ import { fetchCsrfToken } from './store/api/apiSlice';
 import AppRoutes from './store/AppRoutes';
 import NewsTicker from './pages/home/NewsTicker';
 import SEOHead from './component/SEOHead';
-import { trackPageView, setUserId, captureAttribution } from './utils/analytics';
+import { trackPageView, setUserId, captureAttribution, setMetaAdvancedMatching } from './utils/analytics';
 // check
 const ORG_STRUCTURED_DATA = {
   '@context': 'https://schema.org',
@@ -56,6 +56,14 @@ const SessionManager = ({ children }) => {
 
         // Stitch identity into analytics (GA4 user_id) on session restore
         setUserId(user?.userId || user?.id || user?._id);
+        // Feed Meta Advanced Matching (email/phone/name) for all browser events
+        setMetaAdvancedMatching({
+          email: user?.email,
+          phone: user?.mobile,
+          firstName: user?.name ? user.name.split(' ')[0] : undefined,
+          lastName: user?.name ? user.name.split(' ').slice(1).join(' ') : undefined,
+          userId: user?.userId || user?.id || user?._id,
+        });
         
         // Fetch CSRF token for authenticated user
         fetchCsrfToken().catch(err => {
