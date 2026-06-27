@@ -146,11 +146,7 @@ const SyncProvider = ({ children }) => {
 
 function App() {
   useEffect(() => {
-<<<<<<< Updated upstream
     console.log("%c URBAN NOOK CLIENT ACTIVE - VERSION 2.1.1 (STRICT VARIANT) ", "background: #2e443c; color: #F5DEB3; font-weight: bold; font-size: 14px; padding: 10px; border-radius: 5px;");
-=======
-    console.log("%c URBAN NOOK CLIENT ACTIVE - VERSION 2.1.1 (META PIXEL + CAPI) ", "background: #2e443c; color: #F5DEB3; font-weight: bold; font-size: 14px; padding: 10px; border-radius: 5px;");
->>>>>>> Stashed changes
   }, []);
 
   return (
