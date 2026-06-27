@@ -137,6 +137,13 @@ const orderSchema = new mongoose.Schema(
       email: { type: String, default: null },
       mobile: { type: String, default: null },
     },
+    metaTracking: {
+      fbp: { type: String, default: null },
+      fbc: { type: String, default: null },
+      clientIp: { type: String, default: null },
+      clientUserAgent: { type: String, default: null },
+      eventSourceUrl: { type: String, default: null },
+    },
   },
   { timestamps: true },
 );

@@ -78,14 +78,19 @@ function pushEcommerce(eventName, ecommerce) {
 }
 
 /** Send an event to the Meta Pixel (fbq). Silently skips if not loaded. */
-function pushPixelEvent(eventName, params = {}) {
+function pushPixelEvent(eventName, params = {}, options) {
   if (!enabled()) return;
   if (typeof window.fbq !== 'function') {
     if (isDebug()) console.warn('[Analytics] fbq not loaded, Meta event skipped:', eventName);
     return;
   }
-  if (isDebug()) console.log(`%c📘 Meta → ${eventName}`, 'color:#7e9cc9;font-weight:bold', params);
-  window.fbq('track', eventName, params);
+  if (isDebug()) console.log(`%c📘 Meta → ${eventName}`, 'color:#7e9cc9;font-weight:bold', { params, options });
+  // Meta deduplication: eventID MUST be the 4th argument, never inside params.
+  if (options && options.eventID) {
+    window.fbq('track', eventName, params, { eventID: options.eventID });
+  } else {
+    window.fbq('track', eventName, params);
+  }
 }
 
 /** Map an app product shape → GA4 item. Omits empty/placeholder fields. */
@@ -169,6 +174,34 @@ function getAttribution() {
   }
 }
 
+/**
+ * Read Meta's `_fbp` / `_fbc` cookies (and synthesize `_fbc` from a `fbclid` in the
+ * URL / stored attribution if the cookie is absent). Pass these to the server at
+ * checkout so the Conversions API can include them — the single biggest
+ * match-quality (EMQ) lever for server-side events.
+ */
+export function getFbCookies() {
+  if (typeof document === 'undefined') return {};
+  try {
+    const read = (name) => {
+      const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+      return m ? decodeURIComponent(m[1]) : null;
+    };
+    const fbp = read('_fbp');
+    let fbc = read('_fbc');
+    if (!fbc) {
+      const fbclid = new URLSearchParams(window.location.search).get('fbclid') || getAttribution().fbclid;
+      if (fbclid) fbc = `fb.1.${Date.now()}.${fbclid}`;
+    }
+    const out = {};
+    if (fbp) out.fbp = fbp;
+    if (fbc) out.fbc = fbc;
+    return out;
+  } catch {
+    return {};
+  }
+}
+
 /* ---------------------------------------------------------------------------
  * Page / navigation  (React Router does NOT auto-fire pageviews in an SPA)
  * ------------------------------------------------------------------------ */
@@ -184,6 +217,7 @@ export function trackPageView({ pagePath, pageTitle } = {}) {
     };
     pushEvent({ event: 'page_view', ...params }); // for future GTM
     sendGtag('page_view', params);                 // direct to GA4 now
+    pushPixelEvent('PageView');                     // Meta PageView on SPA navigation
   } catch (error) {
     console.warn('[Analytics] trackPageView:', error);
   }
@@ -272,7 +306,7 @@ export function trackAddToCart({ itemId, itemName, itemVariant, price, quantity 
       ...(placement ? { placement } : {}),
       items: [toItem({ itemId, itemName, itemVariant, price, quantity })],
     });
-    pushPixelEvent('AddToCart', { content_ids: [itemId], content_name: itemName, content_type: 'product', value: price * quantity, currency: CURRENCY });
+    pushPixelEvent('AddToCart', { content_ids: [itemId], contents: [{ id: itemId, quantity }], content_name: itemName, content_type: 'product', value: price * quantity, currency: CURRENCY });
   } catch (error) {
     console.warn('[Analytics] trackAddToCart:', error);
   }
@@ -315,7 +349,7 @@ export function trackBeginCheckout({ items = [], value, coupon, isGuest }) {
       ...(isGuest != null ? { is_guest: isGuest } : {}),
       items: items.map((it) => toItem(it)),
     });
-    pushPixelEvent('InitiateCheckout', { content_ids: items.map((i) => i.itemId), value, currency: CURRENCY, num_items: items.length });
+    pushPixelEvent('InitiateCheckout', { content_ids: items.map((i) => i.itemId), contents: items.map((i) => ({ id: i.itemId, quantity: i.quantity || 1 })), value, currency: CURRENCY, num_items: items.reduce((n, i) => n + (i.quantity || 1), 0) });
   } catch (error) {
     console.warn('[Analytics] trackBeginCheckout:', error);
   }
@@ -432,7 +466,18 @@ export function trackPurchase({ transactionId, value, shipping = 0, tax = 0, cou
       ...(eventId ? { event_id: eventId } : {}),
       items: items.map((it) => toItem(it)),
     });
-    pushPixelEvent('Purchase', { content_ids: items.map((i) => i.itemId), value, currency: CURRENCY, num_items: items.length, ...(eventId ? { eventID: eventId } : {}) });
+    pushPixelEvent(
+      'Purchase',
+      {
+        content_ids: items.map((i) => i.itemId),
+        contents: items.map((i) => ({ id: i.itemId, quantity: i.quantity || 1 })),
+        content_type: 'product',
+        value,
+        currency: CURRENCY,
+        num_items: items.reduce((n, i) => n + (i.quantity || 1), 0),
+      },
+      eventId ? { eventID: eventId } : undefined, // dedup key = orderId (4th arg)
+    );
   } catch (error) {
     console.warn('[Analytics] trackPurchase:', error);
   }

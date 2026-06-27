@@ -19,6 +19,19 @@ import Address from "../model/address.new.model.js";
 import html_to_pdf from "html-pdf-node";
 import { generateInvoiceHtmlTemplate } from "../template/invoiceTemplate.template.js";
 import { calculateShippingRate } from "../services/shipping.service.js";
+import { sendMetaCapiEvent } from "../services/meta.capi.service.js";
+
+// Collect Meta CAPI match-quality signals from the order-creation request.
+// The webhook (Razorpay → server) has no browser context, so we persist these on
+// the order and replay them into the server-side Purchase for high match quality.
+const collectMetaTracking = (req) => ({
+  fbp: req.body?.fbp || null,
+  fbc: req.body?.fbc || null,
+  clientIp:
+    req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.ip || null,
+  clientUserAgent: req.headers["user-agent"] || null,
+  eventSourceUrl: req.headers["referer"] || req.headers["origin"] || null,
+});
 
 const PAYMENT_ERROR_MESSAGES = {
   BAD_REQUEST_ERROR: "Payment failed due to invalid request. Please try again.",
@@ -329,6 +342,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       discountAmount,
       isApplied,
     },
+    metaTracking: collectMetaTracking(req),
     note: "Amount is the final amount paid by the user",
   });
 
@@ -567,6 +581,37 @@ const razorpayWebHookController = async (req, res) => {
               invoiceError,
             );
           }
+          try {
+            const capiContents = order.items.map((i) => ({
+              id: i.productId,
+              quantity: i.productSnapshot.quantity,
+            }));
+            await sendMetaCapiEvent({
+              eventName: "Purchase",
+              eventId: order.orderId,
+              eventSourceUrl: order.metaTracking?.eventSourceUrl,
+              userData: {
+                email: order.userEmail,
+                phone: order.userMobile || order.senderMobile,
+                firstName: (order.userName || order.guestInfo?.name || "").split(" ")[0],
+                externalId: order.userId,
+                fbp: order.metaTracking?.fbp,
+                fbc: order.metaTracking?.fbc,
+                clientIp: order.metaTracking?.clientIp,
+                clientUserAgent: order.metaTracking?.clientUserAgent,
+              },
+              customData: {
+                currency: "INR",
+                value: order.amount,
+                content_ids: capiContents.map((c) => c.id),
+                contents: capiContents,
+                num_items: capiContents.reduce((n, c) => n + (c.quantity || 1), 0),
+                order_id: order.orderId,
+              },
+            });
+          } catch (capiError) {
+            console.error("[Meta CAPI] Purchase dispatch error:", capiError.message);
+          }
         }
 
         console.log("✅ Payment Captured:", payment.id);
@@ -745,6 +790,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     codDetails: isCOD ? { partialAmountPaid: codPartialAmount, remainingAmount: codRemainingAmount } : undefined,
     isGuestOrder: true,
     guestInfo: { name: guestInfo.name.trim(), email: guestEmail, mobile: cleanMobile },
+    metaTracking: collectMetaTracking(req),
   });
 
   return res.status(200).json(

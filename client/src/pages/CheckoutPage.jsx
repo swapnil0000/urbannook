@@ -20,7 +20,7 @@ import { clearCart, removeItem } from "../store/slices/cartSlice";
 import { fetchCsrfToken } from "../store/api/apiSlice";
 import CouponInput from "../component/CouponInput";
 import { ComponentLoader } from "../component/layout/LoadingSpinner";
-import { trackBeginCheckout, trackPurchase, trackAddShippingInfo, trackAddPaymentInfo, trackPaymentFailed, trackPaymentModalDismissed, trackCheckoutStep, trackOrderCreated } from "../utils/analytics";
+import { trackBeginCheckout, trackPurchase, trackAddShippingInfo, trackAddPaymentInfo, trackPaymentFailed, trackPaymentModalDismissed, trackCheckoutStep, trackOrderCreated, getFbCookies } from "../utils/analytics";
 
 const CouponList = lazy(() => import("../component/CouponList"));
 const MobileNumberModal = lazy(() => import("../component/MobileNumberModal"));
@@ -600,6 +600,7 @@ const CheckoutPage = () => {
             long: addressForm?.long || 0,
           },
           paymentMethod,
+          ...getFbCookies(), // _fbp / _fbc → stored on order for CAPI match quality
         }).unwrap();
 
         trackOrderCreated({
@@ -619,6 +620,13 @@ const CheckoutPage = () => {
           order_id: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId,
           handler: (response) => {
             paymentCompletedRef.current = true;
+            trackPurchase({
+              transactionId: response.razorpay_order_id,
+              eventId: orderResult.data?.orderId, // dedup key — matches server CAPI event_id
+              value: totalToPay, shipping: pricingDetails.shipping, tax: 0,
+              paymentMethod,
+              items: cartItems.map((i) => ({ itemId: i.mongoId || i.id, itemName: i.name, itemVariant: i.selectedVariant || "N/A", price: i.price, quantity: i.quantity })),
+            });
             dispatch(clearCart());
             localStorage.removeItem("guestCart"); localStorage.removeItem("guestId");
             sessionStorage.removeItem("checkoutState");
@@ -668,6 +676,7 @@ const CheckoutPage = () => {
           long: selectedFullAddr?.location?.coordinates?.[0] || selectedFullAddr?.long || 0,
         },
         paymentMethod,
+        ...getFbCookies(), // _fbp / _fbc → stored on order for CAPI match quality
       }).unwrap();
 
       trackOrderCreated({
@@ -689,7 +698,9 @@ const CheckoutPage = () => {
           try {
             trackPurchase({
               transactionId: response.razorpay_order_id,
+              eventId: orderResult.data?.orderId, // dedup key — matches server CAPI event_id
               value: totalToPay, shipping: pricingDetails.shipping, tax: 0,
+              paymentMethod,
               items: cartItems.map((i) => ({ itemId: i.mongoId || i.id, itemName: i.name, itemVariant: i.selectedVariant || "N/A", price: i.price, quantity: i.quantity })),
             });
             sessionStorage.removeItem("checkoutState");
