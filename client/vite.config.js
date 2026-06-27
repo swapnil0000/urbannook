@@ -89,11 +89,14 @@ function bundleSizeMonitor() {
  * HTML Environment Variable Replace Plugin
  * Replaces %VITE_GTM_ID% placeholder in index.html with the actual GTM container ID
  */
-function htmlEnvReplace(gtmId) {
+function htmlEnvReplace(gtmId, metaPixelId) {
   return {
     name: 'html-env-replace',
     transformIndexHtml(html) {
-      return html.replace(/__VITE_GTM_ID__/g, gtmId || 'GTM-XXXXXXX');
+      return html
+        .replace(/__VITE_GTM_ID__/g, gtmId || 'GTM-XXXXXXX')
+        // Leave the placeholder if no pixel id is set; the inline guard then skips init.
+        .replace(/__VITE_META_PIXEL_ID__/g, metaPixelId || '');
     }
   };
 }
@@ -101,9 +104,9 @@ function htmlEnvReplace(gtmId) {
 export default defineConfig(({ mode }) => {
   // Vite does NOT auto-populate process.env from .env files, so load them here
   // and hand the GTM container id to the index.html replace plugin.
-  const env = loadEnv(mode, process.cwd(), '');
+  const env = loadEnv(mode, '.', '');
   return {
-  plugins: [react(), bundleSizeMonitor(), htmlEnvReplace(env.VITE_GTM_ID)],
+  plugins: [react(), bundleSizeMonitor(), htmlEnvReplace(env.VITE_GTM_ID, env.VITE_META_PIXEL_ID)],
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
