@@ -19,6 +19,7 @@ import {
   eventRouter,
   catalogRouter,
   metaCapiRouter,
+  adminAnalyticsRouter,
 } from "./routes/index.js";
 import cookieParser from "cookie-parser";
 import healthRouter from "./routes/health.route.js";
@@ -213,6 +214,7 @@ app.use(
   eventRouter,
   catalogRouter,
   metaCapiRouter,
+  adminAnalyticsRouter,
 );
 
 app.use(errorHandler);
