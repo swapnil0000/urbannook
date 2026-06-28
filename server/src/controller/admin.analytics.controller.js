@@ -1,6 +1,12 @@
 import Event from "../model/event.model.js";
 
-const FUNNEL_STEPS = ["ViewContent", "AddToCart", "InitiateCheckout", "Purchase"];
+// GA4-style names — these are what analytics.js stores via pushEcommerce/recordEvent
+const FUNNEL_STEPS = [
+  { key: "ViewContent",        dbName: "view_item"      },
+  { key: "AddToCart",          dbName: "add_to_cart"    },
+  { key: "InitiateCheckout",   dbName: "begin_checkout" },
+  { key: "Purchase",           dbName: "purchase"       },
+];
 
 function sinceDate(days) {
   return new Date(Date.now() - Math.min(parseInt(days) || 7, 90) * 24 * 60 * 60 * 1000);
@@ -11,17 +17,17 @@ async function getFunnel(req, res) {
   const since = sinceDate(req.query.days);
 
   const counts = await Promise.all(
-    FUNNEL_STEPS.map((step) =>
-      Event.countDocuments({ eventName: step, createdAt: { $gte: since } })
+    FUNNEL_STEPS.map(({ dbName }) =>
+      Event.countDocuments({ eventName: dbName, createdAt: { $gte: since } })
     )
   );
 
-  const steps = FUNNEL_STEPS.map((name, i) => {
+  const steps = FUNNEL_STEPS.map(({ key }, i) => {
     const count = counts[i];
     const top = counts[0] || 1;
     const prev = i === 0 ? count : counts[i - 1] || 1;
     return {
-      step: name,
+      step: key,
       count,
       dropOffPct: parseFloat((((prev - count) / prev) * 100).toFixed(1)),
       conversionPct: parseFloat(((count / top) * 100).toFixed(1)),
@@ -38,7 +44,7 @@ async function getSummary(req, res) {
   const [totalEvents, purchases] = await Promise.all([
     Event.countDocuments({ createdAt: { $gte: since } }),
     Event.find(
-      { eventName: "Purchase", createdAt: { $gte: since } },
+      { eventName: "purchase", createdAt: { $gte: since } },
       "properties userId"
     ).lean(),
   ]);
@@ -84,7 +90,7 @@ async function getTopProducts(req, res) {
   const rows = await Event.aggregate([
     {
       $match: {
-        eventName: { $in: ["ViewContent", "AddToCart", "Purchase"] },
+        eventName: { $in: ["view_item", "add_to_cart", "purchase"] },
         createdAt: { $gte: since },
         "properties.item_id": { $exists: true, $ne: null },
       },
@@ -101,6 +107,7 @@ async function getTopProducts(req, res) {
         _id: "$_id.itemId",
         itemName: { $first: "$itemName" },
         events: { $push: { k: "$_id.eventName", v: "$count" } },
+        // k values will be "view_item", "add_to_cart", "purchase"
       },
     },
     { $addFields: { eventsMap: { $arrayToObject: "$events" } } },
@@ -109,9 +116,9 @@ async function getTopProducts(req, res) {
         _id: 0,
         itemId: "$_id",
         itemName: 1,
-        views: { $ifNull: ["$eventsMap.ViewContent", 0] },
-        addToCarts: { $ifNull: ["$eventsMap.AddToCart", 0] },
-        purchases: { $ifNull: ["$eventsMap.Purchase", 0] },
+        views: { $ifNull: ["$eventsMap.view_item", 0] },
+        addToCarts: { $ifNull: ["$eventsMap.add_to_cart", 0] },
+        purchases: { $ifNull: ["$eventsMap.purchase", 0] },
       },
     },
     { $sort: { views: -1 } },
