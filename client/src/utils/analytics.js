@@ -156,7 +156,7 @@ function uuid() {
 }
 
 /** Persistent per-device id — set once, survives login/logout (enables stitching). */
-function getAnonymousId() {
+export function getAnonymousId() {
   if (typeof window === 'undefined') return null;
   try {
     let id = localStorage.getItem(ANON_KEY);

@@ -27,6 +27,7 @@ import { sendMetaCapiEvent } from "../services/meta.capi.service.js";
 const collectMetaTracking = (req) => ({
   fbp: req.body?.fbp || null,
   fbc: req.body?.fbc || null,
+  anonymousId: req.body?.anonymousId || null, // persistent device id — fallback externalId for guests
   clientIp:
     req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.ip || null,
   clientUserAgent: req.headers["user-agent"] || null,
@@ -595,7 +596,7 @@ const razorpayWebHookController = async (req, res) => {
                 phone: order.userMobile || order.senderMobile,
                 firstName: (order.userName || order.guestInfo?.name || "").split(" ")[0],
                 lastName: (order.userName || order.guestInfo?.name || "").split(" ").slice(1).join(" "),
-                externalId: order.userId,
+                externalId: order.userId || order.metaTracking?.anonymousId,
                 fbp: order.metaTracking?.fbp,
                 fbc: order.metaTracking?.fbc,
                 clientIp: order.metaTracking?.clientIp,
