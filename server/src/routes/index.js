@@ -14,6 +14,7 @@ import dynamicShippingRouter from "./dynamic.shipping.route.js";
 import eventRouter from "./event.route.js";
 import catalogRouter from "./catalog.route.js";
 import metaCapiRouter from "./meta.capi.route.js";
+import adminAnalyticsRouter from "./admin.analytics.route.js";
 export {
   userRouter,
   productRouter,
@@ -31,4 +32,5 @@ export {
   eventRouter,
   catalogRouter,
   metaCapiRouter,
+  adminAnalyticsRouter,
 };
