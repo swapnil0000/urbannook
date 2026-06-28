@@ -18,6 +18,7 @@ import {
   dynamicShippingRouter,
   eventRouter,
   catalogRouter,
+  metaCapiRouter,
 } from "./routes/index.js";
 import cookieParser from "cookie-parser";
 import healthRouter from "./routes/health.route.js";
@@ -211,6 +212,7 @@ app.use(
   dynamicShippingRouter,
   eventRouter,
   catalogRouter,
+  metaCapiRouter,
 );
 
 app.use(errorHandler);

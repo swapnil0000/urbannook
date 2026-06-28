@@ -13,6 +13,7 @@ import statsRouter from "./stats.route.js";
 import dynamicShippingRouter from "./dynamic.shipping.route.js";
 import eventRouter from "./event.route.js";
 import catalogRouter from "./catalog.route.js";
+import metaCapiRouter from "./meta.capi.route.js";
 export {
   userRouter,
   productRouter,
@@ -29,4 +30,5 @@ export {
   dynamicShippingRouter,
   eventRouter,
   catalogRouter,
+  metaCapiRouter,
 };

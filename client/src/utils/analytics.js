@@ -78,6 +78,34 @@ function pushEcommerce(eventName, ecommerce) {
   recordEvent(eventName, ecommerce);             // our own DB
 }
 
+/**
+ * Relay a pixel event to our server → Meta CAPI.
+ * Fire-and-forget: never awaited, never throws to caller.
+ * Server adds IP + UA server-side; we provide fbp/fbc + externalId + customData.
+ */
+function relayCapi(eventName, eventId, customData = {}) {
+  if (!enabled()) return;
+  try {
+    const { fbp, fbc } = getFbCookies();
+    fetch(`${config.apiBaseUrl}/meta/capi-event`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        eventName,
+        eventId,
+        eventSourceUrl: typeof window !== 'undefined' ? window.location.href : undefined,
+        userData: {
+          externalId: _currentUserId || undefined,
+          fbp: fbp || undefined,
+          fbc: fbc || undefined,
+        },
+        customData,
+      }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch (_) {}
+}
+
 /** Send an event to the Meta Pixel (fbq). Silently skips if not loaded. */
 function pushPixelEvent(eventName, params = {}, options) {
   if (!enabled()) return;
@@ -435,7 +463,9 @@ export function trackAddToCart({ itemId, itemName, itemVariant, price, quantity 
       ...(placement ? { placement } : {}),
       items: [toItem({ itemId, itemName, itemVariant, price, quantity })],
     });
-    pushPixelEvent('AddToCart', { content_ids: [itemId], contents: [{ id: itemId, quantity }], content_name: itemName, content_type: 'product', value: price * quantity, currency: CURRENCY });
+    const atcEventId = uuid();
+    pushPixelEvent('AddToCart', { content_ids: [itemId], contents: [{ id: itemId, quantity }], content_name: itemName, content_type: 'product', value: price * quantity, currency: CURRENCY }, { eventID: atcEventId });
+    relayCapi('AddToCart', atcEventId, { content_ids: [itemId], contents: [{ id: itemId, quantity }], value: price * quantity, currency: CURRENCY });
   } catch (error) {
     console.warn('[Analytics] trackAddToCart:', error);
   }
@@ -478,7 +508,9 @@ export function trackBeginCheckout({ items = [], value, coupon, isGuest }) {
       ...(isGuest != null ? { is_guest: isGuest } : {}),
       items: items.map((it) => toItem(it)),
     });
-    pushPixelEvent('InitiateCheckout', { content_ids: items.map((i) => i.itemId), contents: items.map((i) => ({ id: i.itemId, quantity: i.quantity || 1 })), value, currency: CURRENCY, num_items: items.reduce((n, i) => n + (i.quantity || 1), 0) });
+    const icEventId = uuid();
+    pushPixelEvent('InitiateCheckout', { content_ids: items.map((i) => i.itemId), contents: items.map((i) => ({ id: i.itemId, quantity: i.quantity || 1 })), value, currency: CURRENCY, num_items: items.reduce((n, i) => n + (i.quantity || 1), 0) }, { eventID: icEventId });
+    relayCapi('InitiateCheckout', icEventId, { content_ids: items.map((i) => i.itemId), contents: items.map((i) => ({ id: i.itemId, quantity: i.quantity || 1 })), value, currency: CURRENCY, num_items: items.reduce((n, i) => n + (i.quantity || 1), 0) });
   } catch (error) {
     console.warn('[Analytics] trackBeginCheckout:', error);
   }
