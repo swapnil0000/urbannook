@@ -14,7 +14,7 @@ import confetti from "canvas-confetti";
 import SEOHead from "../../component/SEOHead";
 import useTimer from "../../hooks/useTimer";
 import config from "../../config/env";
-import { trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist } from "../../utils/analytics";
+import { trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist, trackVariantSelect } from "../../utils/analytics";
 
 // Timer Component for Product Page
 const ProductTimer = memo(({ timeLeft }) => {
@@ -808,6 +808,7 @@ const ProductDetailPage = () => {
                           onClick={() => {
                             setSelectedVariant(variantName);
                             if (galleryImages[idx]) setCurrentImageIndex(idx);
+                            trackVariantSelect({ itemId: product.productId, itemName: product.productName, variantName, price: currentPrice });
                           }}
                           className={`group flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border transition-all duration-300 ${
                             isSelected

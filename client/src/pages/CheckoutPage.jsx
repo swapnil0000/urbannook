@@ -20,7 +20,7 @@ import { clearCart, removeItem } from "../store/slices/cartSlice";
 import { fetchCsrfToken } from "../store/api/apiSlice";
 import CouponInput from "../component/CouponInput";
 import { ComponentLoader } from "../component/layout/LoadingSpinner";
-import { trackBeginCheckout, trackPurchase, trackAddShippingInfo, trackAddPaymentInfo, trackPaymentFailed, trackPaymentModalDismissed, trackCheckoutStep, trackOrderCreated, getFbCookies } from "../utils/analytics";
+import { trackBeginCheckout, trackPurchase, trackAddShippingInfo, trackAddPaymentInfo, trackPaymentFailed, trackPaymentModalDismissed, trackCheckoutStep, trackOrderCreated, trackSelectPaymentMethod, trackDeliveryCheck, getFbCookies } from "../utils/analytics";
 
 const CouponList = lazy(() => import("../component/CouponList"));
 const MobileNumberModal = lazy(() => import("../component/MobileNumberModal"));
@@ -287,26 +287,26 @@ const CheckoutPage = () => {
         if (cancelled) return;
 
         if (result.success && result.data) {
+          const shippingAmount = parseFloat(result.data.total_charges);
           setPricingDetails(prev => ({
             ...prev,
-            shipping: {
-              ...result.data,
-              amount: parseFloat(result.data.total_charges)
-            }
+            shipping: { ...result.data, amount: shippingAmount }
           }));
+          trackDeliveryCheck({ pincode, serviceable: true, shippingAmount });
         } else {
           // API responded but no valid rate — use fallback
           setPricingDetails(prev => ({ ...prev, shipping: { amount: FALLBACK_SHIPPING, type: "standard" } }));
+          trackDeliveryCheck({ pincode, serviceable: false, errorReason: "no_rate" });
         }
       } catch (error) {
         if (cancelled) return;
         console.error(`[Shipping] Attempt ${attempt} failed:`, error);
         if (attempt < 3) {
-          // Retry up to 3 times with a short delay
           setTimeout(() => fetchShippingRate(attempt + 1), 1500 * attempt);
         } else {
           // All retries exhausted — fall back to ₹149
           setPricingDetails(prev => ({ ...prev, shipping: { amount: FALLBACK_SHIPPING, type: "standard" } }));
+          trackDeliveryCheck({ pincode, serviceable: false, errorReason: "api_error" });
         }
       }
     };
@@ -1211,7 +1211,7 @@ const CheckoutPage = () => {
                 <div className="p-4 space-y-3">
                   {/* Online Payment */}
                   <button
-                    onClick={() => setPaymentMethod("PREPAID")}
+                    onClick={() => { setPaymentMethod("PREPAID"); trackSelectPaymentMethod({ paymentMethod: "PREPAID" }); }}
                     className={`w-full rounded-xl border-2 text-left transition-all duration-200 overflow-hidden ${
                       paymentMethod === "PREPAID" ? "border-[#2e443c]" : "border-gray-100 hover:border-gray-200"
                     }`}
@@ -1243,7 +1243,7 @@ const CheckoutPage = () => {
 
                   {/* Cash on Delivery */}
                   <button
-                    onClick={() => setPaymentMethod("COD")}
+                    onClick={() => { setPaymentMethod("COD"); trackSelectPaymentMethod({ paymentMethod: "COD" }); }}
                     disabled={pricingDetails.shipping === null || isCalculatingShipping}
                     className={`w-full rounded-xl border-2 text-left transition-all duration-200 overflow-hidden disabled:opacity-40 disabled:cursor-not-allowed ${
                       paymentMethod === "COD" ? "border-[#a89068]" : "border-gray-100 hover:border-gray-200"
