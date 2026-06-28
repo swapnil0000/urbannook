@@ -752,6 +752,50 @@ export function trackShare({ contentType, itemId, method }) {
   }
 }
 
+/**
+ * User selects a product variant (color, size, finish, etc.)
+ * → Meta: CustomizeProduct (standard event — helps catalog dynamic ads)
+ * → GA4: customize_product (custom ecommerce event)
+ * → DB: variant_selected
+ */
+export function trackVariantSelect({ itemId, itemName, variantName, price }) {
+  try {
+    const eventId = uuid();
+    pushEcommerce('variant_selected', {
+      item_id: itemId,
+      item_name: itemName,
+      item_variant: variantName,
+      price,
+    });
+    pushPixelEvent('CustomizeProduct', {
+      content_ids: [itemId],
+      content_name: itemName,
+      content_type: 'product',
+      variant: variantName,
+    }, { eventID: eventId });
+  } catch (error) {
+    console.warn('[Analytics] trackVariantSelect:', error);
+  }
+}
+
+/**
+ * User enters a pincode to check delivery availability.
+ * → DB only (no standard Meta/GA4 event for this — stored for drop-off analysis)
+ * serviceable: true = delivery available, false = not available / error
+ */
+export function trackDeliveryCheck({ pincode, serviceable, shippingAmount, errorReason }) {
+  try {
+    track('delivery_check', {
+      pincode: String(pincode),
+      serviceable,
+      shipping_amount: shippingAmount || null,
+      error_reason: errorReason || null,
+    });
+  } catch (error) {
+    console.warn('[Analytics] trackDeliveryCheck:', error);
+  }
+}
+
 /** Crash / chunk-load / fatal fetch error. Scrubbed + truncated; never include PII. */
 export function trackException({ description, errorType, fatal = false }) {
   try {
