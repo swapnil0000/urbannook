@@ -85,13 +85,14 @@ function pushPixelEvent(eventName, params = {}, options) {
     if (isDebug()) console.warn('[Analytics] fbq not loaded, Meta event skipped:', eventName);
     return;
   }
-  if (isDebug()) console.log(`%c📘 Meta → ${eventName}`, 'color:#7e9cc9;font-weight:bold', { params, options });
-  // Meta deduplication: eventID MUST be the 4th argument, never inside params.
-  if (options && options.eventID) {
-    window.fbq('track', eventName, params, { eventID: options.eventID });
-  } else {
-    window.fbq('track', eventName, params);
-  }
+  // Always attach an event_id so Meta can deduplicate this browser event against
+  // its server-side counterpart (our CAPI for Purchase; Meta's auto-mirror for the
+  // rest). A stable key on every event pushes dedup coverage well past Meta's 75%
+  // target. Use the caller's id (e.g. Purchase = orderId) or generate a unique one.
+  // eventID MUST be the 4th argument, never inside params.
+  const eventID = (options && options.eventID) || uuid();
+  if (isDebug()) console.log(`%c📘 Meta → ${eventName}`, 'color:#7e9cc9;font-weight:bold', { params, eventID });
+  window.fbq('track', eventName, params, { eventID });
 }
 
 /** Map an app product shape → GA4 item. Omits empty/placeholder fields. */
