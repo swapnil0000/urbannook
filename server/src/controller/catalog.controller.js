@@ -105,7 +105,7 @@ const metaProductFeed = asyncHandler(async (req, res) => {
 
       rows.push(
         [
-          csv(`${p.productId}_${i + 1}`), // unique per-variant id
+          csv(i === 0 ? p.productId : `${p.productId}_${i + 1}`), // variant 1 id = productId (matches Pixel content_ids exactly)
           csv(p.productId), // item_group_id — matches Pixel content_ids
           csv(title),
           csv(description),
