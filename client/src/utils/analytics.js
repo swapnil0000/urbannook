@@ -75,6 +75,7 @@ function pushEcommerce(eventName, ecommerce) {
   clearEcommerce();
   pushEvent({ event: eventName, ecommerce });   // for future GTM (currently inert)
   sendGtag(eventName, ecommerce);                // direct to GA4 via gtag — this one counts today
+  recordEvent(eventName, ecommerce);             // our own DB
 }
 
 /** Send an event to the Meta Pixel (fbq). Silently skips if not loaded. */
@@ -84,13 +85,14 @@ function pushPixelEvent(eventName, params = {}, options) {
     if (isDebug()) console.warn('[Analytics] fbq not loaded, Meta event skipped:', eventName);
     return;
   }
-  if (isDebug()) console.log(`%c📘 Meta → ${eventName}`, 'color:#7e9cc9;font-weight:bold', { params, options });
-  // Meta deduplication: eventID MUST be the 4th argument, never inside params.
-  if (options && options.eventID) {
-    window.fbq('track', eventName, params, { eventID: options.eventID });
-  } else {
-    window.fbq('track', eventName, params);
-  }
+  // Always attach an event_id so Meta can deduplicate this browser event against
+  // its server-side counterpart (our CAPI for Purchase; Meta's auto-mirror for the
+  // rest). A stable key on every event pushes dedup coverage well past Meta's 75%
+  // target. Use the caller's id (e.g. Purchase = orderId) or generate a unique one.
+  // eventID MUST be the 4th argument, never inside params.
+  const eventID = (options && options.eventID) || uuid();
+  if (isDebug()) console.log(`%c📘 Meta → ${eventName}`, 'color:#7e9cc9;font-weight:bold', { params, eventID });
+  window.fbq('track', eventName, params, { eventID });
 }
 
 /** Map an app product shape → GA4 item. Omits empty/placeholder fields. */
@@ -104,12 +106,110 @@ function toItem({ itemId, itemName, itemVariant, price, quantity, index, listId,
   if (listName) item.item_list_name = listName;
   return item;
 }
+const ANON_KEY = 'un_anon_id';            
+const SESSION_KEY = 'un_session';         
+const SESSION_TTL = 30 * 60 * 1000;       
+const FLUSH_INTERVAL = 5000;              
+const MAX_QUEUE = 15;           
+
+let _eventQueue = [];
+let _flushTimer = null;
+let _currentUserId = null;                // set by setUserId(); attached to events
+
+/** RFC4122-ish id without a dependency. */
+function uuid() {
+  try {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  } catch { /* fall through */ }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
+/** Persistent per-device id — set once, survives login/logout (enables stitching). */
+function getAnonymousId() {
+  if (typeof window === 'undefined') return null;
+  try {
+    let id = localStorage.getItem(ANON_KEY);
+    if (!id) { id = uuid(); localStorage.setItem(ANON_KEY, id); }
+    return id;
+  } catch { return null; }
+}
+
+/** Session id with a 30-min sliding inactivity window. */
+function getSessionId() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const now = Date.now();
+    const raw = localStorage.getItem(SESSION_KEY);
+    let session = raw ? JSON.parse(raw) : null;
+    if (!session || !session.id || (now - session.ts) > SESSION_TTL) {
+      session = { id: uuid(), ts: now };
+    } else {
+      session.ts = now; // refresh activity
+    }
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    return session.id;
+  } catch { return null; }
+}
+
+/** POST the current queue to our backend. keepalive=true for the final unload flush. */
+function flushEvents(useKeepalive = false) {
+  if (!_eventQueue.length) return;
+  const batch = _eventQueue.splice(0, _eventQueue.length);
+  try {
+    fetch(`${config.apiBaseUrl}/events/track`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ events: batch }),
+      keepalive: useKeepalive,
+    }).catch(() => { /* analytics must never throw */ });
+  } catch { /* ignore */ }
+}
+
+function scheduleFlush() {
+  if (_flushTimer) return;
+  _flushTimer = setTimeout(() => { _flushTimer = null; flushEvents(); }, FLUSH_INTERVAL);
+}
+
+/** Queue one event for our own backend (batched). Called by the 3 choke points. */
+function recordEvent(eventName, properties = {}) {
+  if (!enabled() || typeof window === 'undefined') return;
+  try {
+    _eventQueue.push({
+      eventName,
+      userId: _currentUserId || undefined,
+      anonymousId: getAnonymousId(),
+      sessionId: getSessionId(),
+      properties,
+      url: window.location.href,
+      path: window.location.pathname,
+      referrer: document.referrer || undefined,
+      attribution: getAttribution(),
+      timestamp: Date.now(),
+    });
+    if (_eventQueue.length >= MAX_QUEUE) flushEvents();
+    else scheduleFlush();
+  } catch (error) {
+    if (isDebug()) console.warn('[Analytics] recordEvent:', error);
+  }
+}
+
+// Final best-effort flush so the last events of a session aren't lost.
+if (typeof window !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushEvents(true);
+  });
+  window.addEventListener('pagehide', () => flushEvents(true));
+}
 
 /** Generic custom (non-ecommerce) event. */
 export function track(eventName, params = {}) {
   try {
     pushEvent({ event: eventName, ...params });  // for future GTM
     sendGtag(eventName, params);                  // direct to GA4 now
+    recordEvent(eventName, params);               // our own DB
   } catch (error) {
     console.warn('[Analytics]', eventName, error);
   }
@@ -122,6 +222,7 @@ export function track(eventName, params = {}) {
 /** Associate the current user with all subsequent events (GA4 user_id). */
 export function setUserId(userId) {
   if (!userId) return;
+  _currentUserId = String(userId); // attach to all subsequent first-party events
   try {
     pushEvent({ event: 'set_user_id', user_id: String(userId) });
     if (typeof window !== 'undefined' && typeof window.gtag === 'function') {
@@ -245,6 +346,7 @@ export function trackPageView({ pagePath, pageTitle } = {}) {
     pushEvent({ event: 'page_view', ...params }); // for future GTM
     sendGtag('page_view', params);                 // direct to GA4 now
     pushPixelEvent('PageView');                     // Meta PageView on SPA navigation
+    recordEvent('page_view', params);               // our own DB
   } catch (error) {
     console.warn('[Analytics] trackPageView:', error);
   }

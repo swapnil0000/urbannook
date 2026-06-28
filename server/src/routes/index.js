@@ -11,6 +11,8 @@ import testimonialRouter from "./testimonial.route.js";
 import contactRouter from "./contact.route.js";
 import statsRouter from "./stats.route.js";
 import dynamicShippingRouter from "./dynamic.shipping.route.js";
+import eventRouter from "./event.route.js";
+import catalogRouter from "./catalog.route.js";
 export {
   userRouter,
   productRouter,
@@ -25,4 +27,6 @@ export {
   contactRouter,
   statsRouter,
   dynamicShippingRouter,
+  eventRouter,
+  catalogRouter,
 };

@@ -16,6 +16,8 @@ import {
   contactRouter,
   statsRouter,
   dynamicShippingRouter,
+  eventRouter,
+  catalogRouter,
 } from "./routes/index.js";
 import cookieParser from "cookie-parser";
 import healthRouter from "./routes/health.route.js";
@@ -207,6 +209,8 @@ app.use(
   contactRouter,
   statsRouter,
   dynamicShippingRouter,
+  eventRouter,
+  catalogRouter,
 );
 
 app.use(errorHandler);
