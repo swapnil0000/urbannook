@@ -87,6 +87,7 @@ function relayCapi(eventName, eventId, customData = {}) {
   if (!enabled()) return;
   try {
     const { fbp, fbc } = getFbCookies();
+    const addr = getCachedAddress();
     fetch(`${config.apiBaseUrl}/meta/capi-event`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -95,9 +96,16 @@ function relayCapi(eventName, eventId, customData = {}) {
         eventId,
         eventSourceUrl: typeof window !== 'undefined' ? window.location.href : undefined,
         userData: {
-          externalId: _currentUserId || undefined,
+          externalId: _currentUserId || getAnonymousId() || undefined,
+          email: _currentUserEmail || undefined,
+          phone: _currentUserPhone || undefined,
+          firstName: _currentUserFirstName || undefined,
+          lastName: _currentUserLastName || undefined,
           fbp: fbp || undefined,
           fbc: fbc || undefined,
+          zip: addr.zip || undefined,
+          city: addr.city || undefined,
+          state: addr.state || undefined,
         },
         customData,
       }),
@@ -134,15 +142,20 @@ function toItem({ itemId, itemName, itemVariant, price, quantity, index, listId,
   if (listName) item.item_list_name = listName;
   return item;
 }
-const ANON_KEY = 'un_anon_id';            
-const SESSION_KEY = 'un_session';         
+const ANON_KEY = 'un_anon_id';
+const SESSION_KEY = 'un_session';
+const CACHED_ADDRESS_KEY = 'un_last_address';         
 const SESSION_TTL = 30 * 60 * 1000;       
 const FLUSH_INTERVAL = 5000;              
 const MAX_QUEUE = 15;           
 
 let _eventQueue = [];
 let _flushTimer = null;
-let _currentUserId = null;                // set by setUserId(); attached to events
+let _currentUserId = null;
+let _currentUserEmail = null;
+let _currentUserPhone = null;
+let _currentUserFirstName = null;
+let _currentUserLastName = null;
 
 /** RFC4122-ish id without a dependency. */
 function uuid() {
@@ -153,6 +166,28 @@ function uuid() {
     const r = (Math.random() * 16) | 0;
     return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
   });
+}
+
+/**
+ * Cache delivery address after checkout — used to send ZIP/city/state in CAPI
+ * for future AddToCart/InitiateCheckout events for returning users.
+ */
+export function cacheAddressForCapi({ zip, city, state } = {}) {
+  if (!zip && !city && !state) return;
+  try {
+    const data = {};
+    if (zip) data.zip = String(zip).trim();
+    if (city) data.city = String(city).trim();
+    if (state) data.state = String(state).trim();
+    localStorage.setItem(CACHED_ADDRESS_KEY, JSON.stringify(data));
+  } catch (_) {}
+}
+
+function getCachedAddress() {
+  try {
+    const raw = localStorage.getItem(CACHED_ADDRESS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
 }
 
 /** Persistent per-device id — set once, survives login/logout (enables stitching). */
@@ -268,6 +303,12 @@ export function setUserId(userId) {
  * Note (DPDP): ideally gate behind marketing consent.
  */
 export function setMetaAdvancedMatching({ email, phone, firstName, lastName, userId } = {}) {
+  // Cache PII for CAPI relay (AddToCart/InitiateCheckout server-side signals)
+  if (email) _currentUserEmail = email;
+  if (phone) _currentUserPhone = phone;
+  if (firstName) _currentUserFirstName = firstName;
+  if (lastName) _currentUserLastName = lastName;
+
   if (!enabled()) return;
   if (typeof window === 'undefined' || typeof window.fbq !== 'function') return;
   const pixelId = config.metaPixelId;
@@ -415,7 +456,9 @@ export function trackViewItem({ itemId, itemName, itemVariant, price, quantity =
       value: price,
       items: [toItem({ itemId, itemName, itemVariant, price, quantity })],
     });
-    pushPixelEvent('ViewContent', { content_ids: [itemId], content_name: itemName, content_type: 'product', value: price, currency: CURRENCY });
+    const vcEventId = uuid();
+    pushPixelEvent('ViewContent', { content_ids: [itemId], content_name: itemName, content_type: 'product', value: price, currency: CURRENCY }, { eventID: vcEventId });
+    relayCapi('ViewContent', vcEventId, { content_ids: [itemId], content_name: itemName, content_type: 'product', value: price, currency: CURRENCY });
   } catch (error) {
     console.warn('[Analytics] trackViewItem:', error);
   }
@@ -773,6 +816,7 @@ export function trackVariantSelect({ itemId, itemName, variantName, price }) {
       content_type: 'product',
       variant: variantName,
     }, { eventID: eventId });
+    relayCapi('CustomizeProduct', eventId, { content_ids: [itemId], content_name: itemName, content_type: 'product' });
   } catch (error) {
     console.warn('[Analytics] trackVariantSelect:', error);
   }

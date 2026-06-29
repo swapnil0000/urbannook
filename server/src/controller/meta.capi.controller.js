@@ -1,6 +1,6 @@
 import { sendMetaCapiEvent } from "../services/meta.capi.service.js";
 
-const ALLOWED_EVENTS = new Set(["AddToCart", "InitiateCheckout", "ViewContent", "AddToWishlist"]);
+const ALLOWED_EVENTS = new Set(["AddToCart", "InitiateCheckout", "ViewContent", "AddToWishlist", "CustomizeProduct"]);
 const clamp = (val, len) => (val == null ? null : String(val).slice(0, len));
 
 function getClientIp(req) {

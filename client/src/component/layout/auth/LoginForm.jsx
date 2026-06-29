@@ -292,8 +292,8 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
               </div>
               
               <div className="flex justify-center">
-                <GoogleLoginButton 
-                  useOneTap={true}
+                <GoogleLoginButton
+                  useOneTap={false}
                   onSuccess={(userData) => {
                     showNotification('Google login successful!');
                     if (onLoginSuccess) {

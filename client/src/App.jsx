@@ -38,6 +38,7 @@ const Footer = lazy(() => import('./component/layout/Footer'));
 const Notification = lazy(() => import('./component/Notification'));
 const SocialMediaFAB = lazy(() => import('./component/layout/WhatsAppButton'));
 const OpenInBrowserBanner = lazy(() => import('./component/OpenInBrowserBanner'));
+const GoogleOneTap = lazy(() => import('./component/GoogleOneTap'));
 
 // Component to handle session restoration and token removal detection
 const SessionManager = ({ children }) => {
@@ -172,6 +173,10 @@ function App() {
                 </ErrorBoundary>
                 <SocialMediaFAB />
                 <Notification />
+                {/* Global Google One Tap for logged-out visitors (boosts Meta EMQ) */}
+                <ErrorBoundary>
+                  <GoogleOneTap />
+                </ErrorBoundary>
               </Suspense>
             </SyncProvider>
           </SessionManager>

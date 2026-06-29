@@ -601,6 +601,9 @@ const razorpayWebHookController = async (req, res) => {
                 fbc: order.metaTracking?.fbc,
                 clientIp: order.metaTracking?.clientIp,
                 clientUserAgent: order.metaTracking?.clientUserAgent,
+                zip: order.deliveryAddress?.pinCode ? String(order.deliveryAddress.pinCode) : null,
+                city: order.deliveryAddress?.city || null,
+                state: order.deliveryAddress?.state || null,
               },
               customData: {
                 currency: "INR",

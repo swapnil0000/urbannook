@@ -20,7 +20,7 @@ import { clearCart, removeItem } from "../store/slices/cartSlice";
 import { fetchCsrfToken } from "../store/api/apiSlice";
 import CouponInput from "../component/CouponInput";
 import { ComponentLoader } from "../component/layout/LoadingSpinner";
-import { trackBeginCheckout, trackPurchase, trackAddShippingInfo, trackAddPaymentInfo, trackPaymentFailed, trackPaymentModalDismissed, trackCheckoutStep, trackOrderCreated, trackSelectPaymentMethod, trackDeliveryCheck, getFbCookies, getAnonymousId } from "../utils/analytics";
+import { trackBeginCheckout, trackPurchase, trackAddShippingInfo, trackAddPaymentInfo, trackPaymentFailed, trackPaymentModalDismissed, trackCheckoutStep, trackOrderCreated, trackSelectPaymentMethod, trackDeliveryCheck, getFbCookies, getAnonymousId, cacheAddressForCapi } from "../utils/analytics";
 
 const CouponList = lazy(() => import("../component/CouponList"));
 const MobileNumberModal = lazy(() => import("../component/MobileNumberModal"));
@@ -430,6 +430,7 @@ const CheckoutPage = () => {
       state: suggestion.state,
       pinCode: suggestion.pinCode,
     });
+    cacheAddressForCapi({ zip: suggestion.pinCode, city: suggestion.city, state: suggestion.state });
     if (!isGuest) refetchAddresses();
     goToStep(reviewStep);
   };
@@ -469,6 +470,7 @@ const CheckoutPage = () => {
       placeId: addr.placeId || "N/A",
       formattedAddress: addr.formattedAddress || addr.deliveryAddressFull
     });
+    cacheAddressForCapi({ zip: addr.pinCode, city: addr.city, state: addr.state });
     showNotification("Address selected", "success");
   };
 
