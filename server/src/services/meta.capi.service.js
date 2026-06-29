@@ -77,6 +77,12 @@ export async function sendMetaCapiEvent({
   if (userData.fbp) user_data.fbp = userData.fbp;
   if (userData.fbc) user_data.fbc = userData.fbc;
   if (userData.clientIp) user_data.client_ip_address = userData.clientIp;
+  const zp = hashNormalized(userData.zip);
+  if (zp) user_data.zp = [zp];
+  const ct = hashNormalized(userData.city);
+  if (ct) user_data.ct = [ct];
+  const st = hashNormalized(userData.state);
+  if (st) user_data.st = [st];
   if (userData.clientUserAgent) user_data.client_user_agent = userData.clientUserAgent;
 
   const eventPayload = {
