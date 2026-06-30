@@ -138,6 +138,8 @@ const RouteTracker = () => {
   return null;
 };
 
+
+
 // Component to handle cart and wishlist sync
 const SyncProvider = ({ children }) => {
   useCartSync();
