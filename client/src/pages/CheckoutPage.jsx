@@ -20,7 +20,7 @@ import { clearCart, removeItem } from "../store/slices/cartSlice";
 import { fetchCsrfToken } from "../store/api/apiSlice";
 import CouponInput from "../component/CouponInput";
 import { ComponentLoader } from "../component/layout/LoadingSpinner";
-import { trackBeginCheckout, trackPurchase, trackAddShippingInfo, trackAddPaymentInfo, trackPaymentFailed, trackPaymentModalDismissed, trackCheckoutStep, trackOrderCreated, trackSelectPaymentMethod, trackDeliveryCheck, getFbCookies, getAnonymousId, cacheAddressForCapi } from "../utils/analytics";
+import { trackBeginCheckout, trackPurchase, trackAddShippingInfo, trackAddPaymentInfo, trackPaymentFailed, trackPaymentModalDismissed, trackCheckoutStep, trackOrderCreated, trackSelectPaymentMethod, trackDeliveryCheck, getFbCookies, getAnonymousId, cacheAddressForCapi, setMetaAdvancedMatching } from "../utils/analytics";
 
 const CouponList = lazy(() => import("../component/CouponList"));
 const MobileNumberModal = lazy(() => import("../component/MobileNumberModal"));
@@ -292,11 +292,11 @@ const CheckoutPage = () => {
             ...prev,
             shipping: { ...result.data, amount: shippingAmount }
           }));
-          trackDeliveryCheck({ pincode, serviceable: true, shippingAmount });
+          trackDeliveryCheck({ pincode: pinCode, serviceable: true, shippingAmount });
         } else {
           // API responded but no valid rate — use fallback
           setPricingDetails(prev => ({ ...prev, shipping: { amount: FALLBACK_SHIPPING, type: "standard" } }));
-          trackDeliveryCheck({ pincode, serviceable: false, errorReason: "no_rate" });
+          trackDeliveryCheck({ pincode: pinCode, serviceable: false, errorReason: "no_rate" });
         }
       } catch (error) {
         if (cancelled) return;
@@ -306,7 +306,7 @@ const CheckoutPage = () => {
         } else {
           // All retries exhausted — fall back to ₹149
           setPricingDetails(prev => ({ ...prev, shipping: { amount: FALLBACK_SHIPPING, type: "standard" } }));
-          trackDeliveryCheck({ pincode, serviceable: false, errorReason: "api_error" });
+          trackDeliveryCheck({ pincode: pinCode, serviceable: false, errorReason: "api_error" });
         }
       }
     };
@@ -582,6 +582,16 @@ const CheckoutPage = () => {
 
   const handlePayment = async () => {
     setPaymentError(null);
+    {
+      const buyerName = (isGuest ? guestName : (userProfile?.userName || userProfile?.name || "")).trim();
+      setMetaAdvancedMatching({
+        email: isGuest ? guestEmail.trim() : userProfile?.email,
+        phone: isGuest ? guestMobile.trim() : stripCC(String(senderMobile || "")),
+        firstName: buyerName.split(" ")[0],
+        lastName: buyerName.split(" ").slice(1).join(" "),
+        userId: isGuest ? getAnonymousId() : (userProfile?.userId || userProfile?._id || getAnonymousId()),
+      });
+    }
 
     trackCheckoutStep({ step: currentStep, stepLabel: "payment", isGuest });
     trackAddPaymentInfo({ items: buildTrackItems(), value: totalToPay, paymentMethod, isGuest });
@@ -628,6 +638,8 @@ const CheckoutPage = () => {
               eventId: orderResult.data?.orderId, // dedup key — matches server CAPI event_id
               value: totalToPay, shipping: pricingDetails.shipping, tax: 0,
               paymentMethod,
+              // Feed buyer PII to the browser Purchase pixel (guest = no prior login → boosts web EMQ)
+              email: guestEmail.trim(), phone: guestMobile.trim(), name: guestName.trim(), externalId: getAnonymousId(),
               items: cartItems.map((i) => ({ itemId: i.mongoId || i.id, itemName: i.name, itemVariant: i.selectedVariant || "N/A", price: i.price, quantity: i.quantity })),
             });
             dispatch(clearCart());
@@ -704,6 +716,8 @@ const CheckoutPage = () => {
               eventId: orderResult.data?.orderId, // dedup key — matches server CAPI event_id
               value: totalToPay, shipping: pricingDetails.shipping, tax: 0,
               paymentMethod,
+              // Feed buyer PII to the browser Purchase pixel → boosts web EMQ (phone esp.)
+              email: userProfile?.email, phone: senderMobileStr, name: userProfile?.userName || userProfile?.name, externalId: userProfile?.userId || userProfile?._id || getAnonymousId(),
               items: cartItems.map((i) => ({ itemId: i.mongoId || i.id, itemName: i.name, itemVariant: i.selectedVariant || "N/A", price: i.price, quantity: i.quantity })),
             });
             sessionStorage.removeItem("checkoutState");

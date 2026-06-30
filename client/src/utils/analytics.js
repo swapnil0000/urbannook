@@ -316,11 +316,20 @@ export function setMetaAdvancedMatching({ email, phone, firstName, lastName, use
   try {
     const userData = {};
     if (email) userData.em = String(email).trim().toLowerCase();
-    if (phone) userData.ph = String(phone).replace(/\D/g, '');
+    if (phone) {
+      // Normalize to digits + India country code (91XXXXXXXXXX) to match the server's
+      // hashPhone, so the browser and CAPI phone hashes are identical and reinforce matching.
+      let digits = String(phone).replace(/\D/g, '');
+      if (digits.length === 10) digits = `91${digits}`;
+      if (digits) userData.ph = digits;
+    }
     if (firstName) userData.fn = String(firstName).trim().toLowerCase();
     if (lastName) userData.ln = String(lastName).trim().toLowerCase();
     if (userId) userData.external_id = String(userId);
     if (Object.keys(userData).length === 0) return;
+    // Re-assert autoConfig:false BEFORE re-init so this fbq('init') can never turn Meta's
+    // automatic event detection back on (that was the source of the fake AddToCart flood).
+    window.fbq('set', 'autoConfig', false, pixelId);
     // Re-init with advanced matching data — Meta merges it for subsequent events (no extra PageView).
     window.fbq('init', pixelId, userData);
     if (isDebug()) console.log('%c📘 Meta Advanced Matching set', 'color:#7e9cc9;font-weight:bold', Object.keys(userData));
@@ -657,8 +666,22 @@ export function trackOrderCreated({ orderId, userType, paymentMethod }) {
  * Purchase  (client = Meta/consent signal; canonical GA4 purchase fires server-side)
  * ------------------------------------------------------------------------ */
 
-export function trackPurchase({ transactionId, value, shipping = 0, tax = 0, coupon, items = [], paymentMethod, eventId }) {
+export function trackPurchase({ transactionId, value, shipping = 0, tax = 0, coupon, items = [], paymentMethod, eventId, email, phone, name, externalId }) {
   try {
+    // Feed Advanced Matching so the BROWSER Purchase pixel carries hashed email/phone/name/external_id.
+    // Critical for GUESTS (most traffic): they enter contact at checkout but never logged in, so
+    // setMetaAdvancedMatching was never called for them — without this the browser Purchase event
+    // has no PII and the web Event Match Quality stays low (~28% phone / external_id). The server
+    // CAPI already has this data; this closes the browser side.
+    if (email || phone || name || externalId) {
+      setMetaAdvancedMatching({
+        email,
+        phone,
+        firstName: name ? name.split(' ')[0] : undefined,
+        lastName: name ? name.split(' ').slice(1).join(' ') : undefined,
+        userId: externalId, // sets the pixel's external_id (use real userId, else anonymousId)
+      });
+    }
     pushEcommerce('purchase', {
       transaction_id: transactionId,
       value,
