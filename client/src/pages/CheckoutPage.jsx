@@ -78,17 +78,28 @@ const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, it
   return (
     <div className="space-y-3">
       <div className="flex justify-between items-center text-sm">
-        <span className="text-gray-500">Subtotal <span className="text-gray-400">({itemCount} item{itemCount !== 1 ? "s" : ""})</span></span>
-        <span className="font-medium text-gray-800">₹{subtotal.toLocaleString()}</span>
+        <span className="text-gray-500">
+          Subtotal{" "}
+          <span className="text-gray-400">
+            ({itemCount} item{itemCount !== 1 ? "s" : ""})
+          </span>
+        </span>
+        <span className="font-medium text-gray-800">
+          ₹{subtotal.toLocaleString()}
+        </span>
       </div>
       <div className="flex justify-between items-center text-sm">
         <span className="text-gray-500">Delivery</span>
         <span className="font-medium text-gray-800">
-          {isLoadingShipping
-            ? <span className="inline-block w-16 h-3.5 bg-gray-200 rounded animate-pulse" />
-            : shippingAmount === null || shippingAmount === undefined
-            ? <span className="text-[10px] text-amber-600 font-bold uppercase tracking-wider">Enter address</span>
-            : `₹${Math.ceil(shippingAmount).toLocaleString()}`}
+          {isLoadingShipping ? (
+            <span className="inline-block w-16 h-3.5 bg-gray-200 rounded animate-pulse" />
+          ) : shippingAmount === null || shippingAmount === undefined ? (
+            <span className="text-[10px] text-amber-600 font-bold uppercase tracking-wider">
+              Enter address
+            </span>
+          ) : (
+            `₹${Math.ceil(shippingAmount).toLocaleString()}`
+          )}
         </span>
       </div>
       {appliedCoupon && discount > 0 && (
@@ -102,7 +113,9 @@ const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, it
       <div className="border-t border-gray-100 pt-3 flex justify-between items-center">
         <span className="font-bold text-gray-900">Total</span>
         <div className="text-right">
-          <span className="text-2xl font-bold text-[#2e443c]">₹{totalToPay.toLocaleString()}</span>
+          <span className="text-2xl font-bold text-[#2e443c]">
+            ₹{totalToPay.toLocaleString()}
+          </span>
           <p className="text-[10px] text-gray-400 mt-0.5">Incl. GST</p>
         </div>
       </div>
@@ -119,16 +132,20 @@ const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, it
                 </span>
                 Pay Now
               </span>
-              <span className="text-sm font-bold text-[#2e443c]">₹{codPartialAmount.toLocaleString()}</span>
+              <span className="text-sm font-bold text-[#2e443c]">
+                ₹{codPartialAmount.toLocaleString()}
+              </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-xs text-gray-600 flex items-center gap-2">
                 <span className="w-4 h-4 rounded-full bg-amber-400 flex items-center justify-center shrink-0">
                   <i className="fa-solid fa-door-open text-white text-[7px]" />
                 </span>
-               Rest Pay at delivery
+                Rest Pay at delivery
               </span>
-              <span className="text-sm font-bold text-amber-700">₹{codRemainingAmount.toLocaleString()}</span>
+              <span className="text-sm font-bold text-amber-700">
+                ₹{codRemainingAmount.toLocaleString()}
+              </span>
             </div>
           </div>
         </div>
@@ -194,6 +211,7 @@ const CheckoutPage = () => {
     shipping: null, // this will now store the full shippingInfo object
     discount: 0,
   });
+  const [shippingError, setShippingError] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("PREPAID"); // "PREPAID" | "COD"
   const [paymentError, setPaymentError] = useState(null);
   const [showRetry, setShowRetry] = useState(false);
@@ -255,21 +273,29 @@ const CheckoutPage = () => {
     }
   }, [currentStep, address, pinCode, preciseDetails, addressForm, currentAddressId, senderMobile, appliedCoupon, guestName, guestEmail, guestMobile]);
 
-  // Dynamic Shipping Calculation Logic
+  // Dynamic Shipping Calculation - triggered by payment method change on Review page
   const calculateShippingRef = useRef(calculateShipping);
   useEffect(() => { calculateShippingRef.current = calculateShipping; }, [calculateShipping]);
 
+  // Clear old shipping value immediately when payment method changes on review page,
+  // so the pay button blocks until the fresh API response arrives
   useEffect(() => {
-    const FALLBACK_SHIPPING = 149;
+    if (currentStep === reviewStep && pinCode && pinCode.toString().length === 6) {
+      setPricingDetails(prev => ({ ...prev, shipping: null }));
+      setShippingError("");
+    }
+  }, [paymentMethod]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    // Run shipping calculation on Review page when address/pincode is available
+    if (currentStep !== reviewStep || !pinCode || pinCode.toString().length !== 6 || cartItems.length === 0) {
+      return;
+    }
+
     let cancelled = false;
 
-    const fetchShippingRate = async (attempt = 1) => {
+    const fetchShippingRate = async () => {
       if (cancelled) return;
-
-      if (!pinCode || pinCode.toString().length !== 6 || cartItems.length === 0) {
-        setPricingDetails(prev => ({ ...prev, shipping: null }));
-        return;
-      }
 
       try {
         const formattedCartItems = cartItems.map(item => ({
@@ -282,6 +308,7 @@ const CheckoutPage = () => {
         const result = await calculateShippingRef.current({
           deliveryPinCode: parseInt(pinCode, 10),
           cartItems: formattedCartItems,
+          paymentType: paymentMethod,
         }).unwrap();
 
         if (cancelled) return;
@@ -292,28 +319,25 @@ const CheckoutPage = () => {
             ...prev,
             shipping: { ...result.data, amount: shippingAmount }
           }));
-          trackDeliveryCheck({ pincode: pinCode, serviceable: true, shippingAmount });
+          setShippingError("");
+          trackDeliveryCheck({ pincode: pinCode, serviceable: true, shippingAmount, paymentMethod });
         } else {
-          // API responded but no valid rate — use fallback
-          setPricingDetails(prev => ({ ...prev, shipping: { amount: FALLBACK_SHIPPING, type: "standard" } }));
-          trackDeliveryCheck({ pincode: pinCode, serviceable: false, errorReason: "no_rate" });
+          showNotificationRef.current?.("Unable to calculate shipping. Please try again.", "error");
         }
       } catch (error) {
         if (cancelled) return;
-        console.error(`[Shipping] Attempt ${attempt} failed:`, error);
-        if (attempt < 3) {
-          setTimeout(() => fetchShippingRate(attempt + 1), 1500 * attempt);
-        } else {
-          // All retries exhausted — fall back to ₹149
-          setPricingDetails(prev => ({ ...prev, shipping: { amount: FALLBACK_SHIPPING, type: "standard" } }));
-          trackDeliveryCheck({ pincode: pinCode, serviceable: false, errorReason: "api_error" });
-        }
+        console.error('[Shipping Calculation Failed]:', error);
+        
+        const errorMsg = error?.data?.message || error?.message || "";
+        setShippingError(errorMsg);
+        setPricingDetails(prev => ({ ...prev, shipping: null }));
+        showNotificationRef.current?.(errorMsg || "Failed to calculate shipping charges.", "error");
       }
     };
 
     fetchShippingRate();
     return () => { cancelled = true; };
-  }, [pinCode, cartItems.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentStep, reviewStep, pinCode, cartItems.length, paymentMethod]);
 
   useEffect(() => {
     if (savedAddressData?.success) {
@@ -552,7 +576,7 @@ const CheckoutPage = () => {
     goToStep(addressStep);
   };
 
-  const handleStep2Next = () => {
+  const handleStep2Next = async () => {
     const addr = String(address || "").trim();
     const pin = String(pinCode || "").trim();
 
@@ -563,7 +587,6 @@ const CheckoutPage = () => {
 
     if (!pin || pin.length < 6) {
       showNotification(pin ? "Pincode must be at least 6 digits" : "Please enter your pincode", "error");
-      // If we have an address but no pin, force the modal open to fix it
       if (addr) setShowMapModal(true);
       return;
     }
@@ -1126,8 +1149,10 @@ const CheckoutPage = () => {
                   disabled={!address.trim()}
                   className="flex-1 h-14 bg-[#2e443c] text-white rounded-2xl font-bold text-sm hover:bg-[#1a2822] active:scale-[0.99] transition-all flex items-center justify-center gap-3 shadow-lg shadow-[#2e443c]/20 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
                 >
-                  Continue to Review
-                  <i className="fa-solid fa-arrow-right text-xs" />
+                  <>
+                    Continue to Review
+                    <i className="fa-solid fa-arrow-right text-xs" />
+                  </>
                 </button>
               </div>
             </div>
@@ -1141,6 +1166,25 @@ const CheckoutPage = () => {
                 <h1 className="text-2xl sm:text-3xl font-serif text-gray-900 leading-tight">Review Your Order</h1>
                 <p className="text-sm text-gray-400 mt-1.5">Almost there — confirm everything looks right</p>
               </div>
+
+              {/* Shipping error banner */}
+              {shippingError && (
+                <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-5 flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
+                    <i className="fa-solid fa-triangle-exclamation text-red-500 text-lg" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-red-800 mb-1">Shipping Not Available</p>
+                    <p className="text-xs text-red-600 leading-relaxed">Shipping is not available for this pincode. Please change your pincode and try again.</p>
+                    <button
+                      onClick={() => { goToStep(addressStep); setShowMapModal(true); setShippingError(""); }}
+                      className="mt-3 text-xs font-bold text-red-600 border-2 border-red-300 px-4 py-2 rounded-lg hover:bg-red-100 transition-colors flex items-center gap-2"
+                    >
+                      <i className="fa-solid fa-location-dot text-xs" /> Change Address
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Contact + Address combined card */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -1411,7 +1455,7 @@ const CheckoutPage = () => {
               <div className="px-5 pb-5 space-y-3">
                 <button
                   onClick={handlePayment}
-                  disabled={isOrdering || isCalculatingShipping || pricingDetails.shipping === null}
+                  disabled={isOrdering || isCalculatingShipping || pricingDetails.shipping === null || shippingError}
                   className="w-full h-14 bg-[#2e443c] text-white rounded-xl font-bold text-sm hover:bg-[#1a2822] active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 shadow-lg shadow-[#2e443c]/25 disabled:opacity-50"
                 >
                   {isOrdering
@@ -1453,7 +1497,7 @@ const CheckoutPage = () => {
               </div>
               <button
                 onClick={handlePayment}
-                disabled={isOrdering || isCalculatingShipping || pricingDetails.shipping === null}
+                disabled={isOrdering || isCalculatingShipping || pricingDetails.shipping === null || shippingError}
                 className="flex-1 h-12 bg-[#2e443c] text-white rounded-xl font-bold text-sm hover:bg-[#1a2822] active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 shadow-lg disabled:opacity-50"
               >
                 {isOrdering
