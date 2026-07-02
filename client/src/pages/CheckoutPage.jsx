@@ -409,13 +409,26 @@ const CheckoutPage = () => {
     fetchPricing();
   }, [cartItemsLength, cartTotalAmount, applyCouponMutation, appliedCoupon, userEmail, isGuest]);
 
+  // Fire begin_checkout ONCE per checkout. React Router remounts this page on
+  // navigate-away-and-back, and the Redux cart hydrates asynchronously AFTER mount,
+  // so a []-deps effect either double-fires or misses on refresh/deep-link. Gate on
+  // a ref (per-mount) + a sessionStorage flag (survives remounts) and depend on the
+  // cart so it fires the moment items hydrate. The flag is cleared on purchase.
+  const beginCheckoutFiredRef = useRef(false);
   useEffect(() => {
-    if (cartItems.length > 0)
+    if (
+      cartItems.length > 0 &&
+      !beginCheckoutFiredRef.current &&
+      !sessionStorage.getItem("un_begin_checkout_fired")
+    ) {
+      beginCheckoutFiredRef.current = true;
       trackBeginCheckout({
         items: cartItems.map((i) => ({ itemId: i.mongoId || i.id, itemName: i.name, itemVariant: i.selectedVariant || "N/A", price: i.price, quantity: i.quantity })),
         value: pricingDetails.subtotal,
       });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+      sessionStorage.setItem("un_begin_checkout_fired", "1");
+    }
+  }, [cartItems.length, pricingDetails.subtotal]); // eslint-disable-line react-hooks/exhaustive-deps -- length-based trigger is intentional
 
   const validateMobile = (m) => /^[6-9][0-9]{9}$/.test(String(m).trim());
   const stripCC = (m) => {
@@ -668,6 +681,7 @@ const CheckoutPage = () => {
             dispatch(clearCart());
             localStorage.removeItem("guestCart"); localStorage.removeItem("guestId");
             sessionStorage.removeItem("checkoutState");
+            sessionStorage.removeItem("un_begin_checkout_fired"); // allow begin_checkout again for the next order
             navigate(`/payment-processing/${response.razorpay_order_id}`);
           },
           prefill: { name: guestName.trim(), email: guestEmail.trim(), contact: guestMobile.trim() },
@@ -744,6 +758,7 @@ const CheckoutPage = () => {
               items: cartItems.map((i) => ({ itemId: i.mongoId || i.id, itemName: i.name, itemVariant: i.selectedVariant || "N/A", price: i.price, quantity: i.quantity })),
             });
             sessionStorage.removeItem("checkoutState");
+            sessionStorage.removeItem("un_begin_checkout_fired"); // allow begin_checkout again for the next order
             navigate(`/payment-processing/${response.razorpay_order_id}`);
           } catch (_) { setPaymentError("Payment verification failed. Contact support if amount was debited."); }
         },
