@@ -251,9 +251,13 @@ const ProductDetailPage = () => {
     setCurrentImageIndex(0);
   }, [selectedVariant]);
 
-  // Track product view when product loads or variant changes
+  // Track product view ONCE per product. Switching variant/color must NOT re-fire
+  // ViewContent (that inflated it 2-5x); variant interest is captured by the separate
+  // trackVariantSelect event. Guard on the product id so only a genuine new product fires.
+  const viewedProductRef = useRef(null);
   useEffect(() => {
-    if (product && selectedVariant) {
+    if (product && selectedVariant && viewedProductRef.current !== product.productId) {
+      viewedProductRef.current = product.productId;
       trackViewItem({
         itemId: product.productId,
         itemName: product.productName,
