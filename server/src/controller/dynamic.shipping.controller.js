@@ -1,41 +1,55 @@
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
 import { ApiRes } from "../utils/index.js";
 import {
-  checkPincodeServiceability,
   calculateShippingRate
 } from "../services/shipping.service.js";
 
-const pinCodeDeliverableOrNotCheck = asyncHandler(async (req, res) => {
-  const { deliveryPinCode, userPincode } = req.body;
-  const pincode = deliveryPinCode || userPincode;
-
-  const result = await checkPincodeServiceability(pincode);
-
-  return res.status(200).json(
-    new ApiRes(
-      200,
-      "Pincode serviceability checked",
-      result,
-      true
-    )
-  );
-});
-
 const dynamicShippingCal = asyncHandler(async (req, res) => {
-  const { deliveryPinCode, userPincode, cartItems } = req.body;
+  // console.log("\n" + "*".repeat(80));
+  // console.log("[CONTROLLER] 📦 Dynamic Shipping Calculation Request Received");
+  // console.log("[CONTROLLER] Request Body:", JSON.stringify(req.body, null, 2));
+  // console.log("[CONTROLLER] Request Headers:", JSON.stringify(req.headers, null, 2));
+  // console.log("*".repeat(80) + "\n");
+  
+  const { deliveryPinCode, userPincode, cartItems, paymentType } = req.body;
   const pincode = deliveryPinCode || userPincode;
 
-  const selectedService = await calculateShippingRate({ pincode, cartItems });
+  console.log("[CONTROLLER] Extracted Parameters:");
+  console.log("  - Pincode:", pincode);
+  console.log("  - Payment Type:", paymentType || "PREPAID");
+  console.log("  - Cart Items:", cartItems?.length, "items");
 
-  if (!selectedService) {
-    return res.status(200).json(
-      new ApiRes(200, "No preferred shipping services available", null, false)
+  if (!pincode) {
+    console.error("[CONTROLLER] ❌ Validation Error: Pincode is missing");
+    console.log("*".repeat(80) + "\n");
+    return res.status(400).json(
+      new ApiRes(400, "Pincode is required", null, false)
     );
   }
+
+  if (!cartItems || !Array.isArray(cartItems) || cartItems.length === 0) {
+    console.error("[CONTROLLER] ❌ Validation Error: Cart items missing or invalid");
+    console.log("*".repeat(80) + "\n");
+    return res.status(400).json(
+      new ApiRes(400, "Cart items are required", null, false)
+    );
+  }
+
+  console.log("[CONTROLLER] ✓ Validation passed, calling calculateShippingRate service...\n");
+
+  const selectedService = await calculateShippingRate({ 
+    pincode, 
+    cartItems,
+    paymentType: paymentType || "PREPAID"
+  });
+
+  console.log("\n[CONTROLLER] Service returned result:", JSON.stringify(selectedService, null, 2));
+  console.log("[CONTROLLER] Sending response to client");
+  console.log("*".repeat(80) + "\n");
 
   return res.status(200).json(
     new ApiRes(200, "Shipping rate calculated successfully", selectedService, true)
   );
 });
 
-export { pinCodeDeliverableOrNotCheck, dynamicShippingCal };
+export { dynamicShippingCal };
