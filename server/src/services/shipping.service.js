@@ -46,11 +46,6 @@ const calculateShippingRate = async ({ pincode, cartItems, paymentType = "PREPAI
     let totalBoxes = 0;
     const dimensions = [];
 
-    console.log("\n" + "=".repeat(80));
-    console.log("[SHIPPING RATE] 🚀 Starting shipping rate calculation");
-    console.log("[SHIPPING RATE] Cart Items:", cartItems.length);
-    console.log("=".repeat(80) + "\n");
-
     for (const item of finalOrderItems) {
       const quantity = safeFloat(item.quantity, 1);
       totalBoxes += quantity;
@@ -130,7 +125,7 @@ const calculateShippingRate = async ({ pincode, cartItems, paymentType = "PREPAI
           ...(validPaymentType === "COD" && { cod_amount: Math.ceil(totalAmount) }),
         };
 
-        console.log(`[SHIPPING RATE] 📤 API Request:`, JSON.stringify(requestPayload, null, 2));
+        // console.log(`[SHIPPING RATE] 📤 API Request:`, JSON.stringify(requestPayload, null, 2));
 
         const response = await axios.post(
           `https://shipping-api.com/app/api/v1/rate-calculator`,
@@ -145,7 +140,7 @@ const calculateShippingRate = async ({ pincode, cartItems, paymentType = "PREPAI
         );
 
         console.log(`[SHIPPING RATE] ✅ API Response (Status ${response.status})`);
-        console.log(`[SHIPPING RATE] 📄 FULL API RESPONSE:`, JSON.stringify(response.data, null, 2));
+        // console.log(`[SHIPPING RATE] 📄 FULL API RESPONSE:`, JSON.stringify(response.data, null, 2));
 
         if (!response.data || !response.data.data || !Array.isArray(response.data.data)) {
           console.error(`[SHIPPING RATE] ❌ Invalid response structure`);
