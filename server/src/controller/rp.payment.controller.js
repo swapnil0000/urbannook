@@ -288,6 +288,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   // Re-calculate shipping to get enriched data (type, weight, boxes)
   const shippingResult = await calculateShippingRate({
     pincode: deliveryAddressSnapshot.pinCode,
+    paymentType: reqPaymentMethod === "COD" ? "COD" : "PREPAID",
     cartItems: items.map(i => ({
       productId: i.productId,
       quantity: i.quantity,
@@ -309,6 +310,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   const codPartialAmount = isCOD ? Math.min(Math.ceil(shippingAmount) * 2, Math.ceil(finalAmount)) : 0;
   const codRemainingAmount = isCOD ? Math.max(0, Math.ceil(finalAmount) - codPartialAmount) : 0;
   const razorpayChargeAmount = isCOD ? codPartialAmount : finalAmount;
+  console.log("[AUTH]", { reqPaymentMethod, shippingAmount, isCOD, codPartialAmount, razorpayChargeAmount_rupees: Math.ceil(razorpayChargeAmount) });
 
   const razorpayOrder = await razorpayCreateOrderService(
     Math.ceil(razorpayChargeAmount * 100), // Razorpay expects integer paise
@@ -354,7 +356,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       {
         orderId: order.orderId,
         razorpayOrderId: razorpayOrder?.data?.id,
-        amount: razorpayChargeAmount * 100, // paise for Razorpay (partial for COD)
+        amount: Math.ceil(razorpayChargeAmount) * 100, // paise — must match what was passed to Razorpay
         currency: "INR",
         paymentMethod: isCOD ? "COD" : "PREPAID",
         codDetails: isCOD ? { partialAmountPaid: codPartialAmount, remainingAmount: codRemainingAmount } : null,
@@ -743,6 +745,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
 
   const shippingResult = await calculateShippingRate({
     pincode: deliveryAddress.pinCode,
+    paymentType: reqPaymentMethod === "COD" ? "COD" : "PREPAID",
     cartItems: rawItemsForShipping
   });
   const shippingAmount = shippingResult?.total_charges || 179;
@@ -756,6 +759,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   const codPartialAmount = isCOD ? Math.min(Math.ceil(shippingAmount) * 2, Math.ceil(finalAmount)) : 0;
   const codRemainingAmount = isCOD ? Math.max(0, Math.ceil(finalAmount) - codPartialAmount) : 0;
   const razorpayChargeAmount = isCOD ? codPartialAmount : finalAmount;
+  console.log("[GUEST]", { reqPaymentMethod, shippingAmount, isCOD, codPartialAmount, razorpayChargeAmount_rupees: Math.ceil(razorpayChargeAmount) });
 
   const razorpayOrder = await razorpayCreateOrderService(Math.ceil(razorpayChargeAmount * 100), "INR");
 
@@ -805,7 +809,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
       {
         orderId: order.orderId,
         razorpayOrderId: razorpayOrder?.data?.id,
-        amount: razorpayChargeAmount * 100, // paise for Razorpay (partial for COD)
+        amount: Math.ceil(razorpayChargeAmount) * 100, // paise — must match what was passed to Razorpay
         currency: "INR",
         paymentMethod: isCOD ? "COD" : "PREPAID",
         codDetails: isCOD ? { partialAmountPaid: codPartialAmount, remainingAmount: codRemainingAmount } : null,
