@@ -112,7 +112,7 @@ const ProductDetailPage = () => {
     return q || 0;
   };
 
-  const { productId } = useParams();
+  const { productId, variantSku: urlVariantSku } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { showNotification, openLoginModal, closeLoginModal } = useUI();
@@ -229,22 +229,23 @@ const ProductDetailPage = () => {
 
   useEffect(() => {
     if (availableVariants.length > 0 && product) {
-      const savedSelection = cartSelections[product.productId];
       let initialVariant = availableVariants[0];
 
-      if (
-        savedSelection &&
-        savedSelection.variant &&
-        availableVariants.includes(savedSelection.variant)
-      ) {
-        initialVariant = savedSelection.variant;
+      if (urlVariantSku) {
+        const matched = product.variantDetails?.find(v => v.sku === urlVariantSku);
+        if (matched) initialVariant = matched.variantName;
+      } else {
+        const savedSelection = cartSelections[product.productId];
+        if (savedSelection && savedSelection.variant && availableVariants.includes(savedSelection.variant)) {
+          initialVariant = savedSelection.variant;
+        }
       }
       setSelectedVariant(initialVariant);
       setCurrentImageIndex(0);
     } else if (!product) {
        setSelectedVariant("");
     }
-  }, [product?.productId, availableVariants, cartSelections, product]);
+  }, [product?.productId, availableVariants, cartSelections, product, urlVariantSku]);
 
   // NAYA: Variant change hone par image index hamesha reset hoga
   useEffect(() => {
@@ -813,6 +814,8 @@ const ProductDetailPage = () => {
                             setSelectedVariant(variantName);
                             if (galleryImages[idx]) setCurrentImageIndex(idx);
                             trackVariantSelect({ itemId: product.productId, itemName: product.productName, variantName, price: currentPrice });
+                            const vSku = product.variantDetails?.find(v => v.variantName === variantName)?.sku;
+                            navigate(`/product/${productId}/${vSku || variantName}`);
                           }}
                           className={`group flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border transition-all duration-300 ${
                             isSelected
@@ -839,6 +842,8 @@ const ProductDetailPage = () => {
                         onClick={() => {
                           setSelectedVariant(variantName);
                           if (galleryImages[idx]) setCurrentImageIndex(idx);
+                          const vSku = product.variantDetails?.find(v => v.variantName === variantName)?.sku;
+                          navigate(`/product/${productId}/${vSku || variantName}`);
                         }}
                         className={`group relative w-7 h-7 rounded-full transition-all duration-300 ${
                           isSelected
