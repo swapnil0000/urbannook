@@ -69,6 +69,14 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/product/:productId/:variantSku"
+        element={
+          <Suspense fallback={<MinimalLoader />}>
+            <ProductDetailPage />
+          </Suspense>
+        }
+      />
+      <Route
         path="/checkout"
         element={
           <Suspense fallback={<MinimalLoader />}>

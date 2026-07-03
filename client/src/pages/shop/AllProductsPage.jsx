@@ -139,7 +139,8 @@ const AllProductsPage = () => {
                         listName: 'All Products',
                         index,
                       });
-                      navigate(`/product/${product.productId}`);
+                      const firstVariant = product.variantDetails?.[0];
+                      navigate(firstVariant?.sku ? `/product/${product.productId}/${firstVariant.sku}` : `/product/${product.productId}`);
                     }}
                   >
                     
@@ -190,12 +191,17 @@ const AllProductsPage = () => {
                                     <div
                                       key={idx}
                                       title={variantName}
-                                      className="w-4 h-4 rounded-full border border-[#d1d5db] shadow-sm transition-transform hover:scale-110"
+                                      className="w-4 h-4 rounded-full border border-[#d1d5db] shadow-sm transition-transform hover:scale-110 cursor-pointer"
                                       style={
                                         variantName.toLowerCase() === 'rainbow'
                                           ? { background: 'linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)' }
                                           : { backgroundColor: variantName.replace(/\s+/g, '').toLowerCase() }
                                       }
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const vSku = product.variantDetails?.find(v => v.variantName === variantName)?.sku;
+                                        navigate(`/product/${product.productId}/${vSku || variantName}`);
+                                      }}
                                     ></div>
                                   ))}
                                   
