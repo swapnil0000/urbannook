@@ -34,15 +34,15 @@ export default {
 
         // ===== Editorial "2040" palette (Urban Nook redesign) =====
         un: {
-          ink: "#141414",
+          ink: "#141414",       // near-black ink
           ink2: "#1F1E1C",
-          cream: "#EFEAE0",
-          cream2: "#E5DFD3",
-          red: "#E63329",
+          cream: "#FFFFFF",      // pure white background (per request — no off-white)
+          cream2: "#F2F2F2",     // neutral light grey (skeletons only)
+          red: "#E63329",        // accent
           red2: "#C9281F",
           grey: "#8C8779",
-          greyd: "#615C50",
-          line: "#D8D2C5",
+          greyd: "#5B554D",
+          line: "#E6E6E6",       // neutral hairline border
           lined: "#33312D",
         },
       },

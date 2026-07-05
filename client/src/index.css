@@ -520,8 +520,9 @@
 .un-rise .un-ch{display:inline-block;transform:translateY(115%) rotate(4deg);animation:un-rise .9s cubic-bezier(.16,1,.3,1) forwards}
 
 /* editorial marquee ticker */
-.un-marquee{display:inline-flex;white-space:nowrap;animation:un-scrollx 26s linear infinite}
+.un-marquee{display:inline-flex;flex-wrap:nowrap;white-space:normal;animation:un-scrollx 26s linear infinite}
 .un-marquee:hover{animation-play-state:paused}
+.un-marquee > *{white-space:normal}
 @keyframes un-scrollx{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 
 /* button ink-fill */

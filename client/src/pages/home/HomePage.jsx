@@ -204,8 +204,8 @@ const HomePage = () => {
             {categories.map((c, i) => (
               <button key={c.name} onClick={() => navigate(`/products?category=${encodeURIComponent(c.name)}`)}
                 className="un-card un-reveal relative aspect-[3/4] overflow-hidden bg-un-ink flex items-end text-left group" style={{ transitionDelay: `${i * 50}ms` }}>
-                <OptimizedImage src={c.img} alt={c.name} className="absolute inset-0 w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-700" />
-                <span className="absolute inset-0 bg-gradient-to-t from-un-ink/90 to-transparent" />
+                <OptimizedImage src={c.img} alt={c.name} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                <span className="absolute inset-0 bg-gradient-to-t from-un-ink/85 via-un-ink/20 to-transparent" />
                 <span className="un-glare" />
                 <span className="relative z-[2] p-4 w-full font-archivo font-black uppercase text-un-cream text-lg">{c.name}</span>
               </button>
