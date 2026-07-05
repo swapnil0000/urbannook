@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Urban Nook — Brand & UI Style Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Anton&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --black:#141414;
+    --black-2:#1F1E1C;
+    --cream:#EFEAE0;       /* off-white / paper */
+    --cream-2:#E5DFD3;
+    --red:#E63329;         /* signature editorial red */
+    --red-2:#C9281F;
+    --grey:#8C8779;
+    --line:#D8D2C5;
+    --line-dk:#33312D;
+    --radius:10px;
+    --maxw:1080px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--cream);color:var(--black);font-family:'Inter',sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+  h1,h2,h3{font-family:'Archivo',sans-serif;font-weight:900;letter-spacing:-.02em;line-height:1}
+  .anton{font-family:'Anton',sans-serif;font-weight:400}
+  .mono{font-family:'JetBrains Mono',monospace}
+  .red{color:var(--red)}
+  .dot{display:inline-block;width:.62em;height:.62em;background:var(--red);border-radius:50%;vertical-align:middle}
+
+  /* HERO */
+  header.hero{border-bottom:2px solid var(--black);padding:78px 0 56px;position:relative}
+  .kicker{font-family:'JetBrains Mono',monospace;font-size:13px;letter-spacing:.28em;text-transform:uppercase;color:var(--red);margin-bottom:22px}
+  .logo-lockup{display:flex;align-items:center;gap:18px;margin-bottom:26px}
+  .logo-mark{width:60px;height:60px;border:3px solid var(--black);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .logo-mark span{font-family:'Anton',sans-serif;font-size:30px;line-height:1}
+  .logo-word{font-family:'Anton',sans-serif;font-size:clamp(40px,8vw,74px);text-transform:uppercase;letter-spacing:.005em}
+  .logo-word .o{position:relative}
+  header.hero p.lede{max-width:620px;color:#4a463d;font-size:18px}
+  .corner-dot{position:absolute;top:78px;right:24px;width:18px;height:18px;border-radius:50%;background:var(--red)}
+
+  section{padding:60px 0;border-bottom:1px solid var(--line)}
+  .sec-label{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.26em;text-transform:uppercase;color:var(--grey);margin-bottom:14px}
+  h2.sec-title{font-size:clamp(28px,5vw,46px);text-transform:uppercase;margin-bottom:10px}
+  .sec-intro{max-width:650px;color:#4a463d;margin-bottom:36px;font-size:16px}
+
+  /* COLOR */
+  .swatch-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:14px}
+  .swatch{border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:#fff}
+  .swatch .chip{height:104px}
+  .swatch .meta{padding:12px 14px}
+  .swatch .name{font-weight:700;font-size:14px}
+  .swatch .hex{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--grey);margin-top:2px}
+  .swatch .role{font-size:11px;color:#615c50;margin-top:6px;line-height:1.4}
+  .ratio{display:flex;height:46px;border-radius:8px;overflow:hidden;margin-top:22px;border:1px solid var(--line);font-family:'JetBrains Mono';font-size:11px;letter-spacing:.1em}
+  .ratio div{display:flex;align-items:center;justify-content:center}
+
+  /* TYPE */
+  .type-row{border-top:1px solid var(--line);padding:22px 0;display:grid;grid-template-columns:150px 1fr;gap:24px;align-items:baseline}
+  .type-row:first-child{border-top:0}
+  .type-spec{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--grey);line-height:1.6}
+  .type-spec b{color:var(--black);display:block;font-family:'Inter';font-weight:700;font-size:13px;margin-bottom:4px}
+  .t-display{font-family:'Anton',sans-serif;font-size:clamp(34px,6vw,60px);text-transform:uppercase;line-height:.92}
+  .t-h2{font-family:'Archivo',sans-serif;font-weight:900;font-size:30px;text-transform:uppercase}
+  .t-h3{font-family:'Archivo',sans-serif;font-weight:800;font-size:21px}
+  .t-body{font-family:'Inter',sans-serif;font-size:16px;color:#4a463d;max-width:560px}
+  .t-caption{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--grey)}
+
+  /* GENRE / duotone */
+  .genre-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:14px}
+  .duo{border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:#fff}
+  .duo .img{height:120px;position:relative;background:linear-gradient(135deg,#3a3a3a,#111)}
+  .duo .img::after{content:"";position:absolute;inset:0;background:var(--red);mix-blend-mode:multiply;opacity:.35}
+  .duo .img .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Anton';font-size:30px;color:rgba(255,255,255,.25)}
+  .duo .b{padding:14px}
+  .duo .g-name{font-family:'Archivo';font-weight:800;text-transform:uppercase;font-size:15px}
+  .duo .g-tag{font-size:12px;color:var(--grey);margin-top:4px}
+
+  /* COMPONENTS */
+  .comp-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+  @media(max-width:720px){.comp-grid{grid-template-columns:1fr}.type-row{grid-template-columns:1fr}.voice-grid{grid-template-columns:1fr!important}}
+  .panel{border:1px solid var(--line);border-radius:var(--radius);padding:24px;background:#fff}
+  .panel.dark{background:var(--black);border-color:var(--line-dk);color:var(--cream)}
+  .panel h4{font-family:'JetBrains Mono';font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--grey);margin-bottom:18px;font-weight:600}
+  .btn{display:inline-block;font-family:'Archivo';font-weight:800;text-transform:uppercase;letter-spacing:.03em;font-size:14px;padding:13px 26px;border:2px solid transparent;cursor:pointer;text-decoration:none}
+  .btn-primary{background:var(--red);color:#fff}
+  .btn-primary:hover{background:var(--red-2)}
+  .btn-ghost{background:transparent;color:var(--black);border-color:var(--black)}
+  .btn-ghost:hover{background:var(--black);color:var(--cream)}
+  .panel.dark .btn-ghost{color:var(--cream);border-color:var(--cream)}
+  .panel.dark .btn-ghost:hover{background:var(--cream);color:var(--black)}
+  .btn-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+
+  .pcard{background:var(--cream);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+  .pcard .img{height:150px;background:linear-gradient(135deg,#3a3a3a,#141414);position:relative;display:flex;align-items:center;justify-content:center}
+  .pcard .img::after{content:"";position:absolute;inset:0;background:var(--red);mix-blend-mode:multiply;opacity:.25}
+  .pcard .badge{position:absolute;top:12px;left:12px;font-family:'JetBrains Mono';font-size:10px;letter-spacing:.15em;text-transform:uppercase;padding:5px 9px;font-weight:600;color:#fff;background:var(--red);z-index:2}
+  .pcard .ph{font-family:'Anton';font-size:36px;color:rgba(255,255,255,.22);z-index:1}
+  .pcard .pinfo{padding:16px}
+  .pcard .pname{font-family:'Archivo';font-weight:800;font-size:16px;text-transform:uppercase}
+  .pcard .pmeta{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+  .pcard .price{font-family:'JetBrains Mono';font-weight:600;color:var(--red)}
+  .pcard .strike{color:var(--grey);text-decoration:line-through;font-size:13px;margin-right:6px}
+
+  .tag{display:inline-block;font-family:'JetBrains Mono';font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:5px 11px;border:1px solid var(--line);border-radius:99px;color:#615c50;margin:0 6px 8px 0}
+  .tag.on{background:var(--red);color:#fff;border-color:var(--red);font-weight:700}
+
+  .navmock{display:flex;align-items:center;justify-content:space-between;background:var(--black);border-radius:8px;padding:14px 20px;color:var(--cream)}
+  .navmock .nlogo{font-family:'Anton';text-transform:uppercase;letter-spacing:.02em;font-size:20px}
+  .navmock .nlinks{display:flex;gap:18px;font-family:'JetBrains Mono';font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#bdb6a6}
+  .navmock .nlinks span.red{color:var(--red)}
+
+  .voice-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .vbox{border-radius:var(--radius);padding:22px}
+  .v-do{background:#fff;border:1px solid var(--line)}
+  .v-dont{background:#fff;border:1px solid var(--line)}
+  .vbox .vh{font-family:'JetBrains Mono';font-size:12px;letter-spacing:.2em;text-transform:uppercase;margin-bottom:14px;font-weight:600}
+  .v-do .vh{color:var(--red)}.v-dont .vh{color:var(--grey)}
+  .vbox p{font-size:15px;margin-bottom:10px}
+  .vbox p .q{color:var(--grey)}
+
+  .principle{display:grid;grid-template-columns:42px 1fr;gap:16px;padding:18px 0;border-top:1px solid var(--line)}
+  .principle .num{font-family:'Anton';font-size:30px;color:var(--red)}
+  .principle h4{font-family:'Archivo';font-weight:800;text-transform:uppercase;font-size:17px;margin-bottom:4px}
+  .principle p{color:#4a463d;font-size:14px}
+
+  footer{padding:50px 0 80px;color:var(--grey);font-family:'JetBrains Mono';font-size:12px;letter-spacing:.1em}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="corner-dot"></span>
+    <div class="kicker">Brand &amp; UI System v2.0 — Editorial</div>
+    <div class="logo-lockup">
+      <div class="logo-mark"><span>UN</span></div>
+      <div class="logo-word red">Urban Nook</div>
+    </div>
+    <p class="lede">One store. Every fandom. A disciplined red, off-white and black system — premium because it's restrained. The palette never changes; the products and photography carry every world. <span class="red">Upgrade your space.</span></p>
+  </div>
+</header>
+
+<!-- STRATEGY -->
+<section>
+  <div class="wrap">
+    <div class="sec-label">01 — Core Idea</div>
+    <h2 class="sec-title">Restraint = Premium <span class="dot"></span></h2>
+    <p class="sec-intro">Three colours, four type styles, one red dot. The discipline is the luxury. Every genre lives inside duotone photography and labels — not new brand colours — so anime, auto, tech and beyond all share one confident, editorial identity.</p>
+    <div class="principle"><div class="num">1</div><div><h4>Strict three-colour palette</h4><p>Red, off-white, black on every page. No genre colours in the UI. This is what makes it read as a premium label rather than a busy marketplace.</p></div></div>
+    <div class="principle"><div class="num">2</div><div><h4>Photography carries the genre</h4><p>Product and lifestyle shots — often duotone or red-tinted — bring each world to life. The frame stays neutral; the imagery does the talking.</p></div></div>
+    <div class="principle"><div class="num">3</div><div><h4>The red dot is the signature</h4><p>A single red circle recurs across pages, packaging and socials — a tiny, ownable mark that ties everything together.</p></div></div>
+  </div>
+</section>
+
+<!-- COLOR -->
+<section>
+  <div class="wrap">
+    <div class="sec-label">02 — Palette</div>
+    <h2 class="sec-title">Three Colours. That's It.</h2>
+    <p class="sec-intro">Off-white is the canvas, black is the structure, red is the one and only accent — used for headlines, the dot, CTAs and prices so it always commands attention.</p>
+    <div class="swatch-grid">
+      <div class="swatch"><div class="chip" style="background:#E63329"></div><div class="meta"><div class="name">Nook Red</div><div class="hex">#E63329</div><div class="role">Signature — headlines, dot, CTAs, prices</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#EFEAE0"></div><div class="meta"><div class="name">Off-White / Paper</div><div class="hex">#EFEAE0</div><div class="role">Primary canvas, light sections</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#141414"></div><div class="meta"><div class="name">Ink Black</div><div class="hex">#141414</div><div class="role">Text, dark UI, structure</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#C9281F"></div><div class="meta"><div class="name">Red Deep</div><div class="hex">#C9281F</div><div class="role">Hover / pressed states</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#8C8779"></div><div class="meta"><div class="name">Stone Grey</div><div class="hex">#8C8779</div><div class="role">Secondary text, captions</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#D8D2C5"></div><div class="meta"><div class="name">Line</div><div class="hex">#D8D2C5</div><div class="role">Borders, dividers on paper</div></div></div>
+    </div>
+    <div class="ratio">
+      <div style="flex:60;background:#EFEAE0;color:#141414">60% OFF-WHITE</div>
+      <div style="flex:30;background:#141414;color:#EFEAE0">30% BLACK</div>
+      <div style="flex:10;background:#E63329;color:#fff">10% RED</div>
+    </div>
+  </div>
+</section>
+
+<!-- GENRE -->
+<section>
+  <div class="wrap">
+    <div class="sec-label">03 — Genre Without New Colours</div>
+    <h2 class="sec-title">Duotone Worlds</h2>
+    <p class="sec-intro">Instead of giving each category its own colour, every genre is shot in black &amp; white with a red duotone wash and a mono label. The palette stays pure; the worlds still feel distinct. Scales infinitely as you add categories.</p>
+    <div class="genre-grid">
+      <div class="duo"><div class="img"><span class="ph">UN</span></div><div class="b"><div class="g-name">Anime</div><div class="g-tag">Posters · katanas · tapestry</div></div></div>
+      <div class="duo"><div class="img"><span class="ph">UN</span></div><div class="b"><div class="g-name">Auto</div><div class="g-tag">Caliper lamps · keychain holders</div></div></div>
+      <div class="duo"><div class="img"><span class="ph">UN</span></div><div class="b"><div class="g-name">Tech</div><div class="g-tag">Desk gear · cable mgmt</div></div></div>
+      <div class="duo"><div class="img"><span class="ph">UN</span></div><div class="b"><div class="g-name">Gaming</div><div class="g-tag">Stands · RGB · decor</div></div></div>
+      <div class="duo"><div class="img"><span class="ph">UN</span></div><div class="b"><div class="g-name">Plants</div><div class="g-tag">Planters · desk greenery</div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- TYPE -->
+<section>
+  <div class="wrap">
+    <div class="sec-label">04 — Typography</div>
+    <h2 class="sec-title">Type System</h2>
+    <p class="sec-intro">A heavy condensed display face for big editorial headlines, a clean grotesque for reading, and mono for prices and labels. All free (Google Fonts), so web, print and packaging match exactly.</p>
+    <div class="type-row">
+      <div class="type-spec"><b>Anton</b>Display / Hero<br>UPPERCASE · red or black<br>Headlines, banners, logo</div>
+      <div><div class="t-display red">Upgrade Your Space</div></div>
+    </div>
+    <div class="type-row">
+      <div class="type-spec"><b>Archivo Black / 900</b>Headings<br>Section + product titles</div>
+      <div><div class="t-h2">Shop The Anime Drop</div><div class="t-h3" style="margin-top:10px">3D-Printed Caliper Lamp</div></div>
+    </div>
+    <div class="type-row">
+      <div class="type-spec"><b>Inter</b>Body · 400–600<br>Descriptions, paragraphs</div>
+      <div><p class="t-body">Built for the desk that says something about you. Every piece is curated to upgrade your workspace — whatever world you're repping. Free shipping over ₹999.</p></div>
+    </div>
+    <div class="type-row">
+      <div class="type-spec"><b>JetBrains Mono</b>Utility<br>Prices, tags, labels, nav</div>
+      <div><div class="t-caption">New Drop · Limited · ₹1,499 · Free Shipping</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- COMPONENTS -->
+<section>
+  <div class="wrap">
+    <div class="sec-label">05 — UI In Action</div>
+    <h2 class="sec-title">Components</h2>
+    <p class="sec-intro">The system applied. Note the red dot recurring as a quiet signature.</p>
+
+    <div class="panel dark" style="margin-bottom:24px">
+      <h4 style="color:#bdb6a6">Navigation</h4>
+      <div class="navmock">
+        <div class="nlogo">Urban Nook</div>
+        <div class="nlinks"><span>Anime</span><span>Auto</span><span>Tech</span><span>Gaming</span><span class="red">New</span></div>
+      </div>
+    </div>
+
+    <div class="comp-grid">
+      <div class="panel">
+        <h4>Buttons</h4>
+        <div class="btn-row">
+          <a class="btn btn-primary">Add to Cart</a>
+          <a class="btn btn-ghost">View Drop</a>
+        </div>
+      </div>
+      <div class="panel">
+        <h4>Filter Tags</h4>
+        <div><span class="tag on">All</span><span class="tag">Anime</span><span class="tag">Auto</span><span class="tag">Under ₹999</span><span class="tag">New</span></div>
+      </div>
+      <div class="panel">
+        <h4>Product Card</h4>
+        <div class="pcard">
+          <div class="img"><span class="badge">Anime</span><span class="ph">UN</span></div>
+          <div class="pinfo"><div class="pname">Reaper Wall Tapestry</div><div class="pmeta"><div><span class="strike">₹1,299</span><span class="price">₹899</span></div><a class="btn btn-primary" style="padding:8px 16px;font-size:12px">Add</a></div></div>
+        </div>
+      </div>
+      <div class="panel dark">
+        <h4 style="color:#bdb6a6">Product Card — Dark</h4>
+        <div class="pcard" style="background:#1F1E1C;border-color:#33312D">
+          <div class="img"><span class="badge">Auto</span><span class="ph">UN</span></div>
+          <div class="pinfo"><div class="pname" style="color:var(--cream)">Caliper Desk Lamp</div><div class="pmeta"><div><span class="price">₹1,799</span></div><a class="btn btn-primary" style="padding:8px 16px;font-size:12px">Add</a></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- VOICE -->
+<section>
+  <div class="wrap">
+    <div class="sec-label">06 — Voice &amp; Tone</div>
+    <h2 class="sec-title">How We Talk</h2>
+    <p class="sec-intro">Confident, punchy, a little cheeky — fan-to-fan, never corporate. Short lines.</p>
+    <div class="voice-grid">
+      <div class="vbox v-do">
+        <div class="vh">Do</div>
+        <p>"Upgrade your space."</p>
+        <p>"Built for the desk that flexes your fandom."</p>
+        <p>"New drop. Limited stock. Don't sleep."</p>
+        <p class="q">Punchy, active, fan-to-fan.</p>
+      </div>
+      <div class="vbox v-dont">
+        <div class="vh">Don't</div>
+        <p>"We offer a wide range of premium lifestyle products."</p>
+        <p>"Enhance your workspace environment today."</p>
+        <p>"Our company is dedicated to quality."</p>
+        <p class="q">Generic, passive, corporate.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    URBAN NOOK · BRAND SYSTEM v2.0 · RED #E63329 / OFF-WHITE #EFEAE0 / BLACK #141414 · ANTON · ARCHIVO · INTER · JETBRAINS MONO
+  </div>
+</footer>
+
+</body>
+</html>

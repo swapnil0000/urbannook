@@ -1,250 +1,111 @@
-import { useState, useMemo, useEffect, lazy, Suspense } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useGetProductsQuery } from '../../store/api/productsApi';
 import SEOHead from '../../component/SEOHead';
-import { trackViewItemList, trackSelectItem } from '../../utils/analytics';
+import UnProductCard, { firstVariant } from '../../component/UnProductCard';
+import { trackViewItemList } from '../../utils/analytics';
 
-const PlaceholderImage = lazy(() => import('../../component/PlaceholderImage'));
-const WishlistButton = lazy(() => import('../../component/WishlistButton'));
+const productList = (res) => res?.data?.products || res?.data?.listofPublishedProducts || [];
 
 const AllProductsPage = () => {
-  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeCat, setActiveCat] = useState(searchParams.get('category') || 'All');
   const [sortBy, setSortBy] = useState('featured');
-  const [showSortModal, setShowSortModal] = useState(false);
-  
-  const { data: productsResponse, isLoading, error } = useGetProductsQuery({
-    page: 1,
-    limit: 12,
-    sortBy: sortBy === 'featured' ? undefined : sortBy
-  });
 
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, []);
+  const { data: productsResponse, isLoading, error } = useGetProductsQuery({ page: 1, limit: 24 });
 
-  // Extract products from response
-  const products = productsResponse?.data?.products || productsResponse?.data?.listofPublishedProducts || [];
+  useEffect(() => { window.scrollTo(0, 0); }, []);
+  useEffect(() => { setActiveCat(searchParams.get('category') || 'All'); }, [searchParams]);
+
+  const products = useMemo(() => productList(productsResponse), [productsResponse]);
+
+  const categories = useMemo(() => {
+    const set = [];
+    products.forEach((p) => { if (p.productCategory && !set.includes(p.productCategory)) set.push(p.productCategory); });
+    return set;
+  }, [products]);
 
   const displayProducts = useMemo(() => {
-    let sorted = products.map(p => {
-      const firstVariantPrice = p.variantDetails?.[0]?.variantPrice || 0;
-      return {
-        ...p,
-        effectivePrice: firstVariantPrice
-      };
-    });
-
-    if (sortBy === 'price-low') sorted.sort((a, b) => a.effectivePrice - b.effectivePrice);
-    if (sortBy === 'price-high') sorted.sort((a, b) => b.effectivePrice - a.effectivePrice);
-    return sorted;
-  }, [products, sortBy]);
+    let list = products.filter((p) => activeCat === 'All' || p.productCategory === activeCat);
+    const price = (p) => firstVariant(p)?.variantPrice || 0;
+    if (sortBy === 'price-low') list = [...list].sort((a, b) => price(a) - price(b));
+    if (sortBy === 'price-high') list = [...list].sort((a, b) => price(b) - price(a));
+    return list;
+  }, [products, activeCat, sortBy]);
 
   useEffect(() => {
-    if (displayProducts.length > 0) {
-      trackViewItemList({
-        listName: 'All Products',
-        listId: 'all_products',
-        items: displayProducts.map((product, index) => ({
-          itemId: product.productId,
-          itemName: product.productName,
-          price: product.variantDetails?.[0]?.variantPrice || 0,
-          itemVariant: product.variantDetails?.[0]?.variantName || '',
-          index,
+    if (displayProducts.length) {
+      trackViewItemList?.({
+        listName: 'All Products', listId: 'all_products',
+        items: displayProducts.map((p, i) => ({
+          itemId: p.productId, itemName: p.productName,
+          price: firstVariant(p)?.variantPrice || 0, itemVariant: firstVariant(p)?.variantName || '', index: i,
         })),
       });
     }
   }, [displayProducts]);
 
-  if (error) {
-    console.error("API Error:", error);
-  }
+  const selectCat = (c) => {
+    setActiveCat(c);
+    if (c === 'All') { searchParams.delete('category'); setSearchParams(searchParams, { replace: true }); }
+    else setSearchParams({ category: c }, { replace: true });
+  };
 
   return (
-    <div className="min-h-screen bg-[#2e443c] relative font-sans selection:bg-[#F5DEB3] selection:text-[#2e443c] pb-10">
-      <SEOHead
-        title="Shop All Products"
-        description="Browse UrbanNook's full collection of premium 3D printed home decor, lighting & lifestyle products. Modern designs, fast pan-India delivery."
-        url="/products"
-      />
+    <div className="un-eddy bg-un-cream text-un-ink font-inter min-h-screen">
+      <SEOHead title="Shop All Products" url="/products"
+        description="Browse UrbanNook's full collection of 3D-printed desk lamps, pen stands & décor. Made in India, fast pan-India delivery." />
 
-      {/* --- Ambient Background Glow --- */}
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#F5DEB3]/5 rounded-full blur-[120px] pointer-events-none"></div>
+      {/* editorial header */}
+      <section className="bg-un-ink text-un-cream border-b-2 border-un-red pt-28 pb-14">
+        <div className="max-w-[1280px] mx-auto px-7">
+          <span className="font-mono text-[11px] tracking-[0.3em] uppercase text-un-red">The Catalogue</span>
+          <h1 className="font-anton uppercase text-[clamp(44px,8vw,88px)] leading-[0.86] mt-3">Shop All</h1>
+          <p className="text-[#bdb6a6] max-w-[520px] mt-3">Every corner, one grid. Filter by category — the palette stays pure, the products do the talking.</p>
+        </div>
+      </section>
 
-      {/* Hero Section */}
-      <section className="pt-[5rem] pb-8 md:pt-[7rem] md:pb-5 px-6 relative z-10">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-end gap-10">
-          
-          {/* LEFT SIDE: Heading & Description */}
-          <div >
-            <h1 className="text-4xl sm:text-6xl md:text-7xl font-serif text-white leading-[0.9] mb-2">
-              Curated{' '}
-              <span className="italic font-light text-[#F5DEB3]">Atmospheres.</span>
-            </h1>
-            <p className="text-sm md:text-base text-green-50/70 font-light leading-relaxed max-w-md">
-              Explore our exclusive collection designed for modern indoor environments.
-            </p>
+      {/* filters + sort */}
+      <div className="max-w-[1280px] mx-auto px-7 pt-10 pb-6 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap gap-2.5">
+          {['All', ...categories].map((c) => (
+            <button key={c} onClick={() => selectCat(c)}
+              className={`un-chip font-mono text-[11px] tracking-[0.1em] uppercase px-4 py-2 border transition-colors ${
+                activeCat === c ? 'bg-un-red text-white border-un-red font-semibold' : 'bg-white border-un-line hover:border-un-ink'
+              }`}>{c}</button>
+          ))}
+        </div>
+        <div className="flex items-center border border-un-line bg-white">
+          {[['featured', 'Featured'], ['price-low', '₹ Low'], ['price-high', '₹ High']].map(([v, l]) => (
+            <button key={v} onClick={() => setSortBy(v)}
+              className={`font-mono text-[11px] tracking-[0.08em] uppercase px-3.5 py-2 transition-colors ${sortBy === v ? 'bg-un-ink text-un-cream' : 'text-un-greyd hover:text-un-ink'}`}>{l}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* grid */}
+      <section className="max-w-[1280px] mx-auto px-7 pb-28">
+        {isLoading ? (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+            {[...Array(8)].map((_, i) => <div key={i} className="aspect-[3/4] bg-un-cream2 animate-pulse border border-un-line" />)}
           </div>
-        </div>
+        ) : error ? (
+          <div className="text-center py-28 border border-un-line bg-white">
+            <h2 className="font-archivo font-black uppercase text-2xl">Unable to load products</h2>
+            <p className="text-un-greyd mt-2">Please check your connection and try again.</p>
+            <button onClick={() => window.location.reload()} className="un-btn bg-un-red text-white font-archivo font-extrabold uppercase text-sm px-7 py-3.5 mt-6"><span className="un-fill bg-un-ink" />Retry</button>
+          </div>
+        ) : displayProducts.length === 0 ? (
+          <div className="text-center py-28 border border-un-line bg-white">
+            <h2 className="font-archivo font-black uppercase text-2xl">Dropping soon</h2>
+            <p className="text-un-greyd mt-2">New pieces land here — check back Friday.</p>
+          </div>
+        ) : (
+          <div className="un-tiltwrap grid grid-cols-2 lg:grid-cols-4 gap-5">
+            {displayProducts.map((p, i) => <UnProductCard key={p.productId || i} p={p} index={i} listId="all_products" listName="All Products" />)}
+          </div>
+        )}
       </section>
-
-      {/* Product Grid */}
-      <section className="pb-24 px-4 md:px-6 relative z-10">
-        <div className="max-w-7xl mx-auto">
-          {isLoading ? (
-            <div className="flex justify-center py-32">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#F5DEB3]"></div>
-            </div>
-          ) : error ? (
-            <div className="flex flex-col items-center justify-center py-32 bg-black/10 rounded-[2rem] border border-white/5 backdrop-blur-sm">
-              <i className="fa-solid fa-triangle-exclamation text-4xl text-[#F5DEB3]/50 mb-4"></i>
-              <h2 className="text-2xl font-serif text-white mb-2">Unable to load products</h2>
-              <p className="text-green-50/60 mb-6 font-light">Please check your connection and try again</p>
-              <button 
-                onClick={() => window.location.reload()} 
-                className="bg-[#F5DEB3] text-[#2e443c] px-8 py-3 rounded-full font-bold uppercase tracking-widest text-xs hover:bg-white transition-colors"
-              >
-                Retry Connection
-              </button>
-            </div>
-          ) : displayProducts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-32 bg-black/10 rounded-[2rem] border border-white/5 backdrop-blur-sm">
-              <i className="fa-solid fa-box-open text-4xl text-[#F5DEB3]/50 mb-4"></i>
-              <h2 className="text-2xl font-serif text-white mb-2">The collection is updating</h2>
-              <p className="text-green-50/60 font-light">Check back later for new arrivals.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-              {displayProducts?.map((product, index) => (
-                <div
-                  key={product.productId}
-                  className="group relative rounded-[2rem] overflow-hidden bg-black/20 border border-white/5 shadow-lg hover:shadow-2xl hover:border-[#F5DEB3]/30 transition-all duration-500 flex flex-col"
-                >
-                  {/* Wishlist Button (Floating Top Right) */}
-                  <div className="absolute top-4 right-4 z-20">
-                    <Suspense fallback={<div className="w-8 h-8 bg-white/20 rounded-full animate-pulse"></div>}>
-                      <WishlistButton productId={product.productId} />
-                    </Suspense>
-                  </div>
-
-                  {/* Clickable Card Area */}
-                  <div
-                    className="flex flex-col max-h-[520px] cursor-pointer"
-                    onClick={() => {
-                      trackSelectItem({
-                        itemId: product.productId,
-                        itemName: product.productName,
-                        itemVariant: product.variantDetails?.[0]?.variantName,
-                        price: product.effectivePrice,
-                        listId: 'all_products',
-                        listName: 'All Products',
-                        index,
-                      });
-                      const firstVariant = product.variantDetails?.[0];
-                      navigate(firstVariant?.sku ? `/product/${product.productId}/${firstVariant.sku}` : `/product/${product.productId}`);
-                    }}
-                  >
-                    
-                    <div className="relative w-full aspect-square bg-[#f8f8f5] overflow-hidden">
-                      {(() => {
-                        const thumbnail = (product?.variantDetails && product.variantDetails[0]?.variantImage?.[0]) || "/placeholder.jpg";
-                        return (
-                          <img 
-                            src={thumbnail} 
-                            alt={product.productName} 
-                            className="w-full h-full object-cover mix-blend-multiply transition-transform duration-[1.5s] group-hover:scale-110" 
-                          />
-                        );
-                      })()}
-                    </div>
-
-                    {/* 2. TEXT & CTA SECTION */}
-                    <div className="p-4 md:p-4 flex flex-col flex-grow justify-between bg-[#f5f7f8] to-transparent backdrop-blur-md">
-                      
-                      <div className="mb-2">
-                        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a89068] block opacity-80">
-                          {product.productCategory}
-                        </span>
-                        <h3 className="font-serif text-xl md:text-2xl text-gray-500  leading-snug line-clamp-2">
-                          {product.productName}
-                        </h3>
-                      </div>
-                      
-                      <div className="flex justify-between items-end pt-2 border-t border-[#F5DEB3]/10] mt-auto">
-                        <div className="flex flex-col">
-                          
-                          {/* --- Available Variants Section --- */}
-                          {(() => {
-                            const availableVariants = (product?.variantDetails && product.variantDetails.length > 0)
-                              ? product.variantDetails.map(v => v.variantName)
-                              : (product?.color || []);
-
-                            if (availableVariants.length === 0) return null;
-
-                            return (
-                              <div className="mb-3">
-                                <span className="text-[10px] uppercase tracking-widest text-gray-500 mb-1.5 block">
-                                  Available Variants
-                                </span>
-                                <div className="flex flex-wrap gap-1.5 items-center">
-                                  {/* Sirf pehle 5 variants dikhayenge */}
-                                  {availableVariants.slice(0, 5).map((variantName, idx) => (
-                                    <div
-                                      key={idx}
-                                      title={variantName}
-                                      className="w-4 h-4 rounded-full border border-[#d1d5db] shadow-sm transition-transform hover:scale-110 cursor-pointer"
-                                      style={
-                                        variantName.toLowerCase() === 'rainbow'
-                                          ? { background: 'linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)' }
-                                          : { backgroundColor: variantName.replace(/\s+/g, '').toLowerCase() }
-                                      }
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        const vSku = product.variantDetails?.find(v => v.variantName === variantName)?.sku;
-                                        navigate(`/product/${product.productId}/${vSku || variantName}`);
-                                      }}
-                                    ></div>
-                                  ))}
-                                  
-                                  {/* 5 se zyada hone par +X dikhayenge */}
-                                  {availableVariants.length > 5 && (
-                                    <span className="text-[10px] font-medium text-gray-500 ml-1">
-                                      +{availableVariants.length - 5}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })()}
-
-                          <span className="text-[10px] uppercase tracking-widest text-gray-500 mb-1 block">
-                            Pricing
-                          </span>
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-lg md:text-xl font-semibold text-[#a89068]">
-                              ₹{product.effectivePrice?.toLocaleString()}
-                            </span>
-                            <span className="text-xs text-gray-400 line-through">
-                              ₹{(product.effectivePrice * 1.18).toFixed(0).toLocaleString()}
-                            </span>
-                          </div>
-                           
-                        </div>
-                        
-                        {/* Interactive Arrow CTA */}
-                        <div className="w-12 h-12 rounded-full bg-[#F5DEB3]/10 text-gray-500  flex items-center justify-center group-hover:bg-[#F5DEB3] group-hover:text-[#2e443c] transition-all duration-300">
-                          <i className="fa-solid fa-arrow-right -rotate-45 group-hover:rotate-0 transition-transform duration-500"></i>
-                        </div>
-                      </div>
-
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-
     </div>
   );
 };

@@ -31,6 +31,26 @@ export default {
         warning: "var(--color-warning)",
         error: "var(--color-error)",
         info: "var(--color-info)",
+
+        // ===== Editorial "2040" palette (Urban Nook redesign) =====
+        un: {
+          ink: "#141414",
+          ink2: "#1F1E1C",
+          cream: "#EFEAE0",
+          cream2: "#E5DFD3",
+          red: "#E63329",
+          red2: "#C9281F",
+          grey: "#8C8779",
+          greyd: "#615C50",
+          line: "#D8D2C5",
+          lined: "#33312D",
+        },
+      },
+      fontFamily: {
+        anton: ["Anton", "ui-sans-serif", "sans-serif"],
+        archivo: ["Archivo", "ui-sans-serif", "sans-serif"],
+        inter: ["Inter", "ui-sans-serif", "sans-serif"],
+        mono: ['"JetBrains Mono"', "ui-monospace", "monospace"],
       },
     },
   },
