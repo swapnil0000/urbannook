@@ -536,3 +536,22 @@
   .un-rise .un-ch{transform:none;animation:none}
   .un-card{transition:none}
 }
+
+/* ============================================================
+   GULLYLABS-STYLE HELPERS (chosen direction)
+   ============================================================ */
+.gl-lbl{font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700}
+.gl-pcard{transition:box-shadow .3s,transform .3s,border-color .3s}
+.gl-pcard:hover{box-shadow:0 16px 40px -18px rgba(20,20,20,.22);transform:translateY(-3px)}
+.gl-img{transition:transform .6s cubic-bezier(.2,.7,.2,1),opacity .4s}
+.gl-pcard:hover .gl-img{transform:scale(1.04)}
+.gl-img2{opacity:0;transition:opacity .5s}
+.gl-pcard:hover .gl-img2{opacity:1}
+.gl-qa{transform:translateY(105%);opacity:0;transition:transform .32s cubic-bezier(.2,.7,.2,1),opacity .3s}
+.gl-pcard:hover .gl-qa{transform:none;opacity:1}
+.gl-hscroll{scrollbar-width:none}.gl-hscroll::-webkit-scrollbar{display:none}
+.gl-swatch.on{outline:2px solid #003BD0;outline-offset:2px}
+.gl-press{transition:transform .18s ease}.gl-press:active{transform:scale(.97)}
+@media(prefers-reduced-motion:reduce){
+  .gl-pcard,.gl-img,.gl-img2,.gl-qa{transition:none!important;transform:none!important}
+}

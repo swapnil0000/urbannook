@@ -45,12 +45,25 @@ export default {
           line: "#E6E6E6",       // neutral hairline border
           lined: "#33312D",
         },
+
+        // ===== GullyLabs-style palette (chosen direction) =====
+        brand:   "#003BD0",   // primary — buttons, links, accents
+        brandHi: "#0F52DC",
+        sale:    "#D62828",   // discounts / sale ONLY
+        star:    "#F3C33B",   // ratings
+        save:    "#108474",   // savings (teal)
+        ink:     "#202223",   // near-black text
+        paper:   "#FFFFFF",
+        muted:   "#7B7B7B",
+        faint:   "#9A9A9A",
+        hair:    "#EBEBEB",   // hairline borders
       },
       fontFamily: {
         anton: ["Anton", "ui-sans-serif", "sans-serif"],
         archivo: ["Archivo", "ui-sans-serif", "sans-serif"],
         inter: ["Inter", "ui-sans-serif", "sans-serif"],
         mono: ['"JetBrains Mono"', "ui-monospace", "monospace"],
+        jakarta: ['"Plus Jakarta Sans"', "ui-sans-serif", "system-ui", "sans-serif"],
       },
     },
   },

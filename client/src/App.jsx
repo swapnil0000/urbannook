@@ -12,7 +12,6 @@ import { fetchCsrfToken } from './store/api/apiSlice';
 import AppRoutes from './store/AppRoutes';
 import NewsTicker from './pages/home/NewsTicker';
 import SEOHead from './component/SEOHead';
-import MotionLayer from './component/MotionLayer';
 import { trackPageView, setUserId, captureAttribution, setMetaAdvancedMatching } from './utils/analytics';
 // check
 const ORG_STRUCTURED_DATA = {
@@ -156,7 +155,6 @@ function App() {
     <Provider store={store}>
         <Router> 
           <SEOHead structuredData={ORG_STRUCTURED_DATA} />
-          <MotionLayer />
           <RouteTracker />
           <SessionManager>
             <SyncProvider>

@@ -2,329 +2,209 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SEOHead from '../../component/SEOHead';
 import OptimizedImage from '../../component/OptimizedImage';
-import WishlistButton from '../../component/WishlistButton';
+import UnProductCard, { productImg, firstVariant } from '../../component/UnProductCard';
 import { useGetFeaturedProductsQuery, useGetProductsQuery } from '../../store/api/productsApi';
-import { useGetTestimonialsQuery, useSubmitTestimonialMutation } from '../../store/api/testimonialsApi';
-import { trackViewItemList, trackSelectItem } from '../../utils/analytics';
+import { useGetTestimonialsQuery } from '../../store/api/testimonialsApi';
+import { trackViewItemList } from '../../utils/analytics';
 
 const HOME_STRUCTURED_DATA = {
-  '@context': 'https://schema.org',
-  '@type': 'WebSite',
-  name: 'UrbanNook',
-  url: 'https://www.urbannook.in',
-  potentialAction: {
-    '@type': 'SearchAction',
-    target: 'https://www.urbannook.in/products?q={search_term_string}',
-    'query-input': 'required name=search_term_string',
-  },
+  '@context': 'https://schema.org', '@type': 'WebSite', name: 'UrbanNook', url: 'https://www.urbannook.in',
+  potentialAction: { '@type': 'SearchAction', target: 'https://www.urbannook.in/products?q={search_term_string}', 'query-input': 'required name=search_term_string' },
 };
-
-const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
 const productList = (res) => res?.data?.products || res?.data?.listofPublishedProducts || [];
-const firstVariant = (p) => p?.variantDetails?.[0] || {};
-const productImg = (p) => firstVariant(p)?.variantImage?.[0] || p?.productImg || p?.productImage || '/assets/logo.webp';
-const productHref = (p) => {
-  const sku = firstVariant(p)?.sku;
-  return sku ? `/product/${p.productId}/${sku}` : `/product/${p.productId}`;
-};
+const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
 
-/* ---------------- Editorial product card (3D tilt + glare) ---------------- */
-const ProductCard = ({ p, index }) => {
-  const navigate = useNavigate();
-  const v = firstVariant(p);
-  const go = () => {
-    trackSelectItem?.({
-      itemId: p.productId, itemName: p.productName, itemVariant: v.variantName || '',
-      price: v.variantPrice || 0, listId: 'home_grid', listName: 'Home Grid', index,
-    });
-    navigate(productHref(p));
-  };
-  const badge = (p.tags || []).includes('best_seller') ? 'Best Seller'
-    : (p.tags || []).includes('new_arrival') ? 'New'
-    : (p.tags || []).includes('trending') ? 'Trending'
-    : (p.tags || []).includes('featured') ? 'Featured' : null;
-
-  return (
-    <article className="un-card group relative flex flex-col bg-white border border-un-line" style={{ transitionDelay: `${index * 60}ms` }}>
-      <div className="relative aspect-square overflow-hidden bg-un-ink">
-        {badge && (
-          <span className="absolute top-3 left-3 z-[3] bg-un-red text-white font-mono text-[10px] tracking-[0.14em] uppercase font-semibold px-2.5 py-1">{badge}</span>
-        )}
-        <div className="absolute top-2.5 right-2.5 z-[3]"><WishlistButton productId={p.productId} /></div>
-        <button onClick={go} className="block w-full h-full" aria-label={p.productName}>
-          <OptimizedImage
-            src={productImg(p)} alt={p.productName}
-            className="w-full h-full object-cover transition-transform duration-[900ms] ease-out group-hover:scale-[1.07]"
-          />
-        </button>
-        <span className="un-glare" />
-      </div>
-      <div className="flex flex-col gap-2 p-4 flex-1" style={{ transform: 'translateZ(24px)' }}>
-        <span className="font-mono text-[10px] tracking-[0.16em] uppercase text-un-grey">{p.productCategory || 'Urban Nook'}</span>
-        <button onClick={go} className="text-left font-archivo font-extrabold uppercase text-[15px] leading-tight text-un-ink hover:text-un-red transition-colors line-clamp-2">
-          {p.productName}
-        </button>
-        <div className="mt-auto flex items-center justify-between pt-2">
-          <span className="font-mono font-semibold text-un-red">{inr(v.variantPrice)}</span>
-          <button onClick={go} className="un-btn font-archivo font-extrabold text-[11px] tracking-[0.06em] uppercase border-2 border-un-ink px-3.5 py-2 text-un-ink hover:text-white transition-colors">
-            <span className="un-fill bg-un-red" />View
-          </button>
-        </div>
-      </div>
-    </article>
-  );
-};
+const Kicker = ({ children }) => <p className="gl-lbl text-brand mb-1">{children}</p>;
+const SecHead = ({ kicker, title, onView }) => (
+  <div className="flex items-end justify-between mb-7">
+    <div><Kicker>{kicker}</Kicker><h2 className="text-3xl md:text-4xl font-extrabold tracking-tight">{title}</h2></div>
+    {onView && <button onClick={onView} className="text-sm font-bold underline underline-offset-4 decoration-2 hover:text-brand cursor-pointer">View all →</button>}
+  </div>
+);
 
 const HomePage = () => {
   const navigate = useNavigate();
   useEffect(() => { window.scrollTo(0, 0); }, []);
 
-  const { data: featRes } = useGetFeaturedProductsQuery({ limit: 1 }, {
-    refetchOnMountOrArgChange: false, refetchOnFocus: false, refetchOnReconnect: false,
-  });
+  const { data: featRes } = useGetFeaturedProductsQuery({ limit: 1 }, { refetchOnMountOrArgChange: false, refetchOnFocus: false, refetchOnReconnect: false });
   const featured = useMemo(() => productList(featRes)[0], [featRes]);
   const heroImg = productImg(featured) || '/assets/hero2.webp';
 
-  const { data: prodRes, isLoading: prodLoading } = useGetProductsQuery({ page: 1, limit: 8 });
+  const { data: prodRes, isLoading } = useGetProductsQuery({ page: 1, limit: 8 });
   const products = useMemo(() => productList(prodRes), [prodRes]);
+  const best = products.slice(0, 4);
+  const fresh = products.length > 4 ? products.slice(4, 8) : [...products].reverse().slice(0, 4);
 
-  const categories = useMemo(() => {
+  const penStand = useMemo(() => products.find((p) => /pen/i.test(p.productCategory || '') || /pen/i.test(p.productName || '')), [products]);
+
+  const collections = useMemo(() => {
     const seen = [];
-    products.forEach((p) => { if (p.productCategory && !seen.find((c) => c.name === p.productCategory)) seen.push({ name: p.productCategory, img: productImg(p) }); });
-    return seen.slice(0, 5);
+    products.forEach((p) => { if (p.productCategory && !seen.find((c) => c.name === p.productCategory)) seen.push({ name: p.productCategory, img: productImg(p), count: '' }); });
+    const soon = [{ name: 'Wall Posters', img: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=600&q=80', soon: true }, { name: 'Desk Décor', img: 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=600&q=80', soon: true }];
+    return [...seen, ...soon].slice(0, 4);
   }, [products]);
 
   const { data: testRes } = useGetTestimonialsQuery();
-  const testimonials = testRes?.data?.testimonials || [];
+  const testimonials = (testRes?.data?.testimonials || []).slice(0, 3);
+  const fallbackReviews = [
+    { userName: 'Aryan', content: 'The red glow is unreal on a late-night setup. Way cooler in person.', rating: 5 },
+    { userName: 'Simran', content: 'Gifted the Porsche caliper — my brother hasn’t turned it off since.', rating: 5 },
+    { userName: 'Kabir', content: 'Pen stand is tiny but adorable. Desk finally looks intentional.', rating: 4 },
+  ];
+  const reviews = testimonials.length ? testimonials : fallbackReviews;
 
   useEffect(() => {
-    if (products.length) {
-      trackViewItemList?.({
-        listName: 'Home Grid', listId: 'home_grid',
-        items: products.map((p, i) => ({
-          itemId: p.productId, itemName: p.productName,
-          price: firstVariant(p)?.variantPrice || 0, itemVariant: firstVariant(p)?.variantName || '', index: i,
-        })),
-      });
-    }
+    if (products.length) trackViewItemList?.({ listName: 'Home', listId: 'home', items: products.map((p, i) => ({ itemId: p.productId, itemName: p.productName, price: firstVariant(p)?.variantPrice || 0, index: i })) });
   }, [products]);
 
-  /* testimonial submit (preserved from old UI, restyled) */
-  const [submitTestimonial, { isLoading: submitting }] = useSubmitTestimonialMutation();
-  const [tName, setTName] = useState('');
-  const [tText, setTText] = useState('');
-  const [tRating, setTRating] = useState(5);
-  const [tDone, setTDone] = useState(false);
-  const onSubmitTestimonial = async (e) => {
-    e.preventDefault();
-    if (!tName.trim() || !tText.trim()) return;
-    try {
-      await submitTestimonial({ userName: tName.trim(), content: tText.trim(), rating: tRating }).unwrap();
-      setTDone(true); setTName(''); setTText(''); setTRating(5);
-      setTimeout(() => setTDone(false), 3000);
-    } catch (_) { /* silently ignore in demo */ }
-  };
-
-  const marquee = testimonials.length ? testimonials : [
-    { userName: 'Aryan', content: 'The red glow is unreal on a late-night setup. Way cooler in person.', rating: 5 },
-    { userName: 'Simran', content: 'Gifted the Porsche caliper lamp — my brother hasn’t turned it off since.', rating: 5 },
-    { userName: 'Kabir', content: 'Pen stand is tiny but adorable. Desk finally looks intentional.', rating: 5 },
-  ];
+  // countdown (cosmetic)
+  const [cd, setCd] = useState({ d: 2, h: 11, m: 45, s: 30 });
+  useEffect(() => {
+    const t = setInterval(() => setCd((p) => {
+      let s = ((p.d * 24 + p.h) * 60 + p.m) * 60 + p.s - 1; if (s < 0) s = 0;
+      return { d: Math.floor(s / 86400), h: Math.floor((s % 86400) / 3600), m: Math.floor((s % 3600) / 60), s: s % 60 };
+    }), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const pad = (n) => String(n).padStart(2, '0');
 
   return (
-    <div className="un-eddy bg-un-cream text-un-ink font-inter">
+    <div className="font-jakarta bg-paper text-ink">
       <SEOHead url="/" structuredData={HOME_STRUCTURED_DATA} />
 
-      {/* ============ HERO ============ */}
-      <section className="relative border-b-2 border-un-ink overflow-hidden">
-        <div className="max-w-[1280px] mx-auto px-7 pt-16 pb-24 lg:pb-28 grid lg:grid-cols-[1.1fr_.9fr] gap-10 items-center min-h-[calc(100svh-160px)]">
-          <div>
-            <div className="flex flex-wrap gap-6 font-mono text-[11px] tracking-[0.22em] uppercase text-un-greyd mb-7 un-reveal">
-              <span>Est. 2024 → 2040</span>
-              <span>Curated / Not Cluttered</span>
-              <span className="text-un-red">Drop 047 Live</span>
-            </div>
-            <h1 className="font-anton uppercase leading-[0.84] tracking-tight text-[clamp(56px,11vw,150px)] un-reveal">
-              Make Every<br />
-              <span className="text-transparent [-webkit-text-stroke:2px_#141414]">Corner</span><br />
-              <span className="text-un-red">Count.</span>
-            </h1>
-            <p className="max-w-[430px] text-un-greyd text-[17px] mt-8 mb-8 un-reveal">
-              3D-crafted lamps, pen stands &amp; desk décor — made to order in India. Aesthetic, fandom-driven gear for the desk that says something about you.
-            </p>
-            <div className="flex flex-wrap gap-3.5 un-reveal">
-              <button onClick={() => navigate('/products')} className="un-btn un-magnet bg-un-red text-white font-archivo font-extrabold uppercase tracking-[0.04em] text-sm px-8 py-4">
-                <span className="un-fill bg-un-ink" />Shop The Drop
-              </button>
-              {featured && (
-                <button onClick={() => navigate(productHref(featured))} className="un-btn un-magnet border-2 border-un-ink text-un-ink font-archivo font-extrabold uppercase tracking-[0.04em] text-sm px-8 py-4 hover:text-un-cream transition-colors">
-                  <span className="un-fill bg-un-ink" />View Featured
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* hero visual — CALIPER LAMP variant image */}
-          <div className="relative hidden lg:block un-reveal">
-            <div className="relative aspect-[3/4] max-w-[480px] ml-auto">
-              <div className="absolute inset-0 border-2 border-un-ink translate-x-4 translate-y-4" />
-              <div className="relative w-full h-full overflow-hidden bg-un-ink un-card">
-                <OptimizedImage
-                  src={heroImg} alt={featured?.productName || 'Featured product'}
-                  className="w-full h-full object-cover"
-                  loading="eager" fetchPriority="high"
-                />
-                <span className="un-glare" />
-                <div className="absolute inset-0 bg-un-red mix-blend-multiply opacity-[0.32] pointer-events-none" />
-              </div>
-              <span className="absolute bottom-5 -left-6 bg-un-ink text-un-cream font-mono text-[10px] tracking-[0.18em] uppercase px-4 py-2.5 flex items-center gap-2.5">
-                <i className="w-1.5 h-1.5 rounded-full bg-un-red inline-block" />
-                {featured?.productName ? `${featured.productName} · Limited` : 'New Drop · Limited'}
-              </span>
-            </div>
-          </div>
-        </div>
-        {/* scroll cue */}
-        <div className="absolute bottom-6 left-7 font-mono text-[10px] tracking-[0.3em] uppercase text-un-grey hidden md:flex items-center gap-3">
-          Scroll <span className="w-12 h-px bg-un-grey" /> 001 / 005
-        </div>
-      </section>
-
-      {/* ============ CATEGORY STRIP ============ */}
-      {categories.length > 0 && (
-        <section className="max-w-[1280px] mx-auto px-7 py-24">
-          <div className="flex items-end justify-between gap-5 flex-wrap mb-11 un-reveal">
-            <div>
-              <span className="block font-mono text-[11px] tracking-[0.3em] uppercase text-un-red mb-3">002 — Collections</span>
-              <h2 className="font-archivo font-black uppercase text-[clamp(34px,5.4vw,60px)] leading-[0.95] tracking-tight">Pick Your Corner</h2>
-            </div>
-            <button onClick={() => navigate('/products')} className="font-mono text-[11px] tracking-[0.18em] uppercase border-b-2 border-un-red pb-1 hover:tracking-[0.24em] transition-all">View All →</button>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
-            {categories.map((c, i) => (
-              <button key={c.name} onClick={() => navigate(`/products?category=${encodeURIComponent(c.name)}`)}
-                className="un-card un-reveal relative aspect-[3/4] overflow-hidden bg-un-ink flex items-end text-left group" style={{ transitionDelay: `${i * 50}ms` }}>
-                <OptimizedImage src={c.img} alt={c.name} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-                <span className="absolute inset-0 bg-gradient-to-t from-un-ink/85 via-un-ink/20 to-transparent" />
-                <span className="un-glare" />
-                <span className="relative z-[2] p-4 w-full font-archivo font-black uppercase text-un-cream text-lg">{c.name}</span>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* ============ BEST SELLERS GRID ============ */}
-      <section className="max-w-[1280px] mx-auto px-7 pb-24">
-        <div className="flex items-end justify-between gap-5 flex-wrap mb-11 un-reveal">
-          <div>
-            <span className="block font-mono text-[11px] tracking-[0.3em] uppercase text-un-red mb-3">003 — The Collection</span>
-            <h2 className="font-archivo font-black uppercase text-[clamp(34px,5.4vw,60px)] leading-[0.95] tracking-tight">The Heavy Rotation</h2>
-          </div>
-          <button onClick={() => navigate('/products')} className="font-mono text-[11px] tracking-[0.18em] uppercase border-b-2 border-un-red pb-1 hover:tracking-[0.24em] transition-all">Shop All →</button>
-        </div>
-        {prodLoading ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
-            {[...Array(4)].map((_, i) => <div key={i} className="aspect-[3/4] bg-un-cream2 animate-pulse border border-un-line" />)}
-          </div>
-        ) : (
-          <div className="un-tiltwrap grid grid-cols-2 lg:grid-cols-4 gap-5">
-            {products.map((p, i) => <ProductCard key={p.productId || i} p={p} index={i} />)}
-          </div>
-        )}
-      </section>
-
-      {/* ============ MANIFESTO ============ */}
-      <section className="bg-un-ink text-un-cream border-y-2 border-un-ink py-28">
-        <div className="max-w-[1280px] mx-auto px-7">
-          <span className="block font-mono text-[11px] tracking-[0.3em] uppercase text-un-red mb-6 un-reveal">004 — Manifesto</span>
-          <p className="un-reveal font-archivo font-black uppercase tracking-tight text-[clamp(28px,5vw,60px)] leading-[1.06] max-w-[1000px]">
-            Your desk is not furniture. It is the six square feet where your world happens. We build the gear that makes it <span className="text-un-red">yours</span> — one drop at a time.
-          </p>
-          <div className="mt-14 flex flex-wrap gap-10">
-            {[['3D', 'Printed To Order'], ['100%', 'Made In India'], ['COD', 'Available'], ['7-Day', 'Easy Returns']].map(([n, l]) => (
-              <div key={l} className="min-w-[150px] un-reveal">
-                <div className="font-anton text-[clamp(38px,5vw,58px)] text-un-red leading-none">{n}</div>
-                <div className="font-mono text-[10px] tracking-[0.24em] uppercase text-un-grey mt-2">{l}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ============ FEATURE / STEPS ============ */}
-      <section className="border-b-2 border-un-ink">
-        <div className="grid lg:grid-cols-2 min-h-[540px]">
-          <div className="relative overflow-hidden bg-un-ink border-r-0 lg:border-r-2 border-un-ink min-h-[320px]">
-            <OptimizedImage src={heroImg} alt="Urban Nook desk gear" className="absolute inset-0 w-full h-full object-cover" />
-            <span className="absolute inset-0 bg-un-red mix-blend-multiply opacity-[0.32]" />
-          </div>
-          <div className="px-8 lg:px-16 py-16 flex flex-col justify-center gap-5">
-            <span className="font-mono text-[11px] tracking-[0.3em] uppercase text-un-red un-reveal">005 — How It Works</span>
-            <h3 className="font-archivo font-black uppercase text-[clamp(30px,4vw,48px)] leading-[0.98] un-reveal">Built For The Desk That Flexes</h3>
-            <div className="flex flex-col mt-2">
-              {[
-                ['01', 'Pick Your Corner', 'Browse lamps, pen stands & décor — every shelf curated, never cluttered.'],
-                ['02', 'Add The Pieces', 'The 3D-printed upgrades that make a desk unmistakably yours.'],
-                ['03', 'Upgrade Your Space', 'Fast dispatch, easy returns, COD available. Done.'],
-              ].map(([n, h, d]) => (
-                <div key={n} className="grid grid-cols-[56px_1fr] gap-4 py-5 border-t border-un-line items-baseline un-reveal last:border-b">
-                  <div className="font-anton text-2xl text-un-red">{n}</div>
-                  <div><h4 className="font-archivo font-extrabold uppercase text-base">{h}</h4><p className="text-sm text-un-greyd mt-1">{d}</p></div>
+      {/* HERO */}
+      <div className="relative max-w-[1400px] mx-auto md:px-5 md:pt-5">
+        <div className="relative overflow-hidden md:rounded-[1.5rem] min-h-[74vh] md:min-h-[66vh] flex items-center bg-ink">
+          <OptimizedImage src={heroImg} alt={featured?.productName || 'Featured'} className="absolute inset-0 w-full h-full object-cover opacity-90" loading="eager" fetchPriority="high" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent"></div>
+          <div className="relative px-7 md:px-16 max-w-xl text-white">
+            <p className="gl-lbl text-white/80 mb-4">Summer Drop · Auto Series</p>
+            <h1 className="text-5xl md:text-7xl font-extrabold leading-[0.95] tracking-tight">Light up<br />your grind.</h1>
+            <p className="mt-5 text-white/85 text-lg max-w-md">3D-printed desk lamps &amp; décor, made to order in India. Warm, aggressive ambient glow for late-night sessions.</p>
+            <div className="mt-7 flex items-center gap-3">
+              <span className="gl-lbl text-white/70 text-[10px] mr-1">Ends in</span>
+              {[['days', cd.d], ['hrs', cd.h], ['min', cd.m], ['sec', cd.s]].map(([l, val], i) => (
+                <div key={l} className="flex items-center gap-3">
+                  {i > 0 && <span className="text-xl font-bold text-white/50">:</span>}
+                  <div className="text-center"><div className="text-2xl font-extrabold tabular-nums">{pad(val)}</div><div className="text-[9px] text-white/60 uppercase tracking-wider">{l}</div></div>
                 </div>
               ))}
             </div>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <button onClick={() => navigate('/products')} className="gl-press bg-brand text-white font-bold text-sm px-8 py-3.5 rounded-xl hover:bg-brandHi transition-colors">Shop Now</button>
+              {featured && <button onClick={() => navigate(`/product/${featured.productId}`)} className="gl-press border border-white/40 text-white font-bold text-sm px-8 py-3.5 rounded-xl hover:bg-white/10 transition-colors">View Lamp</button>}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* CATEGORY PILLS */}
+      <div className="max-w-[1280px] mx-auto px-5 pt-6">
+        <div className="flex gap-2.5 overflow-x-auto gl-hscroll pb-1">
+          <button onClick={() => navigate('/products')} className="shrink-0 gl-press bg-brand text-white text-sm font-semibold px-5 py-2.5 rounded-full">Shop All</button>
+          {['💡 Lamps', '✏️ Pen Stands', '🎁 Gifting', 'Under ₹500', '✨ New'].map((c) => (
+            <button key={c} onClick={() => navigate('/products')} className="shrink-0 gl-press border border-hair text-sm font-semibold px-5 py-2.5 rounded-full hover:border-ink transition-colors">{c}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* SOCIAL PROOF + PAYMENT */}
+      <div className="max-w-[1280px] mx-auto px-5 py-7">
+        <div className="rounded-2xl border border-hair bg-[#FAFAFA] px-5 py-4 flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
+          <div className="flex items-center gap-5">
+            <div className="flex items-center gap-2"><span className="text-star text-lg">★★★★★</span><span className="font-extrabold">4.9</span><span className="text-muted text-sm">/ 5</span></div>
+            <span className="hidden sm:block w-px h-8 bg-hair"></span>
+            <p className="text-sm text-muted"><b className="text-ink">2,000+</b> desks upgraded · <b className="text-ink">100%</b> made in India</p>
+          </div>
+          <div className="flex items-center gap-2 text-[11px] font-bold text-muted">
+            {['VISA', 'Mastercard', 'UPI', 'RuPay', 'COD'].map((x) => <span key={x} className="border border-hair rounded px-2 py-1 bg-white">{x}</span>)}
+          </div>
+        </div>
+      </div>
+
+      {/* BESTSELLERS */}
+      <section className="max-w-[1280px] mx-auto px-5 pt-4 pb-12">
+        <SecHead kicker="The Hype" title="Bestsellers" onView={() => navigate('/products')} />
+        {isLoading
+          ? <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">{[...Array(4)].map((_, i) => <div key={i} className="aspect-[4/5] bg-[#F2F2F2] animate-pulse rounded-2xl border border-hair" />)}</div>
+          : <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">{best.map((p, i) => <UnProductCard key={p.productId || i} p={p} index={i} listId="home_best" listName="Bestsellers" />)}</div>}
+      </section>
+
+      {/* BUNDLE */}
+      <section className="max-w-[1280px] mx-auto px-5 py-10">
+        <div className="rounded-[1.5rem] border border-hair overflow-hidden bg-[#FAFAFA] grid md:grid-cols-2">
+          <div className="p-8 md:p-12 flex flex-col justify-center">
+            <p className="gl-lbl text-brand mb-2">Bundle · Save ₹99</p>
+            <h3 className="text-3xl md:text-4xl font-extrabold tracking-tight leading-tight">Complete your desk</h3>
+            <p className="text-muted mt-3 max-w-md">{featured?.productName || 'Brake Caliper Lamp'} + a matching pen stand — the full setup, bundled.</p>
+            <div className="mt-5 flex items-center gap-3"><span className="text-2xl font-extrabold">₹1,799</span><span className="text-faint line-through">₹1,898</span><span className="gl-lbl text-[10px] bg-save/10 text-save px-2 py-1 rounded">Save ₹99</span></div>
+            <button onClick={() => featured && navigate(`/product/${featured.productId}`)} className="gl-press mt-6 self-start bg-brand text-white font-bold text-sm px-8 py-3.5 rounded-xl hover:bg-brandHi transition-colors">Shop the Bundle</button>
+          </div>
+          <div className="relative min-h-[280px] flex items-center justify-center gap-2 p-6 bg-white">
+            <OptimizedImage src={heroImg} alt="" className="w-1/2 aspect-square object-cover rounded-2xl border border-hair" />
+            <span className="text-3xl font-extrabold text-faint">+</span>
+            <OptimizedImage src={penStand ? productImg(penStand) : heroImg} alt="" className="w-1/2 aspect-square object-cover rounded-2xl border border-hair" />
           </div>
         </div>
       </section>
 
-      {/* ============ TESTIMONIALS (reviews) ============ */}
-      <section className="py-24 overflow-hidden">
-        <div className="max-w-[1280px] mx-auto px-7 mb-10 un-reveal">
-          <span className="block font-mono text-[11px] tracking-[0.3em] uppercase text-un-red mb-3 text-center">006 — Word On The Street</span>
-          <h2 className="font-archivo font-black uppercase text-[clamp(30px,5vw,54px)] text-center leading-[0.95]">Loved By The Desk Crowd</h2>
+      {/* NEW ARRIVALS */}
+      <section className="max-w-[1280px] mx-auto px-5 py-8">
+        <SecHead kicker="Fresh Drop" title="New Arrivals" onView={() => navigate('/products')} />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">{fresh.map((p, i) => <UnProductCard key={p.productId || i} p={p} index={i} listId="home_new" listName="New Arrivals" />)}</div>
+      </section>
+
+      {/* SHOP BY COLLECTION */}
+      <section className="max-w-[1280px] mx-auto px-5 py-10">
+        <div className="mb-7"><Kicker>Find Your Corner</Kicker><h2 className="text-3xl md:text-4xl font-extrabold tracking-tight">Shop by Collection</h2></div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {collections.map((c, i) => (
+            <button key={i} onClick={() => navigate(c.soon ? '/products' : `/products?category=${encodeURIComponent(c.name)}`)} className="gl-pcard group relative rounded-2xl overflow-hidden aspect-[4/5] bg-[#F2F2F2] cursor-pointer text-left">
+              <OptimizedImage src={c.img} alt={c.name} className="gl-img absolute inset-0 w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-transparent"></div>
+              <div className="absolute bottom-0 p-4 text-white"><p className="font-bold text-lg">{c.name}</p><p className="text-white/70 text-xs">{c.soon ? 'Coming soon' : 'Shop now'}</p></div>
+            </button>
+          ))}
         </div>
-        <div className="relative w-full overflow-hidden mb-14">
-          <div className="un-marquee gap-4">
-            {[...marquee, ...marquee].map((t, i) => (
-              <div key={i} className="w-80 shrink-0 bg-white border border-un-line p-6 mx-2">
-                <div className="text-un-red mb-2 tracking-widest">{'★'.repeat(Math.max(1, Math.min(5, t.rating || 5)))}</div>
-                <p className="text-un-greyd text-sm">“{t.content}”</p>
-                <p className="mt-4 font-archivo font-extrabold uppercase text-xs">— {t.userName}{t.userLocation ? `, ${t.userLocation}` : ''}</p>
+      </section>
+
+      {/* SHOP THE FEED */}
+      <section className="max-w-[1280px] mx-auto px-5 py-12">
+        <div className="text-center mb-7"><Kicker>@urbannook.store</Kicker><h2 className="text-3xl md:text-4xl font-extrabold tracking-tight">Shop the Feed</h2><p className="text-muted text-sm mt-2">Tap a shot to shop it</p></div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {(products.length ? products : []).slice(0, 4).map((p, i) => (
+            <button key={i} onClick={() => navigate(`/product/${p.productId}`)} className="gl-pcard group relative aspect-square rounded-2xl overflow-hidden bg-[#F2F2F2] cursor-pointer">
+              <OptimizedImage src={productImg(p)} alt="" className="gl-img w-full h-full object-cover" />
+              <span className="absolute bottom-3 left-3 bg-white/90 backdrop-blur text-ink text-xs font-bold px-2.5 py-1.5 rounded-full opacity-0 group-hover:opacity-100 transition">Shop this →</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* TESTIMONIALS */}
+      <section className="bg-[#FAFAFA] border-y border-hair py-14">
+        <div className="max-w-[1280px] mx-auto px-5">
+          <div className="text-center mb-8"><Kicker>Real Reviews</Kicker><h2 className="text-3xl md:text-4xl font-extrabold tracking-tight">Loved by the desk crowd</h2></div>
+          <div className="grid md:grid-cols-3 gap-5">
+            {reviews.map((r, i) => (
+              <div key={i} className="bg-white rounded-2xl border border-hair p-6">
+                <div className="text-star mb-2">{'★'.repeat(Math.max(1, Math.min(5, r.rating || 5)))}{'☆'.repeat(5 - Math.max(1, Math.min(5, r.rating || 5)))}</div>
+                <p className="text-muted">“{r.content}”</p>
+                <p className="mt-4 font-bold text-sm">{r.userName}{r.userLocation ? `, ${r.userLocation}` : ''} · Verified</p>
               </div>
             ))}
           </div>
         </div>
-        {/* submit (preserved) */}
-        <div className="max-w-[560px] mx-auto px-7 un-reveal">
-          <form onSubmit={onSubmitTestimonial} className="bg-white border-2 border-un-ink p-6">
-            <p className="font-archivo font-black uppercase text-lg mb-4">Drop A Review</p>
-            <div className="flex gap-1 mb-3">
-              {[1, 2, 3, 4, 5].map((r) => (
-                <button type="button" key={r} onClick={() => setTRating(r)} className={`text-2xl leading-none ${r <= tRating ? 'text-un-red' : 'text-un-line'}`}>★</button>
-              ))}
-            </div>
-            <input value={tName} onChange={(e) => setTName(e.target.value)} placeholder="Your name" required
-              className="w-full border-2 border-un-ink px-3.5 py-3 font-mono text-sm mb-3 focus:outline-none focus:border-un-red bg-white" />
-            <textarea value={tText} onChange={(e) => setTText(e.target.value)} placeholder="How’s your setup looking?" required rows={3}
-              className="w-full border-2 border-un-ink px-3.5 py-3 font-inter text-sm mb-3 focus:outline-none focus:border-un-red bg-white resize-none" />
-            <button type="submit" disabled={submitting} className="un-btn bg-un-red text-white font-archivo font-extrabold uppercase tracking-[0.04em] text-sm px-7 py-3.5 disabled:opacity-60">
-              <span className="un-fill bg-un-ink" />{submitting ? 'Sending…' : tDone ? 'Thanks! ✓' : 'Submit Review'}
-            </button>
-          </form>
-        </div>
       </section>
 
-      {/* ============ NEWSLETTER ============ */}
-      <section className="py-24 text-center border-t-2 border-un-ink">
-        <div className="max-w-[560px] mx-auto px-7 un-reveal">
-          <h2 className="font-anton uppercase text-[clamp(40px,7vw,84px)] leading-[0.9]">Don’t Sleep<br />On <span className="text-un-red">Drops</span></h2>
-          <p className="text-un-greyd mt-5 mb-8">New pieces land often. Get early access and member-only deals.</p>
-          <form onSubmit={(e) => e.preventDefault()} className="flex border-2 border-un-ink bg-white">
-            <input type="email" required placeholder="your@email.com" className="flex-1 px-4 py-4 font-mono text-sm bg-transparent focus:outline-none" />
-            <button className="un-btn bg-un-red text-white font-archivo font-extrabold uppercase tracking-[0.04em] text-sm px-8"><span className="un-fill bg-un-ink" />Join</button>
-          </form>
-        </div>
+      {/* NEWSLETTER */}
+      <section className="max-w-[720px] mx-auto px-5 py-16 text-center">
+        <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight">Get first access to drops</h2>
+        <p className="text-muted mt-3">New pieces land often. Members get early access + 10% off the first order.</p>
+        <form onSubmit={(e) => e.preventDefault()} className="mt-6 flex max-w-md mx-auto rounded-xl overflow-hidden border border-ink">
+          <input type="email" placeholder="Enter your email" className="flex-1 px-4 py-3.5 text-sm outline-none" />
+          <button className="gl-press bg-brand text-white font-bold text-sm px-6 hover:bg-brandHi transition-colors">Join</button>
+        </form>
       </section>
     </div>
   );
