@@ -1,175 +1,68 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { aboutValues } from '../../data/constant';
 import SEOHead from '../../component/SEOHead';
 import { useGetPublicStatsQuery } from '../../store/api/statsApi';
 
 const AboutPage = () => {
-    const { data: statsData } = useGetPublicStatsQuery();
-    const totalOrders = statsData?.data?.totalOrders || 150;
+  const navigate = useNavigate();
+  const { data: statsData } = useGetPublicStatsQuery();
+  const totalOrders = statsData?.data?.totalOrders || 150;
 
-    useEffect(() => {
-      window.scrollTo(0, 0);
-    }, []);
+  useEffect(() => { window.scrollTo(0, 0); }, []);
 
   return (
-    // BASE: New Dark Green Background
-    <div className="bg-[#2e443c] min-h-screen text-[#E2E8F0] font-sans relative selection:bg-[#a89068] selection:text-white overflow-x-hidden">
-      <SEOHead
-        title="About Us"
-        description="Learn about UrbanNook — a proudly Indian brand designing premium 3D printed home decor. Our story, values, and commitment to quality craftsmanship."
-        url="/about-us"
-      />
-      
-      {/* Subtle Texture Overlay */}
-      <div className="fixed inset-0 opacity-[0.03] pointer-events-none z-0 mix-blend-overlay" 
-           style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}>
-      </div>
+    <div className="font-jakarta bg-paper text-ink min-h-screen">
+      <SEOHead title="About Us" url="/about-us" description="Learn about UrbanNook — a proudly Indian brand designing premium 3D-printed desk lamps, pen stands & décor. Our story, values, and commitment to quality." />
 
-      {/* --- 1. HERO SECTION --- */}
-      <section className="relative lg:pt-32 pt-24 px-6 lg:px-12 overflow-hidden flex items-center border-b border-[#a89068]/20">
-        {/* Abstract Ambient Glow */}
-        <div className="absolute top-[-20%] right-[-10%] w-[800px] h-[800px] bg-gradient-to-b from-[#1a2822] to-transparent rounded-full blur-[120px] pointer-events-none opacity-60"></div>
-        
-        <div className="max-w-7xl mx-auto relative z-10 w-full">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center mb-12">
-                
-                {/* LEFT: Text Content */}
-                <div className="lg:col-span-7">
-                    <div className="flex items-center gap-4 mb-8">
-                        <span className="h-[1px] w-12 bg-[#F5DEB3]"></span>
-                        <span className="text-[10px] font-bold tracking-[0.3em] text-[#F5DEB3] uppercase">
-                            Our Urbannook Story
-                        </span>
-                    </div>
-                    
-                    <h1 className="text-4xl md:text-6xl lg:text-7xl font-serif text-white leading-[1.05] mb-8">
-                        Designing calm corners <br />
-                        <span className="italic text-[#F5DEB3] font-light">for chaotic lives.</span>
-                    </h1>
-                    
-                    <p className="text-lg md:text-xl text-gray-300 font-light leading-relaxed max-w-lg">
-                        Your Home Should Tell The Story Of Who You Are, And Be A Collection Of What You Love.
-                    </p>
-                </div>
-
-                {/* RIGHT: Visual Element (Badge) */}
-                <div className="hidden md:flex lg:col-span-5 relative">
-                    <div className="relative w-full aspect-square max-w-md mx-auto rounded-full border border-white/10 flex items-center justify-center p-8 bg-gradient-to-br from-white/5 to-transparent backdrop-blur-sm shadow-2xl">
-                        {/* Spinning Dashed Ring */}
-                        <div className="absolute inset-4 rounded-full border border-dashed border-[#a89068]/30 animate-[spin_40s_linear_infinite]"></div>
-                        
-                        <div className="text-center relative z-10">
-                            <div className="w-20 h-20 mx-auto bg-[#a89068]/10 rounded-full flex items-center justify-center mb-6 border border-[#a89068]/20">
-                                <i className="fa-solid fa-shield-halved text-3xl text-[#a89068]"></i>
-                            </div>
-                            <h3 className="font-serif text-3xl text-white mb-2">Verified Trust</h3>
-                            <p className="text-sm text-[#a89068] uppercase tracking-widest font-bold">Est. 2026 • India</p>
-                        </div>
-                    </div>
-                </div>
-
-            </div>
+      {/* HERO */}
+      <section className="max-w-[1280px] mx-auto px-5 pt-14 md:pt-20 pb-10">
+        <p className="gl-lbl text-brand mb-4">Our Story</p>
+        <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight leading-[1.05] max-w-3xl">Designing calm corners for <span className="text-brand">chaotic lives.</span></h1>
+        <p className="text-lg text-muted mt-5 max-w-xl">Your desk should tell the story of who you are — a collection of what you love. We 3D-print that, one piece at a time, in India.</p>
+        <div className="mt-8 grid grid-cols-3 gap-4 max-w-lg">
+          {[[`${totalOrders + 350}+`, 'Orders shipped'], ['100%', 'Made in India'], ['In-house', 'Design & print']].map(([n, l]) => (
+            <div key={l} className="border border-hair rounded-2xl p-4 text-center"><div className="text-2xl md:text-3xl font-extrabold">{n}</div><div className="text-[11px] text-muted mt-1">{l}</div></div>
+          ))}
         </div>
       </section>
 
-      {/* --- 2. MANIFESTO & METRICS --- */}
-      <section className="py-20 px-6 lg:px-12 relative z-10">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-16 lg:gap-24 items-start">
-            
-            {/* LEFT: Text Content */}
-            <div className="lg:col-span-7 lg:sticky lg:top-32">
-                <h2 className="text-4xl md:text-6xl font-serif text-white mb-10 leading-[1.1]">
-                    Beyond the <br/>
-                    <span className="italic text-[#F5DEB3]">Ordinary.</span>
-                </h2>
-                
-                <div className="space-y-8 text-lg text-gray-300 font-light leading-relaxed">
-                    <p className="border-l-2 border-[#F5DEB3]/50 pl-6 text-white font-medium">
-                        When you purchase from UrbanNook, you aren't just buying an object; you are investing in a meticulously engineered piece of functional art.
-                    </p>
-                    <p>
-                        Founded by design and engineering enthusiasts, we started with a simple frustration: why should everyday objects lack aesthetic integrity? We realized that to ensure quality, we had to control the entire process.
-                    </p>
-                    <p>
-                        Today, every piece is prototyped, tested, and manufactured with precision. We use industry-leading secure payment gateways (Razorpay) and reliable logistics partners to ensure your investment is protected from checkout to unboxing.
-                    </p>
-                </div>
+      {/* STORY + TRUST */}
+      <section className="max-w-[1280px] mx-auto px-5 py-12 grid lg:grid-cols-2 gap-12 items-start">
+        <div>
+          <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight">Beyond the ordinary.</h2>
+          <div className="space-y-5 text-muted mt-6 leading-relaxed">
+            <p className="text-ink font-semibold border-l-4 border-brand pl-4">When you buy from Urban Nook you aren't just buying an object — you're investing in a meticulously engineered piece of functional art.</p>
+            <p>Founded by design & engineering enthusiasts, we started with one frustration: why should everyday desk objects lack aesthetic integrity? To guarantee quality, we control the entire process.</p>
+            <p>Every piece is prototyped, tested and made to order. Secure payments via Razorpay and reliable logistics keep your order protected from checkout to unboxing.</p>
+          </div>
+          <button onClick={() => navigate('/products')} className="gl-press mt-7 bg-brand text-white font-bold text-sm px-7 py-3.5 rounded-xl hover:bg-brandHi">Shop the collection</button>
+        </div>
+        <div className="space-y-4">
+          {[['🚚', `${totalOrders + 350}+ successful deliveries`, 'Trusted by homes across India'], ['🔒', '100% secure transactions', 'End-to-end encryption via Razorpay'], ['🛠️', 'In-house design & production', 'Strict QC — never cheap drop-shipping']].map(([e, t, d]) => (
+            <div key={t} className="border border-hair rounded-2xl p-6 flex gap-4 items-start hover:border-brand transition-colors">
+              <span className="text-2xl">{e}</span>
+              <div><p className="font-bold">{t}</p><p className="text-sm text-muted mt-1">{d}</p></div>
             </div>
-
-            {/* RIGHT: Data & Trust Metrics (LIGHT BOXES) */}
-            <div className="lg:col-span-5 space-y-6">
-                
-                {/* Metric Card 1 */}
-                <div className="bg-[#f5f7f8] p-8 md:p-10 rounded-[2rem] border border-white/10 shadow-xl hover:translate-y-[-5px] transition-transform duration-300">
-                    <div className="flex items-center gap-4 mb-4">
-                        <i className="fa-solid fa-box-open text-2xl text-[#a89068]"></i>
-                        <p className="text-4xl font-serif text-[#2e443c]">{totalOrders + 350}+</p>
-                    </div>
-                    <p className="text-sm uppercase tracking-widest text-[#a89068] font-bold">Successful Deliveries</p>
-                    <p className="text-xs text-gray-500 mt-3 border-t border-gray-200 pt-3">Trusted by hundreds of homes across India.</p>
-                </div>
-
-                {/* Metric Card 2 */}
-                <div className="bg-[#f5f7f8] p-8 md:p-10 rounded-[2rem] border border-white/10 shadow-xl hover:translate-y-[-5px] transition-transform duration-300">
-                    <div className="flex items-center gap-4 mb-4">
-                        <i className="fa-solid fa-lock text-2xl text-[#a89068]"></i>
-                        <p className="text-4xl font-serif text-[#2e443c]">100%</p>
-                    </div>
-                    <p className="text-sm uppercase tracking-widest text-[#a89068] font-bold">Secure Transactions</p>
-                    <p className="text-xs text-gray-500 mt-3 border-t border-gray-200 pt-3">End-to-end encryption backed by Razorpay.</p>
-                </div>
-
-                {/* Metric Card 3 */}
-                <div className="bg-[#f5f7f8] p-8 md:p-10 rounded-[2rem] border border-transparent shadow-xl hover:translate-y-[-5px] transition-transform duration-300">
-                    <div className="flex items-center gap-4 mb-4">
-                        <i className="fa-solid fa-pen-ruler text-2xl text-[#a89068]"></i>
-                        <p className="text-3xl font-serif text-[#2e443c]">In-House</p>
-                    </div>
-                    <p className="text-sm uppercase tracking-widest text-[#a89068] font-bold">Design & Production</p>
-                    <p className="text-xs text-gray-500 mt-3 border-t border-[#2e443c]/10 pt-3">Strict quality control. No cheap drop-shipping.</p>
-                </div>
-
-            </div>
+          ))}
         </div>
       </section>
 
-      {/* --- 3. CORE VALUES (Cards) --- */}
-      <section className="py-24 px-6 lg:px-12 bg-[#1a2822]/50 border-t border-[#a89068]/20 relative z-10">
-        <div className="max-w-7xl mx-auto">
-            <div className="mb-16 flex flex-col md:flex-row justify-between items-end gap-8 border-b border-[#a89068]/20 pb-8">
-                <div>
-                    <h2 className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#F5DEB3] mb-3">The UrbanNook Standard</h2>
-                    <p className="text-4xl md:text-5xl font-serif text-white">The principles we live by.</p>
-                </div>
-                <p className="text-gray-400 max-w-sm text-sm md:text-right font-light">
-                    When you shop with us, you are protected by these four pillars of excellence.
-                </p>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {aboutValues.map((val, i) => (
-                    <div 
-                        key={val.id} 
-                        className="group p-8 md:p-10 rounded-[2rem] bg-[#f5f7f8] border border-transparent hover:border-[#a89068]/50 hover:shadow-[0_0_30px_rgba(168,144,104,0.15)] transition-all duration-500 cursor-default"
-                    >
-                        <div className="flex justify-between items-start mb-8">
-                            <i className={`fa-solid ${val.icon} text-2xl text-[#a89068] group-hover:scale-110 transition-transform duration-500`}></i>
-                            <span className="text-2xl font-serif text-[#2e443c]/10 font-bold">
-                                {val.id}
-                            </span>
-                        </div>
-                        <h3 className="text-lg font-serif text-[#2e443c] mb-3">
-                            {val.title}
-                        </h3>
-                        <p className="text-sm text-gray-600 font-light leading-relaxed">
-                            {val.desc}
-                        </p>
-                    </div>
-                ))}
-            </div>
+      {/* VALUES */}
+      <section className="bg-surface border-y border-hair py-16">
+        <div className="max-w-[1280px] mx-auto px-5">
+          <div className="mb-10"><p className="gl-lbl text-brand mb-2">The Urban Nook Standard</p><h2 className="text-3xl md:text-4xl font-extrabold tracking-tight">The principles we live by</h2></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {aboutValues.map((val) => (
+              <div key={val.id} className="bg-white border border-hair rounded-2xl p-6 hover:border-brand hover:shadow-[0_16px_40px_-18px_rgba(20,20,20,.18)] transition-all">
+                <div className="flex justify-between items-start mb-5"><i className={`fa-solid ${val.icon} text-xl text-brand`}></i><span className="text-2xl font-extrabold text-hair">{val.id}</span></div>
+                <h3 className="font-bold">{val.title}</h3>
+                <p className="text-sm text-muted mt-2 leading-relaxed">{val.desc}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
-      
     </div>
   );
 };

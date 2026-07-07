@@ -1,6 +1,5 @@
 import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import OptimizedImage from './OptimizedImage';
 import WishlistButton from './WishlistButton';
 import { addItem } from '../store/slices/cartSlice';
 import { trackSelectItem, trackAddToCart } from '../utils/analytics';
@@ -46,12 +45,12 @@ const UnProductCard = ({ p, index = 0, listId = 'grid', listName = 'Grid' }) => 
 
   return (
     <div onClick={go} className="gl-pcard group bg-white rounded-2xl border border-hair overflow-hidden flex flex-col cursor-pointer">
-      <div className="relative aspect-square overflow-hidden bg-[#FAFAFA]">
-        {badge && <span className="absolute top-3 left-3 z-10 bg-ink text-white gl-lbl text-[9px] px-2 py-1 rounded">{badge}</span>}
+      <div className="relative aspect-square overflow-hidden bg-surface">
+        {badge && <span className="absolute top-3 left-3 z-10 bg-sale text-white gl-lbl text-[9px] px-2 py-1 rounded shadow-sm">{badge}</span>}
         <div className="absolute top-2.5 right-2.5 z-10" onClick={(e) => e.stopPropagation()}>
           <WishlistButton productId={p.productId} />
         </div>
-        <OptimizedImage src={productImg(p)} alt={p.productName} className="gl-img w-full h-full object-cover" />
+        <img src={productImg(p)} alt={p.productName} loading="lazy" className="gl-img w-full h-full object-cover" onError={(e) => { e.currentTarget.src = '/assets/logo.webp'; }} />
         {img2 && <img src={img2} alt="" className="gl-img2 absolute inset-0 w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
         {variants.length > 0 && (
           <div className="gl-qa absolute inset-x-0 bottom-0 z-20 p-2.5 bg-white/95 backdrop-blur border-t border-hair flex items-center gap-2" onClick={(e) => e.stopPropagation()}>

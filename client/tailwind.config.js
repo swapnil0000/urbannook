@@ -46,17 +46,20 @@ export default {
           lined: "#33312D",
         },
 
-        // ===== GullyLabs-style palette (chosen direction) =====
-        brand:   "#003BD0",   // primary — buttons, links, accents
-        brandHi: "#0F52DC",
-        sale:    "#D62828",   // discounts / sale ONLY
-        star:    "#F3C33B",   // ratings
-        save:    "#108474",   // savings (teal)
-        ink:     "#202223",   // near-black text
-        paper:   "#FFFFFF",
-        muted:   "#7B7B7B",
-        faint:   "#9A9A9A",
-        hair:    "#EBEBEB",   // hairline borders
+        // ===== GullyLabs palette — sourced from CSS vars in :root (index.css) =====
+        // Change colours globally by editing --gl-* in index.css.
+        brand:   "rgb(var(--gl-brand) / <alpha-value>)",   // primary — buttons, links, accents
+        brandHi: "rgb(var(--gl-brand-hi) / <alpha-value>)",
+        sale:    "rgb(var(--gl-sale) / <alpha-value>)",    // discounts / sale / hot badges (red)
+        saleDeep:"rgb(var(--gl-sale-deep) / <alpha-value>)", // deep red hover/emphasis
+        star:    "rgb(var(--gl-star) / <alpha-value>)",    // ratings
+        save:    "rgb(var(--gl-save) / <alpha-value>)",    // savings (teal)
+        ink:     "rgb(var(--gl-ink) / <alpha-value>)",     // near-black text
+        paper:   "rgb(var(--gl-paper) / <alpha-value>)",
+        muted:   "rgb(var(--gl-muted) / <alpha-value>)",
+        faint:   "rgb(var(--gl-faint) / <alpha-value>)",
+        hair:    "rgb(var(--gl-hair) / <alpha-value>)",    // hairline borders
+        surface: "rgb(var(--gl-surface) / <alpha-value>)", // light panels / cards
       },
       fontFamily: {
         anton: ["Anton", "ui-sans-serif", "sans-serif"],

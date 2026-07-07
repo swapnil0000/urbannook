@@ -36,6 +36,7 @@ const ORG_STRUCTURED_DATA = {
 const NewHeader = lazy(() => import('./component/layout/NewHeader'));
 const Footer = lazy(() => import('./component/layout/Footer'));
 const Notification = lazy(() => import('./component/Notification'));
+const GlMobileNav = lazy(() => import('./component/layout/GlMobileNav'));
 const SocialMediaFAB = lazy(() => import('./component/layout/WhatsAppButton'));
 const OpenInBrowserBanner = lazy(() => import('./component/OpenInBrowserBanner'));
 const GoogleOneTap = lazy(() => import('./component/GoogleOneTap'));
@@ -172,6 +173,7 @@ function App() {
                   <Footer />
                 </ErrorBoundary>
                 <SocialMediaFAB />
+                <GlMobileNav />
                 <Notification />
                 {/* Global Google One Tap for logged-out visitors (boosts Meta EMQ) */}
                 <ErrorBoundary>

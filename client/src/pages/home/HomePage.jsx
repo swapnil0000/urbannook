@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SEOHead from '../../component/SEOHead';
-import OptimizedImage from '../../component/OptimizedImage';
 import UnProductCard, { productImg, firstVariant } from '../../component/UnProductCard';
+
+const onImgErr = (e) => { e.currentTarget.src = '/assets/logo.webp'; };
 import { useGetFeaturedProductsQuery, useGetProductsQuery } from '../../store/api/productsApi';
 import { useGetTestimonialsQuery } from '../../store/api/testimonialsApi';
 import { trackViewItemList } from '../../utils/analytics';
@@ -75,7 +76,7 @@ const HomePage = () => {
       {/* HERO */}
       <div className="relative max-w-[1400px] mx-auto md:px-5 md:pt-5">
         <div className="relative overflow-hidden md:rounded-[1.5rem] min-h-[74vh] md:min-h-[66vh] flex items-center bg-ink">
-          <OptimizedImage src={heroImg} alt={featured?.productName || 'Featured'} className="absolute inset-0 w-full h-full object-cover opacity-90" loading="eager" fetchPriority="high" />
+          <img src={heroImg} alt={featured?.productName || 'Featured'} loading="eager" fetchPriority="high" className="absolute inset-0 w-full h-full object-cover opacity-90" onError={onImgErr} />
           <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent"></div>
           <div className="relative px-7 md:px-16 max-w-xl text-white">
             <p className="gl-lbl text-white/80 mb-4">Summer Drop · Auto Series</p>
@@ -110,7 +111,7 @@ const HomePage = () => {
 
       {/* SOCIAL PROOF + PAYMENT */}
       <div className="max-w-[1280px] mx-auto px-5 py-7">
-        <div className="rounded-2xl border border-hair bg-[#FAFAFA] px-5 py-4 flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
+        <div className="rounded-2xl border border-hair bg-surface px-5 py-4 flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
           <div className="flex items-center gap-5">
             <div className="flex items-center gap-2"><span className="text-star text-lg">★★★★★</span><span className="font-extrabold">4.9</span><span className="text-muted text-sm">/ 5</span></div>
             <span className="hidden sm:block w-px h-8 bg-hair"></span>
@@ -123,16 +124,18 @@ const HomePage = () => {
       </div>
 
       {/* BESTSELLERS */}
-      <section className="max-w-[1280px] mx-auto px-5 pt-4 pb-12">
-        <SecHead kicker="The Hype" title="Bestsellers" onView={() => navigate('/products')} />
-        {isLoading
-          ? <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">{[...Array(4)].map((_, i) => <div key={i} className="aspect-[4/5] bg-[#F2F2F2] animate-pulse rounded-2xl border border-hair" />)}</div>
-          : <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">{best.map((p, i) => <UnProductCard key={p.productId || i} p={p} index={i} listId="home_best" listName="Bestsellers" />)}</div>}
+      <section className="bg-surface border-y border-hair mt-4">
+        <div className="max-w-[1280px] mx-auto px-5 py-12">
+          <SecHead kicker="The Hype" title="Bestsellers" onView={() => navigate('/products')} />
+          {isLoading
+            ? <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">{[...Array(4)].map((_, i) => <div key={i} className="aspect-[4/5] bg-hair animate-pulse rounded-2xl border border-hair" />)}</div>
+            : <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">{best.map((p, i) => <UnProductCard key={p.productId || i} p={p} index={i} listId="home_best" listName="Bestsellers" />)}</div>}
+        </div>
       </section>
 
       {/* BUNDLE */}
       <section className="max-w-[1280px] mx-auto px-5 py-10">
-        <div className="rounded-[1.5rem] border border-hair overflow-hidden bg-[#FAFAFA] grid md:grid-cols-2">
+        <div className="rounded-[1.5rem] border border-hair overflow-hidden bg-surface grid md:grid-cols-2">
           <div className="p-8 md:p-12 flex flex-col justify-center">
             <p className="gl-lbl text-brand mb-2">Bundle · Save ₹99</p>
             <h3 className="text-3xl md:text-4xl font-extrabold tracking-tight leading-tight">Complete your desk</h3>
@@ -141,17 +144,19 @@ const HomePage = () => {
             <button onClick={() => featured && navigate(`/product/${featured.productId}`)} className="gl-press mt-6 self-start bg-brand text-white font-bold text-sm px-8 py-3.5 rounded-xl hover:bg-brandHi transition-colors">Shop the Bundle</button>
           </div>
           <div className="relative min-h-[280px] flex items-center justify-center gap-2 p-6 bg-white">
-            <OptimizedImage src={heroImg} alt="" className="w-1/2 aspect-square object-cover rounded-2xl border border-hair" />
+            <img src={heroImg} alt="" loading="lazy" className="w-1/2 aspect-square object-cover rounded-2xl border border-hair" onError={onImgErr} />
             <span className="text-3xl font-extrabold text-faint">+</span>
-            <OptimizedImage src={penStand ? productImg(penStand) : heroImg} alt="" className="w-1/2 aspect-square object-cover rounded-2xl border border-hair" />
+            <img src={penStand ? productImg(penStand) : heroImg} alt="" loading="lazy" className="w-1/2 aspect-square object-cover rounded-2xl border border-hair" onError={onImgErr} />
           </div>
         </div>
       </section>
 
       {/* NEW ARRIVALS */}
-      <section className="max-w-[1280px] mx-auto px-5 py-8">
-        <SecHead kicker="Fresh Drop" title="New Arrivals" onView={() => navigate('/products')} />
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">{fresh.map((p, i) => <UnProductCard key={p.productId || i} p={p} index={i} listId="home_new" listName="New Arrivals" />)}</div>
+      <section className="bg-surface border-y border-hair">
+        <div className="max-w-[1280px] mx-auto px-5 py-12">
+          <SecHead kicker="Fresh Drop" title="New Arrivals" onView={() => navigate('/products')} />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">{fresh.map((p, i) => <UnProductCard key={p.productId || i} p={p} index={i} listId="home_new" listName="New Arrivals" />)}</div>
+        </div>
       </section>
 
       {/* SHOP BY COLLECTION */}
@@ -159,8 +164,8 @@ const HomePage = () => {
         <div className="mb-7"><Kicker>Find Your Corner</Kicker><h2 className="text-3xl md:text-4xl font-extrabold tracking-tight">Shop by Collection</h2></div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {collections.map((c, i) => (
-            <button key={i} onClick={() => navigate(c.soon ? '/products' : `/products?category=${encodeURIComponent(c.name)}`)} className="gl-pcard group relative rounded-2xl overflow-hidden aspect-[4/5] bg-[#F2F2F2] cursor-pointer text-left">
-              <OptimizedImage src={c.img} alt={c.name} className="gl-img absolute inset-0 w-full h-full object-cover" />
+            <button key={i} onClick={() => navigate(c.soon ? '/products' : `/products?category=${encodeURIComponent(c.name)}`)} className="gl-pcard group relative rounded-2xl overflow-hidden aspect-[4/5] bg-hair cursor-pointer text-left">
+              <img src={c.img} alt={c.name} loading="lazy" className="gl-img absolute inset-0 w-full h-full object-cover" onError={onImgErr} />
               <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-transparent"></div>
               <div className="absolute bottom-0 p-4 text-white"><p className="font-bold text-lg">{c.name}</p><p className="text-white/70 text-xs">{c.soon ? 'Coming soon' : 'Shop now'}</p></div>
             </button>
@@ -173,8 +178,8 @@ const HomePage = () => {
         <div className="text-center mb-7"><Kicker>@urbannook.store</Kicker><h2 className="text-3xl md:text-4xl font-extrabold tracking-tight">Shop the Feed</h2><p className="text-muted text-sm mt-2">Tap a shot to shop it</p></div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {(products.length ? products : []).slice(0, 4).map((p, i) => (
-            <button key={i} onClick={() => navigate(`/product/${p.productId}`)} className="gl-pcard group relative aspect-square rounded-2xl overflow-hidden bg-[#F2F2F2] cursor-pointer">
-              <OptimizedImage src={productImg(p)} alt="" className="gl-img w-full h-full object-cover" />
+            <button key={i} onClick={() => navigate(`/product/${p.productId}`)} className="gl-pcard group relative aspect-square rounded-2xl overflow-hidden bg-hair cursor-pointer">
+              <img src={productImg(p)} alt="" loading="lazy" className="gl-img w-full h-full object-cover" onError={onImgErr} />
               <span className="absolute bottom-3 left-3 bg-white/90 backdrop-blur text-ink text-xs font-bold px-2.5 py-1.5 rounded-full opacity-0 group-hover:opacity-100 transition">Shop this →</span>
             </button>
           ))}
@@ -182,7 +187,7 @@ const HomePage = () => {
       </section>
 
       {/* TESTIMONIALS */}
-      <section className="bg-[#FAFAFA] border-y border-hair py-14">
+      <section className="bg-surface border-y border-hair py-14">
         <div className="max-w-[1280px] mx-auto px-5">
           <div className="text-center mb-8"><Kicker>Real Reviews</Kicker><h2 className="text-3xl md:text-4xl font-extrabold tracking-tight">Loved by the desk crowd</h2></div>
           <div className="grid md:grid-cols-3 gap-5">

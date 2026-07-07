@@ -42,10 +42,10 @@ const AllProductsPage = () => {
     else setSearchParams({ category: c }, { replace: true });
   };
 
-  const chip = (c) => `gl-press px-4 py-2 rounded-full text-sm font-semibold transition-colors ${activeCat === c ? 'bg-brand text-white' : 'border border-hair hover:border-ink'}`;
+  const chip = (c) => `gl-press px-4 py-2 rounded-full text-sm font-semibold transition-colors ${activeCat === c ? 'bg-brand text-white' : 'bg-white border border-hair hover:border-ink'}`;
 
   return (
-    <div className="font-jakarta bg-paper text-ink min-h-screen">
+    <div className="font-jakarta bg-surface text-ink min-h-screen">
       <SEOHead title="Shop All Products" url="/products" description="Browse UrbanNook's full collection of 3D-printed desk lamps, pen stands & décor. Made in India, fast pan-India delivery." />
 
       <div className="max-w-[1280px] mx-auto px-5 pt-10">
@@ -67,7 +67,7 @@ const AllProductsPage = () => {
 
       <section className="max-w-[1280px] mx-auto px-5 py-8 pb-28">
         {isLoading ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">{[...Array(8)].map((_, i) => <div key={i} className="aspect-[4/5] bg-[#F2F2F2] animate-pulse rounded-2xl border border-hair" />)}</div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">{[...Array(8)].map((_, i) => <div key={i} className="aspect-[4/5] bg-hair animate-pulse rounded-2xl border border-hair" />)}</div>
         ) : error ? (
           <div className="text-center py-28 border border-hair rounded-2xl bg-white">
             <h2 className="text-2xl font-extrabold">Unable to load products</h2>
