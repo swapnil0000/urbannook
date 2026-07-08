@@ -7,12 +7,13 @@ import { asyncHandler } from "../middleware/errorHandler.middleware.js";
 
 const applyCouponCodeController = asyncHandler(async (req, res) => {
   const { userId } = req.user;
-  const { couponCodeName, email } = req.body;
+  const { couponCodeName, email, mobile } = req.body;
 
   const result = await applyCouponCodeService({
     userId,
     couponCodeName,
-    email
+    email,
+    mobile,
   });
 
   return res

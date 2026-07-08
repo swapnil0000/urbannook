@@ -286,6 +286,18 @@ const CheckoutPage = () => {
     }
   }, [paymentMethod]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Clear old shipping immediately when cart changes on review page (item added/removed/quantity changed).
+  // Without this, Pay stays enabled briefly with stale shipping calculated for the old cart.
+  // The shipping recalculation effect already reruns on cart changes — this just ensures
+  // the Pay button is blocked during that async window.
+  useEffect(() => {
+    if (currentStep === reviewStep && pinCode && pinCode.toString().length === 6) {
+      setPricingDetails(prev => ({ ...prev, shipping: null }));
+      setShippingError("");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartItems.length, cartItems.reduce((s, i) => s + Number(i.quantity || 0), 0)]);
+
   useEffect(() => {
     // Run shipping calculation on Review page when address/pincode is available
     if (currentStep !== reviewStep || !pinCode || pinCode.toString().length !== 6 || cartItems.length === 0) {

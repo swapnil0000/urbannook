@@ -7,6 +7,8 @@ import Product from "../model/product.model.js";
 import { v7 as uuidv7 } from "uuid";
 import Cart from "../model/user.cart.model.js";
 import env from "../config/envConfigSetup.js";
+import Coupon from "../model/coupon.model.js";
+import CouponUsage from "../model/couponUsage.model.js";
 import {
   sendOrderConfirmation,
   sendPaymentReceipt,
@@ -297,10 +299,73 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   });
 
   const shippingAmount = shippingResult?.total_charges || summary?.shipping || 179;
-  
-  // Recalculate finalAmount if shipping changed or to ensure consistency
+
+  // Recompute subtotal from actual order items — authoritative, not from cart snapshot
   const subtotal = orderItems.reduce((s, i) => s + (i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity), 0);
-  finalAmount = subtotal + shippingAmount - discountAmount;
+
+  // Always re-derive discount from the live coupon + current subtotal.
+  // This fixes: products added after coupon was applied, COD/prepaid toggle, page not refreshed.
+  let isInternalTestOrder = false;
+  if (isApplied && couponCodeId) {
+    const liveCoupon = await Coupon.findOne(
+      { couponId: couponCodeId },
+      { discountType: 1, discountValue: 1, maxDiscountCap: 1, isInternal: 1, isArchived: 1, maxUsesPerUser: 1, scope: 1 }
+    ).lean();
+
+    if (!liveCoupon || liveCoupon.isArchived) {
+      // Coupon was deleted/archived after apply — reject order so user knows their discount is gone
+      throw new ValidationError(
+        "The coupon you applied is no longer available. Please remove it from your cart and try again."
+      );
+    }
+
+    // Guard: isInternal must only be set when discountType is INTERNAL_TEST.
+    // If DB data is inconsistent, treat it as a regular coupon to prevent unauthorized ₹1 orders.
+    if (liveCoupon.isInternal && liveCoupon.discountType !== "INTERNAL_TEST") {
+      console.error(`[Coupon:Security] Coupon ${couponCodeId} has isInternal=true but discountType=${liveCoupon.discountType} — treating as invalid`);
+      discountAmount = 0; isApplied = false;
+      couponCodeId = null; couponCodeName = null;
+    } else if (liveCoupon.isInternal && liveCoupon.discountType === "INTERNAL_TEST") {
+      // ── INTERNAL TEST: completely separate path ──────────────────────────────
+      // Always ₹1 regardless of cart size, shipping, or payment method.
+      isInternalTestOrder = true;
+      discountAmount = Math.max(subtotal + shippingAmount - 1, 0); // stored for audit record
+    } else if (liveCoupon.discountType === "PERCENTAGE") {
+      let d = Math.floor((subtotal * liveCoupon.discountValue) / 100);
+      if (liveCoupon.maxDiscountCap) d = Math.min(d, liveCoupon.maxDiscountCap);
+      discountAmount = Math.min(d, subtotal);
+    } else { // FLAT
+      discountAmount = Math.min(liveCoupon.discountValue || 0, subtotal);
+    }
+
+    // ── Per-user limit re-check (race condition guard) ────────────────────────
+    // The apply-time check can be beaten by simultaneous orders with the same identity.
+    // Re-checking here, before the Razorpay order is created, prevents double spending.
+    if (isApplied && !isInternalTestOrder) {
+      const normEmailCheck  = userEmail?.toLowerCase().trim() || null;
+      const normMobileCheck = finalSenderMobile || null;
+      const identifiers     = [normEmailCheck, normMobileCheck].filter(Boolean);
+
+      if (identifiers.length > 0 && liveCoupon.maxUsesPerUser) {
+        const priorUses = await CouponUsage.countDocuments({
+          couponId: couponCodeId,
+          $or: [
+            ...(normEmailCheck  ? [{ email:  normEmailCheck  }] : []),
+            ...(normMobileCheck ? [{ mobile: normMobileCheck }] : []),
+          ],
+        });
+        if (priorUses >= liveCoupon.maxUsesPerUser) {
+          throw new ValidationError(
+            liveCoupon.maxUsesPerUser === 1
+              ? "You have already used this coupon. Please remove it from your cart."
+              : `You have already used this coupon ${priorUses} time(s) (limit: ${liveCoupon.maxUsesPerUser}). Please remove it from your cart.`
+          );
+        }
+      }
+    }
+  }
+
+  finalAmount = isInternalTestOrder ? 1 : Math.max(subtotal + shippingAmount - discountAmount, 0);
 
   // Sync shipping in snapshots
   orderItems.forEach(i => { i.productSnapshot.shipping = String(shippingAmount); });
@@ -310,10 +375,12 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   const codPartialAmount = isCOD ? Math.min(Math.ceil(shippingAmount) * 2, Math.ceil(finalAmount)) : 0;
   const codRemainingAmount = isCOD ? Math.max(0, Math.ceil(finalAmount) - codPartialAmount) : 0;
   const razorpayChargeAmount = isCOD ? codPartialAmount : finalAmount;
-  console.log("[AUTH]", { reqPaymentMethod, shippingAmount, isCOD, codPartialAmount, razorpayChargeAmount_rupees: Math.ceil(razorpayChargeAmount) });
+  // Round to whole rupees first, then convert to paise — must match the amount
+  // returned to the client/stored below, or Razorpay Checkout rejects it as a mismatch.
+  const razorpayChargeAmountPaise = Math.ceil(razorpayChargeAmount) * 100;
 
   const razorpayOrder = await razorpayCreateOrderService(
-    Math.ceil(razorpayChargeAmount * 100), // Razorpay expects integer paise
+    razorpayChargeAmountPaise,
     "INR",
   );
 
@@ -356,7 +423,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       {
         orderId: order.orderId,
         razorpayOrderId: razorpayOrder?.data?.id,
-        amount: Math.ceil(razorpayChargeAmount) * 100, // paise — must match what was passed to Razorpay
+        amount: razorpayChargeAmountPaise,
         currency: "INR",
         paymentMethod: isCOD ? "COD" : "PREPAID",
         codDetails: isCOD ? { partialAmountPaid: codPartialAmount, remainingAmount: codRemainingAmount } : null,
@@ -498,6 +565,74 @@ const razorpayWebHookController = async (req, res) => {
               `[ERROR] Failed to clear cart after payment - UserId: ${order.userId}, OrderId: ${order.orderId}:`,
               cartError.message,
             );
+          }
+
+          // 1.5. COUPON REDEMPTION TRACKING — runs after payment confirmed, not at apply time
+          if (order.coupon?.isApplied && order.coupon?.couponCodeId) {
+            try {
+              const couponId   = order.coupon.couponCodeId;
+              const couponCode = order.coupon.couponCodeName;
+              const discount   = order.coupon.discountAmount || 0;
+
+              const normMobile = (order.userMobile || order.senderMobile || "")
+                .replace(/\D/g, "").slice(-10) || null;
+              const normEmail  = order.userEmail?.toLowerCase().trim() || null;
+
+              // Atomically increment usageCount — respects maxTotalUses cap
+              const updatedCoupon = await Coupon.findOneAndUpdate(
+                {
+                  couponId,
+                  isArchived: false,
+                  $or: [
+                    { maxTotalUses: null },
+                    { $expr: { $lt: ["$usageCount", "$maxTotalUses"] } },
+                  ],
+                },
+                { $inc: { usageCount: 1 } },
+                { new: true },
+              );
+
+              if (updatedCoupon) {
+                const productSubtotal = order.items.reduce(
+                  (s, i) => s + ((i.productSnapshot?.priceAtPurchase || 0) * (i.productSnapshot?.quantity || 0)),
+                  0,
+                );
+                await CouponUsage.create({
+                  couponId,
+                  couponCode,
+                  orderId:               order.orderId,
+                  orderType:             "WEBSITE",
+                  userId:                order.userId || null,
+                  email:                 normEmail,
+                  mobile:                normMobile,
+                  discountAmount:        discount,
+                  cartValueBeforeDiscount: productSubtotal,
+                  usedAt:                new Date(),
+                });
+
+                // Mark TARGETED assignment as used (embedded in coupon document)
+                if (updatedCoupon.scope === "TARGETED" && (normEmail || normMobile)) {
+                  await Coupon.updateOne(
+                    {
+                      couponId,
+                      assignedTo: {
+                        $elemMatch: {
+                          identifier: { $in: [normEmail, normMobile].filter(Boolean) },
+                          usedAt: null,
+                        },
+                      },
+                    },
+                    { $set: { "assignedTo.$.usedAt": new Date() } },
+                  );
+                }
+
+                console.log(`[Coupon:Apply] Order=${order.orderId} code=${couponCode} discount=₹${discount} usageCount=${updatedCoupon.usageCount} — tracked`);
+              } else {
+                console.log(`[Coupon:Apply] Order=${order.orderId} code=${couponCode} — cap already reached, skipped increment`);
+              }
+            } catch (couponErr) {
+              console.error(`[Coupon:Apply] Failed to track coupon for order ${order.orderId}:`, couponErr.message);
+            }
           }
 
           // 2. EMAIL NOTIFICATION LOGIC
@@ -759,9 +894,11 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   const codPartialAmount = isCOD ? Math.min(Math.ceil(shippingAmount) * 2, Math.ceil(finalAmount)) : 0;
   const codRemainingAmount = isCOD ? Math.max(0, Math.ceil(finalAmount) - codPartialAmount) : 0;
   const razorpayChargeAmount = isCOD ? codPartialAmount : finalAmount;
-  console.log("[GUEST]", { reqPaymentMethod, shippingAmount, isCOD, codPartialAmount, razorpayChargeAmount_rupees: Math.ceil(razorpayChargeAmount) });
+  // Round to whole rupees first, then convert to paise — must match the amount
+  // returned to the client/stored below, or Razorpay Checkout rejects it as a mismatch.
+  const razorpayChargeAmountPaise = Math.ceil(razorpayChargeAmount) * 100;
 
-  const razorpayOrder = await razorpayCreateOrderService(Math.ceil(razorpayChargeAmount * 100), "INR");
+  const razorpayOrder = await razorpayCreateOrderService(razorpayChargeAmountPaise, "INR");
 
   const guestEmail = guestInfo.email.toLowerCase().trim();
 
@@ -809,7 +946,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
       {
         orderId: order.orderId,
         razorpayOrderId: razorpayOrder?.data?.id,
-        amount: Math.ceil(razorpayChargeAmount) * 100, // paise — must match what was passed to Razorpay
+        amount: razorpayChargeAmountPaise,
         currency: "INR",
         paymentMethod: isCOD ? "COD" : "PREPAID",
         codDetails: isCOD ? { partialAmountPaid: codPartialAmount, remainingAmount: codRemainingAmount } : null,
