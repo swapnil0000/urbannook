@@ -12,6 +12,7 @@ const couponSchema = new mongoose.Schema(
     maxDiscountCap: { type: Number },
     minCartValue:   { type: Number, default: 0 },
     scope:          { type: String, enum: ["PUBLIC", "TARGETED"], default: "PUBLIC" },
+    audience:       { type: String, enum: ["EVERYONE", "MEMBERS_ONLY"], default: "EVERYONE" },
     maxTotalUses:   { type: Number },
     maxUsesPerUser: { type: Number, default: 1 },
     usageCount:     { type: Number, default: 0 },

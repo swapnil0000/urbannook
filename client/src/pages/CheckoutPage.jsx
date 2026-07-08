@@ -398,7 +398,10 @@ const CheckoutPage = () => {
 
   useEffect(() => {
     if (isGuest) {
-      setPricingDetails(prev => ({ ...prev, subtotal: cartTotalAmount, discount: 0 }));
+      // Only sync subtotal — discount is managed by handleGuestCouponApplied/Removed
+      // Do NOT reset discount here: this effect re-runs when appliedCoupon changes,
+      // which would wipe the discount set by handleGuestCouponApplied.
+      setPricingDetails(prev => ({ ...prev, subtotal: cartTotalAmount }));
       return;
     }
     const fetchPricing = async () => {
@@ -569,6 +572,12 @@ const CheckoutPage = () => {
     } catch (e) { showNotification(e?.data?.message || "Failed to apply coupon", "error"); }
   };
 
+  const handleGuestCouponApplied = (couponData) => {
+    setAppliedCoupon(couponData.code);
+    setPricingDetails(prev => ({ ...prev, discount: couponData.discount || 0 }));
+    setShowCouponModal(false);
+  };
+
   const handleCouponRemoved = async () => {
     try {
       const r = await applyCouponMutation({ couponCode: null, email: userEmail }).unwrap();
@@ -578,6 +587,12 @@ const CheckoutPage = () => {
         showNotification("Coupon removed", "success");
       }
     } catch (e) { showNotification(e?.data?.message || "Failed to remove coupon", "error"); }
+  };
+
+  const handleGuestCouponRemoved = () => {
+    setAppliedCoupon(null);
+    setPricingDetails(prev => ({ ...prev, discount: 0 }));
+    showNotification("Coupon removed", "success");
   };
 
   const handleStep1Next = () => {
@@ -660,6 +675,7 @@ const CheckoutPage = () => {
             long: addressForm?.long || 0,
           },
           paymentMethod,
+          ...(appliedCoupon ? { couponCode: appliedCoupon } : {}),
           ...getFbCookies(), // _fbp / _fbc → stored on order for CAPI match quality
           anonymousId: getAnonymousId(), // fallback externalId for guest CAPI
         }).unwrap();
@@ -1369,28 +1385,34 @@ const CheckoutPage = () => {
               {/* COD notice — compact, shown only when COD is selected */}
           
 
-              {/* Coupon — auth only */}
-              {!isGuest && (
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                  <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-50">
-                    <div className="w-8 h-8 rounded-xl bg-[#a89068]/10 flex items-center justify-center">
-                      <i className="fa-solid fa-percent text-[#a89068] text-sm" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-gray-800">Promo Code</p>
-                      <p className="text-xs text-gray-400">Apply a discount coupon</p>
-                    </div>
+              {/* Coupon — available to all (guests + members) */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-50">
+                  <div className="w-8 h-8 rounded-xl bg-[#a89068]/10 flex items-center justify-center">
+                    <i className="fa-solid fa-percent text-[#a89068] text-sm" />
                   </div>
-                  <div className="p-5 space-y-3">
-                    <CouponInput key={appliedCoupon || "none"} appliedCoupon={appliedCoupon} discount={pricingDetails.discount} onCouponApplied={handleCouponApplied} onCouponRemoved={handleCouponRemoved} />
-                    {!appliedCoupon && (
-                      <button onClick={() => setShowCouponModal(true)} className="w-full py-2.5 border border-dashed border-gray-200 rounded-xl text-xs font-bold text-gray-400 hover:border-[#a89068]/50 hover:text-[#a89068] transition-all flex items-center justify-center gap-2">
-                        <i className="fa-solid fa-tags" /> Browse available coupons
-                      </button>
-                    )}
+                  <div>
+                    <p className="text-sm font-bold text-gray-800">Promo Code</p>
+                    <p className="text-xs text-gray-400">Apply a discount coupon</p>
                   </div>
                 </div>
-              )}
+                <div className="p-5 space-y-3">
+                  <CouponInput
+                    key={appliedCoupon || "none"}
+                    appliedCoupon={appliedCoupon}
+                    discount={pricingDetails.discount}
+                    isGuest={isGuest}
+                    cartTotal={cartTotalAmount}
+                    onCouponApplied={isGuest ? handleGuestCouponApplied : handleCouponApplied}
+                    onCouponRemoved={isGuest ? handleGuestCouponRemoved : handleCouponRemoved}
+                  />
+                  {!appliedCoupon && (
+                    <button onClick={() => setShowCouponModal(true)} className="w-full py-2.5 border border-dashed border-gray-200 rounded-xl text-xs font-bold text-gray-400 hover:border-[#a89068]/50 hover:text-[#a89068] transition-all flex items-center justify-center gap-2">
+                      <i className="fa-solid fa-tags" /> Browse available coupons
+                    </button>
+                  )}
+                </div>
+              </div>
 
               
               {/* Payment error */}
@@ -1581,7 +1603,12 @@ const CheckoutPage = () => {
             </div>
             <div className="p-5 overflow-y-auto max-h-[calc(88vh-72px)]">
               <Suspense fallback={<ComponentLoader />}>
-                <CouponList onCouponApplied={handleCouponApplied} userId={userProfile?.userId} />
+                <CouponList
+                  onCouponApplied={isGuest ? handleGuestCouponApplied : handleCouponApplied}
+                  userId={userProfile?.userId}
+                  isGuest={isGuest}
+                  cartTotal={cartTotalAmount}
+                />
               </Suspense>
             </div>
           </div>

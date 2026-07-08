@@ -309,23 +309,70 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   if (isApplied && couponCodeId) {
     const liveCoupon = await Coupon.findOne(
       { couponId: couponCodeId },
-      { discountType: 1, discountValue: 1, maxDiscountCap: 1, isInternal: 1, isArchived: 1, maxUsesPerUser: 1, scope: 1 }
+      {
+        discountType: 1, discountValue: 1, maxDiscountCap: 1,
+        isInternal: 1, isArchived: 1, isActive: 1, isTest: 1,
+        maxUsesPerUser: 1, scope: 1,
+        // Fields missing from original projection — caused silent bypass of these rules
+        minCartValue: 1, validFrom: 1, validUntil: 1,
+        maxTotalUses: 1, usageCount: 1,
+      }
     ).lean();
 
     if (!liveCoupon || liveCoupon.isArchived) {
-      // Coupon was deleted/archived after apply — reject order so user knows their discount is gone
       throw new ValidationError(
         "The coupon you applied is no longer available. Please remove it from your cart and try again."
       );
     }
+    if (!liveCoupon.isActive) {
+      throw new ValidationError(
+        "This coupon has been paused. Please remove it from your cart and try again."
+      );
+    }
 
-    // Guard: isInternal must only be set when discountType is INTERNAL_TEST.
-    // If DB data is inconsistent, treat it as a regular coupon to prevent unauthorized ₹1 orders.
-    if (liveCoupon.isInternal && liveCoupon.discountType !== "INTERNAL_TEST") {
-      console.error(`[Coupon:Security] Coupon ${couponCodeId} has isInternal=true but discountType=${liveCoupon.discountType} — treating as invalid`);
-      discountAmount = 0; isApplied = false;
-      couponCodeId = null; couponCodeName = null;
-    } else if (liveCoupon.isInternal && liveCoupon.discountType === "INTERNAL_TEST") {
+    const isValidInternal = liveCoupon.isInternal && liveCoupon.discountType === "INTERNAL_TEST";
+    if (liveCoupon.isTest && !isValidInternal) {
+      throw new ValidationError(
+        "This coupon is no longer available for customers. Please remove it from your cart and try again."
+      );
+    }
+    // isInternal=true without INTERNAL_TEST type is DB corruption — reject clearly, don't silently zero-out
+    if (liveCoupon.isInternal && !isValidInternal) {
+      console.error(`[Coupon:Security] Coupon ${couponCodeId} has isInternal=true but discountType=${liveCoupon.discountType}`);
+      throw new ValidationError(
+        "This coupon is invalid. Please remove it from your cart and try again."
+      );
+    }
+
+    // Re-check validity window — coupon may have expired or not yet started between apply and pay
+    const now = new Date();
+    if (liveCoupon.validFrom && now < new Date(liveCoupon.validFrom)) {
+      throw new ValidationError(
+        "This coupon is not valid yet. Please remove it from your cart and try again."
+      );
+    }
+    if (liveCoupon.validUntil && now > new Date(liveCoupon.validUntil)) {
+      throw new ValidationError(
+        "This coupon has expired. Please remove it from your cart and try again."
+      );
+    }
+
+    // Re-check minimum cart value against re-derived product subtotal
+    // (user may have removed items from cart after applying the coupon)
+    if (subtotal < (liveCoupon.minCartValue || 0)) {
+      throw new ValidationError(
+        `A minimum cart value of ₹${liveCoupon.minCartValue} is required for this coupon. Please remove it from your cart and try again.`
+      );
+    }
+
+    // Re-check global cap (non-atomic snapshot, main enforcement is atomic $inc in webhook)
+    if (liveCoupon.maxTotalUses != null && liveCoupon.usageCount >= liveCoupon.maxTotalUses) {
+      throw new ValidationError(
+        "This coupon has reached its maximum usage limit. Please remove it from your cart and try again."
+      );
+    }
+
+    if (isValidInternal) {
       // ── INTERNAL TEST: completely separate path ──────────────────────────────
       // Always ₹1 regardless of cart size, shipping, or payment method.
       isInternalTestOrder = true;
@@ -339,11 +386,11 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     }
 
     // ── Per-user limit re-check (race condition guard) ────────────────────────
-    // The apply-time check can be beaten by simultaneous orders with the same identity.
-    // Re-checking here, before the Razorpay order is created, prevents double spending.
+    // IMPORTANT: use the authenticated user's DB record for identity, NOT req.body values.
+    // req.body.userEmail / senderMobile are client-controlled and could be faked to bypass limits.
     if (isApplied && !isInternalTestOrder) {
-      const normEmailCheck  = userEmail?.toLowerCase().trim() || null;
-      const normMobileCheck = finalSenderMobile || null;
+      const normEmailCheck  = user?.email?.toLowerCase().trim() || null;
+      const normMobileCheck = user?.mobileNumber?.toString().replace(/\D/g, "").slice(-10) || finalSenderMobile || null;
       const identifiers     = [normEmailCheck, normMobileCheck].filter(Boolean);
 
       if (identifiers.length > 0 && liveCoupon.maxUsesPerUser) {
@@ -593,40 +640,64 @@ const razorpayWebHookController = async (req, res) => {
               );
 
               if (updatedCoupon) {
-                const productSubtotal = order.items.reduce(
-                  (s, i) => s + ((i.productSnapshot?.priceAtPurchase || 0) * (i.productSnapshot?.quantity || 0)),
-                  0,
-                );
-                await CouponUsage.create({
-                  couponId,
-                  couponCode,
-                  orderId:               order.orderId,
-                  orderType:             "WEBSITE",
-                  userId:                order.userId || null,
-                  email:                 normEmail,
-                  mobile:                normMobile,
-                  discountAmount:        discount,
-                  cartValueBeforeDiscount: productSubtotal,
-                  usedAt:                new Date(),
-                });
-
-                // Mark TARGETED assignment as used (embedded in coupon document)
-                if (updatedCoupon.scope === "TARGETED" && (normEmail || normMobile)) {
-                  await Coupon.updateOne(
-                    {
-                      couponId,
-                      assignedTo: {
-                        $elemMatch: {
-                          identifier: { $in: [normEmail, normMobile].filter(Boolean) },
-                          usedAt: null,
-                        },
-                      },
-                    },
-                    { $set: { "assignedTo.$.usedAt": new Date() } },
-                  );
+                // ── Per-user limit safety net in webhook ─────────────────────
+                // Two simultaneous orders can race past the per-user check at order-creation time
+                // and both reach the webhook. Guard here using countDocuments (this IS the atomic
+                // last line of defence — discount is already given but we prevent audit corruption
+                // and protect against future uses by rolling back the usageCount increment).
+                let perUserOk = true;
+                if (updatedCoupon.maxUsesPerUser && (normEmail || normMobile)) {
+                  const priorUses = await CouponUsage.countDocuments({
+                    couponId,
+                    $or: [
+                      ...(normEmail  ? [{ email:  normEmail  }] : []),
+                      ...(normMobile ? [{ mobile: normMobile }] : []),
+                    ],
+                  });
+                  if (priorUses >= updatedCoupon.maxUsesPerUser) {
+                    perUserOk = false;
+                    // Roll back the usageCount increment so future orders are not blocked unfairly
+                    await Coupon.updateOne({ couponId }, { $inc: { usageCount: -1 } });
+                    console.warn(`[Coupon:Security] Order=${order.orderId} code=${couponCode} — per-user limit hit in webhook (race condition). usageCount rolled back. priorUses=${priorUses} limit=${updatedCoupon.maxUsesPerUser}`);
+                  }
                 }
 
-                console.log(`[Coupon:Apply] Order=${order.orderId} code=${couponCode} discount=₹${discount} usageCount=${updatedCoupon.usageCount} — tracked`);
+                if (perUserOk) {
+                  const productSubtotal = order.items.reduce(
+                    (s, i) => s + ((i.productSnapshot?.priceAtPurchase || 0) * (i.productSnapshot?.quantity || 0)),
+                    0,
+                  );
+                  await CouponUsage.create({
+                    couponId,
+                    couponCode,
+                    orderId:               order.orderId,
+                    orderType:             "WEBSITE",
+                    userId:                order.userId || null,
+                    email:                 normEmail,
+                    mobile:                normMobile,
+                    discountAmount:        discount,
+                    cartValueBeforeDiscount: productSubtotal,
+                    usedAt:                new Date(),
+                  });
+
+                  // Mark TARGETED assignment as used (embedded in coupon document)
+                  if (updatedCoupon.scope === "TARGETED" && (normEmail || normMobile)) {
+                    await Coupon.updateOne(
+                      {
+                        couponId,
+                        assignedTo: {
+                          $elemMatch: {
+                            identifier: { $in: [normEmail, normMobile].filter(Boolean) },
+                            usedAt: null,
+                          },
+                        },
+                      },
+                      { $set: { "assignedTo.$.usedAt": new Date() } },
+                    );
+                  }
+
+                  console.log(`[Coupon:Apply] Order=${order.orderId} code=${couponCode} discount=₹${discount} usageCount=${updatedCoupon.usageCount} — tracked`);
+                }
               } else {
                 console.log(`[Coupon:Apply] Order=${order.orderId} code=${couponCode} — cap already reached, skipped increment`);
               }
@@ -821,7 +892,7 @@ const generateTempPassword = () => {
 };
 
 const guestCreateOrderController = asyncHandler(async (req, res) => {
-  const { items, guestInfo, deliveryAddress, paymentMethod: reqPaymentMethod } = req.body;
+  const { items, guestInfo, deliveryAddress, paymentMethod: reqPaymentMethod, couponCode: rawCouponCode } = req.body;
 
   if (!guestInfo?.name?.trim()) throw new ValidationError("Full name is required");
   if (!guestInfo?.email?.trim()) throw new ValidationError("Email is required");
@@ -884,7 +955,94 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     cartItems: rawItemsForShipping
   });
   const shippingAmount = shippingResult?.total_charges || 179;
-  const finalAmount = subtotal + shippingAmount;
+
+  // ── Guest coupon validation ───────────────────────────────────────────────────
+  let couponCodeId = null, couponCodeName = null, discountAmount = 0, isApplied = false;
+  let isInternalTestOrder = false;
+  const guestEmail = guestInfo.email.toLowerCase().trim();
+
+  if (rawCouponCode?.trim()) {
+    const cleanCode = rawCouponCode.trim().toUpperCase();
+    const liveCoupon = await Coupon.findOne({ code: cleanCode, isArchived: false }).lean();
+
+    if (!liveCoupon || !liveCoupon.isActive) {
+      throw new ValidationError("Invalid or inactive coupon.");
+    }
+    // Guests cannot use MEMBERS_ONLY coupons
+    if (liveCoupon.audience === "MEMBERS_ONLY") {
+      throw new ValidationError("This coupon is only available for registered members. Please sign in to use it.");
+    }
+    const isValidInternal = liveCoupon.isInternal && liveCoupon.discountType === "INTERNAL_TEST";
+    if (liveCoupon.isTest && !isValidInternal) {
+      throw new ValidationError("Invalid or inactive coupon.");
+    }
+    if (liveCoupon.isInternal && !isValidInternal) {
+      throw new ValidationError("Invalid or inactive coupon.");
+    }
+    const now = new Date();
+    if (liveCoupon.validFrom && now < new Date(liveCoupon.validFrom)) {
+      throw new ValidationError("This coupon is not valid yet.");
+    }
+    if (liveCoupon.validUntil && now > new Date(liveCoupon.validUntil)) {
+      throw new ValidationError("This coupon has expired.");
+    }
+    if (subtotal < (liveCoupon.minCartValue || 0)) {
+      throw new ValidationError(`Minimum order of ₹${liveCoupon.minCartValue} required for this coupon.`);
+    }
+    if (liveCoupon.maxTotalUses != null && liveCoupon.usageCount >= liveCoupon.maxTotalUses) {
+      throw new ValidationError("This coupon has reached its maximum number of uses.");
+    }
+
+    // Per-user limit check (by email + mobile)
+    const normMobileCoupon = cleanMobile;
+    const identifiers = [guestEmail, normMobileCoupon].filter(Boolean);
+    if (identifiers.length > 0 && liveCoupon.maxUsesPerUser) {
+      const priorUses = await CouponUsage.countDocuments({
+        couponId: liveCoupon.couponId,
+        $or: [
+          { email: guestEmail },
+          { mobile: normMobileCoupon },
+        ],
+      });
+      if (priorUses >= liveCoupon.maxUsesPerUser) {
+        throw new ValidationError(
+          liveCoupon.maxUsesPerUser === 1
+            ? "You have already used this coupon."
+            : `You have already used this coupon ${priorUses} time(s) (limit: ${liveCoupon.maxUsesPerUser}).`
+        );
+      }
+    }
+
+    // TARGETED scope: must be in assignedTo list
+    if (liveCoupon.scope === "TARGETED") {
+      const assignment = (liveCoupon.assignedTo || []).find(a => identifiers.includes(a.identifier));
+      if (!assignment) {
+        throw new ValidationError("This coupon has not been assigned to you.");
+      }
+      if (assignment.usedAt) {
+        throw new ValidationError("Your personal coupon has already been used.");
+      }
+    }
+
+    // Calculate discount
+    if (isValidInternal) {
+      isInternalTestOrder = true;
+      discountAmount = Math.max(subtotal + shippingAmount - 1, 0);
+    } else if (liveCoupon.discountType === "PERCENTAGE") {
+      let d = Math.floor((subtotal * liveCoupon.discountValue) / 100);
+      if (liveCoupon.maxDiscountCap) d = Math.min(d, liveCoupon.maxDiscountCap);
+      discountAmount = Math.min(d, subtotal);
+    } else {
+      discountAmount = Math.min(liveCoupon.discountValue || 0, subtotal);
+    }
+
+    couponCodeId = liveCoupon.couponId;
+    couponCodeName = liveCoupon.code;
+    isApplied = true;
+    console.log(`[Coupon:Guest] Applied "${cleanCode}" — discount ₹${discountAmount} on subtotal ₹${subtotal}`);
+  }
+
+  const finalAmount = isInternalTestOrder ? 1 : Math.max(subtotal + shippingAmount - discountAmount, 0);
 
   // Update orderItems with shipping value now that it's calculated
   orderItems.forEach(i => { i.productSnapshot.shipping = String(shippingAmount); });
@@ -899,8 +1057,6 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   const razorpayChargeAmountPaise = Math.ceil(razorpayChargeAmount) * 100;
 
   const razorpayOrder = await razorpayCreateOrderService(razorpayChargeAmountPaise, "INR");
-
-  const guestEmail = guestInfo.email.toLowerCase().trim();
 
   const order = await Order.create({
     orderId: uuidv7(),
@@ -936,6 +1092,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     codDetails: isCOD ? { partialAmountPaid: codPartialAmount, remainingAmount: codRemainingAmount } : undefined,
     isGuestOrder: true,
     guestInfo: { name: guestInfo.name.trim(), email: guestEmail, mobile: cleanMobile },
+    coupon: { couponCodeId, couponCodeName, discountAmount, isApplied },
     metaTracking: collectMetaTracking(req),
   });
 
@@ -952,6 +1109,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
         codDetails: isCOD ? { partialAmountPaid: codPartialAmount, remainingAmount: codRemainingAmount } : null,
         senderMobile: cleanMobile,
         receiverMobile: cleanMobile,
+        coupon: isApplied ? { code: couponCodeName, discountAmount } : null,
       },
       true,
     ),

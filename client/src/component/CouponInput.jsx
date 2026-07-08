@@ -1,15 +1,28 @@
 import { useState } from 'react';
-import { useApplyCouponMutation } from '../store/api/userApi';
+import { useApplyCouponMutation, useGetAvailableCouponsQuery } from '../store/api/userApi';
 import { useUI, useAuth } from '../hooks/useRedux';
 
-const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved }) => {
+function calcLocalDiscount(coupon, subtotal) {
+  if (!subtotal || subtotal < (coupon.minCartValue || 0)) return 0;
+  if (coupon.discountType === 'PERCENTAGE') {
+    let amt = Math.floor((subtotal * coupon.discountValue) / 100);
+    if (coupon.maxDiscountCap) amt = Math.min(amt, coupon.maxDiscountCap);
+    return Math.min(amt, subtotal);
+  }
+  return Math.min(coupon.discountValue || 0, subtotal);
+}
+
+const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved, isGuest, cartTotal }) => {
   const [couponCode, setCouponCode] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  
+
   const [applyCoupon, { isLoading }] = useApplyCouponMutation();
   const { showNotification } = useUI();
   const { user } = useAuth();
+
+  // For guests: RTK Query already fetched this for the coupon modal — reuses the cache, no extra request
+  const { data: availableCoupons } = useGetAvailableCouponsQuery(undefined, { skip: !isGuest });
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) {
@@ -20,28 +33,38 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
     setError('');
     setSuccess('');
 
+    if (isGuest) {
+      const cleanCode = couponCode.trim().toUpperCase();
+      const coupon = (availableCoupons?.data || []).find(c => c.code === cleanCode);
+      if (!coupon) {
+        const msg = 'Invalid or inactive coupon code';
+        setError(msg);
+        showNotification(msg, 'error');
+        setTimeout(() => setError(''), 3000);
+        return;
+      }
+      const discountAmount = calcLocalDiscount(coupon, cartTotal || 0);
+      if (onCouponApplied) onCouponApplied({ code: cleanCode, discount: discountAmount });
+      setSuccess(`Coupon applied! You save ₹${discountAmount}`);
+      setCouponCode('');
+      setTimeout(() => setSuccess(''), 3000);
+      return;
+    }
+
     try {
       const result = await applyCoupon({
         couponCode: couponCode?.trim()?.toUpperCase(),
         email: user?.email
       }).unwrap();
-      
+
       if (result?.success) {
         const discountAmount = result.data?.summary?.discount || 0;
-        const successMessage = result.message || `Coupon applied! You saved ₹${discountAmount}`;
-        setSuccess(successMessage);
+        setSuccess(result.message || `Coupon applied! You saved ₹${discountAmount}`);
         setError('');
         setCouponCode('');
-        
-        // Notify parent component with full summary data
         if (onCouponApplied) {
-          onCouponApplied({
-            code: couponCode.trim().toUpperCase(),
-            discount: discountAmount,
-            summary: result.data?.summary
-          });
+          onCouponApplied({ code: couponCode.trim().toUpperCase(), discount: discountAmount, summary: result.data?.summary });
         }
-        
         setTimeout(() => setSuccess(''), 2000);
       } else {
         const errorMessage = result.message || 'Failed to apply coupon';
@@ -50,7 +73,6 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
         setTimeout(() => setError(''), 3000);
       }
     } catch (err) {
-      // Extract error message from backend response
       const errorMessage = err?.data?.message || err?.message || 'Invalid or expired coupon code';
       showNotification(errorMessage, "error");
       setError(errorMessage);
@@ -62,22 +84,16 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
     setError('');
     setSuccess('');
 
+    if (isGuest) {
+      if (onCouponRemoved) onCouponRemoved();
+      return;
+    }
+
     try {
-      // Call applyCoupon with null to remove the coupon
-      const result = await applyCoupon({
-        couponCode: null,
-        email: user?.email
-      }).unwrap();
-      
+      const result = await applyCoupon({ couponCode: null, email: user?.email }).unwrap();
       if (result.success) {
         setSuccess('Coupon removed');
-        
-        // Notify parent component
-        if (onCouponRemoved) {
-          onCouponRemoved();
-        }
-        
-        // Clear success message after 2 seconds
+        if (onCouponRemoved) onCouponRemoved();
         setTimeout(() => setSuccess(''), 2000);
       } else {
         setError(result.message || 'Failed to remove coupon');
@@ -88,9 +104,7 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      handleApplyCoupon();
-    }
+    if (e.key === 'Enter') handleApplyCoupon();
   };
 
   return (

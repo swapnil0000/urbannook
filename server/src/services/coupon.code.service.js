@@ -6,7 +6,6 @@ import Cart from "../model/user.cart.model.js";
 import {
   ValidationError,
   NotFoundError,
-  InternalServerError,
 } from "../utils/errors.js";
 import User from "../model/user.model.js";
 import UserWaistList from "../model/user.waitlist.model.js";
@@ -41,7 +40,8 @@ function calculateDiscount(coupon, cartProductTotal) {
 // ── New-model coupon validation ───────────────────────────────────────────────
 
 // cartProductTotal = product subtotal only — discount applies to products, not shipping (industry standard)
-async function validateNewCoupon({ coupon, cartProductTotal, email, mobile }) {
+// isLoggedIn: true for authenticated users; false/undefined for guests
+async function validateNewCoupon({ coupon, cartProductTotal, email, mobile, isLoggedIn }) {
   const tag = "[Coupon:Storefront]";
   const now = new Date();
 
@@ -49,6 +49,12 @@ async function validateNewCoupon({ coupon, cartProductTotal, email, mobile }) {
     console.log(`${tag} REJECT "${coupon.code}" — not active`);
     throw new ValidationError("This coupon is not currently active.");
   }
+  // MEMBERS_ONLY coupons require a logged-in account — guests cannot redeem them
+  if (coupon.audience === "MEMBERS_ONLY" && !isLoggedIn) {
+    console.log(`${tag} REJECT "${coupon.code}" — MEMBERS_ONLY, not authenticated`);
+    throw new ValidationError("This coupon is only available for registered members. Please sign in to use it.");
+  }
+
   // isInternal is only valid when discountType is INTERNAL_TEST — guard against DB corruption
   const isValidInternal = coupon.isInternal && coupon.discountType === "INTERNAL_TEST";
 
@@ -180,6 +186,7 @@ const applyCouponCodeService = async ({ userId, couponCodeName, email, mobile })
       cartProductTotal: cartSubtotal,
       email,
       mobile,
+      isLoggedIn: !!userId,
     });
 
     // Discount applies to product subtotal only. INTERNAL_TEST is handled at payment time
@@ -258,26 +265,67 @@ const applyCouponCodeService = async ({ userId, couponCodeName, email, mobile })
   return { statusCode: 200, message: "Coupon applied successfully", success: true, data: { items: availableItems, summary: snap.summary } };
 };
 
-// ── List available coupons (legacy, unchanged) ────────────────────────────────
+// ── List available coupons ─────────────────────────────────────────────────────
+// Returns a unified array of coupons in a normalised shape that CouponList can
+// render without knowing which model a coupon came from.
 
 const getAllCouponCodeService = async ({ userId }) => {
-  const allUserRegisterdAndWaitListIsJoined = await User.aggregate([
-    { $match: { userId, isVerified: true } },
-    { $lookup: { from: "userwaistlists", localField: "email", foreignField: "userEmail", as: "waitlistData" } },
-    { $match: { waitlistData: { $ne: [] } } },
-    { $project: { _id: 0, userId: 1, name: 1, email: 1, role: 1 } },
-  ]);
+  const results = [];
 
-  if (allUserRegisterdAndWaitListIsJoined?.length > 0) {
-    const activeCouponCodeList = await CouponCode.find(
-      { isPublished: true },
-      { _id: 0, __v: 0, createdAt: 0, updatedAt: 0 },
-    ).lean();
-    if (!activeCouponCodeList) throw new InternalServerError("activeCouponCodeList can't be retrieved");
-    return { statusCode: 200, message: "activeCouponCodeList", data: activeCouponCodeList, success: true };
+  // 1. New-model PUBLIC + EVERYONE coupons — always visible, no login required.
+  // Match audience:"EVERYONE" OR no audience field at all (coupons created before the field was added).
+  // Exclude audience:"MEMBERS_ONLY" which requires a logged-in account.
+  const newCoupons = await Coupon.find(
+    { scope: "PUBLIC", audience: { $ne: "MEMBERS_ONLY" }, isActive: true, isArchived: false, isTest: false },
+    { couponId: 1, code: 1, title: 1, notes: 1, discountType: 1, discountValue: 1, maxDiscountCap: 1, minCartValue: 1, validUntil: 1 },
+  ).lean();
+
+  for (const c of newCoupons) {
+    results.push({
+      id:            c.couponId,
+      code:          c.code,
+      title:         c.title || c.code,
+      description:   c.notes || null,
+      discountType:  c.discountType,   // "PERCENTAGE" | "FLAT"
+      discountValue: c.discountValue || 0,
+      maxDiscountCap: c.maxDiscountCap || null,
+      minCartValue:  c.minCartValue || 0,
+      validUntil:    c.validUntil || null,
+    });
   }
 
-  return { statusCode: 200, message: "activeCouponCodeList", data: null, success: true };
+  // 2. Legacy waitlist coupons — only for users who joined the waitlist
+  if (userId) {
+    const waitlistCheck = await User.aggregate([
+      { $match: { userId, isVerified: true } },
+      { $lookup: { from: "userwaistlists", localField: "email", foreignField: "userEmail", as: "waitlistData" } },
+      { $match: { waitlistData: { $ne: [] } } },
+      { $project: { _id: 0, userId: 1 } },
+    ]);
+
+    if (waitlistCheck?.length > 0) {
+      const legacy = await CouponCode.find(
+        { isPublished: true },
+        { _id: 0, couponCodeId: 1, name: 1, discountType: 1, discountValue: 1, maxDiscount: 1, minCartValue: 1, expiryDate: 1, description: 1 },
+      ).lean();
+
+      for (const c of legacy) {
+        results.push({
+          id:            c.couponCodeId,
+          code:          c.name,
+          title:         c.name,
+          description:   c.description || null,
+          discountType:  c.discountType === "FIXED" ? "FLAT" : c.discountType,
+          discountValue: c.discountValue || 0,
+          maxDiscountCap: c.maxDiscount || null,
+          minCartValue:  c.minCartValue || 0,
+          validUntil:    c.expiryDate || null,
+        });
+      }
+    }
+  }
+
+  return { statusCode: 200, message: "activeCouponCodeList", data: results, success: true };
 };
 
 export { applyCouponCodeService, getAllCouponCodeService };
