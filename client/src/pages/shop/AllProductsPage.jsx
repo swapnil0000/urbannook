@@ -93,11 +93,11 @@ const SlimRow = memo(({ products, onProductClick }) => {
         className="flex gap-4 overflow-x-auto pb-2"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}
       >
-        {products.map((product) => (
+        {products.map((product, i) => (
           <SlimCard
             key={product.productId}
             product={product}
-            onClick={() => onProductClick(product.productId)}
+            onClick={() => onProductClick(product, i)}
           />
         ))}
       </div>
@@ -196,6 +196,21 @@ const AllProductsPage = () => {
     () => productsData?.data?.listofPublishedProducts || productsData?.data?.products || [],
     [productsData]
   );
+
+  // GA4 view_item_list — fire once the catalogue is loaded
+  useEffect(() => {
+    if (allProducts.length === 0) return;
+    trackViewItemList({
+      listId: 'all_products',
+      listName: 'All Products',
+      items: allProducts.slice(0, 30).map((product) => ({
+        itemId: product.productId,
+        itemName: product.productName,
+        itemVariant: product.variantDetails?.[0]?.variantName,
+        price: product.variantDetails?.[0]?.variantPrice || product.effectivePrice || 0,
+      })),
+    });
+  }, [allProducts]);
 
   const categoryGroups = useMemo(() => {
     if (!allProducts.length) return [];
@@ -397,7 +412,21 @@ const AllProductsPage = () => {
                 </Link>
               </div>
 
-              <SlimRow products={products} onProductClick={(id) => navigate(`/shop?product=${id}`)} />
+              <SlimRow
+                products={products}
+                onProductClick={(product, index) => {
+                  trackSelectItem({
+                    itemId: product.productId,
+                    itemName: product.productName,
+                    itemVariant: product.variantDetails?.[0]?.variantName,
+                    price: product.variantDetails?.[0]?.variantPrice || product.effectivePrice || 0,
+                    listId: cat.slug || cat._id || 'all_products',
+                    listName: cat.name || 'All Products',
+                    index,
+                  });
+                  navigate(`/shop?product=${product.productId}`);
+                }}
+              />
             </div>
           ))}
         </div>

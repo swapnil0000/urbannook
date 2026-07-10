@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useUpdateCartMutation } from '../../store/api/userApi';
 import { updateQuantity, removeItem } from '../../store/slices/cartSlice';
 import { setShowLoginModal, setLoginCallback } from '../../store/slices/uiSlice';
+import { trackViewCart, trackRemoveFromCart, track } from '../../utils/analytics';
 
 const OptimizedImage = lazy(() => import('../OptimizedImage'));
 
@@ -17,19 +18,36 @@ const CartDrawer = ({ isOpen, onClose }) => {
   
   const [updateCart] = useUpdateCartMutation();
 
+  // Map a cart line item → analytics item shape
+  const toTrackItem = (item) => ({
+    itemId: item.productId || item.id || item.mongoId,
+    itemName: item.name,
+    itemVariant: item.selectedVariant,
+    price: Number(item.price) || 0,
+    quantity: typeof item.quantity === 'object' ? Number(item.quantity?.quantity || 0) : Number(item.quantity || 0),
+  });
+
   // Handle animation mounting
   useEffect(() => {
     if (isOpen) {
       setMounted(true);
-      document.body.style.overflow = 'hidden'; 
+      document.body.style.overflow = 'hidden';
       return () => {
-        document.body.style.overflow = ''; 
+        document.body.style.overflow = '';
       };
-    } 
+    }
     else {
       const timer = setTimeout(() => setMounted(false), 300);
       return () => clearTimeout(timer);
     }
+  }, [isOpen]);
+
+  // Fire view_cart when the drawer opens with items in it
+  useEffect(() => {
+    if (isOpen && cartItems.length > 0) {
+      trackViewCart({ value: Number(totalAmount) || 0, items: cartItems.map(toTrackItem) });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   const handleQuantityChange = async (productId, selectedVariant, newQuantity, mongoId, currentQty, image) => {
@@ -38,6 +56,13 @@ const CartDrawer = ({ isOpen, onClose }) => {
       handleRemoveItem(productId, effectiveVariant, mongoId);
       return;
     }
+
+    track('quantity_changed', {
+      item_id: productId,
+      old_quantity: currentQty,
+      new_quantity: newQuantity,
+      placement: 'cart_drawer',
+    });
 
     const hasToken = !!localStorage.getItem('authToken');
     const isLoggedIn = isAuthenticated || hasToken;
@@ -56,6 +81,13 @@ const CartDrawer = ({ isOpen, onClose }) => {
 
   const handleRemoveItem = async (productId, selectedVariant, mongoId) => {
     const effectiveVariant = selectedVariant || 'N/A';
+
+    const removed = cartItems.find(
+      (i) => (i.mongoId || i.productId || i.id) === (mongoId || productId) &&
+             (i.selectedVariant || 'N/A') === effectiveVariant
+    );
+    if (removed) trackRemoveFromCart(toTrackItem(removed));
+
     const hasToken = !!localStorage.getItem('authToken');
     const isLoggedIn = isAuthenticated || hasToken;
 

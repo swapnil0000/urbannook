@@ -14,7 +14,7 @@ import confetti from "canvas-confetti";
 import SEOHead from "../../component/SEOHead";
 import useTimer from "../../hooks/useTimer";
 import config from "../../config/env";
-import { trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist } from "../../utils/analytics";
+import { trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist, trackVariantSelect } from "../../utils/analytics";
 
 // Timer Component for Product Page
 const ProductTimer = memo(({ timeLeft }) => {
@@ -113,7 +113,8 @@ const ProductDetailPage = () => {
   };
 
   const [searchParams] = useSearchParams();
-  const productId = searchParams.get('product');
+  // const productId = searchParams.get('product');
+  const { productId, variantSku: urlVariantSku } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { showNotification, openLoginModal, closeLoginModal } = useUI();
@@ -240,31 +241,36 @@ const ProductDetailPage = () => {
 
   useEffect(() => {
     if (availableVariants.length > 0 && product) {
-      const savedSelection = cartSelections[product.productId];
       let initialVariant = availableVariants[0];
 
-      if (
-        savedSelection &&
-        savedSelection.variant &&
-        availableVariants.includes(savedSelection.variant)
-      ) {
-        initialVariant = savedSelection.variant;
+      if (urlVariantSku) {
+        const matched = product.variantDetails?.find(v => v.sku === urlVariantSku);
+        if (matched) initialVariant = matched.variantName;
+      } else {
+        const savedSelection = cartSelections[product.productId];
+        if (savedSelection && savedSelection.variant && availableVariants.includes(savedSelection.variant)) {
+          initialVariant = savedSelection.variant;
+        }
       }
       setSelectedVariant(initialVariant);
       setCurrentImageIndex(0);
     } else if (!product) {
        setSelectedVariant("");
     }
-  }, [product?.productId, availableVariants, cartSelections, product]);
+  }, [product?.productId, availableVariants, cartSelections, product, urlVariantSku]);
 
   // NAYA: Variant change hone par image index hamesha reset hoga
   useEffect(() => {
     setCurrentImageIndex(0);
   }, [selectedVariant]);
 
-  // Track product view when product loads or variant changes
+  // Track product view ONCE per product. Switching variant/color must NOT re-fire
+  // ViewContent (that inflated it 2-5x); variant interest is captured by the separate
+  // trackVariantSelect event. Guard on the product id so only a genuine new product fires.
+  const viewedProductRef = useRef(null);
   useEffect(() => {
-    if (product && selectedVariant) {
+    if (product && selectedVariant && viewedProductRef.current !== product.productId) {
+      viewedProductRef.current = product.productId;
       trackViewItem({
         itemId: product.productId,
         itemName: product.productName,
@@ -819,6 +825,9 @@ const ProductDetailPage = () => {
                           onClick={() => {
                             setSelectedVariant(variantName);
                             if (galleryImages[idx]) setCurrentImageIndex(idx);
+                            trackVariantSelect({ itemId: product.productId, itemName: product.productName, variantName, price: currentPrice });
+                            const vSku = product.variantDetails?.find(v => v.variantName === variantName)?.sku;
+                            navigate(`/product/${productId}/${vSku || variantName}`);
                           }}
                           className={`group flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border transition-all duration-300 ${
                             isSelected
@@ -845,6 +854,8 @@ const ProductDetailPage = () => {
                         onClick={() => {
                           setSelectedVariant(variantName);
                           if (galleryImages[idx]) setCurrentImageIndex(idx);
+                          const vSku = product.variantDetails?.find(v => v.variantName === variantName)?.sku;
+                          navigate(`/product/${productId}/${vSku || variantName}`);
                         }}
                         className={`group relative w-7 h-7 rounded-full transition-all duration-300 ${
                           isSelected
@@ -1021,7 +1032,7 @@ const ProductDetailPage = () => {
                   <i className="fa-solid fa-truck text-[#F5DEB3] text-sm"></i>
                   <span className="text-[9px] text-[#F5DEB3]/70 uppercase tracking-wider font-bold leading-tight">
                     {" "}
-                  3 to 5 Days Estimated 
+                  24–48 Hours Estimated 
                     <br />
                     Shipment
                   </span>

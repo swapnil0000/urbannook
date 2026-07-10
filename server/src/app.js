@@ -17,6 +17,10 @@ import {
   statsRouter,
   dynamicShippingRouter,
   categoryRouter,
+  eventRouter,
+  catalogRouter,
+  metaCapiRouter,
+  adminAnalyticsRouter,
 } from "./routes/index.js";
 import cookieParser from "cookie-parser";
 import healthRouter from "./routes/health.route.js";
@@ -209,6 +213,10 @@ app.use(
   contactRouter,
   statsRouter,
   dynamicShippingRouter,
+  eventRouter,
+  catalogRouter,
+  metaCapiRouter,
+  adminAnalyticsRouter,
 );
 
 app.use(errorHandler);

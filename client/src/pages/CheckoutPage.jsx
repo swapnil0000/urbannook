@@ -20,7 +20,7 @@ import { clearCart, removeItem } from "../store/slices/cartSlice";
 import { fetchCsrfToken } from "../store/api/apiSlice";
 import CouponInput from "../component/CouponInput";
 import { ComponentLoader } from "../component/layout/LoadingSpinner";
-import { trackBeginCheckout, trackPurchase } from "../utils/analytics";
+import { trackBeginCheckout, trackPurchase, trackAddShippingInfo, trackAddPaymentInfo, trackPaymentFailed, trackPaymentModalDismissed, trackCheckoutStep, trackOrderCreated, trackSelectPaymentMethod, trackDeliveryCheck, getFbCookies, getAnonymousId, cacheAddressForCapi, setMetaAdvancedMatching } from "../utils/analytics";
 
 const CouponList = lazy(() => import("../component/CouponList"));
 const MobileNumberModal = lazy(() => import("../component/MobileNumberModal"));
@@ -78,17 +78,28 @@ const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, it
   return (
     <div className="space-y-3">
       <div className="flex justify-between items-center text-sm">
-        <span className="text-gray-500">Subtotal <span className="text-gray-400">({itemCount} item{itemCount !== 1 ? "s" : ""})</span></span>
-        <span className="font-medium text-gray-800">₹{subtotal.toLocaleString()}</span>
+        <span className="text-gray-500">
+          Subtotal{" "}
+          <span className="text-gray-400">
+            ({itemCount} item{itemCount !== 1 ? "s" : ""})
+          </span>
+        </span>
+        <span className="font-medium text-gray-800">
+          ₹{subtotal.toLocaleString()}
+        </span>
       </div>
       <div className="flex justify-between items-center text-sm">
         <span className="text-gray-500">Delivery</span>
         <span className="font-medium text-gray-800">
-          {isLoadingShipping
-            ? <span className="inline-block w-16 h-3.5 bg-gray-200 rounded animate-pulse" />
-            : shippingAmount === null || shippingAmount === undefined
-            ? <span className="text-[10px] text-amber-600 font-bold uppercase tracking-wider">Enter address</span>
-            : `₹${Math.ceil(shippingAmount).toLocaleString()}`}
+          {isLoadingShipping ? (
+            <span className="inline-block w-16 h-3.5 bg-gray-200 rounded animate-pulse" />
+          ) : shippingAmount === null || shippingAmount === undefined ? (
+            <span className="text-[10px] text-amber-600 font-bold uppercase tracking-wider">
+              Enter address
+            </span>
+          ) : (
+            `₹${Math.ceil(shippingAmount).toLocaleString()}`
+          )}
         </span>
       </div>
       {appliedCoupon && discount > 0 && (
@@ -102,7 +113,9 @@ const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, it
       <div className="border-t border-gray-100 pt-3 flex justify-between items-center">
         <span className="font-bold text-gray-900">Total</span>
         <div className="text-right">
-          <span className="text-2xl font-bold text-[#2e443c]">₹{totalToPay.toLocaleString()}</span>
+          <span className="text-2xl font-bold text-[#2e443c]">
+            ₹{totalToPay.toLocaleString()}
+          </span>
           <p className="text-[10px] text-gray-400 mt-0.5">Incl. GST</p>
         </div>
       </div>
@@ -119,16 +132,20 @@ const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, it
                 </span>
                 Pay Now
               </span>
-              <span className="text-sm font-bold text-[#2e443c]">₹{codPartialAmount.toLocaleString()}</span>
+              <span className="text-sm font-bold text-[#2e443c]">
+                ₹{codPartialAmount.toLocaleString()}
+              </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-xs text-gray-600 flex items-center gap-2">
                 <span className="w-4 h-4 rounded-full bg-amber-400 flex items-center justify-center shrink-0">
                   <i className="fa-solid fa-door-open text-white text-[7px]" />
                 </span>
-               Rest Pay at delivery
+                Rest Pay at delivery
               </span>
-              <span className="text-sm font-bold text-amber-700">₹{codRemainingAmount.toLocaleString()}</span>
+              <span className="text-sm font-bold text-amber-700">
+                ₹{codRemainingAmount.toLocaleString()}
+              </span>
             </div>
           </div>
         </div>
@@ -194,6 +211,7 @@ const CheckoutPage = () => {
     shipping: null, // this will now store the full shippingInfo object
     discount: 0,
   });
+  const [shippingError, setShippingError] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("PREPAID"); // "PREPAID" | "COD"
   const [paymentError, setPaymentError] = useState(null);
   const [showRetry, setShowRetry] = useState(false);
@@ -255,21 +273,41 @@ const CheckoutPage = () => {
     }
   }, [currentStep, address, pinCode, preciseDetails, addressForm, currentAddressId, senderMobile, appliedCoupon, guestName, guestEmail, guestMobile]);
 
-  // Dynamic Shipping Calculation Logic
+  // Dynamic Shipping Calculation - triggered by payment method change on Review page
   const calculateShippingRef = useRef(calculateShipping);
   useEffect(() => { calculateShippingRef.current = calculateShipping; }, [calculateShipping]);
 
+  // Clear old shipping value immediately when payment method changes on review page,
+  // so the pay button blocks until the fresh API response arrives
   useEffect(() => {
-    const FALLBACK_SHIPPING = 149;
+    if (currentStep === reviewStep && pinCode && pinCode.toString().length === 6) {
+      setPricingDetails(prev => ({ ...prev, shipping: null }));
+      setShippingError("");
+    }
+  }, [paymentMethod]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Clear old shipping immediately when cart changes on review page (item added/removed/quantity changed).
+  // Without this, Pay stays enabled briefly with stale shipping calculated for the old cart.
+  // The shipping recalculation effect already reruns on cart changes — this just ensures
+  // the Pay button is blocked during that async window.
+  useEffect(() => {
+    if (currentStep === reviewStep && pinCode && pinCode.toString().length === 6) {
+      setPricingDetails(prev => ({ ...prev, shipping: null }));
+      setShippingError("");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartItems.length, cartItems.reduce((s, i) => s + Number(i.quantity || 0), 0)]);
+
+  useEffect(() => {
+    // Run shipping calculation on Review page when address/pincode is available
+    if (currentStep !== reviewStep || !pinCode || pinCode.toString().length !== 6 || cartItems.length === 0) {
+      return;
+    }
+
     let cancelled = false;
 
-    const fetchShippingRate = async (attempt = 1) => {
+    const fetchShippingRate = async () => {
       if (cancelled) return;
-
-      if (!pinCode || pinCode.toString().length !== 6 || cartItems.length === 0) {
-        setPricingDetails(prev => ({ ...prev, shipping: null }));
-        return;
-      }
 
       try {
         const formattedCartItems = cartItems.map(item => ({
@@ -282,38 +320,36 @@ const CheckoutPage = () => {
         const result = await calculateShippingRef.current({
           deliveryPinCode: parseInt(pinCode, 10),
           cartItems: formattedCartItems,
+          paymentType: paymentMethod,
         }).unwrap();
 
         if (cancelled) return;
 
         if (result.success && result.data) {
+          const shippingAmount = parseFloat(result.data.total_charges);
           setPricingDetails(prev => ({
             ...prev,
-            shipping: {
-              ...result.data,
-              amount: parseFloat(result.data.total_charges)
-            }
+            shipping: { ...result.data, amount: shippingAmount }
           }));
+          setShippingError("");
+          trackDeliveryCheck({ pincode: pinCode, serviceable: true, shippingAmount, paymentMethod });
         } else {
-          // API responded but no valid rate — use fallback
-          setPricingDetails(prev => ({ ...prev, shipping: { amount: FALLBACK_SHIPPING, type: "standard" } }));
+          showNotificationRef.current?.("Unable to calculate shipping. Please try again.", "error");
         }
       } catch (error) {
         if (cancelled) return;
-        console.error(`[Shipping] Attempt ${attempt} failed:`, error);
-        if (attempt < 3) {
-          // Retry up to 3 times with a short delay
-          setTimeout(() => fetchShippingRate(attempt + 1), 1500 * attempt);
-        } else {
-          // All retries exhausted — fall back to ₹149
-          setPricingDetails(prev => ({ ...prev, shipping: { amount: FALLBACK_SHIPPING, type: "standard" } }));
-        }
+        console.error('[Shipping Calculation Failed]:', error);
+        
+        const errorMsg = error?.data?.message || error?.message || "";
+        setShippingError(errorMsg);
+        setPricingDetails(prev => ({ ...prev, shipping: null }));
+        showNotificationRef.current?.(errorMsg || "Failed to calculate shipping charges.", "error");
       }
     };
 
     fetchShippingRate();
     return () => { cancelled = true; };
-  }, [pinCode, cartItems.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentStep, reviewStep, pinCode, cartItems.length, cartItems.reduce((s, i) => s + Number(i.quantity || 0), 0), paymentMethod]);
 
   useEffect(() => {
     if (savedAddressData?.success) {
@@ -362,7 +398,10 @@ const CheckoutPage = () => {
 
   useEffect(() => {
     if (isGuest) {
-      setPricingDetails(prev => ({ ...prev, subtotal: cartTotalAmount, discount: 0 }));
+      // Only sync subtotal — discount is managed by handleGuestCouponApplied/Removed
+      // Do NOT reset discount here: this effect re-runs when appliedCoupon changes,
+      // which would wipe the discount set by handleGuestCouponApplied.
+      setPricingDetails(prev => ({ ...prev, subtotal: cartTotalAmount }));
       return;
     }
     const fetchPricing = async () => {
@@ -385,13 +424,26 @@ const CheckoutPage = () => {
     fetchPricing();
   }, [cartItemsLength, cartTotalAmount, applyCouponMutation, appliedCoupon, userEmail, isGuest]);
 
+  // Fire begin_checkout ONCE per checkout. React Router remounts this page on
+  // navigate-away-and-back, and the Redux cart hydrates asynchronously AFTER mount,
+  // so a []-deps effect either double-fires or misses on refresh/deep-link. Gate on
+  // a ref (per-mount) + a sessionStorage flag (survives remounts) and depend on the
+  // cart so it fires the moment items hydrate. The flag is cleared on purchase.
+  const beginCheckoutFiredRef = useRef(false);
   useEffect(() => {
-    if (cartItems.length > 0)
+    if (
+      cartItems.length > 0 &&
+      !beginCheckoutFiredRef.current &&
+      !sessionStorage.getItem("un_begin_checkout_fired")
+    ) {
+      beginCheckoutFiredRef.current = true;
       trackBeginCheckout({
         items: cartItems.map((i) => ({ itemId: i.mongoId || i.id, itemName: i.name, itemVariant: i.selectedVariant || "N/A", price: i.price, quantity: i.quantity })),
         value: pricingDetails.subtotal,
       });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+      sessionStorage.setItem("un_begin_checkout_fired", "1");
+    }
+  }, [cartItems.length, pricingDetails.subtotal]); // eslint-disable-line react-hooks/exhaustive-deps -- length-based trigger is intentional
 
   const validateMobile = (m) => /^[6-9][0-9]{9}$/.test(String(m).trim());
   const stripCC = (m) => {
@@ -401,6 +453,9 @@ const CheckoutPage = () => {
     return t;
   };
   const goToStep = (n) => { setCurrentStep(n); window.scrollTo({ top: 0, behavior: "smooth" }); };
+
+  const buildTrackItems = () =>
+    cartItems.map((i) => ({ itemId: i.mongoId || i.id, itemName: i.name, itemVariant: i.selectedVariant || "N/A", price: i.price, quantity: i.quantity }));
 
   const loadRazorpay = () =>
     new Promise((res) => {
@@ -427,6 +482,7 @@ const CheckoutPage = () => {
       state: suggestion.state,
       pinCode: suggestion.pinCode,
     });
+    cacheAddressForCapi({ zip: suggestion.pinCode, city: suggestion.city, state: suggestion.state });
     if (!isGuest) refetchAddresses();
     goToStep(reviewStep);
   };
@@ -466,6 +522,7 @@ const CheckoutPage = () => {
       placeId: addr.placeId || "N/A",
       formattedAddress: addr.formattedAddress || addr.deliveryAddressFull
     });
+    cacheAddressForCapi({ zip: addr.pinCode, city: addr.city, state: addr.state });
     showNotification("Address selected", "success");
   };
 
@@ -515,6 +572,12 @@ const CheckoutPage = () => {
     } catch (e) { showNotification(e?.data?.message || "Failed to apply coupon", "error"); }
   };
 
+  const handleGuestCouponApplied = (couponData) => {
+    setAppliedCoupon(couponData.code);
+    setPricingDetails(prev => ({ ...prev, discount: couponData.discount || 0 }));
+    setShowCouponModal(false);
+  };
+
   const handleCouponRemoved = async () => {
     try {
       const r = await applyCouponMutation({ couponCode: null, email: userEmail }).unwrap();
@@ -524,6 +587,12 @@ const CheckoutPage = () => {
         showNotification("Coupon removed", "success");
       }
     } catch (e) { showNotification(e?.data?.message || "Failed to remove coupon", "error"); }
+  };
+
+  const handleGuestCouponRemoved = () => {
+    setAppliedCoupon(null);
+    setPricingDetails(prev => ({ ...prev, discount: 0 }));
+    showNotification("Coupon removed", "success");
   };
 
   const handleStep1Next = () => {
@@ -543,10 +612,11 @@ const CheckoutPage = () => {
         updateUserProfile({ mobileNumber: m }).unwrap().then(() => refetchProfile()).catch(() => {});
       }
     }
+    trackCheckoutStep({ step: 1, stepLabel: "contact", isGuest });
     goToStep(addressStep);
   };
 
-  const handleStep2Next = () => {
+  const handleStep2Next = async () => {
     const addr = String(address || "").trim();
     const pin = String(pinCode || "").trim();
 
@@ -557,16 +627,37 @@ const CheckoutPage = () => {
 
     if (!pin || pin.length < 6) {
       showNotification(pin ? "Pincode must be at least 6 digits" : "Please enter your pincode", "error");
-      // If we have an address but no pin, force the modal open to fix it
       if (addr) setShowMapModal(true);
       return;
     }
 
+    trackAddShippingInfo({
+      items: buildTrackItems(),
+      value: pricingDetails.subtotal,
+      shipping: shippingAmount,
+      pincode: pin,
+      step: "address",
+      isGuest,
+    });
+    trackCheckoutStep({ step: 2, stepLabel: "address", isGuest });
     goToStep(reviewStep);
   };
 
   const handlePayment = async () => {
     setPaymentError(null);
+    {
+      const buyerName = (isGuest ? guestName : (userProfile?.userName || userProfile?.name || "")).trim();
+      setMetaAdvancedMatching({
+        email: isGuest ? guestEmail.trim() : userProfile?.email,
+        phone: isGuest ? guestMobile.trim() : stripCC(String(senderMobile || "")),
+        firstName: buyerName.split(" ")[0],
+        lastName: buyerName.split(" ").slice(1).join(" "),
+        userId: isGuest ? getAnonymousId() : (userProfile?.userId || userProfile?._id || getAnonymousId()),
+      });
+    }
+
+    trackCheckoutStep({ step: currentStep, stepLabel: "payment", isGuest });
+    trackAddPaymentInfo({ items: buildTrackItems(), value: totalToPay, paymentMethod, isGuest });
 
     if (isGuest) {
       try {
@@ -584,7 +675,17 @@ const CheckoutPage = () => {
             long: addressForm?.long || 0,
           },
           paymentMethod,
+          ...(appliedCoupon ? { couponCode: appliedCoupon } : {}),
+          ...getFbCookies(), // _fbp / _fbc → stored on order for CAPI match quality
+          anonymousId: getAnonymousId(), // fallback externalId for guest CAPI
         }).unwrap();
+
+        trackOrderCreated({
+          orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId,
+          userType: "guest",
+          paymentMethod: orderResult.data?.paymentMethod || paymentMethod,
+        });
+
         if (!await loadRazorpay()) { showNotification("Could not load payment.", "error"); return; }
         const isCODOrder = orderResult.data?.paymentMethod === "COD";
         const rp = new window.Razorpay({
@@ -596,16 +697,27 @@ const CheckoutPage = () => {
           order_id: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId,
           handler: (response) => {
             paymentCompletedRef.current = true;
+            trackPurchase({
+              transactionId: response.razorpay_order_id,
+              eventId: orderResult.data?.orderId, // dedup key — matches server CAPI event_id
+              value: totalToPay, shipping: pricingDetails.shipping, tax: 0,
+              paymentMethod,
+              // Feed buyer PII to the browser Purchase pixel (guest = no prior login → boosts web EMQ)
+              email: guestEmail.trim(), phone: guestMobile.trim(), name: guestName.trim(), externalId: getAnonymousId(),
+              items: cartItems.map((i) => ({ itemId: i.mongoId || i.id, itemName: i.name, itemVariant: i.selectedVariant || "N/A", price: i.price, quantity: i.quantity })),
+            });
             dispatch(clearCart());
             localStorage.removeItem("guestCart"); localStorage.removeItem("guestId");
             sessionStorage.removeItem("checkoutState");
+            sessionStorage.removeItem("un_begin_checkout_fired"); // allow begin_checkout again for the next order
             navigate(`/payment-processing/${response.razorpay_order_id}`);
           },
           prefill: { name: guestName.trim(), email: guestEmail.trim(), contact: guestMobile.trim() },
           notes: { address, pinCode }, theme: { color: "#2E443C" },
-          modal: { ondismiss: () => { setPaymentError("Payment cancelled. Your cart is safe."); setShowRetry(true); }, escape: false, confirm_close: true },
+          modal: { ondismiss: () => { trackPaymentModalDismissed({ orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId, value: totalToPay }); setPaymentError("Payment cancelled. Your cart is safe."); setShowRetry(true); }, escape: false, confirm_close: true },
         });
         rp.on("payment.failed", (r) => {
+          trackPaymentFailed({ errorCode: r.error?.code, errorDescription: r.error?.description, paymentMethod, value: totalToPay, orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId });
           setPaymentError(r.error.description || "Payment failed. Please try again.");
           setShowRetry(true);
         });
@@ -644,7 +756,15 @@ const CheckoutPage = () => {
           long: selectedFullAddr?.location?.coordinates?.[0] || selectedFullAddr?.long || 0,
         },
         paymentMethod,
+        ...getFbCookies(), // _fbp / _fbc → stored on order for CAPI match quality
       }).unwrap();
+
+      trackOrderCreated({
+        orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId || orderResult.id,
+        userType: "user",
+        paymentMethod: orderResult.data?.paymentMethod || paymentMethod,
+      });
+
       if (!await loadRazorpay()) { showNotification("Could not load payment.", "error"); return; }
       const isCODOrder = orderResult.data?.paymentMethod === "COD";
       const rp = new window.Razorpay({
@@ -658,18 +778,24 @@ const CheckoutPage = () => {
           try {
             trackPurchase({
               transactionId: response.razorpay_order_id,
+              eventId: orderResult.data?.orderId, // dedup key — matches server CAPI event_id
               value: totalToPay, shipping: pricingDetails.shipping, tax: 0,
+              paymentMethod,
+              // Feed buyer PII to the browser Purchase pixel → boosts web EMQ (phone esp.)
+              email: userProfile?.email, phone: senderMobileStr, name: userProfile?.userName || userProfile?.name, externalId: userProfile?.userId || userProfile?._id || getAnonymousId(),
               items: cartItems.map((i) => ({ itemId: i.mongoId || i.id, itemName: i.name, itemVariant: i.selectedVariant || "N/A", price: i.price, quantity: i.quantity })),
             });
             sessionStorage.removeItem("checkoutState");
+            sessionStorage.removeItem("un_begin_checkout_fired"); // allow begin_checkout again for the next order
             navigate(`/payment-processing/${response.razorpay_order_id}`);
           } catch (_) { setPaymentError("Payment verification failed. Contact support if amount was debited."); }
         },
         prefill: { name: userProfile?.userName || userProfile?.name || "", email: userProfile?.email || "", contact: senderMobileStr },
         notes: { address, pinCode }, theme: { color: "#2E443C" },
-        modal: { ondismiss: () => { setPaymentError("Payment cancelled. Your cart is safe."); setShowRetry(true); }, escape: false, confirm_close: true },
+        modal: { ondismiss: () => { trackPaymentModalDismissed({ orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId || orderResult.id, value: totalToPay }); setPaymentError("Payment cancelled. Your cart is safe."); setShowRetry(true); }, escape: false, confirm_close: true },
       });
       rp.on("payment.failed", (r) => {
+        trackPaymentFailed({ errorCode: r.error?.code, errorDescription: r.error?.description, paymentMethod, value: totalToPay, orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId || orderResult.id });
         setPaymentError(r.error.description || "Payment failed. Please try again.");
         setShowRetry(true);
       });
@@ -1066,8 +1192,10 @@ const CheckoutPage = () => {
                   disabled={!address.trim()}
                   className="flex-1 h-14 bg-[#2e443c] text-white rounded-2xl font-bold text-sm hover:bg-[#1a2822] active:scale-[0.99] transition-all flex items-center justify-center gap-3 shadow-lg shadow-[#2e443c]/20 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
                 >
-                  Continue to Review
-                  <i className="fa-solid fa-arrow-right text-xs" />
+                  <>
+                    Continue to Review
+                    <i className="fa-solid fa-arrow-right text-xs" />
+                  </>
                 </button>
               </div>
             </div>
@@ -1081,6 +1209,25 @@ const CheckoutPage = () => {
                 <h1 className="text-2xl sm:text-3xl font-serif text-gray-900 leading-tight">Review Your Order</h1>
                 <p className="text-sm text-gray-400 mt-1.5">Almost there — confirm everything looks right</p>
               </div>
+
+              {/* Shipping error banner */}
+              {shippingError && (
+                <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-5 flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
+                    <i className="fa-solid fa-triangle-exclamation text-red-500 text-lg" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-red-800 mb-1">Shipping Not Available</p>
+                    <p className="text-xs text-red-600 leading-relaxed">Shipping is not available for this pincode. Please change your pincode and try again.</p>
+                    <button
+                      onClick={() => { goToStep(addressStep); setShowMapModal(true); setShippingError(""); }}
+                      className="mt-3 text-xs font-bold text-red-600 border-2 border-red-300 px-4 py-2 rounded-lg hover:bg-red-100 transition-colors flex items-center gap-2"
+                    >
+                      <i className="fa-solid fa-location-dot text-xs" /> Change Address
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Contact + Address combined card */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -1168,7 +1315,7 @@ const CheckoutPage = () => {
                 <div className="p-4 space-y-3">
                   {/* Online Payment */}
                   <button
-                    onClick={() => setPaymentMethod("PREPAID")}
+                    onClick={() => { setPaymentMethod("PREPAID"); trackSelectPaymentMethod({ paymentMethod: "PREPAID" }); }}
                     className={`w-full rounded-xl border-2 text-left transition-all duration-200 overflow-hidden ${
                       paymentMethod === "PREPAID" ? "border-[#2e443c]" : "border-gray-100 hover:border-gray-200"
                     }`}
@@ -1200,7 +1347,7 @@ const CheckoutPage = () => {
 
                   {/* Cash on Delivery */}
                   <button
-                    onClick={() => setPaymentMethod("COD")}
+                    onClick={() => { setPaymentMethod("COD"); trackSelectPaymentMethod({ paymentMethod: "COD" }); }}
                     disabled={pricingDetails.shipping === null || isCalculatingShipping}
                     className={`w-full rounded-xl border-2 text-left transition-all duration-200 overflow-hidden disabled:opacity-40 disabled:cursor-not-allowed ${
                       paymentMethod === "COD" ? "border-[#a89068]" : "border-gray-100 hover:border-gray-200"
@@ -1238,28 +1385,34 @@ const CheckoutPage = () => {
               {/* COD notice — compact, shown only when COD is selected */}
           
 
-              {/* Coupon — auth only */}
-              {!isGuest && (
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                  <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-50">
-                    <div className="w-8 h-8 rounded-xl bg-[#a89068]/10 flex items-center justify-center">
-                      <i className="fa-solid fa-percent text-[#a89068] text-sm" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-gray-800">Promo Code</p>
-                      <p className="text-xs text-gray-400">Apply a discount coupon</p>
-                    </div>
+              {/* Coupon — available to all (guests + members) */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-50">
+                  <div className="w-8 h-8 rounded-xl bg-[#a89068]/10 flex items-center justify-center">
+                    <i className="fa-solid fa-percent text-[#a89068] text-sm" />
                   </div>
-                  <div className="p-5 space-y-3">
-                    <CouponInput key={appliedCoupon || "none"} appliedCoupon={appliedCoupon} discount={pricingDetails.discount} onCouponApplied={handleCouponApplied} onCouponRemoved={handleCouponRemoved} />
-                    {!appliedCoupon && (
-                      <button onClick={() => setShowCouponModal(true)} className="w-full py-2.5 border border-dashed border-gray-200 rounded-xl text-xs font-bold text-gray-400 hover:border-[#a89068]/50 hover:text-[#a89068] transition-all flex items-center justify-center gap-2">
-                        <i className="fa-solid fa-tags" /> Browse available coupons
-                      </button>
-                    )}
+                  <div>
+                    <p className="text-sm font-bold text-gray-800">Promo Code</p>
+                    <p className="text-xs text-gray-400">Apply a discount coupon</p>
                   </div>
                 </div>
-              )}
+                <div className="p-5 space-y-3">
+                  <CouponInput
+                    key={appliedCoupon || "none"}
+                    appliedCoupon={appliedCoupon}
+                    discount={pricingDetails.discount}
+                    isGuest={isGuest}
+                    cartTotal={cartTotalAmount}
+                    onCouponApplied={isGuest ? handleGuestCouponApplied : handleCouponApplied}
+                    onCouponRemoved={isGuest ? handleGuestCouponRemoved : handleCouponRemoved}
+                  />
+                  {!appliedCoupon && (
+                    <button onClick={() => setShowCouponModal(true)} className="w-full py-2.5 border border-dashed border-gray-200 rounded-xl text-xs font-bold text-gray-400 hover:border-[#a89068]/50 hover:text-[#a89068] transition-all flex items-center justify-center gap-2">
+                      <i className="fa-solid fa-tags" /> Browse available coupons
+                    </button>
+                  )}
+                </div>
+              </div>
 
               
               {/* Payment error */}
@@ -1351,7 +1504,7 @@ const CheckoutPage = () => {
               <div className="px-5 pb-5 space-y-3">
                 <button
                   onClick={handlePayment}
-                  disabled={isOrdering || isCalculatingShipping || pricingDetails.shipping === null}
+                  disabled={isOrdering || isCalculatingShipping || pricingDetails.shipping === null || shippingError}
                   className="w-full h-14 bg-[#2e443c] text-white rounded-xl font-bold text-sm hover:bg-[#1a2822] active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 shadow-lg shadow-[#2e443c]/25 disabled:opacity-50"
                 >
                   {isOrdering
@@ -1393,7 +1546,7 @@ const CheckoutPage = () => {
               </div>
               <button
                 onClick={handlePayment}
-                disabled={isOrdering || isCalculatingShipping || pricingDetails.shipping === null}
+                disabled={isOrdering || isCalculatingShipping || pricingDetails.shipping === null || shippingError}
                 className="flex-1 h-12 bg-[#2e443c] text-white rounded-xl font-bold text-sm hover:bg-[#1a2822] active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 shadow-lg disabled:opacity-50"
               >
                 {isOrdering
@@ -1450,7 +1603,12 @@ const CheckoutPage = () => {
             </div>
             <div className="p-5 overflow-y-auto max-h-[calc(88vh-72px)]">
               <Suspense fallback={<ComponentLoader />}>
-                <CouponList onCouponApplied={handleCouponApplied} userId={userProfile?.userId} />
+                <CouponList
+                  onCouponApplied={isGuest ? handleGuestCouponApplied : handleCouponApplied}
+                  userId={userProfile?.userId}
+                  isGuest={isGuest}
+                  cartTotal={cartTotalAmount}
+                />
               </Suspense>
             </div>
           </div>

@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { memo, useCallback, useMemo, lazy, Suspense } from 'react';
 import { useGetFeaturedProductsQuery } from '../../store/api/productsApi';
+import { trackSelectItem } from '../../utils/analytics';
 
 const WishlistButton = lazy(() => import('../../component/WishlistButton'));
 const OptimizedImage = lazy(() => import('../../component/OptimizedImage'));
@@ -27,9 +28,17 @@ const AireFeaturedProducts = memo(() => {
   // Memoize handler
   const handleViewProduct = useCallback(() => {
     if (featuredProduct?.productId) {
+      trackSelectItem({
+        itemId: featuredProduct.productId,
+        itemName: featuredProduct.productName,
+        price: featuredProduct.variantDetails?.[0]?.variantPrice || 0,
+        listId: 'home_featured',
+        listName: 'Home Featured',
+        index: 0,
+      });
       navigate(`/shop?product=${featuredProduct.productId}`);
     }
-  }, [navigate, featuredProduct?.productId]);
+  }, [navigate, featuredProduct]);
 
 
   // Loading state - show skeleton instead of full loader

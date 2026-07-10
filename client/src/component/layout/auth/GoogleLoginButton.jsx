@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { setCredentials } from '../../../store/slices/authSlice';
 import { clearLoginCallback } from '../../../store/slices/uiSlice';
 import { useNavigate } from 'react-router-dom';
+import { trackLogin } from '../../../utils/analytics';
 
 export default function GoogleLoginButton({ 
   onSuccess, 
@@ -38,6 +39,8 @@ export default function GoogleLoginButton({
           },
           token,
         }));
+
+        trackLogin({ method: 'google', userId: result.data.userId, email: result.data.email, name: result.data.name });
 
         // Call optional onSuccess callback
         if (onSuccess) {

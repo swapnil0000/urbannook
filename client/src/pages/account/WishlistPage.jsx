@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useGetWishlistQuery, useRemoveFromWishlistMutation, useAddToCartMutation } from '../../store/api/userApi';
 import { useUI } from '../../hooks/useRedux';
+import { trackSelectItem, trackRemoveFromWishlist, trackAddToCart } from '../../utils/analytics';
 
 const WishlistPage = () => {
   const navigate = useNavigate();
@@ -25,8 +26,16 @@ const WishlistPage = () => {
   };
 
   const handleRemove = async (productId) => {
+    const removed = wishlistItems.find((i) => i.productId === productId);
     try {
       await removeFromWishlist(productId).unwrap();
+      if (removed) {
+        trackRemoveFromWishlist({
+          itemId: removed.productId,
+          itemName: removed.productName,
+          price: removed.variantDetails?.[0]?.variantPrice || 0,
+        });
+      }
       refetch();
       showNotification('Item removed from wishlist', 'success');
     } catch (error) {
@@ -53,6 +62,15 @@ const WishlistPage = () => {
         variant: firstVariant,
         image: selectedImage
       }).unwrap();
+
+      trackAddToCart({
+        itemId: item.productId,
+        itemName: item.productName,
+        itemVariant: firstVariant,
+        price: item.variantDetails?.[0]?.variantPrice || 0,
+        quantity: 1,
+        placement: 'wishlist',
+      });
 
       setAddingItems(prev => {
         const newSet = new Set(prev);
@@ -121,7 +139,7 @@ const WishlistPage = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-              {wishlistItems?.map((item) => (
+              {wishlistItems?.map((item, index) => (
                 <div
                   key={item.productId}
                   className="group relative rounded-[2rem] overflow-hidden bg-black/20 border border-white/5 shadow-lg hover:shadow-2xl hover:border-[#F5DEB3]/30 transition-all duration-500 flex flex-col animate-in fade-in slide-in-from-bottom-4"
@@ -139,7 +157,17 @@ const WishlistPage = () => {
                   {/* Clickable Card Area */}
                   <div
                     className="flex flex-col max-h-[520px] cursor-pointer"
-                    onClick={() => navigate(`/shop?product=${item.productId}`)}
+                    onClick={() => {
+                      trackSelectItem({
+                        itemId: item.productId,
+                        itemName: item.productName,
+                        price: item.variantDetails?.[0]?.variantPrice || 0,
+                        listId: 'wishlist',
+                        listName: 'Wishlist',
+                        index,
+                      });
+                      navigate(`/shop?product=${item.productId}`);
+                    }}
                   >
 
                     <div className="relative w-full aspect-square bg-[#f8f8f5] overflow-hidden">

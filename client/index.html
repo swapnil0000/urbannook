@@ -15,52 +15,37 @@
         y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
     })(window, document, "clarity", "script", "wdldsf6w73");
  </script>
-  <!-- <script>
-    !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-    n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
-    n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
-    t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}
-    (window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
-    fbq('init', '1551633206614492');
-    fbq('track', 'PageView');
-  </script>
-  <noscript><img height="1" width="1" style="display:none"
-    src="https://www.facebook.com/tr?id=1551633206614492&ev=PageView&noscript=1" /></noscript> -->
   <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
     gtag('config', 'G-B7NGCFCRFG');
   </script>
-  <!-- Meta Pixel Code -->
-<script>
-!function(f,b,e,v,n,t,s)
-{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-n.queue=[];t=b.createElement(e);t.async=!0;
-t.src=v;s=b.getElementsByTagName(e)[0];
-s.parentNode.insertBefore(t,s)}(window, document,'script',
-'https://connect.facebook.net/en_US/fbevents.js');
-fbq('init', '1524895822581155');
-fbq('track', 'PageView');
-</script>
-<!-- End Meta Pixel Code -->
-
-<!-- Meta Pixel Code -->
-<script>
-!function(f,b,e,v,n,t,s)
-{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-n.queue=[];t=b.createElement(e);t.async=!0;
-t.src=v;s=b.getElementsByTagName(e)[0];
-s.parentNode.insertBefore(t,s)}(window, document,'script',
-'https://connect.facebook.net/en_US/fbevents.js');
-fbq('init', '1644636663458748');
-fbq('track', 'PageView');
-</script>
-<!-- End Meta Pixel Code -->
+  <!-- Meta Pixel Code (single source, env-driven via VITE_META_PIXEL_ID) -->
+  <script>
+    !function(f,b,e,v,n,t,s)
+    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+    if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+    n.queue=[];t=b.createElement(e);t.async=!0;
+    t.src=v;s=b.getElementsByTagName(e)[0];
+    s.parentNode.insertBefore(t,s)}(window, document,'script',
+    'https://connect.facebook.net/en_US/fbevents.js');
+    // Only initialise when a real pixel id is injected at build time.
+    var UN_META_PIXEL_ID = '__VITE_META_PIXEL_ID__';
+    if (UN_META_PIXEL_ID && UN_META_PIXEL_ID.indexOf('VITE_') === -1) {
+      // Disable Meta's automatic event detection BEFORE init. With autoConfig on
+      // (the default) the pixel scans the DOM, finds the "Add to Cart" button and
+      // auto-fires parameterless events ({"cs_est":"true"}) on every product page —
+      // which inflated AddToCart ~15x and corrupted ad optimization. We fire every
+      // standard event explicitly (with product data + an event_id for pixel↔CAPI
+      // dedup), so automatic detection is pure noise.
+      fbq('set', 'autoConfig', false, UN_META_PIXEL_ID);
+      fbq('init', UN_META_PIXEL_ID);
+      fbq('track', 'PageView');
+    }
+  </script>
+  <!-- End Meta Pixel Code -->
 
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/assets/logo.webp" />
@@ -214,12 +199,6 @@ fbq('track', 'PageView');
 </head>
 
 <body>
-  <noscript><img height="1" width="1" style="display:none"
-  src="https://www.facebook.com/tr?id=1524895822581155&ev=PageView&noscript=1"
-  ></noscript>
-  <noscript><img height="1" width="1" style="display:none"
-  src="https://www.facebook.com/tr?id=1644636663458748&ev=PageView&noscript=1"
-  ></noscript>
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=__VITE_GTM_ID__"
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <div id="root">

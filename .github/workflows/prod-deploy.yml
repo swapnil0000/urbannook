@@ -56,6 +56,7 @@ jobs:
           echo "VITE_GOOGLE_MAPS_API_KEY=${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}" >> .env
           echo "VITE_GTM_ID=${{ secrets.VITE_GTM_ID }}" >> .env
           echo "VITE_ENABLE_ANALYTICS=${{ secrets.VITE_ENABLE_ANALYTICS }}" >> .env
+          echo "VITE_META_PIXEL_ID=${{ secrets.VITE_META_PIXEL_ID }}" >> .env
 
       # Installs dependencies and builds the production-ready static files
       - name: Build Frontend

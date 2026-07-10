@@ -7,6 +7,8 @@ import Product from "../model/product.model.js";
 import { v7 as uuidv7 } from "uuid";
 import Cart from "../model/user.cart.model.js";
 import env from "../config/envConfigSetup.js";
+import Coupon from "../model/coupon.model.js";
+import CouponUsage from "../model/couponUsage.model.js";
 import {
   sendOrderConfirmation,
   sendPaymentReceipt,
@@ -19,6 +21,20 @@ import Address from "../model/address.new.model.js";
 import html_to_pdf from "html-pdf-node";
 import { generateInvoiceHtmlTemplate } from "../template/invoiceTemplate.template.js";
 import { calculateShippingRate } from "../services/shipping.service.js";
+import { sendMetaCapiEvent } from "../services/meta.capi.service.js";
+
+// Collect Meta CAPI match-quality signals from the order-creation request.
+// The webhook (Razorpay → server) has no browser context, so we persist these on
+// the order and replay them into the server-side Purchase for high match quality.
+const collectMetaTracking = (req) => ({
+  fbp: req.body?.fbp || null,
+  fbc: req.body?.fbc || null,
+  anonymousId: req.body?.anonymousId || null, // persistent device id — fallback externalId for guests
+  clientIp:
+    req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.ip || null,
+  clientUserAgent: req.headers["user-agent"] || null,
+  eventSourceUrl: req.headers["referer"] || req.headers["origin"] || null,
+});
 
 const PAYMENT_ERROR_MESSAGES = {
   BAD_REQUEST_ERROR: "Payment failed due to invalid request. Please try again.",
@@ -274,6 +290,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   // Re-calculate shipping to get enriched data (type, weight, boxes)
   const shippingResult = await calculateShippingRate({
     pincode: deliveryAddressSnapshot.pinCode,
+    paymentType: reqPaymentMethod === "COD" ? "COD" : "PREPAID",
     cartItems: items.map(i => ({
       productId: i.productId,
       quantity: i.quantity,
@@ -282,10 +299,120 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   });
 
   const shippingAmount = shippingResult?.total_charges || summary?.shipping || 179;
-  
-  // Recalculate finalAmount if shipping changed or to ensure consistency
+
+  // Recompute subtotal from actual order items — authoritative, not from cart snapshot
   const subtotal = orderItems.reduce((s, i) => s + (i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity), 0);
-  finalAmount = subtotal + shippingAmount - discountAmount;
+
+  // Always re-derive discount from the live coupon + current subtotal.
+  // This fixes: products added after coupon was applied, COD/prepaid toggle, page not refreshed.
+  let isInternalTestOrder = false;
+  if (isApplied && couponCodeId) {
+    const liveCoupon = await Coupon.findOne(
+      { couponId: couponCodeId },
+      {
+        discountType: 1, discountValue: 1, maxDiscountCap: 1,
+        isInternal: 1, isArchived: 1, isActive: 1, isTest: 1,
+        maxUsesPerUser: 1, scope: 1,
+        // Fields missing from original projection — caused silent bypass of these rules
+        minCartValue: 1, validFrom: 1, validUntil: 1,
+        maxTotalUses: 1, usageCount: 1,
+      }
+    ).lean();
+
+    if (!liveCoupon || liveCoupon.isArchived) {
+      throw new ValidationError(
+        "The coupon you applied is no longer available. Please remove it from your cart and try again."
+      );
+    }
+    if (!liveCoupon.isActive) {
+      throw new ValidationError(
+        "This coupon has been paused. Please remove it from your cart and try again."
+      );
+    }
+
+    const isValidInternal = liveCoupon.isInternal && liveCoupon.discountType === "INTERNAL_TEST";
+    if (liveCoupon.isTest && !isValidInternal) {
+      throw new ValidationError(
+        "This coupon is no longer available for customers. Please remove it from your cart and try again."
+      );
+    }
+    // isInternal=true without INTERNAL_TEST type is DB corruption — reject clearly, don't silently zero-out
+    if (liveCoupon.isInternal && !isValidInternal) {
+      console.error(`[Coupon:Security] Coupon ${couponCodeId} has isInternal=true but discountType=${liveCoupon.discountType}`);
+      throw new ValidationError(
+        "This coupon is invalid. Please remove it from your cart and try again."
+      );
+    }
+
+    // Re-check validity window — coupon may have expired or not yet started between apply and pay
+    const now = new Date();
+    if (liveCoupon.validFrom && now < new Date(liveCoupon.validFrom)) {
+      throw new ValidationError(
+        "This coupon is not valid yet. Please remove it from your cart and try again."
+      );
+    }
+    if (liveCoupon.validUntil && now > new Date(liveCoupon.validUntil)) {
+      throw new ValidationError(
+        "This coupon has expired. Please remove it from your cart and try again."
+      );
+    }
+
+    // Re-check minimum cart value against re-derived product subtotal
+    // (user may have removed items from cart after applying the coupon)
+    if (subtotal < (liveCoupon.minCartValue || 0)) {
+      throw new ValidationError(
+        `A minimum cart value of ₹${liveCoupon.minCartValue} is required for this coupon. Please remove it from your cart and try again.`
+      );
+    }
+
+    // Re-check global cap (non-atomic snapshot, main enforcement is atomic $inc in webhook)
+    if (liveCoupon.maxTotalUses != null && liveCoupon.usageCount >= liveCoupon.maxTotalUses) {
+      throw new ValidationError(
+        "This coupon has reached its maximum usage limit. Please remove it from your cart and try again."
+      );
+    }
+
+    if (isValidInternal) {
+      // ── INTERNAL TEST: completely separate path ──────────────────────────────
+      // Always ₹1 regardless of cart size, shipping, or payment method.
+      isInternalTestOrder = true;
+      discountAmount = Math.max(subtotal + shippingAmount - 1, 0); // stored for audit record
+    } else if (liveCoupon.discountType === "PERCENTAGE") {
+      let d = Math.floor((subtotal * liveCoupon.discountValue) / 100);
+      if (liveCoupon.maxDiscountCap) d = Math.min(d, liveCoupon.maxDiscountCap);
+      discountAmount = Math.min(d, subtotal);
+    } else { // FLAT
+      discountAmount = Math.min(liveCoupon.discountValue || 0, subtotal);
+    }
+
+    // ── Per-user limit re-check (race condition guard) ────────────────────────
+    // IMPORTANT: use the authenticated user's DB record for identity, NOT req.body values.
+    // req.body.userEmail / senderMobile are client-controlled and could be faked to bypass limits.
+    if (isApplied && !isInternalTestOrder) {
+      const normEmailCheck  = user?.email?.toLowerCase().trim() || null;
+      const normMobileCheck = user?.mobileNumber?.toString().replace(/\D/g, "").slice(-10) || finalSenderMobile || null;
+      const identifiers     = [normEmailCheck, normMobileCheck].filter(Boolean);
+
+      if (identifiers.length > 0 && liveCoupon.maxUsesPerUser) {
+        const priorUses = await CouponUsage.countDocuments({
+          couponId: couponCodeId,
+          $or: [
+            ...(normEmailCheck  ? [{ email:  normEmailCheck  }] : []),
+            ...(normMobileCheck ? [{ mobile: normMobileCheck }] : []),
+          ],
+        });
+        if (priorUses >= liveCoupon.maxUsesPerUser) {
+          throw new ValidationError(
+            liveCoupon.maxUsesPerUser === 1
+              ? "You have already used this coupon. Please remove it from your cart."
+              : `You have already used this coupon ${priorUses} time(s) (limit: ${liveCoupon.maxUsesPerUser}). Please remove it from your cart.`
+          );
+        }
+      }
+    }
+  }
+
+  finalAmount = isInternalTestOrder ? 1 : Math.max(subtotal + shippingAmount - discountAmount, 0);
 
   // Sync shipping in snapshots
   orderItems.forEach(i => { i.productSnapshot.shipping = String(shippingAmount); });
@@ -295,9 +422,12 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   const codPartialAmount = isCOD ? Math.min(Math.ceil(shippingAmount) * 2, Math.ceil(finalAmount)) : 0;
   const codRemainingAmount = isCOD ? Math.max(0, Math.ceil(finalAmount) - codPartialAmount) : 0;
   const razorpayChargeAmount = isCOD ? codPartialAmount : finalAmount;
+  // Round to whole rupees first, then convert to paise — must match the amount
+  // returned to the client/stored below, or Razorpay Checkout rejects it as a mismatch.
+  const razorpayChargeAmountPaise = Math.ceil(razorpayChargeAmount) * 100;
 
   const razorpayOrder = await razorpayCreateOrderService(
-    Math.ceil(razorpayChargeAmount * 100), // Razorpay expects integer paise
+    razorpayChargeAmountPaise,
     "INR",
   );
 
@@ -329,6 +459,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       discountAmount,
       isApplied,
     },
+    metaTracking: collectMetaTracking(req),
     note: "Amount is the final amount paid by the user",
   });
 
@@ -339,7 +470,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       {
         orderId: order.orderId,
         razorpayOrderId: razorpayOrder?.data?.id,
-        amount: razorpayChargeAmount * 100, // paise for Razorpay (partial for COD)
+        amount: razorpayChargeAmountPaise,
         currency: "INR",
         paymentMethod: isCOD ? "COD" : "PREPAID",
         codDetails: isCOD ? { partialAmountPaid: codPartialAmount, remainingAmount: codRemainingAmount } : null,
@@ -483,6 +614,98 @@ const razorpayWebHookController = async (req, res) => {
             );
           }
 
+          // 1.5. COUPON REDEMPTION TRACKING — runs after payment confirmed, not at apply time
+          if (order.coupon?.isApplied && order.coupon?.couponCodeId) {
+            try {
+              const couponId   = order.coupon.couponCodeId;
+              const couponCode = order.coupon.couponCodeName;
+              const discount   = order.coupon.discountAmount || 0;
+
+              const normMobile = (order.userMobile || order.senderMobile || "")
+                .replace(/\D/g, "").slice(-10) || null;
+              const normEmail  = order.userEmail?.toLowerCase().trim() || null;
+
+              // Atomically increment usageCount — respects maxTotalUses cap
+              const updatedCoupon = await Coupon.findOneAndUpdate(
+                {
+                  couponId,
+                  isArchived: false,
+                  $or: [
+                    { maxTotalUses: null },
+                    { $expr: { $lt: ["$usageCount", "$maxTotalUses"] } },
+                  ],
+                },
+                { $inc: { usageCount: 1 } },
+                { new: true },
+              );
+
+              if (updatedCoupon) {
+                // ── Per-user limit safety net in webhook ─────────────────────
+                // Two simultaneous orders can race past the per-user check at order-creation time
+                // and both reach the webhook. Guard here using countDocuments (this IS the atomic
+                // last line of defence — discount is already given but we prevent audit corruption
+                // and protect against future uses by rolling back the usageCount increment).
+                let perUserOk = true;
+                if (updatedCoupon.maxUsesPerUser && (normEmail || normMobile)) {
+                  const priorUses = await CouponUsage.countDocuments({
+                    couponId,
+                    $or: [
+                      ...(normEmail  ? [{ email:  normEmail  }] : []),
+                      ...(normMobile ? [{ mobile: normMobile }] : []),
+                    ],
+                  });
+                  if (priorUses >= updatedCoupon.maxUsesPerUser) {
+                    perUserOk = false;
+                    // Roll back the usageCount increment so future orders are not blocked unfairly
+                    await Coupon.updateOne({ couponId }, { $inc: { usageCount: -1 } });
+                    console.warn(`[Coupon:Security] Order=${order.orderId} code=${couponCode} — per-user limit hit in webhook (race condition). usageCount rolled back. priorUses=${priorUses} limit=${updatedCoupon.maxUsesPerUser}`);
+                  }
+                }
+
+                if (perUserOk) {
+                  const productSubtotal = order.items.reduce(
+                    (s, i) => s + ((i.productSnapshot?.priceAtPurchase || 0) * (i.productSnapshot?.quantity || 0)),
+                    0,
+                  );
+                  await CouponUsage.create({
+                    couponId,
+                    couponCode,
+                    orderId:               order.orderId,
+                    orderType:             "WEBSITE",
+                    userId:                order.userId || null,
+                    email:                 normEmail,
+                    mobile:                normMobile,
+                    discountAmount:        discount,
+                    cartValueBeforeDiscount: productSubtotal,
+                    usedAt:                new Date(),
+                  });
+
+                  // Mark TARGETED assignment as used (embedded in coupon document)
+                  if (updatedCoupon.scope === "TARGETED" && (normEmail || normMobile)) {
+                    await Coupon.updateOne(
+                      {
+                        couponId,
+                        assignedTo: {
+                          $elemMatch: {
+                            identifier: { $in: [normEmail, normMobile].filter(Boolean) },
+                            usedAt: null,
+                          },
+                        },
+                      },
+                      { $set: { "assignedTo.$.usedAt": new Date() } },
+                    );
+                  }
+
+                  console.log(`[Coupon:Apply] Order=${order.orderId} code=${couponCode} discount=₹${discount} usageCount=${updatedCoupon.usageCount} — tracked`);
+                }
+              } else {
+                console.log(`[Coupon:Apply] Order=${order.orderId} code=${couponCode} — cap already reached, skipped increment`);
+              }
+            } catch (couponErr) {
+              console.error(`[Coupon:Apply] Failed to track coupon for order ${order.orderId}:`, couponErr.message);
+            }
+          }
+
           // 2. EMAIL NOTIFICATION LOGIC
           try {
             if (order.userEmail) {
@@ -567,6 +790,41 @@ const razorpayWebHookController = async (req, res) => {
               invoiceError,
             );
           }
+          try {
+            const capiContents = order.items.map((i) => ({
+              id: i.productId,
+              quantity: i.productSnapshot.quantity,
+            }));
+            await sendMetaCapiEvent({
+              eventName: "Purchase",
+              eventId: order.orderId,
+              eventSourceUrl: order.metaTracking?.eventSourceUrl,
+              userData: {
+                email: order.userEmail,
+                phone: order.userMobile || order.senderMobile,
+                firstName: (order.userName || order.guestInfo?.name || "").split(" ")[0],
+                lastName: (order.userName || order.guestInfo?.name || "").split(" ").slice(1).join(" "),
+                externalId: order.userId || order.metaTracking?.anonymousId,
+                fbp: order.metaTracking?.fbp,
+                fbc: order.metaTracking?.fbc,
+                clientIp: order.metaTracking?.clientIp,
+                clientUserAgent: order.metaTracking?.clientUserAgent,
+                zip: order.deliveryAddress?.pinCode ? String(order.deliveryAddress.pinCode) : null,
+                city: order.deliveryAddress?.city || null,
+                state: order.deliveryAddress?.state || null,
+              },
+              customData: {
+                currency: "INR",
+                value: order.amount,
+                content_ids: capiContents.map((c) => c.id),
+                contents: capiContents,
+                num_items: capiContents.reduce((n, c) => n + (c.quantity || 1), 0),
+                order_id: order.orderId,
+              },
+            });
+          } catch (capiError) {
+            console.error("[Meta CAPI] Purchase dispatch error:", capiError.message);
+          }
         }
 
         console.log("✅ Payment Captured:", payment.id);
@@ -634,7 +892,7 @@ const generateTempPassword = () => {
 };
 
 const guestCreateOrderController = asyncHandler(async (req, res) => {
-  const { items, guestInfo, deliveryAddress, paymentMethod: reqPaymentMethod } = req.body;
+  const { items, guestInfo, deliveryAddress, paymentMethod: reqPaymentMethod, couponCode: rawCouponCode } = req.body;
 
   if (!guestInfo?.name?.trim()) throw new ValidationError("Full name is required");
   if (!guestInfo?.email?.trim()) throw new ValidationError("Email is required");
@@ -693,10 +951,98 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
 
   const shippingResult = await calculateShippingRate({
     pincode: deliveryAddress.pinCode,
+    paymentType: reqPaymentMethod === "COD" ? "COD" : "PREPAID",
     cartItems: rawItemsForShipping
   });
   const shippingAmount = shippingResult?.total_charges || 179;
-  const finalAmount = subtotal + shippingAmount;
+
+  // ── Guest coupon validation ───────────────────────────────────────────────────
+  let couponCodeId = null, couponCodeName = null, discountAmount = 0, isApplied = false;
+  let isInternalTestOrder = false;
+  const guestEmail = guestInfo.email.toLowerCase().trim();
+
+  if (rawCouponCode?.trim()) {
+    const cleanCode = rawCouponCode.trim().toUpperCase();
+    const liveCoupon = await Coupon.findOne({ code: cleanCode, isArchived: false }).lean();
+
+    if (!liveCoupon || !liveCoupon.isActive) {
+      throw new ValidationError("Invalid or inactive coupon.");
+    }
+    // Guests cannot use MEMBERS_ONLY coupons
+    if (liveCoupon.audience === "MEMBERS_ONLY") {
+      throw new ValidationError("This coupon is only available for registered members. Please sign in to use it.");
+    }
+    const isValidInternal = liveCoupon.isInternal && liveCoupon.discountType === "INTERNAL_TEST";
+    if (liveCoupon.isTest && !isValidInternal) {
+      throw new ValidationError("Invalid or inactive coupon.");
+    }
+    if (liveCoupon.isInternal && !isValidInternal) {
+      throw new ValidationError("Invalid or inactive coupon.");
+    }
+    const now = new Date();
+    if (liveCoupon.validFrom && now < new Date(liveCoupon.validFrom)) {
+      throw new ValidationError("This coupon is not valid yet.");
+    }
+    if (liveCoupon.validUntil && now > new Date(liveCoupon.validUntil)) {
+      throw new ValidationError("This coupon has expired.");
+    }
+    if (subtotal < (liveCoupon.minCartValue || 0)) {
+      throw new ValidationError(`Minimum order of ₹${liveCoupon.minCartValue} required for this coupon.`);
+    }
+    if (liveCoupon.maxTotalUses != null && liveCoupon.usageCount >= liveCoupon.maxTotalUses) {
+      throw new ValidationError("This coupon has reached its maximum number of uses.");
+    }
+
+    // Per-user limit check (by email + mobile)
+    const normMobileCoupon = cleanMobile;
+    const identifiers = [guestEmail, normMobileCoupon].filter(Boolean);
+    if (identifiers.length > 0 && liveCoupon.maxUsesPerUser) {
+      const priorUses = await CouponUsage.countDocuments({
+        couponId: liveCoupon.couponId,
+        $or: [
+          { email: guestEmail },
+          { mobile: normMobileCoupon },
+        ],
+      });
+      if (priorUses >= liveCoupon.maxUsesPerUser) {
+        throw new ValidationError(
+          liveCoupon.maxUsesPerUser === 1
+            ? "You have already used this coupon."
+            : `You have already used this coupon ${priorUses} time(s) (limit: ${liveCoupon.maxUsesPerUser}).`
+        );
+      }
+    }
+
+    // TARGETED scope: must be in assignedTo list
+    if (liveCoupon.scope === "TARGETED") {
+      const assignment = (liveCoupon.assignedTo || []).find(a => identifiers.includes(a.identifier));
+      if (!assignment) {
+        throw new ValidationError("This coupon has not been assigned to you.");
+      }
+      if (assignment.usedAt) {
+        throw new ValidationError("Your personal coupon has already been used.");
+      }
+    }
+
+    // Calculate discount
+    if (isValidInternal) {
+      isInternalTestOrder = true;
+      discountAmount = Math.max(subtotal + shippingAmount - 1, 0);
+    } else if (liveCoupon.discountType === "PERCENTAGE") {
+      let d = Math.floor((subtotal * liveCoupon.discountValue) / 100);
+      if (liveCoupon.maxDiscountCap) d = Math.min(d, liveCoupon.maxDiscountCap);
+      discountAmount = Math.min(d, subtotal);
+    } else {
+      discountAmount = Math.min(liveCoupon.discountValue || 0, subtotal);
+    }
+
+    couponCodeId = liveCoupon.couponId;
+    couponCodeName = liveCoupon.code;
+    isApplied = true;
+    console.log(`[Coupon:Guest] Applied "${cleanCode}" — discount ₹${discountAmount} on subtotal ₹${subtotal}`);
+  }
+
+  const finalAmount = isInternalTestOrder ? 1 : Math.max(subtotal + shippingAmount - discountAmount, 0);
 
   // Update orderItems with shipping value now that it's calculated
   orderItems.forEach(i => { i.productSnapshot.shipping = String(shippingAmount); });
@@ -706,10 +1052,11 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   const codPartialAmount = isCOD ? Math.min(Math.ceil(shippingAmount) * 2, Math.ceil(finalAmount)) : 0;
   const codRemainingAmount = isCOD ? Math.max(0, Math.ceil(finalAmount) - codPartialAmount) : 0;
   const razorpayChargeAmount = isCOD ? codPartialAmount : finalAmount;
+  // Round to whole rupees first, then convert to paise — must match the amount
+  // returned to the client/stored below, or Razorpay Checkout rejects it as a mismatch.
+  const razorpayChargeAmountPaise = Math.ceil(razorpayChargeAmount) * 100;
 
-  const razorpayOrder = await razorpayCreateOrderService(Math.ceil(razorpayChargeAmount * 100), "INR");
-
-  const guestEmail = guestInfo.email.toLowerCase().trim();
+  const razorpayOrder = await razorpayCreateOrderService(razorpayChargeAmountPaise, "INR");
 
   const order = await Order.create({
     orderId: uuidv7(),
@@ -745,6 +1092,8 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     codDetails: isCOD ? { partialAmountPaid: codPartialAmount, remainingAmount: codRemainingAmount } : undefined,
     isGuestOrder: true,
     guestInfo: { name: guestInfo.name.trim(), email: guestEmail, mobile: cleanMobile },
+    coupon: { couponCodeId, couponCodeName, discountAmount, isApplied },
+    metaTracking: collectMetaTracking(req),
   });
 
   return res.status(200).json(
@@ -754,12 +1103,13 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
       {
         orderId: order.orderId,
         razorpayOrderId: razorpayOrder?.data?.id,
-        amount: razorpayChargeAmount * 100, // paise for Razorpay (partial for COD)
+        amount: razorpayChargeAmountPaise,
         currency: "INR",
         paymentMethod: isCOD ? "COD" : "PREPAID",
         codDetails: isCOD ? { partialAmountPaid: codPartialAmount, remainingAmount: codRemainingAmount } : null,
         senderMobile: cleanMobile,
         receiverMobile: cleanMobile,
+        coupon: isApplied ? { code: couponCodeName, discountAmount } : null,
       },
       true,
     ),
