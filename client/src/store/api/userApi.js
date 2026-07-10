@@ -109,6 +109,15 @@ export const userApi = apiSlice.injectEndpoints({
       }),
       providesTags: ["Coupon"],
     }),
+    // Look up a single coupon by exact code (used by guests for hidden/secret codes).
+    // Same endpoint as the list — returns [] if the code is unknown.
+    lookupCoupon: builder.mutation({
+      query: (code) => ({
+        url: "coupon/list",
+        method: "POST",
+        body: { code },
+      }),
+    }),
 
     // Community APIs
     joinCommunity: builder.mutation({
@@ -266,6 +275,7 @@ export const {
   useOrderHistoryQuery,
   useApplyCouponMutation,
   useGetAvailableCouponsQuery,
+  useLookupCouponMutation,
   useGetRazorpayKeyQuery,
   useCreateOrderMutation,
   useCreateGuestOrderMutation,

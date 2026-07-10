@@ -269,14 +269,49 @@ const applyCouponCodeService = async ({ userId, couponCodeName, email, mobile })
 // Returns a unified array of coupons in a normalised shape that CouponList can
 // render without knowing which model a coupon came from.
 
-const getAllCouponCodeService = async ({ userId }) => {
+const getAllCouponCodeService = async ({ userId, code }) => {
+  // ── Single-coupon lookup by exact code (used by guests typing a code manually) ──
+  // Lets the storefront show the correct discount for HIDDEN coupons without listing them.
+  // Only returns a coupon if the exact code is known — hidden coupons never appear in the
+  // general list below. Server still fully re-validates at order creation.
+  if (code) {
+    const cleanCode = String(code).trim().toUpperCase();
+    const one = await Coupon.findOne(
+      {
+        code: cleanCode,
+        scope: "PUBLIC",
+        audience: { $ne: "MEMBERS_ONLY" },
+        isActive: true,
+        isArchived: false,
+        isTest: false, // testing/internal coupons stay invisible; isHidden is intentionally NOT filtered
+      },
+      { couponId: 1, code: 1, title: 1, notes: 1, discountType: 1, discountValue: 1, maxDiscountCap: 1, minCartValue: 1, validUntil: 1 },
+    ).lean();
+
+    const data = one
+      ? [{
+          id:            one.couponId,
+          code:          one.code,
+          title:         one.title || one.code,
+          description:   one.notes || null,
+          discountType:  one.discountType,
+          discountValue: one.discountValue || 0,
+          maxDiscountCap: one.maxDiscountCap || null,
+          minCartValue:  one.minCartValue || 0,
+          validUntil:    one.validUntil || null,
+        }]
+      : [];
+
+    return { statusCode: 200, message: "couponLookup", data, success: true };
+  }
+
   const results = [];
 
   // 1. New-model PUBLIC + EVERYONE coupons — always visible, no login required.
   // Match audience:"EVERYONE" OR no audience field at all (coupons created before the field was added).
   // Exclude audience:"MEMBERS_ONLY" which requires a logged-in account.
   const newCoupons = await Coupon.find(
-    { scope: "PUBLIC", audience: { $ne: "MEMBERS_ONLY" }, isActive: true, isArchived: false, isTest: false },
+    { scope: "PUBLIC", audience: { $ne: "MEMBERS_ONLY" }, isActive: true, isArchived: false, isTest: false, isHidden: { $ne: true } },
     { couponId: 1, code: 1, title: 1, notes: 1, discountType: 1, discountValue: 1, maxDiscountCap: 1, minCartValue: 1, validUntil: 1 },
   ).lean();
 

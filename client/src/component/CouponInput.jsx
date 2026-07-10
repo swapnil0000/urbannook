@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useApplyCouponMutation, useGetAvailableCouponsQuery } from '../store/api/userApi';
+import { useApplyCouponMutation, useGetAvailableCouponsQuery, useLookupCouponMutation } from '../store/api/userApi';
 import { useUI, useAuth } from '../hooks/useRedux';
 
 function calcLocalDiscount(coupon, subtotal) {
@@ -23,6 +23,7 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
 
   // For guests: RTK Query already fetched this for the coupon modal — reuses the cache, no extra request
   const { data: availableCoupons } = useGetAvailableCouponsQuery(undefined, { skip: !isGuest });
+  const [lookupCoupon, { isLoading: isLookingUp }] = useLookupCouponMutation();
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) {
@@ -35,7 +36,19 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
 
     if (isGuest) {
       const cleanCode = couponCode.trim().toUpperCase();
-      const coupon = (availableCoupons?.data || []).find(c => c.code === cleanCode);
+      // 1. Try the cached visible-coupons list first (no extra request)
+      let coupon = (availableCoupons?.data || []).find(c => c.code === cleanCode);
+
+      // 2. Not in the list? It may be a hidden/secret code — ask the server for its details.
+      if (!coupon) {
+        try {
+          const res = await lookupCoupon(cleanCode).unwrap();
+          coupon = (res?.data || [])[0];
+        } catch {
+          coupon = null;
+        }
+      }
+
       if (!coupon) {
         const msg = 'Invalid or inactive coupon code';
         setError(msg);
@@ -43,6 +56,7 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
         setTimeout(() => setError(''), 3000);
         return;
       }
+
       const discountAmount = calcLocalDiscount(coupon, cartTotal || 0);
       if (onCouponApplied) onCouponApplied({ code: cleanCode, discount: discountAmount });
       setSuccess(`Coupon applied! You save ₹${discountAmount}`);
@@ -119,15 +133,15 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
               onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
               onKeyDown={handleKeyPress}
               placeholder="Enter coupon code..."
-              disabled={isLoading}
+              disabled={isLoading || isLookingUp}
               className="flex-1 bg-white border border-[#F5DEB3] rounded-xl px-4 py-3 text-[#2e443c]  focus:outline-none focus:border-[#F5DEB3] focus:ring-1 focus:ring-[#F5DEB3] transition-all uppercase tracking-wider text-sm disabled:opacity-50"
             />
             <button
               onClick={handleApplyCoupon}
-              disabled={isLoading || !couponCode.trim()}
+              disabled={isLoading || isLookingUp || !couponCode.trim()}
               className="px-6 py-3 bg-[#a89068] text-[#fff] rounded-xl font-bold uppercase tracking-wider text-xs hover:bg-[#a89068] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? (
+              {(isLoading || isLookingUp) ? (
                 <i className="fa-solid fa-spinner fa-spin"></i>
               ) : (
                 'Apply'
