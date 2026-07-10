@@ -106,12 +106,12 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
               onKeyDown={handleKeyPress}
               placeholder="Enter coupon code..."
               disabled={isLoading}
-              className="flex-1 bg-white border border-[#F5DEB3] rounded-xl px-4 py-3 text-[#2e443c]  focus:outline-none focus:border-[#F5DEB3] focus:ring-1 focus:ring-[#F5DEB3] transition-all uppercase tracking-wider text-sm disabled:opacity-50"
+              className="flex-1 bg-white border border-hair rounded-xl px-4 py-3 text-ink  focus:outline-none focus:border-hair focus:ring-1 focus:ring-hair transition-all uppercase tracking-wider text-sm disabled:opacity-50"
             />
             <button
               onClick={handleApplyCoupon}
               disabled={isLoading || !couponCode.trim()}
-              className="px-6 py-3 bg-[#a89068] text-[#fff] rounded-xl font-bold uppercase tracking-wider text-xs hover:bg-[#a89068] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-3 bg-brand text-[#fff] rounded-xl font-bold uppercase tracking-wider text-xs hover:bg-brandHi transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (
                 <i className="fa-solid fa-spinner fa-spin"></i>
@@ -139,10 +139,10 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
         <div className="space-y-3">
           <div className="flex items-center justify-between bg-white px-4 py-3 rounded-xl border border-gray">
             <div className="flex items-center gap-3">
-              <i className="fa-solid fa-circle-check text-[#a89068]"></i>
+              <i className="fa-solid fa-circle-check text-brand"></i>
               <div>
                 <p className="text-sm font-bold text-gray-500 uppercase tracking-wider">{appliedCoupon}</p>
-                <p className="text-xs text-[#a89068]">You saved ₹{discount?.toLocaleString() || 0}</p>
+                <p className="text-xs text-brand">You saved ₹{discount?.toLocaleString() || 0}</p>
               </div>
             </div>
             <button

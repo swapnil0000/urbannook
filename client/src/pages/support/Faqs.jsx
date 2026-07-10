@@ -45,7 +45,7 @@ const Faq = () => {
   };
 
   return (
-    <div className="bg-[#2e443c] min-h-screen text-gray-300 font-sans relative selection:bg-[#F5DEB3] selection:text-white">
+    <div className="bg-ink min-h-screen text-gray-300 font-sans relative selection:bg-brand selection:text-white">
       <SEOHead
         title="FAQs"
         description="Frequently asked questions about UrbanNook — shipping, returns, custom orders, assembly, and more."
@@ -59,19 +59,19 @@ const Faq = () => {
           Questions
         </h1>
       </div>
-      <div className="fixed top-0 right-0 w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[120px] pointer-events-none"></div>
+      <div className="fixed top-0 right-0 w-[500px] h-[500px] bg-save/10 rounded-full blur-[120px] pointer-events-none"></div>
 
       <div className="relative z-10 max-w-5xl mx-auto px-6 py-20 md:py-28">
         
         {/* Header */}
         <div className="mb-16 text-left border-b border-white/10 pb-12">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 w-fit mb-6 backdrop-blur-md mx-auto">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#F5DEB3]"></span>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-[#F5DEB3]">Help Center</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-brand"></span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-brand">Help Center</span>
           </div>
           
           <h1 className="text-4xl md:text-6xl font-serif text-white mb-4 leading-tight">
-            Frequently Asked <span className="italic text-[#F5DEB3]">Questions</span>
+            Frequently Asked <span className="italic text-brand">Questions</span>
           </h1>
           <p className="  text-left text-gray-400 text-sm md:text-base mx-auto">
             Everything you need to know about our products and billing. Can't find the answer you're looking for? Chat with us.
@@ -85,7 +85,7 @@ const Faq = () => {
               {/* Category Title */}
               <div className="md:col-span-1">
                 <h3 className="text-2xl font-serif text-white sticky top-24">{section.category}</h3>
-                <div className="h-1 w-12 bg-[#F5DEB3] mt-4 rounded-full"></div>
+                <div className="h-1 w-12 bg-brand mt-4 rounded-full"></div>
               </div>
 
               {/* Questions */}
@@ -93,7 +93,7 @@ const Faq = () => {
                 {section.items.map((item, itemIdx) => (
                   <div key={itemIdx} className="group">
                     <h4 className="text-white font-bold text-lg mb-3 flex items-start gap-3">
-                      <span className="text-[#F5DEB3] text-sm mt-1">0{itemIdx + 1}.</span>
+                      <span className="text-brand text-sm mt-1">0{itemIdx + 1}.</span>
                       {item.q}
                     </h4>
                     <p className="text-gray-400 leading-relaxed pl-7 border-l border-white/10 ml-1.5">

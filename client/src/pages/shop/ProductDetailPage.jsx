@@ -5,6 +5,8 @@ import confetti from 'canvas-confetti';
 import SEOHead from '../../component/SEOHead';
 import WishlistButton from '../../component/WishlistButton';
 import UnProductCard from '../../component/UnProductCard';
+import ImageCarousel from '../../component/ImageCarousel';
+import { motion, AnimatePresence } from 'motion/react';
 import { trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist, trackVariantSelect } from '../../utils/analytics';
 import { useGetProductByIdQuery, useGetProductsQuery } from '../../store/api/productsApi';
 import { useAddToCartMutation, useUpdateCartMutation } from '../../store/api/userApi';
@@ -13,6 +15,7 @@ import { addItem, updateQuantity, removeItem, updateSelection } from '../../stor
 import { useUI } from '../../hooks/useRedux';
 import { useCartData } from '../../hooks/useCartSync';
 
+const MotionDiv = motion.div;
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
 const productList = (res) => res?.data?.products || res?.data?.listofPublishedProducts || [];
 const onImgErr = (e) => { e.currentTarget.src = '/assets/logo.webp'; };
@@ -34,10 +37,10 @@ const ProductDetailPage = () => {
   const cartSelections = useSelector((state) => state.cart.selections);
   const currentUserId = useSelector((state) => state.auth.user?.userId);
 
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [selectedVariant, setSelectedVariant] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState('');
-  const [addGift, setAddGift] = useState(false);
+  const buyBoxRef = useRef(null);
+  const [buyBoxVisible, setBuyBoxVisible] = useState(true); // controls the sticky mobile CTA
 
   const { data: productResponse, isLoading, error } = useGetProductByIdQuery(productId);
   const [addToCartAPI, { isLoading: isAdding }] = useAddToCartMutation();
@@ -54,10 +57,52 @@ const ProductDetailPage = () => {
   const [reviewImagePreviews, setReviewImagePreviews] = useState([]);
   const reviewImageRef = useRef(null);
   const [lightbox, setLightbox] = useState(null); // {list:[url], idx}
+  const [visibleReviews, setVisibleReviews] = useState(4); // progressive "show more" reviews
 
   const product = productResponse?.data;
   const { data: relRes } = useGetProductsQuery({ page: 1, limit: 8 });
   const related = useMemo(() => productList(relRes).filter((p) => p.productId !== productId).slice(0, 4), [relRes, productId]);
+
+  // Product FAQs — use CMS-provided product.faqs if present, else generate helpful
+  // defaults from the product's own data so buyers understand it before purchase.
+  const productFaqs = useMemo(() => {
+    if (Array.isArray(product?.faqs) && product.faqs.length) {
+      return product.faqs.map((f) => ({ q: f.question || f.q, a: f.answer || f.a })).filter((f) => f.q && f.a);
+    }
+    if (!product) return [];
+    const cat = (product.productCategory || '').toLowerCase();
+    const isLamp = cat.includes('lamp');
+    const list = [
+      { q: 'How long does delivery take?', a: 'Every piece is 3D-printed to order and ships pan-India in 2–4 business days with tracking.' },
+    ];
+    if (isLamp) list.push({ q: 'How is it powered?', a: 'It runs on a USB adapter (included) — just plug in and switch it on. No batteries required.' });
+    list.push({ q: 'What is it made of?', a: `Precision 3D-printed with a durable build and a hand-finished ${isLamp ? 'glossy resin' : 'premium'} coat, so no two are exactly alike.` });
+    list.push({
+      q: product.isCodAvailable ? 'Is Cash on Delivery available?' : 'What payment methods do you accept?',
+      a: product.isCodAvailable ? 'Yes — COD is available at checkout, alongside UPI, cards, net-banking and wallets.' : 'We accept UPI, credit/debit cards, net-banking and wallets at checkout.',
+    });
+    list.push({ q: 'Can I return or exchange it?', a: '7-day easy returns on unused items in original condition — reach out and we’ll sort it quickly.' });
+    return list;
+  }, [product]);
+
+  // Cross-sell: pair a lamp with a pen stand (and vice-versa) — "complete the set".
+  const crossSell = useMemo(() => {
+    const all = productList(relRes).filter((p) => p.productId !== productId);
+    const viewingPen = /pen/i.test(product?.productCategory || '') || /pen/i.test(product?.productName || '');
+    const match = all.find((p) =>
+      viewingPen
+        ? /lamp/i.test(p.productCategory || '')
+        : (/pen/i.test(p.productCategory || '') || /pen/i.test(p.productName || ''))
+    );
+    return match || null;
+  }, [relRes, product, productId]);
+  const crossSellVariant = crossSell?.variantDetails?.[0];
+  const crossSellPrice = crossSellVariant?.variantPrice || 0;
+  const crossSellImg = crossSellVariant?.variantImage?.[0] || crossSell?.productImg || 'https://urbannook.in/assets/logo.webp';
+  const crossSellInCart = useMemo(
+    () => !!crossSell && cartItems.some((i) => [i.id, i.mongoId, i.productId].map(String).includes(String(crossSell.productId))),
+    [cartItems, crossSell]
+  );
 
   const currentPrice = useMemo(() => {
     if (!product?.variantDetails?.length) return 0;
@@ -93,12 +138,19 @@ const ProductDetailPage = () => {
         if (saved?.variant && availableVariants.includes(saved.variant)) initial = saved.variant;
       }
       setSelectedVariant(initial);
-      setCurrentImageIndex(0);
     } else if (!product) setSelectedVariant('');
   }, [product?.productId, availableVariants, cartSelections, product, urlVariantSku]);
 
-  useEffect(() => { setCurrentImageIndex(0); }, [selectedVariant]);
   useEffect(() => { window.scrollTo(0, 0); }, []);
+
+  // Show the sticky mobile CTA only once the main Add-to-Cart box has scrolled out of view.
+  useEffect(() => {
+    const el = buyBoxRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(([e]) => setBuyBoxVisible(e.isIntersecting), { threshold: 0 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [product?.productId]);
 
   const viewedProductRef = useRef(null);
   useEffect(() => {
@@ -123,7 +175,6 @@ const ProductDetailPage = () => {
 
   const onSelectVariant = (v) => {
     setSelectedVariant(v.variantName);
-    setCurrentImageIndex(0);
     trackVariantSelect?.({ itemId: product.productId, itemName: product.productName, itemVariant: v.variantName, price: v.variantPrice });
     if (v.sku) navigate(`/product/${product.productId}/${v.sku}`, { replace: true });
   };
@@ -158,9 +209,24 @@ const ProductDetailPage = () => {
       trackAddToCart({ itemId: product.productId, itemName: product.productName, itemVariant: effectiveVariant, price: currentPrice, quantity: 1 });
     }
 
-    // optional matching add-on
-    const gift = product?.giftAddOns?.[0];
-    if (addGift && gift) dispatch(addItem({ id: gift.giftProductId, mongoId: gift.giftProductId, name: gift.label || 'Add-on', price: gift.addOnPrice || 0, image: undefined, quantity: 1, selectedVariant: 'Add-on' }));
+  };
+
+  const addCrossSell = async () => {
+    if (!crossSell) return;
+    const vName = crossSellVariant?.variantName || 'Standard Variant';
+    const isLoggedIn = isAuthenticated || !!localStorage.getItem('authToken');
+    try {
+      if (isLoggedIn) {
+        await addToCartAPI({ productId: crossSell.productId, quantity: 1, variant: vName, image: crossSellImg }).unwrap();
+        await refetchCart().unwrap();
+      } else {
+        dispatch(addItem({ id: crossSell.productId, mongoId: crossSell.productId, name: crossSell.productName, price: crossSellPrice, image: crossSellImg, quantity: 1, selectedVariant: vName }));
+      }
+      confetti({ particleCount: 90, spread: 70, origin: { y: 0.7 }, colors: ['#DF0024', '#F3C33B', '#ffffff'] });
+      trackAddToCart({ itemId: crossSell.productId, itemName: crossSell.productName, itemVariant: vName, price: crossSellPrice, quantity: 1 });
+    } catch (err) {
+      showNotification(err?.data?.message || 'Something went wrong', 'error');
+    }
   };
 
   const handleUpdateQty = async (newQuantity) => {
@@ -186,9 +252,28 @@ const ProductDetailPage = () => {
 
   // reviews
   const rd = reviewsData?.data || {};
-  const reviews = rd.reviews || [];
+  const reviews = useMemo(() => rd.reviews || [], [rd.reviews]);
   const avgRating = rd.avgRating || 0;
   const totalReviews = rd.totalReviews || reviews.length;
+
+  // Count of reviews per star (index 0 = 1★ … 4 = 5★) for the distribution bars.
+  const ratingDist = useMemo(() => {
+    const counts = [0, 0, 0, 0, 0];
+    reviews.forEach((r) => { const n = Math.round(r.rating || 0); if (n >= 1 && n <= 5) counts[n - 1]++; });
+    return counts;
+  }, [reviews]);
+
+  // All customer-uploaded review photos, for the editorial "In the wild" showcase.
+  const communityShots = useMemo(() => {
+    const shots = [];
+    reviews.forEach((r) => {
+      const imgs = r.imageUrls?.length ? r.imageUrls : (r.imageUrl ? [r.imageUrl] : []);
+      imgs.forEach((u) => shots.push({ url: u, name: r.userName || 'Customer' }));
+    });
+    return shots.slice(0, 8);
+  }, [reviews]);
+  // Stable URL array so the carousel doesn't reset every render.
+  const communityShotUrls = useMemo(() => communityShots.map((s) => s.url), [communityShots]);
 
   const openReviewForm = () => {
     if (!isAuthenticated && !localStorage.getItem('authToken')) { openLoginModal('openReviewForm'); return; }
@@ -233,7 +318,6 @@ const ProductDetailPage = () => {
     </div>
   );
 
-  const gift = product?.giftAddOns?.[0];
   const specs = product.specifications || [];
   const structuredData = {
     '@context': 'https://schema.org', '@type': 'Product', name: product.productName, image: galleryImages, description: product.productSubDes || product.productDes, sku: product.productId,
@@ -242,7 +326,7 @@ const ProductDetailPage = () => {
   };
 
   return (
-    <div className="font-jakarta bg-paper text-ink min-h-screen">
+    <div className="font-jakarta bg-paper text-ink min-h-screen overflow-x-clip">
       <SEOHead title={product.productName} description={product.productSubDes || product.productDes} url={`/product/${product.productId}`} image={galleryImages[0]} structuredData={structuredData} />
 
       <div className="max-w-[1280px] mx-auto px-5 py-6 md:py-8">
@@ -252,176 +336,280 @@ const ProductDetailPage = () => {
         </div>
 
         <div className="grid lg:grid-cols-2 gap-8 lg:gap-10">
-          {/* GALLERY */}
-          <div>
-            <div className="rounded-[1.5rem] overflow-hidden border border-hair bg-surface aspect-square">
-              <img src={galleryImages[currentImageIndex] || galleryImages[0]} alt={product.productName} className="w-full h-full object-cover" onError={onImgErr} />
+          {/* GALLERY — peek filmstrip on mobile, one big framed image on desktop */}
+          <div className="lg:sticky lg:top-24 self-start w-full min-w-0">
+            <div className="md:hidden">
+              <ImageCarousel peek images={galleryImages} alt={product.productName} onImgErr={onImgErr} onItemClick={(i) => setLightbox({ list: galleryImages, idx: i })} />
             </div>
-            {galleryImages.length > 1 && (
-              <div className="grid grid-cols-5 gap-2.5 mt-3">
-                {galleryImages.slice(0, 5).map((img, i) => (
-                  <button key={i} onClick={() => setCurrentImageIndex(i)} className={`rounded-xl overflow-hidden border-2 aspect-square ${i === currentImageIndex ? 'border-brand' : 'border-transparent'}`}>
-                    <img src={img} alt="" className="w-full h-full object-cover" onError={onImgErr} />
-                  </button>
-                ))}
-              </div>
-            )}
+            <div className="hidden md:block">
+              <ImageCarousel images={galleryImages} alt={product.productName} onImgErr={onImgErr} onItemClick={(i) => setLightbox({ list: galleryImages, idx: i })} />
+            </div>
           </div>
 
           {/* INFO */}
-          <div>
-            <p className="gl-lbl text-brand">{product.productSubCategory || product.productCategory || '3D Printed'}</p>
+          <div className="min-w-0">
+            {/* ZONE A — IDENTITY (on paper): kicker + rating chip, title + heart, lede */}
+            <div className="flex items-center justify-between gap-3">
+              <p className="gl-lbl text-brand">{product.productSubCategory || product.productCategory || '3D Printed'}</p>
+              {totalReviews > 0 && (
+                <button onClick={() => document.getElementById('reviews')?.scrollIntoView({ behavior: 'smooth' })} className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-hair px-2.5 py-1 hover:border-ink transition-colors">
+                  <Stars n={avgRating || 5} className="text-xs" />
+                  <span className="text-xs font-bold text-ink">{(avgRating || 4.8).toFixed?.(1) || avgRating}</span>
+                  <span className="text-xs text-muted">({totalReviews})</span>
+                </button>
+              )}
+            </div>
             <div className="flex items-start justify-between gap-3 mt-2">
-              <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">{product.productName}</h1>
+              <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-ink leading-tight">{product.productName}</h1>
               <div className="shrink-0 pt-1"><WishlistButton productId={product.productId} /></div>
             </div>
-            {totalReviews > 0 && (
-              <button onClick={() => document.getElementById('reviews')?.scrollIntoView({ behavior: 'smooth' })} className="flex items-center gap-2 mt-3">
-                <Stars n={avgRating || 5} /><span className="text-sm text-muted">{(avgRating || 4.8).toFixed?.(1) || avgRating} ({totalReviews} reviews)</span>
-              </button>
-            )}
+            {(product.productDes || product.productSubDes) && <p className="text-sm text-muted leading-relaxed mt-2 line-clamp-2">{product.productDes || product.productSubDes}</p>}
 
-            <div className="flex items-center gap-3 mt-4">
-              <span className="text-3xl font-extrabold">{inr(currentPrice)}</span>
-              {discountPercent > 0 && <><span className="text-faint line-through">{inr(maxVariantPrice)}</span><span className="gl-lbl text-[10px] bg-sale/10 text-sale px-2 py-1 rounded">{discountPercent}% OFF</span></>}
+            {/* ZONE B — BUY CARD: price → savings → variants → urgency → CTA → trust, one unit */}
+            <div className="mt-5 rounded-2xl border border-hair bg-surface p-4 md:p-5 md:max-w-md">
+              {/* price hero */}
+              <div className="flex items-baseline flex-wrap gap-x-3 gap-y-1">
+                <span className="text-4xl md:text-5xl font-extrabold text-ink tracking-tight tabular-nums leading-none">{inr(currentPrice)}</span>
+                {discountPercent > 0 && (
+                  <>
+                    <span className="text-base text-faint line-through tabular-nums">{inr(maxVariantPrice)}</span>
+                    <span className="gl-lbl text-[11px] text-save bg-save/10 px-2 py-0.5 rounded-md">{discountPercent}% OFF</span>
+                  </>
+                )}
+              </div>
+              {discountPercent > 0 && <p className="text-sm font-semibold text-save mt-1">You save {inr(maxVariantPrice - currentPrice)}</p>}
+
+              {/* variants */}
+              {availableVariants.length > 0 && (
+                <>
+                  <div className="border-t border-hair my-4" />
+                  <p className="gl-lbl text-ink mb-2">{product.productCategory === 'Lamp' ? 'Marque' : 'Variant'} · <span className="normal-case tracking-normal font-semibold text-muted">{selectedVariant}</span></p>
+                  <div className="flex gap-2 flex-wrap">
+                    {product.variantDetails.map((v, i) => (
+                      <button
+                        key={i}
+                        onClick={() => onSelectVariant(v)}
+                        className={`gl-press px-4 h-10 rounded-xl border text-sm font-semibold transition-colors ${v.variantName === selectedVariant ? 'border-brand bg-brand/5 text-brand' : 'border-hair bg-paper text-ink hover:border-ink'}`}
+                      >
+                        {v.variantName}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* urgency + delivery */}
+              <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs mt-4">
+                {product.productStatus === 'in_stock' && (
+                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-save" /><span className="text-ink font-semibold">In stock</span></span>
+                )}
+                <span className="text-muted">🚚 Ships in 2–4 days</span>
+              </div>
+
+              {/* CTA */}
+              <div ref={buyBoxRef} className="flex items-center gap-3 mt-4">
+                {isInCart ? (
+                  <>
+                    <div className="flex items-center border border-ink rounded-xl h-12 shrink-0">
+                      <button onClick={() => handleUpdateQty(currentCartQty - 1)} className="w-10 h-full text-lg">−</button>
+                      <span className="w-8 text-center font-bold">{currentCartQty}</span>
+                      <button onClick={() => handleUpdateQty(currentCartQty + 1)} className="w-10 h-full text-lg">+</button>
+                    </div>
+                    <button onClick={handleCheckoutClick} className="gl-press flex-1 h-12 bg-brand text-paper font-bold text-sm rounded-xl hover:bg-brandHi">Go to Checkout</button>
+                  </>
+                ) : (
+                  <>
+                    <button onClick={handleInitialAddToCart} disabled={isAdding} className="gl-press flex-1 h-12 bg-brand text-paper font-bold text-sm rounded-xl hover:bg-brandHi disabled:opacity-60 whitespace-nowrap">
+                      {isAdding ? 'Adding…' : <>Add to Cart</>}
+                    </button>
+                    <button onClick={handleCheckoutClick} className="gl-press flex-1 h-12 border border-ink text-ink font-bold text-sm rounded-xl hover:bg-ink hover:text-paper transition-colors whitespace-nowrap">Buy it Now</button>
+                  </>
+                )}
+              </div>
+
+              {/* trust strip inside the card */}
+              <div className="mt-4 pt-4 border-t border-hair grid grid-cols-3 divide-x divide-hair text-center text-[11px] text-muted">
+                <div className="px-1 flex flex-col items-center gap-1"><span className="text-lg">🚚</span>2–4 days</div>
+                <div className="px-1 flex flex-col items-center gap-1"><span className="text-lg">💸</span>{product.isCodAvailable ? 'COD available' : 'Secure pay'}</div>
+                <div className="px-1 flex flex-col items-center gap-1"><span className="text-lg">↺</span>7-day returns</div>
+              </div>
             </div>
 
-            {(product.productDes || product.productSubDes) && <p className="text-muted mt-4 leading-relaxed">{product.productDes || product.productSubDes}</p>}
-
-            {/* variants */}
-            {availableVariants.length > 0 && (
-              <div className="mt-6">
-                <p className="gl-lbl mb-2">{product.productCategory === 'Lamp' ? 'Marque' : 'Variant'} · <span className="text-muted normal-case tracking-normal font-semibold">{selectedVariant}</span></p>
-                <div className="flex gap-3 flex-wrap">
-                  {product.variantDetails.map((v, i) => (
-                    <button key={i} onClick={() => onSelectVariant(v)} title={v.variantName} className={`gl-swatch rounded-xl overflow-hidden w-16 h-16 border ${v.variantName === selectedVariant ? 'on border-brand' : 'border-hair'}`}>
-                      <img src={v.variantImage?.[0] || variantImage(v.variantName)} alt={v.variantName} className="w-full h-full object-cover" onError={onImgErr} />
-                    </button>
-                  ))}
+            {/* ZONE C — complete the set (secondary card) */}
+            {crossSell && (
+              <div className="mt-4 rounded-2xl border border-hair bg-paper p-4 md:max-w-md">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="gl-lbl text-brand">Complete the set</p>
+                  <span className="text-[11px] font-bold text-muted flex items-center gap-1">🔗 Frequently bought together</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <img src={crossSellImg} alt={crossSell.productName} onClick={() => navigate(`/product/${crossSell.productId}`)} className="w-16 h-16 rounded-xl object-cover border border-hair cursor-pointer shrink-0" onError={onImgErr} />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-sm truncate">{crossSell.productName}</p>
+                    <p className="text-xs text-muted">Pairs with your {(product.productCategory || 'lamp').toLowerCase()}</p>
+                    <p className="text-sm font-extrabold mt-0.5">{inr(crossSellPrice)}</p>
+                  </div>
+                  {crossSellInCart ? (
+                    <span className="shrink-0 flex items-center gap-1.5 text-sm font-bold text-save">
+                      <span className="w-5 h-5 rounded-full bg-save text-paper grid place-items-center text-xs">✓</span>Added
+                    </span>
+                  ) : (
+                    <button onClick={addCrossSell} className="un-btn gl-press shrink-0 bg-ink text-paper text-sm font-bold px-5 h-10 rounded-xl hover:bg-brandHi transition-colors">Add</button>
+                  )}
                 </div>
               </div>
             )}
 
-            {/* qty + add */}
-            <div className="mt-7 flex items-center gap-3">
-              {isInCart ? (
-                <>
-                  <div className="flex items-center border border-ink rounded-xl h-14">
-                    <button onClick={() => handleUpdateQty(currentCartQty - 1)} className="w-12 h-full text-xl">−</button>
-                    <span className="w-8 text-center font-bold">{currentCartQty}</span>
-                    <button onClick={() => handleUpdateQty(currentCartQty + 1)} className="w-12 h-full text-xl">+</button>
-                  </div>
-                  <button onClick={handleCheckoutClick} className="gl-press flex-1 h-14 bg-brand text-white font-bold rounded-xl hover:bg-brandHi">Go to Checkout</button>
-                </>
-              ) : (
-                <button onClick={handleInitialAddToCart} disabled={isAdding} className="gl-press flex-1 h-14 bg-brand text-white font-bold rounded-xl hover:bg-brandHi disabled:opacity-60">
-                  {isAdding ? 'Adding…' : <>Add to Cart · {inr(currentPrice)}</>}
-                </button>
-              )}
-            </div>
-            <button onClick={handleCheckoutClick} className="gl-press w-full py-3.5 mt-3 border border-ink rounded-xl font-bold hover:bg-ink hover:text-white transition-colors">Buy it Now</button>
-
-            {/* gift add-on */}
-            {gift && (
-              <label className="mt-4 flex items-center gap-3 border border-hair rounded-xl p-3.5 cursor-pointer hover:border-brand transition-colors">
-                <input type="checkbox" checked={addGift} onChange={(e) => setAddGift(e.target.checked)} className="w-4 h-4 accent-brand" />
-                <span className="flex-1 text-sm"><b>{gift.label || 'Add a matching add-on'}</b><span className="block text-faint text-xs">Add it to this order</span></span>
-                <span className="font-bold text-brand">+{inr(gift.addOnPrice)}</span>
-              </label>
-            )}
-
-            {/* trust */}
-            <div className="grid grid-cols-3 gap-2 mt-5 text-center text-xs text-muted">
-              <div className="border border-hair rounded-xl py-3"><div className="text-lg">🚚</div>Free over ₹999</div>
-              <div className="border border-hair rounded-xl py-3"><div className="text-lg">💸</div>{product.isCodAvailable ? 'COD available' : 'Secure payment'}</div>
-              <div className="border border-hair rounded-xl py-3"><div className="text-lg">↺</div>7-day returns</div>
-            </div>
-
-            {/* accordions */}
-            <div className="mt-6 divide-y divide-hair border-y border-hair">
-              {(product.productSubDes || product.productDes) && (
-                <details open className="py-4"><summary className="flex justify-between cursor-pointer font-bold list-none">Description<span>＋</span></summary><p className="text-muted mt-3 text-sm leading-relaxed">{product.productSubDes || product.productDes}</p></details>
-              )}
-              {specs.length > 0 && (
-                <details className="py-4"><summary className="flex justify-between cursor-pointer font-bold list-none">Specifications<span>＋</span></summary>
-                  <div className="mt-3 text-sm">{specs.map((s, i) => <div key={i} className="flex justify-between py-1.5 border-b border-hair last:border-0"><span className="text-muted">{s.key}</span><span className="font-medium text-right">{s.value}</span></div>)}</div>
-                </details>
-              )}
-              <details className="py-4"><summary className="flex justify-between cursor-pointer font-bold list-none">Shipping &amp; Returns<span>＋</span></summary><p className="text-muted mt-3 text-sm">Made to order, ships pan-India in 2–4 business days. 7-day easy returns.{product.isCodAvailable ? ' COD available.' : ''}</p></details>
-            </div>
           </div>
         </div>
 
-        {/* LOOK CLOSER — showcases variant images (BMW/Porsche/Lambo…) or gallery+specs */}
-        {product.variantDetails?.length > 0 && (
-          <section className="mt-16">
-            <p className="gl-lbl text-brand mb-2">The Details</p>
-            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-8">Look closer.</h2>
-            <div className="grid sm:grid-cols-2 gap-5">
-              {(product.variantDetails.length > 1
-                ? product.variantDetails.slice(0, 4).map((v) => ({ img: v.variantImage?.[0], title: v.variantName, desc: `${inr(v.variantPrice)} · made to order`, v }))
-                : galleryImages.slice(0, 4).map((img, i) => ({ img, title: specs[i]?.key || 'Crafted detail', desc: specs[i]?.value || 'Precision 3D-printed to order.', v: null }))
-              ).map((it, i) => (
-                <div key={i} className={`group ${it.v ? 'cursor-pointer' : ''}`} onClick={() => it.v && onSelectVariant(it.v)}>
-                  <div className="rounded-2xl overflow-hidden border border-hair bg-surface aspect-[4/3]">
-                    <img src={it.img} alt={it.title} loading="lazy" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" onError={onImgErr} />
-                  </div>
-                  <div className="flex gap-4 mt-4">
-                    <span className="text-2xl font-extrabold text-faint">0{i + 1}</span>
-                    <div><h3 className="font-extrabold uppercase text-sm tracking-wide">{it.title}</h3><p className="text-muted text-sm mt-1">{it.desc}</p></div>
-                  </div>
+        {/* LOOK CLOSER — full-bleed LIGHT-GREY (surface) band, auto-playing carousel (tap to zoom) */}
+        {galleryImages.length > 1 && (
+          <div className="w-screen ml-[calc(50%-50vw)] bg-surface text-ink mt-16">
+            <div className="max-w-[1280px] mx-auto px-5 py-14 md:py-16">
+              <div className="flex items-end justify-between mb-6">
+                <div>
+                  <p className="gl-lbl text-brand mb-2">— The Details</p>
+                  <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight leading-[0.95]">
+                    <span className="text-ink">Look</span> <span className="text-faint">closer.</span>
+                  </h2>
                 </div>
+                <span className="text-xs text-faint shrink-0">Tap to zoom</span>
+              </div>
+              <ImageCarousel
+                peek
+                images={galleryImages}
+                alt={product.productName}
+                onImgErr={onImgErr}
+                onItemClick={(i) => setLightbox({ list: galleryImages, idx: i })}
+                renderOverlay={(i) => (
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/80 via-ink/20 to-transparent p-3 pt-8">
+                    <span className="gl-lbl text-paper/60 text-[10px]">0{i + 1}</span>
+                    <p className="text-paper font-bold text-xs uppercase tracking-wide leading-tight line-clamp-1">{specs[i]?.key || product.productName}</p>
+                    {specs[i]?.value && <p className="text-paper/60 text-[10px] leading-tight line-clamp-1">{specs[i].value}</p>}
+                  </div>
+                )}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* IN THE WILD — full-bleed BLACK (ink) editorial band from customer review photos */}
+        {communityShots.length > 0 && (
+          <div className="w-screen ml-[calc(50%-50vw)] bg-ink text-paper mt-16">
+            <div className="max-w-[1280px] mx-auto px-5 py-14 md:py-20">
+              <p className="gl-lbl text-paper/50 mb-2">— In the wild</p>
+              <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight leading-[0.95] mb-1">
+                <span className="text-paper">Seen in</span><br /><span className="text-paper/40">real setups.</span>
+              </h2>
+              <p className="text-paper/50 text-sm mb-7">Straight from {totalReviews > 0 ? `${totalReviews} verified ` : ''}customers who bought it.</p>
+              <ImageCarousel
+                peek
+                images={communityShotUrls}
+                alt={`${product.productName} in real setups`}
+                onImgErr={onImgErr}
+                onItemClick={(i) => setLightbox({ list: communityShotUrls, idx: i })}
+                renderOverlay={(i) => (
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/80 via-ink/20 to-transparent p-3 pt-8">
+                    <span className="gl-lbl text-paper/70 text-[10px]">0{i + 1}</span>
+                    <p className="text-paper font-bold text-xs leading-tight line-clamp-1">{communityShots[i]?.name}</p>
+                  </div>
+                )}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* WHY URBAN NOOK — comparison / trust table */}
+        <section className="mt-14">
+          <p className="gl-lbl text-brand mb-2 text-center">Why Urban Nook</p>
+          <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight mb-6 text-center">Made different.</h2>
+          <div className="max-w-lg mx-auto rounded-2xl border border-hair overflow-hidden">
+            <div className="grid grid-cols-[1fr_64px_64px] items-center px-4 py-2.5 bg-surface">
+              <span />
+              <span className="text-center text-[11px] font-extrabold uppercase tracking-wide text-brand">Us</span>
+              <span className="text-center text-[11px] font-extrabold uppercase tracking-wide text-faint">Others</span>
+            </div>
+            {[
+              '3D-printed to order',
+              'Original Indian design',
+              'Handcrafted finish',
+              'COD available',
+              '7-day easy returns',
+              'Made in India 🇮🇳',
+            ].map((label, i) => (
+              <div key={i} className="grid grid-cols-[1fr_64px_64px] items-center px-4 py-2.5 border-t border-hair">
+                <span className="text-sm font-semibold">{label}</span>
+                <span className="grid place-items-center"><span className="w-6 h-6 rounded-full bg-brand text-white grid place-items-center text-xs">✓</span></span>
+                <span className="grid place-items-center text-faint">✕</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* PRODUCT DETAILS — full-bleed LIGHT-GREY (surface) band: description / specs / shipping */}
+        <div className="w-screen ml-[calc(50%-50vw)] bg-surface mt-16">
+        <section className="max-w-3xl mx-auto px-5 py-14 md:py-16">
+          <p className="gl-lbl text-brand mb-2 text-center">The full rundown</p>
+          <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight mb-6 text-center">Product details</h2>
+          <div className="divide-y divide-hair border-y border-hair">
+            {(product.productSubDes || product.productDes) && (
+              <details open className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Description<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary><p className="text-muted mt-3 text-sm leading-relaxed">{product.productSubDes || product.productDes}</p></details>
+            )}
+            {specs.length > 0 && (
+              <details className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Specifications<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary>
+                <div className="mt-3 text-sm">{specs.map((s, i) => <div key={i} className="flex justify-between py-1.5 border-b border-hair last:border-0"><span className="text-muted">{s.key}</span><span className="font-medium text-right">{s.value}</span></div>)}</div>
+              </details>
+            )}
+            <details className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Shipping &amp; Returns<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary><p className="text-muted mt-3 text-sm">Made to order, ships pan-India in 2–4 business days. 7-day easy returns.{product.isCodAvailable ? ' COD available.' : ''}</p></details>
+          </div>
+        </section>
+        </div>
+
+        {/* FAQ — helps buyers understand the product before purchase */}
+        {productFaqs.length > 0 && (
+          <section className="mt-16">
+            <p className="gl-lbl text-brand mb-2 text-center">Good to know</p>
+            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-8 text-center">Questions, answered</h2>
+            <div className="max-w-3xl mx-auto divide-y divide-hair border-y border-hair">
+              {productFaqs.map((f, i) => (
+                <details key={i} className="group py-4">
+                  <summary className="flex items-center justify-between gap-4 cursor-pointer font-bold list-none">
+                    <span>{f.q}</span>
+                    <span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span>
+                  </summary>
+                  <p className="text-muted text-sm mt-3 leading-relaxed">{f.a}</p>
+                </details>
               ))}
             </div>
           </section>
         )}
 
-        {/* WHY URBAN NOOK — comparison / trust table */}
-        <section className="mt-16">
-          <p className="gl-lbl text-brand mb-2 text-center">Why Urban Nook</p>
-          <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-8 text-center">Made different.</h2>
-          <div className="max-w-3xl mx-auto overflow-x-auto">
-            <div className="min-w-[560px] rounded-2xl border border-hair overflow-hidden">
-              <div className="grid grid-cols-[1.3fr_1fr_1fr_1fr]">
-                <div className="p-4" />
-                <div className="p-4 bg-brand text-white text-center font-extrabold">Urban Nook</div>
-                <div className="p-4 text-center font-bold text-muted">Local sellers</div>
-                <div className="p-4 text-center font-bold text-muted">Marketplace</div>
-              </div>
-              {[
-                ['3D-printed to order', 'Mass-produced', 'Warehouse stock'],
-                ['Original Indian design', 'Generic designs', 'Global templates'],
-                ['Handcrafted finish', 'Machine-made', 'Standardized'],
-                ['COD available', 'Prepaid only', 'Prepaid only'],
-                ['7-day easy returns', 'No returns', 'Complex returns'],
-                ['Made in India 🇮🇳', 'Imported', 'Imported'],
-              ].map((r, i) => (
-                <div key={i} className="grid grid-cols-[1.3fr_1fr_1fr_1fr] border-t border-hair">
-                  <div className="p-4 font-bold text-sm flex items-center">{r[0]}</div>
-                  <div className="p-4 bg-brand grid place-items-center"><span className="w-7 h-7 rounded-full bg-white/20 grid place-items-center text-white text-sm">✓</span></div>
-                  <div className="p-4 text-center text-xs text-faint flex items-center justify-center">{r[1]}</div>
-                  <div className="p-4 text-center text-xs text-faint flex items-center justify-center">{r[2]}</div>
+        {/* REVIEWS — full-bleed LIGHT-GREY (surface) band */}
+        <div className="w-screen ml-[calc(50%-50vw)] bg-surface mt-16">
+        <div id="reviews" className="max-w-[1280px] mx-auto px-5 py-14 md:py-16 scroll-mt-24">
+          <div className="flex items-start justify-between gap-4 mb-6">
+            <div>
+              <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">Ratings &amp; Reviews</h2>
+              {totalReviews > 0 && (
+                <div className="flex items-center gap-2 mt-2">
+                  <Stars n={avgRating || 5} className="text-base" />
+                  <span className="font-extrabold">{Number(avgRating || 0).toFixed(1)}</span>
+                  <span className="text-muted text-sm">· {totalReviews} review{totalReviews === 1 ? '' : 's'}</span>
                 </div>
-              ))}
+              )}
             </div>
-          </div>
-        </section>
-
-        {/* REVIEWS */}
-        <div id="reviews" className="mt-16 scroll-mt-24">
-          <div className="flex items-center justify-between gap-4 mb-6">
-            <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">Ratings &amp; Reviews</h2>
-            <button onClick={openReviewForm} className="gl-press bg-brand text-white font-bold text-sm px-5 py-2.5 rounded-xl hover:bg-brandHi">Write a review</button>
+            <button onClick={openReviewForm} className="gl-press shrink-0 bg-brand text-white font-bold text-sm px-5 py-2.5 rounded-xl hover:bg-brandHi">Write a review</button>
           </div>
 
           <div id="review-form-anchor" />
           {showReviewForm && (
-            <div className="border border-hair rounded-2xl p-6 mb-8 bg-surface">
+            <div className="border border-hair rounded-2xl p-6 mb-8 bg-paper">
               <p className="font-bold text-lg mb-3">{editingReviewId ? 'Edit your review' : 'Share your experience'}</p>
               <div className="flex gap-1 mb-3">
                 {[1, 2, 3, 4, 5].map((r) => <button key={r} onClick={() => setReviewForm((f) => ({ ...f, rating: r }))} className={`text-2xl leading-none ${r <= reviewForm.rating ? 'text-star' : 'text-hair'}`}>★</button>)}
               </div>
-              <textarea value={reviewForm.desc} onChange={(e) => setReviewForm((f) => ({ ...f, desc: e.target.value.slice(0, 500) }))} rows={4} placeholder="How's the product? (max 500 chars)" className="w-full border border-hair rounded-xl px-4 py-3 text-sm outline-none focus:border-brand bg-white resize-none" />
+              <textarea value={reviewForm.desc} onChange={(e) => setReviewForm((f) => ({ ...f, desc: e.target.value.slice(0, 500) }))} rows={4} placeholder="How's the product? (max 500 chars)" className="w-full border border-hair rounded-xl px-4 py-3 text-sm outline-none focus:border-brand bg-paper resize-none" />
               <div className="flex items-center gap-2 mt-3 flex-wrap">
                 {reviewImagePreviews.map((src, i) => (
                   <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden border border-hair"><img src={src} alt="" className="w-full h-full object-cover" /><button onClick={() => handleRemoveReviewImage(i)} className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-ink text-white text-xs grid place-items-center">×</button></div>
@@ -436,19 +624,29 @@ const ProductDetailPage = () => {
             </div>
           )}
 
-          <div className="grid lg:grid-cols-[280px_1fr] gap-8 items-start">
-            <div className="bg-surface border border-hair rounded-2xl p-6 text-center lg:sticky lg:top-24">
-              <div className="text-5xl font-extrabold">{avgRating ? Number(avgRating).toFixed(1) : '—'}</div>
-              <Stars n={avgRating || 0} className="text-lg block my-1" />
-              <p className="text-muted text-sm">{totalReviews} review{totalReviews === 1 ? '' : 's'}</p>
+          {/* {reviews.length > 0 && (
+            <div className="max-w-md mb-8 space-y-1.5">
+              {[5, 4, 3, 2, 1].map((star) => {
+                const c = ratingDist[star - 1];
+                const pct = reviews.length ? (c / reviews.length) * 100 : 0;
+                return (
+                  <div key={star} className="flex items-center gap-3 text-xs">
+                    <span className="w-9 text-muted tabular-nums shrink-0">{star} ★</span>
+                    <div className="flex-1 h-2 rounded-full bg-hair overflow-hidden"><div className="h-full bg-star rounded-full transition-all duration-500" style={{ width: `${pct}%` }} /></div>
+                    <span className="w-6 text-right text-faint tabular-nums shrink-0">{c}</span>
+                  </div>
+                );
+              })}
             </div>
-            <div className="grid sm:grid-cols-2 gap-4">
+          )} */}
+
+          <div className="grid sm:grid-cols-2 gap-4">
               {reviews.length === 0 ? (
-                <div className="sm:col-span-2 text-muted text-sm border border-hair rounded-2xl p-8 text-center">No reviews yet — be the first to review this product.</div>
-              ) : reviews.map((rev) => {
+                <div className="sm:col-span-2 text-muted text-sm bg-paper border border-hair rounded-2xl p-8 text-center">No reviews yet — be the first to review this product.</div>
+              ) : reviews.slice(0, visibleReviews).map((rev) => {
                 const imgs = rev.imageUrls?.length ? rev.imageUrls : rev.imageUrl ? [rev.imageUrl] : [];
                 return (
-                  <div key={rev._id} className="border border-hair rounded-2xl p-5">
+                  <div key={rev._id} className="bg-paper border border-hair rounded-2xl p-5">
                     <div className="flex items-center justify-between"><Stars n={rev.rating} className="text-sm" />{rev.userId && rev.userId === currentUserId && <button onClick={() => handleEditReview(rev)} className="text-xs text-brand font-semibold">Edit</button>}</div>
                     <p className="text-muted text-sm mt-2">{rev.desc}</p>
                     {imgs.length > 0 && (
@@ -459,7 +657,14 @@ const ProductDetailPage = () => {
                 );
               })}
             </div>
-          </div>
+          {reviews.length > visibleReviews && (
+            <div className="text-center mt-6">
+              <button onClick={() => setVisibleReviews((n) => n + 3)} className="gl-press border border-ink font-bold text-sm px-6 py-2.5 rounded-xl hover:bg-ink hover:text-white transition-colors">
+                Show more reviews ({reviews.length - visibleReviews} more)
+              </button>
+            </div>
+          )}
+        </div>
         </div>
 
         {/* related */}
@@ -471,6 +676,31 @@ const ProductDetailPage = () => {
         )}
       </div>
 
+      {/* sticky mobile Add-to-Cart bar — appears after the main CTA scrolls out of view */}
+      <AnimatePresence>
+        {!buyBoxVisible && product && !isLoading && (
+          <MotionDiv
+            initial={{ y: 90, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 90, opacity: 0 }}
+            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            className="md:hidden fixed inset-x-0 z-30 bg-paper/95 backdrop-blur border-t border-hair px-4 py-3 flex items-center gap-3"
+            style={{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom))' }}
+          >
+            <img src={variantImage(selectedVariant)} alt="" className="w-11 h-11 rounded-lg object-cover border border-hair shrink-0" onError={onImgErr} />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold truncate leading-tight">{product.productName}</p>
+              <p className="text-sm font-extrabold">{inr(currentPrice)}</p>
+            </div>
+            {isInCart ? (
+              <button onClick={handleCheckoutClick} className="gl-press bg-brand text-white font-bold text-sm px-6 h-11 rounded-xl shrink-0 hover:bg-brandHi">Checkout</button>
+            ) : (
+              <button onClick={handleInitialAddToCart} disabled={isAdding} className="gl-press bg-brand text-white font-bold text-sm px-6 h-11 rounded-xl shrink-0 hover:bg-brandHi disabled:opacity-60">{isAdding ? 'Adding…' : 'Add to Cart'}</button>
+            )}
+          </MotionDiv>
+        )}
+      </AnimatePresence>
+
       {/* feedback toast */}
       {feedbackMessage && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[120] bg-ink text-white text-sm font-semibold px-5 py-3 rounded-xl shadow-lg">{feedbackMessage}</div>}
 
@@ -478,7 +708,7 @@ const ProductDetailPage = () => {
       {lightbox && (
         <div className="fixed inset-0 z-[130] bg-black/80 grid place-items-center p-6" onClick={() => setLightbox(null)}>
           <img src={lightbox.list[lightbox.idx]} alt="" className="max-h-[85vh] max-w-full rounded-xl" onClick={(e) => e.stopPropagation()} />
-          <button className="absolute top-5 right-5 w-10 h-10 rounded-full bg-white text-ink grid place-items-center text-xl" onClick={() => setLightbox(null)}>×</button>
+          <button className="absolute top-5 right-5 w-10 h-10 rounded-full bg-paper text-ink grid place-items-center text-xl" onClick={() => setLightbox(null)}>×</button>
         </div>
       )}
     </div>

@@ -5,7 +5,7 @@ const OpenInBrowserBanner = () => {
   const [showBanner, setShowBanner] = useState(false);
 
   const headlines = [
-    "🚚 SHIPPING ₹149 ALL OVER INDIA",
+    "🚚 WE DELIVER ALL OVER INDIA",
     "🌿 WAITLIST MEMBERS: USE CODE WLUSER FOR EXCLUSIVE DISCOUNT",
   ];
 
@@ -20,7 +20,7 @@ const OpenInBrowserBanner = () => {
   return (
     <Link 
       to="/products"
-      className="fixed top-0 left-0 right-0 bg-[#a89068] text-white z-[9999] shadow-lg overflow-hidden block h-9 sm:h-10"
+      className="fixed top-0 left-0 right-0 bg-brand text-white z-[9999] shadow-lg overflow-hidden block h-9 sm:h-10"
     >
       <style>{`
         @keyframes marquee-banner {
@@ -50,8 +50,8 @@ const OpenInBrowserBanner = () => {
       </div>
       
       {/* Subtle close hint or indicator if needed, but here we just make it a link */}
-      <div className="absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-[#a89068] to-transparent z-10 pointer-events-none"></div>
-      <div className="absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-[#a89068] to-transparent z-10 pointer-events-none"></div>
+      <div className="absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-brand to-transparent z-10 pointer-events-none"></div>
+      <div className="absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-brand to-transparent z-10 pointer-events-none"></div>
     </Link>
   );
 };

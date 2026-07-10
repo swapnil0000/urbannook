@@ -143,7 +143,7 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
       >
         
         {/* --- LEFT SIDE (Hidden on Mobile) --- */}
-        <div className="hidden md:flex w-5/12 bg-[#1c3026] p-10 flex-col justify-between relative overflow-hidden">
+        <div className="hidden md:flex w-5/12 bg-ink p-10 flex-col justify-between relative overflow-hidden">
           <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
           
           <div className="relative z-10">
@@ -156,7 +156,7 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
             
             <h2 className="text-3xl font-serif text-white mb-6 leading-tight">
               Design your <br/>
-              <span className="italic text-[#F5DEB3]">dream space.</span>
+              <span className="italic text-brand">dream space.</span>
             </h2>
             
             <ul className="space-y-5">
@@ -167,7 +167,7 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
               ].map((item, idx) => (
                 <li key={idx} className="flex items-center gap-4 text-gray-300 text-sm">
                   <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center shrink-0">
-                    <i className={`fa-solid ${item.icon} text-[#F5DEB3] text-xs`}></i>
+                    <i className={`fa-solid ${item.icon} text-brand text-xs`}></i>
                   </div>
                   {item.text}
                 </li>
@@ -204,7 +204,7 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
         {/* --- RIGHT SIDE (Scrollable Form Area) --- */}
         <div ref={scrollContainerRef} className="w-full md:w-7/12 overflow-y-auto px-6 py-8 md:px-12 md:py-10 relative bg-white">
           <button 
-            className="absolute top-4 right-4 md:top-6 md:right-6 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:text-[#1c3026] transition-colors z-20" 
+            className="absolute top-4 right-4 md:top-6 md:right-6 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:text-ink transition-colors z-20"
             onClick={() => {
               dispatch(setShowLoginModal(false));
               onClose();
@@ -215,7 +215,7 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
 
           <div className="max-w-md mx-auto h-full flex flex-col justify-center">
             <div className="mb-2.5 md:mb-5 text-center md:text-left mt-2 md:mt-0">
-              <h2 className="text-2xl md:text-3xl font-serif text-[#1c3026] mb-1">Create Account</h2>
+              <h2 className="text-2xl md:text-3xl font-serif text-ink mb-1">Create Account</h2>
               <p className="text-gray-500 text-xs md:text-sm">Join us for a curated shopping experience.</p>
             </div>
 
@@ -231,7 +231,7 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
                     value={formData.name} 
                     onChange={handleInputChange} 
                     onFocus={handleAutoScroll}
-                    className={`w-full p-2.5 md:p-4 bg-white border rounded-2xl text-sm text-[#1c3026] focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10 outline-none transition-all ${
+                    className={`w-full p-2.5 md:p-4 bg-white border rounded-2xl text-sm text-ink focus:border-brand focus:ring-4 focus:ring-brand/10 outline-none transition-all ${
                       errors.name ? 'border-red-400' : 'border-gray-200'
                     }`}
                     placeholder="John Doe"
@@ -247,7 +247,7 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
                     value={formData.email} 
                     onChange={handleInputChange} 
                     onFocus={handleAutoScroll}
-                    className={`w-full p-2.5 md:p-4 bg-white border rounded-2xl text-sm text-[#1c3026] focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10 outline-none transition-all ${
+                    className={`w-full p-2.5 md:p-4 bg-white border rounded-2xl text-sm text-ink focus:border-brand focus:ring-4 focus:ring-brand/10 outline-none transition-all ${
                       errors.email ? 'border-red-400' : 'border-gray-200'
                     }`}
                     placeholder="john@example.com"
@@ -266,7 +266,7 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
                   onChange={handleInputChange} 
                   onFocus={handleAutoScroll} 
                   maxLength="10"
-                  className={`w-full p-2.5 md:p-4 bg-white border rounded-2xl text-sm text-[#1c3026] focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10 outline-none transition-all ${
+                  className={`w-full p-2.5 md:p-4 bg-white border rounded-2xl text-sm text-ink focus:border-brand focus:ring-4 focus:ring-brand/10 outline-none transition-all ${
                     errors.mobile ? 'border-red-400' : 'border-gray-200'
                   }`}
                   placeholder="9876543210"
@@ -286,14 +286,14 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
                       onChange={handleInputChange} 
                       onFocus={handleAutoScroll}
                       placeholder='••••••••'
-                      className={`w-full p-2.5 md:p-4 bg-white border rounded-2xl text-sm text-[#1c3026] pr-10 outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10 transition-all ${
+                      className={`w-full p-2.5 md:p-4 bg-white border rounded-2xl text-sm text-ink pr-10 outline-none focus:border-brand focus:ring-4 focus:ring-brand/10 transition-all ${
                         errors.password ? 'border-red-400' : 'border-gray-200'
                       }`}
                     />
                     <button 
                       type="button" 
                       onClick={() => setShowPwd(!showPwd)} 
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-600 p-1"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-brand p-1"
                     >
                       <i className={`fa-solid ${showPwd ? 'fa-eye-slash' : 'fa-eye'} text-xs`}></i>
                     </button>
@@ -310,14 +310,14 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
                       onChange={handleInputChange} 
                       onFocus={handleAutoScroll}
                       placeholder='••••••••'
-                      className={`w-full p-2.5 md:p-4 bg-white border rounded-2xl text-sm text-[#1c3026] pr-10 outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10 transition-all ${
+                      className={`w-full p-2.5 md:p-4 bg-white border rounded-2xl text-sm text-ink pr-10 outline-none focus:border-brand focus:ring-4 focus:ring-brand/10 transition-all ${
                         errors.confirmPassword ? 'border-red-400' : 'border-gray-200'
                       }`}
                     />
                     <button 
                       type="button" 
                       onClick={() => setShowConfirmPwd(!showConfirmPwd)} 
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-600 p-1"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-brand p-1"
                     >
                       <i className={`fa-solid ${showConfirmPwd ? 'fa-eye-slash' : 'fa-eye'} text-xs`}></i>
                     </button>
@@ -334,14 +334,14 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
               <button
                 type="submit" 
                 disabled={isRegistering || isSendingOtp}
-                className="w-full py-3 md:py-4 bg-emerald-600 text-white rounded-2xl font-bold uppercase tracking-widest text-xs hover:bg-emerald-700 transition-all shadow-lg active:scale-[0.98] mt-4 md:mt-6 disabled:opacity-50"
+                className="w-full py-3 md:py-4 bg-brand text-white rounded-2xl font-bold uppercase tracking-widest text-xs hover:bg-brandHi transition-all shadow-lg active:scale-[0.98] mt-4 md:mt-6 disabled:opacity-50"
               >
                 {isRegistering || isSendingOtp ? 'Processing...' : 'Sign Up'}
               </button>
 
               <div className="text-xs text-gray-500 mt-4 md:mt-6 pb-2">
                 Already have an account?{' '}
-                <span onClick={onSwitchToLogin} className="text-emerald-600 font-bold cursor-pointer underline">Login</span>
+                <span onClick={onSwitchToLogin} className="text-brand font-bold cursor-pointer underline">Login</span>
               </div>
             </form>
           </div>

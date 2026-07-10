@@ -7,7 +7,7 @@ const NewsTicker = () => (
     className="block bg-ink text-white text-center py-2 font-jakarta gl-lbl text-[10px] tracking-[0.18em] hover:bg-black transition-colors"
     aria-label="Shop all products"
   >
-    Free shipping over ₹999 · COD available · Made in India 🇮🇳 · New drop live now
+    Pan-India delivery · COD available · Made in India 🇮🇳 · New drop live now
   </Link>
 );
 

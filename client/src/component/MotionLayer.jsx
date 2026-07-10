@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
+import { animate } from 'motion';
 
 /**
  * URBAN NOOK — editorial "2040" motion layer.
- * Mounted once at app level. Adds a custom cursor + film grain, and wires
+ * Mounted once at app level. Adds film grain, and wires
  * up (via event delegation, so it survives route changes / re-renders):
  *   - magnetic pull on `.un-magnet`
  *   - 3D tilt + glare on `.un-card`
@@ -12,8 +13,6 @@ import { useEffect, useRef } from 'react';
  */
 const MotionLayer = () => {
   const grainRef = useRef(null);
-  const curRef = useRef(null);
-  const ringRef = useRef(null);
 
   useEffect(() => {
     const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -46,24 +45,8 @@ const MotionLayer = () => {
       document.querySelectorAll('.un-reveal').forEach((el) => el.classList.add('in'));
     }
 
-    /* ---------- cursor + grain + tilt + magnet (pointer devices only) ---------- */
+    /* ---------- 3D tilt + magnet (pointer devices only) ---------- */
     if (!coarse && !reduced) {
-      const cur = curRef.current, ring = ringRef.current;
-      let mx = innerWidth / 2, my = innerHeight / 2, rx = mx, ry = my, raf;
-      const onMove = (e) => { mx = e.clientX; my = e.clientY; };
-      addEventListener('mousemove', onMove, { passive: true });
-      const loop = () => {
-        rx += (mx - rx) * 0.16; ry += (my - ry) * 0.16;
-        if (cur) cur.style.transform = `translate(${mx}px,${my}px) translate(-50%,-50%)`;
-        if (ring) ring.style.transform = `translate(${rx}px,${ry}px) translate(-50%,-50%)`;
-        raf = requestAnimationFrame(loop);
-      };
-      loop();
-
-      const onOver = (e) => {
-        const t = e.target.closest && e.target.closest('a,button,.un-card,.un-chip,input,select,textarea,[data-cursor]');
-        if (ring) ring.classList.toggle('is-hover', !!t);
-      };
       const onTiltMove = (e) => {
         const mag = e.target.closest && e.target.closest('.un-magnet');
         if (mag) {
@@ -85,45 +68,29 @@ const MotionLayer = () => {
         const card = e.target.closest && e.target.closest('.un-card');
         if (card && !card.contains(e.relatedTarget)) card.style.transform = '';
       };
-      addEventListener('mouseover', onOver, { passive: true });
       addEventListener('mousemove', onTiltMove, { passive: true });
       addEventListener('mouseout', onTiltOut, { passive: true });
       cleanups.push(() => {
-        cancelAnimationFrame(raf);
-        removeEventListener('mousemove', onMove);
-        removeEventListener('mouseover', onOver);
         removeEventListener('mousemove', onTiltMove);
         removeEventListener('mouseout', onTiltOut);
       });
     }
 
-    /* ---------- Motion (motion.dev) press spring — progressive enhancement ---------- */
-    let disposed = false;
+    /* ---------- press spring on .un-btn / .un-chip (Motion, bundled locally) ---------- */
     if (!reduced) {
-      import(/* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/motion@11/+esm')
-        .then(({ animate, press }) => {
-          if (disposed || !press) return;
-          const onDown = (e) => {
-            const b = e.target.closest('.un-btn,.un-chip');
-            if (b) animate(b, { scale: 0.95 }, { duration: 0.12 }).finished
-              .then(() => animate(b, { scale: 1 }, { type: 'spring', stiffness: 460, damping: 15 }));
-          };
-          document.body.addEventListener('pointerdown', onDown);
-          cleanups.push(() => document.body.removeEventListener('pointerdown', onDown));
-        })
-        .catch(() => {});
+      const onDown = (e) => {
+        const b = e.target.closest && e.target.closest('.un-btn,.un-chip');
+        if (b) animate(b, { scale: 0.95 }, { duration: 0.12 }).finished
+          .then(() => animate(b, { scale: 1 }, { type: 'spring', stiffness: 460, damping: 15 }));
+      };
+      document.body.addEventListener('pointerdown', onDown);
+      cleanups.push(() => document.body.removeEventListener('pointerdown', onDown));
     }
 
-    return () => { disposed = true; cleanups.forEach((fn) => fn()); };
+    return () => { cleanups.forEach((fn) => fn()); };
   }, []);
 
-  return (
-    <>
-      <div ref={grainRef} className="un-grain" aria-hidden="true" />
-      <div ref={curRef} className="un-cursor" aria-hidden="true" />
-      <div ref={ringRef} className="un-cursor-ring" aria-hidden="true" />
-    </>
-  );
+  return <div ref={grainRef} className="un-grain" aria-hidden="true" />;
 };
 
 export default MotionLayer;

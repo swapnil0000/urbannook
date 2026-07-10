@@ -13,6 +13,8 @@ import AppRoutes from './store/AppRoutes';
 import NewsTicker from './pages/home/NewsTicker';
 import SEOHead from './component/SEOHead';
 import { trackPageView, setUserId, captureAttribution, setMetaAdvancedMatching } from './utils/analytics';
+import MotionLayer from './component/MotionLayer';
+import SmoothScroll from './component/motion/SmoothScroll';
 // check
 const ORG_STRUCTURED_DATA = {
   '@context': 'https://schema.org',
@@ -148,15 +150,17 @@ const SyncProvider = ({ children }) => {
 
 function App() {
   useEffect(() => {
-    console.log("%c URBAN NOOK CLIENT ACTIVE - VERSION 2.1.1 (STRICT VARIANT) ", "background: #2e443c; color: #F5DEB3; font-weight: bold; font-size: 14px; padding: 10px; border-radius: 5px;");
+    console.log("%c URBAN NOOK CLIENT ACTIVE - VERSION 2.1.1 (STRICT VARIANT) ", "background: #202223; color: #DF0024; font-weight: bold; font-size: 14px; padding: 10px; border-radius: 5px;");
   }, []);
 
   return (
     <HelmetProvider>
     <Provider store={store}>
-        <Router> 
+        <Router>
+          <SmoothScroll>
           <SEOHead structuredData={ORG_STRUCTURED_DATA} />
           <RouteTracker />
+          <MotionLayer />
           <SessionManager>
             <SyncProvider>
               <ErrorBoundary>
@@ -182,6 +186,7 @@ function App() {
               </Suspense>
             </SyncProvider>
           </SessionManager>
+          </SmoothScroll>
         </Router>
     </Provider>
     </HelmetProvider>

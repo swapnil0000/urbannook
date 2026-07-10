@@ -521,6 +521,12 @@
 .un-cursor-ring{width:38px;height:38px;border:1.5px solid #E63329;opacity:.5;transition:width .35s cubic-bezier(.2,.7,.2,1),height .35s cubic-bezier(.2,.7,.2,1),opacity .3s,background-color .3s}
 .un-cursor-ring.is-hover{width:60px;height:60px;background:rgba(230,51,41,.14);border-color:transparent;opacity:1}
 @media(hover:none),(pointer:coarse){.un-cursor,.un-cursor-ring,.un-grain{display:none!important}}
+/* When the editorial cursor is active (set by MotionLayer on fine-pointer devices), hide the
+   native cursor everywhere except text-entry fields so the caret stays usable. */
+@media(hover:hover) and (pointer:fine){
+  html.un-cursor-active,html.un-cursor-active *{cursor:none!important}
+  html.un-cursor-active input,html.un-cursor-active textarea,html.un-cursor-active [contenteditable]{cursor:text!important}
+}
 
 /* 3D tilt + glare cards */
 .un-tiltwrap{perspective:1000px}
