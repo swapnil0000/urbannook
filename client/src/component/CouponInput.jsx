@@ -1,15 +1,29 @@
 import { useState } from 'react';
-import { useApplyCouponMutation } from '../store/api/userApi';
+import { useApplyCouponMutation, useGetAvailableCouponsQuery, useLookupCouponMutation } from '../store/api/userApi';
 import { useUI, useAuth } from '../hooks/useRedux';
 
-const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved }) => {
+function calcLocalDiscount(coupon, subtotal) {
+  if (!subtotal || subtotal < (coupon.minCartValue || 0)) return 0;
+  if (coupon.discountType === 'PERCENTAGE') {
+    let amt = Math.floor((subtotal * coupon.discountValue) / 100);
+    if (coupon.maxDiscountCap) amt = Math.min(amt, coupon.maxDiscountCap);
+    return Math.min(amt, subtotal);
+  }
+  return Math.min(coupon.discountValue || 0, subtotal);
+}
+
+const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved, isGuest, cartTotal }) => {
   const [couponCode, setCouponCode] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  
+
   const [applyCoupon, { isLoading }] = useApplyCouponMutation();
   const { showNotification } = useUI();
   const { user } = useAuth();
+
+  // For guests: RTK Query already fetched this for the coupon modal — reuses the cache, no extra request
+  const { data: availableCoupons } = useGetAvailableCouponsQuery(undefined, { skip: !isGuest });
+  const [lookupCoupon, { isLoading: isLookingUp }] = useLookupCouponMutation();
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) {
@@ -20,28 +34,51 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
     setError('');
     setSuccess('');
 
+    if (isGuest) {
+      const cleanCode = couponCode.trim().toUpperCase();
+      // 1. Try the cached visible-coupons list first (no extra request)
+      let coupon = (availableCoupons?.data || []).find(c => c.code === cleanCode);
+
+      // 2. Not in the list? It may be a hidden/secret code — ask the server for its details.
+      if (!coupon) {
+        try {
+          const res = await lookupCoupon(cleanCode).unwrap();
+          coupon = (res?.data || [])[0];
+        } catch {
+          coupon = null;
+        }
+      }
+
+      if (!coupon) {
+        const msg = 'Invalid or inactive coupon code';
+        setError(msg);
+        showNotification(msg, 'error');
+        setTimeout(() => setError(''), 3000);
+        return;
+      }
+
+      const discountAmount = calcLocalDiscount(coupon, cartTotal || 0);
+      if (onCouponApplied) onCouponApplied({ code: cleanCode, discount: discountAmount });
+      setSuccess(`Coupon applied! You save ₹${discountAmount}`);
+      setCouponCode('');
+      setTimeout(() => setSuccess(''), 3000);
+      return;
+    }
+
     try {
       const result = await applyCoupon({
         couponCode: couponCode?.trim()?.toUpperCase(),
         email: user?.email
       }).unwrap();
-      
+
       if (result?.success) {
         const discountAmount = result.data?.summary?.discount || 0;
-        const successMessage = result.message || `Coupon applied! You saved ₹${discountAmount}`;
-        setSuccess(successMessage);
+        setSuccess(result.message || `Coupon applied! You saved ₹${discountAmount}`);
         setError('');
         setCouponCode('');
-        
-        // Notify parent component with full summary data
         if (onCouponApplied) {
-          onCouponApplied({
-            code: couponCode.trim().toUpperCase(),
-            discount: discountAmount,
-            summary: result.data?.summary
-          });
+          onCouponApplied({ code: couponCode.trim().toUpperCase(), discount: discountAmount, summary: result.data?.summary });
         }
-        
         setTimeout(() => setSuccess(''), 2000);
       } else {
         const errorMessage = result.message || 'Failed to apply coupon';
@@ -50,7 +87,6 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
         setTimeout(() => setError(''), 3000);
       }
     } catch (err) {
-      // Extract error message from backend response
       const errorMessage = err?.data?.message || err?.message || 'Invalid or expired coupon code';
       showNotification(errorMessage, "error");
       setError(errorMessage);
@@ -62,22 +98,16 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
     setError('');
     setSuccess('');
 
+    if (isGuest) {
+      if (onCouponRemoved) onCouponRemoved();
+      return;
+    }
+
     try {
-      // Call applyCoupon with null to remove the coupon
-      const result = await applyCoupon({
-        couponCode: null,
-        email: user?.email
-      }).unwrap();
-      
+      const result = await applyCoupon({ couponCode: null, email: user?.email }).unwrap();
       if (result.success) {
         setSuccess('Coupon removed');
-        
-        // Notify parent component
-        if (onCouponRemoved) {
-          onCouponRemoved();
-        }
-        
-        // Clear success message after 2 seconds
+        if (onCouponRemoved) onCouponRemoved();
         setTimeout(() => setSuccess(''), 2000);
       } else {
         setError(result.message || 'Failed to remove coupon');
@@ -88,9 +118,7 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      handleApplyCoupon();
-    }
+    if (e.key === 'Enter') handleApplyCoupon();
   };
 
   return (
@@ -105,15 +133,15 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
               onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
               onKeyDown={handleKeyPress}
               placeholder="Enter coupon code..."
-              disabled={isLoading}
-              className="flex-1 bg-white border border-hair rounded-xl px-4 py-3 text-ink  focus:outline-none focus:border-hair focus:ring-1 focus:ring-hair transition-all uppercase tracking-wider text-sm disabled:opacity-50"
+              disabled={isLoading || isLookingUp}
+              className="flex-1 bg-white border border-[#F5DEB3] rounded-xl px-4 py-3 text-[#2e443c]  focus:outline-none focus:border-[#F5DEB3] focus:ring-1 focus:ring-[#F5DEB3] transition-all uppercase tracking-wider text-sm disabled:opacity-50"
             />
             <button
               onClick={handleApplyCoupon}
-              disabled={isLoading || !couponCode.trim()}
-              className="px-6 py-3 bg-brand text-[#fff] rounded-xl font-bold uppercase tracking-wider text-xs hover:bg-brandHi transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isLoading || isLookingUp || !couponCode.trim()}
+              className="px-6 py-3 bg-[#a89068] text-[#fff] rounded-xl font-bold uppercase tracking-wider text-xs hover:bg-[#a89068] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? (
+              {(isLoading || isLookingUp) ? (
                 <i className="fa-solid fa-spinner fa-spin"></i>
               ) : (
                 'Apply'

@@ -2,57 +2,18 @@ import mongoose from "mongoose";
 
 const couponCodeSchema = mongoose.Schema(
   {
-    name: {
-      type: String,
-      required: true,
-      uppercase: true,
-      trim: true,
-    },
-
-    couponCodeId: {
-      type: String,
-      required: true,
-      unique: true,
-    },
-
-    discountType: {
-      type: String,
-      enum: ["PERCENTAGE", "FLAT"],
-      required: true,
-    },
-
-    discountValue: {
-      type: Number,
-      required: true,
-    },
-
-    maxDiscount: {
-      type: Number,
-      default: null,
-    },
-
-    minCartValue: {
-      type: Number,
-      default: 0,
-    },
-
-    isPublished: {
-      type: Boolean,
-      default: true,
-    },
-    desc: {
-      type: String,
-      required: false,
-      trim: true,
-    },
+    name: { type: String, uppercase: true, trim: true },
+    couponCodeId: { type: String },   // no unique:true — new model uses couponId instead
+    discountType: { type: String, enum: ["PERCENTAGE", "FLAT"] },
+    discountValue: { type: Number },
+    maxDiscount: { type: Number, default: null },
+    minCartValue: { type: Number, default: 0 },
+    isPublished: { type: Boolean, default: true },
+    desc: { type: String, trim: true },
   },
-  { timestamps: true },
+  { timestamps: true, autoIndex: false },  // autoIndex:false stops Mongoose recreating old indexes
 );
 
-// Indexes for performance optimization
-couponCodeSchema.index({ name: 1 }, { unique: true });
-couponCodeSchema.index({ isPublished: 1 });
-
-const CouponCode = mongoose.model("CouponCode", couponCodeSchema);
+const CouponCode = mongoose.model("CouponCode", couponCodeSchema, "couponcodes");
 
 export default CouponCode;
