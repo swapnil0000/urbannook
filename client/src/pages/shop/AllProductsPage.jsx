@@ -2,6 +2,7 @@ import { useMemo, useState, useRef, useCallback, memo, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useGetCategoriesQuery, useGetProductsQuery, useSearchProductsQuery } from '../../store/api/productsApi';
 import SEOHead from '../../component/SEOHead';
+import { trackViewItemList } from '../../utils/analytics';
 
 /* ─── Static product card (no auto-carousel for performance) ─────── */
 const SlimCard = memo(({ product, onClick }) => {

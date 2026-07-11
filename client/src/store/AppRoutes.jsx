@@ -16,6 +16,7 @@ import {
   Faq,
   Return,
   AboutPage,
+  ProductDetailPage,
 } from "../pages/index.js";
 import PaymentProcessing from "../pages/PaymentProcessing.jsx";
 import PaymentFailed from "../pages/PaymentFailed.jsx";
