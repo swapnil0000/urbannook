@@ -12,6 +12,8 @@ import { useSelector, useDispatch } from "react-redux";
 import { useCookies } from "react-cookie";
 import confetti from "canvas-confetti";
 import SEOHead from "../../component/SEOHead";
+import ComparisonTable from "../../component/ComparisonTable";
+import FreeShippingBanner from "../../component/FreeShippingBanner";
 import useTimer from "../../hooks/useTimer";
 import config from "../../config/env";
 import { trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist, trackVariantSelect } from "../../utils/analytics";
@@ -751,6 +753,10 @@ const ProductDetailPage = () => {
               )}
             </div>
 
+            <div className="w-full max-w-[500px]">
+              <FreeShippingBanner productId={product.productId} />
+            </div>
+
             {/* NAYA: Variant Selection Block - Ab yahan aayega (Badi image ke neeche aur thumbnails se pehle) */}
             {availableVariants && availableVariants.length > 0 && (
               <div className="w-full max-w-[500px] mt-8 bg-white/5 p-5 rounded-2xl border border-[#F5DEB3]/10">
@@ -1169,6 +1175,9 @@ const ProductDetailPage = () => {
               </p>
           </div>
         </div>
+
+        {/* ===== COMPARISON TABLE ===== */}
+        <ComparisonTable productName={product.productName} />
 
         {/* ===== REVIEWS SECTION ===== */}
         <div className="mt-16 pt-12 border-t border-[#1c3026]/10">

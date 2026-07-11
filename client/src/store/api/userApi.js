@@ -257,6 +257,14 @@ export const userApi = apiSlice.injectEndpoints({
         body: data,
       }),
     }),
+
+    // Free shipping offer — admin-configured cart-value threshold
+    getFreeShippingOffer: builder.query({
+      query: () => "free-shipping-offer",
+    }),
+    getFreeShippingBanner: builder.query({
+      query: (productId) => `free-shipping-offer/banner/${productId}`,
+    }),
   }),
 });
 
@@ -289,4 +297,6 @@ export const {
   useUpdateAddressMutation,
   useDeleteAddressMutation,
   useCalculateShippingMutation,
+  useGetFreeShippingOfferQuery,
+  useGetFreeShippingBannerQuery,
 } = userApi;

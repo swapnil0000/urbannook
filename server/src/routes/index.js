@@ -17,6 +17,7 @@ import eventRouter from "./event.route.js";
 import catalogRouter from "./catalog.route.js";
 import metaCapiRouter from "./meta.capi.route.js";
 import adminAnalyticsRouter from "./admin.analytics.route.js";
+import freeShippingOfferRouter from "./freeShippingOffer.route.js";
 export {
   userRouter,
   productRouter,
@@ -36,4 +37,5 @@ export {
   catalogRouter,
   metaCapiRouter,
   adminAnalyticsRouter,
+  freeShippingOfferRouter,
 };
