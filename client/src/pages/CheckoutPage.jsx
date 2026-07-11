@@ -13,6 +13,7 @@ import {
   useUpdateCartMutation,
   useUpdateUserProfileMutation,
   useCalculateShippingMutation,
+  useGetFreeShippingOfferQuery,
 } from "../store/api/userApi";
 import { setShowLoginModal, setLoginCallback } from "../store/slices/uiSlice";
 import { useUI } from "../hooks/useRedux";
@@ -71,8 +72,13 @@ const iconInput = (icon, children) => (
 
 const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, itemCount, isLoadingShipping, paymentMethod }) => {
   const shippingAmount = typeof shipping === "object" ? shipping?.amount : shipping;
+  // COD advance must be based on the REAL carrier rate, not the (possibly
+  // free-shipping-zeroed) charged amount — same real/charged split as the
+  // server. realAmount is only present on the object form; the plain-number
+  // form of `shipping` is legacy/display-only and never feeds COD math.
+  const realShippingAmount = typeof shipping === "object" ? (shipping?.realAmount ?? shipping?.amount) : shipping;
   const isCOD = paymentMethod === "COD";
-  const codPartialAmount = isCOD && shippingAmount ? Math.min(Math.ceil(shippingAmount) * 2, totalToPay) : 0;
+  const codPartialAmount = isCOD && realShippingAmount ? Math.min(Math.ceil(realShippingAmount) * 2, totalToPay) : 0;
   const codRemainingAmount = isCOD ? Math.max(0, totalToPay - codPartialAmount) : 0;
 
   return (
@@ -97,6 +103,10 @@ const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, it
             <span className="text-[10px] text-amber-600 font-bold uppercase tracking-wider">
               Enter address
             </span>
+          ) : shippingAmount === 0 ? (
+            <span className="text-emerald-600 font-bold uppercase tracking-wider text-xs">
+              Free
+            </span>
           ) : (
             `₹${Math.ceil(shippingAmount).toLocaleString()}`
           )}
@@ -119,7 +129,7 @@ const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, it
           <p className="text-[10px] text-gray-400 mt-0.5">Incl. GST</p>
         </div>
       </div>
-      {isCOD && shippingAmount > 0 && (
+      {isCOD && realShippingAmount > 0 && (
         <div className="border-t border-dashed border-amber-200 pt-3 space-y-0 rounded-xl bg-amber-50/60 -mx-1 px-3 pb-3 mt-1">
           <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-amber-600 mb-2.5 flex items-center gap-1.5">
             <i className="fa-solid fa-receipt text-[8px]" /> COD Breakdown
@@ -237,6 +247,7 @@ const CheckoutPage = () => {
   const { data: savedAddressData, refetch: refetchAddresses } =
     useGetSavedAddressesQuery(undefined, { skip: isGuest });
   const [calculateShipping, { isLoading: isCalculatingShipping }] = useCalculateShippingMutation();
+  const { data: freeShippingOfferData } = useGetFreeShippingOfferQuery();
 
   // When user logs in mid-checkout (guest → auth), AUTH_STEPS has fewer steps.
   // Clamp currentStep so STEPS[currentStep-1] is never undefined.
@@ -299,8 +310,21 @@ const CheckoutPage = () => {
   }, [cartItems.length, cartItems.reduce((s, i) => s + Number(i.quantity || 0), 0)]);
 
   useEffect(() => {
-    // Run shipping calculation on Review page when address/pincode is available
-    if (currentStep !== reviewStep || !pinCode || pinCode.toString().length !== 6 || cartItems.length === 0) {
+    // Run shipping calculation on Review page when address/pincode is available.
+    // Also wait for the free-shipping config to finish loading first — without
+    // this, the calc can run while freeShippingOfferData is still undefined,
+    // compute eligibility as false, and never re-run once the config arrives
+    // (it wasn't a dependency), leaving the wrong shipping amount stuck in the
+    // UI even though the backend — which recomputes fresh at order-submission
+    // time — applies free shipping correctly. Symptom: frontend shows a
+    // charge, Razorpay/backend charges the correct (free) amount.
+    if (
+      currentStep !== reviewStep ||
+      !pinCode ||
+      pinCode.toString().length !== 6 ||
+      cartItems.length === 0 ||
+      freeShippingOfferData === undefined
+    ) {
       return;
     }
 
@@ -326,10 +350,25 @@ const CheckoutPage = () => {
         if (cancelled) return;
 
         if (result.success && result.data) {
-          const shippingAmount = parseFloat(result.data.total_charges);
+          // Free shipping: admin-configured cart-value threshold. Still call
+          // the rate API above to confirm the pincode is serviceable, but
+          // zero the charged amount when subtotal clears the threshold.
+          const cartSubtotal = cartItems.reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0);
+          const offerConfig = freeShippingOfferData?.data;
+          const isFreeShippingEligible = offerConfig?.isActive && cartSubtotal > offerConfig.thresholdAmount;
+          console.log(
+            `[FreeShipping][Client] subtotal=₹${cartSubtotal} threshold=₹${offerConfig?.thresholdAmount} isActive=${offerConfig?.isActive} → eligible=${isFreeShippingEligible}`,
+          );
+          // realAmount = actual carrier rate, always — this is what the COD
+          // 2x-advance must be based on (matches the server's realShippingAmount).
+          // amount = what the customer's total/display reflects — 0 when free
+          // shipping applies. Keeping both on the object prevents the COD math
+          // from silently inheriting the free-shipping zero.
+          const realAmount = parseFloat(result.data.total_charges);
+          const shippingAmount = isFreeShippingEligible ? 0 : realAmount;
           setPricingDetails(prev => ({
             ...prev,
-            shipping: { ...result.data, amount: shippingAmount }
+            shipping: { ...result.data, amount: shippingAmount, realAmount }
           }));
           setShippingError("");
           trackDeliveryCheck({ pincode: pinCode, serviceable: true, shippingAmount, paymentMethod });
@@ -349,7 +388,7 @@ const CheckoutPage = () => {
 
     fetchShippingRate();
     return () => { cancelled = true; };
-  }, [currentStep, reviewStep, pinCode, cartItems.length, cartItems.reduce((s, i) => s + Number(i.quantity || 0), 0), paymentMethod]);
+  }, [currentStep, reviewStep, pinCode, cartItems.length, cartItems.reduce((s, i) => s + Number(i.quantity || 0), 0), paymentMethod, freeShippingOfferData]);
 
   useEffect(() => {
     if (savedAddressData?.success) {
@@ -809,6 +848,11 @@ const CheckoutPage = () => {
   const shippingAmount = typeof pricingDetails.shipping === "number"
     ? pricingDetails.shipping
     : (pricingDetails.shipping?.amount ?? 0);
+  // Real carrier rate — COD's 2x advance must be based on this, never on
+  // `shippingAmount` above (which is 0 when free shipping applies).
+  const realShippingAmount = typeof pricingDetails.shipping === "number"
+    ? pricingDetails.shipping
+    : (pricingDetails.shipping?.realAmount ?? pricingDetails.shipping?.amount ?? 0);
   const totalToPay = pricingDetails.subtotal + shippingAmount - pricingDetails.discount;
   const userName = isGuest ? guestName : (userProfile?.userName || userProfile?.name || "");
   const userInitials = userName ? userName.split(" ").filter(Boolean).map((w) => w[0]).join("").toUpperCase().slice(0, 2) : "?";
@@ -1363,9 +1407,9 @@ const CheckoutPage = () => {
                         <p className={`text-sm font-bold transition-colors ${paymentMethod === "COD" ? "text-[#a89068]" : "text-gray-800"}`}>
                           Cash on Delivery
                         </p>
-                        {paymentMethod === "COD" && shippingAmount > 0 ? (
+                        {paymentMethod === "COD" && realShippingAmount > 0 ? (
                           <p className="text-xs text-[#a89068]/80 font-medium mt-0.5">
-                            ₹{Math.min(Math.ceil(shippingAmount) * 2, totalToPay).toLocaleString()} now · ₹{Math.max(0, totalToPay - Math.min(Math.ceil(shippingAmount) * 2, totalToPay)).toLocaleString()} at delivery
+                            ₹{Math.min(Math.ceil(realShippingAmount) * 2, totalToPay).toLocaleString()} now · ₹{Math.max(0, totalToPay - Math.min(Math.ceil(realShippingAmount) * 2, totalToPay)).toLocaleString()} at delivery
                           </p>
                         ) : (
                           <p className="text-xs text-gray-400 mt-0.5">Small advance online · rest at your door</p>
@@ -1511,8 +1555,8 @@ const CheckoutPage = () => {
                     ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Processing…</>
                     : isCalculatingShipping
                     ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Calculating…</>
-                    : paymentMethod === "COD" && shippingAmount > 0
-                    ? <><i className="fa-solid fa-hand-holding-dollar text-xs opacity-70" /> Pay ₹{Math.min(Math.ceil(shippingAmount) * 2, totalToPay).toLocaleString()} Advance</>
+                    : paymentMethod === "COD" && realShippingAmount > 0
+                    ? <><i className="fa-solid fa-hand-holding-dollar text-xs opacity-70" /> Pay ₹{Math.min(Math.ceil(realShippingAmount) * 2, totalToPay).toLocaleString()} Advance</>
                     : <><i className="fa-solid fa-lock text-xs opacity-70" /> Pay ₹{totalToPay.toLocaleString()}</>
                   }
                 </button>
@@ -1538,8 +1582,8 @@ const CheckoutPage = () => {
                   {paymentMethod === "COD" ? "Pay Now" : "Total"}
                 </p>
                 <p className="text-lg font-bold text-[#2e443c]">
-                  ₹{(paymentMethod === "COD" && shippingAmount > 0
-                    ? Math.min(Math.ceil(shippingAmount) * 2, totalToPay)
+                  ₹{(paymentMethod === "COD" && realShippingAmount > 0
+                    ? Math.min(Math.ceil(realShippingAmount) * 2, totalToPay)
                     : totalToPay
                   ).toLocaleString()}
                 </p>
@@ -1553,7 +1597,7 @@ const CheckoutPage = () => {
                   ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Processing…</>
                   : isCalculatingShipping
                   ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Calculating…</>
-                  : paymentMethod === "COD" && shippingAmount > 0
+                  : paymentMethod === "COD" && realShippingAmount > 0
                   ? <> Pay Advance</>
                   : <><i className="fa-solid fa-lock text-[10px] opacity-70" /> Pay Now</>
                 }
