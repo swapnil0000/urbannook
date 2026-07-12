@@ -265,6 +265,11 @@ export const userApi = apiSlice.injectEndpoints({
     getFreeShippingBanner: builder.query({
       query: (productId) => `free-shipping-offer/banner/${productId}`,
     }),
+    // Used on checkout to find a banner matching whatever's in the cart —
+    // checkout isn't tied to one product page like the PDP is.
+    getAllFreeShippingBanners: builder.query({
+      query: () => "free-shipping-offer/banners",
+    }),
   }),
 });
 
@@ -299,4 +304,5 @@ export const {
   useCalculateShippingMutation,
   useGetFreeShippingOfferQuery,
   useGetFreeShippingBannerQuery,
+  useGetAllFreeShippingBannersQuery,
 } = userApi;

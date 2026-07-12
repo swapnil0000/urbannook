@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense, useRef, Fragment } from "react";
+import { useState, useEffect, useMemo, lazy, Suspense, useRef, Fragment } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 
@@ -14,12 +14,14 @@ import {
   useUpdateUserProfileMutation,
   useCalculateShippingMutation,
   useGetFreeShippingOfferQuery,
+  useGetAllFreeShippingBannersQuery,
 } from "../store/api/userApi";
 import { setShowLoginModal, setLoginCallback } from "../store/slices/uiSlice";
 import { useUI } from "../hooks/useRedux";
 import { clearCart, removeItem } from "../store/slices/cartSlice";
 import { fetchCsrfToken } from "../store/api/apiSlice";
 import CouponInput from "../component/CouponInput";
+import FreeShippingBanner from "../component/FreeShippingBanner";
 import { ComponentLoader } from "../component/layout/LoadingSpinner";
 import { trackBeginCheckout, trackPurchase, trackAddShippingInfo, trackAddPaymentInfo, trackPaymentFailed, trackPaymentModalDismissed, trackCheckoutStep, trackOrderCreated, trackSelectPaymentMethod, trackDeliveryCheck, getFbCookies, getAnonymousId, cacheAddressForCapi, setMetaAdvancedMatching } from "../utils/analytics";
 
@@ -70,6 +72,155 @@ const iconInput = (icon, children) => (
   </div>
 );
 
+// Green "You're saving ₹X" banner. Savings = (subtotal + real shipping) −
+// what they're actually paying — i.e. every rupee shaved off, whether from
+// a coupon or from the free-shipping offer, in one honest number.
+const SavingsBanner = ({ amount, freeShipping = false }) => (
+  <div
+    style={{
+      position: "relative",
+      display: "flex",
+      alignItems: "center",
+      gap: 14,
+      width: "100%",
+      minHeight: 64,
+      boxSizing: "border-box",
+      padding: "14px 16px",
+      borderRadius: 16,
+      background:
+        "linear-gradient(135deg, oklch(0.93 0.09 152) 0%, oklch(0.90 0.11 150) 60%, oklch(0.92 0.10 148) 100%)",
+      overflow: "hidden",
+      textAlign: "center",
+    }}
+  >
+    {/* diagonal shine streaks */}
+    <div
+      style={{
+        position: "absolute",
+        top: "-40%",
+        left: "55%",
+        width: 60,
+        height: "220%",
+        background: "linear-gradient(120deg, transparent 0%, oklch(1 0 0 / 0.35) 45%, transparent 100%)",
+        transform: "rotate(18deg)",
+        pointerEvents: "none",
+      }}
+    />
+    <div
+      style={{
+        position: "absolute",
+        top: "-40%",
+        left: "78%",
+        width: 24,
+        height: "220%",
+        background: "linear-gradient(120deg, transparent 0%, oklch(1 0 0 / 0.22) 45%, transparent 100%)",
+        transform: "rotate(18deg)",
+        pointerEvents: "none",
+      }}
+    />
+
+    {/* seal badge */}
+    <div
+      style={{
+        position: "relative",
+        flex: "0 0 auto",
+        width: 38,
+        height: 38,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1,
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          inset: -6,
+          borderRadius: "50%",
+          background: "oklch(0.62 0.14 155 / 0.35)",
+          filter: "blur(6px)",
+        }}
+      />
+      <div
+        style={{
+          position: "relative",
+          width: 36,
+          height: 36,
+          background: "oklch(0.47 0.10 165)",
+          clipPath:
+            "polygon(50% 0%, 61% 7%, 73% 2%, 79% 13%, 91% 15%, 92% 27%, 100% 35%, 95% 46%, 100% 57%, 91% 65%, 89% 77%, 77% 78%, 70% 89%, 58% 84%, 47% 92%, 38% 83%, 26% 87%, 21% 76%, 9% 73%, 11% 61%, 2% 52%, 9% 42%, 5% 30%, 16% 25%, 19% 13%, 31% 14%, 39% 4%)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <span style={{ color: "oklch(0.99 0 0)", fontSize: 16, fontWeight: 700, lineHeight: 1 }}>%</span>
+      </div>
+    </div>
+
+    {/* text */}
+    <div
+      style={{
+        position: "relative",
+        zIndex: 1,
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 3,
+      }}
+    >
+      {/* Big prominent free-shipping line — only when the offer combo has
+          actually zeroed the shipping charge. */}
+      {freeShipping && (
+        <span
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 7,
+            fontSize: 17,
+            fontWeight: 800,
+            letterSpacing: "0.02em",
+            textTransform: "uppercase",
+            lineHeight: 1.1,
+            color: "oklch(0.30 0.05 155)",
+          }}
+        >
+          <i className="fa-solid fa-truck-fast" style={{ color: "oklch(0.47 0.10 165)" }} />
+          Free Shipping Unlocked
+        </span>
+      )}
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "center",
+          flexWrap: "wrap",
+          gap: 5,
+          fontSize: freeShipping ? 13 : 17,
+          fontWeight: 500,
+          color: "oklch(0.30 0.05 155)",
+        }}
+      >
+        <span>You're saving</span>
+        <span style={{ position: "relative", fontWeight: 800, color: "oklch(0.16 0.01 155)", display: "inline-block" }}>
+          ₹{amount.toLocaleString()}
+          <svg
+            viewBox="0 0 100 14"
+            preserveAspectRatio="none"
+            style={{ position: "absolute", left: -2, right: -2, bottom: -7, width: "calc(100% + 4px)", height: 10 }}
+          >
+            <path d="M2,7 Q50,2 98,8" fill="none" stroke="oklch(0.55 0.14 155)" strokeWidth="3.5" strokeLinecap="round" />
+          </svg>
+        </span>
+        <span>on this order</span>
+      </div>
+    </div>
+  </div>
+);
+
 const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, itemCount, isLoadingShipping, paymentMethod }) => {
   const shippingAmount = typeof shipping === "object" ? shipping?.amount : shipping;
   // COD advance must be based on the REAL carrier rate, not the (possibly
@@ -81,54 +232,73 @@ const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, it
   const codPartialAmount = isCOD && realShippingAmount ? Math.min(Math.ceil(realShippingAmount) * 2, totalToPay) : 0;
   const codRemainingAmount = isCOD ? Math.max(0, totalToPay - codPartialAmount) : 0;
 
+  const isShippingFree = shippingAmount === 0 && realShippingAmount > 0;
+  const hasDiscount = appliedCoupon && discount > 0;
+  // (lamp + stand + ... + real shipping) − what they're actually paying = savings.
+  const totalSavings = Math.max(0, subtotal + (realShippingAmount || 0) - totalToPay);
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <div className="flex justify-between items-center text-sm">
         <span className="text-gray-500">
-          Subtotal{" "}
+          Cart value{" "}
           <span className="text-gray-400">
             ({itemCount} item{itemCount !== 1 ? "s" : ""})
           </span>
         </span>
-        <span className="font-medium text-gray-800">
+        <span className="font-bold text-gray-900">
           ₹{subtotal.toLocaleString()}
         </span>
       </div>
+
       <div className="flex justify-between items-center text-sm">
-        <span className="text-gray-500">Delivery</span>
-        <span className="font-medium text-gray-800">
+        <span className="text-gray-500">Shipping</span>
+        <span className="font-bold text-gray-900">
           {isLoadingShipping ? (
             <span className="inline-block w-16 h-3.5 bg-gray-200 rounded animate-pulse" />
           ) : shippingAmount === null || shippingAmount === undefined ? (
             <span className="text-[10px] text-amber-600 font-bold uppercase tracking-wider">
               Enter address
             </span>
-          ) : shippingAmount === 0 ? (
-            <span className="text-emerald-600 font-bold uppercase tracking-wider text-xs">
-              Free
+          ) : isShippingFree ? (
+            // Free shipping applied — show the real carrier amount struck
+            // through with a green FREE beside it, instead of a separate
+            // "shipping discount" line.
+            <span className="flex items-center gap-2">
+              <span className="text-gray-400 font-normal line-through">
+                ₹{Math.ceil(realShippingAmount).toLocaleString()}
+              </span>
+              <span className="text-emerald-600 font-bold uppercase tracking-wider text-xs">Free</span>
             </span>
+          ) : realShippingAmount ? (
+            `₹${Math.ceil(realShippingAmount).toLocaleString()}`
           ) : (
-            `₹${Math.ceil(shippingAmount).toLocaleString()}`
+            <span className="text-emerald-600 font-bold uppercase tracking-wider text-xs">Free</span>
           )}
         </span>
       </div>
-      {appliedCoupon && discount > 0 && (
-        <div className="flex justify-between items-center text-sm font-semibold text-emerald-600 bg-emerald-50 rounded-xl px-3.5 py-2.5 -mx-1">
-          <span className="flex items-center gap-2">
-            <i className="fa-solid fa-tag text-xs" /> {appliedCoupon}
-          </span>
-          <span>−₹{discount.toLocaleString()}</span>
+
+      {hasDiscount && (
+        <div className="flex justify-between items-center text-sm">
+          <span className="text-rose-700">Discount applied</span>
+          <span className="font-bold text-rose-700">−₹{discount.toLocaleString()}</span>
         </div>
       )}
-      <div className="border-t border-gray-100 pt-3 flex justify-between items-center">
-        <span className="font-bold text-gray-900">Total</span>
-        <div className="text-right">
-          <span className="text-2xl font-bold text-[#2e443c]">
-            ₹{totalToPay.toLocaleString()}
-          </span>
-          <p className="text-[10px] text-gray-400 mt-0.5">Incl. GST</p>
+
+      <div className="border-t border-gray-100 pt-3">
+        <div className="flex justify-between items-center">
+          <span className="font-bold text-gray-900">Total</span>
+          <div className="text-right">
+            <span className="text-2xl font-bold text-[#2e443c]">
+              ₹{totalToPay.toLocaleString()}
+            </span>
+            <p className="text-[10px] text-gray-400 mt-0.5">Incl. GST</p>
+          </div>
         </div>
       </div>
+
+      {totalSavings > 0 && <SavingsBanner amount={totalSavings} freeShipping={isShippingFree} />}
+
       {isCOD && realShippingAmount > 0 && (
         <div className="border-t border-dashed border-amber-200 pt-3 space-y-0 rounded-xl bg-amber-50/60 -mx-1 px-3 pb-3 mt-1">
           <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-amber-600 mb-2.5 flex items-center gap-1.5">
@@ -248,6 +418,52 @@ const CheckoutPage = () => {
     useGetSavedAddressesQuery(undefined, { skip: isGuest });
   const [calculateShipping, { isLoading: isCalculatingShipping }] = useCalculateShippingMutation();
   const { data: freeShippingOfferData } = useGetFreeShippingOfferQuery();
+  const { data: allFreeShippingBannersData } = useGetAllFreeShippingBannersQuery();
+
+  // Checkout-only nudge: if the cart hasn't crossed the free-shipping
+  // threshold yet, show a banner for the first cart item that has one
+  // configured, so a customer who missed it on the PDP gets one more chance
+  // before paying. Free shipping is a product-COMBO rule (source + recommended
+  // both in cart), so we show the banner for a combo whose source product IS
+  // in the cart but whose recommended add-on ISN'T yet — that's the only case
+  // with something left to upsell. If both are already in the cart the combo
+  // is complete (nothing to nudge), and if the source isn't in the cart the
+  // offer doesn't apply to this cart at all.
+  // TODO: only supports a single banner (first match) even if multiple cart
+  // items each have one configured — fine for now (single active offer),
+  // revisit if multiple simultaneous offers are ever needed.
+  const checkoutBannerProductId = useMemo(() => {
+    const offerConfig = freeShippingOfferData?.data;
+    if (!offerConfig?.isActive) return null;
+
+    const banners = allFreeShippingBannersData?.data || [];
+    if (banners.length === 0) return null;
+
+    const cartProductIds = new Set(cartItems.map((i) => i.mongoId || i.id?.split(":")[0]));
+    const match = banners.find(
+      (b) => cartProductIds.has(b.sourceProductId) && !cartProductIds.has(b.recommendedProductId),
+    );
+    return match?.sourceProductId || null;
+  }, [freeShippingOfferData, allFreeShippingBannersData, cartItems]);
+
+  // The moment adding the recommended item pushes the cart over the
+  // threshold, `checkoutBannerProductId` above flips to null in the SAME
+  // render as the cart update — which used to unmount FreeShippingBanner
+  // outright, killing its own bar-fill/confetti/"Unlocked" celebration
+  // sequence mid-flight. Hold the last non-null id visible for a beat after
+  // it goes null so that sequence gets to finish before we actually remove
+  // the banner from the page.
+  const [visibleBannerProductId, setVisibleBannerProductId] = useState(null);
+  useEffect(() => {
+    if (checkoutBannerProductId) {
+      setVisibleBannerProductId(checkoutBannerProductId);
+      return;
+    }
+    if (!visibleBannerProductId) return;
+    const timer = setTimeout(() => setVisibleBannerProductId(null), 1900);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally omits visibleBannerProductId so the timer isn't re-armed by its own update
+  }, [checkoutBannerProductId]);
 
   // When user logs in mid-checkout (guest → auth), AUTH_STEPS has fewer steps.
   // Clamp currentStep so STEPS[currentStep-1] is never undefined.
@@ -350,14 +566,20 @@ const CheckoutPage = () => {
         if (cancelled) return;
 
         if (result.success && result.data) {
-          // Free shipping: admin-configured cart-value threshold. Still call
-          // the rate API above to confirm the pincode is serviceable, but
-          // zero the charged amount when subtotal clears the threshold.
-          const cartSubtotal = cartItems.reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0);
+          // Free shipping: product-COMBO rule. Still call the rate API above to
+          // confirm the pincode is serviceable, but zero the charged amount
+          // only when the cart contains a full offer combo (source +
+          // recommended product). Mirrors the server's isFreeShippingEligible.
           const offerConfig = freeShippingOfferData?.data;
-          const isFreeShippingEligible = offerConfig?.isActive && cartSubtotal > offerConfig.thresholdAmount;
+          const banners = allFreeShippingBannersData?.data || [];
+          const cartProductIds = new Set(cartItems.map((i) => i.mongoId || i.id?.split(":")[0]));
+          const isFreeShippingEligible =
+            !!offerConfig?.isActive &&
+            banners.some(
+              (b) => cartProductIds.has(b.sourceProductId) && cartProductIds.has(b.recommendedProductId),
+            );
           console.log(
-            `[FreeShipping][Client] subtotal=₹${cartSubtotal} threshold=₹${offerConfig?.thresholdAmount} isActive=${offerConfig?.isActive} → eligible=${isFreeShippingEligible}`,
+            `[FreeShipping][Client] cartIds=[${[...cartProductIds].join(",")}] isActive=${offerConfig?.isActive} → eligible=${isFreeShippingEligible}`,
           );
           // realAmount = actual carrier rate, always — this is what the COD
           // 2x-advance must be based on (matches the server's realShippingAmount).
@@ -388,7 +610,7 @@ const CheckoutPage = () => {
 
     fetchShippingRate();
     return () => { cancelled = true; };
-  }, [currentStep, reviewStep, pinCode, cartItems.length, cartItems.reduce((s, i) => s + Number(i.quantity || 0), 0), paymentMethod, freeShippingOfferData]);
+  }, [currentStep, reviewStep, pinCode, cartItems.length, cartItems.reduce((s, i) => s + Number(i.quantity || 0), 0), paymentMethod, freeShippingOfferData, allFreeShippingBannersData]);
 
   useEffect(() => {
     if (savedAddressData?.success) {
@@ -871,7 +1093,6 @@ const CheckoutPage = () => {
 
   return (
     <div className="bg-[#f5f7f5]">
-
       {/* ── Step wizard ────────────────────────────────────────────────── */}
       <div className="bg-white border-b border-gray-100 pt-28 lg:pt-36">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 pb-6">
@@ -1343,6 +1564,11 @@ const CheckoutPage = () => {
                   </div>
                   <div className="px-5 py-4 border-t border-gray-50"><PriceRows subtotal={pricingDetails.subtotal} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} isLoadingShipping={isCalculatingShipping} paymentMethod={paymentMethod} /></div>
                 </div>
+                {visibleBannerProductId && (
+                  <div className="px-5 pb-5">
+                    <FreeShippingBanner productId={visibleBannerProductId} variant="light" showQuantityStepper />
+                  </div>
+                )}
               </div>
 
               {/* Payment Method Selection */}
@@ -1542,6 +1768,12 @@ const CheckoutPage = () => {
             <div className="px-5 py-5 border-t border-gray-100">
               <PriceRows subtotal={pricingDetails.subtotal} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} isLoadingShipping={isCalculatingShipping} paymentMethod={paymentMethod} />
             </div>
+
+            {visibleBannerProductId && (
+              <div className="px-5 pb-5">
+                <FreeShippingBanner productId={visibleBannerProductId} variant="light" showQuantityStepper />
+              </div>
+            )}
 
             {/* Pay button (review step only) */}
             {currentStep === reviewStep && (

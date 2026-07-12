@@ -25,4 +25,18 @@ const getBannerForProductController = asyncHandler(async (req, res) => {
   return res.status(200).json(new ApiRes(200, "OK", banner, true));
 });
 
-export { getFreeShippingConfigController, getBannerForProductController };
+// Public: all active banners across every product. Used on checkout (which
+// isn't tied to a single product page) to find a banner matching whatever's
+// in the cart. Cart could contain items from multiple source products, each
+// with its own banner — for now we only ever show ONE banner on checkout
+// (first match, picked client-side), so this just returns the raw active
+// list and lets the client decide. Revisit if/when multi-banner display on
+// checkout is actually needed — see matching TODO comment in CheckoutPage.jsx.
+const getAllActiveBannersController = asyncHandler(async (_req, res) => {
+  const offer = await FreeShippingOffer.findOne({ isActive: true }).select("banners").lean();
+  const banners = (offer?.banners || []).filter((b) => b.isActive);
+
+  return res.status(200).json(new ApiRes(200, "OK", banners, true));
+});
+
+export { getFreeShippingConfigController, getBannerForProductController, getAllActiveBannersController };
