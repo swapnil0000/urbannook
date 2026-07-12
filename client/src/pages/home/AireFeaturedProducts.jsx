@@ -36,7 +36,7 @@ const AireFeaturedProducts = memo(() => {
         listName: 'Home Featured',
         index: 0,
       });
-      navigate(`/shop?product=${featuredProduct.productId}`);
+      navigate(`/product/${featuredProduct.productId}`);
     }
   }, [navigate, featuredProduct]);
 

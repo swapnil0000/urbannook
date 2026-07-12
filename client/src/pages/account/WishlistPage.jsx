@@ -131,7 +131,7 @@ const WishlistPage = () => {
               <h2 className="text-2xl font-serif text-white mb-2">Your collection is empty</h2>
               <p className="text-green-50/60 mb-6 font-light">Save your favorite pieces to easily find them later.</p>
               <button
-                onClick={() => navigate('/shop')}
+                onClick={() => navigate('/products')}
                 className="bg-[#F5DEB3] text-[#2e443c] px-8 py-3 rounded-full font-bold uppercase tracking-widest text-xs hover:bg-white transition-colors"
               >
                 Explore Collection
@@ -166,7 +166,7 @@ const WishlistPage = () => {
                         listName: 'Wishlist',
                         index,
                       });
-                      navigate(`/shop?product=${item.productId}`);
+                      navigate(`/product/${item.productId}`);
                     }}
                   >
 

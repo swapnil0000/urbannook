@@ -257,19 +257,6 @@ export const userApi = apiSlice.injectEndpoints({
         body: data,
       }),
     }),
-
-    // Free shipping offer — admin-configured cart-value threshold
-    getFreeShippingOffer: builder.query({
-      query: () => "free-shipping-offer",
-    }),
-    getFreeShippingBanner: builder.query({
-      query: (productId) => `free-shipping-offer/banner/${productId}`,
-    }),
-    // Used on checkout to find a banner matching whatever's in the cart —
-    // checkout isn't tied to one product page like the PDP is.
-    getAllFreeShippingBanners: builder.query({
-      query: () => "free-shipping-offer/banners",
-    }),
   }),
 });
 
@@ -302,7 +289,4 @@ export const {
   useUpdateAddressMutation,
   useDeleteAddressMutation,
   useCalculateShippingMutation,
-  useGetFreeShippingOfferQuery,
-  useGetFreeShippingBannerQuery,
-  useGetAllFreeShippingBannersQuery,
 } = userApi;

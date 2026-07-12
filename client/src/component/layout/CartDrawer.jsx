@@ -165,7 +165,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
               <button 
                 onClick={() => {
                   onClose();
-                  navigate('/shop');
+                  navigate('/products');
                 }}
                 className="px-8 py-3.5 bg-[#0a110e] text-white text-xs font-bold uppercase tracking-[0.15em] rounded-full hover:bg-[#1a2b24] transition-all duration-300"
               >
