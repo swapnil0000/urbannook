@@ -1,437 +1,250 @@
-import { useMemo, useState, useRef, useCallback, memo, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { useGetCategoriesQuery, useGetProductsQuery, useSearchProductsQuery } from '../../store/api/productsApi';
+import { useState, useMemo, useEffect, lazy, Suspense } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useGetProductsQuery } from '../../store/api/productsApi';
 import SEOHead from '../../component/SEOHead';
-import { trackViewItemList } from '../../utils/analytics';
+import { trackViewItemList, trackSelectItem } from '../../utils/analytics';
 
-/* ─── Static product card (no auto-carousel for performance) ─────── */
-const SlimCard = memo(({ product, onClick }) => {
-  const img = product.variantDetails?.[0]?.variantImage?.[0] || product.productImg || null;
-  const price = product.variantDetails?.[0]?.variantPrice;
+const PlaceholderImage = lazy(() => import('../../component/PlaceholderImage'));
+const WishlistButton = lazy(() => import('../../component/WishlistButton'));
 
-  return (
-    <div
-      className="flex-shrink-0 w-[155px] sm:w-[185px] md:w-[205px] rounded-2xl overflow-hidden cursor-pointer
-                 bg-white/5 border border-[#a89068]/40 hover:border-[#F5DEB3] hover:shadow-xl
-                 transition-all duration-300 group"
-      onClick={onClick}
-    >
-      <div className="w-full aspect-square bg-[#f8f8f5] overflow-hidden rounded-t-2xl">
-        {img ? (
-          <img
-            src={img}
-            alt={product.productName}
-            loading="lazy"
-            decoding="async"
-            className="w-full h-full object-cover mix-blend-multiply group-hover:scale-105 transition-transform duration-500"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <i className="fa-solid fa-image text-3xl text-gray-300" />
-          </div>
-        )}
-      </div>
-      <div className="px-3 bg-[#faf9f6] rounded-b-2xl h-[68px] flex flex-col justify-center">
-        <p className="text-sm font-serif text-[#2e443c] leading-snug line-clamp-2 group-hover:text-[#4a6b5d] transition-colors duration-300">
-          {product.productName}
-        </p>
-        {price > 0 && (
-          <p className="text-xs text-[#2e443c]/60 mt-1 font-mono">₹{price.toLocaleString()}</p>
-        )}
-      </div>
-    </div>
-  );
-});
-SlimCard.displayName = 'SlimCard';
-
-/* ─── Horizontal scroll row ──────────────────────────────────────── */
-const SlimRow = memo(({ products, onProductClick }) => {
-  const rowRef = useRef(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(true);
-  const [activeDot, setActiveDot] = useState(0);
-  const SCROLL_STEP = 221;
-
-  const updateState = useCallback(() => {
-    const el = rowRef.current;
-    if (!el) return;
-    const { scrollLeft, scrollWidth, clientWidth } = el;
-    setCanScrollLeft(scrollLeft > 4);
-    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 4);
-    const maxScroll = scrollWidth - clientWidth;
-    const numDots = Math.max(1, Math.ceil(products.length / 3));
-    setActiveDot(maxScroll > 0 ? Math.round((scrollLeft / maxScroll) * (numDots - 1)) : 0);
-  }, [products.length]);
-
-  useEffect(() => {
-    const el = rowRef.current;
-    if (!el) return;
-    el.addEventListener('scroll', updateState, { passive: true });
-    updateState();
-    return () => el.removeEventListener('scroll', updateState);
-  }, [updateState]);
-
-  const scrollBy = (dir) => rowRef.current?.scrollBy({ left: dir * SCROLL_STEP, behavior: 'smooth' });
-  const numDots = Math.max(1, Math.ceil(products.length / 3));
-
-  return (
-    <div className="relative">
-      {canScrollLeft && (
-        <button
-          onClick={() => scrollBy(-1)}
-          className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 z-20 w-9 h-9 rounded-full
-                     bg-[#2e443c] border border-white/15 flex items-center justify-center shadow-lg
-                     hover:bg-[#F5DEB3] hover:border-[#F5DEB3] hover:text-[#2e443c] text-white
-                     transition-all duration-300"
-          aria-label="Scroll left"
-        >
-          <i className="fa-solid fa-chevron-left text-xs" />
-        </button>
-      )}
-
-      <div
-        ref={rowRef}
-        className="flex gap-4 overflow-x-auto pb-2"
-        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}
-      >
-        {products.map((product, i) => (
-          <SlimCard
-            key={product.productId}
-            product={product}
-            onClick={() => onProductClick(product, i)}
-          />
-        ))}
-      </div>
-
-      {canScrollRight && (
-        <button
-          onClick={() => scrollBy(1)}
-          className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-3 z-20 w-9 h-9 rounded-full
-                     bg-[#2e443c] border border-white/15 flex items-center justify-center shadow-lg
-                     hover:bg-[#F5DEB3] hover:border-[#F5DEB3] hover:text-[#2e443c] text-white
-                     transition-all duration-300"
-          aria-label="Scroll right"
-        >
-          <i className="fa-solid fa-chevron-right text-xs" />
-        </button>
-      )}
-
-      {numDots > 1 && (
-        <div className="flex items-center justify-center gap-[6px] mt-3">
-          {Array.from({ length: numDots }).map((_, i) => (
-            <span
-              key={i}
-              className="rounded-full transition-all duration-300"
-              style={{
-                width: i === activeDot ? 18 : 6,
-                height: 6,
-                background:
-                  i === activeDot
-                    ? '#F5DEB3'
-                    : i === activeDot + 1
-                    ? 'rgba(245,222,179,0.3)'
-                    : 'rgba(245,222,179,0.15)',
-              }}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-});
-SlimRow.displayName = 'SlimRow';
-
-/* ─── Main page ──────────────────────────────────────────────────── */
 const AllProductsPage = () => {
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
-  const debounceRef = useRef(null);
-  const searchRef = useRef(null);
-  const [searchFocused, setSearchFocused] = useState(false);
+  const [sortBy, setSortBy] = useState('featured');
+  const [showSortModal, setShowSortModal] = useState(false);
+  
+  const { data: productsResponse, isLoading, error } = useGetProductsQuery({
+    page: 1,
+    limit: 12,
+    sortBy: sortBy === 'featured' ? undefined : sortBy
+  });
 
-  useEffect(() => { window.scrollTo(0, 0); }, []);
-
-  const [activeCategory, setActiveCategory] = useState('');
-  const [activeSubCategory, setActiveSubCategory] = useState('');
-
-  const handleSearchChange = useCallback((e) => {
-    const val = e.target.value;
-    setSearchQuery(val);
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => setDebouncedQuery(val.trim()), 350);
+  useEffect(() => {
+    window.scrollTo(0, 0);
   }, []);
 
-  useEffect(() => () => clearTimeout(debounceRef.current), []);
+  // Extract products from response
+  const products = productsResponse?.data?.products || productsResponse?.data?.listofPublishedProducts || [];
 
-  const shouldSearch = debouncedQuery.length >= 2;
-  const { data: searchData, isFetching: searchFetching } = useSearchProductsQuery(
-    { search: debouncedQuery, limit: 8 },
-    { skip: !shouldSearch }
-  );
-  const searchResults = useMemo(
-    () => searchData?.data?.listofPublishedProducts || [],
-    [searchData]
-  );
-  const showDropdown = searchFocused && searchQuery.length >= 2;
-
-  const { data: catData } = useGetCategoriesQuery(undefined, {
-    refetchOnMountOrArgChange: false,
-    refetchOnFocus: false,
-    refetchOnReconnect: false,
-  });
-  const categories = useMemo(() => catData?.data || [], [catData]);
-
-  const subCategories = useMemo(() => {
-    if (!activeCategory) return [];
-    const cat = categories.find(c => c.name === activeCategory || c.slug === activeCategory);
-    return (cat?.subcategories || []).map(s => s.name);
-  }, [activeCategory, categories]);
-
-  const { data: productsData, isLoading } = useGetProductsQuery(
-    { page: 1, limit: 300 },
-    { refetchOnMountOrArgChange: false, refetchOnFocus: false, refetchOnReconnect: false }
-  );
-
-  const allProducts = useMemo(
-    () => productsData?.data?.listofPublishedProducts || productsData?.data?.products || [],
-    [productsData]
-  );
-
-  // GA4 view_item_list — fire once the catalogue is loaded
-  useEffect(() => {
-    if (allProducts.length === 0) return;
-    trackViewItemList({
-      listId: 'all_products',
-      listName: 'All Products',
-      items: allProducts.slice(0, 30).map((product) => ({
-        itemId: product.productId,
-        itemName: product.productName,
-        itemVariant: product.variantDetails?.[0]?.variantName,
-        price: product.variantDetails?.[0]?.variantPrice || product.effectivePrice || 0,
-      })),
+  const displayProducts = useMemo(() => {
+    let sorted = products.map(p => {
+      const firstVariantPrice = p.variantDetails?.[0]?.variantPrice || 0;
+      return {
+        ...p,
+        effectivePrice: firstVariantPrice
+      };
     });
-  }, [allProducts]);
 
-  const categoryGroups = useMemo(() => {
-    if (!allProducts.length) return [];
+    if (sortBy === 'price-low') sorted.sort((a, b) => a.effectivePrice - b.effectivePrice);
+    if (sortBy === 'price-high') sorted.sort((a, b) => b.effectivePrice - a.effectivePrice);
+    return sorted;
+  }, [products, sortBy]);
 
-    const map = new Map();
-    for (const p of allProducts) {
-      const key = p.categorySlug || p.productCategory?.toLowerCase().replace(/\s+/g, '-') || '__other__';
-      if (!map.has(key)) map.set(key, []);
-      map.get(key).push(p);
-    }
-
-    const groups = [];
-
-    for (const cat of categories) {
-      const prods = map.get(cat.slug);
-      if (!prods?.length) continue;
-
-      // Build subcategory position index for sorting
-      const subcatNameOrder = new Map((cat.subcategories || []).map((s, i) => [s.name, i]));
-      const subcatSlugOrder = new Map((cat.subcategories || []).map((s, i) => [s.slug, i]));
-
-      // Sort all products by subcategory order (desktop) — same base for both views
-      const sorted = [...prods].sort((a, b) => {
-        const ai = subcatNameOrder.get(a.productSubCategory) ?? subcatSlugOrder.get(a.subCategorySlug) ?? 999;
-        const bi = subcatNameOrder.get(b.productSubCategory) ?? subcatSlugOrder.get(b.subCategorySlug) ?? 999;
-        return ai - bi;
+  useEffect(() => {
+    if (displayProducts.length > 0) {
+      trackViewItemList({
+        listName: 'All Products',
+        listId: 'all_products',
+        items: displayProducts.map((product, index) => ({
+          itemId: product.productId,
+          itemName: product.productName,
+          price: product.variantDetails?.[0]?.variantPrice || 0,
+          itemVariant: product.variantDetails?.[0]?.variantName || '',
+          index,
+        })),
       });
-
-      groups.push({ cat, products: sorted });
-      map.delete(cat.slug);
     }
+  }, [displayProducts]);
 
-    // Orphaned products (category not in categories list)
-    for (const [key, prods] of map.entries()) {
-      if (prods.length) {
-        const name = prods[0].productCategory || key;
-        groups.push({ cat: { name, slug: key, _id: key }, products: prods });
-      }
-    }
-
-    return groups;
-  }, [allProducts, categories]);
+  if (error) {
+    console.error("API Error:", error);
+  }
 
   return (
-    <div className="min-h-screen bg-[#2e443c] relative font-sans pb-20">
+    <div className="min-h-screen bg-[#2e443c] relative font-sans selection:bg-[#F5DEB3] selection:text-[#2e443c] pb-10">
       <SEOHead
-        title="Shop All — UrbanNook"
-        description="Browse UrbanNook's full collection of premium lifestyle products, organized by category."
+        title="Shop All Products"
+        description="Browse UrbanNook's full collection of premium 3D printed home decor, lighting & lifestyle products. Modern designs, fast pan-India delivery."
         url="/products"
       />
 
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#F5DEB3]/5 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-1/3 left-0 w-[300px] h-[300px] bg-[#F5DEB3]/3 rounded-full blur-[100px] pointer-events-none" />
+      {/* --- Ambient Background Glow --- */}
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#F5DEB3]/5 rounded-full blur-[120px] pointer-events-none"></div>
 
-      {/* Page header */}
-      <section className="pt-[5rem] pb-8 md:pt-[7rem] md:pb-8 px-5 md:px-8 relative z-20">
+      {/* Hero Section */}
+      <section className="pt-[5rem] pb-8 md:pt-[7rem] md:pb-5 px-6 relative z-10">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-end gap-10">
+          
+          {/* LEFT SIDE: Heading & Description */}
+          <div >
+            <h1 className="text-4xl sm:text-6xl md:text-7xl font-serif text-white leading-[0.9] mb-2">
+              Curated{' '}
+              <span className="italic font-light text-[#F5DEB3]">Atmospheres.</span>
+            </h1>
+            <p className="text-sm md:text-base text-green-50/70 font-light leading-relaxed max-w-md">
+              Explore our exclusive collection designed for modern indoor environments.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Product Grid */}
+      <section className="pb-24 px-4 md:px-6 relative z-10">
         <div className="max-w-7xl mx-auto">
-          <nav className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.2em] text-white/40 mb-5">
-            <Link to="/" className="hover:text-[#F5DEB3] transition-colors">Home</Link>
-            <span>/</span>
-            <span className="text-[#F5DEB3]/70">Shop All</span>
-          </nav>
-
-          <div className="flex items-center gap-3 mb-2">
-            <span className="w-2 h-2 bg-[#F5DEB3] rounded-full animate-pulse" />
-            <span className="text-[#F5DEB3] font-mono text-xs tracking-[0.3em] uppercase">
-              {allProducts.length > 0 ? `${allProducts.length} Products` : 'All Collections'}
-            </span>
-          </div>
-
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-serif text-white leading-[0.95] mb-6">
-            Shop All
-          </h1>
-
-          {/* Search bar */}
-          <div className="relative max-w-xl" ref={searchRef}>
-            <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/10 border border-white/15 focus-within:bg-white/15 focus-within:border-[#F5DEB3]/40 transition-all">
-              <i className="fa-solid fa-magnifying-glass text-white/40 text-sm shrink-0" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={handleSearchChange}
-                onFocus={() => setSearchFocused(true)}
-                onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
-                placeholder="Search products…"
-                autoComplete="off"
-                className="flex-1 bg-transparent text-white placeholder-white/30 text-sm focus:outline-none"
-              />
-              {searchFetching && (
-                <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-white/60 rounded-full animate-spin shrink-0" />
-              )}
-              {searchQuery && !searchFetching && (
-                <button onClick={() => { setSearchQuery(''); setDebouncedQuery(''); }} className="shrink-0">
-                  <i className="fa-solid fa-xmark text-white/40 hover:text-white/70 text-sm transition-colors" />
-                </button>
-              )}
+          {isLoading ? (
+            <div className="flex justify-center py-32">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#F5DEB3]"></div>
             </div>
-
-            {/* Dropdown results */}
-            {showDropdown && (
-              <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-50 max-h-80 overflow-y-auto">
-                {searchFetching && (
-                  <div className="px-4 py-3 text-sm text-gray-400">Searching…</div>
-                )}
-                {!searchFetching && searchResults.length === 0 && (
-                  <div className="px-4 py-3 text-sm text-gray-400">No results for "{debouncedQuery}"</div>
-                )}
-                {!searchFetching && searchResults.map((p) => {
-                  const img = p.variantDetails?.[0]?.variantImage?.[0] || p.productImg || null;
-                  const price = p.variantDetails?.[0]?.variantPrice;
-                  return (
-                    <button
-                      key={p.productId}
-                      onMouseDown={() => navigate(`/shop?product=${p.productId}`)}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-0 text-left transition-colors"
-                    >
-                      <div className="w-10 h-10 rounded-xl bg-gray-100 overflow-hidden shrink-0">
-                        {img ? (
-                          <img src={img} alt={p.productName} className="w-full h-full object-cover mix-blend-multiply" loading="lazy" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <i className="fa-solid fa-image text-xs text-gray-300" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-900 truncate">{p.productName}</p>
-                        <p className="text-xs text-gray-400 truncate">{p.productCategory}</p>
-                      </div>
-                      {price > 0 && <span className="text-sm font-semibold text-[#a89068] shrink-0">₹{price.toLocaleString()}</span>}
-                      <i className="fa-solid fa-arrow-right text-[10px] text-gray-300 shrink-0" />
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Sub-category pills — shown only when a category is active */}
-          {activeCategory && subCategories.length > 0 && (
-            <div className="flex items-center gap-2 mt-2 overflow-x-auto no-scrollbar px-1">
-              <button
-                onClick={() => setActiveSubCategory('')}
-                className={`shrink-0 px-3 py-1 rounded-full text-[11px] font-semibold transition-all ${
-                  !activeSubCategory
-                    ? 'bg-white/20 text-white'
-                    : 'text-white/50 hover:text-white'
-                }`}
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-32 bg-black/10 rounded-[2rem] border border-white/5 backdrop-blur-sm">
+              <i className="fa-solid fa-triangle-exclamation text-4xl text-[#F5DEB3]/50 mb-4"></i>
+              <h2 className="text-2xl font-serif text-white mb-2">Unable to load products</h2>
+              <p className="text-green-50/60 mb-6 font-light">Please check your connection and try again</p>
+              <button 
+                onClick={() => window.location.reload()} 
+                className="bg-[#F5DEB3] text-[#2e443c] px-8 py-3 rounded-full font-bold uppercase tracking-widest text-xs hover:bg-white transition-colors"
               >
-                All {activeCategory}
+                Retry Connection
               </button>
-              {subCategories.map((sub) => (
-                <button
-                  key={sub}
-                  onClick={() => setActiveSubCategory(sub === activeSubCategory ? '' : sub)}
-                  className={`shrink-0 px-3 py-1 rounded-full text-[11px] font-semibold transition-all whitespace-nowrap ${
-                    activeSubCategory === sub
-                      ? 'bg-white/20 text-white'
-                      : 'text-white/50 hover:text-white'
-                  }`}
+            </div>
+          ) : displayProducts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-32 bg-black/10 rounded-[2rem] border border-white/5 backdrop-blur-sm">
+              <i className="fa-solid fa-box-open text-4xl text-[#F5DEB3]/50 mb-4"></i>
+              <h2 className="text-2xl font-serif text-white mb-2">The collection is updating</h2>
+              <p className="text-green-50/60 font-light">Check back later for new arrivals.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+              {displayProducts?.map((product, index) => (
+                <div
+                  key={product.productId}
+                  className="group relative rounded-[2rem] overflow-hidden bg-black/20 border border-white/5 shadow-lg hover:shadow-2xl hover:border-[#F5DEB3]/30 transition-all duration-500 flex flex-col"
                 >
-                  {sub}
-                </button>
+                  {/* Wishlist Button (Floating Top Right) */}
+                  <div className="absolute top-4 right-4 z-20">
+                    <Suspense fallback={<div className="w-8 h-8 bg-white/20 rounded-full animate-pulse"></div>}>
+                      <WishlistButton productId={product.productId} />
+                    </Suspense>
+                  </div>
+
+                  {/* Clickable Card Area */}
+                  <div
+                    className="flex flex-col max-h-[520px] cursor-pointer"
+                    onClick={() => {
+                      trackSelectItem({
+                        itemId: product.productId,
+                        itemName: product.productName,
+                        itemVariant: product.variantDetails?.[0]?.variantName,
+                        price: product.effectivePrice,
+                        listId: 'all_products',
+                        listName: 'All Products',
+                        index,
+                      });
+                      const firstVariant = product.variantDetails?.[0];
+                      navigate(firstVariant?.sku ? `/product/${product.productId}/${firstVariant.sku}` : `/product/${product.productId}`);
+                    }}
+                  >
+                    
+                    <div className="relative w-full aspect-square bg-[#f8f8f5] overflow-hidden">
+                      {(() => {
+                        const thumbnail = (product?.variantDetails && product.variantDetails[0]?.variantImage?.[0]) || "/placeholder.jpg";
+                        return (
+                          <img 
+                            src={thumbnail} 
+                            alt={product.productName} 
+                            className="w-full h-full object-cover mix-blend-multiply transition-transform duration-[1.5s] group-hover:scale-110" 
+                          />
+                        );
+                      })()}
+                    </div>
+
+                    {/* 2. TEXT & CTA SECTION */}
+                    <div className="p-4 md:p-4 flex flex-col flex-grow justify-between bg-[#f5f7f8] to-transparent backdrop-blur-md">
+                      
+                      <div className="mb-2">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a89068] block opacity-80">
+                          {product.productCategory}
+                        </span>
+                        <h3 className="font-serif text-xl md:text-2xl text-gray-500  leading-snug line-clamp-2">
+                          {product.productName}
+                        </h3>
+                      </div>
+                      
+                      <div className="flex justify-between items-end pt-2 border-t border-[#F5DEB3]/10] mt-auto">
+                        <div className="flex flex-col">
+                          
+                          {/* --- Available Variants Section --- */}
+                          {(() => {
+                            const availableVariants = (product?.variantDetails && product.variantDetails.length > 0)
+                              ? product.variantDetails.map(v => v.variantName)
+                              : (product?.color || []);
+
+                            if (availableVariants.length === 0) return null;
+
+                            return (
+                              <div className="mb-3">
+                                <span className="text-[10px] uppercase tracking-widest text-gray-500 mb-1.5 block">
+                                  Available Variants
+                                </span>
+                                <div className="flex flex-wrap gap-1.5 items-center">
+                                  {/* Sirf pehle 5 variants dikhayenge */}
+                                  {availableVariants.slice(0, 5).map((variantName, idx) => (
+                                    <div
+                                      key={idx}
+                                      title={variantName}
+                                      className="w-4 h-4 rounded-full border border-[#d1d5db] shadow-sm transition-transform hover:scale-110 cursor-pointer"
+                                      style={
+                                        variantName.toLowerCase() === 'rainbow'
+                                          ? { background: 'linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)' }
+                                          : { backgroundColor: variantName.replace(/\s+/g, '').toLowerCase() }
+                                      }
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const vSku = product.variantDetails?.find(v => v.variantName === variantName)?.sku;
+                                        navigate(`/product/${product.productId}/${vSku || variantName}`);
+                                      }}
+                                    ></div>
+                                  ))}
+                                  
+                                  {/* 5 se zyada hone par +X dikhayenge */}
+                                  {availableVariants.length > 5 && (
+                                    <span className="text-[10px] font-medium text-gray-500 ml-1">
+                                      +{availableVariants.length - 5}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          <span className="text-[10px] uppercase tracking-widest text-gray-500 mb-1 block">
+                            Pricing
+                          </span>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-lg md:text-xl font-semibold text-[#a89068]">
+                              ₹{product.effectivePrice?.toLocaleString()}
+                            </span>
+                            <span className="text-xs text-gray-400 line-through">
+                              ₹{(product.effectivePrice * 1.18).toFixed(0).toLocaleString()}
+                            </span>
+                          </div>
+                           
+                        </div>
+                        
+                        {/* Interactive Arrow CTA */}
+                        <div className="w-12 h-12 rounded-full bg-[#F5DEB3]/10 text-gray-500  flex items-center justify-center group-hover:bg-[#F5DEB3] group-hover:text-[#2e443c] transition-all duration-300">
+                          <i className="fa-solid fa-arrow-right -rotate-45 group-hover:rotate-0 transition-transform duration-500"></i>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
           )}
         </div>
       </section>
 
-      {/* Category rows */}
-      <section className="px-5 md:px-8 relative z-10">
-        <div className="max-w-7xl mx-auto space-y-14">
-
-          {categoryGroups.length === 0 && (
-            <p className="text-white/40 text-sm py-10 text-center">No products</p>
-          )}
-
-          {categoryGroups.map(({ cat, products }) => (
-            <div key={cat.slug || cat._id}>
-              {/* Category heading */}
-              <div className="flex items-center gap-3 mb-5">
-                <div className="w-1 h-6 bg-[#F5DEB3] rounded-full flex-shrink-0" />
-                <Link
-                  to={`/shop?category=${cat.slug}`}
-                  className="text-xl md:text-2xl font-serif text-white hover:text-[#F5DEB3] transition-colors"
-                >
-                  {cat.name}
-                </Link>
-                <span className="text-[10px] font-mono uppercase tracking-widest text-white/30">
-                  {products.length} item{products.length !== 1 ? 's' : ''}
-                </span>
-                <div className="flex-1 h-px bg-white/8" />
-                <Link
-                  to={`/shop?category=${cat.slug}`}
-                  className="text-[10px] font-mono uppercase tracking-widest text-[#F5DEB3]/60
-                             hover:text-[#F5DEB3] transition-colors flex items-center gap-1 shrink-0"
-                >
-                  View All <i className="fa-solid fa-arrow-right text-[9px]" />
-                </Link>
-              </div>
-
-              <SlimRow
-                products={products}
-                onProductClick={(product, index) => {
-                  trackSelectItem({
-                    itemId: product.productId,
-                    itemName: product.productName,
-                    itemVariant: product.variantDetails?.[0]?.variantName,
-                    price: product.variantDetails?.[0]?.variantPrice || product.effectivePrice || 0,
-                    listId: cat.slug || cat._id || 'all_products',
-                    listName: cat.name || 'All Products',
-                    index,
-                  });
-                  navigate(`/shop?product=${product.productId}`);
-                }}
-              />
-            </div>
-          ))}
-        </div>
-      </section>
     </div>
   );
 };

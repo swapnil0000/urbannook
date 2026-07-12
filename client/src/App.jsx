@@ -12,7 +12,6 @@ import { fetchCsrfToken } from './store/api/apiSlice';
 import AppRoutes from './store/AppRoutes';
 import NewsTicker from './pages/home/NewsTicker';
 import SEOHead from './component/SEOHead';
-  // trigger buil
 import { trackPageView, setUserId, captureAttribution, setMetaAdvancedMatching } from './utils/analytics';
 // check
 const ORG_STRUCTURED_DATA = {
@@ -188,5 +187,3 @@ function App() {
 }
 
 export default App;
-
-// categories not showing  trigger build

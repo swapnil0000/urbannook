@@ -16,12 +16,10 @@ import {
   contactRouter,
   statsRouter,
   dynamicShippingRouter,
-  categoryRouter,
   eventRouter,
   catalogRouter,
   metaCapiRouter,
   adminAnalyticsRouter,
-  freeShippingOfferRouter,
 } from "./routes/index.js";
 import cookieParser from "cookie-parser";
 import healthRouter from "./routes/health.route.js";
@@ -202,7 +200,6 @@ app.use(
   "/api/v1",
   userRouter,
   productRouter,
-  categoryRouter,
   commonRouter,
   userWaitListRouter,
   userWishListRouter,
@@ -218,7 +215,6 @@ app.use(
   catalogRouter,
   metaCapiRouter,
   adminAnalyticsRouter,
-  freeShippingOfferRouter,
 );
 
 app.use(errorHandler);

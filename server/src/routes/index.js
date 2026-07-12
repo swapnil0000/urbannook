@@ -11,13 +11,10 @@ import testimonialRouter from "./testimonial.route.js";
 import contactRouter from "./contact.route.js";
 import statsRouter from "./stats.route.js";
 import dynamicShippingRouter from "./dynamic.shipping.route.js";
-import categoryRouter from "./category.route.js";
-
 import eventRouter from "./event.route.js";
 import catalogRouter from "./catalog.route.js";
 import metaCapiRouter from "./meta.capi.route.js";
 import adminAnalyticsRouter from "./admin.analytics.route.js";
-import freeShippingOfferRouter from "./freeShippingOffer.route.js";
 export {
   userRouter,
   productRouter,
@@ -32,10 +29,8 @@ export {
   contactRouter,
   statsRouter,
   dynamicShippingRouter,
-  categoryRouter,
   eventRouter,
   catalogRouter,
   metaCapiRouter,
   adminAnalyticsRouter,
-  freeShippingOfferRouter,
 };

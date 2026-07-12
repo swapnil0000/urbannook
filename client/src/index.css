@@ -379,23 +379,7 @@
       box-shadow: 0 0 40px rgba(59, 130, 246, 0.6), 0 0 60px rgba(16, 185, 129, 0.3);
     }
   }
-
-  @keyframes ppc-shimmer {
-    0% { transform: translateX(-160%) skewX(-18deg); }
-    100% { transform: translateX(220%) skewX(-18deg); }
-  }
-
-  @keyframes ppc-glowpulse {
-    0% { box-shadow: 0 0 0px 0px rgba(245,222,179,0.0); }
-    50% { box-shadow: 0 0 22px 4px rgba(245,222,179,0.45); }
-    100% { box-shadow: 0 0 0px 0px rgba(245,222,179,0.0); }
-  }
-
-  @keyframes ppc-blobfloat {
-    0%, 100% { transform: translate(0px, 0px) scale(1); }
-    50% { transform: translate(20px, -14px) scale(1.06); }
-  }
-
+  
   .line-clamp-3 {
     display: -webkit-box;
     -webkit-line-clamp: 3;

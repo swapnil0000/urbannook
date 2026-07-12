@@ -21,7 +21,6 @@ import Address from "../model/address.new.model.js";
 import html_to_pdf from "html-pdf-node";
 import { generateInvoiceHtmlTemplate } from "../template/invoiceTemplate.template.js";
 import { calculateShippingRate } from "../services/shipping.service.js";
-import { isFreeShippingEligible } from "../utils/freeShippingOffer.util.js";
 import { sendMetaCapiEvent } from "../services/meta.capi.service.js";
 
 // Collect Meta CAPI match-quality signals from the order-creation request.
@@ -299,22 +298,10 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     }))
   });
 
-  // realShippingAmount = actual carrier rate — always used as the basis for
-  // the COD upfront advance (a fraud/RTO-risk deposit, not a shipping fee).
-  // chargedShippingAmount = what the customer's order total reflects — 0 when
-  // the free-shipping offer applies. These must NOT be the same variable:
-  // zeroing shipping for the customer should not also zero the COD advance.
-  const realShippingAmount = shippingResult?.total_charges || summary?.shipping || 179;
+  const shippingAmount = shippingResult?.total_charges || summary?.shipping || 179;
 
   // Recompute subtotal from actual order items — authoritative, not from cart snapshot
   const subtotal = orderItems.reduce((s, i) => s + (i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity), 0);
-
-  // Free shipping unlocks only when the cart contains a configured offer
-  // combo (source + recommended product both present), NOT on cart value.
-  const chargedShippingAmount = (await isFreeShippingEligible(items.map((i) => i.productId))) ? 0 : realShippingAmount;
-  // console.log(
-  //   `[FreeShipping][Order:auth] realShipping=₹${realShippingAmount} chargedShipping=₹${chargedShippingAmount} items=${items.map(i => `${i.productId}x${i.quantity}`).join(",")}`,
-  // );
 
   // Always re-derive discount from the live coupon + current subtotal.
   // This fixes: products added after coupon was applied, COD/prepaid toggle, page not refreshed.
@@ -389,7 +376,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       // ── INTERNAL TEST: completely separate path ──────────────────────────────
       // Always ₹1 regardless of cart size, shipping, or payment method.
       isInternalTestOrder = true;
-      discountAmount = Math.max(subtotal + chargedShippingAmount - 1, 0); // stored for audit record
+      discountAmount = Math.max(subtotal + shippingAmount - 1, 0); // stored for audit record
     } else if (liveCoupon.discountType === "PERCENTAGE") {
       let d = Math.floor((subtotal * liveCoupon.discountValue) / 100);
       if (liveCoupon.maxDiscountCap) d = Math.min(d, liveCoupon.maxDiscountCap);
@@ -425,17 +412,14 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     }
   }
 
-  finalAmount = isInternalTestOrder ? 1 : Math.max(subtotal + chargedShippingAmount - discountAmount, 0);
+  finalAmount = isInternalTestOrder ? 1 : Math.max(subtotal + shippingAmount - discountAmount, 0);
 
-  // Sync shipping in snapshots — customer-facing amount (0 when free-shipping offer applies)
-  orderItems.forEach(i => { i.productSnapshot.shipping = String(chargedShippingAmount); });
+  // Sync shipping in snapshots
+  orderItems.forEach(i => { i.productSnapshot.shipping = String(shippingAmount); });
 
-  // COD: charge 2x the REAL shipping cost upfront via Razorpay as an RTO/fraud
-  // deposit — this must stay based on realShippingAmount even when the order
-  // itself has free shipping, otherwise a free-shipping COD order collects
-  // zero advance and loses its anti-fraud protection entirely.
+  // COD: charge 2x shipping upfront via Razorpay, rest collected at delivery
   const isCOD = reqPaymentMethod === "COD";
-  const codPartialAmount = isCOD ? Math.min(Math.ceil(realShippingAmount) * 2, Math.ceil(finalAmount)) : 0;
+  const codPartialAmount = isCOD ? Math.min(Math.ceil(shippingAmount) * 2, Math.ceil(finalAmount)) : 0;
   const codRemainingAmount = isCOD ? Math.max(0, Math.ceil(finalAmount) - codPartialAmount) : 0;
   const razorpayChargeAmount = isCOD ? codPartialAmount : finalAmount;
   // Round to whole rupees first, then convert to paise — must match the amount
@@ -456,9 +440,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     items: orderItems,
     amount: finalAmount,
     shippingInfo: {
-      // Real carrier cost for internal accounting — grouped with the other
-      // carrier-enrichment fields below, not the customer-facing amount.
-      amount: realShippingAmount,
+      amount: shippingAmount,
       type: shippingResult?.type || "standard",
       expectedNoOfBoxes: shippingResult?.expectedNoOfBoxes || 0,
       totalWeight: shippingResult?.totalWeight || 0,
@@ -972,13 +954,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     paymentType: reqPaymentMethod === "COD" ? "COD" : "PREPAID",
     cartItems: rawItemsForShipping
   });
-  const realShippingAmount = shippingResult?.total_charges || 179;
-  // Free shipping unlocks only when the cart contains a configured offer
-  // combo (source + recommended product both present), NOT on cart value.
-  const chargedShippingAmount = (await isFreeShippingEligible(items.map((i) => i.productId))) ? 0 : realShippingAmount;
-  // console.log(
-  //   `[FreeShipping][Order:guest] realShipping=₹${realShippingAmount} chargedShipping=₹${chargedShippingAmount} items=${items.map(i => `${i.productId}x${i.quantity}`).join(",")}`,
-  // );
+  const shippingAmount = shippingResult?.total_charges || 179;
 
   // ── Guest coupon validation ───────────────────────────────────────────────────
   let couponCodeId = null, couponCodeName = null, discountAmount = 0, isApplied = false;
@@ -1051,7 +1027,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     // Calculate discount
     if (isValidInternal) {
       isInternalTestOrder = true;
-      discountAmount = Math.max(subtotal + chargedShippingAmount - 1, 0);
+      discountAmount = Math.max(subtotal + shippingAmount - 1, 0);
     } else if (liveCoupon.discountType === "PERCENTAGE") {
       let d = Math.floor((subtotal * liveCoupon.discountValue) / 100);
       if (liveCoupon.maxDiscountCap) d = Math.min(d, liveCoupon.maxDiscountCap);
@@ -1066,15 +1042,14 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     console.log(`[Coupon:Guest] Applied "${cleanCode}" — discount ₹${discountAmount} on subtotal ₹${subtotal}`);
   }
 
-  const finalAmount = isInternalTestOrder ? 1 : Math.max(subtotal + chargedShippingAmount - discountAmount, 0);
+  const finalAmount = isInternalTestOrder ? 1 : Math.max(subtotal + shippingAmount - discountAmount, 0);
 
-  // Update orderItems with shipping value now that it's calculated — customer-facing amount
-  orderItems.forEach(i => { i.productSnapshot.shipping = String(chargedShippingAmount); });
+  // Update orderItems with shipping value now that it's calculated
+  orderItems.forEach(i => { i.productSnapshot.shipping = String(shippingAmount); });
 
-  // COD: charge 2x the REAL shipping cost upfront via Razorpay as an RTO/fraud
-  // deposit — stays based on realShippingAmount even on free-shipping orders.
+  // COD: charge 2x shipping upfront via Razorpay, rest collected at delivery
   const isCOD = reqPaymentMethod === "COD";
-  const codPartialAmount = isCOD ? Math.min(Math.ceil(realShippingAmount) * 2, Math.ceil(finalAmount)) : 0;
+  const codPartialAmount = isCOD ? Math.min(Math.ceil(shippingAmount) * 2, Math.ceil(finalAmount)) : 0;
   const codRemainingAmount = isCOD ? Math.max(0, Math.ceil(finalAmount) - codPartialAmount) : 0;
   const razorpayChargeAmount = isCOD ? codPartialAmount : finalAmount;
   // Round to whole rupees first, then convert to paise — must match the amount
@@ -1092,7 +1067,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     items: orderItems,
     amount: finalAmount,
     shippingInfo: {
-      amount: realShippingAmount,
+      amount: shippingAmount,
       type: shippingResult?.type || "standard",
       expectedNoOfBoxes: shippingResult?.expectedNoOfBoxes || 0,
       totalWeight: shippingResult?.totalWeight || 0,

@@ -1,12 +1,12 @@
-import { useState, useEffect, useRef, Suspense, useMemo, useCallback, lazy } from 'react';
+import { useState, useEffect, useRef, Suspense, useMemo } from 'react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { useGetWishlistQuery } from '../../store/api/userApi';
-import { useGetCategoriesQuery, useGetProductsQuery } from '../../store/api/productsApi';
+import { useGetWishlistQuery,  } from '../../store/api/userApi';
 import { logout as logoutAction } from '../../store/slices/authSlice';
 import { setShowLoginModal, clearLoginCallback } from '../../store/slices/uiSlice';
 import { useLogoutMutation } from '../../store/api/authApi';
 import { useAuth } from '../../hooks/useRedux';
+import { lazy } from 'react';
 import GoogleLoginButton from './auth/GoogleLoginButton';
 import { clearCsrfToken } from '../../store/api/apiSlice';
 
@@ -35,39 +35,7 @@ const NewHeader = () => {
   const lastScrollY = useRef(0);
   const [user, setUser] = useState(null);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
-  const [showShopDropdown, setShowShopDropdown] = useState(false);
-  const [expandedCats, setExpandedCats] = useState(new Set());
-  const toggleCat = useCallback((slug) => {
-    setExpandedCats((prev) => {
-      const next = new Set(prev);
-      next.has(slug) ? next.delete(slug) : next.add(slug);
-      return next;
-    });
-  }, []);
-
-  // Fetch categories for Shop dropdown
-  const { data: categoriesData } = useGetCategoriesQuery(undefined, {
-    refetchOnMountOrArgChange: false,
-  });
-  const categories = categoriesData?.data || [];
-
-  const shopOpen = expandedCats.has('__shop__');
-  const { data: shopProductsData } = useGetProductsQuery(
-    { limit: 200 },
-    { skip: !shopOpen, refetchOnMountOrArgChange: false }
-  );
-  const shopProductsByCategory = useMemo(() => {
-    if (!shopOpen) return {};
-    const all = shopProductsData?.data?.listofPublishedProducts || [];
-    const map = {};
-    for (const p of all) {
-      const key = p.categorySlug || p.productCategory?.toLowerCase().replace(/\s+/g, '-') || '__other__';
-      if (!map[key]) map[key] = [];
-      map[key].push(p);
-    }
-    return map;
-  }, [shopProductsData, shopOpen]);
-
+  
   // Get wishlist count from Redux
   const wishlistCount = wishlistItems?.length;
   
@@ -83,7 +51,7 @@ const NewHeader = () => {
   const getActiveRoute = () => {
     const path = location.pathname;
     if (path === '/') return 'home';
-    if (path.startsWith('/shop')) return 'products';
+    if (path.startsWith('/products')) return 'products';
     if (path === '/contact-us') return 'support';
     if (path === '/about-us') return 'about-us';
     return '';
@@ -92,7 +60,7 @@ const NewHeader = () => {
   // Memoize expensive calculations
   const navLinks = useMemo(() => [
     { name: 'Home', path: '/', key: 'home' },
-    { name: 'Shop', path: '/shop', key: 'products' },
+    { name: 'Shop', path: '/products', key: 'products' },
     { name: 'About Us', path: '/about-us', key: 'about-us' },
     { name: 'Contact Us', path: '/contact-us', key: 'support' },
   ], []);
@@ -211,7 +179,9 @@ const NewHeader = () => {
   return (
     <>
       <header
-        className="fixed top-14 left-3 right-3 md:top-12 md:left-6 md:right-6 z-50 bg-[#e8f8d7]/90 backdrop-blur-xl shadow-lg border border-white/40 transition-all duration-500 ease-in-out rounded-full"
+        className={`fixed top-14 left-3 right-3 md:top-12 md:left-6 md:right-6 z-50 bg-[#e8f8d7]/90 backdrop-blur-xl shadow-lg border border-white/40 transition-all duration-0 md:duration-500 ease-in-out ${
+          isMenuOpen ? 'rounded-[2rem]' : 'rounded-full'
+        }`}
         style={{
           transform: showHeader ? 'translateY(0)' : 'translateY(-200%)',
         }}
@@ -255,72 +225,13 @@ const NewHeader = () => {
               <nav className="hidden lg:flex items-center gap-1 bg-white/40 p-1.5 rounded-full border border-white/20 shadow-sm backdrop-blur-md">
                 {navLinks.map((item) => {
                   const isActive = activeRoute === item.key;
-
-                  if (item.key === 'products') {
-                    return (
-                      <div
-                        key={item.key}
-                        className="relative"
-                        onMouseEnter={() => setShowShopDropdown(true)}
-                        onMouseLeave={() => setShowShopDropdown(false)}
-                      >
-                        <button
-                          className={`px-5 py-2 rounded-full text-sm font-semibold transition-all duration-300 flex items-center gap-1.5 ${
-                            isActive
-                              ? 'bg-emerald-800 text-white shadow-md'
-                              : 'text-emerald-900 hover:text-emerald-700 hover:bg-white/50'
-                          }`}
-                        >
-                          Shop
-                          <i className={`fa-solid fa-chevron-down text-[10px] transition-transform duration-200 ${showShopDropdown ? 'rotate-180' : ''}`}></i>
-                        </button>
-
-                        {showShopDropdown && categories.length > 0 && (
-                          <div className="absolute top-[calc(100%+10px)] left-1/2 -translate-x-1/2 bg-white rounded-2xl shadow-2xl border border-emerald-100/60 p-5 z-50"
-                            style={{ minWidth: '420px' }}>
-                            {/* Caret */}
-                            <div className="absolute -top-[7px] left-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-white border-t border-l border-emerald-100 rotate-45 rounded-tl-sm"></div>
-
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-500 mb-3 px-1">Browse Categories</p>
-                            <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-                              {categories.map((cat) => (
-                                <div key={cat.slug || cat._id?.$oid}>
-                                  <Link
-                                    to={`/shop?category=${cat.slug}`}
-                                    onClick={() => setShowShopDropdown(false)}
-                                    className="text-sm font-bold text-emerald-900 hover:text-emerald-600 transition-colors block mb-2"
-                                  >
-                                    {cat.name}
-                                  </Link>
-                                  <ul className="space-y-1">
-                                    {cat.subcategories?.map((sub) => (
-                                      <li key={sub.slug || sub._id?.$oid}>
-                                        <Link
-                                          to={`/shop?category=${cat.slug}&subcategory=${sub.slug}`}
-                                          onClick={() => setShowShopDropdown(false)}
-                                          className="text-xs text-emerald-700/80 hover:text-emerald-900 transition-colors flex items-center gap-1.5 pl-2 border-l-2 border-emerald-100 hover:border-emerald-400 py-0.5"
-                                        >
-                                          {sub.name}
-                                        </Link>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
-
                   return (
-                    <Link
+                    <Link 
                       key={item.key}
                       to={item.path}
                       className={`px-5 py-2 rounded-full text-sm font-semibold transition-all duration-300 ${
-                        isActive
-                          ? 'bg-emerald-800 text-white shadow-md'
+                        isActive 
+                          ? 'bg-emerald-800 text-white shadow-md' 
                           : 'text-emerald-900 hover:text-emerald-700 hover:bg-white/50'
                       }`}
                     >
@@ -391,7 +302,6 @@ const NewHeader = () => {
                 </button>
               )}
 
-
               <button
                 className="relative flex items-center px-5 py-2.5 bg-emerald-800 text-white rounded-full hover:bg-emerald-900 hover:shadow-lg transition-all duration-200 shadow-md"
                 onClick={() => setShowCart(true)}
@@ -421,246 +331,154 @@ const NewHeader = () => {
                 </Link>
               )}
             </div>
+             <div className="lg:hidden w-10"></div> 
           </div>
 
-        </div>
-      </header>
+          {/* --- MOBILE MENU DROPDOWN --- */}
+          {isMenuOpen && (
+            <div className="lg:hidden mt-4 pt-4 border-t border-emerald-900/10 animate-in fade-in slide-in-from-top-2 pb-2 max-h-[calc(100vh-120px)] overflow-y-auto no-scrollbar">
+              
+              {/* 1. MOBILE USER CONTROL CENTER */}
+              {user ? (
+                <div className="bg-white/60 p-3 rounded-3xl border border-white/60 shadow-sm mb-6 relative overflow-hidden group flex-shrink-0">
+                    {/* Decorative Background Blob */}
+                    <div className="absolute -right-10 -top-10 w-32 h-32 bg-emerald-200/30 rounded-full blur-2xl group-hover:bg-emerald-300/40 transition-all"></div>
 
-      {/* --- MOBILE SIDEBAR BACKDROP --- */}
-      <div
-        className={`fixed inset-0 z-[59] bg-black/40 backdrop-blur-sm lg:hidden transition-opacity duration-200 ${
-          isMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        }`}
-        onClick={() => setIsMenuOpen(false)}
-      />
+                    {/* Header: Clickable Profile Access */}
+                    <div onClick={() => handleMobileNav('/profile')} className="flex items-center justify-between mb-6 relative z-10 cursor-pointer active:opacity-80">
+                        <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 bg-emerald-700 rounded-full flex items-center justify-center text-white text-lg font-serif italic shadow-md border-2 border-white">
+                                {user?.name?.charAt(0)?.toUpperCase()}
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-emerald-950 font-bold text-lg leading-tight">Hi, {user?.name?.split(' ')[0]}</span>
+                                <span className="text-xs text-emerald-700 uppercase tracking-wider font-semibold">View Profile <i className="fa-solid fa-chevron-right text-[9px]"></i></span>
+                            </div>
+                        </div>
+                        <button onClick={(e) => { e.stopPropagation(); handleLogout(); }} disabled={isLoggingOut} className="w-8 h-8 flex items-center justify-center rounded-full bg-red-50 text-red-500 hover:bg-red-100 transition-colors disabled:opacity-50">
+                            <i className="fa-solid fa-arrow-right-from-bracket text-sm"></i>
+                        </button>
+                    </div>
 
-      {/* --- MOBILE SIDEBAR --- */}
-      <aside
-        className={`fixed top-0 left-0 h-full w-[300px] z-[60] lg:hidden flex flex-col bg-[#faf9f6] shadow-2xl transition-all duration-200 ease-in-out ${
-          isMenuOpen ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'
-        }`}
-      >
-        {/* Sidebar Header */}
-        <div className="flex items-center justify-between px-5 pt-10 pb-5 border-b border-gray-200 shrink-0">
-          <Link to="/" onClick={() => setIsMenuOpen(false)}>
-            <img src="/assets/logo.webp" alt="UrbanNook" className="h-12 w-auto object-contain rounded-full mix-blend-multiply" />
-          </Link>
-          <button
-            onClick={() => setIsMenuOpen(false)}
-            className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
-          >
-            <i className="fa-solid fa-xmark text-base text-gray-600"></i>
-          </button>
-        </div>
+                    {/* THE APP-STYLE GRID (Modified to 3 Cols since Orders is removed) */}
+                    <div className="grid grid-cols-4 gap-3 relative z-10">
+                        
+                    
 
-        {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto no-scrollbar px-4 py-4 space-y-3">
+                        {/* Support */}
+                        <button onClick={() => handleMobileNav('/customer-support')} className="flex flex-col items-center gap-2 group/btn">
+                            <div className="w-12 h-12 rounded-2xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-700 shadow-sm group-hover/btn:scale-105 group-hover/btn:border-emerald-300 transition-all">
+                                <i className="fa-solid fa-headset text-lg"></i>
+                            </div>
+                            <span className="text-[10px] font-bold text-emerald-900 uppercase tracking-wide">Support</span>
+                        </button>
 
-          {/* USER SECTION */}
-          {user ? (
-            <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm relative overflow-hidden">
-              <div className="absolute -right-8 -top-8 w-28 h-28 bg-gray-100/60 rounded-full blur-2xl pointer-events-none" />
-              <div
-                onClick={() => handleMobileNav('/profile')}
-                className="flex items-center gap-3 mb-4 cursor-pointer active:opacity-80 relative z-10"
-              >
-                <div className="w-11 h-11 bg-emerald-700 rounded-full flex items-center justify-center text-white text-base font-serif italic shadow border-2 border-white shrink-0">
-                  {user?.name?.charAt(0)?.toUpperCase()}
+                         {/* Cart */}
+                         <button onClick={handleMobileCart} className="flex flex-col items-center gap-2 group/btn relative">
+                            <div className="w-12 h-12 rounded-2xl bg-white border border-emerald-200 flex items-center justify-center text-emerald-800 shadow-sm group-hover/btn:scale-105 group-hover/btn:bg-emerald-200 transition-all">
+                                <i className="fa-solid fa-cart-shopping text-lg"></i>
+                            </div>
+                            {totalQuantity > 0 && (
+                                <span className="absolute top-0 right-1 w-4 h-4 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold border-2 border-white shadow-sm animate-bounce">
+                                    {totalQuantity}
+                                </span>
+                            )}
+                            <span className="text-[10px] font-bold text-emerald-900 uppercase tracking-wide">Cart</span>
+                        </button>
+
+                        {/* Wishlist */}
+                        <button onClick={() => handleMobileNav('/wishlist')} className="flex flex-col items-center gap-2 group/btn relative">
+                            <div className="w-12 h-12 rounded-2xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-700 shadow-sm group-hover/btn:scale-105 group-hover/btn:border-emerald-300 transition-all">
+                                <i className="fa-regular fa-heart text-lg"></i>
+                            </div>
+                            {wishlistCount > 0 && (
+                                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold border-2 border-white shadow-lg">
+                                    {wishlistCount}
+                                </span>
+                            )}
+                            <span className="text-[10px] font-bold text-emerald-900 uppercase tracking-wide">Wishlist</span>
+                        </button>
+
+                        <button onClick={() => handleMobileNav('/orders')} className="flex flex-col items-center gap-2 group/btn">
+                            <div className="w-12 h-12 rounded-2xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-700 shadow-sm group-hover/btn:scale-105 group-hover/btn:border-emerald-300 transition-all">
+                                <i className="fa-solid fa-box w-5"></i>
+                            </div>
+                            <span className="text-[10px] font-bold text-emerald-900 uppercase tracking-wide">My Orders</span>
+                        </button>
+
+                    </div>
                 </div>
-                <div>
-                  <p className="text-emerald-950 font-bold text-sm leading-tight">Hi, {user?.name?.split(' ')[0]}</p>
-                  <p className="text-[10px] text-emerald-700 uppercase tracking-wider font-semibold">
-                    View Profile <i className="fa-solid fa-chevron-right text-[8px]"></i>
-                  </p>
-                </div>
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleLogout(); }}
-                  disabled={isLoggingOut}
-                  className="ml-auto w-8 h-8 flex items-center justify-center rounded-full bg-red-50 text-red-500 hover:bg-red-100 transition-colors disabled:opacity-50 shrink-0"
-                >
-                  <i className="fa-solid fa-arrow-right-from-bracket text-sm"></i>
-                </button>
-              </div>
-              <div className="grid grid-cols-4 gap-2 relative z-10">
-                <button onClick={() => handleMobileNav('/customer-support')} className="flex flex-col items-center gap-1.5">
-                  <div className="w-11 h-11 rounded-xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-700 shadow-sm">
-                    <i className="fa-solid fa-headset"></i>
-                  </div>
-                  <span className="text-[9px] font-bold text-emerald-900 uppercase tracking-wide">Support</span>
-                </button>
-                <button onClick={handleMobileCart} className="flex flex-col items-center gap-1.5 relative">
-                  <div className="w-11 h-11 rounded-xl bg-white border border-emerald-200 flex items-center justify-center text-emerald-800 shadow-sm">
-                    <i className="fa-solid fa-cart-shopping"></i>
-                  </div>
-                  {totalQuantity > 0 && (
-                    <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 text-white text-[8px] rounded-full flex items-center justify-center font-bold border border-white">
-                      {totalQuantity}
-                    </span>
-                  )}
-                  <span className="text-[9px] font-bold text-emerald-900 uppercase tracking-wide">Cart</span>
-                </button>
-                <button onClick={() => handleMobileNav('/wishlist')} className="flex flex-col items-center gap-1.5 relative">
-                  <div className="w-11 h-11 rounded-xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-700 shadow-sm">
-                    <i className="fa-regular fa-heart"></i>
-                  </div>
-                  {wishlistCount > 0 && (
-                    <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 text-white text-[8px] rounded-full flex items-center justify-center font-bold border border-white">
-                      {wishlistCount}
-                    </span>
-                  )}
-                  <span className="text-[9px] font-bold text-emerald-900 uppercase tracking-wide">Wishlist</span>
-                </button>
-                <button onClick={() => handleMobileNav('/orders')} className="flex flex-col items-center gap-1.5">
-                  <div className="w-11 h-11 rounded-xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-700 shadow-sm">
-                    <i className="fa-solid fa-box"></i>
-                  </div>
-                  <span className="text-[9px] font-bold text-emerald-900 uppercase tracking-wide">Orders</span>
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <button
-                onClick={handleMobileLogin}
-                className="w-full py-3.5 bg-[#2e443c] text-white rounded-xl font-bold uppercase tracking-widest text-xs shadow-md flex items-center justify-center gap-2 active:scale-95 transition-all"
-              >
-                <i className="fa-regular fa-user text-sm"></i>
-                Login / Sign Up
-              </button>
-              <button
-                onClick={handleMobileCart}
-                className="w-full py-3.5 bg-white border border-gray-200 text-gray-800 rounded-xl font-bold uppercase tracking-widest text-xs shadow-sm flex items-center justify-center gap-2 active:scale-95 transition-all relative"
-              >
-                <i className="fa-solid fa-cart-shopping text-sm"></i>
-                View Cart
-                {totalQuantity > 0 && (
-                  <span className="absolute top-2 right-4 w-5 h-5 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold border-2 border-white">
-                    {totalQuantity}
-                  </span>
-                )}
-              </button>
-            </div>
-          )}
-
-          {/* NAVIGATION */}
-          <nav className="flex flex-col">
-
-            {/* Other top-level links */}
-            {[
-              { path: '/', label: 'Home', icon: 'fa-house' },
-              { path: '/shop', label: 'All Products', icon: 'fa-bag-shopping' },
-            ].map(({ path, label, icon }) => (
-              <Link
-                key={path}
-                to={path}
-                onClick={() => setIsMenuOpen(false)}
-                className="flex items-center gap-3 px-1 py-3.5 border-b border-gray-200/70"
-              >
-                <i className={`fa-solid ${icon} text-sm text-gray-400 w-4 text-center`} />
-                <span className="text-[15px] font-bold text-gray-900">{label}</span>
-              </Link>
-            ))}
-
-            {/* SHOP accordion — contains all categories */}
-            <div className="border-b border-gray-200/70">
-              <button
-                onClick={() => toggleCat('__shop__')}
-                className="w-full flex items-center justify-between px-1 py-3.5 text-left"
-              >
-                <div className="flex items-center gap-3">
-                  <i className="fa-solid fa-store text-sm text-gray-400 w-4 text-center" />
-                  <span className="text-[15px] font-bold text-gray-900">Shop</span>
-                </div>
-                <i className={`fa-solid fa-chevron-down text-[11px] text-gray-400 transition-transform duration-200 ${expandedCats.has('__shop__') ? 'rotate-180' : ''}`} />
-              </button>
-
-              {/* Category sections inside Shop */}
-              {expandedCats.has('__shop__') && categories.length > 0 && (
-                <div className="pb-3 space-y-4 pt-1">
-                  {categories.map((cat) => {
-                    const products = shopProductsByCategory[cat.slug] || [];
-                    return (
-                      <div key={cat.slug}>
-                        {/* Category heading — tapping navigates to all products */}
-                        <Link
-                          to={`/shop?category=${cat.slug}`}
-                          onClick={() => setIsMenuOpen(false)}
-                          className="flex items-center justify-between px-1 mb-2"
-                        >
-                          <span className="text-sm font-bold text-gray-900">{cat.name}</span>
-                          <i className="fa-solid fa-chevron-right text-[10px] text-gray-400" />
-                        </Link>
-
-                        {/* Horizontal scrollable product cards */}
-                        {products.length > 0 ? (
-                          <div
-                            className="flex gap-2.5 overflow-x-auto pb-1"
-                            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                          >
-                            {products.map((p) => {
-                              const img = p.variantDetails?.[0]?.variantImage?.[0] || p.productImg || null;
-                              return (
-                                <Link
-                                  key={p.productId}
-                                  to={`/shop?product=${p.productId}`}
-                                  onClick={() => setIsMenuOpen(false)}
-                                  className="flex-shrink-0 w-24 flex flex-col rounded-xl overflow-hidden border border-gray-200 bg-white"
-                                >
-                                  <div className="w-full aspect-square bg-gray-100 overflow-hidden">
-                                    {img ? (
-                                      <img
-                                        src={img}
-                                        alt={p.productName}
-                                        loading="lazy"
-                                        decoding="async"
-                                        className="w-full h-full object-cover mix-blend-multiply"
-                                      />
-                                    ) : (
-                                      <div className="w-full h-full flex items-center justify-center">
-                                        <i className="fa-solid fa-image text-xs text-gray-300" />
-                                      </div>
-                                    )}
-                                  </div>
-                                  {/* <p className="text-[10px] font-medium text-gray-700 px-1.5 py-1 line-clamp-2 leading-tight">
-                                    {p.productName}
-                                  </p> */}
-                                </Link>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <div className="h-24 flex items-center justify-center">
-                            <div className="w-4 h-4 border-2 border-gray-200 border-t-gray-500 rounded-full animate-spin" />
-                          </div>
+              ) : (
+                /* LOGIN CTA IF NOT LOGGED IN */
+                <div className="bg-white/40 p-4 rounded-2xl border border-white/50 mb-6 space-y-3">
+                    <button 
+                        onClick={handleMobileLogin}
+                        className="w-full py-4 bg-emerald-800 text-white rounded-xl font-bold uppercase tracking-widest text-xs shadow-lg hover:bg-emerald-900 flex items-center justify-center gap-3 active:scale-95 transition-all"
+                    >
+                        <i className="fa-regular fa-user text-sm"></i> 
+                        Login / Create Account
+                    </button>
+                    {/* Cart button for guests */}
+                    <button
+                        onClick={handleMobileCart}
+                        className="w-full py-4 bg-white border border-emerald-200 text-emerald-900 rounded-xl font-bold uppercase tracking-widest text-xs shadow-sm hover:bg-emerald-50 flex items-center justify-center gap-3 active:scale-95 transition-all relative"
+                    >
+                        <i className="fa-solid fa-cart-shopping text-sm"></i>
+                        View Cart
+                        {totalQuantity > 0 && (
+                            <span className="absolute top-2 right-4 w-5 h-5 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold border-2 border-white shadow-sm">
+                                {totalQuantity}
+                            </span>
                         )}
-                      </div>
-                    );
-                  })}
+                    </button>
                 </div>
               )}
+
+              {/* 2. MAIN NAVIGATION LIST */}
+              <nav className="flex flex-col gap-2 flex-shrink-0">
+                {navLinks.map((item) => {
+                  const isActive = activeRoute === item.key;
+                  // Map specific icons for each route
+                  const icons = {
+                    home: 'fa-house',
+                    products: 'fa-bag-shopping',
+                    support: 'fa-life-ring',
+                    'about-us': 'fa-users',
+                    'contact-us': 'fa-envelope'
+                  };
+
+                  return (
+                    <Link 
+                      key={item.key}
+                      to={item.path}
+                      onClick={() => setIsMenuOpen(false)}
+                      className={`flex items-center justify-between p-3 sm:p-4 rounded-2xl transition-all duration-200 group ${
+                        isActive 
+                          ? 'bg-white shadow-md border border-emerald-100' 
+                          : 'bg-transparent hover:bg-white/40 border border-transparent'
+                      }`}
+                    >
+                        <div className="flex items-center gap-3 sm:gap-4">
+                            <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm transition-colors ${
+                                isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-white/40 text-emerald-900'
+                            }`}>
+                                <i className={`fa-solid ${icons[item.key] || 'fa-circle'}`}></i>
+                            </div>
+                            <span className={`font-bold text-xs sm:text-sm tracking-wide ${isActive ? 'text-emerald-900' : 'text-emerald-900/80'}`}>
+                                {item.name}
+                            </span>
+                        </div>
+                        <i className={`fa-solid fa-chevron-right text-[10px] sm:text-xs transition-transform group-hover:translate-x-1 ${isActive ? 'text-emerald-500' : 'text-black/10'}`}></i>
+                    </Link>
+                  );
+                })}
+              </nav>
+
             </div>
-
-            {/* Bottom links */}
-            {[
-              { path: '/about-us', label: 'About Us', icon: 'fa-users' },
-              { path: '/contact-us', label: 'Contact', icon: 'fa-envelope' },
-              { path: '/customer-support', label: 'Support', icon: 'fa-life-ring' },
-            ].map(({ path, label, icon }) => (
-              <Link
-                key={path}
-                to={path}
-                onClick={() => setIsMenuOpen(false)}
-                className="flex items-center gap-3 px-1 py-3.5 border-b border-gray-200/70 last:border-b-0"
-              >
-                <i className={`fa-solid ${icon} text-sm text-gray-400 w-4 text-center`} />
-                <span className="text-[15px] font-bold text-gray-900">{label}</span>
-              </Link>
-            ))}
-
-          </nav>
+          )}
         </div>
-      </aside>
-
+      </header>
+      
       {/* --- MODALS --- */}
       <Suspense fallback={
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60">
@@ -712,13 +530,12 @@ const NewHeader = () => {
           />
         )}
 
-        <CartDrawer
-          isOpen={showCart}
-          onClose={() => setShowCart(false)}
-          cartItems={cartItems}
+        <CartDrawer 
+          isOpen={showCart} 
+          onClose={() => setShowCart(false)} 
+          cartItems={cartItems} 
         />
       </Suspense>
-
     </>
   );
 };

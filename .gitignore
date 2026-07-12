@@ -1,7 +1,4 @@
 node_modules
 
-db_seed
-# merged main
-test_seed.json
-# merged main
-# trigger build again
+
+# merged main with pr
