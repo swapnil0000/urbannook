@@ -12,6 +12,8 @@ import { useSelector, useDispatch } from "react-redux";
 import { useCookies } from "react-cookie";
 import confetti from "canvas-confetti";
 import SEOHead from "../../component/SEOHead";
+import ComparisonTable from "../../component/ComparisonTable";
+import FreeShippingBanner from "../../component/FreeShippingBanner";
 import useTimer from "../../hooks/useTimer";
 import config from "../../config/env";
 import { trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist, trackVariantSelect } from "../../utils/analytics";
@@ -1044,6 +1046,8 @@ const ProductDetailPage = () => {
               </div>
             </div>
 
+            <FreeShippingBanner productId={product.productId} />
+
             <div className="border-t border-[#F5DEB3]/10">
               {product.productDes && (
                 <AccordionItem
@@ -1157,6 +1161,9 @@ const ProductDetailPage = () => {
               </p>
           </div>
         </div>
+
+        {/* ===== COMPARISON TABLE ===== */}
+        <ComparisonTable productName={product.productName} />
 
         {/* ===== REVIEWS SECTION ===== */}
         <div className="mt-16 pt-12 border-t border-[#1c3026]/10">

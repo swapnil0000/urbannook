@@ -20,6 +20,7 @@ import {
   catalogRouter,
   metaCapiRouter,
   adminAnalyticsRouter,
+  freeShippingOfferRouter,
 } from "./routes/index.js";
 import cookieParser from "cookie-parser";
 import healthRouter from "./routes/health.route.js";
@@ -215,6 +216,7 @@ app.use(
   catalogRouter,
   metaCapiRouter,
   adminAnalyticsRouter,
+  freeShippingOfferRouter,
 );
 
 app.use(errorHandler);
