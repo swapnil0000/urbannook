@@ -309,9 +309,9 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   // Recompute subtotal from actual order items — authoritative, not from cart snapshot
   const subtotal = orderItems.reduce((s, i) => s + (i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity), 0);
 
-  // Admin-configured cart-value threshold — "subtotal > thresholdAmount" unlocks
-  // free shipping, no specific products required.
-  const chargedShippingAmount = (await isFreeShippingEligible(subtotal)) ? 0 : realShippingAmount;
+  // Free shipping unlocks only when the cart contains a configured offer
+  // combo (source + recommended product both present), NOT on cart value.
+  const chargedShippingAmount = (await isFreeShippingEligible(items.map((i) => i.productId))) ? 0 : realShippingAmount;
   // console.log(
   //   `[FreeShipping][Order:auth] realShipping=₹${realShippingAmount} chargedShipping=₹${chargedShippingAmount} items=${items.map(i => `${i.productId}x${i.quantity}`).join(",")}`,
   // );
@@ -973,9 +973,9 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     cartItems: rawItemsForShipping
   });
   const realShippingAmount = shippingResult?.total_charges || 179;
-  // Admin-configured cart-value threshold — "subtotal > thresholdAmount" unlocks
-  // free shipping, no specific products required.
-  const chargedShippingAmount = (await isFreeShippingEligible(subtotal)) ? 0 : realShippingAmount;
+  // Free shipping unlocks only when the cart contains a configured offer
+  // combo (source + recommended product both present), NOT on cart value.
+  const chargedShippingAmount = (await isFreeShippingEligible(items.map((i) => i.productId))) ? 0 : realShippingAmount;
   // console.log(
   //   `[FreeShipping][Order:guest] realShipping=₹${realShippingAmount} chargedShipping=₹${chargedShippingAmount} items=${items.map(i => `${i.productId}x${i.quantity}`).join(",")}`,
   // );

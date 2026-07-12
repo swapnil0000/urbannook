@@ -753,10 +753,6 @@ const ProductDetailPage = () => {
               )}
             </div>
 
-            <div className="w-full max-w-[500px]">
-              <FreeShippingBanner productId={product.productId} />
-            </div>
-
             {/* NAYA: Variant Selection Block - Ab yahan aayega (Badi image ke neeche aur thumbnails se pehle) */}
             {availableVariants && availableVariants.length > 0 && (
               <div className="w-full max-w-[500px] mt-8 bg-white/5 p-5 rounded-2xl border border-[#F5DEB3]/10">
@@ -1061,6 +1057,8 @@ const ProductDetailPage = () => {
                 </div>
               </div>
             </div>
+
+            <FreeShippingBanner productId={product.productId} />
 
             <div className="border-t border-[#F5DEB3]/10">
               {product.productDes && (
