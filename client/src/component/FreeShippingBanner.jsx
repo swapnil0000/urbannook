@@ -45,8 +45,8 @@ const VARIANT_COLOR_MAP = {
   grey: "#808080",
   purple: "#800080",
 };
-const variantColor = (name = "") => {
-  const key = name.toLowerCase();
+const variantColor = (name) => {
+  const key = (name || "").toLowerCase();
   return VARIANT_COLOR_MAP[key] || key.replace(/\s+/g, "");
 };
 
@@ -71,8 +71,14 @@ const SMOKE_LIFE = 950;
  * quantity there directly affects whether the cart clears the free-shipping
  * threshold) instead of just a remove button — the PDP keeps the simpler
  * single-item add/remove since that's not the point of the PDP banner.
+ *
+ * `variant`: "dark" (default) matches the PDP's dark "Add to Collection" card
+ * (translucent bg-white/5 shell, cream-on-dark buttons) since that's the card
+ * this banner sits next to there; checkout passes variant="light" to keep the
+ * cream-card look appropriate for that page's light background.
  */
-const FreeShippingBanner = ({ productId, showQuantityStepper = false, className = "mt-4" }) => {
+const FreeShippingBanner = ({ productId, showQuantityStepper = false, className = "mt-4", variant = "dark" }) => {
+  const isDark = variant !== "light";
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { isAuthenticated } = useSelector((state) => state.auth);
@@ -84,7 +90,6 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
   const itemQty = (q) => (typeof q === "object" && q !== null ? q.quantity || 0 : q || 0);
 
   const [selectedVariant, setSelectedVariant] = useState(null);
-  const [userPickedVariant, setUserPickedVariant] = useState(false);
 
   // Keeps the progress bar mounted (and the CTA showing a transitional
   // "unlocking" state) for a beat after the cart actually updates, so the
@@ -240,33 +245,22 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
 
   useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
 
+  // Seeds the dropdown to "Purple" by default (falling back to the first
+  // variant if this recommendation has no purple option), once per product —
+  // no auto-cycling; the image only changes when the customer picks a variant.
   useEffect(() => {
-    if (variants.length > 0 && !selectedVariant) setSelectedVariant(variants[0].variantName);
+    if (variants.length > 0 && !selectedVariant) {
+      const white = variants.find((v) => v.variantName?.toLowerCase() === "white");
+      setSelectedVariant((white || variants[0]).variantName);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only seed once when variants first load
   }, [recommendedProduct?.productId]);
 
   // Keep the displayed image/price in sync with whatever variant is actually
-  // in the cart once added (could differ from the last-cycled auto-slide
-  // value, or from a variant changed elsewhere).
+  // in the cart once added (could differ from a variant changed elsewhere).
   useEffect(() => {
     if (addedVariant) setSelectedVariant(addedVariant);
   }, [addedVariant]);
-
-  // Auto-cycle through variants so a multi-variant recommendation doesn't go
-  // unnoticed as a static list — stops the moment the customer picks one
-  // themselves, or once they've added to cart.
-  useEffect(() => {
-    if (variants.length <= 1 || userPickedVariant || added) return;
-    const interval = setInterval(() => {
-      setSelectedVariant((prev) => {
-        const idx = variants.findIndex((v) => v.variantName === prev);
-        const next = variants[(idx + 1) % variants.length];
-        return next.variantName;
-      });
-    }, 1600);
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- variants.length/productId are the stable identity here
-  }, [variants.length, recommendedProduct?.productId, userPickedVariant, added]);
 
   if (!banner || !recommendedProduct) return null;
 
@@ -401,13 +395,18 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
     }
   };
 
-  // Fixed black/cream/red design regardless of PDP vs checkout context — the
-  // card carries its own background/border so it reads the same everywhere
-  // it's dropped in. `className` lets callers override outer spacing (e.g.
-  // dropping the top margin when placed side-by-side in a desktop grid)
-  // without affecting the other call sites' default stacked spacing.
+  // Shell styling forks on `variant`: dark mirrors the PDP's translucent
+  // "Add to Collection" card exactly (bg-white/5 backdrop-blur, cream
+  // border, big rounded corners); light keeps the solid cream card used on
+  // checkout's plain-white layout. `className` lets callers override outer
+  // spacing (e.g. dropping the top margin when placed side-by-side in a
+  // desktop grid) without affecting the other call sites' default spacing.
+  const cardShell = isDark
+    ? "rounded-[2rem] border border-[#F5DEB3]/10 bg-white/5 backdrop-blur-sm"
+    : "rounded-2xl border border-[#1c3026]/10 bg-[#FAF7F2] shadow-sm";
+
   return (
-    <div className={`rounded-2xl overflow-hidden border border-black/10 bg-[#FAF7F2] shadow-sm ${className}`}>
+    <div className={`overflow-hidden ${cardShell} ${className}`}>
       {/* Ribbon header */}
       {/* <div className="flex items-center justify-between gap-3 bg-[#2e443c] px-4 py-3">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -431,21 +430,22 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
           <div
             className="rounded-xl px-3.5 pt-3 pb-2"
             style={{
-              background:
-                "linear-gradient(135deg, oklch(0.93 0.09 152) 0%, oklch(0.90 0.11 150) 60%, oklch(0.92 0.10 148) 100%)",
+              background: isDark
+                ? "linear-gradient(135deg, rgba(245,222,179,0.16) 0%, rgba(245,222,179,0.07) 100%)"
+                : "linear-gradient(135deg, #FBF4E4 0%, #F5DEB3 60%, #EFDCAE 100%)",
             }}
           >
                 <div className="mb-1">
                   {comboUnlocked ? (
-                    <span className="text-[11px] font-bold uppercase tracking-[0.05em]" style={{ color: "oklch(0.47 0.10 165)" }}>
+                    <span className={`text-[11px] font-bold uppercase tracking-[0.05em] ${isDark ? "text-[#F5DEB3]" : "text-[#1c3026]"}`}>
                       Free shipping unlocked on this order
                     </span>
                   ) : (
                     <>
-                      <p className="text-[11px] font-bold uppercase tracking-[0.05em]" style={{ color: "oklch(0.47 0.10 165)" }}>
+                      <p className={`text-[11px] font-bold uppercase tracking-[0.05em] ${isDark ? "text-[#F5DEB3]" : "text-[#1c3026]"}`}>
                         You're almost there!
                       </p>
-                      <p className="text-[11px] font-semibold" style={{ color: "oklch(0.47 0.10 165)" }}>
+                      <p className={`text-[11px] font-semibold ${isDark ? "text-[#F5DEB3]/80" : "text-[#1c3026]/80"}`}>
                         Add {recommendedProduct.productName} & unlock free shipping
                       </p>
                     </>
@@ -476,11 +476,13 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
                         bottom: 6,
                         height: 14,
                         borderRadius: 999,
-                        background: "#e3f6e7",
-                        boxShadow: "inset 0 2px 5px rgba(21,122,68,0.18)",
+                        background: isDark ? "rgba(0,0,0,0.28)" : "#EDE1C4",
+                        boxShadow: isDark
+                          ? "inset 0 2px 5px rgba(0,0,0,0.4)"
+                          : "inset 0 2px 5px rgba(28,48,38,0.18)",
                       }}
                     >
-                      {/* Fill — green gradient + drop shadow, with a shine sweep. */}
+                      {/* Fill — brand gradient + drop shadow, with a shine sweep. */}
                       <div
                         style={{
                           position: "absolute",
@@ -490,8 +492,12 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
                           width: `${anim.frac * 100}%`,
                           minWidth: 14,
                           borderRadius: 999,
-                          background: "linear-gradient(90deg, #157a44 0%, #2fb463 100%)",
-                          boxShadow: "0 2px 6px -2px rgba(21,122,68,0.5)",
+                          background: isDark
+                            ? "linear-gradient(90deg, #F5DEB3 0%, #fff3d6 100%)"
+                            : "linear-gradient(90deg, #1c3026 0%, #3c5748 100%)",
+                          boxShadow: isDark
+                            ? "0 2px 6px -2px rgba(245,222,179,0.5)"
+                            : "0 2px 6px -2px rgba(28,48,38,0.5)",
                         }}
                       >
                         <div className="absolute inset-0 overflow-hidden" style={{ borderRadius: 999 }}>
@@ -509,7 +515,7 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
 
                     {/* Exhaust smoke — puffs grow, rise, drift back, fade out.
                         Anchored to the truck's rear via the same travel calc. */}
-                    {anim.puffs.map((p) => {
+                    {/* {anim.puffs.map((p) => {
                       const t = Math.min(Math.max(performance.now() - p.born, 0) / SMOKE_LIFE, 1);
                       const size = 7 + t * 18;
                       return (
@@ -524,18 +530,23 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
                             marginLeft: -(size / 2),
                             marginBottom: -(size / 2),
                             background:
-                              "radial-gradient(circle at 40% 40%, rgba(255,255,255,0.95), rgba(200,220,206,0.6) 55%, rgba(180,205,188,0) 72%)",
+                              "radial-gradient(circle at 40% 40%, rgba(255,255,255,0.95), rgba(212,204,180,0.6) 55%, rgba(190,180,155,0) 72%)",
                             filter: "blur(1px)",
                             opacity: (1 - t) * 0.4,
                             zIndex: 2,
                           }}
                         />
                       );
-                    })}
+                    })} */}
 
-                    {/* Truck. Travels across (laneWidth - TRUCK_W) so at 100%
-                        its right edge lands flush at the lane's end rather than
-                        hanging outside it. */}
+                    {/* Truck — disabled (kept in code, not rendered). Wrapped in
+                        a `false &&` guard rather than a JSX block comment
+                        because the SVG below has its own inner JSX comments,
+                        which would prematurely close an outer one. Travels
+                        across (laneWidth - TRUCK_W) so at 100% its right edge
+                        lands flush at the lane's end rather than hanging outside
+                        it. */}
+                    {false && (
                     <div
                       style={{
                         position: "absolute",
@@ -548,22 +559,22 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
                     >
                     <svg width={TRUCK_W} height="36" viewBox="0 0 80 56" fill="none" style={{ display: "block", overflow: "visible" }}>
                       {/* ground shadow */}
-                      <ellipse cx="40" cy="53" rx="30" ry="3.4" fill="rgba(21,122,68,0.22)" />
+                      <ellipse cx="40" cy="53" rx="30" ry="3.4" fill="rgba(28,48,38,0.22)" />
                       {/* cargo box */}
-                      <rect x="2" y="7" width="44" height="30" rx="6" fill="#ffffff" stroke="#157a44" strokeWidth="2.4" />
-                      <rect x="9" y="14" width="6" height="16" rx="2" fill="#d6f2dd" />
-                      <rect x="20" y="14" width="6" height="16" rx="2" fill="#d6f2dd" />
-                      <rect x="31" y="14" width="6" height="16" rx="2" fill="#d6f2dd" />
+                      <rect x="2" y="7" width="44" height="30" rx="6" fill="#FAF7F2" stroke="#1c3026" strokeWidth="2.4" />
+                      <rect x="9" y="14" width="6" height="16" rx="2" fill="#EFDCAE" />
+                      <rect x="20" y="14" width="6" height="16" rx="2" fill="#EFDCAE" />
+                      <rect x="31" y="14" width="6" height="16" rx="2" fill="#EFDCAE" />
                       {/* cab */}
                       <path
                         d="M46 14 h13 a5 5 0 0 1 4 2.2 L69 26 a4 4 0 0 1 0.8 2.4 V37 H46 Z"
-                        fill="#2fb463"
-                        stroke="#157a44"
+                        fill="#F5DEB3"
+                        stroke="#1c3026"
                         strokeWidth="2.4"
                         strokeLinejoin="round"
                       />
-                      <rect x="50" y="18" width="12" height="8.5" rx="2.5" fill="#dff7e6" stroke="#157a44" strokeWidth="1.8" />
-                      <circle cx="67.5" cy="33.5" r="1.8" fill="#ffd34d" />
+                      <rect x="50" y="18" width="12" height="8.5" rx="2.5" fill="#FBF4E4" stroke="#1c3026" strokeWidth="1.8" />
+                      <circle cx="67.5" cy="33.5" r="1.8" fill="#E63329" />
                       {/* wheels — spokes make the rotation actually readable */}
                       <g
                         style={{
@@ -572,10 +583,10 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
                           animation: anim.moving ? "fsbWheel 0.55s linear infinite" : "none",
                         }}
                       >
-                        <circle cx="18" cy="40" r="8.4" fill="#1f2a24" />
-                        <circle cx="18" cy="40" r="3.3" fill="#cfeed7" />
-                        <rect x="17" y="32" width="2" height="16" rx="1" fill="#4c5a52" />
-                        <rect x="10" y="39" width="16" height="2" rx="1" fill="#4c5a52" />
+                        <circle cx="18" cy="40" r="8.4" fill="#1c3026" />
+                        <circle cx="18" cy="40" r="3.3" fill="#F5DEB3" />
+                        <rect x="17" y="32" width="2" height="16" rx="1" fill="#5a6d61" />
+                        <rect x="10" y="39" width="16" height="2" rx="1" fill="#5a6d61" />
                       </g>
                       <g
                         style={{
@@ -584,13 +595,14 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
                           animation: anim.moving ? "fsbWheel 0.55s linear infinite" : "none",
                         }}
                       >
-                        <circle cx="55" cy="40" r="8.4" fill="#1f2a24" />
-                        <circle cx="55" cy="40" r="3.3" fill="#cfeed7" />
-                        <rect x="54" y="32" width="2" height="16" rx="1" fill="#4c5a52" />
-                        <rect x="47" y="39" width="16" height="2" rx="1" fill="#4c5a52" />
+                        <circle cx="55" cy="40" r="8.4" fill="#1c3026" />
+                        <circle cx="55" cy="40" r="3.3" fill="#F5DEB3" />
+                        <rect x="54" y="32" width="2" height="16" rx="1" fill="#5a6d61" />
+                        <rect x="47" y="39" width="16" height="2" rx="1" fill="#5a6d61" />
                       </g>
                     </svg>
                     </div>
+                    )}
                   </div>
 
                   {/* Destination reward — sits in the reserved GOAL_W gutter at
@@ -606,15 +618,15 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
                       height: 26,
                       borderRadius: 9,
                       background: "#fff",
-                      boxShadow: "0 6px 14px -6px rgba(21,122,68,0.5)",
-                      border: `2px solid ${comboUnlocked ? "#2fb463" : "#bfe6cb"}`,
+                      boxShadow: "0 6px 14px -6px rgba(28,48,38,0.5)",
+                      border: `2px solid ${comboUnlocked ? (isDark ? "#F5DEB3" : "#1c3026") : isDark ? "rgba(245,222,179,0.35)" : "#D8D2C5"}`,
                       animation: comboUnlocked ? "fsbPop 0.45s cubic-bezier(0.34,1.56,0.64,1) both" : "none",
                     }}
                   >
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                      <path d="M12 2 3 6.5v11L12 22l9-4.5v-11L12 2Z" fill="#eafaee" stroke="#157a44" strokeWidth="1.6" strokeLinejoin="round" />
-                      <path d="M3 6.5 12 11l9-4.5M12 11v11" stroke="#157a44" strokeWidth="1.6" strokeLinejoin="round" />
-                      <path d="M7.5 4.25 16.5 8.75" stroke="#157a44" strokeWidth="1.6" strokeLinejoin="round" />
+                      <path d="M12 2 3 6.5v11L12 22l9-4.5v-11L12 2Z" fill="#FBF4E4" stroke="#1c3026" strokeWidth="1.6" strokeLinejoin="round" />
+                      <path d="M3 6.5 12 11l9-4.5M12 11v11" stroke="#1c3026" strokeWidth="1.6" strokeLinejoin="round" />
+                      <path d="M7.5 4.25 16.5 8.75" stroke="#1c3026" strokeWidth="1.6" strokeLinejoin="round" />
                     </svg>
                   </div>
                 </div>
@@ -627,10 +639,10 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
         <button
           onClick={goToProduct}
           title={`View ${recommendedProduct.productName}`}
-          className="relative shrink-0 w-24 h-24 rounded-xl overflow-hidden border border-[#D8D2C5] bg-white"
+          className={`relative shrink-0 w-24 h-24 rounded-xl overflow-hidden border bg-white ${isDark ? "border-[#F5DEB3]/20" : "border-[#D8D2C5]"}`}
         >
           {discountPercent > 0 && (
-            <span className="absolute top-1.5 left-1.5 z-10 bg-[#E63329] text-white text-[10px] font-bold uppercase px-1.5 py-0.5">
+            <span className="absolute top-1.5 left-1.5 z-10 rounded-sm bg-[#E63329] text-white text-[10px] font-bold uppercase px-1.5 py-0.5">
               −{discountPercent}%
             </span>
           )}
@@ -646,56 +658,68 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
           <button
             onClick={goToProduct}
             title={`View ${recommendedProduct.productName}`}
-            className="block w-full text-sm font-extrabold uppercase tracking-tight truncate text-left text-black hover:underline"
+            className={`block w-full text-sm font-extrabold uppercase tracking-tight truncate text-left hover:underline ${isDark ? "text-[#F5DEB3]" : "text-[#1c3026]"}`}
           >
             {recommendedProduct.productName}
           </button>
 
           <div className="flex items-baseline gap-2 mt-1 flex-wrap">
-            <span className="text-lg font-bold tabular-nums text-[#E63329]">
+            <span className={`text-lg font-bold tabular-nums ${isDark ? "text-white" : "text-[#E63329]"}`}>
               ₹{displayPrice.toLocaleString()}
             </span>
             {discountPercent > 0 && (
               <>
-                <span className="text-xs text-gray-400 line-through tabular-nums">
+                <span className={`text-xs line-through tabular-nums ${isDark ? "text-[#F5DEB3]/40" : "text-gray-400"}`}>
                   ₹{maxVariantPrice.toLocaleString()}
                 </span>
-                <span className="text-[10px] font-bold uppercase bg-black text-white px-1.5 py-0.5">
+                <span
+                  className={`text-[10px] font-bold uppercase px-1.5 py-0.5 ${
+                    isDark ? "rounded-full bg-[#F5DEB3] text-[#1c3026]" : "rounded-sm bg-[#1c3026] text-[#FAF7F2]"
+                  }`}
+                >
                   Save ₹{(maxVariantPrice - displayPrice).toLocaleString()}
                 </span>
               </>
             )}
           </div>
 
-          {/* Variant swatches. Before adding: auto-cycles until the customer
-              picks one. After adding: the row STAYS visible (doesn't collapse)
-              and simply shows the chosen colour that's now in the cart —
-              swatch picking is disabled at that point since the cart line is
+          {/* Variant picker: a plain dropdown — no auto-cycling. The displayed
+              image/price only change when the customer explicitly picks a
+              variant here. Disabled once added, since the cart line is
               already committed to `addedVariant`. */}
           {variants.length > 1 && (
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-gray-500 mt-2.5">
-                {added ? "In cart" : "Colour"} — <span className="text-black">{selectedVariant}</span>
-              </p>
-              <div className="flex items-center gap-1 mt-1.5 flex-nowrap overflow-x-auto">
-                {variants.map((v) => {
-                  const isActive = v.variantName === selectedVariant;
-                  return (
-                    <button
-                      key={v.variantName}
-                      onClick={() => {
-                        if (added) return; // cart line already committed to the chosen variant
-                        setSelectedVariant(v.variantName);
-                        setUserPickedVariant(true);
-                      }}
-                      title={v.variantName}
-                      className={`shrink-0 rounded-full border-1 transition-all duration-300 ${
-                        isActive ? "w-5 h-5 border-[#E63329]" : "w-4 h-4 border-[#D8D2C5] opacity-70"
-                      } ${added ? "cursor-default" : ""}`}
-                      style={{ background: variantColor(v.variantName) }}
-                    />
-                  );
-                })}
+            <div className="mt-2.5">
+              <label className={`block text-[10px] font-semibold uppercase tracking-[0.1em] mb-1 ${isDark ? "text-[#F5DEB3]/50" : "text-[#1c3026]/50"}`}>
+                {added ? "In cart" : "Colour"}
+              </label>
+              <div className="relative">
+                <span
+                  aria-hidden="true"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border border-black/10 shrink-0"
+                  style={{ background: variantColor(selectedVariant) }}
+                />
+                <select
+                  value={selectedVariant || ""}
+                  disabled={added}
+                  onChange={(e) => setSelectedVariant(e.target.value)}
+                  title="Choose a colour"
+                  className={`w-full appearance-none rounded-lg border pl-8 pr-8 py-2 text-xs font-bold uppercase tracking-wide focus:outline-none disabled:opacity-70 disabled:cursor-default ${
+                    isDark
+                      ? "bg-[#1c3026] border-[#F5DEB3]/20 text-[#F5DEB3]"
+                      : "bg-white border-[#D8D2C5] text-[#1c3026]"
+                  }`}
+                >
+                  {variants.map((v) => (
+                    <option key={v.variantName} value={v.variantName}>
+                      {v.variantName}
+                    </option>
+                  ))}
+                </select>
+                <i
+                  className={`fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-[10px] pointer-events-none ${
+                    isDark ? "text-[#F5DEB3]/60" : "text-[#1c3026]/50"
+                  }`}
+                />
               </div>
             </div>
           )}
@@ -708,33 +732,45 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
           // Transitional state: cart is already updated but we're holding
           // the celebratory sequence (bar fill → confetti) before revealing
           // the final "Unlocked" button, so the swap doesn't happen instantly.
-          <div className="w-full py-3.5 rounded-xl flex items-center justify-center gap-2.5 text-sm font-extrabold uppercase tracking-wide bg-black/5 text-black/70 border-2 border-black/10 animate-pulse">
+          <div
+            className={`w-full py-3.5 rounded-full flex items-center justify-center gap-2.5 text-sm font-extrabold uppercase tracking-wide border-2 animate-pulse ${
+              isDark ? "bg-[#F5DEB3]/10 text-[#F5DEB3]/80 border-[#F5DEB3]/20" : "bg-[#1c3026]/5 text-[#1c3026]/70 border-[#1c3026]/10"
+            }`}
+          >
             <i className="fa-solid fa-truck-fast" /> Unlocking free shipping…
           </div>
         ) : added ? (
           <div className="flex items-center gap-2">
-            <div className="flex-1 py-3.5 rounded-xl text-[11px] font-extrabold uppercase tracking-[0.1em] text-center bg-black/5 text-black border border-black/15">
-              <i className="fa-solid fa-circle-check mr-1.5 text-[#E63329]" /> Free Shipping Unlocked!
+            <div
+              className={`flex-1 py-3.5 rounded-full text-[11px] font-extrabold uppercase tracking-[0.1em] text-center border ${
+                isDark ? "bg-[#F5DEB3]/10 text-[#F5DEB3] border-[#F5DEB3]/20" : "bg-[#1c3026]/5 text-[#1c3026] border-[#1c3026]/15"
+              }`}
+            >
+              <i className="fa-solid fa-circle-check mr-1.5 text-green-300/80" /> Free Shipping Unlocked!
             </div>
 
             {showQuantityStepper ? (
-              <div className="shrink-0 flex items-center gap-3 rounded-xl border border-[#D8D2C5] px-3 h-[52px] bg-white">
+              <div
+                className={`shrink-0 flex items-center gap-3 rounded-full border px-4 h-[52px] ${
+                  isDark ? "bg-[#1c3026] border-[#F5DEB3]/20" : "bg-white border-[#D8D2C5]"
+                }`}
+              >
                 <button
                   onClick={handleDecrement}
                   disabled={isUpdatingQty}
                   title="Decrease quantity"
-                  className="disabled:opacity-50 text-gray-500 hover:text-[#E63329]"
+                  className={`disabled:opacity-50 ${isDark ? "text-[#F5DEB3]/70 hover:text-[#F5DEB3]" : "text-gray-500 hover:text-[#E63329]"}`}
                 >
                   <i className="fa-solid fa-minus text-[10px]" />
                 </button>
-                <span className="text-xs font-bold w-3 text-center text-black">
+                <span className={`text-xs font-bold w-3 text-center ${isDark ? "text-[#F5DEB3]" : "text-[#1c3026]"}`}>
                   {itemQty(cartMatch?.quantity) || 1}
                 </span>
                 <button
                   onClick={handleIncrement}
                   disabled={isUpdatingQty}
                   title="Increase quantity"
-                  className="disabled:opacity-50 text-gray-500 hover:text-black"
+                  className={`disabled:opacity-50 ${isDark ? "text-[#F5DEB3]/70 hover:text-[#F5DEB3]" : "text-gray-500 hover:text-[#1c3026]"}`}
                 >
                   <i className="fa-solid fa-plus text-[10px]" />
                 </button>
@@ -744,17 +780,36 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
                 onClick={handleRemove}
                 disabled={isUpdatingQty}
                 title="Remove from cart"
-                className="shrink-0 w-[52px] h-[52px] rounded-xl flex items-center justify-center border border-[#D8D2C5] bg-white text-gray-400 hover:text-[#E63329] transition-colors disabled:opacity-50"
+                className={`shrink-0 w-[52px] h-[52px] rounded-full flex items-center justify-center border transition-all disabled:opacity-50 ${
+                  isDark
+                    ? "border-[#F5DEB3]/20 text-[#F5DEB3] hover:bg-[#F5DEB3] hover:text-[#1c3026]"
+                    : "bg-white border-[#D8D2C5] text-gray-400 hover:text-[#E63329]"
+                }`}
               >
                 <i className="fa-solid fa-xmark text-xs" />
               </button>
             )}
           </div>
+        ) : isDark ? (
+          <button
+            onClick={handleAddToCart}
+            disabled={isAdding}
+            className="w-full h-14 rounded-full flex items-center justify-center gap-2.5 text-xs font-bold uppercase tracking-[0.2em] bg-[#F5DEB3] text-[#1c3026] hover:bg-white transition-all shadow-xl shadow-[#F5DEB3]/10 disabled:opacity-50"
+          >
+            {isAdding ? (
+              "Adding…"
+            ) : (
+              <>
+                Add &amp; Ship Free
+                <span className="text-base leading-none">→</span>
+              </>
+            )}
+          </button>
         ) : (
           <button
             onClick={handleAddToCart}
             disabled={isAdding}
-            className="group relative w-full py-3.5 rounded-xl overflow-hidden flex items-center justify-center gap-2.5 text-sm font-extrabold uppercase tracking-wide disabled:opacity-50 bg-[#f5deb3] text-black transition-colors duration-500 hover:text-[#f5deb3]"
+            className="group relative w-full py-3.5 rounded-full overflow-hidden flex items-center justify-center gap-2.5 text-sm font-extrabold uppercase tracking-wide disabled:opacity-50 bg-[#f5deb3] text-[#1c3026] transition-colors duration-500 hover:text-[#f5deb3]"
           >
             {/* Dark fill that flows in from the left on hover — the label sits
                 above it (z-10) and flips to cream as it sweeps past. */}
