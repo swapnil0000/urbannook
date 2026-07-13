@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import confetti from "canvas-confetti";
@@ -50,6 +50,14 @@ const variantColor = (name = "") => {
   return VARIANT_COLOR_MAP[key] || key.replace(/\s+/g, "");
 };
 
+// Progress-bar geometry. The truck travels across (laneWidth - TRUCK_W) so its
+// right edge lands flush with the lane end at 100% instead of overhanging, and
+// GOAL_W reserves a gutter on the right that the truck never enters — which is
+// what keeps it from colliding with the destination marker on narrow cards.
+const TRUCK_W = 46;
+const GOAL_W = 32;
+const SMOKE_LIFE = 950;
+
 /**
  * Cross-sell card: "add this other product, unlock free shipping." Shown on
  * the PDP (dark theme) and on checkout (light theme, when the cart hasn't
@@ -64,8 +72,7 @@ const variantColor = (name = "") => {
  * threshold) instead of just a remove button — the PDP keeps the simpler
  * single-item add/remove since that's not the point of the PDP banner.
  */
-const FreeShippingBanner = ({ productId, variant = "dark", showQuantityStepper = false }) => {
-  const isLight = variant === "light";
+const FreeShippingBanner = ({ productId, showQuantityStepper = false, className = "mt-4" }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { isAuthenticated } = useSelector((state) => state.auth);
@@ -130,6 +137,108 @@ const FreeShippingBanner = ({ productId, variant = "dark", showQuantityStepper =
   // combo is complete and the bar fills to 100%.
   const comboUnlocked = added;
   const progressPct = comboUnlocked ? 100 : 55;
+
+  // --- Scroll-triggered truck animation for the progress bar. Every time the
+  // bar scrolls into view it replays 0 → current threshold (truck driving in,
+  // spinning wheels + trailing smoke); if the target changes while already in
+  // view (item added/removed), it eases from wherever it currently sits to
+  // the new target instead of restarting from zero.
+  const observerInstanceRef = useRef(null);
+  const rafRef = useRef(null);
+  const smokeIdRef = useRef(0);
+  const lastSpawnRef = useRef(0);
+  const truckFracRef = useRef(0);
+  const puffsRef = useRef([]);
+  const lastTargetRef = useRef(null);
+  const wasInViewRef = useRef(false);
+  const [isInView, setIsInView] = useState(false);
+
+  // ONE state object updated once per frame. Splitting the truck transform and
+  // the smoke list across two setState calls made React render twice per frame,
+  // which is what made the motion stutter — the fill/truck/puffs could also
+  // land a frame apart from each other. Single update keeps them in lockstep.
+  const [anim, setAnim] = useState({ frac: 0, bob: 0, moving: false, puffs: [] });
+
+  const animateTruckTo = (toFrac, duration) => {
+    cancelAnimationFrame(rafRef.current);
+    const fromFrac = truckFracRef.current;
+    const t0 = performance.now();
+    lastSpawnRef.current = 0;
+
+    const tick = (now) => {
+      const elapsed = now - t0;
+      const k = Math.min(elapsed / duration, 1);
+      const eased = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      const frac = fromFrac + (toFrac - fromFrac) * eased;
+      const moving = k < 1;
+      const bob = moving ? Math.sin(now / 90) * 1.2 : 0;
+
+      truckFracRef.current = frac;
+
+      // Spawn a puff at the truck's rear every ~70ms while it's driving, then
+      // age out anything past its life. Held in a ref so the rAF loop owns the
+      // list and we don't need a functional setState to read it.
+      let puffs = puffsRef.current;
+      if (moving && now - lastSpawnRef.current > 70) {
+        lastSpawnRef.current = now;
+        puffs = puffs.concat({ id: ++smokeIdRef.current, frac, born: now });
+      }
+      puffs = puffs.filter((p) => now - p.born < SMOKE_LIFE);
+      puffsRef.current = puffs;
+
+      setAnim({ frac, bob, moving, puffs });
+
+      // Keep ticking while moving OR while smoke is still fading, so the last
+      // puffs finish their fade instead of freezing mid-air.
+      if (moving || puffs.length > 0) {
+        rafRef.current = requestAnimationFrame(tick);
+      }
+    };
+    rafRef.current = requestAnimationFrame(tick);
+  };
+
+  // Callback ref instead of a plain useRef + effect: this fires exactly when
+  // the track DOM node mounts/unmounts, so it can't miss the mount the way an
+  // effect keyed on `offerActive` did (offerActive/banner/recommendedProduct
+  // are independent async queries that can resolve in any order — an effect
+  // dependency can flip true and "use up" its one re-run before the DOM
+  // this component conditionally renders actually exists yet).
+  const setTrackRef = useCallback((node) => {
+    if (observerInstanceRef.current) {
+      observerInstanceRef.current.disconnect();
+      observerInstanceRef.current = null;
+    }
+    if (node && typeof IntersectionObserver !== "undefined") {
+      const observer = new IntersectionObserver(([entry]) => setIsInView(entry.isIntersecting), { threshold: 0.25 });
+      observer.observe(node);
+      observerInstanceRef.current = observer;
+    }
+  }, []);
+
+  useEffect(() => {
+    const target = progressPct / 100;
+    const justEntered = isInView && !wasInViewRef.current;
+    wasInViewRef.current = isInView;
+
+    if (!isInView) return;
+
+    if (justEntered) {
+      // Replays the full 0 → threshold drive-in every time the bar re-enters
+      // the viewport (scrolling away and back retriggers it).
+      lastTargetRef.current = target;
+      animateTruckTo(target, 1800);
+      return;
+    }
+
+    if (lastTargetRef.current !== target) {
+      // Target changed while already on screen (e.g. add-on added/removed) —
+      // ease from the current position instead of restarting from zero.
+      lastTargetRef.current = target;
+      animateTruckTo(target, 900);
+    }
+  }, [isInView, progressPct]);
+
+  useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
 
   useEffect(() => {
     if (variants.length > 0 && !selectedVariant) setSelectedVariant(variants[0].variantName);
@@ -294,12 +403,13 @@ const FreeShippingBanner = ({ productId, variant = "dark", showQuantityStepper =
 
   // Fixed black/cream/red design regardless of PDP vs checkout context — the
   // card carries its own background/border so it reads the same everywhere
-  // it's dropped in. `isLight`/`variant` prop is kept for the outer spacing
-  // only, nothing else depends on it visually anymore.
+  // it's dropped in. `className` lets callers override outer spacing (e.g.
+  // dropping the top margin when placed side-by-side in a desktop grid)
+  // without affecting the other call sites' default stacked spacing.
   return (
-    <div className={`rounded-2xl overflow-hidden border border-black/10 bg-[#FAF7F2] shadow-sm ${isLight ? "mt-4" : "mt-4"}`}>
+    <div className={`rounded-2xl overflow-hidden border border-black/10 bg-[#FAF7F2] shadow-sm ${className}`}>
       {/* Ribbon header */}
-      <div className="flex items-center justify-between gap-3 bg-[#2e443c] px-4 py-3">
+      {/* <div className="flex items-center justify-between gap-3 bg-[#2e443c] px-4 py-3">
         <div className="flex items-center gap-2.5 min-w-0">
           <i className="fa-solid fa-truck-fast text-sm text-[#E63329] shrink-0" />
           <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#EFEAE0] truncate">
@@ -309,7 +419,7 @@ const FreeShippingBanner = ({ productId, variant = "dark", showQuantityStepper =
         <span className="hidden sm:block shrink-0 text-[9px] font-semibold uppercase tracking-[0.16em] text-white/40">
           Add-on deal
         </span>
-      </div>
+      </div> */}
 
       {/* Combo progress — free shipping unlocks when the recommended add-on is
           in the cart alongside the source product. The bar fills to 100% and
@@ -317,62 +427,197 @@ const FreeShippingBanner = ({ productId, variant = "dark", showQuantityStepper =
           rather than collapsing it away, so the celebratory end-state stays
           frozen on screen instead of disappearing. */}
       {offerActive && (
-        <div>
-          <div className="overflow-hidden">
-            <div className="px-4 pt-3.5 pb-1">
-              <div
-                className="rounded-xl px-3.5 py-3"
-                style={{
-                  background:
-                    "linear-gradient(135deg, oklch(0.93 0.09 152) 0%, oklch(0.90 0.11 150) 60%, oklch(0.92 0.10 148) 100%)",
-                }}
-              >
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <span className="text-[11px] font-bold uppercase tracking-[0.05em]" style={{ color: "oklch(0.47 0.10 165)" }}>
-                    {comboUnlocked
-                      ? "Free shipping unlocked on this order"
-                      : `Add ${recommendedProduct.productName} to unlock free shipping`}
-                  </span>
+        <div className="px-3 pt-3">
+          <div
+            className="rounded-xl px-3.5 pt-3 pb-2"
+            style={{
+              background:
+                "linear-gradient(135deg, oklch(0.93 0.09 152) 0%, oklch(0.90 0.11 150) 60%, oklch(0.92 0.10 148) 100%)",
+            }}
+          >
+                <div className="mb-1">
+                  {comboUnlocked ? (
+                    <span className="text-[11px] font-bold uppercase tracking-[0.05em]" style={{ color: "oklch(0.47 0.10 165)" }}>
+                      Free shipping unlocked on this order
+                    </span>
+                  ) : (
+                    <>
+                      <p className="text-[11px] font-bold uppercase tracking-[0.05em]" style={{ color: "oklch(0.47 0.10 165)" }}>
+                        You're almost there!
+                      </p>
+                      <p className="text-[11px] font-semibold" style={{ color: "oklch(0.47 0.10 165)" }}>
+                        Add {recommendedProduct.productName} & unlock free shipping
+                      </p>
+                    </>
+                  )}
                 </div>
                 <style>{`
-                  @keyframes fsbShimmer { 0% { transform: translateX(-120%); } 100% { transform: translateX(220%); } }
-                  @keyframes fsbPulse { 0%, 100% { opacity: .55; transform: translateY(-50%) scale(1); } 50% { opacity: 1; transform: translateY(-50%) scale(1.35); } }
+                  @keyframes fsbShine { 0% { transform: translateX(-120%); } 100% { transform: translateX(320%); } }
+                  @keyframes fsbWheel { to { transform: rotate(360deg); } }
+                  @keyframes fsbPop { 0% { transform: scale(0.4); opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
                 `}</style>
-                <div className="h-2.5 rounded-full overflow-hidden relative" style={{ background: "oklch(0.99 0 0 / 0.5)" }}>
+                {/* Truck-driven progress bar — a direct port of the "Free
+                    Shipping Bar" Claude Design prototype (track/fill/truck/
+                    smoke geometry and timings kept 1:1 with that file). Driven
+                    by requestAnimationFrame rather than a CSS width transition
+                    so the fill, the truck and its exhaust stay locked to the
+                    same frame. The wrapper is the IntersectionObserver target
+                    that (re)starts the drive-in whenever it scrolls into view. */}
+                <div ref={setTrackRef} className="relative" style={{ height: 48, marginTop: 4 }}>
+                  {/* The "lane": everything (track, fill, truck, smoke) is
+                      positioned inside this, and it stops short of the right
+                      edge by GOAL_W so the destination marker always has its
+                      own space — the truck can never collide with it. */}
+                  <div className="absolute left-0 bottom-0" style={{ right: GOAL_W, top: 0 }}>
+                    {/* Track */}
+                    <div
+                      className="absolute left-0 right-0"
+                      style={{
+                        bottom: 6,
+                        height: 14,
+                        borderRadius: 999,
+                        background: "#e3f6e7",
+                        boxShadow: "inset 0 2px 5px rgba(21,122,68,0.18)",
+                      }}
+                    >
+                      {/* Fill — green gradient + drop shadow, with a shine sweep. */}
+                      <div
+                        style={{
+                          position: "absolute",
+                          left: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: `${anim.frac * 100}%`,
+                          minWidth: 14,
+                          borderRadius: 999,
+                          background: "linear-gradient(90deg, #157a44 0%, #2fb463 100%)",
+                          boxShadow: "0 2px 6px -2px rgba(21,122,68,0.5)",
+                        }}
+                      >
+                        <div className="absolute inset-0 overflow-hidden" style={{ borderRadius: 999 }}>
+                          <div
+                            className="absolute top-0 bottom-0"
+                            style={{
+                              width: "40%",
+                              background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent)",
+                              animation: "fsbShine 2.4s linear infinite",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Exhaust smoke — puffs grow, rise, drift back, fade out.
+                        Anchored to the truck's rear via the same travel calc. */}
+                    {anim.puffs.map((p) => {
+                      const t = Math.min(Math.max(performance.now() - p.born, 0) / SMOKE_LIFE, 1);
+                      const size = 7 + t * 18;
+                      return (
+                        <div
+                          key={p.id}
+                          className="absolute rounded-full pointer-events-none"
+                          style={{
+                            left: `calc(${p.frac} * (100% - ${TRUCK_W}px) + ${10 - t * 20}px)`,
+                            bottom: 14 + t * 20,
+                            width: size,
+                            height: size,
+                            marginLeft: -(size / 2),
+                            marginBottom: -(size / 2),
+                            background:
+                              "radial-gradient(circle at 40% 40%, rgba(255,255,255,0.95), rgba(200,220,206,0.6) 55%, rgba(180,205,188,0) 72%)",
+                            filter: "blur(1px)",
+                            opacity: (1 - t) * 0.4,
+                            zIndex: 2,
+                          }}
+                        />
+                      );
+                    })}
+
+                    {/* Truck. Travels across (laneWidth - TRUCK_W) so at 100%
+                        its right edge lands flush at the lane's end rather than
+                        hanging outside it. */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: `calc(${anim.frac} * (100% - ${TRUCK_W}px))`,
+                        bottom: 8 + anim.bob,
+                        width: TRUCK_W,
+                        willChange: "left",
+                        zIndex: 3,
+                      }}
+                    >
+                    <svg width={TRUCK_W} height="36" viewBox="0 0 80 56" fill="none" style={{ display: "block", overflow: "visible" }}>
+                      {/* ground shadow */}
+                      <ellipse cx="40" cy="53" rx="30" ry="3.4" fill="rgba(21,122,68,0.22)" />
+                      {/* cargo box */}
+                      <rect x="2" y="7" width="44" height="30" rx="6" fill="#ffffff" stroke="#157a44" strokeWidth="2.4" />
+                      <rect x="9" y="14" width="6" height="16" rx="2" fill="#d6f2dd" />
+                      <rect x="20" y="14" width="6" height="16" rx="2" fill="#d6f2dd" />
+                      <rect x="31" y="14" width="6" height="16" rx="2" fill="#d6f2dd" />
+                      {/* cab */}
+                      <path
+                        d="M46 14 h13 a5 5 0 0 1 4 2.2 L69 26 a4 4 0 0 1 0.8 2.4 V37 H46 Z"
+                        fill="#2fb463"
+                        stroke="#157a44"
+                        strokeWidth="2.4"
+                        strokeLinejoin="round"
+                      />
+                      <rect x="50" y="18" width="12" height="8.5" rx="2.5" fill="#dff7e6" stroke="#157a44" strokeWidth="1.8" />
+                      <circle cx="67.5" cy="33.5" r="1.8" fill="#ffd34d" />
+                      {/* wheels — spokes make the rotation actually readable */}
+                      <g
+                        style={{
+                          transformBox: "fill-box",
+                          transformOrigin: "center",
+                          animation: anim.moving ? "fsbWheel 0.55s linear infinite" : "none",
+                        }}
+                      >
+                        <circle cx="18" cy="40" r="8.4" fill="#1f2a24" />
+                        <circle cx="18" cy="40" r="3.3" fill="#cfeed7" />
+                        <rect x="17" y="32" width="2" height="16" rx="1" fill="#4c5a52" />
+                        <rect x="10" y="39" width="16" height="2" rx="1" fill="#4c5a52" />
+                      </g>
+                      <g
+                        style={{
+                          transformBox: "fill-box",
+                          transformOrigin: "center",
+                          animation: anim.moving ? "fsbWheel 0.55s linear infinite" : "none",
+                        }}
+                      >
+                        <circle cx="55" cy="40" r="8.4" fill="#1f2a24" />
+                        <circle cx="55" cy="40" r="3.3" fill="#cfeed7" />
+                        <rect x="54" y="32" width="2" height="16" rx="1" fill="#4c5a52" />
+                        <rect x="47" y="39" width="16" height="2" rx="1" fill="#4c5a52" />
+                      </g>
+                    </svg>
+                    </div>
+                  </div>
+
+                  {/* Destination reward — sits in the reserved GOAL_W gutter at
+                      the far right, outside the truck's travel lane, and pops
+                      with a bounce the moment the combo unlocks. */}
                   <div
-                    className="h-full rounded-full relative overflow-hidden"
+                    key={comboUnlocked ? "unlocked" : "locked"}
+                    className="absolute flex items-center justify-center"
                     style={{
-                      width: `${progressPct}%`,
-                      background: "linear-gradient(90deg, oklch(0.55 0.14 155), oklch(0.47 0.10 165))",
-                      transition: "width 900ms cubic-bezier(.2,.8,.2,1)",
+                      right: 0,
+                      bottom: 1,
+                      width: 26,
+                      height: 26,
+                      borderRadius: 9,
+                      background: "#fff",
+                      boxShadow: "0 6px 14px -6px rgba(21,122,68,0.5)",
+                      border: `2px solid ${comboUnlocked ? "#2fb463" : "#bfe6cb"}`,
+                      animation: comboUnlocked ? "fsbPop 0.45s cubic-bezier(0.34,1.56,0.64,1) both" : "none",
                     }}
                   >
-                    {/* Continuously moving shine sweep — keeps the bar feeling
-                        "alive" even when the width isn't currently changing. */}
-                    <span
-                      className="absolute inset-y-0 w-1/3"
-                      style={{
-                        background:
-                          "linear-gradient(90deg, transparent, oklch(1 0 0 / 0.55), transparent)",
-                        animation: "fsbShimmer 2.2s ease-in-out infinite",
-                      }}
-                    />
-                    {/* Glowing dot at the leading edge, like a comet head, so the
-                        fill point reads as an active, moving position. */}
-                    {progressPct > 2 && (
-                      <span
-                        className="absolute top-1/2 right-0 w-2.5 h-2.5 rounded-full"
-                        style={{
-                          background: "oklch(0.99 0 0)",
-                          boxShadow: "0 0 8px 2px oklch(0.55 0.14 155 / 0.9)",
-                          animation: "fsbPulse 1.4s ease-in-out infinite",
-                        }}
-                      />
-                    )}
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                      <path d="M12 2 3 6.5v11L12 22l9-4.5v-11L12 2Z" fill="#eafaee" stroke="#157a44" strokeWidth="1.6" strokeLinejoin="round" />
+                      <path d="M3 6.5 12 11l9-4.5M12 11v11" stroke="#157a44" strokeWidth="1.6" strokeLinejoin="round" />
+                      <path d="M7.5 4.25 16.5 8.75" stroke="#157a44" strokeWidth="1.6" strokeLinejoin="round" />
+                    </svg>
                   </div>
                 </div>
-              </div>
-            </div>
           </div>
         </div>
       )}
@@ -509,19 +754,24 @@ const FreeShippingBanner = ({ productId, variant = "dark", showQuantityStepper =
           <button
             onClick={handleAddToCart}
             disabled={isAdding}
-            className="w-full py-3.5 rounded-xl flex items-center justify-center gap-2.5 text-sm font-extrabold uppercase tracking-wide transition-colors disabled:opacity-50 bg-[#F5F1E6] text-black border-2 border-black hover:bg-white"
+            className="group relative w-full py-3.5 rounded-xl overflow-hidden flex items-center justify-center gap-2.5 text-sm font-extrabold uppercase tracking-wide disabled:opacity-50 bg-[#f5deb3] text-black transition-colors duration-500 hover:text-[#f5deb3]"
           >
-            {isAdding ? (
-              "Adding…"
-            ) : (
-              <>
-                Add &amp; Ship Free
-                {/* <span className="text-[11px] font-bold px-2 py-1 bg-black/10">
-                  +₹{displayPrice.toLocaleString()}
-                </span> */}
-                <span className="text-base leading-none">→</span>
-              </>
-            )}
+            {/* Dark fill that flows in from the left on hover — the label sits
+                above it (z-10) and flips to cream as it sweeps past. */}
+            <span
+              aria-hidden="true"
+              className="absolute inset-0 bg-[#1c3026] -translate-x-full transition-transform duration-500 ease-out group-hover:translate-x-0"
+            />
+            <span className="relative z-10 flex items-center justify-center gap-2.5">
+              {isAdding ? (
+                "Adding…"
+              ) : (
+                <>
+                  Add &amp; Ship Free
+                  <span className="text-base leading-none">→</span>
+                </>
+              )}
+            </span>
           </button>
         )}
       </div>
