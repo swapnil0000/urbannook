@@ -14,6 +14,7 @@ import confetti from "canvas-confetti";
 import SEOHead from "../../component/SEOHead";
 import ComparisonTable from "../../component/ComparisonTable";
 import FreeShippingBanner from "../../component/FreeShippingBanner";
+import MiniCartPreview from "../../component/layout/MiniCartPreview";
 import useTimer from "../../hooks/useTimer";
 import config from "../../config/env";
 import { trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist, trackVariantSelect } from "../../utils/analytics";
@@ -117,13 +118,18 @@ const ProductDetailPage = () => {
   const { productId, variantSku: urlVariantSku } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const { showNotification, openLoginModal, closeLoginModal } = useUI();
+  const { showNotification, openLoginModal, closeLoginModal, openCart } = useUI();
+  // Tapping "Go to Cart" opens this quick preview first (items + total +
+  // shipping note), not the full editable CartDrawer — "View Cart" inside it
+  // is the escape hatch into that full drawer via `openCart`.
+  const [showMiniCart, setShowMiniCart] = useState(false);
 
   // 1. Auth & Cookies
   const [cookies] = useCookies(["userAccessToken"]);
   const { isAuthenticated } = useSelector((state) => state.auth);
   const cartItems = useSelector((state) => state.cart.items);
   const cartSelections = useSelector((state) => state.cart.selections);
+  const cartTotalQuantity = useSelector((state) => state.cart.totalQuantity);
 
   // 2. Local UI States
   const [activeAccordion, setActiveAccordion] = useState("description");
@@ -2071,7 +2077,7 @@ const ProductDetailPage = () => {
 
       {/* Mobile Sticky Bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-[#1c3026]/95 backdrop-blur-xl border-t border-[#F5DEB3]/20 z-50 lg:hidden shadow-[0_-10px_40px_rgba(0,0,0,0.3)]">
-        {/* Delivery strip above buttons */}
+        {/* Delivery strip above buttons — removed per request, keep for later reference
         <div className="flex items-center bg-white justify-center gap-4 px-4 py-2 border-b border-[#F5DEB3]/10">
           <span className="flex items-center gap-1.5 text-[9px] text-[#2e443c]/70 uppercase tracking-wider font-bold">
             <i className="fa-solid fa-truck text-[#2e443c] text-[9px]"></i>
@@ -2088,6 +2094,7 @@ const ProductDetailPage = () => {
             Secure Pay
           </span>
         </div>
+        */}
         <div className="flex gap-4 items-center p-4 px-6">
           <div className="flex-1">
             {!isInCart ? (
@@ -2120,11 +2127,24 @@ const ProductDetailPage = () => {
                   </button>
                 </div>
 
+                {/* Mobile: opens the quick mini-cart preview first (items +
+                    total + shipping note), not straight to checkout —
+                    checkout itself is reached from the cart page/drawer,
+                    same as the desktop flow. */}
                 <button
-                  onClick={handleCheckoutClick}
-                  className="flex-1 h-12 bg-[#F5DEB3] text-[#1c3026] rounded-full font-bold uppercase tracking-widest text-[10px] shadow-lg active:scale-95 transition-transform"
+                  onClick={() => setShowMiniCart(true)}
+                  className="flex-1 h-12 bg-[#F5DEB3] text-[#1c3026] rounded-full font-bold uppercase tracking-widest text-[10px] shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2"
                 >
-                  Checkout
+                  <span className="relative flex items-center justify-center">
+                    <i className="fa-solid fa-cart-shopping text-[11px]"></i>
+                    {cartTotalQuantity > 0 && (
+                      <span className="absolute -top-2 -right-2 min-w-[15px] h-[15px] px-0.5 rounded-full bg-[#1c3026] text-[#F5DEB3] text-[8px] font-bold flex items-center justify-center">
+                        {cartTotalQuantity}
+                      </span>
+                    )}
+                  </span>
+                  Go to Cart
+                  <i className="fa-solid fa-chevron-right text-[9px]"></i>
                 </button>
               </div>
             )}
@@ -2144,6 +2164,16 @@ const ProductDetailPage = () => {
           </button>
         </div>
       </div>
+
+      {showMiniCart && (
+        <MiniCartPreview
+          onClose={() => setShowMiniCart(false)}
+          onViewCart={() => {
+            setShowMiniCart(false);
+            openCart();
+          }}
+        />
+      )}
 
       {feedbackMessage && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-[#F5DEB3] text-[#1c3026] px-6 py-3 rounded-full shadow-2xl z-[60] flex items-center gap-2 font-bold text-xs uppercase tracking-widest">
