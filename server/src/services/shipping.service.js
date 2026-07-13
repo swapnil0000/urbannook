@@ -2,6 +2,115 @@ import axios from "axios";
 import Product from "../model/product.model.js";
 import { ValidationError, NotFoundError } from "../utils/errors.js";
 
+// Couriers we ship with, in the order we prefer them. Selection is slab-first:
+// the parcel's weight decides the slab, and this order only breaks ties *within* that slab.
+const COURIER_PRIORITY = ["delhivery", "dtdc", "bluedart", "xpressbees"];
+
+// Charged when the API answers but no allowlisted courier serves the required slab.
+const FALLBACK_SHIPPING_CHARGE = 179;
+
+// The API's own slab field, e.g. "0.5 KG" / "10 KG". Authoritative — this drives selection.
+const parseSlabKg = (value) => {
+  if (value == null) return null;
+  const match = String(value).match(/([\d.]+)\s*(kg|g)?/i);
+  if (!match) return null;
+  const amount = parseFloat(match[1]);
+  if (isNaN(amount)) return null;
+  return match[2]?.toLowerCase() === "g" ? amount / 1000 : amount;
+};
+
+// The slab as advertised in the service name, e.g. "Delhivery 2Kg" -> 2. Used only to
+// verify parseSlabKg agrees; names without a kg figure ("Delhivery Heavy MPS") return null.
+const parseWeightFromName = (name) => {
+  const match = String(name || "").match(/([\d.]+)\s*kg/i);
+  return match ? parseFloat(match[1]) : null;
+};
+
+const safeFloat = (val, fallback = 0) => {
+  const parsed = parseFloat(val);
+  return isNaN(parsed) ? fallback : parsed;
+};
+
+// Slab-first courier selection.
+//
+// The parcel's weight alone decides the slab (smallest tier that can hold it); COURIER_PRIORITY
+// only breaks ties *within* that slab. A courier that has no service at the required slab is not
+// a candidate at all — that is what stops a 1.68kg parcel being billed on a 10kg product.
+//
+// Returns { selected, targetSlab, candidates } — selected is null when no allowlisted courier
+// serves the required slab (caller falls back to the flat rate).
+const selectCourierService = (allServices, chargeableWeightInKg) => {
+  const candidates = allServices
+    .map((svc) => {
+      const nameLower = String(svc.name || "").toLowerCase();
+      return {
+        raw: svc,
+        name: svc.name,
+        courier: COURIER_PRIORITY.find((c) => nameLower.includes(c)) || null,
+        slabKg: parseSlabKg(svc.minimum_chargeable_weight),
+        nameKg: parseWeightFromName(svc.name),
+        charges: safeFloat(svc.total_charges, NaN),
+      };
+    })
+    .filter((c) => {
+      if (!c.courier) return false; // outside the allowlist
+      if (!(c.slabKg > 0)) {
+        console.warn(`[SHIPPING RATE] ⚠️  Dropped "${c.name}" - unreadable minimum_chargeable_weight (${c.raw.minimum_chargeable_weight})`);
+        return false;
+      }
+      if (!(c.charges > 0)) {
+        console.warn(`[SHIPPING RATE] ⚠️  Dropped "${c.name}" - invalid total_charges (${c.raw.total_charges})`);
+        return false;
+      }
+      // Cross-check the slab in the name against minimum_chargeable_weight, so a malformed
+      // API row can't silently price the parcel on the wrong slab.
+      if (c.nameKg === null) {
+        console.warn(`[SHIPPING RATE] ⚠️  Dropped "${c.name}" - no slab in name to verify against ${c.slabKg}kg`);
+        return false;
+      }
+      if (Math.abs(c.nameKg - c.slabKg) > 0.001) {
+        console.warn(`[SHIPPING RATE] 🚨 Dropped "${c.name}" - slab mismatch: name says ${c.nameKg}kg, API says ${c.slabKg}kg`);
+        return false;
+      }
+      return true;
+    });
+
+  console.log(`\n[SHIPPING RATE] 🚚 ${candidates.length} verified services from allowlisted couriers:`);
+  [...candidates]
+    .sort((a, b) => a.slabKg - b.slabKg || a.charges - b.charges)
+    .forEach((c) => console.log(`    • [${c.slabKg}kg slab] ${c.name} - ₹${c.charges}`));
+
+  // Step 1 — the slab, purely on weight. 1.68kg → 2kg. 1.3kg → 2kg. 0.3kg → 0.5kg.
+  const availableSlabs = [...new Set(candidates.map((c) => c.slabKg))].sort((a, b) => a - b);
+  let targetSlab = availableSlabs.find((slab) => slab >= chargeableWeightInKg);
+
+  if (targetSlab === undefined && availableSlabs.length > 0) {
+    // Parcel outweighs every slab on offer — bill the largest rather than under-charging.
+    targetSlab = availableSlabs[availableSlabs.length - 1];
+    console.warn(`[SHIPPING RATE] 🚨 Parcel (${chargeableWeightInKg.toFixed(2)}kg) exceeds every available slab. Falling back to largest slab: ${targetSlab}kg`);
+  }
+
+  // Step 2 — within that slab only, pick by courier priority.
+  let selected = null;
+  if (targetSlab !== undefined) {
+    const atSlab = candidates.filter((c) => c.slabKg === targetSlab);
+    console.log(`\n[SHIPPING RATE] 🎯 Chargeable ${chargeableWeightInKg.toFixed(2)}kg → target slab ${targetSlab}kg (${atSlab.length} services)`);
+
+    for (const courier of COURIER_PRIORITY) {
+      const fromCourier = atSlab
+        .filter((c) => c.courier === courier)
+        .sort((a, b) => a.charges - b.charges); // cheapest if one courier has several at this slab
+      if (fromCourier.length > 0) {
+        selected = fromCourier[0];
+        break;
+      }
+      console.log(`[SHIPPING RATE]    ${courier.toUpperCase()} has no ${targetSlab}kg service → next courier`);
+    }
+  }
+
+  return { selected, targetSlab, candidates };
+};
+
 const calculateShippingRate = async ({ pincode, cartItems, paymentType = "PREPAID" }) => {
   if (!pincode || !cartItems || !Array.isArray(cartItems)) {
     throw new ValidationError("Pincode and cart items are required");
@@ -33,11 +142,6 @@ const calculateShippingRate = async ({ pincode, cartItems, paymentType = "PREPAI
         quantity: cartItem.quant || cartItem.quantity
       };
     }).filter(item => item !== null);
-
-    const safeFloat = (val, fallback = 0) => {
-      const parsed = parseFloat(val);
-      return isNaN(parsed) ? fallback : parsed;
-    };
 
     // Calculate total volumetric and actual weight
     let totalVolumetricWeight = 0; // in grams
@@ -150,106 +254,37 @@ const calculateShippingRate = async ({ pincode, cartItems, paymentType = "PREPAI
         const allServices = response.data.data;
         console.log(`\n[SHIPPING RATE] 📦 Received ${allServices.length} services from API`);
 
-        // Filter for preferred couriers (Delhivery, DTDC, BlueDart, XpressBees)
-        // Include both surface and non-surface variants
-        const courierPriorityNames = ["delhivery", "dtdc", "xpressbees", "bluedart"];
-        const filteredServices = allServices.filter(svc => {
-          const nameLower = svc.name.toLowerCase();
-          return courierPriorityNames.some(courier => nameLower.includes(courier));
-        });
-
-        console.log(`[SHIPPING RATE] 🚚 Found ${filteredServices.length} services from preferred couriers`);
-
-        if (filteredServices.length === 0) {
-          console.error(`[SHIPPING RATE] ❌ No services available from preferred couriers`);
-          throw new Error("Pincode not serviceable - No preferred courier available");
+        if (allServices.length === 0) {
+          console.error(`[SHIPPING RATE] ❌ No services returned for this pincode`);
+          throw new Error("Pincode not serviceable - No courier available");
         }
 
-        // Helper function to extract weight from service name (e.g., "Delhivery 2Kg" -> 2)
-        const extractWeightFromName = (name) => {
-          const match = name.match(/([0-9.]+)\s*k?g/i);
-          return match ? parseFloat(match[1]) : null;
-        };
+        const { selected, targetSlab } = selectCourierService(allServices, totalChargeableWeightInKg);
 
-        // Group services by courier
-        const courierPriority = ["delhivery", "dtdc", "xpressbees", "bluedart"];
-        const servicesByCourier = {};
-
-        filteredServices.forEach(svc => {
-          const nameLower = svc.name.toLowerCase();
-          for (const courier of courierPriority) {
-            if (nameLower.includes(courier)) {
-              if (!servicesByCourier[courier]) {
-                servicesByCourier[courier] = [];
-              }
-              servicesByCourier[courier].push(svc);
-              break;
-            }
-          }
-        });
-
-        console.log(`\n[SHIPPING RATE] 🏢 Services grouped by courier:`);
-        Object.keys(servicesByCourier).forEach(courier => {
-          console.log(`  - ${courier.toUpperCase()}: ${servicesByCourier[courier].length} slabs`);
-          servicesByCourier[courier].forEach(svc => {
-            const weight = extractWeightFromName(svc.name);
-            console.log(`    • ${svc.name} - ${weight}kg - ₹${svc.total_charges}`);
-          });
-        });
-
-        // Try each courier in priority order and select FIRST available nearest higher slab
-        let selectedService = null;
-
-        for (const courier of courierPriority) {
-          if (servicesByCourier[courier] && servicesByCourier[courier].length > 0) {
-            const courierServices = servicesByCourier[courier];
-
-            // Find the nearest higher weight slab
-            let bestMatch = null;
-            let minDiff = Infinity;
-
-            for (const svc of courierServices) {
-              const slabWeight = extractWeightFromName(svc.name);
-              if (slabWeight === null) continue;
-
-              // We want nearest HIGHER slab (slab >= chargeable weight)
-              if (slabWeight >= totalChargeableWeightInKg) {
-                const diff = slabWeight - totalChargeableWeightInKg;
-                if (diff < minDiff) {
-                  minDiff = diff;
-                  bestMatch = svc;
-                }
-              }
-            }
-
-            // If no higher slab found, take the highest available slab
-            if (!bestMatch && courierServices.length > 0) {
-              bestMatch = courierServices.reduce((max, svc) => {
-                const slabWeight = extractWeightFromName(svc.name) || 0;
-                const maxWeight = extractWeightFromName(max.name) || 0;
-                return slabWeight > maxWeight ? svc : max;
-              });
-            }
-
-            if (bestMatch) {
-              selectedService = bestMatch;
-              console.log(`\n[SHIPPING RATE] 🎯 Selected ${courier.toUpperCase()}: ${bestMatch.name} - ₹${bestMatch.total_charges}`);
-              break;
-            }
-          }
+        // No allowlisted courier at the required slab → flat fallback
+        if (!selected) {
+          console.warn(`[SHIPPING RATE] 🚨 No allowlisted courier at the required slab. Using flat fallback ₹${FALLBACK_SHIPPING_CHARGE}`);
+          const fallbackResult = {
+            total_charges: FALLBACK_SHIPPING_CHARGE,
+            type: "fallback",
+            totalWeight: Math.ceil(totalChargeableWeight),
+            expectedNoOfBoxes: totalBoxes,
+            serviceName: null,
+            courierName: null,
+            estimatedDays: "3-4 Days",
+            paymentType: validPaymentType,
+          };
+          console.log(`\n[SHIPPING RATE] 🎉 FALLBACK:`, JSON.stringify(fallbackResult, null, 2));
+          console.log("=".repeat(80) + "\n");
+          return fallbackResult;
         }
 
-        // If no priority courier found, throw error
-        if (!selectedService) {
-          console.error(`[SHIPPING RATE] ❌ No suitable courier found from priority list`);
-          throw new Error("Pincode not serviceable - No preferred courier available");
-        }
-
-        const finalCharge = Math.ceil(safeFloat(selectedService.total_charges));
+        const finalCharge = Math.ceil(selected.charges);
 
         console.log(`\n[SHIPPING RATE] 💰 Final Calculation:`);
-        console.log(`  - Service: ${selectedService.name}`);
-        console.log(`  - Base Charge (incl. GST): ₹${selectedService.total_charges}`);
+        console.log(`  - Chargeable Weight: ${totalChargeableWeightInKg.toFixed(2)}kg → ${targetSlab}kg slab`);
+        console.log(`  - Service: ${selected.name} (${selected.courier.toUpperCase()})`);
+        console.log(`  - Base Charge (incl. GST): ₹${selected.charges}`);
         console.log(`  - Final Charge: ₹${finalCharge}`);
 
         const result = {
@@ -257,9 +292,11 @@ const calculateShippingRate = async ({ pincode, cartItems, paymentType = "PREPAI
           type: "dynamic",
           totalWeight: Math.ceil(totalChargeableWeight),
           expectedNoOfBoxes: totalBoxes,
-          serviceName: selectedService.name,
-          courierName: selectedService.name.split(' ')[0], // Extract courier name
-          estimatedDays: selectedService.estimated_delivery || "3-4 Days",
+          serviceName: selected.name,
+          courierName: selected.courier,
+          slabKg: targetSlab,
+          chargeableWeightKg: Number(totalChargeableWeightInKg.toFixed(3)),
+          estimatedDays: selected.raw.estimated_delivery || "3-4 Days",
           paymentType: validPaymentType,
         };
 
@@ -306,4 +343,4 @@ const calculateShippingRate = async ({ pincode, cartItems, paymentType = "PREPAI
   }
 };
 
-export { calculateShippingRate };
+export { calculateShippingRate, selectCourierService };
