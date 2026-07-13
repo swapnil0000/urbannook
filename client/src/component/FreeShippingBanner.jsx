@@ -31,6 +31,28 @@ const fireCelebrationConfetti = () => {
   fire(0.1, { spread: 120, startVelocity: 45 });
 };
 
+// Same variant-name → colour lookup used on the PDP (ProductDetailPage.jsx),
+// so a "Rust Orange" variant renders as the same swatch colour everywhere.
+// Used for the small colour circle next to each option in the variant
+// dropdown below — anything not in the map falls back to the name itself
+// with spaces stripped (works for plain CSS colour words like "gold").
+const VARIANT_COLOR_MAP = {
+  rainbow: "linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)",
+  "sky blue": "#87CEEB",
+  white: "#FFFFFF",
+  black: "#000000",
+  red: "#FF0000",
+  blue: "#0000FF",
+  yellow: "#FFFF00",
+  orange: "#FFA500",
+  grey: "#808080",
+  purple: "#800080",
+};
+const variantColor = (name = "") => {
+  const key = name.toLowerCase();
+  return VARIANT_COLOR_MAP[key] || key.replace(/\s+/g, "");
+};
+
 // Progress-bar geometry. The truck travels across (laneWidth - TRUCK_W) so its
 // right edge lands flush with the lane end at 100% instead of overhanging, and
 // GOAL_W reserves a gutter on the right that the truck never enters — which is
@@ -65,6 +87,14 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
   const itemQty = (q) => (typeof q === "object" && q !== null ? q.quantity || 0 : q || 0);
 
   const [selectedVariant, setSelectedVariant] = useState(null);
+
+  // Custom variant dropdown state — replaces a native <select>, which looks
+  // inconsistent/unthemed on mobile (each OS renders its own native picker
+  // UI that CSS can't meaningfully touch). This is a plain button + an
+  // absolutely-positioned list, fully on-brand everywhere, closed by
+  // clicking its own toggle again, picking an option, or clicking outside.
+  const [variantMenuOpen, setVariantMenuOpen] = useState(false);
+  const variantMenuRef = useRef(null);
 
   // The slider IS the loader for the add-to-cart click: button shows
   // "Adding…" (disabled, no other visual change) from click until the truck
@@ -297,7 +327,10 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
   // in the cart once added (could differ from what's selected in the
   // dropdown, or from a variant changed elsewhere).
   useEffect(() => {
-    if (addedVariant) setSelectedVariant(addedVariant);
+    if (addedVariant) {
+      setSelectedVariant(addedVariant);
+      setVariantMenuOpen(false);
+    }
   }, [addedVariant]);
 
   // Mount-then-animate so the sheet slides up from off-screen rather than
@@ -313,6 +346,22 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
     setSourcePromptMounted(false);
     setTimeout(() => setShowSourcePrompt(false), 300);
   };
+
+  // Closes the custom variant dropdown when clicking anywhere outside it.
+  useEffect(() => {
+    if (!variantMenuOpen) return;
+    const handleClickOutside = (e) => {
+      if (variantMenuRef.current && !variantMenuRef.current.contains(e.target)) {
+        setVariantMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, [variantMenuOpen]);
 
   if (!banner || !recommendedProduct) return null;
 
@@ -594,53 +643,66 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
               {recommendedProduct.productName}
             </button>
 
-            {/* Variant dropdown — label + select on one line, themed to match
-                the card (black/cream/red) instead of a native grey/blue
-                <select>. Whatever's selected here is exactly what
-                handleAddToCart sends to the cart (via `activeVariant`,
-                derived from `selectedVariant` below). Disabled once already
-                in cart since that cart line is committed to `addedVariant`. */}
+            {/* Custom variant dropdown — label + button on one line, fully
+                on-brand (cream/green) everywhere, unlike a native <select>
+                whose open popup is rendered by the OS/browser and can't be
+                meaningfully styled, especially on mobile. Whatever's picked
+                here is exactly what handleAddToCart sends to the cart (via
+                `activeVariant`, derived from `selectedVariant`). Disabled
+                once already in cart since that line is committed to
+                `addedVariant`. */}
             {variants.length > 1 && (
               <div className="flex items-center gap-2 mt-1">
                 <label className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.1em] text-gray-500">
                   {added ? "In cart" : "Variants"}
                 </label>
-                <div className="relative flex-1 min-w-0 max-w-[96px]">
-                  {/* The dark/transparent popup you saw was Chrome auto-dark-
-                      styling the native <select> popup to match the device's
-                      OS dark mode — `color-scheme: light` below forces it to
-                      render light regardless of system theme, which is the
-                      well-supported fix (not a guess). Cream option
-                      background + green hover/checked row on top of that. */}
-                  <style>{`
-                    select.fsb-variant-select option {
-                      background-color: #FAF7F0;
-                      color: #1c3026;
-                    }
-                    select.fsb-variant-select option:hover,
-                    select.fsb-variant-select option:focus {
-                      background-color: #d6f2dd;
-                      color: #157a44;
-                    }
-                    select.fsb-variant-select option:checked {
-                      background-color: #d6f2dd;
-                      color: #157a44;
-                    }
-                  `}</style>
-                  <select
-                    value={selectedVariant || ""}
-                    onChange={(e) => setSelectedVariant(e.target.value)}
+                <div ref={variantMenuRef} className="relative flex-1 min-w-0 max-w-[96px]">
+                  <button
+                    type="button"
+                    onClick={() => !added && setVariantMenuOpen((v) => !v)}
                     disabled={added}
-                    style={{ colorScheme: "light" }}
-                    className="fsb-variant-select w-full appearance-none rounded-lg border border-black/15 bg-white px-2.5 py-1 pr-7 text-xs font-bold text-black disabled:opacity-60 disabled:cursor-default focus:outline-none focus:ring-1 focus:ring-[#157a44] focus:border-[#157a44]"
+                    className="w-full flex items-center justify-between gap-1 rounded-lg border border-black/15 bg-white px-2.5 py-1 text-xs font-bold text-black disabled:opacity-60 disabled:cursor-default focus:outline-none focus:ring-1 focus:ring-[#157a44] focus:border-[#157a44]"
                   >
-                    {variants.map((v) => (
-                      <option key={v.variantName} value={v.variantName}>
-                        {v.variantName}
-                      </option>
-                    ))}
-                  </select>
-                  <i className="fa-solid fa-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] text-black/40 pointer-events-none" />
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      <span
+                        className="shrink-0 w-2.5 h-2.5 rounded-full border border-black/15"
+                        style={{ background: variantColor(selectedVariant || "") }}
+                      />
+                      <span className="truncate">{selectedVariant}</span>
+                    </span>
+                    <i
+                      className={`fa-solid fa-chevron-down text-[9px] text-black/40 shrink-0 transition-transform duration-200 ${
+                        variantMenuOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {variantMenuOpen && (
+                    <div className="absolute z-20 top-full left-0 right-0 mt-1 rounded-lg border border-[#157a44]/30 bg-[#FAF7F0] shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+                      {variants.map((v) => {
+                        const isSelected = v.variantName === selectedVariant;
+                        return (
+                          <button
+                            key={v.variantName}
+                            type="button"
+                            onClick={() => {
+                              setSelectedVariant(v.variantName);
+                              setVariantMenuOpen(false);
+                            }}
+                            className={`w-full flex items-center gap-1.5 text-left px-2.5 py-1.5 text-xs font-bold transition-colors ${
+                              isSelected ? "bg-[#d6f2dd] text-[#157a44]" : "text-[#1c3026] hover:bg-[#d6f2dd] hover:text-[#157a44]"
+                            }`}
+                          >
+                            <span
+                              className="shrink-0 w-2.5 h-2.5 rounded-full border border-black/15"
+                              style={{ background: variantColor(v.variantName) }}
+                            />
+                            <span className="truncate">{v.variantName}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
