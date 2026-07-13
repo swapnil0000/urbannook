@@ -17,11 +17,24 @@ const COMPARISONS = {
     caption:
       "Compared against typical desk-lighting alternatives in its category.",
     rows: [
-      { label: "Dual Mount — Wall + Desk", other: "cross" },
-      { label: "6-Month No-Fuss Warranty", other: "dash" },
-      { label: "Hassle-Free Replacement", other: "dash" },
-      { label: "Heat-Resistant PETG Build", other: "dash" },
-      { label: "Wide Glow + Heat Vents", other: "dash" },
+      { label: "Wall mounted + Desk placed", other: "cross" },
+      { label: "Easy replacement. No questions asked", note: "*", other: "cross" },
+      { label: "6-months warranty", note: "**", other: "cross" },
+      { label: "Heat-resistant PETG build", other: "cross" },
+      { label: "Wide light area + Heat vents", other: "cross" },
+    ],
+    // Footnotes keyed to the asterisks above. Scope/exclusions are stated
+    // explicitly so the warranty and replacement claims in the table are not
+    // read as unconditional.
+    footnotes: [
+      {
+        marker: "*",
+        text: "Replacement coverage applies to electronic components only. Damage to 3D-printed structural parts is not eligible for replacement. In the event of damage sustained in transit, photographic or video evidence of the packaging and product, captured on receipt, is required to process a replacement claim.",
+      },
+      {
+        marker: "**",
+        text: "Warranty covers electronic components only — LED strip and power adapter. Coverage excludes physical or external damage, misuse, and unauthorised modification.",
+      },
     ],
   },
 };
@@ -292,7 +305,7 @@ const ComparisonTable = ({ productName }) => {
               style={{
                 gridColumn: "2",
                 gridRow: "1",
-                padding: "26px 20px 22px",
+                // padding: "20px 20px 20px",
                 textAlign: "center",
                 position: "relative",
                 zIndex: 2,
@@ -318,31 +331,11 @@ const ComparisonTable = ({ productName }) => {
               >
                 {data.badgeText}
               </div> */}
-              <div
-                style={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: "50%",
-                  background: "linear-gradient(150deg,#2e443c,#1b2b24)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  boxShadow:
-                    "0 8px 20px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.1), 0 0 0 1px rgba(245,222,179,0.4)",
-                }}
-              >
-                <span
-                  style={{
-                    fontFamily: "'Playfair Display', Georgia, serif",
-                    fontWeight: 600,
-                    fontSize: 19,
-                    letterSpacing: "0.02em",
-                    color: "#F5DEB3",
-                  }}
-                >
-                  UN
-                </span>
-              </div>
+              <img
+                src="/assets/logo_only.webp"
+                alt="UrbanNook"
+                style={{ width: 90, height: 90, objectFit: "contain", display: "block" }}
+              />
             </div>
 
             <div
@@ -413,6 +406,18 @@ const ComparisonTable = ({ productName }) => {
                       }}
                     >
                       {row.label}
+                      {row.note && (
+                        <sup
+                          style={{
+                            marginLeft: 2,
+                            color: "#F5DEB3",
+                            fontWeight: 700,
+                            fontSize: 11,
+                          }}
+                        >
+                          {row.note}
+                        </sup>
+                      )}
                     </span>
                   </div>
 
@@ -492,6 +497,42 @@ const ComparisonTable = ({ productName }) => {
         >
           {data.caption}
         </p>
+
+        {/* Footnotes — the asterisked qualifications on the warranty and
+            replacement rows. Deliberately set quieter and smaller than the
+            caption: legally necessary, but not competing with the table. */}
+        {data.footnotes?.length > 0 && (
+          <div
+            style={{
+              maxWidth: 760,
+              margin: "18px auto 0",
+              paddingTop: 16,
+              borderTop: "1px solid rgba(255,255,255,0.08)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+            }}
+          >
+            {data.footnotes.map((fn) => (
+              <p
+                key={fn.marker}
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  margin: 0,
+                  fontSize: 11.5,
+                  lineHeight: 1.55,
+                  color: "rgba(255,255,255,0.38)",
+                }}
+              >
+                <span style={{ color: "rgba(245,222,179,0.55)", fontWeight: 700, flexShrink: 0 }}>
+                  {fn.marker}
+                </span>
+                <span>{fn.text}</span>
+              </p>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );

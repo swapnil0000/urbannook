@@ -964,7 +964,12 @@ const ProductDetailPage = () => {
               {product.productSubDes}
             </p>
 
-            <div className="hidden lg:block bg-white/5 backdrop-blur-sm p-8 rounded-[2rem] max-w-[420px] border border-[#F5DEB3]/10 mb-10">
+            {/* Desktop: "Add to Collection" box and the free-shipping banner
+                sit side-by-side as two columns. Mobile keeps its original
+                stacked flow untouched — the grid classes only kick in at lg,
+                so below that this wrapper behaves like a plain block. */}
+            <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start lg:mb-10">
+            <div className="hidden lg:block bg-white/5 backdrop-blur-sm p-8 rounded-[2rem] border border-[#F5DEB3]/10 mb-10 lg:mb-0 lg:h-full">
               <div className="flex flex-row gap-4">
                 {!isInCart ? (
                   <button
@@ -1046,7 +1051,8 @@ const ProductDetailPage = () => {
               </div>
             </div>
 
-            <FreeShippingBanner productId={product.productId} />
+            <FreeShippingBanner productId={product.productId} className="mt-4 lg:mt-0" />
+            </div>
 
             <div className="border-t border-[#F5DEB3]/10">
               {product.productDes && (
