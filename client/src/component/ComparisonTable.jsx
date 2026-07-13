@@ -19,7 +19,7 @@ const COMPARISONS = {
     rows: [
       { label: "Wall mounted + Desk placed", other: "cross" },
       { label: "Easy replacement. No questions asked", note: "*", other: "cross" },
-      { label: "6-months warranty", note: "**", other: "cross" },
+      { label: "6-months electronics warranty", note: "**", other: "cross" },
       { label: "Heat-resistant PETG build", other: "cross" },
       { label: "Wide light area + Heat vents", other: "cross" },
     ],
@@ -29,7 +29,7 @@ const COMPARISONS = {
     footnotes: [
       {
         marker: "*",
-        text: "Replacement coverage applies to electronic components only. Damage to 3D-printed structural parts is not eligible for replacement. In the event of damage sustained in transit, photographic or video evidence of the packaging and product, captured on receipt, is required to process a replacement claim.",
+        text: "Shipping damage is replaced hassle-free.",
       },
       {
         marker: "**",
@@ -172,7 +172,7 @@ const ComparisonTable = ({ productName }) => {
               textTransform: "uppercase",
               color: "#F5DEB3",
               opacity: 0.85,
-              marginBottom: 14,
+              marginBottom: 1,
             }}
           >
             {data.eyebrow}
@@ -299,7 +299,7 @@ const ComparisonTable = ({ productName }) => {
           />
 
             {/* ── Header row (grid row 1) ── */}
-            <div style={{ gridColumn: "1", gridRow: "1", padding: "28px 24px 20px", position: "relative", zIndex: 2 }} />
+            <div style={{ gridColumn: "1", gridRow: "1", padding: "24px 24px 2px", position: "relative", zIndex: 2 }} />
 
             <div
               style={{
@@ -342,7 +342,7 @@ const ComparisonTable = ({ productName }) => {
               style={{
                 gridColumn: "3",
                 gridRow: "1",
-                padding: "26px 24px 20px",
+                padding: "24px 24px 2px",
                 textAlign: "center",
                 position: "relative",
                 zIndex: 2,
