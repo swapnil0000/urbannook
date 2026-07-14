@@ -108,12 +108,12 @@ const ComparisonTable = ({ productName }) => {
       style={{
         position: "relative",
         background: "#2e443c",
-        padding: "96px 24px",
+        padding: "36px 24px",
         fontFamily: "'Manrope', sans-serif",
         overflow: "hidden",
         isolation: "isolate",
       }}
-      className="mt-16 -mx-4 lg:-mx-12"
+      className="mt-1 -mx-4 lg:-mx-12"
     >
       {/* Floating ambient blobs */}
       {/* Top-left bubble — commented out per request, keep for later reference

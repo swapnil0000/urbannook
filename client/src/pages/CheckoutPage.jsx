@@ -188,7 +188,7 @@ const SavingsBanner = ({ amount, freeShipping = false }) => (
             display: "flex",
             alignItems: "center",
             gap: 7,
-            fontSize: 17,
+            fontSize: 14,
             fontWeight: 800,
             letterSpacing: "0.02em",
             textTransform: "uppercase",
