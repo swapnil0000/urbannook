@@ -16,6 +16,7 @@ import catalogRouter from "./catalog.route.js";
 import metaCapiRouter from "./meta.capi.route.js";
 import adminAnalyticsRouter from "./admin.analytics.route.js";
 import freeShippingOfferRouter from "./freeShippingOffer.route.js";
+import cartRuleRouter from "./cartRule.route.js";
 export {
   userRouter,
   productRouter,
@@ -35,4 +36,5 @@ export {
   metaCapiRouter,
   adminAnalyticsRouter,
   freeShippingOfferRouter,
+  cartRuleRouter,
 };

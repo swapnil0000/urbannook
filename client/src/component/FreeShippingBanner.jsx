@@ -7,6 +7,7 @@ import {
   useGetFreeShippingOfferQuery,
   useAddToCartMutation,
   useUpdateCartMutation,
+  useEvaluateCartRulesQuery,
 } from "../store/api/userApi";
 import { useGetProductByIdQuery } from "../store/api/productsApi";
 import { addItem, removeItem, updateQuantity, updateSelection } from "../store/slices/cartSlice";
@@ -80,6 +81,7 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
   const navigate = useNavigate();
   const { isAuthenticated } = useSelector((state) => state.auth);
   const cartItems = useSelector((state) => state.cart.items);
+  const cartTotalAmount = useSelector((state) => state.cart.totalAmount);
   const { refetch: refetchCart } = useCartData();
   const [addToCartAPI, { isLoading: isAdding }] = useAddToCartMutation();
   const [updateCart, { isLoading: isUpdatingQty }] = useUpdateCartMutation();
@@ -193,8 +195,78 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
   const recommendedRefPrice = variants?.[0]?.variantPrice || 0;
   const comboTotal = sourceRefPrice + recommendedRefPrice;
   const cartValueTowardCombo = (sourceInCart ? sourceRefPrice : 0) + (added ? recommendedRefPrice : 0);
-  const progressPct =
+  const comboProgressPct =
     comboTotal > 0 ? Math.round((cartValueTowardCombo / comboTotal) * 100) : comboUnlocked ? 100 : 0;
+
+  // --- Generic, data-driven cart-promotion rules (server/src/model/cartRule.model.js)
+  // — e.g. "2+ Lamps => free shipping" or "2+ Lamps => 50% off Pen Stand",
+  // fully additive to the admin-configured combo banner above (neither
+  // replaces the other; either unlocking free shipping is enough, mirroring
+  // the backend's OR logic in rp.payment.controller.js exactly). Debounced
+  // ~400ms after cart contents settle so rapid +/- clicks don't fire a
+  // request per click.
+  const cartItemsKey = useMemo(
+    () =>
+      cartItems
+        .map((item) => `${item.id || item.mongoId}:${itemQty(item.quantity)}`)
+        .sort()
+        .join(","),
+    [cartItems],
+  );
+  const [debouncedCartItems, setDebouncedCartItems] = useState(cartItems);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedCartItems(cartItems), 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed off the serialized key so identical content (re-render without a real cart change) doesn't reset the debounce timer
+  }, [cartItemsKey]);
+
+  const ruleEvalItems = useMemo(
+    () =>
+      debouncedCartItems
+        .map((item) => ({ productId: item.id || item.mongoId, quantity: itemQty(item.quantity) }))
+        .filter((i) => i.productId && i.quantity > 0),
+    [debouncedCartItems],
+  );
+  const { data: ruleEvalRes } = useEvaluateCartRulesQuery(ruleEvalItems, { skip: ruleEvalItems.length === 0 });
+  const ruleEval = ruleEvalRes?.data;
+
+  // The primary product still blocking the closest generic rule (if any) —
+  // fetched only when actually needed, for its display name in the nudge copy.
+  const closestRuleBlockingProductId = ruleEval?.closestUnmatchedRule?.conditions?.find((c) => c.remaining > 0)
+    ?.productId;
+  const { data: closestRuleProductRes } = useGetProductByIdQuery(closestRuleBlockingProductId, {
+    skip: !closestRuleBlockingProductId,
+  });
+  const closestRuleProduct = closestRuleProductRes?.data;
+
+  const genericFreeShipping = !!ruleEval?.freeShipping;
+  const genericProgressPct = ruleEval?.closestUnmatchedRule
+    ? Math.round(ruleEval.closestUnmatchedRule.progress * 100)
+    : 0;
+
+  // Plain cart-value threshold — whole cart, any products count (matches the
+  // server's direct subtotal >= thresholdAmount comparison in
+  // rp.payment.controller.js). Deliberately NOT part of the rules engine —
+  // a simple, separate check.
+  const thresholdAmount = offerConfig?.thresholdAmount || 0;
+  const thresholdEligible = offerActive && thresholdAmount > 0 && cartTotalAmount >= thresholdAmount;
+  const thresholdProgressPct =
+    thresholdAmount > 0 ? Math.round(Math.min((Number(cartTotalAmount) || 0) / thresholdAmount, 1) * 100) : 0;
+
+  // Overall unlock/progress = whichever path (old combo, a generic rule, or
+  // the plain cart-value threshold) is unlocked or closer — "show progress
+  // toward the closest matching rule."
+  const genericIsCloser =
+    !comboUnlocked && genericProgressPct > comboProgressPct && genericProgressPct >= thresholdProgressPct;
+  const progressPct =
+    comboUnlocked || genericFreeShipping || thresholdEligible
+      ? 100
+      : Math.max(comboProgressPct, genericProgressPct, thresholdProgressPct);
+  // Used for DISPLAY only (top copy, "unlocked" CTA label) — the click-driven
+  // loader/confetti in handleAddToCart deliberately still gates on the old
+  // sourceInCart-based combo alone, not this, so it can't repeat the
+  // multi-path confetti double-fire bug found earlier this session.
+  const freeShippingUnlocked = comboUnlocked || genericFreeShipping || thresholdEligible;
 
   // --- Scroll-triggered truck animation for the progress bar. Every time the
   // bar scrolls into view it replays 0 → current threshold (truck driving in,
@@ -380,6 +452,28 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
   const maxVariantPrice = Math.max(...variants.map((v) => v.variantPrice || 0), 0);
   const discountPercent =
     maxVariantPrice > displayPrice ? Math.round(((maxVariantPrice - displayPrice) / maxVariantPrice) * 100) : 0;
+
+  // A generic cart rule (e.g. "2+ Lamps => 50% off Pen Stand") may ALSO
+  // discount this exact recommended product — mirrors the server's
+  // applyBestDiscount EXACTLY, including the Math.round (best price for the
+  // customer wins if more than one rule matches, rounded to the nearest
+  // rupee) — so what's shown here can never drift from what checkout
+  // actually charges (e.g. 50% off ₹299 is ₹149.5 mathematically, but both
+  // this and the server round that to ₹150, consistently, everywhere).
+  const ruleDiscountCandidates = ruleEval?.discounts?.[recommendedProduct.productId];
+  const ruleDiscountedPrice = ruleDiscountCandidates?.length
+    ? Math.round(
+        Math.max(
+          Math.min(
+            ...ruleDiscountCandidates.map((c) =>
+              c.type === "percent_off" ? displayPrice * (1 - c.value / 100) : displayPrice - c.value,
+            ),
+          ),
+          0,
+        ),
+      )
+    : null;
+  const hasRuleDiscount = ruleDiscountedPrice !== null && ruleDiscountedPrice < displayPrice;
 
   const hasToken = !!localStorage.getItem("authToken");
   const isLoggedIn = isAuthenticated || hasToken;
@@ -569,7 +663,7 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
           progress bar lives further down, right above the CTA (see below). */}
         {offerActive && (
           <div className="px-4 pt-3 text-center">
-            {comboUnlocked ? (
+            {freeShippingUnlocked ? (
               <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#1c3026]">
                 Free shipping unlocked on this order
               </span>
@@ -590,6 +684,18 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
                   </span>
                 </p>
               </>
+            ) : genericIsCloser && closestRuleProduct ? (
+              // A generic cart rule (e.g. "2+ Lamps") is currently closer to
+              // completing than the admin-configured combo above — nudge
+              // toward THAT instead, since it's genuinely nearer.
+              <p className="text-[10px] font-semibold text-[#1c3026]/80">
+                Add{" "}
+                {ruleEval.closestUnmatchedRule.conditions.find(
+                  (c) => c.remaining > 0,
+                )?.remaining || 1}{" "}
+                more {closestRuleProduct.productName} to unlock{" "}
+                <span className="font-bold text-[#E63329]">free shipping</span>
+              </p>
             ) : (
               <>
                 {/* <p className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#1c3026]">
@@ -656,7 +762,10 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
                 <label className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.1em] text-gray-500">
                   {added ? "In cart" : "Variants"}
                 </label>
-                <div ref={variantMenuRef} className="relative flex-1 min-w-0 max-w-[96px]">
+                <div
+                  ref={variantMenuRef}
+                  className="relative flex-1 min-w-0 max-w-[96px]"
+                >
                   <button
                     type="button"
                     onClick={() => !added && setVariantMenuOpen((v) => !v)}
@@ -666,7 +775,9 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
                     <span className="flex items-center gap-1.5 min-w-0">
                       <span
                         className="shrink-0 w-2.5 h-2.5 rounded-full border border-black/15"
-                        style={{ background: variantColor(selectedVariant || "") }}
+                        style={{
+                          background: variantColor(selectedVariant || ""),
+                        }}
                       />
                       <span className="truncate">{selectedVariant}</span>
                     </span>
@@ -690,12 +801,16 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
                               setVariantMenuOpen(false);
                             }}
                             className={`w-full flex items-center gap-1.5 text-left px-2.5 py-1.5 text-xs font-bold transition-colors ${
-                              isSelected ? "bg-[#d6f2dd] text-[#157a44]" : "text-[#1c3026] hover:bg-[#d6f2dd] hover:text-[#157a44]"
+                              isSelected
+                                ? "bg-[#d6f2dd] text-[#157a44]"
+                                : "text-[#1c3026] hover:bg-[#d6f2dd] hover:text-[#157a44]"
                             }`}
                           >
                             <span
                               className="shrink-0 w-2.5 h-2.5 rounded-full border border-black/15"
-                              style={{ background: variantColor(v.variantName) }}
+                              style={{
+                                background: variantColor(v.variantName),
+                              }}
                             />
                             <span className="truncate">{v.variantName}</span>
                           </button>
@@ -708,17 +823,38 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
             )}
 
             <div className="flex items-baseline gap-2 mt-1.5 flex-wrap">
-              <span className="text-lg font-bold tabular-nums text-[#E63329]">
-                ₹{displayPrice.toLocaleString()}
-              </span>
-              {discountPercent > 0 && (
+              {hasRuleDiscount ? (
+                // A generic cart rule just unlocked a discount on THIS exact
+                // product (e.g. "2+ Lamps => 50% off Pen Stand") — takes
+                // priority over the plain variant-markdown display below,
+                // since it's a live reward, not just a baseline price.
                 <>
+                  <span className="text-lg font-bold tabular-nums text-[#E63329]">
+                    ₹{Math.round(ruleDiscountedPrice).toLocaleString()}
+                  </span>
                   <span className="text-xs text-gray-400 line-through tabular-nums">
-                    ₹{maxVariantPrice.toLocaleString()}
+                    ₹{displayPrice.toLocaleString()}
                   </span>
-                  <span className="text-[10px] font-bold uppercase bg-black text-white px-1.5 py-0.5">
-                    Save ₹{(maxVariantPrice - displayPrice).toLocaleString()}
+                  <span className="text-[10px] font-bold uppercase rounded-full bg-[#157a44] text-white px-1.5 py-0.5">
+                    🎉 Discount Unlocked!
                   </span>
+                </>
+              ) : (
+                <>
+                  <span className="text-lg font-bold tabular-nums text-[#E63329]">
+                    ₹{displayPrice.toLocaleString()}
+                  </span>
+                  {discountPercent > 0 && (
+                    <>
+                      <span className="text-xs text-gray-400 line-through tabular-nums">
+                        ₹{maxVariantPrice.toLocaleString()}
+                      </span>
+                      <span className="text-[10px] font-bold uppercase bg-black text-white px-1.5 py-0.5">
+                        Save ₹
+                        {(maxVariantPrice - displayPrice).toLocaleString()}
+                      </span>
+                    </>
+                  )}
                 </>
               )}
             </div>
@@ -740,7 +876,7 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
             @keyframes fsbWheel { to { transform: rotate(360deg); } }
             @keyframes fsbPop { 0% { transform: scale(0.4); opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
           `}</style>
-            <div ref={setTrackRef} className="relative" style={{ height: 48 }}>
+            <div ref={setTrackRef} className="relative" style={{ height: 38 }}>
               {/* The "lane": everything (track, fill, truck, smoke) is
                 positioned inside this, and it stops short of the right edge
                 by GOAL_W so the destination marker always has its own space —
@@ -828,7 +964,7 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
                   style={{
                     position: "absolute",
                     left: `calc(${anim.frac} * (100% - ${TRUCK_W}px))`,
-                    bottom: 8 + anim.bob,
+                    bottom: 2 + anim.bob,
                     width: TRUCK_W,
                     willChange: "left",
                     zIndex: 3,
@@ -968,7 +1104,7 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
                 far right, outside the truck's travel lane, and pops with a
                 bounce the moment the combo unlocks. */}
               <div
-                key={comboUnlocked ? "unlocked" : "locked"}
+                key={freeShippingUnlocked ? "unlocked" : "locked"}
                 className="absolute flex items-center justify-center"
                 style={{
                   right: 0,
@@ -978,8 +1114,8 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
                   borderRadius: 9,
                   background: "#fff",
                   boxShadow: "0 6px 14px -6px rgba(21,122,68,0.5)",
-                  border: `2px solid ${comboUnlocked ? "#2fb463" : "#bfe6cb"}`,
-                  animation: comboUnlocked
+                  border: `2px solid ${freeShippingUnlocked ? "#2fb463" : "#bfe6cb"}`,
+                  animation: freeShippingUnlocked
                     ? "fsbPop 0.45s cubic-bezier(0.34,1.56,0.64,1) both"
                     : "none",
                 }}
@@ -1011,7 +1147,7 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
         )}
 
         {/* CTA */}
-        <div className="px-4 pt-1 pb-4">
+        <div className="px-4 pt-0 pb-4">
           {addLoading ? (
             // The slider above IS the loader for this: cart is already updated
             // (`added` is already true underneath) but we hold this exact same
@@ -1022,14 +1158,14 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
             // back off, at the moment the bar visually finishes.
             <button
               disabled
-              className="w-full py-3.5 rounded-xl flex items-center justify-center gap-2.5 text-sm font-extrabold uppercase tracking-wide bg-[#f5deb3] text-black opacity-70"
+              className="w-full py-3.5 rounded-full flex items-center justify-center gap-2.5 text-sm font-extrabold uppercase tracking-wide bg-[#f5deb3] text-black opacity-70"
             >
               Adding…
             </button>
           ) : added ? (
             <div className="flex items-center gap-2">
-              <div className="flex-1 py-3.5 rounded-xl text-[11px] font-extrabold uppercase tracking-[0.1em] text-center bg-black/5 text-black border border-black/15">
-                {comboUnlocked ? (
+              <div className="flex-1 py-3.5 rounded-full text-[11px] font-extrabold uppercase tracking-[0.1em] text-center bg-[#f5deb3] text-[#1c3026] border border-black/15">
+                {freeShippingUnlocked ? (
                   <>
                     <i className="fa-solid fa-circle-check mr-1.5 text-[#E63329]" />{" "}
                     Free Shipping Unlocked!
@@ -1079,7 +1215,7 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
             <button
               onClick={handleAddToCart}
               disabled={isAdding}
-              className="group relative w-full py-3.5 rounded-xl overflow-hidden flex items-center justify-center gap-2.5 text-sm font-medium uppercase tracking-wide disabled:opacity-50 bg-[#f5deb3]"
+              className="group relative w-full py-3.5 rounded-full overflow-hidden flex items-center justify-center gap-2.5 text-sm font-medium uppercase tracking-wide disabled:opacity-50 bg-[#f5deb3]"
             >
               {/* Green fill that flows in from the left on hover — the label
                 sits above it (z-10) and flips to cream as it sweeps past.
@@ -1094,6 +1230,15 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
               <span className="relative z-10 flex items-center justify-center gap-2.5 text-[#1c3026] transition-colors duration-500 group-hover:text-[#f5deb3]">
                 {isAdding ? (
                   "Adding…"
+                ) : hasRuleDiscount ? (
+                  // A rule discount is active on this exact product (e.g. "2+
+                  // Lamps => 50% off Pen Stand") — the real incentive right
+                  // now is the price, not shipping, so the label should say
+                  // so instead of the generic "Add & Ship Free".
+                  <>
+                    Add for ₹{Math.round(ruleDiscountedPrice).toLocaleString()}
+                    <span className="text-base leading-none">→</span>
+                  </>
                 ) : (
                   <>
                     Add &amp; Ship Free

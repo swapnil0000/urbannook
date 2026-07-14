@@ -21,7 +21,8 @@ import Address from "../model/address.new.model.js";
 import html_to_pdf from "html-pdf-node";
 import { generateInvoiceHtmlTemplate } from "../template/invoiceTemplate.template.js";
 import { calculateShippingRate } from "../services/shipping.service.js";
-import { isFreeShippingEligible } from "../utils/freeShippingOffer.util.js";
+import { isFreeShippingEligible, getFreeShippingConfig } from "../utils/freeShippingOffer.util.js";
+import { getActiveCartRules, evaluateCartRules, applyBestDiscount } from "../utils/cartRule.util.js";
 import { sendMetaCapiEvent } from "../services/meta.capi.service.js";
 
 // Collect Meta CAPI match-quality signals from the order-creation request.
@@ -249,6 +250,25 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     };
   });
 
+  // Generic, data-driven cart-promotion rules (server/src/model/cartRule.model.js)
+  // — e.g. "2+ Lamps => free shipping" or "2+ Lamps => 50% off Pen Stand".
+  // Fully additive to the existing combo-banner system below (isFreeShippingEligible):
+  // either mechanism unlocking free shipping is enough, and this is the ONLY
+  // place a rule's product discount is actually applied to the charged price
+  // — baked into `priceAtPurchase` here so subtotal, the persisted order, and
+  // the invoice all agree with each other and with what was charged.
+  const activeCartRules = await getActiveCartRules();
+  const cartRuleResult = evaluateCartRules(
+    orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity })),
+    activeCartRules,
+  );
+  for (const oi of orderItems) {
+    const candidates = cartRuleResult.discountCandidatesByProduct.get(String(oi.productId));
+    if (candidates?.length) {
+      oi.productSnapshot.priceAtPurchase = applyBestDiscount(oi.productSnapshot.priceAtPurchase, candidates);
+    }
+  }
+
   const deliveryAddressSnapshot = {
     addressId: addressId,
     fullName:
@@ -306,12 +326,21 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   // zeroing shipping for the customer should not also zero the COD advance.
   const realShippingAmount = shippingResult?.total_charges || summary?.shipping || 179;
 
-  // Recompute subtotal from actual order items — authoritative, not from cart snapshot
+  // Recompute subtotal from actual order items — authoritative, not from cart snapshot.
+  // Computed AFTER the cart-rule discount loop above has already reduced any
+  // discounted items' priceAtPurchase, so this naturally includes those discounts.
   const subtotal = orderItems.reduce((s, i) => s + (i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity), 0);
 
-  // Free shipping unlocks only when the cart contains a configured offer
-  // combo (source + recommended product both present), NOT on cart value.
-  const chargedShippingAmount = (await isFreeShippingEligible(items.map((i) => i.productId))) ? 0 : realShippingAmount;
+  // Free shipping unlocks via ANY of: the combo-banner offer (source +
+  // recommended product both present), any active generic cart rule whose
+  // effects include free_shipping (e.g. "2+ Lamps"), OR the cart subtotal
+  // simply being at/above the admin-configured thresholdAmount — plain,
+  // direct comparison, whole-cart (any products count), no rules table.
+  const freeShippingConfig = await getFreeShippingConfig();
+  const thresholdEligible = freeShippingConfig.isActive && subtotal >= freeShippingConfig.thresholdAmount;
+  const freeShippingUnlocked =
+    (await isFreeShippingEligible(items.map((i) => i.productId))) || cartRuleResult.freeShipping || thresholdEligible;
+  const chargedShippingAmount = freeShippingUnlocked ? 0 : realShippingAmount;
   // console.log(
   //   `[FreeShipping][Order:auth] realShipping=₹${realShippingAmount} chargedShipping=₹${chargedShippingAmount} items=${items.map(i => `${i.productId}x${i.quantity}`).join(",")}`,
   // );
@@ -931,7 +960,6 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
 
   if (products.length !== productIds.length) throw new ValidationError("One or more products unavailable");
 
-  let subtotal = 0;
   const rawItemsForShipping = [];
 
   const orderItems = items.map((item) => {
@@ -943,7 +971,9 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
       const variant = product.variantDetails.find((v) => v.variantName === itemVariant);
       priceAtPurchase = variant?.variantPrice || product.variantDetails[0].variantPrice || 0;
     }
-    subtotal += priceAtPurchase * item.quantity;
+    // Shipping-rate calculation uses the pre-discount price (weight/rate
+    // tiers, not the customer's charged amount) — deliberately NOT touched
+    // by the cart-rule discount applied to orderItems below.
     rawItemsForShipping.push({ productId: item.productId, quantity: item.quantity, price: priceAtPurchase, selectedVariant: itemVariant });
 
     let itemImage = null;
@@ -967,15 +997,42 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     };
   });
 
+  // Generic, data-driven cart-promotion rules — see the matching comment in
+  // razorpayCreateOrderController above for the full rationale. Applied here
+  // BEFORE subtotal is computed below, so the discount is baked into
+  // priceAtPurchase and subtotal/order/invoice all agree.
+  const activeCartRules = await getActiveCartRules();
+  const cartRuleResult = evaluateCartRules(
+    orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity })),
+    activeCartRules,
+  );
+  for (const oi of orderItems) {
+    const candidates = cartRuleResult.discountCandidatesByProduct.get(String(oi.productId));
+    if (candidates?.length) {
+      oi.productSnapshot.priceAtPurchase = applyBestDiscount(oi.productSnapshot.priceAtPurchase, candidates);
+    }
+  }
+
+  // Recomputed from orderItems (post cart-rule discount), not accumulated
+  // inline during the map above — mirrors the authenticated-user path.
+  const subtotal = orderItems.reduce((s, i) => s + i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity, 0);
+
   const shippingResult = await calculateShippingRate({
     pincode: deliveryAddress.pinCode,
     paymentType: reqPaymentMethod === "COD" ? "COD" : "PREPAID",
     cartItems: rawItemsForShipping
   });
   const realShippingAmount = shippingResult?.total_charges || 179;
-  // Free shipping unlocks only when the cart contains a configured offer
-  // combo (source + recommended product both present), NOT on cart value.
-  const chargedShippingAmount = (await isFreeShippingEligible(items.map((i) => i.productId))) ? 0 : realShippingAmount;
+  // Free shipping unlocks via ANY of: the combo-banner offer (source +
+  // recommended product both present), any active generic cart rule whose
+  // effects include free_shipping (e.g. "2+ Lamps"), OR the cart subtotal
+  // simply being at/above the admin-configured thresholdAmount — plain,
+  // direct comparison, whole-cart (any products count), no rules table.
+  const freeShippingConfig = await getFreeShippingConfig();
+  const thresholdEligible = freeShippingConfig.isActive && subtotal >= freeShippingConfig.thresholdAmount;
+  const freeShippingUnlocked =
+    (await isFreeShippingEligible(items.map((i) => i.productId))) || cartRuleResult.freeShipping || thresholdEligible;
+  const chargedShippingAmount = freeShippingUnlocked ? 0 : realShippingAmount;
   // console.log(
   //   `[FreeShipping][Order:guest] realShipping=₹${realShippingAmount} chargedShipping=₹${chargedShippingAmount} items=${items.map(i => `${i.productId}x${i.quantity}`).join(",")}`,
   // );

@@ -15,6 +15,7 @@ import {
   useCalculateShippingMutation,
   useGetFreeShippingOfferQuery,
   useGetAllFreeShippingBannersQuery,
+  useEvaluateCartRulesQuery,
 } from "../store/api/userApi";
 import { setShowLoginModal, setLoginCallback } from "../store/slices/uiSlice";
 import { useUI } from "../hooks/useRedux";
@@ -419,6 +420,51 @@ const CheckoutPage = () => {
   const [calculateShipping, { isLoading: isCalculatingShipping }] = useCalculateShippingMutation();
   const { data: freeShippingOfferData } = useGetFreeShippingOfferQuery();
   const { data: allFreeShippingBannersData } = useGetAllFreeShippingBannersQuery();
+  // Generic, data-driven cart-promotion rules (server/src/model/cartRule.model.js)
+  // — same evaluator the payment controller uses for the real order total,
+  // ORed into the combo-banner eligibility check below so this page can
+  // never disagree with what checkout actually charges.
+  const cartRuleEvalItems = useMemo(
+    () =>
+      cartItems
+        .map((i) => ({ productId: i.mongoId || i.id?.split(":")[0], quantity: Number(i.quantity) || 0 }))
+        .filter((i) => i.productId && i.quantity > 0),
+    [cartItems],
+  );
+  const { data: cartRuleEvalData } = useEvaluateCartRulesQuery(cartRuleEvalItems, {
+    skip: cartRuleEvalItems.length === 0,
+  });
+
+  // A generic cart rule (e.g. "2+ Lamps => 50% off Pen Stand") may discount
+  // a specific item's price. Mirrors the server's applyBestDiscount exactly
+  // (best resulting price wins if more than one rule discounts the same
+  // product) so what's shown here never disagrees with what actually gets
+  // charged. Used both for per-line-item display AND for correcting the
+  // subtotal fed into the final "amount to pay" below — previously this page
+  // only ever showed the undiscounted price everywhere, so a rule discount
+  // was invisible on checkout even though the real order total (payment
+  // controller) already applied it correctly.
+  const getItemDiscountedPrice = (item) => {
+    const productId = item.mongoId || item.id?.split(":")[0];
+    const candidates = cartRuleEvalData?.data?.discounts?.[productId];
+    const price = Number(item.price) || 0;
+    if (!candidates?.length) return price;
+    const results = candidates.map((c) =>
+      c.type === "percent_off" ? price * (1 - Number(c.value) / 100) : price - Number(c.value),
+    );
+    // Rounded to match the server's applyBestDiscount exactly (50% off ₹299
+    // is ₹149.5 mathematically — both round that to ₹150, consistently).
+    return Math.round(Math.max(Math.min(...results), 0));
+  };
+  // Total ₹ shaved off the cart by matched rule discounts — subtracted from
+  // whatever subtotal this page would otherwise display (guest's direct
+  // calc, or the coupon endpoint's summary.subtotal, which doesn't know
+  // about cart rules at all).
+  const ruleDiscountSavings = cartItems.reduce((sum, item) => {
+    const price = Number(item.price) || 0;
+    const discounted = getItemDiscountedPrice(item);
+    return sum + (price - discounted) * (Number(item.quantity) || 0);
+  }, 0);
 
   // Checkout-only nudge: if the cart hasn't crossed the free-shipping
   // threshold yet, show a banner for the first cart item that has one
@@ -573,13 +619,25 @@ const CheckoutPage = () => {
           const offerConfig = freeShippingOfferData?.data;
           const banners = allFreeShippingBannersData?.data || [];
           const cartProductIds = new Set(cartItems.map((i) => i.mongoId || i.id?.split(":")[0]));
-          const isFreeShippingEligible =
+          const comboEligible =
             !!offerConfig?.isActive &&
             banners.some(
               (b) => cartProductIds.has(b.sourceProductId) && cartProductIds.has(b.recommendedProductId),
             );
+          // Plain cart-value threshold — whole cart, any products count.
+          // Mirrors the server's direct subtotal >= thresholdAmount check,
+          // computed AFTER rule discounts (server discounts items first,
+          // then compares the resulting subtotal to the threshold).
+          const cartSubtotal =
+            cartItems.reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0) - ruleDiscountSavings;
+          const thresholdEligible =
+            !!offerConfig?.isActive && (offerConfig?.thresholdAmount || 0) > 0 && cartSubtotal >= offerConfig.thresholdAmount;
+          // Either the old combo-banner offer, any active generic cart
+          // rule's free_shipping effect, or the cart-value threshold is
+          // enough — mirrors the OR logic in rp.payment.controller.js exactly.
+          const isFreeShippingEligible = comboEligible || !!cartRuleEvalData?.data?.freeShipping || thresholdEligible;
           console.log(
-            `[FreeShipping][Client] cartIds=[${[...cartProductIds].join(",")}] isActive=${offerConfig?.isActive} → eligible=${isFreeShippingEligible}`,
+            `[FreeShipping][Client] cartIds=[${[...cartProductIds].join(",")}] isActive=${offerConfig?.isActive} comboEligible=${comboEligible} ruleEligible=${!!cartRuleEvalData?.data?.freeShipping} thresholdEligible=${thresholdEligible} → eligible=${isFreeShippingEligible}`,
           );
           // realAmount = actual carrier rate, always — this is what the COD
           // 2x-advance must be based on (matches the server's realShippingAmount).
@@ -610,7 +668,7 @@ const CheckoutPage = () => {
 
     fetchShippingRate();
     return () => { cancelled = true; };
-  }, [currentStep, reviewStep, pinCode, cartItems.length, cartItems.reduce((s, i) => s + Number(i.quantity || 0), 0), paymentMethod, freeShippingOfferData, allFreeShippingBannersData]);
+  }, [currentStep, reviewStep, pinCode, cartItems.length, cartItems.reduce((s, i) => s + Number(i.quantity || 0), 0), paymentMethod, freeShippingOfferData, allFreeShippingBannersData, cartRuleEvalData, ruleDiscountSavings]);
 
   useEffect(() => {
     if (savedAddressData?.success) {
@@ -654,7 +712,8 @@ const CheckoutPage = () => {
   }, [userProfile, address, pinCode, senderMobile]);
 
   const cartItemsLength = cartItems?.length;
-  const cartTotalAmount = cartItems.reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0);
+  const cartTotalAmount =
+    cartItems.reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0) - ruleDiscountSavings;
   const userEmail = userProfile?.email;
 
   useEffect(() => {
@@ -669,21 +728,24 @@ const CheckoutPage = () => {
       if (!cartItemsLength) return;
       try {
         const r = await applyCouponMutation({ couponCode: appliedCoupon || null, email: userEmail }).unwrap();
+        // r.data.summary.subtotal comes from the coupon endpoint, which
+        // doesn't know about cart-rule discounts — subtract ruleDiscountSavings
+        // so this matches what the real order total will charge.
         if (r.success && r.data?.summary)
-          setPricingDetails(prev => ({ ...prev, subtotal: r.data.summary.subtotal || 0, discount: r.data.summary.discount || 0 }));
+          setPricingDetails(prev => ({ ...prev, subtotal: (r.data.summary.subtotal || 0) - ruleDiscountSavings, discount: r.data.summary.discount || 0 }));
       } catch (err) {
         if (err?.data?.statusCode === 400 && appliedCoupon) {
           setAppliedCoupon(null);
           try {
             const r2 = await applyCouponMutation({ couponCode: null, email: userEmail }).unwrap();
             if (r2.success && r2.data?.summary)
-              setPricingDetails(prev => ({ ...prev, subtotal: r2.data.summary.subtotal || 0, discount: r2.data.summary.discount || 0 }));
+              setPricingDetails(prev => ({ ...prev, subtotal: (r2.data.summary.subtotal || 0) - ruleDiscountSavings, discount: r2.data.summary.discount || 0 }));
           } catch (_) {}
         }
       }
     };
     fetchPricing();
-  }, [cartItemsLength, cartTotalAmount, applyCouponMutation, appliedCoupon, userEmail, isGuest]);
+  }, [cartItemsLength, cartTotalAmount, applyCouponMutation, appliedCoupon, userEmail, isGuest, ruleDiscountSavings]);
 
   // Fire begin_checkout ONCE per checkout. React Router remounts this page on
   // navigate-away-and-back, and the Redux cart hydrates asynchronously AFTER mount,
@@ -826,7 +888,7 @@ const CheckoutPage = () => {
       const r = await applyCouponMutation({ couponCode: couponData.code, email: userEmail }).unwrap();
       if (r.success && r.data?.summary) {
         setAppliedCoupon(couponData.code);
-        setPricingDetails(prev => ({ ...prev, subtotal: r.data.summary.subtotal || 0, discount: r.data.summary.discount || 0 }));
+        setPricingDetails(prev => ({ ...prev, subtotal: (r.data.summary.subtotal || 0) - ruleDiscountSavings, discount: r.data.summary.discount || 0 }));
         showNotification(r.message || "Coupon applied!", "success");
         setShowCouponModal(false);
       }
@@ -844,7 +906,7 @@ const CheckoutPage = () => {
       const r = await applyCouponMutation({ couponCode: null, email: userEmail }).unwrap();
       if (r.success && r.data?.summary) {
         setAppliedCoupon(null);
-        setPricingDetails(prev => ({ ...prev, subtotal: r.data.summary.subtotal || 0, discount: r.data.summary.discount || 0 }));
+        setPricingDetails(prev => ({ ...prev, subtotal: (r.data.summary.subtotal || 0) - ruleDiscountSavings, discount: r.data.summary.discount || 0 }));
         showNotification("Coupon removed", "success");
       }
     } catch (e) { showNotification(e?.data?.message || "Failed to remove coupon", "error"); }
@@ -1558,7 +1620,18 @@ const CheckoutPage = () => {
                           {item.selectedVariant && item.selectedVariant !== "N/A" && <p className="text-[10px] text-gray-400">{item.selectedVariant}</p>}
                           <p className="text-[10px] text-gray-400">Qty {item.quantity}</p>
                         </div>
-                        <p className="text-sm font-bold text-gray-800 shrink-0">₹{(Number(item.price) * Number(item.quantity)).toLocaleString()}</p>
+                        {(() => {
+                          const discountedPrice = getItemDiscountedPrice(item);
+                          const hasDiscount = discountedPrice < Number(item.price);
+                          return hasDiscount ? (
+                            <div className="text-right shrink-0">
+                              <p className="text-sm font-bold text-[#157a44]">₹{(discountedPrice * Number(item.quantity)).toLocaleString()}</p>
+                              <p className="text-[10px] text-gray-400 line-through">₹{(Number(item.price) * Number(item.quantity)).toLocaleString()}</p>
+                            </div>
+                          ) : (
+                            <p className="text-sm font-bold text-gray-800 shrink-0">₹{(Number(item.price) * Number(item.quantity)).toLocaleString()}</p>
+                          );
+                        })()}
                       </div>
                     ))}
                   </div>
@@ -1757,9 +1830,20 @@ const CheckoutPage = () => {
                       <p className="text-[10px] text-gray-400 mt-0.5">{item.selectedVariant}</p>
                     )}
                   </div>
-                  <p className="text-xs font-bold text-gray-800 shrink-0">
-                    ₹{(Number(item.price) * Number(item.quantity)).toLocaleString()}
-                  </p>
+                  {(() => {
+                    const discountedPrice = getItemDiscountedPrice(item);
+                    const hasDiscount = discountedPrice < Number(item.price);
+                    return hasDiscount ? (
+                      <div className="text-right shrink-0">
+                        <p className="text-xs font-bold text-[#157a44]">₹{(discountedPrice * Number(item.quantity)).toLocaleString()}</p>
+                        <p className="text-[9px] text-gray-400 line-through">₹{(Number(item.price) * Number(item.quantity)).toLocaleString()}</p>
+                      </div>
+                    ) : (
+                      <p className="text-xs font-bold text-gray-800 shrink-0">
+                        ₹{(Number(item.price) * Number(item.quantity)).toLocaleString()}
+                      </p>
+                    );
+                  })()}
                 </div>
               ))}
             </div>

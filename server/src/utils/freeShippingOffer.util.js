@@ -1,10 +1,12 @@
 import FreeShippingOffer from "../model/freeShippingOffer.model.js";
 
 /**
- * Free shipping is a simple cart-value threshold, admin-configurable —
- * "subtotal > thresholdAmount" unlocks it, no specific products required.
- * Returns { isActive, thresholdAmount } — callers compare subtotal
- * themselves so this stays a pure data fetch, no business logic baked in.
+ * Returns { isActive, thresholdAmount } — the raw offer config. Used both for
+ * client-side display (progress bar / "how far to unlock" copy) AND, since
+ * rp.payment.controller.js compares subtotal >= thresholdAmount directly at
+ * order-total time, as one of the real eligibility signals — free shipping
+ * unlocks if EITHER the combo-pair rule (isFreeShippingEligible below), a
+ * generic cart rule, OR the plain cart-value threshold is met.
  */
 export const getFreeShippingConfig = async () => {
   const offer = await FreeShippingOffer.findOne().select("isActive thresholdAmount").lean();
