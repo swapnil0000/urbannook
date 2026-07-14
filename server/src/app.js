@@ -38,16 +38,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// TEMP deploy-verification header — visible in any browser's Network tab
-// without needing EC2/PM2 log access. Remove once the cart-rules deploy is
-// confirmed live on staging. If this header is MISSING from a live response,
-// the process serving that request is running code from before this line
-// existed — i.e. not this build.
-app.use((req, res, next) => {
-  res.setHeader("X-Cart-Rules-Build", "cart-rules-debug-2026-07-14");
-  next();
-});
-
 // Set essential app settings
 app.set("trust proxy", 1);
 app.set("etag", false);
@@ -234,7 +224,7 @@ app.use(
 // TEMP deploy-verification log — remove once cart-rules deploy is confirmed
 // live on staging. Prints once at process boot so it's easy to grep PM2
 // logs after a redeploy to confirm this build actually replaced the old one.
-console.log("[DEPLOY CHECK] cart-rules route mounted — build marker v1");
+// console.log("[DEPLOY CHECK] cart-rules route mounted — build marker v1");
 
 app.use(errorHandler);
 

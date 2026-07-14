@@ -82,6 +82,16 @@ const OptimizedImage = ({
   const responsiveSrcset = generateSrcset(src);
   const responsiveSizes = generateSizes();
 
+  // `className` lands on the WRAPPER div below, so any object-fit class a
+  // caller passes (object-cover / object-contain) was being applied to the
+  // div — where it does nothing — while the <img> itself had no object-fit at
+  // all and therefore fell back to the CSS default, `fill`: stretched to the
+  // box's dimensions with the aspect ratio thrown away. That's what squished
+  // every non-square image. Forward the caller's intent to the img, and
+  // default to `cover` (crops, never distorts) when they didn't specify.
+  const objectFitClass =
+    className.split(/\s+/).find((c) => c.startsWith('object-')) || 'object-cover';
+
   useEffect(() => {
     // Skip intersection observer if loading is eager
     if (loading === 'eager') {
@@ -172,7 +182,7 @@ const OptimizedImage = ({
           alt={alt}
           srcSet={responsiveSrcset}
           sizes={responsiveSizes}
-          className={`w-full h-full transition-opacity duration-300 ${
+          className={`w-full h-full ${objectFitClass} transition-opacity duration-300 ${
             isLoaded ? 'opacity-100' : 'opacity-0'
           }`}
           loading={loading}

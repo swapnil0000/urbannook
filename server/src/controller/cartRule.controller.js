@@ -13,7 +13,7 @@ import { getActiveCartRules, evaluateCartRules, findClosestUnmatchedRule } from 
 const evaluateCartRulesController = asyncHandler(async (req, res) => {
   // TEMP deploy-verification log — remove once cart-rules deploy is confirmed
   // live on staging.
-  console.log("[DEPLOY CHECK] /cart-rules/evaluate hit", req.body);
+  // console.log("[DEPLOY CHECK] /cart-rules/evaluate hit", req.body);
   const { items } = req.body;
   if (!Array.isArray(items)) {
     throw new ValidationError("items must be an array of { productId, quantity }");

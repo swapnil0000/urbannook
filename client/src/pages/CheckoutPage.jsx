@@ -30,6 +30,14 @@ const CouponList = lazy(() => import("../component/CouponList"));
 const MobileNumberModal = lazy(() => import("../component/MobileNumberModal"));
 const GoogleAddressFormModal = lazy(() => import("../component/GoogleAddressFormModal"));
 
+// What the courier charges to collect/remit cash at the door — the reason a
+// COD order costs more than the same order paid online. Display-only: the real
+// difference is already baked into the carrier rate returned for paymentType
+// "COD" (see the shipping-rate call below), this range just lets the notice
+// name the figure. A range (not one number) because the courier's exact COD
+// fee varies per order — keep it in step with what they actually charge.
+const COD_HANDLING_FEE = "30–40";
+
 const GUEST_STEPS = [
   { number: 1, label: "Account" },
   { number: 2, label: "Contact" },
@@ -1622,14 +1630,23 @@ const CheckoutPage = () => {
                         </div>
                         {(() => {
                           const discountedPrice = getItemDiscountedPrice(item);
-                          const hasDiscount = discountedPrice < Number(item.price);
+                          const rawPrice = Number(item.price) || 0;
+                          const hasDiscount = discountedPrice < rawPrice;
+                          const percentOff = hasDiscount
+                            ? Math.round(((rawPrice - discountedPrice) / rawPrice) * 100)
+                            : 0;
                           return hasDiscount ? (
                             <div className="text-right shrink-0">
                               <p className="text-sm font-bold text-[#157a44]">₹{(discountedPrice * Number(item.quantity)).toLocaleString()}</p>
-                              <p className="text-[10px] text-gray-400 line-through">₹{(Number(item.price) * Number(item.quantity)).toLocaleString()}</p>
+                              <div className="flex items-center justify-end gap-1">
+                                <span className="text-[10px] text-gray-400 line-through">₹{(rawPrice * Number(item.quantity)).toLocaleString()}</span>
+                                <span className="text-[9px] font-bold uppercase rounded-full bg-[#157a44] text-white px-1.5 py-px">
+                                  {percentOff}% OFF
+                                </span>
+                              </div>
                             </div>
                           ) : (
-                            <p className="text-sm font-bold text-gray-800 shrink-0">₹{(Number(item.price) * Number(item.quantity)).toLocaleString()}</p>
+                            <p className="text-sm font-bold text-gray-800 shrink-0">₹{(rawPrice * Number(item.quantity)).toLocaleString()}</p>
                           );
                         })()}
                       </div>
@@ -1725,8 +1742,17 @@ const CheckoutPage = () => {
                
               </div>
 
-              {/* COD notice — compact, shown only when COD is selected */}
-          
+              {/* COD notice — single-line disclosure, the standard e-commerce
+                  pattern ("₹X COD handling fee applies"). Names the fee so the
+                  higher COD total never reads as a hidden markup. */}
+              {paymentMethod === "COD" && (
+                <div className="flex items-center gap-2 bg-[#a89068]/8 border border-[#a89068]/25 rounded-xl px-4 py-2.5">
+                  <i className="fa-solid fa-circle-info text-[#a89068] text-xs shrink-0" />
+                  <p className="text-[11px] font-medium text-gray-600">
+                    An additional COD handling fee of ₹{COD_HANDLING_FEE} applies to Cash on Delivery orders.
+                  </p>
+                </div>
+              )}
 
               {/* Coupon — available to all (guests + members) */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -1832,15 +1858,24 @@ const CheckoutPage = () => {
                   </div>
                   {(() => {
                     const discountedPrice = getItemDiscountedPrice(item);
-                    const hasDiscount = discountedPrice < Number(item.price);
+                    const rawPrice = Number(item.price) || 0;
+                    const hasDiscount = discountedPrice < rawPrice;
+                    const percentOff = hasDiscount
+                      ? Math.round(((rawPrice - discountedPrice) / rawPrice) * 100)
+                      : 0;
                     return hasDiscount ? (
                       <div className="text-right shrink-0">
                         <p className="text-xs font-bold text-[#157a44]">₹{(discountedPrice * Number(item.quantity)).toLocaleString()}</p>
-                        <p className="text-[9px] text-gray-400 line-through">₹{(Number(item.price) * Number(item.quantity)).toLocaleString()}</p>
+                        <div className="flex items-center justify-end gap-1">
+                          <span className="text-[9px] text-gray-400 line-through">₹{(rawPrice * Number(item.quantity)).toLocaleString()}</span>
+                          <span className="text-[9px] font-bold uppercase rounded-full bg-[#157a44] text-white px-1.5 py-px">
+                            {percentOff}% OFF
+                          </span>
+                        </div>
                       </div>
                     ) : (
                       <p className="text-xs font-bold text-gray-800 shrink-0">
-                        ₹{(Number(item.price) * Number(item.quantity)).toLocaleString()}
+                        ₹{(rawPrice * Number(item.quantity)).toLocaleString()}
                       </p>
                     );
                   })()}

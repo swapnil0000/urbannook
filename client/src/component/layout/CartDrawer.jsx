@@ -1,7 +1,12 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { useUpdateCartMutation, useEvaluateCartRulesQuery } from '../../store/api/userApi';
+import {
+  useUpdateCartMutation,
+  useEvaluateCartRulesQuery,
+  useGetFreeShippingOfferQuery,
+  useGetAllFreeShippingBannersQuery,
+} from '../../store/api/userApi';
 import { updateQuantity, removeItem } from '../../store/slices/cartSlice';
 import { setShowLoginModal, setLoginCallback } from '../../store/slices/uiSlice';
 import { trackViewCart, trackRemoveFromCart, track } from '../../utils/analytics';
@@ -32,6 +37,14 @@ const CartDrawer = ({ isOpen, onClose }) => {
   const { data: cartRuleEvalData } = useEvaluateCartRulesQuery(cartRuleEvalItems, {
     skip: cartRuleEvalItems.length === 0,
   });
+
+  // Free-shipping eligibility for the "Shipping" line below — mirrors the
+  // same OR logic used at checkout/payment (rp.payment.controller.js): the
+  // admin combo-banner offer, any active generic cart rule's free_shipping
+  // effect, or the plain cart-value threshold. Previously this drawer never
+  // showed shipping status at all, so the customer only found out at checkout.
+  const { data: offerRes } = useGetFreeShippingOfferQuery();
+  const { data: bannersRes } = useGetAllFreeShippingBannersQuery();
   const getItemDiscountedPrice = (item) => {
     const productId = item.mongoId || item.id;
     const candidates = cartRuleEvalData?.data?.discounts?.[productId];
@@ -146,6 +159,19 @@ const CartDrawer = ({ isOpen, onClose }) => {
     return sum + (rawPrice - discounted) * qty;
   }, 0);
   const subtotal = totalAmount - ruleDiscountSavings;
+
+  // Same three-path eligibility used at checkout: admin combo banner (source
+  // + recommended product both in cart), any active generic cart rule whose
+  // effects include free_shipping, or the plain cart-value threshold.
+  const offerConfig = offerRes?.data;
+  const banners = bannersRes?.data || [];
+  const cartProductIds = new Set(cartItems.map((i) => i.mongoId || i.id));
+  const comboEligible =
+    !!offerConfig?.isActive &&
+    banners.some((b) => cartProductIds.has(b.sourceProductId) && cartProductIds.has(b.recommendedProductId));
+  const thresholdEligible =
+    !!offerConfig?.isActive && (offerConfig?.thresholdAmount || 0) > 0 && subtotal >= offerConfig.thresholdAmount;
+  const isFreeShippingEligible = comboEligible || !!cartRuleEvalData?.data?.freeShipping || thresholdEligible;
 
   return (
     <div className="fixed inset-0 z-[9999] flex justify-end">
@@ -300,10 +326,18 @@ const CartDrawer = ({ isOpen, onClose }) => {
                             const discountedPrice = getItemDiscountedPrice(item);
                             const rawPrice = Number(item.price) || 0;
                             const hasDiscount = discountedPrice < rawPrice;
+                            const percentOff = hasDiscount
+                              ? Math.round(((rawPrice - discountedPrice) / rawPrice) * 100)
+                              : 0;
                             return hasDiscount ? (
                               <div className="text-right">
                                 <p className="text-sm font-bold text-[#157a44]">₹{Math.round(discountedPrice).toLocaleString()}</p>
-                                <p className="text-[10px] text-gray-400 line-through">₹{rawPrice.toLocaleString()}</p>
+                                <div className="flex items-center justify-end gap-1">
+                                  <span className="text-[10px] text-gray-400 line-through">₹{rawPrice.toLocaleString()}</span>
+                                  <span className="text-[9px] font-bold uppercase rounded-full bg-[#157a44] text-white px-1.5 py-px">
+                                    {percentOff}% OFF
+                                  </span>
+                                </div>
                               </div>
                             ) : (
                               <p className="text-sm font-bold text-[#0a110e]">₹{rawPrice.toLocaleString()}</p>
@@ -327,6 +361,14 @@ const CartDrawer = ({ isOpen, onClose }) => {
                 <div className="flex justify-between items-center text-[11px] font-bold text-gray-400 uppercase tracking-widest">
                     <span>Subtotal</span>
                     <span className="font-medium text-[#0a110e]">₹{(Number(subtotal) || 0).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center gap-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest">
+                    <span className="shrink-0">Shipping</span>
+                    {isFreeShippingEligible ? (
+                      <span className="font-extrabold text-green-600 text-right">Free</span>
+                    ) : (
+                      <span className="font-medium normal-case tracking-normal text-gray-500 text-right">Calculated at checkout</span>
+                    )}
                 </div>
                 <div className="pt-3 border-t border-gray-100 flex justify-between items-center">
                     <span className="text-base font-serif text-[#0a110e]">Total</span>

@@ -10,7 +10,7 @@ import {
 import { useParams, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { useCookies } from "react-cookie";
-import confetti from "canvas-confetti";
+import { fireAddToCartConfetti } from "../../utils/celebration";
 import SEOHead from "../../component/SEOHead";
 import ComparisonTable from "../../component/ComparisonTable";
 import FreeShippingBanner from "../../component/FreeShippingBanner";
@@ -359,12 +359,7 @@ const ProductDetailPage = () => {
         // Force an immediate refetch and wait for it
         await refetchCart().unwrap();
 
-        confetti({
-          particleCount: 150,
-          spread: 80,
-          origin: { y: 0.6 },
-          colors: ["#F5DEB3", "#1c3026", "#a89068", "#ffffff"],
-        });
+        fireAddToCartConfetti();
 
         setSelectedVariant(effectiveVariant);
 

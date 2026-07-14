@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
-import { useEvaluateCartRulesQuery } from "../../store/api/userApi";
+import {
+  useEvaluateCartRulesQuery,
+  useGetFreeShippingOfferQuery,
+  useGetAllFreeShippingBannersQuery,
+} from "../../store/api/userApi";
 
 /**
  * Lightweight cart preview — a compact bottom sheet showing what's in the
@@ -31,6 +35,13 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
   const { data: cartRuleEvalData } = useEvaluateCartRulesQuery(cartRuleEvalItems, {
     skip: cartRuleEvalItems.length === 0,
   });
+
+  // Same eligibility check used at checkout (rp.payment.controller.js): the
+  // admin combo-banner offer, any active generic cart rule's free_shipping
+  // effect, or the plain cart-value threshold. Previously this preview
+  // always said "calculated at checkout" regardless of actual eligibility.
+  const { data: offerRes } = useGetFreeShippingOfferQuery();
+  const { data: bannersRes } = useGetAllFreeShippingBannersQuery();
   const getItemDiscountedPrice = (item) => {
     const productId = item.mongoId || item.id;
     const candidates = cartRuleEvalData?.data?.discounts?.[productId];
@@ -51,6 +62,17 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
     const rawPrice = Number(item.price) || 0;
     return sum + (rawPrice - getItemDiscountedPrice(item)) * itemQty(item.quantity);
   }, 0);
+  const subtotal = (Number(totalAmount) || 0) - ruleDiscountSavings;
+
+  const offerConfig = offerRes?.data;
+  const banners = bannersRes?.data || [];
+  const cartProductIds = new Set(cartItems.map((i) => i.mongoId || i.id));
+  const comboEligible =
+    !!offerConfig?.isActive &&
+    banners.some((b) => cartProductIds.has(b.sourceProductId) && cartProductIds.has(b.recommendedProductId));
+  const thresholdEligible =
+    !!offerConfig?.isActive && (offerConfig?.thresholdAmount || 0) > 0 && subtotal >= offerConfig.thresholdAmount;
+  const isFreeShippingEligible = comboEligible || !!cartRuleEvalData?.data?.freeShipping || thresholdEligible;
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setMounted(true));
@@ -100,10 +122,18 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
                     const discountedPrice = getItemDiscountedPrice(item);
                     const rawPrice = Number(item.price) || 0;
                     const hasDiscount = discountedPrice < rawPrice;
+                    const percentOff = hasDiscount
+                      ? Math.round(((rawPrice - discountedPrice) / rawPrice) * 100)
+                      : 0;
                     return hasDiscount ? (
                       <div className="text-right shrink-0">
                         <p className="text-xs font-bold text-[#157a44]">₹{Math.round(discountedPrice * itemQty(item.quantity)).toLocaleString()}</p>
-                        <p className="text-[9px] text-black/40 line-through">₹{(rawPrice * itemQty(item.quantity)).toLocaleString()}</p>
+                        <div className="flex items-center justify-end gap-1">
+                          <span className="text-[9px] text-black/40 line-through">₹{(rawPrice * itemQty(item.quantity)).toLocaleString()}</span>
+                          <span className="text-[9px] font-bold uppercase rounded-full bg-[#157a44] text-white px-1.5 py-px">
+                            {percentOff}% OFF
+                          </span>
+                        </div>
                       </div>
                     ) : (
                       <p className="text-xs font-bold text-black shrink-0">
@@ -118,11 +148,20 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
         </div>
 
         <div className="px-5 pt-3 pb-5 border-t border-black/10 shrink-0">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs font-bold uppercase tracking-wide text-black/60">Total</span>
-            <span className="text-base font-extrabold text-black">₹{((Number(totalAmount) || 0) - ruleDiscountSavings).toLocaleString()}</span>
+          {/* Shipping — label left, value right, same two-column row as Total
+              below it (rather than a footnote line under the total). */}
+          <div className="flex items-center justify-between gap-3 mb-1.5">
+            <span className="text-xs font-bold uppercase tracking-wide text-black/60 shrink-0">Shipping</span>
+            {isFreeShippingEligible ? (
+              <span className="text-xs font-extrabold text-green-600 text-right">Free</span>
+            ) : (
+              <span className="text-[11px] font-medium text-black/50 text-right">Calculated at checkout</span>
+            )}
           </div>
-          <p className="text-[10px] text-black/45 mb-4">Shipping will be calculated at checkout.</p>
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-xs font-bold uppercase tracking-wide text-black/60">Total</span>
+            <span className="text-base font-extrabold text-black">₹{subtotal.toLocaleString()}</span>
+          </div>
 
           <button
             onClick={onViewCart}
