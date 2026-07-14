@@ -34,6 +34,9 @@ const fireCelebrationConfetti = () => {
 
 // Same variant-name → colour lookup used on the PDP (ProductDetailPage.jsx),
 // so a "Rust Orange" variant renders as the same swatch colour everywhere.
+// Used for the small colour circle next to each option in the variant
+// dropdown below — anything not in the map falls back to the name itself
+// with spaces stripped (works for plain CSS colour words like "gold").
 const VARIANT_COLOR_MAP = {
   rainbow: "linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)",
   "sky blue": "#87CEEB",
@@ -46,8 +49,8 @@ const VARIANT_COLOR_MAP = {
   grey: "#808080",
   purple: "#800080",
 };
-const variantColor = (name) => {
-  const key = (name || "").toLowerCase();
+const variantColor = (name = "") => {
+  const key = name.toLowerCase();
   return VARIANT_COLOR_MAP[key] || key.replace(/\s+/g, "");
 };
 
@@ -72,14 +75,8 @@ const SMOKE_LIFE = 950;
  * quantity there directly affects whether the cart clears the free-shipping
  * threshold) instead of just a remove button — the PDP keeps the simpler
  * single-item add/remove since that's not the point of the PDP banner.
- *
- * `variant`: "dark" (default) matches the PDP's dark "Add to Collection" card
- * (translucent bg-white/5 shell, cream-on-dark buttons) since that's the card
- * this banner sits next to there; checkout passes variant="light" to keep the
- * cream-card look appropriate for that page's light background.
  */
-const FreeShippingBanner = ({ productId, showQuantityStepper = false, className = "mt-4", variant = "dark" }) => {
-  const isDark = variant !== "light";
+const FreeShippingBanner = ({ productId, showQuantityStepper = false, className = "mt-4" }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { isAuthenticated } = useSelector((state) => state.auth);
@@ -93,11 +90,32 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
 
   const [selectedVariant, setSelectedVariant] = useState(null);
 
-  // Keeps the progress bar mounted (and the CTA showing a transitional
-  // "unlocking" state) for a beat after the cart actually updates, so the
-  // fill animation + confetti + button swap play as a sequence instead of
-  // the bar just vanishing the instant `alreadyEligible`/`added` flip true.
-  const [justAdded, setJustAdded] = useState(false);
+  // Custom variant dropdown state — replaces a native <select>, which looks
+  // inconsistent/unthemed on mobile (each OS renders its own native picker
+  // UI that CSS can't meaningfully touch). This is a plain button + an
+  // absolutely-positioned list, fully on-brand everywhere, closed by
+  // clicking its own toggle again, picking an option, or clicking outside.
+  const [variantMenuOpen, setVariantMenuOpen] = useState(false);
+  const variantMenuRef = useRef(null);
+
+  // The slider IS the loader for the add-to-cart click: button shows
+  // "Adding…" (disabled, no other visual change) from click until the truck
+  // bar's fill animation actually reaches its target — only then does the
+  // CTA swap to the unlocked/added state and confetti fire. `onFillCompleteRef`
+  // is a one-shot callback the animateTruckTo loop below calls the instant a
+  // fill finishes; handleAddToCart populates it only when this click will
+  // complete the combo, so the scroll-into-view entrance replay (which never
+  // touches this ref) is completely unaffected.
+  const [addLoading, setAddLoading] = useState(false);
+  const onFillCompleteRef = useRef(null);
+
+  // Bottom sheet shown right after adding the recommended add-on IF that
+  // leaves the cart with only the add-on and not the source product — tells
+  // the customer, in a dedicated moment, that they still need the source
+  // product for the offer to actually apply. Replaces cramming that message
+  // into the CTA button's label.
+  const [showSourcePrompt, setShowSourcePrompt] = useState(false);
+  const [sourcePromptMounted, setSourcePromptMounted] = useState(false);
 
   const { data: bannerRes } = useGetFreeShippingBannerQuery(productId, { skip: !productId });
   const banner = bannerRes?.data;
@@ -116,6 +134,15 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
   });
   const recommendedProduct = recommendedRes?.data;
   const variants = recommendedProduct?.variantDetails || [];
+
+  // Needed for the "you added the add-on but not the main product" copy
+  // state below. RTK Query dedupes/caches by id, so on the PDP (where this
+  // is almost always the same product the page itself already fetched) this
+  // doesn't cost an extra request.
+  const { data: sourceRes } = useGetProductByIdQuery(banner?.sourceProductId, {
+    skip: !banner?.sourceProductId,
+  });
+  const sourceProduct = sourceRes?.data;
 
   // Source of truth for "added" is the actual cart, read fresh on every
   // render — NOT a local flag. A local "I just added this" boolean resets
@@ -136,6 +163,20 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
   }, [cartItems, recommendedProduct]);
   const added = !!cartMatch;
   const addedVariant = cartMatch?.selectedVariant || null;
+
+  // The backend (server/src/utils/freeShippingOffer.util.js) only grants free
+  // shipping when BOTH banner.sourceProductId AND recommendedProductId are in
+  // the cart — this mirrors that check. Previously this only looked at the
+  // recommended add-on, so viewing the source product's page (without ever
+  // adding the source product itself) and adding just the add-on showed
+  // "unlocked" even though checkout would still charge shipping.
+  const sourceInCart = useMemo(() => {
+    const sourceId = banner?.sourceProductId;
+    if (!sourceId) return false;
+    return cartItems.some(
+      (item) => String(item.id) === String(sourceId) || String(item.mongoId) === String(sourceId),
+    );
+  }, [cartItems, banner?.sourceProductId]);
 
   // Combo progress for the bar: this banner exists to nudge adding the
   // recommended add-on that completes the free-shipping combo. Real
@@ -282,6 +323,7 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
     const fromFrac = truckFracRef.current;
     const t0 = performance.now();
     lastSpawnRef.current = 0;
+    let fillDone = false;
 
     const tick = (now) => {
       const elapsed = now - t0;
@@ -290,6 +332,18 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
       const frac = fromFrac + (toFrac - fromFrac) * eased;
       const moving = k < 1;
       const bob = moving ? Math.sin(now / 90) * 1.2 : 0;
+
+      // Fire exactly once, the instant the FILL itself finishes (not waiting
+      // for the trailing smoke to fade) — this is what lets a click-to-add
+      // gate the CTA button on the bar actually reaching its target instead
+      // of a fixed timeout. Only ever set by handleAddToCart for a real
+      // combo-completing add, so this is a no-op the rest of the time.
+      if (!moving && !fillDone) {
+        fillDone = true;
+        const onComplete = onFillCompleteRef.current;
+        onFillCompleteRef.current = null;
+        onComplete?.();
+      }
 
       truckFracRef.current = frac;
 
@@ -358,21 +412,26 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
 
   useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
 
-  // Seeds the dropdown to "Purple" by default (falling back to the first
-  // variant if this recommendation has no purple option), once per product —
-  // no auto-cycling; the image only changes when the customer picks a variant.
+  // Seed the initial selection once variants load — prefers a "purple"
+  // variant if the product has one, otherwise falls back to the first
+  // variant. No auto-cycling: the selection just sits still until the
+  // customer changes it via the dropdown below.
   useEffect(() => {
     if (variants.length > 0 && !selectedVariant) {
-      const white = variants.find((v) => v.variantName?.toLowerCase() === "white");
-      setSelectedVariant((white || variants[0]).variantName);
+      const purple = variants.find((v) => v.variantName?.toLowerCase().includes("purple"));
+      setSelectedVariant((purple || variants[0]).variantName);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only seed once when variants first load
   }, [recommendedProduct?.productId]);
 
   // Keep the displayed image/price in sync with whatever variant is actually
-  // in the cart once added (could differ from a variant changed elsewhere).
+  // in the cart once added (could differ from what's selected in the
+  // dropdown, or from a variant changed elsewhere).
   useEffect(() => {
-    if (addedVariant) setSelectedVariant(addedVariant);
+    if (addedVariant) {
+      setSelectedVariant(addedVariant);
+      setVariantMenuOpen(false);
+    }
   }, [addedVariant]);
 
   // Mount-then-animate so the sheet slides up from off-screen rather than
@@ -406,14 +465,14 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
   }, [variantMenuOpen]);
 
   // eslint-disable-next-line no-console -- TEMP debug, remove after checkout discount bug is diagnosed
-  // console.log("[FSB debug top]", {
-  //   productIdProp: productId,
-  //   banner,
-  //   recommendedProductId: banner?.recommendedProductId,
-  //   recommendedProduct,
-  //   ruleEvalItems,
-  //   ruleEval,
-  // });
+  console.log("[FSB debug top]", {
+    productIdProp: productId,
+    banner,
+    recommendedProductId: banner?.recommendedProductId,
+    recommendedProduct,
+    ruleEvalItems,
+    ruleEval,
+  });
   if (!banner || !recommendedProduct) return null;
 
   const activeVariant =
@@ -459,6 +518,27 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
 
   const handleAddToCart = async () => {
     const effectiveVariant = activeVariant?.variantName || "Standard Variant";
+    // Captured BEFORE the cart updates — this is what decides whether this
+    // specific click completes the combo, independent of the add itself.
+    const willCompleteCombo = sourceInCart;
+
+    let safetyTimer = null;
+    if (willCompleteCombo) {
+      // Button shows "Adding…"/disabled starting now. The scroll-triggered
+      // effect further down will notice progressPct flip to 100 once the
+      // cart updates below and animate the bar to it; onFillCompleteRef is
+      // what that animation calls the moment it truly finishes.
+      setAddLoading(true);
+      // Safety net: if the bar is somehow never in view to animate (so the
+      // fill-driving effect never runs), don't leave the button stuck on
+      // "Adding…" forever.
+      safetyTimer = setTimeout(() => setAddLoading(false), 3000);
+      onFillCompleteRef.current = () => {
+        clearTimeout(safetyTimer);
+        setAddLoading(false);
+        fireCelebrationConfetti();
+      };
+    }
 
     if (isLoggedIn) {
       try {
@@ -471,6 +551,11 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
         dispatch(updateSelection({ productId: recommendedProduct.productId, quantity: 1, variant: effectiveVariant }));
         await refetchCart().unwrap();
       } catch {
+        if (willCompleteCombo) {
+          clearTimeout(safetyTimer);
+          onFillCompleteRef.current = null;
+          setAddLoading(false);
+        }
         return; // swallow — this card is a nudge, not the primary add-to-cart flow
       }
     } else {
@@ -495,15 +580,15 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
       quantity: 1,
     });
 
-    // Sequence the celebration: let the bar's width transition play out,
-    // then pop the confetti, then swap the CTA to "Unlocked" — instead of
-    // the bar instantly vanishing and the button instantly flipping the
-    // moment the underlying cart data changes.
-    setJustAdded(true);
-    setTimeout(fireCelebrationConfetti, 900);
-    setTimeout(() => setJustAdded(false), 1200);
+    if (!willCompleteCombo) {
+      // This add just left the cart with ONLY the add-on and not the source
+      // product — free shipping isn't actually active. Say so in a dedicated
+      // moment (bottom sheet) rather than folding it into the CTA label.
+      setShowSourcePrompt(true);
+    }
     // No local "added" flag to set — cartItems updates (dispatch above, or
-    // refetchCart) and cartMatch/added derive from that automatically.
+    // refetchCart) and cartMatch/added/progressPct derive from that
+    // automatically, which is what drives the bar animation above.
   };
 
   const handleRemove = async () => {
@@ -569,16 +654,11 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
     }
   };
 
-  // Shell styling forks on `variant`: dark mirrors the PDP's translucent
-  // "Add to Collection" card exactly (bg-white/5 backdrop-blur, cream
-  // border, big rounded corners); light keeps the solid cream card used on
-  // checkout's plain-white layout. `className` lets callers override outer
-  // spacing (e.g. dropping the top margin when placed side-by-side in a
-  // desktop grid) without affecting the other call sites' default spacing.
-  const cardShell = isDark
-    ? "rounded-[2rem] border border-[#F5DEB3]/10 bg-white/5 backdrop-blur-sm"
-    : "rounded-2xl border border-[#1c3026]/10 bg-[#FAF7F2] shadow-sm";
-
+  // Fixed black/cream/red design regardless of PDP vs checkout context — the
+  // card carries its own background/border so it reads the same everywhere
+  // it's dropped in. `className` lets callers override outer spacing (e.g.
+  // dropping the top margin when placed side-by-side in a desktop grid)
+  // without affecting the other call sites' default stacked spacing.
   return (
     <>
       <div
@@ -929,83 +1009,34 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
                     }}
                   >
                     <div
-                      className="absolute left-0 right-0"
-                      style={{
-                        bottom: 6,
-                        height: 14,
-                        borderRadius: 999,
-                        background: isDark ? "rgba(0,0,0,0.28)" : "#EDE1C4",
-                        boxShadow: isDark
-                          ? "inset 0 2px 5px rgba(0,0,0,0.4)"
-                          : "inset 0 2px 5px rgba(28,48,38,0.18)",
-                      }}
+                      className="absolute inset-0 overflow-hidden"
+                      style={{ borderRadius: 999 }}
                     >
-                      {/* Fill — brand gradient + drop shadow, with a shine sweep. */}
                       <div
+                        className="absolute top-0 bottom-0"
                         style={{
-                          position: "absolute",
-                          left: 0,
-                          top: 0,
-                          bottom: 0,
-                          width: `${anim.frac * 100}%`,
-                          minWidth: 14,
-                          borderRadius: 999,
-                          background: isDark
-                            ? "linear-gradient(90deg, #F5DEB3 0%, #fff3d6 100%)"
-                            : "linear-gradient(90deg, #1c3026 0%, #3c5748 100%)",
-                          boxShadow: isDark
-                            ? "0 2px 6px -2px rgba(245,222,179,0.5)"
-                            : "0 2px 6px -2px rgba(28,48,38,0.5)",
+                          width: "40%",
+                          background:
+                            "linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent)",
+                          animation: "fsbShine 2.4s linear infinite",
                         }}
-                      >
-                        <div className="absolute inset-0 overflow-hidden" style={{ borderRadius: 999 }}>
-                          <div
-                            className="absolute top-0 bottom-0"
-                            style={{
-                              width: "40%",
-                              background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent)",
-                              animation: "fsbShine 2.4s linear infinite",
-                            }}
-                          />
-                        </div>
-                      </div>
+                      />
                     </div>
+                  </div>
+                </div>
 
-                    {/* Exhaust smoke — puffs grow, rise, drift back, fade out.
-                        Anchored to the truck's rear via the same travel calc. */}
-                    {/* {anim.puffs.map((p) => {
-                      const t = Math.min(Math.max(performance.now() - p.born, 0) / SMOKE_LIFE, 1);
-                      const size = 7 + t * 18;
-                      return (
-                        <div
-                          key={p.id}
-                          className="absolute rounded-full pointer-events-none"
-                          style={{
-                            left: `calc(${p.frac} * (100% - ${TRUCK_W}px) + ${10 - t * 20}px)`,
-                            bottom: 14 + t * 20,
-                            width: size,
-                            height: size,
-                            marginLeft: -(size / 2),
-                            marginBottom: -(size / 2),
-                            background:
-                              "radial-gradient(circle at 40% 40%, rgba(255,255,255,0.95), rgba(212,204,180,0.6) 55%, rgba(190,180,155,0) 72%)",
-                            filter: "blur(1px)",
-                            opacity: (1 - t) * 0.4,
-                            zIndex: 2,
-                          }}
-                        />
-                      );
-                    })} */}
-
-                    {/* Truck — disabled (kept in code, not rendered). Wrapped in
-                        a `false &&` guard rather than a JSX block comment
-                        because the SVG below has its own inner JSX comments,
-                        which would prematurely close an outer one. Travels
-                        across (laneWidth - TRUCK_W) so at 100% its right edge
-                        lands flush at the lane's end rather than hanging outside
-                        it. */}
-                    {false && (
+                {/* Exhaust smoke — puffs grow, rise, drift back, fade out.
+                  Anchored to the truck's rear via the same travel calc. */}
+                {anim.puffs.map((p) => {
+                  const t = Math.min(
+                    Math.max(performance.now() - p.born, 0) / SMOKE_LIFE,
+                    1,
+                  );
+                  const size = 7 + t * 18;
+                  return (
                     <div
+                      key={p.id}
+                      className="absolute rounded-full pointer-events-none"
                       style={{
                         left: `calc(${p.frac} * (100% - ${TRUCK_W}px) + ${10 - t * 20}px)`,
                         bottom: 14 + t * 20,
@@ -1115,53 +1146,56 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
                           : "none",
                       }}
                     >
-                    <svg width={TRUCK_W} height="36" viewBox="0 0 80 56" fill="none" style={{ display: "block", overflow: "visible" }}>
-                      {/* ground shadow */}
-                      <ellipse cx="40" cy="53" rx="30" ry="3.4" fill="rgba(28,48,38,0.22)" />
-                      {/* cargo box */}
-                      <rect x="2" y="7" width="44" height="30" rx="6" fill="#FAF7F2" stroke="#1c3026" strokeWidth="2.4" />
-                      <rect x="9" y="14" width="6" height="16" rx="2" fill="#EFDCAE" />
-                      <rect x="20" y="14" width="6" height="16" rx="2" fill="#EFDCAE" />
-                      <rect x="31" y="14" width="6" height="16" rx="2" fill="#EFDCAE" />
-                      {/* cab */}
-                      <path
-                        d="M46 14 h13 a5 5 0 0 1 4 2.2 L69 26 a4 4 0 0 1 0.8 2.4 V37 H46 Z"
-                        fill="#F5DEB3"
-                        stroke="#1c3026"
-                        strokeWidth="2.4"
-                        strokeLinejoin="round"
+                      <circle cx="18" cy="40" r="8.4" fill="#1f2a24" />
+                      <circle cx="18" cy="40" r="3.3" fill="#cfeed7" />
+                      <rect
+                        x="17"
+                        y="32"
+                        width="2"
+                        height="16"
+                        rx="1"
+                        fill="#4c5a52"
                       />
-                      <rect x="50" y="18" width="12" height="8.5" rx="2.5" fill="#FBF4E4" stroke="#1c3026" strokeWidth="1.8" />
-                      <circle cx="67.5" cy="33.5" r="1.8" fill="#E63329" />
-                      {/* wheels — spokes make the rotation actually readable */}
-                      <g
-                        style={{
-                          transformBox: "fill-box",
-                          transformOrigin: "center",
-                          animation: anim.moving ? "fsbWheel 0.55s linear infinite" : "none",
-                        }}
-                      >
-                        <circle cx="18" cy="40" r="8.4" fill="#1c3026" />
-                        <circle cx="18" cy="40" r="3.3" fill="#F5DEB3" />
-                        <rect x="17" y="32" width="2" height="16" rx="1" fill="#5a6d61" />
-                        <rect x="10" y="39" width="16" height="2" rx="1" fill="#5a6d61" />
-                      </g>
-                      <g
-                        style={{
-                          transformBox: "fill-box",
-                          transformOrigin: "center",
-                          animation: anim.moving ? "fsbWheel 0.55s linear infinite" : "none",
-                        }}
-                      >
-                        <circle cx="55" cy="40" r="8.4" fill="#1c3026" />
-                        <circle cx="55" cy="40" r="3.3" fill="#F5DEB3" />
-                        <rect x="54" y="32" width="2" height="16" rx="1" fill="#5a6d61" />
-                        <rect x="47" y="39" width="16" height="2" rx="1" fill="#5a6d61" />
-                      </g>
-                    </svg>
-                    </div>
-                    )}
-                  </div>
+                      <rect
+                        x="10"
+                        y="39"
+                        width="16"
+                        height="2"
+                        rx="1"
+                        fill="#4c5a52"
+                      />
+                    </g>
+                    <g
+                      style={{
+                        transformBox: "fill-box",
+                        transformOrigin: "center",
+                        animation: anim.moving
+                          ? "fsbWheel 0.55s linear infinite"
+                          : "none",
+                      }}
+                    >
+                      <circle cx="55" cy="40" r="8.4" fill="#1f2a24" />
+                      <circle cx="55" cy="40" r="3.3" fill="#cfeed7" />
+                      <rect
+                        x="54"
+                        y="32"
+                        width="2"
+                        height="16"
+                        rx="1"
+                        fill="#4c5a52"
+                      />
+                      <rect
+                        x="47"
+                        y="39"
+                        width="16"
+                        height="2"
+                        rx="1"
+                        fill="#4c5a52"
+                      />
+                    </g>
+                  </svg>
+                </div>
+              </div>
 
               {/* Destination reward — sits in the reserved GOAL_W gutter at the
                 far right, outside the truck's travel lane, and pops with a
@@ -1207,8 +1241,7 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
         {/* CTA */}
         {/* pt-0 when the truck bar above it is visible (tight gap to it, per
@@ -1344,111 +1377,69 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
         </div>
       </div>
 
-      {/* CTA */}
-      <div className="px-4 pb-4">
-        {added && justAdded ? (
-          // Transitional state: cart is already updated but we're holding
-          // the celebratory sequence (bar fill → confetti) before revealing
-          // the final "Unlocked" button, so the swap doesn't happen instantly.
+      {/* "You still need the source product" bottom sheet — shown after adding
+        the recommended add-on when that leaves the cart with ONLY the add-on
+        (source product not in cart), so free shipping isn't actually active
+        yet. Slides up from the bottom, backdrop-dismissible, with a single
+        clear action: go add the source product (its own page, so the
+        customer picks their own variant rather than one being guessed here). */}
+      {showSourcePrompt && (
+        <div className="fixed inset-0 z-[70] flex items-end justify-center">
           <div
-            className={`w-full py-3.5 rounded-full flex items-center justify-center gap-2.5 text-sm font-extrabold uppercase tracking-wide border-2 animate-pulse ${
-              isDark ? "bg-[#F5DEB3]/10 text-[#F5DEB3]/80 border-[#F5DEB3]/20" : "bg-[#1c3026]/5 text-[#1c3026]/70 border-[#1c3026]/10"
+            className={`absolute inset-0 bg-black/50 transition-opacity duration-300 ${sourcePromptMounted ? "opacity-100" : "opacity-0"}`}
+            onClick={closeSourcePrompt}
+          />
+          <div
+            className={`relative w-full max-w-md bg-[#FAF7F2] rounded-t-3xl px-5 pt-5 pb-6 shadow-2xl transition-transform duration-300 ease-out ${
+              sourcePromptMounted ? "translate-y-0" : "translate-y-full"
             }`}
           >
-            <i className="fa-solid fa-truck-fast" /> Unlocking free shipping…
-          </div>
-        ) : added ? (
-          <div className="flex items-center gap-2">
-            <div
-              className={`flex-1 py-3.5 rounded-full text-[11px] font-extrabold uppercase tracking-[0.1em] text-center border ${
-                isDark ? "bg-[#F5DEB3]/10 text-[#F5DEB3] border-[#F5DEB3]/20" : "bg-[#1c3026]/5 text-[#1c3026] border-[#1c3026]/15"
-              }`}
-            >
-              <i className="fa-solid fa-circle-check mr-1.5 text-green-300/80" /> Free Shipping Unlocked!
+            <div className="mx-auto w-10 h-1 rounded-full bg-black/15 mb-4" />
+
+            <div className="flex items-start gap-3">
+              <div className="shrink-0 w-11 h-11 rounded-full bg-[#E63329]/10 flex items-center justify-center">
+                <i className="fa-solid fa-truck-fast text-[#E63329] text-sm" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-extrabold uppercase tracking-wide text-black">
+                  Almost there
+                </p>
+                <p className="text-[13px] text-black/70 mt-1 leading-snug">
+                  {recommendedProduct.productName} is in your cart, but free
+                  shipping needs{" "}
+                  <span className="font-bold text-black">
+                    {sourceProduct?.productName || "the main product"}
+                  </span>{" "}
+                  in there too.
+                </p>
+              </div>
             </div>
 
-            {showQuantityStepper ? (
-              <div
-                className={`shrink-0 flex items-center gap-3 rounded-full border px-4 h-[52px] ${
-                  isDark ? "bg-[#1c3026] border-[#F5DEB3]/20" : "bg-white border-[#D8D2C5]"
-                }`}
-              >
-                <button
-                  onClick={handleDecrement}
-                  disabled={isUpdatingQty}
-                  title="Decrease quantity"
-                  className={`disabled:opacity-50 ${isDark ? "text-[#F5DEB3]/70 hover:text-[#F5DEB3]" : "text-gray-500 hover:text-[#E63329]"}`}
-                >
-                  <i className="fa-solid fa-minus text-[10px]" />
-                </button>
-                <span className={`text-xs font-bold w-3 text-center ${isDark ? "text-[#F5DEB3]" : "text-[#1c3026]"}`}>
-                  {itemQty(cartMatch?.quantity) || 1}
-                </span>
-                <button
-                  onClick={handleIncrement}
-                  disabled={isUpdatingQty}
-                  title="Increase quantity"
-                  className={`disabled:opacity-50 ${isDark ? "text-[#F5DEB3]/70 hover:text-[#F5DEB3]" : "text-gray-500 hover:text-[#1c3026]"}`}
-                >
-                  <i className="fa-solid fa-plus text-[10px]" />
-                </button>
-              </div>
-            ) : (
+            <div className="flex items-center gap-2.5 mt-5">
               <button
-                onClick={handleRemove}
-                disabled={isUpdatingQty}
-                title="Remove from cart"
-                className={`shrink-0 w-[52px] h-[52px] rounded-full flex items-center justify-center border transition-all disabled:opacity-50 ${
-                  isDark
-                    ? "border-[#F5DEB3]/20 text-[#F5DEB3] hover:bg-[#F5DEB3] hover:text-[#1c3026]"
-                    : "bg-white border-[#D8D2C5] text-gray-400 hover:text-[#E63329]"
-                }`}
+                onClick={closeSourcePrompt}
+                className="flex-1 py-3 rounded-xl text-[11px] font-extrabold uppercase tracking-[0.1em] text-black/60 border border-black/15"
               >
-                <i className="fa-solid fa-xmark text-xs" />
+                Maybe Later
               </button>
-            )}
+              <button
+                onClick={() => {
+                  closeSourcePrompt();
+                  if (sourceProduct?.productId)
+                    navigate(`/product/${sourceProduct.productId}`);
+                }}
+                className="flex-1 py-3 rounded-xl text-[11px] font-extrabold uppercase tracking-[0.1em] text-white bg-[#1c3026]"
+              >
+                Add{" "}
+                {sourceProduct?.productName
+                  ? sourceProduct.productName.split(" ")[0]
+                  : "Product"}
+              </button>
+            </div>
           </div>
-        ) : isDark ? (
-          <button
-            onClick={handleAddToCart}
-            disabled={isAdding}
-            className="w-full h-14 rounded-full flex items-center justify-center gap-2.5 text-xs font-bold uppercase tracking-[0.2em] bg-[#F5DEB3] text-[#1c3026] hover:bg-white transition-all shadow-xl shadow-[#F5DEB3]/10 disabled:opacity-50"
-          >
-            {isAdding ? (
-              "Adding…"
-            ) : (
-              <>
-                Add &amp; Ship Free
-                <span className="text-base leading-none">→</span>
-              </>
-            )}
-          </button>
-        ) : (
-          <button
-            onClick={handleAddToCart}
-            disabled={isAdding}
-            className="group relative w-full py-3.5 rounded-full overflow-hidden flex items-center justify-center gap-2.5 text-sm font-extrabold uppercase tracking-wide disabled:opacity-50 bg-[#f5deb3] text-[#1c3026] transition-colors duration-500 hover:text-[#f5deb3]"
-          >
-            {/* Dark fill that flows in from the left on hover — the label sits
-                above it (z-10) and flips to cream as it sweeps past. */}
-            <span
-              aria-hidden="true"
-              className="absolute inset-0 bg-[#1c3026] -translate-x-full transition-transform duration-500 ease-out group-hover:translate-x-0"
-            />
-            <span className="relative z-10 flex items-center justify-center gap-2.5">
-              {isAdding ? (
-                "Adding…"
-              ) : (
-                <>
-                  Add &amp; Ship Free
-                  <span className="text-base leading-none">→</span>
-                </>
-              )}
-            </span>
-          </button>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </>
   );
 };
 
