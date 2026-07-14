@@ -30,5 +30,4 @@ connDB()
     process.exit(1);
   });
 
-  
-  // trigger build
+// trigger build
