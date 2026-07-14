@@ -464,6 +464,15 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
     };
   }, [variantMenuOpen]);
 
+  // eslint-disable-next-line no-console -- TEMP debug, remove after checkout discount bug is diagnosed
+  // console.log("[FSB debug top]", {
+  //   productIdProp: productId,
+  //   banner,
+  //   recommendedProductId: banner?.recommendedProductId,
+  //   recommendedProduct,
+  //   ruleEvalItems,
+  //   ruleEval,
+  // });
   if (!banner || !recommendedProduct) return null;
 
   const activeVariant =
@@ -787,7 +796,7 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
                 once already in cart since that line is committed to
                 `addedVariant`. */}
             {variants.length > 1 && (
-              <div className="flex items-center gap-2 mt-1">
+              <div className="flex items-center gap-8 mt-1">
                 <label className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.1em] text-gray-500">
                   {added ? "In cart" : "Variants"}
                 </label>
