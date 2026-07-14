@@ -53,7 +53,14 @@ export const evaluateCartRules = (cartItems, activeRules) => {
       if (effect.type !== "percent_off" && effect.type !== "flat_off") continue;
       const productId = String(effect.targetProductId);
       const list = discountCandidatesByProduct.get(productId) || [];
-      list.push({ type: effect.type, value: effect.value });
+      list.push({
+        type: effect.type,
+        value: effect.value,
+        // Falls back to 1 for rules written before this field existed, which
+        // matches the intended semantics ("one discounted unit") rather than
+        // silently discounting an unlimited quantity.
+        maxDiscountedQuantity: effect.maxDiscountedQuantity ?? 1,
+      });
       discountCandidatesByProduct.set(productId, list);
     }
   }
@@ -62,14 +69,13 @@ export const evaluateCartRules = (cartItems, activeRules) => {
 };
 
 /**
- * Applies whichever discount candidate for a product results in the LOWEST
- * price — "best discount for the customer wins" when two rules both discount
- * the same item, computed from actual resulting price rather than a
- * priority field. Rounded to the nearest whole rupee (e.g. 50% off ₹299 is
- * ₹149.5 mathematically, but INR pricing doesn't do paise in the UI) — this
- * is the ONE place that rounding happens; every client-side display mirrors
- * this exact same rounding so the price shown never drifts from what this
- * function (used for the real charged amount) actually produces.
+ * The discounted price of a SINGLE unit under whichever candidate is best for
+ * the customer — "best discount wins" when two rules both discount the same
+ * item, decided by actual resulting price rather than a priority field.
+ * Rounded to the nearest whole rupee (50% off ₹299 is ₹149.5 mathematically,
+ * but INR pricing doesn't do paise) — this is the ONE place that rounding
+ * happens, and every client-side display mirrors it exactly so the price shown
+ * never drifts from what's actually charged.
  */
 export const applyBestDiscount = (unitPrice, candidates = []) => {
   if (!candidates.length) return unitPrice;
@@ -80,6 +86,48 @@ export const applyBestDiscount = (unitPrice, candidates = []) => {
     return price;
   });
   return Math.round(Math.max(Math.min(...results), 0));
+};
+
+/**
+ * Total rupees knocked off a cart LINE (one product × its quantity).
+ *
+ * The discount is capped to the winning candidate's `maxDiscountedQuantity`
+ * (default 1), so "2+ Lamps => 50% off Pen Stand" discounts exactly ONE Pen
+ * Stand: a second one is charged full price. For 2 × ₹299 Pen Stands that's
+ * ₹598 − ₹149 = ₹449, not ₹300.
+ *
+ * Returned as a LINE-LEVEL rupee amount rather than a modified unit price
+ * because a line whose first unit costs ₹150 and second costs ₹299 has no
+ * single "unit price" — it can only be expressed as (unitPrice × qty) minus
+ * this. Both the order total and every client display are built that way.
+ */
+export const computeLineDiscount = (unitPrice, quantity, candidates = []) => {
+  if (!candidates.length) return 0;
+  const price = Number(unitPrice) || 0;
+  const qty = Number(quantity) || 0;
+  if (price <= 0 || qty <= 0) return 0;
+
+  // Pick the winning candidate by resulting unit price, then honour ITS cap —
+  // the cap belongs to the rule that actually won, not to some other rule.
+  let best = null;
+  let bestUnitPrice = Infinity;
+  for (const c of candidates) {
+    const discounted =
+      c.type === "percent_off"
+        ? price * (1 - Number(c.value) / 100)
+        : c.type === "flat_off"
+          ? price - Number(c.value)
+          : price;
+    const finalUnit = Math.round(Math.max(discounted, 0));
+    if (finalUnit < bestUnitPrice) {
+      bestUnitPrice = finalUnit;
+      best = c;
+    }
+  }
+  if (!best || bestUnitPrice >= price) return 0;
+
+  const discountedUnits = Math.min(qty, Math.max(Number(best.maxDiscountedQuantity) || 1, 1));
+  return (price - bestUnitPrice) * discountedUnits;
 };
 
 /**

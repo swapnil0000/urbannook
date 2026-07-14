@@ -17,6 +17,7 @@ import {
   useGetAllFreeShippingBannersQuery,
   useEvaluateCartRulesQuery,
 } from "../store/api/userApi";
+import { computeLineDiscount } from "../utils/cartRules";
 import { setShowLoginModal, setLoginCallback } from "../store/slices/uiSlice";
 import { useUI } from "../hooks/useRedux";
 import { clearCart, removeItem } from "../store/slices/cartSlice";
@@ -443,36 +444,21 @@ const CheckoutPage = () => {
     skip: cartRuleEvalItems.length === 0,
   });
 
-  // A generic cart rule (e.g. "2+ Lamps => 50% off Pen Stand") may discount
-  // a specific item's price. Mirrors the server's applyBestDiscount exactly
-  // (best resulting price wins if more than one rule discounts the same
-  // product) so what's shown here never disagrees with what actually gets
-  // charged. Used both for per-line-item display AND for correcting the
-  // subtotal fed into the final "amount to pay" below — previously this page
-  // only ever showed the undiscounted price everywhere, so a rule discount
-  // was invisible on checkout even though the real order total (payment
-  // controller) already applied it correctly.
-  const getItemDiscountedPrice = (item) => {
-    const productId = item.mongoId || item.id?.split(":")[0];
-    const candidates = cartRuleEvalData?.data?.discounts?.[productId];
-    const price = Number(item.price) || 0;
-    if (!candidates?.length) return price;
-    const results = candidates.map((c) =>
-      c.type === "percent_off" ? price * (1 - Number(c.value) / 100) : price - Number(c.value),
-    );
-    // Rounded to match the server's applyBestDiscount exactly (50% off ₹299
-    // is ₹149.5 mathematically — both round that to ₹150, consistently).
-    return Math.round(Math.max(Math.min(...results), 0));
-  };
+  // A generic cart rule (e.g. "2+ Lamps => 50% off Pen Stand") may discount an
+  // item. Computed by the shared helper in utils/cartRules.js, which mirrors
+  // server/src/utils/cartRule.util.js exactly — including the rule's
+  // discounted-unit cap, so a 2nd Pen Stand shows (and is charged) full price.
+  const getItemCandidates = (item) =>
+    cartRuleEvalData?.data?.discounts?.[item.mongoId || item.id?.split(":")[0]];
+  // ₹ knocked off a whole line — NOT a per-unit price, since only some units
+  // of the line may be discounted.
+  const getItemLineDiscount = (item) =>
+    computeLineDiscount(item.price, item.quantity, getItemCandidates(item));
   // Total ₹ shaved off the cart by matched rule discounts — subtracted from
   // whatever subtotal this page would otherwise display (guest's direct
   // calc, or the coupon endpoint's summary.subtotal, which doesn't know
   // about cart rules at all).
-  const ruleDiscountSavings = cartItems.reduce((sum, item) => {
-    const price = Number(item.price) || 0;
-    const discounted = getItemDiscountedPrice(item);
-    return sum + (price - discounted) * (Number(item.quantity) || 0);
-  }, 0);
+  const ruleDiscountSavings = cartItems.reduce((sum, item) => sum + getItemLineDiscount(item), 0);
 
   // Checkout-only nudge: if the cart hasn't crossed the free-shipping
   // threshold yet, show a banner for the first cart item that has one
@@ -1629,24 +1615,22 @@ const CheckoutPage = () => {
                           <p className="text-[10px] text-gray-400">Qty {item.quantity}</p>
                         </div>
                         {(() => {
-                          const discountedPrice = getItemDiscountedPrice(item);
                           const rawPrice = Number(item.price) || 0;
-                          const hasDiscount = discountedPrice < rawPrice;
-                          const percentOff = hasDiscount
-                            ? Math.round(((rawPrice - discountedPrice) / rawPrice) * 100)
-                            : 0;
-                          return hasDiscount ? (
+                          const lineRaw = rawPrice * Number(item.quantity);
+                          const lineDiscount = getItemLineDiscount(item);
+                          const percentOff = lineDiscount > 0 ? Math.round((lineDiscount / lineRaw) * 100) : 0;
+                          return lineDiscount > 0 ? (
                             <div className="text-right shrink-0">
-                              <p className="text-sm font-bold text-[#157a44]">₹{(discountedPrice * Number(item.quantity)).toLocaleString()}</p>
+                              <p className="text-sm font-bold text-[#157a44]">₹{(lineRaw - lineDiscount).toLocaleString()}</p>
                               <div className="flex items-center justify-end gap-1">
-                                <span className="text-[10px] text-gray-400 line-through">₹{(rawPrice * Number(item.quantity)).toLocaleString()}</span>
+                                <span className="text-[10px] text-gray-400 line-through">₹{lineRaw.toLocaleString()}</span>
                                 <span className="text-[9px] font-bold uppercase rounded-full bg-[#157a44] text-white px-1.5 py-px">
                                   {percentOff}% OFF
                                 </span>
                               </div>
                             </div>
                           ) : (
-                            <p className="text-sm font-bold text-gray-800 shrink-0">₹{(rawPrice * Number(item.quantity)).toLocaleString()}</p>
+                            <p className="text-sm font-bold text-gray-800 shrink-0">₹{lineRaw.toLocaleString()}</p>
                           );
                         })()}
                       </div>
@@ -1857,17 +1841,15 @@ const CheckoutPage = () => {
                     )}
                   </div>
                   {(() => {
-                    const discountedPrice = getItemDiscountedPrice(item);
                     const rawPrice = Number(item.price) || 0;
-                    const hasDiscount = discountedPrice < rawPrice;
-                    const percentOff = hasDiscount
-                      ? Math.round(((rawPrice - discountedPrice) / rawPrice) * 100)
-                      : 0;
-                    return hasDiscount ? (
+                    const lineRaw = rawPrice * Number(item.quantity);
+                    const lineDiscount = getItemLineDiscount(item);
+                    const percentOff = lineDiscount > 0 ? Math.round((lineDiscount / lineRaw) * 100) : 0;
+                    return lineDiscount > 0 ? (
                       <div className="text-right shrink-0">
-                        <p className="text-xs font-bold text-[#157a44]">₹{(discountedPrice * Number(item.quantity)).toLocaleString()}</p>
+                        <p className="text-xs font-bold text-[#157a44]">₹{(lineRaw - lineDiscount).toLocaleString()}</p>
                         <div className="flex items-center justify-end gap-1">
-                          <span className="text-[9px] text-gray-400 line-through">₹{(rawPrice * Number(item.quantity)).toLocaleString()}</span>
+                          <span className="text-[9px] text-gray-400 line-through">₹{lineRaw.toLocaleString()}</span>
                           <span className="text-[9px] font-bold uppercase rounded-full bg-[#157a44] text-white px-1.5 py-px">
                             {percentOff}% OFF
                           </span>
@@ -1875,7 +1857,7 @@ const CheckoutPage = () => {
                       </div>
                     ) : (
                       <p className="text-xs font-bold text-gray-800 shrink-0">
-                        ₹{(rawPrice * Number(item.quantity)).toLocaleString()}
+                        ₹{lineRaw.toLocaleString()}
                       </p>
                     );
                   })()}

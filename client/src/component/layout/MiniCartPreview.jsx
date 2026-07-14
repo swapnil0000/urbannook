@@ -5,6 +5,7 @@ import {
   useGetFreeShippingOfferQuery,
   useGetAllFreeShippingBannersQuery,
 } from "../../store/api/userApi";
+import { computeLineDiscount } from "../../utils/cartRules";
 
 /**
  * Lightweight cart preview — a compact bottom sheet showing what's in the
@@ -42,26 +43,16 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
   // always said "calculated at checkout" regardless of actual eligibility.
   const { data: offerRes } = useGetFreeShippingOfferQuery();
   const { data: bannersRes } = useGetAllFreeShippingBannersQuery();
-  const getItemDiscountedPrice = (item) => {
-    const productId = item.mongoId || item.id;
-    const candidates = cartRuleEvalData?.data?.discounts?.[productId];
-    const price = Number(item.price) || 0;
-    if (!candidates?.length) return price;
-    const results = candidates.map((c) =>
-      c.type === "percent_off" ? price * (1 - Number(c.value) / 100) : price - Number(c.value),
+  // ₹ knocked off a whole line by a matched rule. Shared helper mirrors the
+  // server exactly, including the rule's discounted-unit cap — so a 2nd Pen
+  // Stand is shown (and charged) at full price, not another ₹150.
+  const getItemLineDiscount = (item) =>
+    computeLineDiscount(
+      item.price,
+      item.quantity,
+      cartRuleEvalData?.data?.discounts?.[item.mongoId || item.id],
     );
-    // Rounded to match the server's applyBestDiscount exactly (50% off ₹299
-    // is ₹149.5 mathematically — both round that to ₹150, consistently).
-    // Rounding the PER-UNIT price here (before the line-total display
-    // multiplies by quantity below) also fixes a second bug: rounding after
-    // multiplying gave a different total for qty=2 (round(149.5×2)=299)
-    // than rounding per-unit first then multiplying (150×2=300) would.
-    return Math.round(Math.max(Math.min(...results), 0));
-  };
-  const ruleDiscountSavings = cartItems.reduce((sum, item) => {
-    const rawPrice = Number(item.price) || 0;
-    return sum + (rawPrice - getItemDiscountedPrice(item)) * itemQty(item.quantity);
-  }, 0);
+  const ruleDiscountSavings = cartItems.reduce((sum, item) => sum + getItemLineDiscount(item), 0);
   const subtotal = (Number(totalAmount) || 0) - ruleDiscountSavings;
 
   const offerConfig = offerRes?.data;
@@ -119,17 +110,16 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
                     <p className="text-[10px] text-black/50">Qty {itemQty(item.quantity)}</p>
                   </div>
                   {(() => {
-                    const discountedPrice = getItemDiscountedPrice(item);
                     const rawPrice = Number(item.price) || 0;
-                    const hasDiscount = discountedPrice < rawPrice;
-                    const percentOff = hasDiscount
-                      ? Math.round(((rawPrice - discountedPrice) / rawPrice) * 100)
-                      : 0;
-                    return hasDiscount ? (
+                    const lineRaw = rawPrice * itemQty(item.quantity);
+                    const lineDiscount = getItemLineDiscount(item);
+                    const percentOff =
+                      lineDiscount > 0 ? Math.round((lineDiscount / lineRaw) * 100) : 0;
+                    return lineDiscount > 0 ? (
                       <div className="text-right shrink-0">
-                        <p className="text-xs font-bold text-[#157a44]">₹{Math.round(discountedPrice * itemQty(item.quantity)).toLocaleString()}</p>
+                        <p className="text-xs font-bold text-[#157a44]">₹{(lineRaw - lineDiscount).toLocaleString()}</p>
                         <div className="flex items-center justify-end gap-1">
-                          <span className="text-[9px] text-black/40 line-through">₹{(rawPrice * itemQty(item.quantity)).toLocaleString()}</span>
+                          <span className="text-[9px] text-black/40 line-through">₹{lineRaw.toLocaleString()}</span>
                           <span className="text-[9px] font-bold uppercase rounded-full bg-[#157a44] text-white px-1.5 py-px">
                             {percentOff}% OFF
                           </span>
@@ -137,7 +127,7 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
                       </div>
                     ) : (
                       <p className="text-xs font-bold text-black shrink-0">
-                        ₹{(rawPrice * itemQty(item.quantity)).toLocaleString()}
+                        ₹{lineRaw.toLocaleString()}
                       </p>
                     );
                   })()}

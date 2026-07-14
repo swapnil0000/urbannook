@@ -65,19 +65,32 @@ export const generateInvoiceHtmlTemplate = (order) => {
             <tr><th>Item</th><th class="center">Qty</th><th class="center">Price</th><th class="center">Total</th></tr>
           </thead>
           <tbody>
-            ${order.items.map(item => `
+            ${order.items.map(item => {
+              // Line total is (unit price × qty) minus whatever a matched cart
+              // rule knocked off THIS line — the rule may discount only some of
+              // the units (e.g. 50% off one Pen Stand, the second at full
+              // price), so it can't be shown as a reduced unit price. Spell the
+              // saving out on its own row so the invoice's arithmetic is
+              // verifiable by the customer instead of a number that doesn't add up.
+              const ruleDiscount = item.productSnapshot.ruleDiscountAmount || 0;
+              const lineTotal = item.productSnapshot.priceAtPurchase * item.productSnapshot.quantity - ruleDiscount;
+              return `
               <tr>
                 <td>
                   ${item.productSnapshot.productName}
                   ${item.productSnapshot.selectedVariant && item.productSnapshot.selectedVariant !== 'N/A'
                    ? `<br/><small style="color: #666;">Variant: ${item.productSnapshot.selectedVariant}</small>`
                    : ''}
-                  }
+                  ${ruleDiscount > 0
+                   ? `<br/><small style="color: #157a44;">Offer applied: -₹${ruleDiscount}</small>`
+                   : ''}
+                </td>
                 <td class="center">${item.productSnapshot.quantity}</td>
                 <td class="center">₹${item.productSnapshot.priceAtPurchase}</td>
-                <td class="center">₹${item.productSnapshot.priceAtPurchase * item.productSnapshot.quantity}</td>
+                <td class="center">₹${lineTotal}</td>
               </tr>
-            `).join('')}
+            `;
+            }).join('')}
           </tbody>
         </table>
         <div class="totals-wrapper">

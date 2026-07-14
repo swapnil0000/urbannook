@@ -10,6 +10,7 @@ import {
 import { updateQuantity, removeItem } from '../../store/slices/cartSlice';
 import { setShowLoginModal, setLoginCallback } from '../../store/slices/uiSlice';
 import { trackViewCart, trackRemoveFromCart, track } from '../../utils/analytics';
+import { computeLineDiscount } from '../../utils/cartRules';
 
 const OptimizedImage = lazy(() => import('../OptimizedImage'));
 
@@ -45,18 +46,15 @@ const CartDrawer = ({ isOpen, onClose }) => {
   // showed shipping status at all, so the customer only found out at checkout.
   const { data: offerRes } = useGetFreeShippingOfferQuery();
   const { data: bannersRes } = useGetAllFreeShippingBannersQuery();
-  const getItemDiscountedPrice = (item) => {
-    const productId = item.mongoId || item.id;
-    const candidates = cartRuleEvalData?.data?.discounts?.[productId];
-    const price = Number(item.price) || 0;
-    if (!candidates?.length) return price;
-    const results = candidates.map((c) =>
-      c.type === 'percent_off' ? price * (1 - Number(c.value) / 100) : price - Number(c.value),
+  // ₹ knocked off a whole line by a matched rule. Shared helper mirrors the
+  // server exactly, including the rule's discounted-unit cap — so a 2nd Pen
+  // Stand is shown (and charged) at full price, not another ₹150.
+  const getItemLineDiscount = (item) =>
+    computeLineDiscount(
+      item.price,
+      item.quantity,
+      cartRuleEvalData?.data?.discounts?.[item.mongoId || item.id],
     );
-    // Rounded to match the server's applyBestDiscount exactly (50% off ₹299
-    // is ₹149.5 mathematically — both round that to ₹150, consistently).
-    return Math.round(Math.max(Math.min(...results), 0));
-  };
 
   // Map a cart line item → analytics item shape
   const toTrackItem = (item) => ({
@@ -152,12 +150,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
   // totalAmount (Redux) doesn't know about cart-rule discounts — subtract
   // the same savings the line-item prices above already reflect, so the
   // drawer's own subtotal/total never disagrees with what checkout charges.
-  const ruleDiscountSavings = cartItems.reduce((sum, item) => {
-    const rawPrice = Number(item.price) || 0;
-    const discounted = getItemDiscountedPrice(item);
-    const qty = typeof item.quantity === 'object' ? Number(item.quantity?.quantity || 0) : Number(item.quantity || 0);
-    return sum + (rawPrice - discounted) * qty;
-  }, 0);
+  const ruleDiscountSavings = cartItems.reduce((sum, item) => sum + getItemLineDiscount(item), 0);
   const subtotal = totalAmount - ruleDiscountSavings;
 
   // Same three-path eligibility used at checkout: admin combo banner (source
@@ -318,29 +311,31 @@ const CartDrawer = ({ isOpen, onClose }) => {
                             </button>
                           </div>
 
-                          {/* Price — shows the rule-discounted price (if any
-                              active cart rule discounts this item) instead of
-                              always the raw price, so this never disagrees
-                              with what checkout will actually charge. */}
+                          {/* LINE total (unit price × qty, minus any rule
+                              discount) — not a per-unit price. A rule may
+                              discount only some units of the line (one Pen
+                              Stand at 50% off, a second at full price), which
+                              no single unit price can express. */}
                           {(() => {
-                            const discountedPrice = getItemDiscountedPrice(item);
                             const rawPrice = Number(item.price) || 0;
-                            const hasDiscount = discountedPrice < rawPrice;
-                            const percentOff = hasDiscount
-                              ? Math.round(((rawPrice - discountedPrice) / rawPrice) * 100)
-                              : 0;
-                            return hasDiscount ? (
+                            // `itemQty` here is the local numeric quantity
+                            // computed above in this map scope, not a function.
+                            const lineRaw = rawPrice * itemQty;
+                            const lineDiscount = getItemLineDiscount(item);
+                            const percentOff =
+                              lineDiscount > 0 ? Math.round((lineDiscount / lineRaw) * 100) : 0;
+                            return lineDiscount > 0 ? (
                               <div className="text-right">
-                                <p className="text-sm font-bold text-[#157a44]">₹{Math.round(discountedPrice).toLocaleString()}</p>
+                                <p className="text-sm font-bold text-[#157a44]">₹{(lineRaw - lineDiscount).toLocaleString()}</p>
                                 <div className="flex items-center justify-end gap-1">
-                                  <span className="text-[10px] text-gray-400 line-through">₹{rawPrice.toLocaleString()}</span>
+                                  <span className="text-[10px] text-gray-400 line-through">₹{lineRaw.toLocaleString()}</span>
                                   <span className="text-[9px] font-bold uppercase rounded-full bg-[#157a44] text-white px-1.5 py-px">
                                     {percentOff}% OFF
                                   </span>
                                 </div>
                               </div>
                             ) : (
-                              <p className="text-sm font-bold text-[#0a110e]">₹{rawPrice.toLocaleString()}</p>
+                              <p className="text-sm font-bold text-[#0a110e]">₹{lineRaw.toLocaleString()}</p>
                             );
                           })()}
                         </div>

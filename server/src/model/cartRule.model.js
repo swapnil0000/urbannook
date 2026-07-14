@@ -25,6 +25,11 @@ const effectSchema = new mongoose.Schema(
     targetProductId: { type: String, trim: true },
     // percent_off: 0-100 percentage. flat_off: a rupee amount.
     value: { type: Number, min: 0 },
+    // How many UNITS of targetProductId the discount applies to. Defaults to 1
+    // — "2+ Lamps => 50% off Pen Stand" means one discounted Pen Stand, not an
+    // unlimited supply of them: a second Pen Stand is charged full price. Raise
+    // this per-rule if an offer should ever discount more than one unit.
+    maxDiscountedQuantity: { type: Number, min: 1, default: 1 },
   },
   { _id: false },
 );

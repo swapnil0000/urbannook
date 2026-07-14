@@ -22,7 +22,7 @@ import html_to_pdf from "html-pdf-node";
 import { generateInvoiceHtmlTemplate } from "../template/invoiceTemplate.template.js";
 import { calculateShippingRate } from "../services/shipping.service.js";
 import { isFreeShippingEligible, getFreeShippingConfig } from "../utils/freeShippingOffer.util.js";
-import { getActiveCartRules, evaluateCartRules, applyBestDiscount } from "../utils/cartRule.util.js";
+import { getActiveCartRules, evaluateCartRules, computeLineDiscount } from "../utils/cartRule.util.js";
 import { sendMetaCapiEvent } from "../services/meta.capi.service.js";
 
 // Collect Meta CAPI match-quality signals from the order-creation request.
@@ -254,9 +254,13 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   // — e.g. "2+ Lamps => free shipping" or "2+ Lamps => 50% off Pen Stand".
   // Fully additive to the existing combo-banner system below (isFreeShippingEligible):
   // either mechanism unlocking free shipping is enough, and this is the ONLY
-  // place a rule's product discount is actually applied to the charged price
-  // — baked into `priceAtPurchase` here so subtotal, the persisted order, and
-  // the invoice all agree with each other and with what was charged.
+  // place a rule's product discount is actually applied to the charged price.
+  //
+  // The discount is recorded LINE-LEVEL (`ruleDiscountAmount`), leaving
+  // `priceAtPurchase` as the true unit price — because a rule discounts only N
+  // units of a line (one Pen Stand at 50% off; a second is full price), which
+  // no single unit price can express. Every total below is therefore
+  // (priceAtPurchase × quantity) − ruleDiscountAmount.
   const activeCartRules = await getActiveCartRules();
   const cartRuleResult = evaluateCartRules(
     orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity })),
@@ -264,9 +268,9 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   );
   for (const oi of orderItems) {
     const candidates = cartRuleResult.discountCandidatesByProduct.get(String(oi.productId));
-    if (candidates?.length) {
-      oi.productSnapshot.priceAtPurchase = applyBestDiscount(oi.productSnapshot.priceAtPurchase, candidates);
-    }
+    oi.productSnapshot.ruleDiscountAmount = candidates?.length
+      ? computeLineDiscount(oi.productSnapshot.priceAtPurchase, oi.productSnapshot.quantity, candidates)
+      : 0;
   }
 
   const deliveryAddressSnapshot = {
@@ -326,10 +330,16 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   // zeroing shipping for the customer should not also zero the COD advance.
   const realShippingAmount = shippingResult?.total_charges || summary?.shipping || 179;
 
-  // Recompute subtotal from actual order items — authoritative, not from cart snapshot.
-  // Computed AFTER the cart-rule discount loop above has already reduced any
-  // discounted items' priceAtPurchase, so this naturally includes those discounts.
-  const subtotal = orderItems.reduce((s, i) => s + (i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity), 0);
+  // Recompute subtotal from actual order items — authoritative, not from cart
+  // snapshot. Line total is (unit price × qty) minus whatever the matched cart
+  // rule knocked off that line, so this is the real charged amount.
+  const subtotal = orderItems.reduce(
+    (s, i) =>
+      s +
+      i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity -
+      (i.productSnapshot.ruleDiscountAmount || 0),
+    0,
+  );
 
   // Free shipping unlocks via ANY of: the combo-banner offer (source +
   // recommended product both present), any active generic cart rule whose
@@ -711,7 +721,10 @@ const razorpayWebHookController = async (req, res) => {
 
                 if (perUserOk) {
                   const productSubtotal = order.items.reduce(
-                    (s, i) => s + ((i.productSnapshot?.priceAtPurchase || 0) * (i.productSnapshot?.quantity || 0)),
+                    (s, i) =>
+                      s +
+                      (i.productSnapshot?.priceAtPurchase || 0) * (i.productSnapshot?.quantity || 0) -
+                      (i.productSnapshot?.ruleDiscountAmount || 0),
                     0,
                   );
                   await CouponUsage.create({
@@ -998,9 +1011,9 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   });
 
   // Generic, data-driven cart-promotion rules — see the matching comment in
-  // razorpayCreateOrderController above for the full rationale. Applied here
-  // BEFORE subtotal is computed below, so the discount is baked into
-  // priceAtPurchase and subtotal/order/invoice all agree.
+  // razorpayCreateOrderController above for the full rationale. Recorded
+  // line-level (ruleDiscountAmount) rather than folded into priceAtPurchase,
+  // since a rule only discounts N units of a line.
   const activeCartRules = await getActiveCartRules();
   const cartRuleResult = evaluateCartRules(
     orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity })),
@@ -1008,14 +1021,21 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   );
   for (const oi of orderItems) {
     const candidates = cartRuleResult.discountCandidatesByProduct.get(String(oi.productId));
-    if (candidates?.length) {
-      oi.productSnapshot.priceAtPurchase = applyBestDiscount(oi.productSnapshot.priceAtPurchase, candidates);
-    }
+    oi.productSnapshot.ruleDiscountAmount = candidates?.length
+      ? computeLineDiscount(oi.productSnapshot.priceAtPurchase, oi.productSnapshot.quantity, candidates)
+      : 0;
   }
 
-  // Recomputed from orderItems (post cart-rule discount), not accumulated
-  // inline during the map above — mirrors the authenticated-user path.
-  const subtotal = orderItems.reduce((s, i) => s + i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity, 0);
+  // Recomputed from orderItems, not accumulated inline during the map above —
+  // mirrors the authenticated-user path. Line total is (unit price × qty)
+  // minus whatever the matched rule knocked off that line.
+  const subtotal = orderItems.reduce(
+    (s, i) =>
+      s +
+      i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity -
+      (i.productSnapshot.ruleDiscountAmount || 0),
+    0,
+  );
 
   const shippingResult = await calculateShippingRate({
     pincode: deliveryAddress.pinCode,

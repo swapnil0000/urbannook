@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { fireCelebrationConfetti } from "../utils/celebration";
+import { bestUnitPrice, computeLineDiscount } from "../utils/cartRules";
 import {
   useGetFreeShippingBannerQuery,
   useGetFreeShippingOfferQuery,
@@ -512,19 +513,19 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
   // actually charges (e.g. 50% off ₹299 is ₹149.5 mathematically, but both
   // this and the server round that to ₹150, consistently, everywhere).
   const ruleDiscountCandidates = ruleEval?.discounts?.[recommendedProduct.productId];
-  const ruleDiscountedPrice = ruleDiscountCandidates?.length
-    ? Math.round(
-        Math.max(
-          Math.min(
-            ...ruleDiscountCandidates.map((c) =>
-              c.type === "percent_off" ? displayPrice * (1 - c.value / 100) : displayPrice - c.value,
-            ),
-          ),
-          0,
-        ),
-      )
-    : null;
-  const hasRuleDiscount = ruleDiscountedPrice !== null && ruleDiscountedPrice < displayPrice;
+  // Price of the NEXT unit the customer would add. The rule discounts only
+  // `maxDiscountedQuantity` units (default 1), so once they already hold that
+  // many, the next one is full price — and the CTA must say so rather than
+  // promising ₹150 and then charging ₹299.
+  const alreadyInCartQty = added ? itemQty(cartMatch?.quantity) || 0 : 0;
+  const discountUnitCap = ruleDiscountCandidates?.length
+    ? Math.max(Number(ruleDiscountCandidates[0]?.maxDiscountedQuantity) || 1, 1)
+    : 0;
+  const nextUnitPrice =
+    ruleDiscountCandidates?.length && alreadyInCartQty < discountUnitCap
+      ? bestUnitPrice(displayPrice, ruleDiscountCandidates)
+      : displayPrice;
+  const hasRuleDiscount = nextUnitPrice < displayPrice;
 
   const hasToken = !!localStorage.getItem("authToken");
   const isLoggedIn = isAuthenticated || hasToken;
@@ -968,17 +969,28 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
                 const lineQty = added ? itemQty(cartMatch?.quantity) || 1 : 1;
                 const lineDisplayPrice = displayPrice * lineQty;
 
-                if (hasRuleDiscount) {
+                // Rupees the rule actually takes off this line — capped to the
+                // rule's discounted-unit limit, so a 2nd Pen Stand is full
+                // price. NOT unitDiscount × qty, which would have promised a
+                // ₹300 line for 2 and then charged ₹449 at checkout.
+                const lineRuleDiscount = computeLineDiscount(
+                  displayPrice,
+                  lineQty,
+                  ruleDiscountCandidates,
+                );
+
+                if (lineRuleDiscount > 0) {
                   // A REAL cart rule discount is active on this exact product
                   // (e.g. "2+ Lamps => 50% off Pen Stand") — always takes
                   // priority over both the variant markdown and the cosmetic
                   // badge below; a real reward is never hidden behind a fake one.
-                  const lineDiscounted =
-                    Math.round(ruleDiscountedPrice) * lineQty;
-                  // Derived from the actual prices rather than read off the
-                  // rule, so a flat_off rule (₹X off) shows a correct % too.
+                  const lineDiscounted = lineDisplayPrice - lineRuleDiscount;
+                  // Effective % across the whole line, derived from real prices
+                  // (so flat_off rules read correctly too). For 2 Pen Stands
+                  // with only 1 discounted this is 25%, not 50% — which is the
+                  // truth, and matches the amount actually charged.
                   const rulePercent = Math.round(
-                    ((lineDisplayPrice - lineDiscounted) / lineDisplayPrice) * 100,
+                    (lineRuleDiscount / lineDisplayPrice) * 100,
                   );
                   return (
                     <>
@@ -1473,7 +1485,7 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
                   // now is the price, not shipping, so the label should say
                   // so instead of the generic "Add & Ship Free".
                   <>
-                    Add for ₹{Math.round(ruleDiscountedPrice).toLocaleString()}
+                    Add for ₹{nextUnitPrice.toLocaleString()}
                     <span className="text-base leading-none">→</span>
                   </>
                 ) : (

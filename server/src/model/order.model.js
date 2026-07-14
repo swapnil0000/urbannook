@@ -22,6 +22,12 @@ const orderSchema = new mongoose.Schema(
           productCategory: String,
           productSubCategory: String,
           priceAtPurchase: { type: Number, required: true },
+          // Rupees knocked off THIS LINE by a matched cart rule (see
+          // server/src/utils/cartRule.util.js). Stored line-level, not folded
+          // into priceAtPurchase, because a rule discounts only N units of the
+          // line ("50% off ONE Pen Stand") — so a line of 2 has no single unit
+          // price. Line total is always (priceAtPurchase × quantity) − this.
+          ruleDiscountAmount: { type: Number, default: 0, min: 0 },
           shipping: String,
           selectedVariant: { type: String, default: "N/A" },
         },
