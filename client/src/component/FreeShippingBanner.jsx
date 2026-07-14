@@ -230,6 +230,26 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
   const { data: ruleEvalRes } = useEvaluateCartRulesQuery(ruleEvalItems, { skip: ruleEvalItems.length === 0 });
   const ruleEval = ruleEvalRes?.data;
 
+  // Confetti when a rule discount on the recommended product (e.g. "2+
+  // Lamps => 50% off Pen Stand") becomes active — fires even when the Lamps
+  // were added elsewhere entirely (the cart page, a +/- stepper, not this
+  // banner's own button), since the discount itself isn't tied to any click
+  // here. Fired IMMEDIATELY and synchronously inside the effect (not queued
+  // for a later animation-completion callback like the free-shipping
+  // confetti is) — that's deliberate: the earlier "fire for any path"
+  // free-shipping version double-fired because it queued into a list a
+  // second effect run could add to again before the first drained. Setting
+  // the guard in the same synchronous tick as the fire call closes that gap
+  // entirely — there's no window for a second run to see the guard unset.
+  const wasDiscountActiveRef = useRef(false);
+  useEffect(() => {
+    const active = !!ruleEval?.discounts?.[recommendedProduct?.productId]?.length;
+    if (active && !wasDiscountActiveRef.current) {
+      fireCelebrationConfetti();
+    }
+    wasDiscountActiveRef.current = active;
+  }, [ruleEval, recommendedProduct?.productId]);
+
   // The primary product still blocking the closest generic rule (if any) —
   // fetched only when actually needed, for its display name in the nudge copy.
   const closestRuleBlockingProductId = ruleEval?.closestUnmatchedRule?.conditions?.find((c) => c.remaining > 0)
@@ -288,6 +308,15 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
   // which is what made the motion stutter — the fill/truck/puffs could also
   // land a frame apart from each other. Single update keeps them in lockstep.
   const [anim, setAnim] = useState({ frac: 0, bob: 0, moving: false, puffs: [] });
+
+  // Drives the progress bar's smooth fade/collapse-out — true only once the
+  // truck has actually FINISHED settling (anim.moving false) AND we're
+  // unlocked, not the instant freeShippingUnlocked flips true (which happens
+  // the moment cart data updates, well before the truck has visually
+  // finished animating to 100%). This keeps the bar on screen for its full
+  // fill animation — and in sync with confetti, which is also gated on the
+  // fill actually completing — instead of yanking it away mid-animation.
+  const barHidden = freeShippingUnlocked && !anim.moving;
 
   const animateTruckTo = (toFrac, duration) => {
     cancelAnimationFrame(rafRef.current);
@@ -624,12 +653,12 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
   return (
     <>
       <div
-        className={`rounded-3xl overflow-hidden border border-red-400  bg-[#FAF7F2] shadow-sm ${className}`}
+        className={`rounded-3xl overflow-hidden border border-red-400 bg-[#FBF5E8] shadow-sm ${className}`}
       >
         {/* Top offer ribbon — high-contrast strip so this reads as "a deal"
           before anything else on the card is even read. Separate from the
           green progress panel below so it stays legible/unmissable
-          regardless of combo state. */}
+          regardless of combo state. bg-[#FAF7F2] */}
         <div className="relative z-10 overflow-hidden bg-[#E63329] px-4 py-3 flex items-center justify-center gap-2">
           <style>{`@keyframes fsbRibbonShine { 0% { transform: translateX(-120%); } 100% { transform: translateX(320%); } }`}</style>
           <i className="fa-solid fa-bolt text-[10px] text-[#F5DEB3]" />
@@ -823,40 +852,79 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
             )}
 
             <div className="flex items-baseline gap-2 mt-1.5 flex-wrap">
-              {hasRuleDiscount ? (
-                // A generic cart rule just unlocked a discount on THIS exact
-                // product (e.g. "2+ Lamps => 50% off Pen Stand") — takes
-                // priority over the plain variant-markdown display below,
-                // since it's a live reward, not just a baseline price.
-                <>
-                  <span className="text-lg font-bold tabular-nums text-[#E63329]">
-                    ₹{Math.round(ruleDiscountedPrice).toLocaleString()}
-                  </span>
-                  <span className="text-xs text-gray-400 line-through tabular-nums">
-                    ₹{displayPrice.toLocaleString()}
-                  </span>
-                  <span className="text-[10px] font-bold uppercase rounded-full bg-[#157a44] text-white px-1.5 py-0.5">
-                    🎉 Discount Unlocked!
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="text-lg font-bold tabular-nums text-[#E63329]">
-                    ₹{displayPrice.toLocaleString()}
-                  </span>
-                  {discountPercent > 0 && (
+              {(() => {
+                // Line-total, not just unit price — once the item is in the
+                // cart, this scales with whatever quantity is set via the
+                // stepper below, instead of always showing the ₹1-unit price
+                // next to a "2" the customer has to do the multiplication for.
+                const lineQty = added ? itemQty(cartMatch?.quantity) || 1 : 1;
+                const lineDisplayPrice = displayPrice * lineQty;
+
+                if (hasRuleDiscount) {
+                  // A REAL cart rule discount is active on this exact product
+                  // (e.g. "2+ Lamps => 50% off Pen Stand") — always takes
+                  // priority over both the variant markdown and the cosmetic
+                  // badge below; a real reward is never hidden behind a fake one.
+                  const lineDiscounted =
+                    Math.round(ruleDiscountedPrice) * lineQty;
+                  return (
                     <>
-                      <span className="text-xs text-gray-400 line-through tabular-nums">
-                        ₹{maxVariantPrice.toLocaleString()}
+                      <span className="text-lg font-bold tabular-nums text-[#E63329]">
+                        ₹{lineDiscounted.toLocaleString()}
                       </span>
-                      <span className="text-[10px] font-bold uppercase bg-black text-white px-1.5 py-0.5">
-                        Save ₹
-                        {(maxVariantPrice - displayPrice).toLocaleString()}
+                      <span className="text-xs text-gray-400 line-through tabular-nums">
+                        ₹{lineDisplayPrice.toLocaleString()}
+                      </span>
+                      <span className="text-[10px] font-bold uppercase rounded-full bg-[#157a44] text-white px-1.5 py-0.5">
+                        🎉 Discount Unlocked!
                       </span>
                     </>
-                  )}
-                </>
-              )}
+                  );
+                }
+
+                if (discountPercent > 0) {
+                  // A genuine price difference between this product's own
+                  // variants (not a cart rule) — same "Save ₹X" treatment as
+                  // before, just now quantity-scaled too.
+                  const lineMax = maxVariantPrice * lineQty;
+                  return (
+                    <>
+                      <span className="text-lg font-bold tabular-nums text-[#E63329]">
+                        ₹{lineDisplayPrice.toLocaleString()}
+                      </span>
+                      <span className="text-xs text-gray-400 line-through tabular-nums">
+                        ₹{lineMax.toLocaleString()}
+                      </span>
+                      <span className="text-[10px] font-bold uppercase bg-black text-white px-1.5 py-0.5">
+                        Save ₹{(lineMax - lineDisplayPrice).toLocaleString()}
+                      </span>
+                    </>
+                  );
+                }
+
+                // No real discount of any kind — a purely cosmetic "feels
+                // like a deal" strikethrough, frontend-only, not tied to any
+                // actual pricing rule. Computed generically as 25% off the
+                // real price (so it's never a hardcoded number — for a ₹299
+                // item this lands on ₹399, matching the example exactly, but
+                // it scales correctly for any other product/price too).
+                // Deliberately replaced entirely by either branch above the
+                // moment a real discount exists — never shown alongside one.
+                const fakeMrpLine = Math.round(displayPrice / 0.75) * lineQty;
+                return (
+                  <>
+                    <span className="text-lg font-bold tabular-nums text-[#E63329]">
+                      ₹{lineDisplayPrice.toLocaleString()}
+                    </span>
+                    <span className="text-xs text-gray-400 line-through tabular-nums">
+                      ₹{fakeMrpLine.toLocaleString()}
+                    </span>
+                    <span className="text-[10px] font-bold uppercase bg-black text-white px-1.5 py-0.5">
+                      25% OFF
+                    </span>
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -868,9 +936,29 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
           file), driven by requestAnimationFrame rather than a CSS width
           transition so the fill/truck/exhaust stay locked to the same frame.
           `setTrackRef` is the IntersectionObserver target that (re)starts the
-          drive-in whenever this scrolls into view. */}
+          drive-in whenever this scrolls into view.
+
+          Fades/collapses away once barHidden (truck settled AND unlocked) —
+          at that point the heading text above AND the "Free Shipping
+          Unlocked!" pill below already say the same thing, so keeping a
+          fully-filled bar on screen too just repeats the same message a
+          third time. Stays mounted the whole time (never conditionally
+          unmounted) so the IntersectionObserver/truck-animation logic is
+          never disrupted by a hide/show cycle — only its own opacity/height
+          transition, eased smoothly both ways, changes. Un-hides the same
+          way if the item's later removed. */}
         {offerActive && (
-          <div className="px-4">
+          <div
+            className="px-4 overflow-hidden"
+            style={{
+              transition:
+                "opacity 450ms ease-in-out, max-height 450ms ease-in-out, margin-top 450ms ease-in-out",
+              opacity: barHidden ? 0 : 1,
+              maxHeight: barHidden ? 0 : 60,
+              marginTop: barHidden ? 0 : undefined,
+              pointerEvents: barHidden ? "none" : "auto",
+            }}
+          >
             <style>{`
             @keyframes fsbShine { 0% { transform: translateX(-120%); } 100% { transform: translateX(320%); } }
             @keyframes fsbWheel { to { transform: rotate(360deg); } }
@@ -1147,7 +1235,20 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
         )}
 
         {/* CTA */}
-        <div className="px-4 pt-0 pb-4">
+        {/* pt-0 when the truck bar above it is visible (tight gap to it, per
+            your earlier request). Keyed on barHidden (not freeShippingUnlocked
+            directly) so this padding only opens up in sync with the bar
+            actually finishing its fade/collapse above — not a beat earlier,
+            which would otherwise make the CTA jump down while the bar is
+            still visibly mid-transition above it. Also transitioned, so the
+            gap opens smoothly rather than snapping. */}
+        <div
+          className="px-4 pb-4"
+          style={{
+            paddingTop: barHidden ? 12 : 0,
+            transition: "padding-top 450ms ease-in-out",
+          }}
+        >
           {addLoading ? (
             // The slider above IS the loader for this: cart is already updated
             // (`added` is already true underneath) but we hold this exact same
@@ -1164,7 +1265,7 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
             </button>
           ) : added ? (
             <div className="flex items-center gap-2">
-              <div className="flex-1 py-3.5 rounded-full text-[11px] font-extrabold uppercase tracking-[0.1em] text-center bg-[#f5deb3] text-[#1c3026] border border-black/15">
+              <div className="flex-1 h-[50px] flex items-center justify-center rounded-full text-[11px] font-extrabold uppercase tracking-[0.1em] text-center bg-[#f5deb3] text-[#1c3026] border border-[#ffce64]">
                 {freeShippingUnlocked ? (
                   <>
                     <i className="fa-solid fa-circle-check mr-1.5 text-[#E63329]" />{" "}
@@ -1201,14 +1302,30 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
                   </button>
                 </div>
               ) : (
-                <button
-                  onClick={handleRemove}
-                  disabled={isUpdatingQty}
-                  title="Remove from cart"
-                  className="shrink-0 w-[52px] h-[52px] rounded-xl flex items-center justify-center border border-[#D8D2C5] bg-white text-gray-400 hover:text-[#E63329] transition-colors disabled:opacity-50"
-                >
-                  <i className="fa-solid fa-xmark text-xs" />
-                </button>
+                // Quantity stepper here too (was a remove-only X) — decrementing
+                // to 1 and pressing minus again still removes the line, via the
+                // existing handleDecrement → handleRemove fallback below.
+                <div className="shrink-0 flex items-center gap-3 rounded-full border border-[#ffce64] px-3 h-[50px] bg-[#f5deb3]">
+                  <button
+                    onClick={handleDecrement}
+                    disabled={isUpdatingQty}
+                    title="Decrease quantity"
+                    className="disabled:opacity-50 text-[#1c3026]/60 hover:text-[#E63329]"
+                  >
+                    <i className="fa-solid fa-minus text-[10px]" />
+                  </button>
+                  <span className="text-xs font-bold w-3 text-center text-[#1c3026]">
+                    {itemQty(cartMatch?.quantity) || 1}
+                  </span>
+                  <button
+                    onClick={handleIncrement}
+                    disabled={isUpdatingQty}
+                    title="Increase quantity"
+                    className="disabled:opacity-50 text-[#1c3026]/60 hover:text-[#1c3026]"
+                  >
+                    <i className="fa-solid fa-plus text-[10px]" />
+                  </button>
+                </div>
               )}
             </div>
           ) : (
