@@ -21,6 +21,8 @@ import Address from "../model/address.new.model.js";
 import html_to_pdf from "html-pdf-node";
 import { generateInvoiceHtmlTemplate } from "../template/invoiceTemplate.template.js";
 import { calculateShippingRate } from "../services/shipping.service.js";
+import { isFreeShippingEligible, getFreeShippingConfig } from "../utils/freeShippingOffer.util.js";
+import { getActiveCartRules, evaluateCartRules, applyBestDiscount } from "../utils/cartRule.util.js";
 import { sendMetaCapiEvent } from "../services/meta.capi.service.js";
 
 // Collect Meta CAPI match-quality signals from the order-creation request.
@@ -248,6 +250,25 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     };
   });
 
+  // Generic, data-driven cart-promotion rules (server/src/model/cartRule.model.js)
+  // — e.g. "2+ Lamps => free shipping" or "2+ Lamps => 50% off Pen Stand".
+  // Fully additive to the existing combo-banner system below (isFreeShippingEligible):
+  // either mechanism unlocking free shipping is enough, and this is the ONLY
+  // place a rule's product discount is actually applied to the charged price
+  // — baked into `priceAtPurchase` here so subtotal, the persisted order, and
+  // the invoice all agree with each other and with what was charged.
+  const activeCartRules = await getActiveCartRules();
+  const cartRuleResult = evaluateCartRules(
+    orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity })),
+    activeCartRules,
+  );
+  for (const oi of orderItems) {
+    const candidates = cartRuleResult.discountCandidatesByProduct.get(String(oi.productId));
+    if (candidates?.length) {
+      oi.productSnapshot.priceAtPurchase = applyBestDiscount(oi.productSnapshot.priceAtPurchase, candidates);
+    }
+  }
+
   const deliveryAddressSnapshot = {
     addressId: addressId,
     fullName:
@@ -298,10 +319,31 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     }))
   });
 
-  const shippingAmount = shippingResult?.total_charges || summary?.shipping || 179;
+  // realShippingAmount = actual carrier rate — always used as the basis for
+  // the COD upfront advance (a fraud/RTO-risk deposit, not a shipping fee).
+  // chargedShippingAmount = what the customer's order total reflects — 0 when
+  // the free-shipping offer applies. These must NOT be the same variable:
+  // zeroing shipping for the customer should not also zero the COD advance.
+  const realShippingAmount = shippingResult?.total_charges || summary?.shipping || 179;
 
-  // Recompute subtotal from actual order items — authoritative, not from cart snapshot
+  // Recompute subtotal from actual order items — authoritative, not from cart snapshot.
+  // Computed AFTER the cart-rule discount loop above has already reduced any
+  // discounted items' priceAtPurchase, so this naturally includes those discounts.
   const subtotal = orderItems.reduce((s, i) => s + (i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity), 0);
+
+  // Free shipping unlocks via ANY of: the combo-banner offer (source +
+  // recommended product both present), any active generic cart rule whose
+  // effects include free_shipping (e.g. "2+ Lamps"), OR the cart subtotal
+  // simply being at/above the admin-configured thresholdAmount — plain,
+  // direct comparison, whole-cart (any products count), no rules table.
+  const freeShippingConfig = await getFreeShippingConfig();
+  const thresholdEligible = freeShippingConfig.isActive && subtotal >= freeShippingConfig.thresholdAmount;
+  const freeShippingUnlocked =
+    (await isFreeShippingEligible(items.map((i) => i.productId))) || cartRuleResult.freeShipping || thresholdEligible;
+  const chargedShippingAmount = freeShippingUnlocked ? 0 : realShippingAmount;
+  // console.log(
+  //   `[FreeShipping][Order:auth] realShipping=₹${realShippingAmount} chargedShipping=₹${chargedShippingAmount} items=${items.map(i => `${i.productId}x${i.quantity}`).join(",")}`,
+  // );
 
   // Always re-derive discount from the live coupon + current subtotal.
   // This fixes: products added after coupon was applied, COD/prepaid toggle, page not refreshed.
@@ -376,7 +418,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       // ── INTERNAL TEST: completely separate path ──────────────────────────────
       // Always ₹1 regardless of cart size, shipping, or payment method.
       isInternalTestOrder = true;
-      discountAmount = Math.max(subtotal + shippingAmount - 1, 0); // stored for audit record
+      discountAmount = Math.max(subtotal + chargedShippingAmount - 1, 0); // stored for audit record
     } else if (liveCoupon.discountType === "PERCENTAGE") {
       let d = Math.floor((subtotal * liveCoupon.discountValue) / 100);
       if (liveCoupon.maxDiscountCap) d = Math.min(d, liveCoupon.maxDiscountCap);
@@ -412,14 +454,17 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     }
   }
 
-  finalAmount = isInternalTestOrder ? 1 : Math.max(subtotal + shippingAmount - discountAmount, 0);
+  finalAmount = isInternalTestOrder ? 1 : Math.max(subtotal + chargedShippingAmount - discountAmount, 0);
 
-  // Sync shipping in snapshots
-  orderItems.forEach(i => { i.productSnapshot.shipping = String(shippingAmount); });
+  // Sync shipping in snapshots — customer-facing amount (0 when free-shipping offer applies)
+  orderItems.forEach(i => { i.productSnapshot.shipping = String(chargedShippingAmount); });
 
-  // COD: charge 2x shipping upfront via Razorpay, rest collected at delivery
+  // COD: charge 2x the REAL shipping cost upfront via Razorpay as an RTO/fraud
+  // deposit — this must stay based on realShippingAmount even when the order
+  // itself has free shipping, otherwise a free-shipping COD order collects
+  // zero advance and loses its anti-fraud protection entirely.
   const isCOD = reqPaymentMethod === "COD";
-  const codPartialAmount = isCOD ? Math.min(Math.ceil(shippingAmount) * 2, Math.ceil(finalAmount)) : 0;
+  const codPartialAmount = isCOD ? Math.min(Math.ceil(realShippingAmount) * 2, Math.ceil(finalAmount)) : 0;
   const codRemainingAmount = isCOD ? Math.max(0, Math.ceil(finalAmount) - codPartialAmount) : 0;
   const razorpayChargeAmount = isCOD ? codPartialAmount : finalAmount;
   // Round to whole rupees first, then convert to paise — must match the amount
@@ -440,7 +485,9 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     items: orderItems,
     amount: finalAmount,
     shippingInfo: {
-      amount: shippingAmount,
+      // Real carrier cost for internal accounting — grouped with the other
+      // carrier-enrichment fields below, not the customer-facing amount.
+      amount: realShippingAmount,
       type: shippingResult?.type || "standard",
       expectedNoOfBoxes: shippingResult?.expectedNoOfBoxes || 0,
       totalWeight: shippingResult?.totalWeight || 0,
@@ -913,7 +960,6 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
 
   if (products.length !== productIds.length) throw new ValidationError("One or more products unavailable");
 
-  let subtotal = 0;
   const rawItemsForShipping = [];
 
   const orderItems = items.map((item) => {
@@ -925,7 +971,9 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
       const variant = product.variantDetails.find((v) => v.variantName === itemVariant);
       priceAtPurchase = variant?.variantPrice || product.variantDetails[0].variantPrice || 0;
     }
-    subtotal += priceAtPurchase * item.quantity;
+    // Shipping-rate calculation uses the pre-discount price (weight/rate
+    // tiers, not the customer's charged amount) — deliberately NOT touched
+    // by the cart-rule discount applied to orderItems below.
     rawItemsForShipping.push({ productId: item.productId, quantity: item.quantity, price: priceAtPurchase, selectedVariant: itemVariant });
 
     let itemImage = null;
@@ -949,12 +997,45 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     };
   });
 
+  // Generic, data-driven cart-promotion rules — see the matching comment in
+  // razorpayCreateOrderController above for the full rationale. Applied here
+  // BEFORE subtotal is computed below, so the discount is baked into
+  // priceAtPurchase and subtotal/order/invoice all agree.
+  const activeCartRules = await getActiveCartRules();
+  const cartRuleResult = evaluateCartRules(
+    orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity })),
+    activeCartRules,
+  );
+  for (const oi of orderItems) {
+    const candidates = cartRuleResult.discountCandidatesByProduct.get(String(oi.productId));
+    if (candidates?.length) {
+      oi.productSnapshot.priceAtPurchase = applyBestDiscount(oi.productSnapshot.priceAtPurchase, candidates);
+    }
+  }
+
+  // Recomputed from orderItems (post cart-rule discount), not accumulated
+  // inline during the map above — mirrors the authenticated-user path.
+  const subtotal = orderItems.reduce((s, i) => s + i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity, 0);
+
   const shippingResult = await calculateShippingRate({
     pincode: deliveryAddress.pinCode,
     paymentType: reqPaymentMethod === "COD" ? "COD" : "PREPAID",
     cartItems: rawItemsForShipping
   });
-  const shippingAmount = shippingResult?.total_charges || 179;
+  const realShippingAmount = shippingResult?.total_charges || 179;
+  // Free shipping unlocks via ANY of: the combo-banner offer (source +
+  // recommended product both present), any active generic cart rule whose
+  // effects include free_shipping (e.g. "2+ Lamps"), OR the cart subtotal
+  // simply being at/above the admin-configured thresholdAmount — plain,
+  // direct comparison, whole-cart (any products count), no rules table.
+  const freeShippingConfig = await getFreeShippingConfig();
+  const thresholdEligible = freeShippingConfig.isActive && subtotal >= freeShippingConfig.thresholdAmount;
+  const freeShippingUnlocked =
+    (await isFreeShippingEligible(items.map((i) => i.productId))) || cartRuleResult.freeShipping || thresholdEligible;
+  const chargedShippingAmount = freeShippingUnlocked ? 0 : realShippingAmount;
+  // console.log(
+  //   `[FreeShipping][Order:guest] realShipping=₹${realShippingAmount} chargedShipping=₹${chargedShippingAmount} items=${items.map(i => `${i.productId}x${i.quantity}`).join(",")}`,
+  // );
 
   // ── Guest coupon validation ───────────────────────────────────────────────────
   let couponCodeId = null, couponCodeName = null, discountAmount = 0, isApplied = false;
@@ -1027,7 +1108,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     // Calculate discount
     if (isValidInternal) {
       isInternalTestOrder = true;
-      discountAmount = Math.max(subtotal + shippingAmount - 1, 0);
+      discountAmount = Math.max(subtotal + chargedShippingAmount - 1, 0);
     } else if (liveCoupon.discountType === "PERCENTAGE") {
       let d = Math.floor((subtotal * liveCoupon.discountValue) / 100);
       if (liveCoupon.maxDiscountCap) d = Math.min(d, liveCoupon.maxDiscountCap);
@@ -1042,14 +1123,15 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     console.log(`[Coupon:Guest] Applied "${cleanCode}" — discount ₹${discountAmount} on subtotal ₹${subtotal}`);
   }
 
-  const finalAmount = isInternalTestOrder ? 1 : Math.max(subtotal + shippingAmount - discountAmount, 0);
+  const finalAmount = isInternalTestOrder ? 1 : Math.max(subtotal + chargedShippingAmount - discountAmount, 0);
 
-  // Update orderItems with shipping value now that it's calculated
-  orderItems.forEach(i => { i.productSnapshot.shipping = String(shippingAmount); });
+  // Update orderItems with shipping value now that it's calculated — customer-facing amount
+  orderItems.forEach(i => { i.productSnapshot.shipping = String(chargedShippingAmount); });
 
-  // COD: charge 2x shipping upfront via Razorpay, rest collected at delivery
+  // COD: charge 2x the REAL shipping cost upfront via Razorpay as an RTO/fraud
+  // deposit — stays based on realShippingAmount even on free-shipping orders.
   const isCOD = reqPaymentMethod === "COD";
-  const codPartialAmount = isCOD ? Math.min(Math.ceil(shippingAmount) * 2, Math.ceil(finalAmount)) : 0;
+  const codPartialAmount = isCOD ? Math.min(Math.ceil(realShippingAmount) * 2, Math.ceil(finalAmount)) : 0;
   const codRemainingAmount = isCOD ? Math.max(0, Math.ceil(finalAmount) - codPartialAmount) : 0;
   const razorpayChargeAmount = isCOD ? codPartialAmount : finalAmount;
   // Round to whole rupees first, then convert to paise — must match the amount
@@ -1067,7 +1149,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     items: orderItems,
     amount: finalAmount,
     shippingInfo: {
-      amount: shippingAmount,
+      amount: realShippingAmount,
       type: shippingResult?.type || "standard",
       expectedNoOfBoxes: shippingResult?.expectedNoOfBoxes || 0,
       totalWeight: shippingResult?.totalWeight || 0,

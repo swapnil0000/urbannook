@@ -10,8 +10,11 @@ import {
 import { useParams, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { useCookies } from "react-cookie";
-import confetti from "canvas-confetti";
+import { fireAddToCartConfetti } from "../../utils/celebration";
 import SEOHead from "../../component/SEOHead";
+import ComparisonTable from "../../component/ComparisonTable";
+import FreeShippingBanner from "../../component/FreeShippingBanner";
+import MiniCartPreview from "../../component/layout/MiniCartPreview";
 import useTimer from "../../hooks/useTimer";
 import config from "../../config/env";
 import { trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist, trackVariantSelect } from "../../utils/analytics";
@@ -115,13 +118,18 @@ const ProductDetailPage = () => {
   const { productId, variantSku: urlVariantSku } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const { showNotification, openLoginModal, closeLoginModal } = useUI();
+  const { showNotification, openLoginModal, closeLoginModal, openCart } = useUI();
+  // Tapping "Go to Cart" opens this quick preview first (items + total +
+  // shipping note), not the full editable CartDrawer — "View Cart" inside it
+  // is the escape hatch into that full drawer via `openCart`.
+  const [showMiniCart, setShowMiniCart] = useState(false);
 
   // 1. Auth & Cookies
   const [cookies] = useCookies(["userAccessToken"]);
   const { isAuthenticated } = useSelector((state) => state.auth);
   const cartItems = useSelector((state) => state.cart.items);
   const cartSelections = useSelector((state) => state.cart.selections);
+  const cartTotalQuantity = useSelector((state) => state.cart.totalQuantity);
 
   // 2. Local UI States
   const [activeAccordion, setActiveAccordion] = useState("description");
@@ -351,12 +359,7 @@ const ProductDetailPage = () => {
         // Force an immediate refetch and wait for it
         await refetchCart().unwrap();
 
-        confetti({
-          particleCount: 150,
-          spread: 80,
-          origin: { y: 0.6 },
-          colors: ["#F5DEB3", "#1c3026", "#a89068", "#ffffff"],
-        });
+        fireAddToCartConfetti();
 
         setSelectedVariant(effectiveVariant);
 
@@ -937,7 +940,10 @@ const ProductDetailPage = () => {
                 <p className="text-2xl lg:text-3xl font-light text-white">
                   ₹{currentPrice.toLocaleString()}
                 </p>
-                {discountPercent > 0 && (
+                {discountPercent > 0 ? (
+                  // Real discount — this product's own variants are priced
+                  // differently (e.g. one variant genuinely costs more),
+                  // currentPrice vs maxVariantPrice is an actual comparison.
                   <>
                     <p className="text-sm text-gray-500 line-through">
                       ₹{maxVariantPrice.toLocaleString()}
@@ -945,6 +951,23 @@ const ProductDetailPage = () => {
                     <span className="text-xs font-bold text-green-400 bg-green-400/10 px-2.5 py-1 rounded-full flex items-center gap-1.5">
                       <i className="fa-solid fa-bolt-lightning text-[9px]"></i>
                       {discountPercent}% OFF
+                      <span className="text-[9px] text-green-300/80 font-medium">• Limited Time</span>
+                    </span>
+                  </>
+                ) : (
+                  // No real discount (e.g. every variant is the same flat
+                  // price) — a purely cosmetic "feels like a deal" strikethrough,
+                  // frontend-only, not tied to any actual pricing rule. Same
+                  // generic 25%-off-of-real-price computation as the
+                  // FreeShippingBanner cross-sell card, so it's never a
+                  // hardcoded number and scales correctly for any product.
+                  <>
+                    <p className="text-sm text-gray-500 line-through">
+                      ₹{Math.round(currentPrice / 0.75).toLocaleString()}
+                    </p>
+                    <span className="text-xs font-bold text-green-400 bg-green-400/10 px-2.5 py-1 rounded-full flex items-center gap-1.5">
+                      <i className="fa-solid fa-bolt-lightning text-[9px]"></i>
+                      25% OFF
                       <span className="text-[9px] text-green-300/80 font-medium">• Limited Time</span>
                     </span>
                   </>
@@ -962,7 +985,12 @@ const ProductDetailPage = () => {
               {product.productSubDes}
             </p>
 
-            <div className="hidden lg:block bg-white/5 backdrop-blur-sm p-8 rounded-[2rem] max-w-[420px] border border-[#F5DEB3]/10 mb-10">
+            {/* Desktop: "Add to Collection" box and the free-shipping banner
+                sit side-by-side as two columns. Mobile keeps its original
+                stacked flow untouched — the grid classes only kick in at lg,
+                so below that this wrapper behaves like a plain block. */}
+            <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start lg:mb-10">
+            <div className="hidden lg:block bg-white/5 backdrop-blur-sm p-8 rounded-[2rem] border border-[#F5DEB3]/10 mb-10 lg:mb-0 lg:h-full">
               <div className="flex flex-row gap-4">
                 {!isInCart ? (
                   <button
@@ -1042,6 +1070,9 @@ const ProductDetailPage = () => {
                   </span>
                 </div>
               </div>
+            </div>
+
+            <FreeShippingBanner productId={product.productId} className="mt-4 lg:mt-0" />
             </div>
 
             <div className="border-t border-[#F5DEB3]/10">
@@ -1157,6 +1188,9 @@ const ProductDetailPage = () => {
               </p>
           </div>
         </div>
+
+        {/* ===== COMPARISON TABLE ===== */}
+        <ComparisonTable productName={product.productName} />
 
         {/* ===== REVIEWS SECTION ===== */}
         <div className="mt-16 pt-12 border-t border-[#1c3026]/10">
@@ -2058,7 +2092,7 @@ const ProductDetailPage = () => {
 
       {/* Mobile Sticky Bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-[#1c3026]/95 backdrop-blur-xl border-t border-[#F5DEB3]/20 z-50 lg:hidden shadow-[0_-10px_40px_rgba(0,0,0,0.3)]">
-        {/* Delivery strip above buttons */}
+        {/* Delivery strip above buttons — removed per request, keep for later reference
         <div className="flex items-center bg-white justify-center gap-4 px-4 py-2 border-b border-[#F5DEB3]/10">
           <span className="flex items-center gap-1.5 text-[9px] text-[#2e443c]/70 uppercase tracking-wider font-bold">
             <i className="fa-solid fa-truck text-[#2e443c] text-[9px]"></i>
@@ -2075,6 +2109,7 @@ const ProductDetailPage = () => {
             Secure Pay
           </span>
         </div>
+        */}
         <div className="flex gap-4 items-center p-4 px-6">
           <div className="flex-1">
             {!isInCart ? (
@@ -2107,11 +2142,24 @@ const ProductDetailPage = () => {
                   </button>
                 </div>
 
+                {/* Mobile: opens the quick mini-cart preview first (items +
+                    total + shipping note), not straight to checkout —
+                    checkout itself is reached from the cart page/drawer,
+                    same as the desktop flow. */}
                 <button
-                  onClick={handleCheckoutClick}
-                  className="flex-1 h-12 bg-[#F5DEB3] text-[#1c3026] rounded-full font-bold uppercase tracking-widest text-[10px] shadow-lg active:scale-95 transition-transform"
+                  onClick={() => setShowMiniCart(true)}
+                  className="flex-1 h-12 bg-[#F5DEB3] text-[#1c3026] rounded-full font-bold uppercase tracking-widest text-[10px] shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2"
                 >
-                  Checkout
+                  <span className="relative flex items-center justify-center">
+                    <i className="fa-solid fa-cart-shopping text-[11px]"></i>
+                    {cartTotalQuantity > 0 && (
+                      <span className="absolute -top-2 -right-2 min-w-[15px] h-[15px] px-0.5 rounded-full bg-[#1c3026] text-[#F5DEB3] text-[8px] font-bold flex items-center justify-center">
+                        {cartTotalQuantity}
+                      </span>
+                    )}
+                  </span>
+                  Go to Cart
+                  <i className="fa-solid fa-chevron-right text-[9px]"></i>
                 </button>
               </div>
             )}
@@ -2131,6 +2179,16 @@ const ProductDetailPage = () => {
           </button>
         </div>
       </div>
+
+      {showMiniCart && (
+        <MiniCartPreview
+          onClose={() => setShowMiniCart(false)}
+          onViewCart={() => {
+            setShowMiniCart(false);
+            openCart();
+          }}
+        />
+      )}
 
       {feedbackMessage && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-[#F5DEB3] text-[#1c3026] px-6 py-3 rounded-full shadow-2xl z-[60] flex items-center gap-2 font-bold text-xs uppercase tracking-widest">

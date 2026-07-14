@@ -1,7 +1,12 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { useUpdateCartMutation } from '../../store/api/userApi';
+import {
+  useUpdateCartMutation,
+  useEvaluateCartRulesQuery,
+  useGetFreeShippingOfferQuery,
+  useGetAllFreeShippingBannersQuery,
+} from '../../store/api/userApi';
 import { updateQuantity, removeItem } from '../../store/slices/cartSlice';
 import { setShowLoginModal, setLoginCallback } from '../../store/slices/uiSlice';
 import { trackViewCart, trackRemoveFromCart, track } from '../../utils/analytics';
@@ -15,8 +20,43 @@ const CartDrawer = ({ isOpen, onClose }) => {
   
   const { items: cartItems, totalAmount } = useSelector((state) => state.cart);
   const { isAuthenticated } = useSelector((state) => state.auth);
-  
+
   const [updateCart] = useUpdateCartMutation();
+
+  // Generic, data-driven cart-promotion rules (server/src/model/cartRule.model.js)
+  // — same evaluator the payment controller uses for the real order total.
+  // Needed here so the drawer's own price display doesn't disagree with
+  // checkout/the actual charge (previously it never checked this at all,
+  // so a discounted item like Pen Stand at 2+ Lamps still showed ₹299 here).
+  const cartRuleEvalItems = cartItems
+    .map((item) => ({
+      productId: item.mongoId || item.id,
+      quantity: typeof item.quantity === 'object' ? Number(item.quantity?.quantity || 0) : Number(item.quantity || 0),
+    }))
+    .filter((i) => i.productId && i.quantity > 0);
+  const { data: cartRuleEvalData } = useEvaluateCartRulesQuery(cartRuleEvalItems, {
+    skip: cartRuleEvalItems.length === 0,
+  });
+
+  // Free-shipping eligibility for the "Shipping" line below — mirrors the
+  // same OR logic used at checkout/payment (rp.payment.controller.js): the
+  // admin combo-banner offer, any active generic cart rule's free_shipping
+  // effect, or the plain cart-value threshold. Previously this drawer never
+  // showed shipping status at all, so the customer only found out at checkout.
+  const { data: offerRes } = useGetFreeShippingOfferQuery();
+  const { data: bannersRes } = useGetAllFreeShippingBannersQuery();
+  const getItemDiscountedPrice = (item) => {
+    const productId = item.mongoId || item.id;
+    const candidates = cartRuleEvalData?.data?.discounts?.[productId];
+    const price = Number(item.price) || 0;
+    if (!candidates?.length) return price;
+    const results = candidates.map((c) =>
+      c.type === 'percent_off' ? price * (1 - Number(c.value) / 100) : price - Number(c.value),
+    );
+    // Rounded to match the server's applyBestDiscount exactly (50% off ₹299
+    // is ₹149.5 mathematically — both round that to ₹150, consistently).
+    return Math.round(Math.max(Math.min(...results), 0));
+  };
 
   // Map a cart line item → analytics item shape
   const toTrackItem = (item) => ({
@@ -109,10 +149,29 @@ const CartDrawer = ({ isOpen, onClose }) => {
 
   if (!mounted && !isOpen) return null;
 
-  const subtotal = totalAmount;
-  const freeShippingThreshold = 300; 
-  const progress = Math.min((subtotal / freeShippingThreshold) * 100, 100);
-  const remainingForFreeShip = freeShippingThreshold - subtotal;
+  // totalAmount (Redux) doesn't know about cart-rule discounts — subtract
+  // the same savings the line-item prices above already reflect, so the
+  // drawer's own subtotal/total never disagrees with what checkout charges.
+  const ruleDiscountSavings = cartItems.reduce((sum, item) => {
+    const rawPrice = Number(item.price) || 0;
+    const discounted = getItemDiscountedPrice(item);
+    const qty = typeof item.quantity === 'object' ? Number(item.quantity?.quantity || 0) : Number(item.quantity || 0);
+    return sum + (rawPrice - discounted) * qty;
+  }, 0);
+  const subtotal = totalAmount - ruleDiscountSavings;
+
+  // Same three-path eligibility used at checkout: admin combo banner (source
+  // + recommended product both in cart), any active generic cart rule whose
+  // effects include free_shipping, or the plain cart-value threshold.
+  const offerConfig = offerRes?.data;
+  const banners = bannersRes?.data || [];
+  const cartProductIds = new Set(cartItems.map((i) => i.mongoId || i.id));
+  const comboEligible =
+    !!offerConfig?.isActive &&
+    banners.some((b) => cartProductIds.has(b.sourceProductId) && cartProductIds.has(b.recommendedProductId));
+  const thresholdEligible =
+    !!offerConfig?.isActive && (offerConfig?.thresholdAmount || 0) > 0 && subtotal >= offerConfig.thresholdAmount;
+  const isFreeShippingEligible = comboEligible || !!cartRuleEvalData?.data?.freeShipping || thresholdEligible;
 
   return (
     <div className="fixed inset-0 z-[9999] flex justify-end">
@@ -259,8 +318,31 @@ const CartDrawer = ({ isOpen, onClose }) => {
                             </button>
                           </div>
 
-                          {/* Price */}
-                          <p className="text-sm font-bold text-[#0a110e]">₹{(Number(item.price) || 0).toLocaleString()}</p>
+                          {/* Price — shows the rule-discounted price (if any
+                              active cart rule discounts this item) instead of
+                              always the raw price, so this never disagrees
+                              with what checkout will actually charge. */}
+                          {(() => {
+                            const discountedPrice = getItemDiscountedPrice(item);
+                            const rawPrice = Number(item.price) || 0;
+                            const hasDiscount = discountedPrice < rawPrice;
+                            const percentOff = hasDiscount
+                              ? Math.round(((rawPrice - discountedPrice) / rawPrice) * 100)
+                              : 0;
+                            return hasDiscount ? (
+                              <div className="text-right">
+                                <p className="text-sm font-bold text-[#157a44]">₹{Math.round(discountedPrice).toLocaleString()}</p>
+                                <div className="flex items-center justify-end gap-1">
+                                  <span className="text-[10px] text-gray-400 line-through">₹{rawPrice.toLocaleString()}</span>
+                                  <span className="text-[9px] font-bold uppercase rounded-full bg-[#157a44] text-white px-1.5 py-px">
+                                    {percentOff}% OFF
+                                  </span>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-sm font-bold text-[#0a110e]">₹{rawPrice.toLocaleString()}</p>
+                            );
+                          })()}
                         </div>
 
                       </div>
@@ -279,6 +361,14 @@ const CartDrawer = ({ isOpen, onClose }) => {
                 <div className="flex justify-between items-center text-[11px] font-bold text-gray-400 uppercase tracking-widest">
                     <span>Subtotal</span>
                     <span className="font-medium text-[#0a110e]">₹{(Number(subtotal) || 0).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center gap-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest">
+                    <span className="shrink-0">Shipping</span>
+                    {isFreeShippingEligible ? (
+                      <span className="font-extrabold text-green-600 text-right">Free</span>
+                    ) : (
+                      <span className="font-medium normal-case tracking-normal text-gray-500 text-right">Calculated at checkout</span>
+                    )}
                 </div>
                 <div className="pt-3 border-t border-gray-100 flex justify-between items-center">
                     <span className="text-base font-serif text-[#0a110e]">Total</span>

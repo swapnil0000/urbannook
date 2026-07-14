@@ -5,7 +5,7 @@ import { useGetWishlistQuery,  } from '../../store/api/userApi';
 import { logout as logoutAction } from '../../store/slices/authSlice';
 import { setShowLoginModal, clearLoginCallback } from '../../store/slices/uiSlice';
 import { useLogoutMutation } from '../../store/api/authApi';
-import { useAuth } from '../../hooks/useRedux';
+import { useAuth, useUI } from '../../hooks/useRedux';
 import { lazy } from 'react';
 import GoogleLoginButton from './auth/GoogleLoginButton';
 import { clearCsrfToken } from '../../store/api/apiSlice';
@@ -13,6 +13,7 @@ import { clearCsrfToken } from '../../store/api/apiSlice';
 const SignupForm = lazy(() => import('./auth/SignupForm'));
 const LoginForm = lazy(() => import('./auth/LoginForm'));
 const CartDrawer = lazy(() => import('./CartDrawer'));
+const MiniCartPreview = lazy(() => import('./MiniCartPreview'));
 
 const NewHeader = () => {
   const location = useLocation();
@@ -20,7 +21,7 @@ const NewHeader = () => {
   const dispatch = useDispatch();
   
   // Get cart and auth state from Redux
-  const { items: cartItems, totalQuantity } = useSelector((state) => state.cart);
+  const { items: cartItems, totalQuantity, totalAmount } = useSelector((state) => state.cart);
   const { isAuthenticated, user: authUser } = useAuth();
   const { showLoginModal } = useSelector((state) => state.ui);
   const { loginCallback } = useSelector((state) => state.ui);
@@ -30,7 +31,14 @@ const NewHeader = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showSignup, setShowSignup] = useState(false);
-  const [showCart, setShowCart] = useState(false);
+  // Cart drawer open/close now lives in Redux (uiSlice.showCartModal) instead
+  // of local state, so other components — the PDP's mobile "Go to Cart"
+  // button, a global sticky mini-cart bar — can open this same drawer
+  // instance without prop-drilling or rendering a second CartDrawer.
+  const { showCartModal: showCart, openCart, closeCart } = useUI();
+  // The sticky mini-cart bar opens this quick preview first, not the full
+  // CartDrawer directly — "View Cart" inside it calls openCart() for that.
+  const [showMiniCart, setShowMiniCart] = useState(false);
   const [showHeader, setShowHeader] = useState(true);
   const lastScrollY = useRef(0);
   const [user, setUser] = useState(null);
@@ -170,7 +178,7 @@ const NewHeader = () => {
 
   const handleMobileCart = () => {
     setIsMenuOpen(false);
-    setShowCart(true);
+    openCart();
   };
   // -------------------------------
 
@@ -304,7 +312,7 @@ const NewHeader = () => {
 
               <button
                 className="relative flex items-center px-5 py-2.5 bg-emerald-800 text-white rounded-full hover:bg-emerald-900 hover:shadow-lg transition-all duration-200 shadow-md"
-                onClick={() => setShowCart(true)}
+                onClick={openCart}
               >
                 <i className="fa-solid fa-cart-shopping text-sm mr-2"></i>
                 <span className="text-xs font-bold uppercase tracking-wide">Cart</span>
@@ -530,12 +538,59 @@ const NewHeader = () => {
           />
         )}
 
-        <CartDrawer 
-          isOpen={showCart} 
-          onClose={() => setShowCart(false)} 
-          cartItems={cartItems} 
+        <CartDrawer
+          isOpen={showCart}
+          onClose={closeCart}
+          cartItems={cartItems}
         />
       </Suspense>
+
+      {/* Sticky mobile mini-cart bar: on mobile there was previously NO way
+          to see cart contents/count without opening the hamburger menu first.
+          Shows whenever the cart is non-empty, on any page EXCEPT the PDP
+          (which already has its own persistent add-to-cart bar with a "Go to
+          Cart" button — a second bar there would just double up) and the
+          checkout/post-checkout flow (already IS the cart/order flow).
+          Tapping it opens the quick mini-cart preview (items + total +
+          shipping note) — "View Cart" inside that opens the full drawer. */}
+      {totalQuantity > 0 &&
+        !location.pathname.startsWith('/product/') &&
+        !['/checkout', '/payment-failed'].includes(location.pathname) &&
+        !location.pathname.startsWith('/payment-processing/') &&
+        !location.pathname.startsWith('/order-confirm/') && (
+          <button
+            onClick={() => setShowMiniCart(true)}
+            className="lg:hidden fixed bottom-0 left-0 right-0 z-40 flex items-center justify-between gap-3 bg-[#1c3026] text-white px-5 py-3 shadow-[0_-6px_20px_rgba(0,0,0,0.25)]"
+          >
+            <span className="flex items-center gap-2.5">
+              <span className="relative flex items-center justify-center w-8 h-8 rounded-full bg-white/10">
+                <i className="fa-solid fa-cart-shopping text-sm"></i>
+                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#F5DEB3] text-[#1c3026] text-[10px] font-bold flex items-center justify-center">
+                  {totalQuantity}
+                </span>
+              </span>
+              <span className="text-xs font-bold uppercase tracking-wide">
+                {totalQuantity} {totalQuantity === 1 ? 'Item' : 'Items'} · ₹{(Number(totalAmount) || 0).toLocaleString()}
+              </span>
+            </span>
+            <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-[#F5DEB3]">
+              View Cart
+              <i className="fa-solid fa-chevron-right text-[10px]"></i>
+            </span>
+          </button>
+        )}
+
+      {showMiniCart && (
+        <Suspense fallback={null}>
+          <MiniCartPreview
+            onClose={() => setShowMiniCart(false)}
+            onViewCart={() => {
+              setShowMiniCart(false);
+              openCart();
+            }}
+          />
+        </Suspense>
+      )}
     </>
   );
 };
