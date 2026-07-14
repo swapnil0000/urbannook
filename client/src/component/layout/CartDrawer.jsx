@@ -1,7 +1,7 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { useUpdateCartMutation } from '../../store/api/userApi';
+import { useUpdateCartMutation, useEvaluateCartRulesQuery } from '../../store/api/userApi';
 import { updateQuantity, removeItem } from '../../store/slices/cartSlice';
 import { setShowLoginModal, setLoginCallback } from '../../store/slices/uiSlice';
 import { trackViewCart, trackRemoveFromCart, track } from '../../utils/analytics';
@@ -15,8 +15,35 @@ const CartDrawer = ({ isOpen, onClose }) => {
   
   const { items: cartItems, totalAmount } = useSelector((state) => state.cart);
   const { isAuthenticated } = useSelector((state) => state.auth);
-  
+
   const [updateCart] = useUpdateCartMutation();
+
+  // Generic, data-driven cart-promotion rules (server/src/model/cartRule.model.js)
+  // — same evaluator the payment controller uses for the real order total.
+  // Needed here so the drawer's own price display doesn't disagree with
+  // checkout/the actual charge (previously it never checked this at all,
+  // so a discounted item like Pen Stand at 2+ Lamps still showed ₹299 here).
+  const cartRuleEvalItems = cartItems
+    .map((item) => ({
+      productId: item.mongoId || item.id,
+      quantity: typeof item.quantity === 'object' ? Number(item.quantity?.quantity || 0) : Number(item.quantity || 0),
+    }))
+    .filter((i) => i.productId && i.quantity > 0);
+  const { data: cartRuleEvalData } = useEvaluateCartRulesQuery(cartRuleEvalItems, {
+    skip: cartRuleEvalItems.length === 0,
+  });
+  const getItemDiscountedPrice = (item) => {
+    const productId = item.mongoId || item.id;
+    const candidates = cartRuleEvalData?.data?.discounts?.[productId];
+    const price = Number(item.price) || 0;
+    if (!candidates?.length) return price;
+    const results = candidates.map((c) =>
+      c.type === 'percent_off' ? price * (1 - Number(c.value) / 100) : price - Number(c.value),
+    );
+    // Rounded to match the server's applyBestDiscount exactly (50% off ₹299
+    // is ₹149.5 mathematically — both round that to ₹150, consistently).
+    return Math.round(Math.max(Math.min(...results), 0));
+  };
 
   // Map a cart line item → analytics item shape
   const toTrackItem = (item) => ({
@@ -109,10 +136,16 @@ const CartDrawer = ({ isOpen, onClose }) => {
 
   if (!mounted && !isOpen) return null;
 
-  const subtotal = totalAmount;
-  const freeShippingThreshold = 300; 
-  const progress = Math.min((subtotal / freeShippingThreshold) * 100, 100);
-  const remainingForFreeShip = freeShippingThreshold - subtotal;
+  // totalAmount (Redux) doesn't know about cart-rule discounts — subtract
+  // the same savings the line-item prices above already reflect, so the
+  // drawer's own subtotal/total never disagrees with what checkout charges.
+  const ruleDiscountSavings = cartItems.reduce((sum, item) => {
+    const rawPrice = Number(item.price) || 0;
+    const discounted = getItemDiscountedPrice(item);
+    const qty = typeof item.quantity === 'object' ? Number(item.quantity?.quantity || 0) : Number(item.quantity || 0);
+    return sum + (rawPrice - discounted) * qty;
+  }, 0);
+  const subtotal = totalAmount - ruleDiscountSavings;
 
   return (
     <div className="fixed inset-0 z-[9999] flex justify-end">
@@ -259,8 +292,23 @@ const CartDrawer = ({ isOpen, onClose }) => {
                             </button>
                           </div>
 
-                          {/* Price */}
-                          <p className="text-sm font-bold text-[#0a110e]">₹{(Number(item.price) || 0).toLocaleString()}</p>
+                          {/* Price — shows the rule-discounted price (if any
+                              active cart rule discounts this item) instead of
+                              always the raw price, so this never disagrees
+                              with what checkout will actually charge. */}
+                          {(() => {
+                            const discountedPrice = getItemDiscountedPrice(item);
+                            const rawPrice = Number(item.price) || 0;
+                            const hasDiscount = discountedPrice < rawPrice;
+                            return hasDiscount ? (
+                              <div className="text-right">
+                                <p className="text-sm font-bold text-[#157a44]">₹{Math.round(discountedPrice).toLocaleString()}</p>
+                                <p className="text-[10px] text-gray-400 line-through">₹{rawPrice.toLocaleString()}</p>
+                              </div>
+                            ) : (
+                              <p className="text-sm font-bold text-[#0a110e]">₹{rawPrice.toLocaleString()}</p>
+                            );
+                          })()}
                         </div>
 
                       </div>

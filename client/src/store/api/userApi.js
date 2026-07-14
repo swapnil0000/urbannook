@@ -270,6 +270,17 @@ export const userApi = apiSlice.injectEndpoints({
     getAllFreeShippingBanners: builder.query({
       query: () => "free-shipping-offer/banners",
     }),
+    // Generic, data-driven cart-promotion rules (server/src/model/cartRule.model.js)
+    // — evaluates the current cart against every active rule and returns
+    // which matched (free shipping / discounts) plus the closest incomplete
+    // one for progress display. `items` is a plain array of
+    // { productId, quantity } — RTK Query serialises it into the cache key,
+    // so this naturally re-fetches whenever cart contents actually change.
+    // Same evaluator the payment controller uses for the real order total,
+    // so this can never disagree with what actually gets charged.
+    evaluateCartRules: builder.query({
+      query: (items) => ({ url: "cart-rules/evaluate", method: "POST", body: { items: items || [] } }),
+    }),
   }),
 });
 
@@ -305,4 +316,5 @@ export const {
   useGetFreeShippingOfferQuery,
   useGetFreeShippingBannerQuery,
   useGetAllFreeShippingBannersQuery,
+  useEvaluateCartRulesQuery,
 } = userApi;

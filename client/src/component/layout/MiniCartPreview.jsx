@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
+import { useEvaluateCartRulesQuery } from "../../store/api/userApi";
 
 /**
  * Lightweight cart preview — a compact bottom sheet showing what's in the
@@ -20,6 +21,36 @@ const itemQty = (q) => (typeof q === "object" && q !== null ? Number(q.quantity)
 const MiniCartPreview = ({ onClose, onViewCart }) => {
   const { items: cartItems, totalAmount } = useSelector((state) => state.cart);
   const [mounted, setMounted] = useState(false);
+
+  // Generic, data-driven cart-promotion rules (server/src/model/cartRule.model.js)
+  // — same evaluator the payment controller uses for the real order total,
+  // so this preview's prices/total never disagree with what checkout charges.
+  const cartRuleEvalItems = cartItems
+    .map((item) => ({ productId: item.mongoId || item.id, quantity: itemQty(item.quantity) }))
+    .filter((i) => i.productId && i.quantity > 0);
+  const { data: cartRuleEvalData } = useEvaluateCartRulesQuery(cartRuleEvalItems, {
+    skip: cartRuleEvalItems.length === 0,
+  });
+  const getItemDiscountedPrice = (item) => {
+    const productId = item.mongoId || item.id;
+    const candidates = cartRuleEvalData?.data?.discounts?.[productId];
+    const price = Number(item.price) || 0;
+    if (!candidates?.length) return price;
+    const results = candidates.map((c) =>
+      c.type === "percent_off" ? price * (1 - Number(c.value) / 100) : price - Number(c.value),
+    );
+    // Rounded to match the server's applyBestDiscount exactly (50% off ₹299
+    // is ₹149.5 mathematically — both round that to ₹150, consistently).
+    // Rounding the PER-UNIT price here (before the line-total display
+    // multiplies by quantity below) also fixes a second bug: rounding after
+    // multiplying gave a different total for qty=2 (round(149.5×2)=299)
+    // than rounding per-unit first then multiplying (150×2=300) would.
+    return Math.round(Math.max(Math.min(...results), 0));
+  };
+  const ruleDiscountSavings = cartItems.reduce((sum, item) => {
+    const rawPrice = Number(item.price) || 0;
+    return sum + (rawPrice - getItemDiscountedPrice(item)) * itemQty(item.quantity);
+  }, 0);
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setMounted(true));
@@ -65,9 +96,21 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
                     )}
                     <p className="text-[10px] text-black/50">Qty {itemQty(item.quantity)}</p>
                   </div>
-                  <p className="text-xs font-bold text-black shrink-0">
-                    ₹{((Number(item.price) || 0) * itemQty(item.quantity)).toLocaleString()}
-                  </p>
+                  {(() => {
+                    const discountedPrice = getItemDiscountedPrice(item);
+                    const rawPrice = Number(item.price) || 0;
+                    const hasDiscount = discountedPrice < rawPrice;
+                    return hasDiscount ? (
+                      <div className="text-right shrink-0">
+                        <p className="text-xs font-bold text-[#157a44]">₹{Math.round(discountedPrice * itemQty(item.quantity)).toLocaleString()}</p>
+                        <p className="text-[9px] text-black/40 line-through">₹{(rawPrice * itemQty(item.quantity)).toLocaleString()}</p>
+                      </div>
+                    ) : (
+                      <p className="text-xs font-bold text-black shrink-0">
+                        ₹{(rawPrice * itemQty(item.quantity)).toLocaleString()}
+                      </p>
+                    );
+                  })()}
                 </div>
               ))}
             </div>
@@ -77,7 +120,7 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
         <div className="px-5 pt-3 pb-5 border-t border-black/10 shrink-0">
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-xs font-bold uppercase tracking-wide text-black/60">Total</span>
-            <span className="text-base font-extrabold text-black">₹{(Number(totalAmount) || 0).toLocaleString()}</span>
+            <span className="text-base font-extrabold text-black">₹{((Number(totalAmount) || 0) - ruleDiscountSavings).toLocaleString()}</span>
           </div>
           <p className="text-[10px] text-black/45 mb-4">Shipping will be calculated at checkout.</p>
 

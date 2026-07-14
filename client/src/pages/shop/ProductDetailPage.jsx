@@ -945,7 +945,10 @@ const ProductDetailPage = () => {
                 <p className="text-2xl lg:text-3xl font-light text-white">
                   ₹{currentPrice.toLocaleString()}
                 </p>
-                {discountPercent > 0 && (
+                {discountPercent > 0 ? (
+                  // Real discount — this product's own variants are priced
+                  // differently (e.g. one variant genuinely costs more),
+                  // currentPrice vs maxVariantPrice is an actual comparison.
                   <>
                     <p className="text-sm text-gray-500 line-through">
                       ₹{maxVariantPrice.toLocaleString()}
@@ -953,6 +956,23 @@ const ProductDetailPage = () => {
                     <span className="text-xs font-bold text-green-400 bg-green-400/10 px-2.5 py-1 rounded-full flex items-center gap-1.5">
                       <i className="fa-solid fa-bolt-lightning text-[9px]"></i>
                       {discountPercent}% OFF
+                      <span className="text-[9px] text-green-300/80 font-medium">• Limited Time</span>
+                    </span>
+                  </>
+                ) : (
+                  // No real discount (e.g. every variant is the same flat
+                  // price) — a purely cosmetic "feels like a deal" strikethrough,
+                  // frontend-only, not tied to any actual pricing rule. Same
+                  // generic 25%-off-of-real-price computation as the
+                  // FreeShippingBanner cross-sell card, so it's never a
+                  // hardcoded number and scales correctly for any product.
+                  <>
+                    <p className="text-sm text-gray-500 line-through">
+                      ₹{Math.round(currentPrice / 0.75).toLocaleString()}
+                    </p>
+                    <span className="text-xs font-bold text-green-400 bg-green-400/10 px-2.5 py-1 rounded-full flex items-center gap-1.5">
+                      <i className="fa-solid fa-bolt-lightning text-[9px]"></i>
+                      25% OFF
                       <span className="text-[9px] text-green-300/80 font-medium">• Limited Time</span>
                     </span>
                   </>
