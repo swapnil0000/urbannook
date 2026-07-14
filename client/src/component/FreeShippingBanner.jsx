@@ -465,14 +465,14 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
   }, [variantMenuOpen]);
 
   // eslint-disable-next-line no-console -- TEMP debug, remove after checkout discount bug is diagnosed
-  // console.log("[FSB debug top]", {
-  //   productIdProp: productId,
-  //   banner,
-  //   recommendedProductId: banner?.recommendedProductId,
-  //   recommendedProduct,
-  //   ruleEvalItems,
-  //   ruleEval,
-  // });
+  console.log("[FSB debug top]", {
+    productIdProp: productId,
+    banner,
+    recommendedProductId: banner?.recommendedProductId,
+    recommendedProduct,
+    ruleEvalItems,
+    ruleEval,
+  });
   if (!banner || !recommendedProduct) return null;
 
   const activeVariant =
