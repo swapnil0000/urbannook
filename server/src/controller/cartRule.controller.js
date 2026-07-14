@@ -11,6 +11,9 @@ import { getActiveCartRules, evaluateCartRules, findClosestUnmatchedRule } from 
 // disagree with what actually gets charged the way the old combo-banner
 // logic did across three separate files.
 const evaluateCartRulesController = asyncHandler(async (req, res) => {
+  // TEMP deploy-verification log — remove once cart-rules deploy is confirmed
+  // live on staging.
+  console.log("[DEPLOY CHECK] /cart-rules/evaluate hit", req.body);
   const { items } = req.body;
   if (!Array.isArray(items)) {
     throw new ValidationError("items must be an array of { productId, quantity }");
