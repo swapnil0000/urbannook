@@ -757,7 +757,7 @@ const ProductDetailPage = () => {
                   </span>
                 </div>
 
-                <div className="flex flex-wrap gap-3 items-center">
+                <div className="flex flex-nowrap gap-2 items-center">
                   {availableVariants.map((variantName, idx) => {
                     const isSelected = selectedVariant === variantName;
                     const lowerName = variantName.toLowerCase();
@@ -820,15 +820,15 @@ const ProductDetailPage = () => {
                             const vSku = product.variantDetails?.find(v => v.variantName === variantName)?.sku;
                             navigate(`/product/${productId}/${vSku || variantName}`);
                           }}
-                          className={`group flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border transition-all duration-300 ${
+                          className={`group flex-1 min-w-0 flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl border transition-all duration-300 ${
                             isSelected
-                              ? "bg-[#F5DEB3] border-[#F5DEB3] text-[#1c3026] shadow-[0_8px_20px_rgba(245,222,179,0.15)] scale-105"
-                              : "bg-white/10 border-white/20 text-gray-200 hover:bg-white/15 hover:border-white/40 hover:scale-[1.02]"
+                              ? "bg-[#F5DEB3] border-[#F5DEB3] text-[#1c3026] shadow-[0_8px_20px_rgba(245,222,179,0.15)]"
+                              : "bg-white/10 border-white/20 text-gray-200 hover:bg-white/15 hover:border-white/40"
                           }`}
                         >
-                          {getVariantIcon(variantName)}
-                          <div className="flex flex-col items-start leading-none">
-                            <span className={`text-[11px] font-bold uppercase tracking-wider ${isSelected ? 'text-[#1c3026]' : 'text-white group-hover:text-[#F5DEB3]'}`}>
+                          <span className="shrink-0">{getVariantIcon(variantName)}</span>
+                          <div className="flex flex-col items-start leading-none min-w-0">
+                            <span className={`text-[11px] font-bold uppercase tracking-wide truncate max-w-full ${isSelected ? 'text-[#1c3026]' : 'text-white group-hover:text-[#F5DEB3]'}`}>
                               {variantName}
                             </span>
                             <span className={`text-[7px] uppercase tracking-tighter ${isSelected ? 'text-[#1c3026]/60' : 'text-gray-400 group-hover:text-[#F5DEB3]/60'} font-bold mt-0.5`}>

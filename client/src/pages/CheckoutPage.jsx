@@ -1738,6 +1738,14 @@ const CheckoutPage = () => {
                       </div>
                     </div>
                   </button>
+                  {paymentMethod === "COD" && (
+                <div className="flex items-center gap-1   rounded-xl px-4 ">
+                  <i className="fa-solid fa-circle-info text-[#a89068] text-xs shrink-0" />
+                  <p className="text-[10px] font-medium text-gray-600">
+                    Additional ₹{COD_HANDLING_FEE} COD handling fee applies.
+                  </p>
+                </div>
+              )}
                 </div>
                
               </div>
@@ -1745,14 +1753,14 @@ const CheckoutPage = () => {
               {/* COD notice — single-line disclosure, the standard e-commerce
                   pattern ("₹X COD handling fee applies"). Names the fee so the
                   higher COD total never reads as a hidden markup. */}
-              {paymentMethod === "COD" && (
-                <div className="flex items-center gap-2 bg-[#a89068]/8 border border-[#a89068]/25 rounded-xl px-4 py-2.5">
+              {/* {paymentMethod === "COD" && (
+                <div className="flex items-center gap-1   rounded-xl px-4 ">
                   <i className="fa-solid fa-circle-info text-[#a89068] text-xs shrink-0" />
-                  <p className="text-[11px] font-medium text-gray-600">
-                    An additional COD handling fee of ₹{COD_HANDLING_FEE} applies to Cash on Delivery orders.
+                  <p className="text-[10px] font-medium text-gray-600">
+                    Additional ₹{COD_HANDLING_FEE} COD handling fee applies.
                   </p>
                 </div>
-              )}
+              )} */}
 
               {/* Coupon — available to all (guests + members) */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">

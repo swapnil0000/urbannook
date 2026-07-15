@@ -107,6 +107,10 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
   // the customer, in a dedicated moment, that they still need the source
   // product for the offer to actually apply. Replaces cramming that message
   // into the CTA button's label.
+  // Flip to true to bring back the "add the source product" bottom sheet that
+  // used to pop after adding the add-on without the source in cart. Disabled
+  // per request — the banner's inline top-copy line covers that case now.
+  const SOURCE_PROMPT_ENABLED = false;
   const [showSourcePrompt, setShowSourcePrompt] = useState(false);
   const [sourcePromptMounted, setSourcePromptMounted] = useState(false);
   const [sourceAdding, setSourceAdding] = useState(false);
@@ -606,12 +610,14 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
       quantity: 1,
     });
 
-    if (!willCompleteCombo) {
-      // This add just left the cart with ONLY the add-on and not the source
-      // product — free shipping isn't actually active. Say so in a dedicated
-      // moment (bottom sheet) rather than folding it into the CTA label.
-      setShowSourcePrompt(true);
-    }
+    // Pop-up removed per request: when the add-on is in the cart but the
+    // source product isn't, we no longer open a bottom sheet. The banner's own
+    // top copy line already tells the customer to add {source} to unlock the
+    // offer (see the `added && !sourceInCart` branch in the render below), so
+    // that single inline message covers this case without a modal.
+    // if (!willCompleteCombo) {
+    //   setShowSourcePrompt(true);
+    // }
     // No local "added" flag to set — cartItems updates (dispatch above, or
     // refetchCart) and cartMatch/added/progressPct derive from that
     // automatically, which is what drives the bar animation above.
@@ -823,9 +829,16 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
                     (font-bold → font-semibold) — same font-size, just less
                     heavy, so this fits on one line on mobile without
                     shrinking the text. */}
-                <p className="text-[10px] font-semibold uppercase tracking-[0.05em] text-[#1c3026]">
-                  Add {recommendedProduct.productName} & unlock{" "}
-                  <span className="font-bold text-[#E63329]">
+                {/* whitespace-nowrap keeps the whole sentence on ONE line;
+                    the clamp() font-size shrinks it on very small screens
+                    (e.g. iPhone SE) so it fits without wrapping, and caps at
+                    11px on normal widths. */}
+                <p
+                  className="font-semibold tracking-[0.01em] text-[#1c3026] whitespace-nowrap"
+                  style={{ fontSize: "clamp(8px, 3vw, 11px)" }}
+                >
+                  Add {recommendedProduct.productName} &amp; unlock{" "}
+                  <span className="font-bold uppercase text-[#E63329]">
                     free shipping
                   </span>
                 </p>
@@ -1488,13 +1501,13 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
         </div>
       </div>
 
-      {/* "You still need the source product" bottom sheet — shown after adding
-        the recommended add-on when that leaves the cart with ONLY the add-on
-        (source product not in cart), so free shipping isn't actually active
-        yet. Slides up from the bottom, backdrop-dismissible, with a single
-        clear action: go add the source product (its own page, so the
-        customer picks their own variant rather than one being guessed here). */}
-      {showSourcePrompt &&
+      {/* "You still need the source product" bottom sheet — DISABLED per
+        request (the `false &&` guard keeps it out of the render but preserves
+        the whole block for easy restore; flip it back to just `showSourcePrompt`
+        to re-enable). Replaced by the inline top-copy line in the banner that
+        already nudges "Add {source} to unlock free shipping" for this exact
+        case (the `added && !sourceInCart` branch above). */}
+      {SOURCE_PROMPT_ENABLED && showSourcePrompt &&
         createPortal(
           <div className="fixed inset-0 z-[200] flex items-end justify-center">
           <div
