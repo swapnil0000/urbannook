@@ -54,48 +54,31 @@ const selectCourierService = (allServices, chargeableWeightInKg) => {
     })
     .filter((c) => {
       if (!c.courier) return false; // outside the allowlist
-      if (!(c.slabKg > 0)) {
-        console.warn(`[SHIPPING RATE] ⚠️  Dropped "${c.name}" - unreadable minimum_chargeable_weight (${c.raw.minimum_chargeable_weight})`);
-        return false;
-      }
-      if (!(c.charges > 0)) {
-        console.warn(`[SHIPPING RATE] ⚠️  Dropped "${c.name}" - invalid total_charges (${c.raw.total_charges})`);
-        return false;
-      }
-      // Cross-check the slab in the name against minimum_chargeable_weight, so a malformed
-      // API row can't silently price the parcel on the wrong slab.
-      if (c.nameKg === null) {
-        console.warn(`[SHIPPING RATE] ⚠️  Dropped "${c.name}" - no slab in name to verify against ${c.slabKg}kg`);
-        return false;
-      }
-      if (Math.abs(c.nameKg - c.slabKg) > 0.001) {
-        console.warn(`[SHIPPING RATE] 🚨 Dropped "${c.name}" - slab mismatch: name says ${c.nameKg}kg, API says ${c.slabKg}kg`);
-        return false;
-      }
+      if (!(c.slabKg > 0)) return false; // unreadable minimum_chargeable_weight
+      if (!(c.charges > 0)) return false; // invalid total_charges
+      // minimum_chargeable_weight (slabKg) is authoritative. The name is only a secondary
+      // cross-check: reject a row ONLY when its name carries a weight that CONTRADICTS the
+      // API slab (a genuine red flag). Names without a weight token — e.g. "Delhivery Heavy
+      // MPS" — are trusted on their API slab, not discarded, so heavy-parcel services stay in.
+      if (c.nameKg !== null && Math.abs(c.nameKg - c.slabKg) > 0.001) return false;
       return true;
     });
-
-  console.log(`\n[SHIPPING RATE] 🚚 ${candidates.length} verified services from allowlisted couriers:`);
-  [...candidates]
-    .sort((a, b) => a.slabKg - b.slabKg || a.charges - b.charges)
-    .forEach((c) => console.log(`    • [${c.slabKg}kg slab] ${c.name} - ₹${c.charges}`));
 
   // Step 1 — the slab, purely on weight. 1.68kg → 2kg. 1.3kg → 2kg. 0.3kg → 0.5kg.
   const availableSlabs = [...new Set(candidates.map((c) => c.slabKg))].sort((a, b) => a - b);
   let targetSlab = availableSlabs.find((slab) => slab >= chargeableWeightInKg);
+  let overweight = false;
 
   if (targetSlab === undefined && availableSlabs.length > 0) {
     // Parcel outweighs every slab on offer — bill the largest rather than under-charging.
     targetSlab = availableSlabs[availableSlabs.length - 1];
-    console.warn(`[SHIPPING RATE] 🚨 Parcel (${chargeableWeightInKg.toFixed(2)}kg) exceeds every available slab. Falling back to largest slab: ${targetSlab}kg`);
+    overweight = true;
   }
 
   // Step 2 — within that slab only, pick by courier priority.
   let selected = null;
   if (targetSlab !== undefined) {
     const atSlab = candidates.filter((c) => c.slabKg === targetSlab);
-    console.log(`\n[SHIPPING RATE] 🎯 Chargeable ${chargeableWeightInKg.toFixed(2)}kg → target slab ${targetSlab}kg (${atSlab.length} services)`);
-
     for (const courier of COURIER_PRIORITY) {
       const fromCourier = atSlab
         .filter((c) => c.courier === courier)
@@ -104,11 +87,10 @@ const selectCourierService = (allServices, chargeableWeightInKg) => {
         selected = fromCourier[0];
         break;
       }
-      console.log(`[SHIPPING RATE]    ${courier.toUpperCase()} has no ${targetSlab}kg service → next courier`);
     }
   }
 
-  return { selected, targetSlab, candidates };
+  return { selected, targetSlab, candidates, overweight };
 };
 
 const calculateShippingRate = async ({ pincode, cartItems, paymentType = "PREPAID" }) => {
@@ -180,13 +162,6 @@ const calculateShippingRate = async ({ pincode, cartItems, paymentType = "PREPAI
       const height = safeFloat(dim.height, 10);
       const volumetricWeightPerUnit = (length * breadth * height) / 5;
 
-      console.log(`[SHIPPING RATE] 📦 Product: ${item.productId}`);
-      console.log(`  - Quantity: ${quantity}`);
-      console.log(`  - Dimensions: ${length} x ${breadth} x ${height} cm`);
-      console.log(`  - Actual Weight/unit: ${actualWeightPerUnit}g`);
-      console.log(`  - Volumetric Weight/unit: ${volumetricWeightPerUnit.toFixed(2)}g`);
-      console.log(`  - Chargeable Weight/unit: ${Math.max(actualWeightPerUnit, volumetricWeightPerUnit).toFixed(2)}g`);
-
       totalActualWeight += actualWeightPerUnit * quantity;
       totalVolumetricWeight += volumetricWeightPerUnit * quantity;
       totalAmount += safeFloat(item?.price, 0) * quantity;
@@ -202,20 +177,10 @@ const calculateShippingRate = async ({ pincode, cartItems, paymentType = "PREPAI
     const totalChargeableWeight = Math.max(totalActualWeight, totalVolumetricWeight);
     const totalChargeableWeightInKg = totalChargeableWeight / 1000;
 
-    console.log(`\n[SHIPPING RATE] 📊 Weight Summary:`);
-    console.log(`  - Total Actual Weight: ${totalActualWeight}g (${(totalActualWeight/1000).toFixed(2)}kg)`);
-    console.log(`  - Total Volumetric Weight: ${totalVolumetricWeight.toFixed(2)}g (${(totalVolumetricWeight/1000).toFixed(2)}kg)`);
-    console.log(`  - Total Chargeable Weight: ${totalChargeableWeight.toFixed(2)}g (${totalChargeableWeightInKg.toFixed(2)}kg)`);
-    console.log(`  - Total Amount: ₹${totalAmount}`);
-    console.log(`  - Total Boxes: ${totalBoxes}`);
-    console.log(`  - Payment Type: ${validPaymentType}`);
-
     // Make API call with retry logic
     while (attempt < MAX_RETRIES) {
       attempt++;
       try {
-        console.log(`\n[SHIPPING RATE] ⏳ Attempt ${attempt}/${MAX_RETRIES}`);
-
         const requestPayload = {
           pickup_pincode: 122018,
           delivery_pincode: pincode,
@@ -243,28 +208,24 @@ const calculateShippingRate = async ({ pincode, cartItems, paymentType = "PREPAI
           },
         );
 
-        console.log(`[SHIPPING RATE] ✅ API Response (Status ${response.status})`);
-        // console.log(`[SHIPPING RATE] 📄 FULL API RESPONSE:`, JSON.stringify(response.data, null, 2));
-
         if (!response.data || !response.data.data || !Array.isArray(response.data.data)) {
-          console.error(`[SHIPPING RATE] ❌ Invalid response structure`);
           throw new Error("Invalid response format from shipping API");
         }
 
         const allServices = response.data.data;
-        console.log(`\n[SHIPPING RATE] 📦 Received ${allServices.length} services from API`);
-
         if (allServices.length === 0) {
-          console.error(`[SHIPPING RATE] ❌ No services returned for this pincode`);
           throw new Error("Pincode not serviceable - No courier available");
         }
 
-        const { selected, targetSlab } = selectCourierService(allServices, totalChargeableWeightInKg);
+        const { selected, targetSlab, candidates, overweight } = selectCourierService(allServices, totalChargeableWeightInKg);
+
+        // Weights condensed for the single summary log below.
+        const wt = `actual ${(totalActualWeight / 1000).toFixed(2)}kg, vol ${(totalVolumetricWeight / 1000).toFixed(2)}kg, chargeable ${totalChargeableWeightInKg.toFixed(2)}kg`;
 
         // No allowlisted courier at the required slab → flat fallback
         if (!selected) {
-          console.warn(`[SHIPPING RATE] 🚨 No allowlisted courier at the required slab. Using flat fallback ₹${FALLBACK_SHIPPING_CHARGE}`);
-          const fallbackResult = {
+          console.warn(`[SHIPPING] pin ${pincode} | ${validPaymentType} | ${wt} | ${totalBoxes} box(es) | ${candidates.length} candidates | no allowlisted courier at slab ${targetSlab ?? "-"}kg → FALLBACK ₹${FALLBACK_SHIPPING_CHARGE}`);
+          return {
             total_charges: FALLBACK_SHIPPING_CHARGE,
             type: "fallback",
             totalWeight: Math.ceil(totalChargeableWeight),
@@ -274,20 +235,14 @@ const calculateShippingRate = async ({ pincode, cartItems, paymentType = "PREPAI
             estimatedDays: "3-4 Days",
             paymentType: validPaymentType,
           };
-          console.log(`\n[SHIPPING RATE] 🎉 FALLBACK:`, JSON.stringify(fallbackResult, null, 2));
-          console.log("=".repeat(80) + "\n");
-          return fallbackResult;
         }
 
         const finalCharge = Math.ceil(selected.charges);
 
-        console.log(`\n[SHIPPING RATE] 💰 Final Calculation:`);
-        console.log(`  - Chargeable Weight: ${totalChargeableWeightInKg.toFixed(2)}kg → ${targetSlab}kg slab`);
-        console.log(`  - Service: ${selected.name} (${selected.courier.toUpperCase()})`);
-        console.log(`  - Base Charge (incl. GST): ₹${selected.charges}`);
-        console.log(`  - Final Charge: ₹${finalCharge}`);
+        // Single detailed line per rate calculation (inputs → decision → charge).
+        console.log(`[SHIPPING] pin ${pincode} | ${validPaymentType} | ${wt} | ${totalBoxes} box(es) | slab ${targetSlab}kg${overweight ? " (OVERWEIGHT→largest)" : ""} | ${candidates.length} candidates | picked ${selected.courier.toUpperCase()} "${selected.name}" ₹${selected.charges} → charge ₹${finalCharge}`);
 
-        const result = {
+        return {
           total_charges: finalCharge,
           type: "dynamic",
           totalWeight: Math.ceil(totalChargeableWeight),
@@ -299,46 +254,30 @@ const calculateShippingRate = async ({ pincode, cartItems, paymentType = "PREPAI
           estimatedDays: selected.raw.estimated_delivery || "3-4 Days",
           paymentType: validPaymentType,
         };
-
-        console.log(`\n[SHIPPING RATE] 🎉 SUCCESS:`, JSON.stringify(result, null, 2));
-        console.log("=".repeat(80) + "\n");
-
-        return result;
       } catch (error) {
         lastError = error;
-
-        console.error(`\n[SHIPPING RATE] ❌ Error on attempt ${attempt}/${MAX_RETRIES}:`);
-        console.error(`[SHIPPING RATE] Error:`, error.message);
-
-        if (error.response) {
-          console.error(`[SHIPPING RATE] Response Status:`, error.response.status);
-          console.error(`[SHIPPING RATE] Response Data:`, JSON.stringify(error.response.data, null, 2));
-        }
 
         // If it's a 4xx error or "Pincode not serviceable" error, don't retry
         if (
           (error.response?.status && error.response.status >= 400 && error.response.status < 500) ||
           error.message.includes("Pincode not serviceable")
         ) {
-          console.error(`[SHIPPING RATE] 🛑 Non-retryable error`);
-          console.error("=".repeat(80) + "\n");
+          console.error(`[SHIPPING] pin ${pincode} | non-retryable error: ${error.message}${error.response ? ` (status ${error.response.status})` : ""}`);
           throw error;
         }
 
         // For network errors, wait before retrying
         if (attempt < MAX_RETRIES) {
-          const delayMs = 1500 * attempt;
-          console.log(`[SHIPPING RATE] ⏸️  Waiting ${delayMs}ms before retry...\n`);
-          await new Promise(resolve => setTimeout(resolve, delayMs));
+          await new Promise(resolve => setTimeout(resolve, 1500 * attempt));
         }
       }
     }
 
     // All retries exhausted
-    console.error("=".repeat(80) + "\n");
+    console.error(`[SHIPPING] pin ${pincode} | failed after ${MAX_RETRIES} attempts: ${lastError?.message || "unknown error"}`);
     throw new Error(lastError?.message || "Unable to calculate shipping rate after multiple attempts");
   } catch (error) {
-    console.error("[Shipping Service Error]:", error.message);
+    console.error(`[SHIPPING] pin ${pincode} | ${error.message}`);
     throw error;
   }
 };
