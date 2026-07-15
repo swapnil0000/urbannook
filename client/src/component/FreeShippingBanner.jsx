@@ -63,7 +63,15 @@ const SMOKE_LIFE = 950;
  * threshold) instead of just a remove button — the PDP keeps the simpler
  * single-item add/remove since that's not the point of the PDP banner.
  */
-const FreeShippingBanner = ({ productId, showQuantityStepper = false, className = "mt-4" }) => {
+const FreeShippingBanner = ({
+  productId,
+  showQuantityStepper = false,
+  className = "mt-4",
+  // When false, the truck/progress "track" section is not rendered — used in
+  // the mini-cart and side-cart, which want just the product details + CTA,
+  // not the full progress animation. PDP/checkout leave it on (default).
+  showProgressBar = true,
+}) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { isAuthenticated } = useSelector((state) => state.auth);
@@ -490,7 +498,12 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
     };
   }, [variantMenuOpen]);
 
-  if (!banner || !recommendedProduct) return null;
+  // Hide the whole card when the admin has switched the offer off
+  // (offerConfig.isActive === false). Previously this only checked that a
+  // banner existed, so a disabled offer still rendered the cross-sell card on
+  // the PDP — only its progress bar hid. Gating on offerActive too makes the
+  // admin toggle fully remove it everywhere, consistent with checkout/cart.
+  if (!banner || !recommendedProduct || !offerActive) return null;
 
   const activeVariant =
     variants.find((v) => v.variantName === selectedVariant) || variants[0];
@@ -935,7 +948,7 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
                         `}</style>
                         <div
                           ref={variantMenuPortalRef}
-                          className="fsb-variant-scroll fixed z-[200] rounded-lg border border-[#157a44]/30 bg-[#FAF7F0] shadow-lg overflow-y-scroll max-h-48"
+                          className="fsb-variant-scroll fixed z-[10050] rounded-lg border border-[#157a44]/30 bg-[#FAF7F0] shadow-lg overflow-y-scroll max-h-48"
                           style={{ top: variantMenuPos.top, left: variantMenuPos.left, width: variantMenuPos.width }}
                         >
                           {variants.map((v) => {
@@ -1074,7 +1087,7 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
           never disrupted by a hide/show cycle — only its own opacity/height
           transition, eased smoothly both ways, changes. Un-hides the same
           way if the item's later removed. */}
-        {offerActive && (
+        {offerActive && showProgressBar && (
           <div
             className="px-4 overflow-hidden"
             style={{
@@ -1372,7 +1385,10 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
         <div
           className="px-4 pb-4"
           style={{
-            paddingTop: barHidden ? 12 : 0,
+            // Gap above the CTA when there's no visible progress bar directly
+            // above it — either the bar has collapsed (barHidden) OR it's not
+            // rendered at all (showProgressBar false, e.g. mini-cart/cart).
+            paddingTop: barHidden || !showProgressBar ? 12 : 0,
             transition: "padding-top 450ms ease-in-out",
           }}
         >

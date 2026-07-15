@@ -1666,7 +1666,7 @@ const CheckoutPage = () => {
                 </div>
                 {visibleBannerProductId && (
                   <div className="px-5 pb-5">
-                    <FreeShippingBanner productId={visibleBannerProductId} variant="light" showQuantityStepper />
+                    <FreeShippingBanner productId={visibleBannerProductId} variant="light" showQuantityStepper showProgressBar={false} />
                   </div>
                 )}
               </div>
@@ -1916,7 +1916,7 @@ const CheckoutPage = () => {
 
             {visibleBannerProductId && (
               <div className="px-5 pb-5">
-                <FreeShippingBanner productId={visibleBannerProductId} variant="light" showQuantityStepper />
+                <FreeShippingBanner productId={visibleBannerProductId} variant="light" showQuantityStepper showProgressBar={false} />
               </div>
             )}
 

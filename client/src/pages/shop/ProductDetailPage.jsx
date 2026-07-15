@@ -13,7 +13,9 @@ import { useCookies } from "react-cookie";
 import { fireAddToCartConfetti } from "../../utils/celebration";
 import SEOHead from "../../component/SEOHead";
 import ComparisonTable from "../../component/ComparisonTable";
-import FreeShippingBanner from "../../component/FreeShippingBanner";
+// FreeShippingBanner render moved off the PDP into the cart — import kept
+// commented so restoring the PDP banner is a one-line change.
+// import FreeShippingBanner from "../../component/FreeShippingBanner";
 import MiniCartPreview from "../../component/layout/MiniCartPreview";
 import useTimer from "../../hooks/useTimer";
 import config from "../../config/env";
@@ -1072,7 +1074,11 @@ const ProductDetailPage = () => {
               </div>
             </div>
 
-            <FreeShippingBanner productId={product.productId} className="mt-4 lg:mt-0" />
+            {/* Combo-offer banner moved OFF the PDP — it now shows in the cart
+                (mini-cart + side drawer) instead, so the customer sees the
+                "add the add-on to unlock free shipping" nudge at the cart stage.
+                Kept here commented for easy restore. */}
+            {/* <FreeShippingBanner productId={product.productId} className="mt-4 lg:mt-0" /> */}
             </div>
 
             <div className="border-t border-[#F5DEB3]/10">
@@ -2142,12 +2148,11 @@ const ProductDetailPage = () => {
                   </button>
                 </div>
 
-                {/* Mobile: opens the quick mini-cart preview first (items +
-                    total + shipping note), not straight to checkout —
-                    checkout itself is reached from the cart page/drawer,
-                    same as the desktop flow. */}
+                {/* Mobile: "Go to Cart" opens the real cart drawer directly
+                    (not the quick mini-cart preview), so the customer lands in
+                    the full cart in one tap. */}
                 <button
-                  onClick={() => setShowMiniCart(true)}
+                  onClick={openCart}
                   className="flex-1 h-12 bg-[#F5DEB3] text-[#1c3026] rounded-full font-bold uppercase tracking-widest text-[10px] shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2"
                 >
                   <span className="relative flex items-center justify-center">

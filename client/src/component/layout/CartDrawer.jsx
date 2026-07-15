@@ -10,6 +10,7 @@ import {
 import { updateQuantity, removeItem } from '../../store/slices/cartSlice';
 import { setShowLoginModal, setLoginCallback } from '../../store/slices/uiSlice';
 import { trackViewCart, trackRemoveFromCart, track } from '../../utils/analytics';
+import FreeShippingBanner from '../FreeShippingBanner';
 
 const OptimizedImage = lazy(() => import('../OptimizedImage'));
 
@@ -172,6 +173,19 @@ const CartDrawer = ({ isOpen, onClose }) => {
   const thresholdEligible =
     !!offerConfig?.isActive && (offerConfig?.thresholdAmount || 0) > 0 && subtotal >= offerConfig.thresholdAmount;
   const isFreeShippingEligible = comboEligible || !!cartRuleEvalData?.data?.freeShipping || thresholdEligible;
+
+  // Cross-sell nudge: when the offer's SOURCE product is in the cart but its
+  // RECOMMENDED add-on isn't, show that offer's FreeShippingBanner in the
+  // drawer so the customer can complete the free-shipping combo here, or just
+  // proceed to checkout. Same selection the checkout page uses; gated on the
+  // offer being active so toggling it off in admin hides this too.
+  const nudgeBannerProductId = (() => {
+    if (!offerConfig?.isActive || banners.length === 0) return null;
+    const match = banners.find(
+      (b) => cartProductIds.has(b.sourceProductId) && !cartProductIds.has(b.recommendedProductId),
+    );
+    return match?.sourceProductId || null;
+  })();
 
   return (
     <div className="fixed inset-0 z-[9999] flex justify-end">
@@ -350,6 +364,19 @@ const CartDrawer = ({ isOpen, onClose }) => {
                   );
                 })}
               </div>
+
+              {/* Add-on nudge — only when the offer's source product is in the
+                  cart but the add-on isn't. Lets the customer complete the
+                  free-shipping combo without leaving the drawer. */}
+              {nudgeBannerProductId && (
+                <FreeShippingBanner
+                  productId={nudgeBannerProductId}
+                  variant="light"
+                  showQuantityStepper
+                  showProgressBar={false}
+                  className="mt-6"
+                />
+              )}
             </>
           )}
         </div>
