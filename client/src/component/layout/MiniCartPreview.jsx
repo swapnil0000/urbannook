@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import {
   useEvaluateCartRulesQuery,
   useGetFreeShippingOfferQuery,
   useGetAllFreeShippingBannersQuery,
+  useUpdateCartMutation,
 } from "../../store/api/userApi";
+import { removeItem } from "../../store/slices/cartSlice";
+import FreeShippingBanner from "../FreeShippingBanner";
 
 /**
  * Lightweight cart preview — a compact bottom sheet showing what's in the
@@ -24,7 +27,33 @@ const itemQty = (q) => (typeof q === "object" && q !== null ? Number(q.quantity)
 
 const MiniCartPreview = ({ onClose, onViewCart }) => {
   const { items: cartItems, totalAmount } = useSelector((state) => state.cart);
+  const { isAuthenticated } = useSelector((state) => state.auth);
+  const dispatch = useDispatch();
+  const [updateCart] = useUpdateCartMutation();
   const [mounted, setMounted] = useState(false);
+
+  // Remove a line item straight from the mini-cart, so a customer who isn't
+  // interested can drop it without opening the full cart. Same dual path as
+  // CartDrawer: server cart for logged-in users, local Redux cart for guests.
+  const handleRemoveItem = async (item) => {
+    const effectiveVariant = item.selectedVariant || "N/A";
+    const hasToken = !!localStorage.getItem("authToken");
+    const isLoggedIn = isAuthenticated || hasToken;
+    if (isLoggedIn) {
+      try {
+        await updateCart({
+          productId: item.mongoId || item.id,
+          quantity: 1,
+          action: "remove",
+          variant: effectiveVariant,
+        }).unwrap();
+      } catch (err) {
+        console.error("Failed to remove item:", err);
+      }
+    } else {
+      dispatch(removeItem({ id: item.id || item.mongoId, selectedVariant: effectiveVariant }));
+    }
+  };
 
   // Generic, data-driven cart-promotion rules (server/src/model/cartRule.model.js)
   // — same evaluator the payment controller uses for the real order total,
@@ -74,6 +103,20 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
     !!offerConfig?.isActive && (offerConfig?.thresholdAmount || 0) > 0 && subtotal >= offerConfig.thresholdAmount;
   const isFreeShippingEligible = comboEligible || !!cartRuleEvalData?.data?.freeShipping || thresholdEligible;
 
+  // Cross-sell nudge: when the offer's SOURCE product (e.g. Brake Caliper Lamp)
+  // is in the cart but its RECOMMENDED add-on (e.g. Pen Stand) isn't yet, show
+  // that offer's FreeShippingBanner right here so the customer can add the
+  // add-on without leaving the cart — or just continue to checkout. Same
+  // selection the checkout page uses; gated on the offer being active, so
+  // toggling it off in admin hides this too.
+  const nudgeBannerProductId = (() => {
+    if (!offerConfig?.isActive || banners.length === 0) return null;
+    const match = banners.find(
+      (b) => cartProductIds.has(b.sourceProductId) && !cartProductIds.has(b.recommendedProductId),
+    );
+    return match?.sourceProductId || null;
+  })();
+
   useEffect(() => {
     const id = requestAnimationFrame(() => setMounted(true));
     return () => cancelAnimationFrame(id);
@@ -108,8 +151,23 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
             <div className="flex flex-col gap-3">
               {cartItems.map((item, idx) => (
                 <div key={`${item.id || item.mongoId}-${item.selectedVariant || idx}`} className="flex items-center gap-3">
-                  <div className="shrink-0 w-12 h-12 rounded-lg overflow-hidden border border-black/10 bg-white">
-                    <img src={item.image || "/placeholder.jpg"} alt={item.name} className="w-full h-full object-contain" />
+                  {/* Outer wrapper is NOT overflow-hidden so the remove badge can
+                      poke out past the top-left corner; the inner div clips the
+                      image to rounded corners. */}
+                  <div className="relative shrink-0 w-12 h-12">
+                    <div className="w-full h-full rounded-lg overflow-hidden border border-black/10 bg-white">
+                      <img src={item.image || "/placeholder.jpg"} alt={item.name} className="w-full h-full object-contain" />
+                    </div>
+                    {/* Remove — top-left of the thumbnail. Lets the customer
+                        drop a product they don't want right from the mini-cart. */}
+                    <button
+                      onClick={() => handleRemoveItem(item)}
+                      title={`Remove ${item.name}`}
+                      aria-label={`Remove ${item.name}`}
+                      className="absolute -top-1.5 -left-1.5 z-10 w-5 h-5 flex items-center justify-center rounded-full bg-[#f5deb3] border border-[#e0c896] shadow-sm text-[#1c3026] hover:bg-[#E63329] hover:text-white hover:border-[#E63329] transition-colors"
+                    >
+                      <i className="fa-solid fa-xmark text-[9px]" />
+                    </button>
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-bold text-black truncate">{item.name}</p>
@@ -143,6 +201,25 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
                   })()}
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Add-on nudge — only when the offer's source product is in the cart
+              but the add-on isn't. Lets the customer complete the free-shipping
+              combo without leaving the cart. */}
+          {nudgeBannerProductId && (
+            // Scaled down slightly so the full card fits comfortably inside the
+            // compact bottom sheet. transform-origin top keeps it anchored under
+            // the items; the negative bottom margin reclaims the space the
+            // scale leaves behind so the footer doesn't get an odd gap.
+            <div className="mt-3" style={{ transform: "scale(0.9)", transformOrigin: "top center", marginBottom: "-8%" }}>
+              <FreeShippingBanner
+                productId={nudgeBannerProductId}
+                variant="light"
+                showQuantityStepper
+                showProgressBar={false}
+                className=""
+              />
             </div>
           )}
         </div>

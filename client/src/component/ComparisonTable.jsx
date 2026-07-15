@@ -18,24 +18,25 @@ const COMPARISONS = {
       "Compared against typical desk-lighting alternatives in its category.",
     rows: [
       { label: "Wall mounted + Desk placed", other: "cross" },
-      { label: "Easy replacement. No questions asked", note: "*", other: "cross" },
-      { label: "6-months electronics warranty", note: "**", other: "cross" },
+      // Asterisk markers commented out per request — restore the `note` keys
+      // (and the `footnotes` block below) together to bring the footnotes back.
+      { label: "Easy replacement. No questions asked", /* note: "*", */ other: "cross" },
+      { label: "6-months electronics warranty", /* note: "**", */ other: "cross" },
       { label: "Heat-resistant PETG build", other: "cross" },
       { label: "Wide light area + Heat vents", other: "cross" },
     ],
-    // Footnotes keyed to the asterisks above. Scope/exclusions are stated
-    // explicitly so the warranty and replacement claims in the table are not
-    // read as unconditional.
-    footnotes: [
-      {
-        marker: "*",
-        text: "Shipping damage is replaced hassle-free.",
-      },
-      {
-        marker: "**",
-        text: "Warranty covers electronic components only — LED strip and power adapter. Coverage excludes physical or external damage, misuse, and unauthorised modification.",
-      },
-    ],
+    // Footnotes keyed to the asterisks above. Commented out per request —
+    // restore alongside the `note` markers on the rows above.
+    // footnotes: [
+    //   {
+    //     marker: "*",
+    //     text: "Shipping damage is replaced hassle-free.",
+    //   },
+    //   {
+    //     marker: "**",
+    //     text: "Warranty covers electronic components only — LED strip and power adapter. Coverage excludes physical or external damage, misuse, and unauthorised modification.",
+    //   },
+    // ],
   },
 };
 

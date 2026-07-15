@@ -13,7 +13,9 @@ import { useCookies } from "react-cookie";
 import { fireAddToCartConfetti } from "../../utils/celebration";
 import SEOHead from "../../component/SEOHead";
 import ComparisonTable from "../../component/ComparisonTable";
-import FreeShippingBanner from "../../component/FreeShippingBanner";
+// FreeShippingBanner render moved off the PDP into the cart — import kept
+// commented so restoring the PDP banner is a one-line change.
+// import FreeShippingBanner from "../../component/FreeShippingBanner";
 import MiniCartPreview from "../../component/layout/MiniCartPreview";
 import useTimer from "../../hooks/useTimer";
 import config from "../../config/env";
@@ -757,7 +759,7 @@ const ProductDetailPage = () => {
                   </span>
                 </div>
 
-                <div className="flex flex-wrap gap-3 items-center">
+                <div className="flex flex-nowrap gap-2 items-center">
                   {availableVariants.map((variantName, idx) => {
                     const isSelected = selectedVariant === variantName;
                     const lowerName = variantName.toLowerCase();
@@ -820,15 +822,15 @@ const ProductDetailPage = () => {
                             const vSku = product.variantDetails?.find(v => v.variantName === variantName)?.sku;
                             navigate(`/product/${productId}/${vSku || variantName}`);
                           }}
-                          className={`group flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border transition-all duration-300 ${
+                          className={`group flex-1 min-w-0 flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl border transition-all duration-300 ${
                             isSelected
-                              ? "bg-[#F5DEB3] border-[#F5DEB3] text-[#1c3026] shadow-[0_8px_20px_rgba(245,222,179,0.15)] scale-105"
-                              : "bg-white/10 border-white/20 text-gray-200 hover:bg-white/15 hover:border-white/40 hover:scale-[1.02]"
+                              ? "bg-[#F5DEB3] border-[#F5DEB3] text-[#1c3026] shadow-[0_8px_20px_rgba(245,222,179,0.15)]"
+                              : "bg-white/10 border-white/20 text-gray-200 hover:bg-white/15 hover:border-white/40"
                           }`}
                         >
-                          {getVariantIcon(variantName)}
-                          <div className="flex flex-col items-start leading-none">
-                            <span className={`text-[11px] font-bold uppercase tracking-wider ${isSelected ? 'text-[#1c3026]' : 'text-white group-hover:text-[#F5DEB3]'}`}>
+                          <span className="shrink-0">{getVariantIcon(variantName)}</span>
+                          <div className="flex flex-col items-start leading-none min-w-0">
+                            <span className={`text-[11px] font-bold uppercase tracking-wide truncate max-w-full ${isSelected ? 'text-[#1c3026]' : 'text-white group-hover:text-[#F5DEB3]'}`}>
                               {variantName}
                             </span>
                             <span className={`text-[7px] uppercase tracking-tighter ${isSelected ? 'text-[#1c3026]/60' : 'text-gray-400 group-hover:text-[#F5DEB3]/60'} font-bold mt-0.5`}>
@@ -1072,7 +1074,11 @@ const ProductDetailPage = () => {
               </div>
             </div>
 
-            <FreeShippingBanner productId={product.productId} className="mt-4 lg:mt-0" />
+            {/* Combo-offer banner moved OFF the PDP — it now shows in the cart
+                (mini-cart + side drawer) instead, so the customer sees the
+                "add the add-on to unlock free shipping" nudge at the cart stage.
+                Kept here commented for easy restore. */}
+            {/* <FreeShippingBanner productId={product.productId} className="mt-4 lg:mt-0" /> */}
             </div>
 
             <div className="border-t border-[#F5DEB3]/10">
@@ -2142,12 +2148,11 @@ const ProductDetailPage = () => {
                   </button>
                 </div>
 
-                {/* Mobile: opens the quick mini-cart preview first (items +
-                    total + shipping note), not straight to checkout —
-                    checkout itself is reached from the cart page/drawer,
-                    same as the desktop flow. */}
+                {/* Mobile: "Go to Cart" opens the real cart drawer directly
+                    (not the quick mini-cart preview), so the customer lands in
+                    the full cart in one tap. */}
                 <button
-                  onClick={() => setShowMiniCart(true)}
+                  onClick={openCart}
                   className="flex-1 h-12 bg-[#F5DEB3] text-[#1c3026] rounded-full font-bold uppercase tracking-widest text-[10px] shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2"
                 >
                   <span className="relative flex items-center justify-center">

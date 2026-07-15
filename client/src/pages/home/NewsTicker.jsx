@@ -5,7 +5,7 @@ const NewsTicker = () => {
   const [isPaused, setIsPaused] = useState(false);
 
   const headlines = [
-    "Limited time offer on selected products",
+    "Free Shipping on orders above ₹1700",
     "Ready to ship within 48 hrs",
     "Cash on Delivery available",
   ];

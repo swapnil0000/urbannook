@@ -63,7 +63,15 @@ const SMOKE_LIFE = 950;
  * threshold) instead of just a remove button — the PDP keeps the simpler
  * single-item add/remove since that's not the point of the PDP banner.
  */
-const FreeShippingBanner = ({ productId, showQuantityStepper = false, className = "mt-4" }) => {
+const FreeShippingBanner = ({
+  productId,
+  showQuantityStepper = false,
+  className = "mt-4",
+  // When false, the truck/progress "track" section is not rendered — used in
+  // the mini-cart and side-cart, which want just the product details + CTA,
+  // not the full progress animation. PDP/checkout leave it on (default).
+  showProgressBar = true,
+}) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { isAuthenticated } = useSelector((state) => state.auth);
@@ -107,6 +115,10 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
   // the customer, in a dedicated moment, that they still need the source
   // product for the offer to actually apply. Replaces cramming that message
   // into the CTA button's label.
+  // Flip to true to bring back the "add the source product" bottom sheet that
+  // used to pop after adding the add-on without the source in cart. Disabled
+  // per request — the banner's inline top-copy line covers that case now.
+  const SOURCE_PROMPT_ENABLED = false;
   const [showSourcePrompt, setShowSourcePrompt] = useState(false);
   const [sourcePromptMounted, setSourcePromptMounted] = useState(false);
   const [sourceAdding, setSourceAdding] = useState(false);
@@ -486,7 +498,12 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
     };
   }, [variantMenuOpen]);
 
-  if (!banner || !recommendedProduct) return null;
+  // Hide the whole card when the admin has switched the offer off
+  // (offerConfig.isActive === false). Previously this only checked that a
+  // banner existed, so a disabled offer still rendered the cross-sell card on
+  // the PDP — only its progress bar hid. Gating on offerActive too makes the
+  // admin toggle fully remove it everywhere, consistent with checkout/cart.
+  if (!banner || !recommendedProduct || !offerActive) return null;
 
   const activeVariant =
     variants.find((v) => v.variantName === selectedVariant) || variants[0];
@@ -606,12 +623,14 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
       quantity: 1,
     });
 
-    if (!willCompleteCombo) {
-      // This add just left the cart with ONLY the add-on and not the source
-      // product — free shipping isn't actually active. Say so in a dedicated
-      // moment (bottom sheet) rather than folding it into the CTA label.
-      setShowSourcePrompt(true);
-    }
+    // Pop-up removed per request: when the add-on is in the cart but the
+    // source product isn't, we no longer open a bottom sheet. The banner's own
+    // top copy line already tells the customer to add {source} to unlock the
+    // offer (see the `added && !sourceInCart` branch in the render below), so
+    // that single inline message covers this case without a modal.
+    // if (!willCompleteCombo) {
+    //   setShowSourcePrompt(true);
+    // }
     // No local "added" flag to set — cartItems updates (dispatch above, or
     // refetchCart) and cartMatch/added/progressPct derive from that
     // automatically, which is what drives the bar animation above.
@@ -823,9 +842,16 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
                     (font-bold → font-semibold) — same font-size, just less
                     heavy, so this fits on one line on mobile without
                     shrinking the text. */}
-                <p className="text-[10px] font-semibold uppercase tracking-[0.05em] text-[#1c3026]">
-                  Add {recommendedProduct.productName} & unlock{" "}
-                  <span className="font-bold text-[#E63329]">
+                {/* whitespace-nowrap keeps the whole sentence on ONE line;
+                    the clamp() font-size shrinks it on very small screens
+                    (e.g. iPhone SE) so it fits without wrapping, and caps at
+                    11px on normal widths. */}
+                <p
+                  className="font-semibold tracking-[0.01em] text-[#1c3026] whitespace-nowrap"
+                  style={{ fontSize: "clamp(8px, 3vw, 11px)" }}
+                >
+                  Add {recommendedProduct.productName} &amp; unlock{" "}
+                  <span className="font-bold uppercase text-[#E63329]">
                     free shipping
                   </span>
                 </p>
@@ -922,7 +948,7 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
                         `}</style>
                         <div
                           ref={variantMenuPortalRef}
-                          className="fsb-variant-scroll fixed z-[200] rounded-lg border border-[#157a44]/30 bg-[#FAF7F0] shadow-lg overflow-y-scroll max-h-48"
+                          className="fsb-variant-scroll fixed z-[10050] rounded-lg border border-[#157a44]/30 bg-[#FAF7F0] shadow-lg overflow-y-scroll max-h-48"
                           style={{ top: variantMenuPos.top, left: variantMenuPos.left, width: variantMenuPos.width }}
                         >
                           {variants.map((v) => {
@@ -1061,7 +1087,7 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
           never disrupted by a hide/show cycle — only its own opacity/height
           transition, eased smoothly both ways, changes. Un-hides the same
           way if the item's later removed. */}
-        {offerActive && (
+        {offerActive && showProgressBar && (
           <div
             className="px-4 overflow-hidden"
             style={{
@@ -1359,7 +1385,10 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
         <div
           className="px-4 pb-4"
           style={{
-            paddingTop: barHidden ? 12 : 0,
+            // Gap above the CTA when there's no visible progress bar directly
+            // above it — either the bar has collapsed (barHidden) OR it's not
+            // rendered at all (showProgressBar false, e.g. mini-cart/cart).
+            paddingTop: barHidden || !showProgressBar ? 12 : 0,
             transition: "padding-top 450ms ease-in-out",
           }}
         >
@@ -1488,13 +1517,13 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
         </div>
       </div>
 
-      {/* "You still need the source product" bottom sheet — shown after adding
-        the recommended add-on when that leaves the cart with ONLY the add-on
-        (source product not in cart), so free shipping isn't actually active
-        yet. Slides up from the bottom, backdrop-dismissible, with a single
-        clear action: go add the source product (its own page, so the
-        customer picks their own variant rather than one being guessed here). */}
-      {showSourcePrompt &&
+      {/* "You still need the source product" bottom sheet — DISABLED per
+        request (the `false &&` guard keeps it out of the render but preserves
+        the whole block for easy restore; flip it back to just `showSourcePrompt`
+        to re-enable). Replaced by the inline top-copy line in the banner that
+        already nudges "Add {source} to unlock free shipping" for this exact
+        case (the `added && !sourceInCart` branch above). */}
+      {SOURCE_PROMPT_ENABLED && showSourcePrompt &&
         createPortal(
           <div className="fixed inset-0 z-[200] flex items-end justify-center">
           <div
