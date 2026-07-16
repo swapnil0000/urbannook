@@ -201,15 +201,24 @@ const ProductDetailPage = () => {
   }, [product, selectedVariant]);
 
   // Calculate the max variant price (acts as MRP) and discount percentage
-  const { maxVariantPrice, discountPercent } = useMemo(() => {
+  // Struck "compare-at" price + its discount %.
+  //  • Non-top variant (a pricier variant exists, e.g. BMW/Porsche below
+  //    Lambo) → 18% markup reference.
+  //  • Top/single variant (e.g. Lambo, or a single-variant product like the
+  //    Pen Stand) → 25%-off reference (price / 0.75).
+  const { strikePrice, discountPercent } = useMemo(() => {
     if (!product || !product.variantDetails || product.variantDetails.length === 0) {
-      return { maxVariantPrice: 0, discountPercent: 0 };
+      return { strikePrice: 0, discountPercent: 0 };
     }
     const maxPrice = Math.max(...product.variantDetails.map(v => v.variantPrice || 0));
-    const discount = maxPrice > currentPrice
-      ? Math.round(((maxPrice - currentPrice) / maxPrice) * 100)
+    const isTopVariant = currentPrice >= maxPrice;
+    const strike = isTopVariant
+      ? Math.round(currentPrice / 0.75)
+      : Math.round(currentPrice * 1.18);
+    const discount = strike > currentPrice
+      ? Math.round(((strike - currentPrice) / strike) * 100)
       : 0;
-    return { maxVariantPrice: maxPrice, discountPercent: discount };
+    return { strikePrice: strike, discountPercent: discount };
   }, [product, currentPrice]);
 
   const availableVariants = useMemo(() => {
@@ -942,34 +951,17 @@ const ProductDetailPage = () => {
                 <p className="text-2xl lg:text-3xl font-light text-white">
                   ₹{currentPrice.toLocaleString()}
                 </p>
-                {discountPercent > 0 ? (
-                  // Real discount — this product's own variants are priced
-                  // differently (e.g. one variant genuinely costs more),
-                  // currentPrice vs maxVariantPrice is an actual comparison.
+                {discountPercent > 0 && (
+                  // strikePrice/discountPercent are computed above: 18% markup
+                  // for a non-top variant, 25%-off reference for the top/single
+                  // variant. Single display path for both cases.
                   <>
                     <p className="text-sm text-gray-500 line-through">
-                      ₹{maxVariantPrice.toLocaleString()}
+                      ₹{strikePrice.toLocaleString()}
                     </p>
                     <span className="text-xs font-bold text-green-400 bg-green-400/10 px-2.5 py-1 rounded-full flex items-center gap-1.5">
                       <i className="fa-solid fa-bolt-lightning text-[9px]"></i>
                       {discountPercent}% OFF
-                      <span className="text-[9px] text-green-300/80 font-medium">• Limited Time</span>
-                    </span>
-                  </>
-                ) : (
-                  // No real discount (e.g. every variant is the same flat
-                  // price) — a purely cosmetic "feels like a deal" strikethrough,
-                  // frontend-only, not tied to any actual pricing rule. Same
-                  // generic 25%-off-of-real-price computation as the
-                  // FreeShippingBanner cross-sell card, so it's never a
-                  // hardcoded number and scales correctly for any product.
-                  <>
-                    <p className="text-sm text-gray-500 line-through">
-                      ₹{Math.round(currentPrice / 0.75).toLocaleString()}
-                    </p>
-                    <span className="text-xs font-bold text-green-400 bg-green-400/10 px-2.5 py-1 rounded-full flex items-center gap-1.5">
-                      <i className="fa-solid fa-bolt-lightning text-[9px]"></i>
-                      25% OFF
                       <span className="text-[9px] text-green-300/80 font-medium">• Limited Time</span>
                     </span>
                   </>

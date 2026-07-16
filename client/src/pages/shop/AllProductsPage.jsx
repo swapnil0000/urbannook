@@ -28,9 +28,13 @@ const AllProductsPage = () => {
   const displayProducts = useMemo(() => {
     let sorted = products.map(p => {
       const firstVariantPrice = p.variantDetails?.[0]?.variantPrice || 0;
+      // Highest-priced variant of this product — same reference the PDP uses
+      // for the struck "compare-at" price, so the two pages agree.
+      const maxVariantPrice = Math.max(...(p.variantDetails || []).map(v => v.variantPrice || 0), 0);
       return {
         ...p,
-        effectivePrice: firstVariantPrice
+        effectivePrice: firstVariantPrice,
+        maxVariantPrice,
       };
     });
 
@@ -187,23 +191,47 @@ const AllProductsPage = () => {
                                 </span>
                                 <div className="flex flex-wrap gap-1.5 items-center">
                                   {/* Sirf pehle 5 variants dikhayenge */}
-                                  {availableVariants.slice(0, 5).map((variantName, idx) => (
-                                    <div
-                                      key={idx}
-                                      title={variantName}
-                                      className="w-4 h-4 rounded-full border border-[#d1d5db] shadow-sm transition-transform hover:scale-110 cursor-pointer"
-                                      style={
-                                        variantName.toLowerCase() === 'rainbow'
-                                          ? { background: 'linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)' }
-                                          : { backgroundColor: variantName.replace(/\s+/g, '').toLowerCase() }
-                                      }
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        const vSku = product.variantDetails?.find(v => v.variantName === variantName)?.sku;
-                                        navigate(`/product/${product.productId}/${vSku || variantName}`);
-                                      }}
-                                    ></div>
-                                  ))}
+                                  {availableVariants.slice(0, 5).map((variantName, idx) => {
+                                    // Brand variants (BMW / Porsche / Lambo) aren't CSS colours, so
+                                    // the old `backgroundColor: "bmw"` produced an empty white circle.
+                                    // Show the brand logo for those; keep the colour swatch for real
+                                    // colour variants. Logos are hosted URLs (not bundled assets).
+                                    const lower = variantName.toLowerCase();
+                                    const brandLogo = lower.includes('bmw')
+                                      ? 'https://upload.wikimedia.org/wikipedia/commons/4/44/BMW.svg'
+                                      : lower.includes('porsche')
+                                        ? 'https://pngimg.com/uploads/porsche_logo/porsche_logo_PNG1.png'
+                                        : lower.includes('lambo')
+                                          ? 'https://upload.wikimedia.org/wikipedia/en/d/df/Lamborghini_Logo.svg'
+                                          : null;
+                                    const goToVariant = (e) => {
+                                      e.stopPropagation();
+                                      const vSku = product.variantDetails?.find(v => v.variantName === variantName)?.sku;
+                                      navigate(`/product/${product.productId}/${vSku || variantName}`);
+                                    };
+                                    return brandLogo ? (
+                                      <img
+                                        key={idx}
+                                        src={brandLogo}
+                                        alt={variantName}
+                                        title={variantName}
+                                        onClick={goToVariant}
+                                        className="w-4 h-4 rounded-full object-contain bg-white border border-[#d1d5db] shadow-sm transition-transform hover:scale-110 cursor-pointer"
+                                      />
+                                    ) : (
+                                      <div
+                                        key={idx}
+                                        title={variantName}
+                                        onClick={goToVariant}
+                                        className="w-4 h-4 rounded-full border border-[#d1d5db] shadow-sm transition-transform hover:scale-110 cursor-pointer"
+                                        style={
+                                          lower === 'rainbow'
+                                            ? { background: 'linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)' }
+                                            : { backgroundColor: variantName.replace(/\s+/g, '').toLowerCase() }
+                                        }
+                                      ></div>
+                                    );
+                                  })}
                                   
                                   {/* 5 se zyada hone par +X dikhayenge */}
                                   {availableVariants.length > 5 && (
@@ -223,9 +251,22 @@ const AllProductsPage = () => {
                             <span className="text-lg md:text-xl font-semibold text-[#a89068]">
                               ₹{product.effectivePrice?.toLocaleString()}
                             </span>
-                            <span className="text-xs text-gray-400 line-through">
-                              ₹{(product.effectivePrice * 1.18).toFixed(0).toLocaleString()}
-                            </span>
+                            {(() => {
+                              // Struck "compare-at" price — SAME rule as the PDP:
+                              //  • a non-top variant (a pricier variant exists, e.g.
+                              //    BMW/Porsche below Lambo) → 18% markup;
+                              //  • the top/single variant (e.g. Lambo, Pen Stand) →
+                              //    25%-off reference (price / 0.75).
+                              const isTopVariant = product.effectivePrice >= product.maxVariantPrice;
+                              const strike = isTopVariant
+                                ? Math.round(product.effectivePrice / 0.75)
+                                : Math.round(product.effectivePrice * 1.18);
+                              return (
+                                <span className="text-xs text-gray-400 line-through">
+                                  ₹{strike.toLocaleString()}
+                                </span>
+                              );
+                            })()}
                           </div>
                            
                         </div>
