@@ -106,6 +106,38 @@ export function Parallax({ children, className, speed = 0.15, style, ...rest }) 
 }
 
 /**
+ * <ScrollColorBand> — the Porsche-style effect: the section enters blending in with
+ * the page (`from` = paper), then morphs to `to` (ink black) so the WHOLE band is
+ * black while it fills the viewport, and stays black as it scrolls up and out.
+ * Text `color` flips `textFrom`→`textTo` in sync. Children WITHOUT an explicit
+ * text-colour class inherit the morphing colour and stay readable the whole way;
+ * give muted children `opacity-*` (not a colour class) so they ride the same
+ * transition. Uses framer-motion (works in every browser) — no CSS scroll-timeline.
+ */
+export function ScrollColorBand({
+  children,
+  className = "",
+  from = "#EFEAE0",   // Off-White / Paper — matches the page as the band enters
+  to = "#141414",     // Ink Black — fully black once the band fills the viewport
+  textFrom = "#141414",
+  textTo = "#EFEAE0",
+  range = [0.05, 0.35],
+  as = "div",
+  ...rest
+}) {
+  const ref = useRef(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
+  const backgroundColor = useTransform(scrollYProgress, range, [from, to]);
+  const color = useTransform(scrollYProgress, range, [textFrom, textTo]);
+  const Tag = motion[as] || motion.div;
+  return (
+    <Tag ref={ref} className={className} style={{ backgroundColor, color }} {...rest}>
+      {children}
+    </Tag>
+  );
+}
+
+/**
  * <TextReveal> — headline whose words rise up from a clipped baseline.
  * Accessible: the full string is exposed via aria-label; the split words are hidden.
  * The inter-word space sits OUTSIDE the clip span so the line still wraps naturally.

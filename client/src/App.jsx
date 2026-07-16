@@ -150,7 +150,7 @@ const SyncProvider = ({ children }) => {
 
 function App() {
   useEffect(() => {
-    console.log("%c URBAN NOOK CLIENT ACTIVE - VERSION 2.1.1 (STRICT VARIANT) ", "background: #202223; color: #DF0024; font-weight: bold; font-size: 14px; padding: 10px; border-radius: 5px;");
+    console.log("%c URBAN NOOK CLIENT ACTIVE - VERSION 2.1.1 (STRICT VARIANT) ", "background: #141414; color: #E63329; font-weight: bold; font-size: 14px; padding: 10px; border-radius: 5px;");
   }, []);
 
   return (
@@ -164,7 +164,7 @@ function App() {
           <SessionManager>
             <SyncProvider>
               <ErrorBoundary>
-                <NewsTicker/>
+                {/* <NewsTicker/> */}
                 <NewHeader/>
               </ErrorBoundary>
               {/* AppRoutes loaded immediately - no lazy loading for critical routing */}

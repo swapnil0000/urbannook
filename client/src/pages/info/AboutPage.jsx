@@ -12,7 +12,7 @@ const AboutPage = () => {
   useEffect(() => { window.scrollTo(0, 0); }, []);
 
   return (
-    <div className="font-jakarta bg-paper text-ink min-h-screen">
+    <div className="font-inter bg-paper text-ink min-h-screen">
       <SEOHead title="About Us" url="/about-us" description="Learn about UrbanNook — a proudly Indian brand designing premium 3D-printed desk lamps, pen stands & décor. Our story, values, and commitment to quality." />
 
       {/* HERO */}

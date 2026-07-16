@@ -101,7 +101,7 @@ const NewHeader = () => {
 
   return (
     <>
-      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-hair font-jakarta text-ink">
+      <header className="sticky top-0 z-50 bg-ink/95 backdrop-blur border-b border-white/10 font-inter text-paper">
         <div className="max-w-[1280px] mx-auto px-5 h-16 flex items-center justify-between gap-4">
           {/* left */}
           <div className="flex items-center gap-2.5">
@@ -116,7 +116,7 @@ const NewHeader = () => {
           {/* center nav */}
           <nav className="hidden md:flex items-center gap-6 text-sm font-semibold">
             {navLinks.map((item) => (
-              <Link key={item.key} to={item.path} className={`flex items-center gap-1.5 transition-colors ${activeRoute === item.key ? 'text-brand' : 'text-ink/80 hover:text-brand'}`}>
+              <Link key={item.key} to={item.path} className={`flex items-center gap-1.5 transition-colors ${activeRoute === item.key ? 'text-brand' : 'text-paper/70 hover:text-brand'}`}>
                 {item.dot && <span className="w-1.5 h-1.5 rounded-full bg-sale"></span>}
                 {item.name}
               </Link>
@@ -129,12 +129,12 @@ const NewHeader = () => {
 
             {user ? (
               <div className="relative hidden sm:block" ref={ddRef}>
-                <button onClick={() => setShowUserDropdown((s) => !s)} className="flex items-center gap-2 pl-1 pr-2.5 py-1.5 rounded-full border border-hair hover:border-ink transition-colors">
+                <button onClick={() => setShowUserDropdown((s) => !s)} className="flex items-center gap-2 pl-1 pr-2.5 py-1.5 rounded-full border border-white/20 hover:border-white/50 transition-colors">
                   <span className="w-7 h-7 rounded-full bg-brand text-white grid place-items-center text-xs font-bold">{user?.name?.charAt(0)?.toUpperCase() || 'U'}</span>
                   <span className="text-sm font-semibold max-w-[80px] truncate">{user?.name?.split(' ')[0]}</span>
                 </button>
                 {showUserDropdown && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-hair overflow-hidden z-50">
+                  <div className="absolute right-0 mt-2 w-56 bg-white text-ink rounded-2xl shadow-xl border border-hair overflow-hidden z-50">
                     <div className="p-4 border-b border-hair"><p className="text-sm font-bold">{user.name}</p><p className="text-xs text-muted truncate">{user.email}</p></div>
                     <div className="p-2 text-sm">
                       <Link to="/profile" onClick={() => setShowUserDropdown(false)} className="block px-3 py-2.5 rounded-xl hover:bg-surface">Profile</Link>
@@ -165,10 +165,10 @@ const NewHeader = () => {
 
         {/* mobile dropdown */}
         {isMenuOpen && (
-          <div className="md:hidden border-t border-hair bg-white px-5 py-3">
+          <div className="md:hidden border-t border-white/10 bg-ink text-paper px-5 py-3">
             <nav className="flex flex-col">
               {navLinks.map((item) => (
-                <button key={item.key} onClick={() => handleMobileNav(item.path)} className={`text-left py-3 border-b border-hair font-semibold ${activeRoute === item.key ? 'text-brand' : 'text-ink'}`}>{item.name}</button>
+                <button key={item.key} onClick={() => handleMobileNav(item.path)} className={`text-left py-3 border-b border-white/10 font-semibold ${activeRoute === item.key ? 'text-brand' : 'text-paper'}`}>{item.name}</button>
               ))}
             </nav>
             {user ? (

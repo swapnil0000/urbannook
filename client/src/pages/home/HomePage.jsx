@@ -70,7 +70,7 @@ const HomePage = () => {
   const pad = (n) => String(n).padStart(2, '0');
 
   return (
-    <div className="font-jakarta bg-paper text-ink">
+    <div className="font-inter bg-paper text-ink">
       <SEOHead url="/" structuredData={HOME_STRUCTURED_DATA} />
 
       {/* HERO */}

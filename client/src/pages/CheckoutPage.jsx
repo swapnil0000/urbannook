@@ -713,7 +713,7 @@ const CheckoutPage = () => {
             navigate(`/payment-processing/${response.razorpay_order_id}`);
           },
           prefill: { name: guestName.trim(), email: guestEmail.trim(), contact: guestMobile.trim() },
-          notes: { address, pinCode }, theme: { color: "#DF0024" },
+          notes: { address, pinCode }, theme: { color: "#E63329" },
           modal: { ondismiss: () => { trackPaymentModalDismissed({ orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId, value: totalToPay }); setPaymentError("Payment cancelled. Your cart is safe."); setShowRetry(true); }, escape: false, confirm_close: true },
         });
         rp.on("payment.failed", (r) => {
@@ -791,7 +791,7 @@ const CheckoutPage = () => {
           } catch (_) { setPaymentError("Payment verification failed. Contact support if amount was debited."); }
         },
         prefill: { name: userProfile?.userName || userProfile?.name || "", email: userProfile?.email || "", contact: senderMobileStr },
-        notes: { address, pinCode }, theme: { color: "#DF0024" },
+        notes: { address, pinCode }, theme: { color: "#E63329" },
         modal: { ondismiss: () => { trackPaymentModalDismissed({ orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId || orderResult.id, value: totalToPay }); setPaymentError("Payment cancelled. Your cart is safe."); setShowRetry(true); }, escape: false, confirm_close: true },
       });
       rp.on("payment.failed", (r) => {
@@ -826,10 +826,10 @@ const CheckoutPage = () => {
 
 
   return (
-    <div className="bg-surface font-jakarta text-ink">
+    <div className="bg-surface font-inter text-ink">
 
       {/* ── Step wizard ────────────────────────────────────────────────── */}
-      <div className="bg-white border-b border-gray-100 pt-28 lg:pt-36">
+      <div className="bg-white border-b border-gray-100 pt-8 lg:pt-10">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 pb-6">
           {/* breadcrumb */}
           <div className="flex items-center gap-2 text-xs text-gray-400 font-medium mb-6">
@@ -889,7 +889,7 @@ const CheckoutPage = () => {
           {isGuest && currentStep === 1 && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
               <div className="text-center">
-                <h1 className="text-2xl sm:text-3xl font-jakarta text-gray-900 leading-tight">How would you like to continue?</h1>
+                <h1 className="text-2xl sm:text-3xl font-inter text-gray-900 leading-tight">How would you like to continue?</h1>
                 {/* <p className="text-sm text-gray-400 mt-2">Sign in for a faster checkout or continue as a guest</p> */}
               </div>
 
@@ -1057,7 +1057,7 @@ const CheckoutPage = () => {
             <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
 
               <div>
-                <h1 className="text-2xl sm:text-3xl font-jakarta text-gray-900 leading-tight">Delivery Address</h1>
+                <h1 className="text-2xl sm:text-3xl font-inter text-gray-900 leading-tight">Delivery Address</h1>
                 <p className="text-sm text-gray-400 mt-1.5">Where should we send your order?</p>
               </div>
 
@@ -1206,7 +1206,7 @@ const CheckoutPage = () => {
             <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
 
               <div>
-                <h1 className="text-2xl sm:text-3xl font-jakarta text-gray-900 leading-tight">Review Your Order</h1>
+                <h1 className="text-2xl sm:text-3xl font-inter text-gray-900 leading-tight">Review Your Order</h1>
                 <p className="text-sm text-gray-400 mt-1.5">Almost there — confirm everything looks right</p>
               </div>
 

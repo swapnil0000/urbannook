@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 
 /* GullyLabs-style footer — dark, clean, trust-forward. */
 const Footer = () => (
-  <footer className="bg-ink text-white/80 font-jakarta">
+  <footer className="bg-ink text-white/80 font-inter">
     <div className="max-w-[1280px] mx-auto px-5 py-14 grid grid-cols-2 md:grid-cols-4 gap-8">
       <div className="col-span-2 md:col-span-1">
         <p className="font-extrabold text-white text-xl tracking-tight">URBAN&nbsp;NOOK</p>

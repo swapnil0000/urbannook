@@ -75,8 +75,11 @@ export default function ImageCarousel({
       const el = trackRef.current;
       if (!el) return;
       const s = stride();
-      const next = (Math.round(el.scrollLeft / s) + 1) % count;
-      el.scrollTo({ left: next * s, behavior: 'smooth' });
+      // Loop: in peek mode the track can't scroll a full slide past the end, so key the
+      // wrap off the real scroll limit (not the index) — once we can't advance further, snap
+      // back to the first slide. Works for both full-width and multi-visible peek layouts.
+      const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 4;
+      el.scrollTo({ left: atEnd ? 0 : el.scrollLeft + s, behavior: 'smooth' });
     }, interval);
     return () => clearInterval(id);
   }, [paused, reduced, count, interval]);
@@ -143,7 +146,7 @@ export default function ImageCarousel({
   // DEFAULT — one full-width framed image at a time.
   return (
     <div className={className} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
-      <div className={`relative rounded-[1.5rem] overflow-hidden border border-hair bg-surface ${aspectClass}`}>
+      <div className={`relative  overflow-hidden border border-hair bg-surface ${aspectClass}`}>
         <div
           ref={trackRef}
           onScroll={onScroll}

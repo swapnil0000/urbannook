@@ -112,7 +112,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
   const subtotal = totalAmount;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex justify-end font-jakarta text-ink">
+    <div className="fixed inset-0 z-[9999] flex justify-end font-inter text-ink">
 
       {/* Backdrop */}
       <div

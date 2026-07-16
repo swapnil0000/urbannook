@@ -7,9 +7,10 @@ import WishlistButton from '../../component/WishlistButton';
 import UnProductCard from '../../component/UnProductCard';
 import ImageCarousel from '../../component/ImageCarousel';
 import { motion, AnimatePresence } from 'motion/react';
-import { trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist, trackVariantSelect } from '../../utils/analytics';
+import { ScrollColorBand } from '../../component/motion';
+import { trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist, trackVariantSelect, trackShare, trackDeliveryCheck } from '../../utils/analytics';
 import { useGetProductByIdQuery, useGetProductsQuery } from '../../store/api/productsApi';
-import { useAddToCartMutation, useUpdateCartMutation } from '../../store/api/userApi';
+import { useAddToCartMutation, useUpdateCartMutation, useCalculateShippingMutation } from '../../store/api/userApi';
 import { useGetProductReviewsQuery, useSubmitProductReviewMutation, useUpdateProductReviewMutation } from '../../store/api/testimonialsApi';
 import { addItem, updateQuantity, removeItem, updateSelection } from '../../store/slices/cartSlice';
 import { useUI } from '../../hooks/useRedux';
@@ -41,10 +42,14 @@ const ProductDetailPage = () => {
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const buyBoxRef = useRef(null);
   const [buyBoxVisible, setBuyBoxVisible] = useState(true); // controls the sticky mobile CTA
+  const [pinInput, setPinInput] = useState('');            // pincode delivery check
+  const [pinStatus, setPinStatus] = useState(null);        // { ok, msg, charge, eta }
+  const [showShare, setShowShare] = useState(false);       // desktop share row fallback
 
   const { data: productResponse, isLoading, error } = useGetProductByIdQuery(productId);
   const [addToCartAPI, { isLoading: isAdding }] = useAddToCartMutation();
   const [updateCart] = useUpdateCartMutation();
+  const [checkPincode, { isLoading: isCheckingPin }] = useCalculateShippingMutation();
   const { refetch: refetchCart } = useCartData();
 
   const { data: reviewsData } = useGetProductReviewsQuery(productId);
@@ -195,7 +200,7 @@ const ProductDetailPage = () => {
         await addToCartAPI({ productId: product?.productId, quantity: 1, variant: effectiveVariant, image: selectedImage }).unwrap();
         dispatch(updateSelection({ productId: product.productId, quantity: 1, variant: effectiveVariant }));
         await refetchCart().unwrap();
-        confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 }, colors: ['#DF0024', '#A8101A', '#F3C33B', '#ffffff'] });
+        confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 }, colors: ['#E63329', '#C9281F', '#F3C33B', '#ffffff'] });
         setSelectedVariant(effectiveVariant);
         setFeedbackMessage('Added to cart'); setTimeout(() => setFeedbackMessage(''), 2000);
         trackAddToCart({ itemId: product.productId, itemName: product.productName, itemVariant: effectiveVariant, price: currentPrice, quantity: 1 });
@@ -222,7 +227,7 @@ const ProductDetailPage = () => {
       } else {
         dispatch(addItem({ id: crossSell.productId, mongoId: crossSell.productId, name: crossSell.productName, price: crossSellPrice, image: crossSellImg, quantity: 1, selectedVariant: vName }));
       }
-      confetti({ particleCount: 90, spread: 70, origin: { y: 0.7 }, colors: ['#DF0024', '#F3C33B', '#ffffff'] });
+      confetti({ particleCount: 90, spread: 70, origin: { y: 0.7 }, colors: ['#E63329', '#F3C33B', '#ffffff'] });
       trackAddToCart({ itemId: crossSell.productId, itemName: crossSell.productName, itemVariant: vName, price: crossSellPrice, quantity: 1 });
     } catch (err) {
       showNotification(err?.data?.message || 'Something went wrong', 'error');
@@ -249,6 +254,53 @@ const ProductDetailPage = () => {
   };
 
   const handleCheckoutClick = () => navigate('/checkout');
+
+  // ── Pincode delivery check — same ShipMozo rate API the checkout uses ──
+  const handlePinCheck = async () => {
+    const pin = pinInput.trim();
+    if (!/^[1-9][0-9]{5}$/.test(pin)) { setPinStatus({ ok: false, msg: 'Please enter a valid 6-digit pincode' }); return; }
+    try {
+      const res = await checkPincode({
+        deliveryPinCode: parseInt(pin, 10),
+        cartItems: [{ productId: product.productId, quant: 1, price: currentPrice, selectedVariant: selectedVariant || undefined }],
+        paymentType: 'PREPAID',
+      }).unwrap();
+      const charge = Math.ceil(parseFloat(res?.data?.total_charges));
+      // Ships in 2–4 days + courier transit — show the outer estimate as the promise date.
+      const eta = new Date(Date.now() + 7 * 86400000).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+      setPinStatus({ ok: true, msg: `Delivery available to ${pin}`, charge: Number.isFinite(charge) ? charge : null, eta });
+      trackDeliveryCheck({ pincode: pin, serviceable: true, shippingAmount: charge });
+    } catch (err) {
+      const reason = err?.data?.message || err?.message || '';
+      setPinStatus({ ok: false, msg: /serviceable/i.test(reason) ? `Sorry — ${pin} isn't serviceable yet` : 'Could not check this pincode. Please try again.' });
+      trackDeliveryCheck({ pincode: pin, serviceable: false, errorReason: reason });
+    }
+  };
+
+  // ── Share — native sheet on mobile, social buttons on desktop ──
+  const shareUrl = `https://www.urbannook.in/shop?product=${product?.productId}`;
+  const shareText = `${product?.productName || 'Urban Nook'} — Urban Nook`;
+  const openShare = (method, href) => {
+    trackShare({ contentType: 'product', itemId: product.productId, method });
+    window.open(href, '_blank', 'noopener,noreferrer');
+  };
+  const handleShareClick = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: shareText, text: shareText, url: shareUrl });
+        trackShare({ contentType: 'product', itemId: product.productId, method: 'native' });
+      } catch { /* user dismissed the sheet */ }
+    } else {
+      setShowShare((s) => !s);
+    }
+  };
+  const copyShareLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setFeedbackMessage('Link copied'); setTimeout(() => setFeedbackMessage(''), 2000);
+    } catch { /* clipboard unavailable */ }
+    trackShare({ contentType: 'product', itemId: product.productId, method: 'copy_link' });
+  };
 
   // reviews
   const rd = reviewsData?.data || {};
@@ -313,7 +365,7 @@ const ProductDetailPage = () => {
 
   if (isLoading) return <div className="min-h-[70vh] grid place-items-center bg-paper"><div className="w-12 h-12 border-2 border-brand border-t-transparent rounded-full animate-spin" /></div>;
   if (error || !product) return (
-    <div className="min-h-[70vh] grid place-items-center bg-paper font-jakarta text-center px-5">
+    <div className="min-h-[70vh] grid place-items-center bg-paper font-inter text-center px-5">
       <div><h1 className="text-3xl font-extrabold">Product not found</h1><button onClick={() => navigate('/products')} className="gl-press mt-5 bg-brand text-white font-bold px-7 py-3 rounded-xl hover:bg-brandHi">Back to Shop</button></div>
     </div>
   );
@@ -326,7 +378,7 @@ const ProductDetailPage = () => {
   };
 
   return (
-    <div className="font-jakarta bg-paper text-ink min-h-screen overflow-x-clip">
+    <div className="font-inter bg-paper text-ink min-h-screen overflow-x-clip">
       <SEOHead title={product.productName} description={product.productSubDes || product.productDes} url={`/product/${product.productId}`} image={galleryImages[0]} structuredData={structuredData} />
 
       <div className="max-w-[1280px] mx-auto px-5 py-6 md:py-8">
@@ -336,14 +388,9 @@ const ProductDetailPage = () => {
         </div>
 
         <div className="grid lg:grid-cols-2 gap-8 lg:gap-10">
-          {/* GALLERY — peek filmstrip on mobile, one big framed image on desktop */}
+          {/* GALLERY — one big full-width framed image (swipe + dots on mobile, arrows on desktop) */}
           <div className="lg:sticky lg:top-24 self-start w-full min-w-0">
-            <div className="md:hidden">
-              <ImageCarousel peek images={galleryImages} alt={product.productName} onImgErr={onImgErr} onItemClick={(i) => setLightbox({ list: galleryImages, idx: i })} />
-            </div>
-            <div className="hidden md:block">
-              <ImageCarousel images={galleryImages} alt={product.productName} onImgErr={onImgErr} onItemClick={(i) => setLightbox({ list: galleryImages, idx: i })} />
-            </div>
+            <ImageCarousel images={galleryImages} alt={product.productName} onImgErr={onImgErr} onItemClick={(i) => setLightbox({ list: galleryImages, idx: i })} />
           </div>
 
           {/* INFO */}
@@ -361,12 +408,27 @@ const ProductDetailPage = () => {
             </div>
             <div className="flex items-start justify-between gap-3 mt-2">
               <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-ink leading-tight">{product.productName}</h1>
-              <div className="shrink-0 pt-1"><WishlistButton productId={product.productId} /></div>
+              <div className="shrink-0 pt-1 flex items-center gap-2">
+                <button onClick={handleShareClick} aria-label="Share this product" className="w-9 h-9 grid place-items-center rounded-full border border-hair text-ink hover:border-ink transition-colors">
+                  <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="m8.7 13.5 6.6 3.9M15.3 6.6 8.7 10.5" /></svg>
+                </button>
+                <WishlistButton productId={product.productId} />
+              </div>
             </div>
+            {showShare && (
+              <div className="flex items-center gap-2 mt-3">
+                <span className="text-xs font-bold text-muted mr-1">Share:</span>
+                <button onClick={() => openShare('whatsapp', `https://api.whatsapp.com/send?text=${encodeURIComponent(`${shareText} ${shareUrl}`)}`)} aria-label="Share on WhatsApp" className="w-9 h-9 grid place-items-center rounded-full border border-hair text-ink hover:border-ink hover:bg-surface transition-colors"><i className="fa-brands fa-whatsapp text-base" /></button>
+                <button onClick={() => openShare('facebook', `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`)} aria-label="Share on Facebook" className="w-9 h-9 grid place-items-center rounded-full border border-hair text-ink hover:border-ink hover:bg-surface transition-colors"><i className="fa-brands fa-facebook-f text-sm" /></button>
+                <button onClick={() => openShare('x', `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`)} aria-label="Share on X" className="w-9 h-9 grid place-items-center rounded-full border border-hair text-ink hover:border-ink hover:bg-surface transition-colors"><i className="fa-brands fa-x-twitter text-sm" /></button>
+                <button onClick={() => openShare('instagram', 'https://www.instagram.com/urbannook.store')} aria-label="Instagram" className="w-9 h-9 grid place-items-center rounded-full border border-hair text-ink hover:border-ink hover:bg-surface transition-colors"><i className="fa-brands fa-instagram text-base" /></button>
+                <button onClick={copyShareLink} aria-label="Copy link" className="w-9 h-9 grid place-items-center rounded-full border border-hair text-ink hover:border-ink hover:bg-surface transition-colors"><i className="fa-solid fa-link text-xs" /></button>
+              </div>
+            )}
             {(product.productDes || product.productSubDes) && <p className="text-sm text-muted leading-relaxed mt-2 line-clamp-2">{product.productDes || product.productSubDes}</p>}
 
             {/* ZONE B — BUY CARD: price → savings → variants → urgency → CTA → trust, one unit */}
-            <div className="mt-5 rounded-2xl border border-hair bg-surface p-4 md:p-5 md:max-w-md">
+            <div className="mt-5  bg-paper p-4 md:p-5 md:max-w-md">
               {/* price hero */}
               <div className="flex items-baseline flex-wrap gap-x-3 gap-y-1">
                 <span className="text-4xl md:text-5xl font-extrabold text-ink tracking-tight tabular-nums leading-none">{inr(currentPrice)}</span>
@@ -389,7 +451,7 @@ const ProductDetailPage = () => {
                       <button
                         key={i}
                         onClick={() => onSelectVariant(v)}
-                        className={`gl-press px-4 h-10 rounded-xl border text-sm font-semibold transition-colors ${v.variantName === selectedVariant ? 'border-brand bg-brand/5 text-brand' : 'border-hair bg-paper text-ink hover:border-ink'}`}
+                        className={`gl-press px-4 h-10 rounded-xl border text-sm font-semibold transition-colors ${v.variantName === selectedVariant ? 'border-brand bg-brand/5 text-brand' : 'border-hair bg-white text-ink hover:border-ink'}`}
                       >
                         {v.variantName}
                       </button>
@@ -422,8 +484,44 @@ const ProductDetailPage = () => {
                     <button onClick={handleInitialAddToCart} disabled={isAdding} className="gl-press flex-1 h-12 bg-brand text-paper font-bold text-sm rounded-xl hover:bg-brandHi disabled:opacity-60 whitespace-nowrap">
                       {isAdding ? 'Adding…' : <>Add to Cart</>}
                     </button>
-                    <button onClick={handleCheckoutClick} className="gl-press flex-1 h-12 border border-ink text-ink font-bold text-sm rounded-xl hover:bg-ink hover:text-paper transition-colors whitespace-nowrap">Buy it Now</button>
+                    {/* <button onClick={handleCheckoutClick} className="gl-press flex-1 h-12 border border-ink text-ink font-bold text-sm rounded-xl hover:bg-ink hover:text-paper transition-colors whitespace-nowrap">Buy it Now</button> */}
                   </>
+                )}
+              </div>
+
+              {/* pincode delivery check */}
+              <div className="mt-4 pt-4 border-t border-hair">
+                <p className="gl-lbl text-ink mb-2">Check delivery</p>
+                <div className="flex gap-2">
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={pinInput}
+                    onChange={(e) => { setPinInput(e.target.value.replace(/\D/g, '').slice(0, 6)); if (pinStatus) setPinStatus(null); }}
+                    onKeyDown={(e) => e.key === 'Enter' && pinInput.length === 6 && handlePinCheck()}
+                    placeholder="Enter 6-digit pincode"
+                    className="flex-1 min-w-0 h-11 px-3.5 rounded-xl border border-hair bg-white text-sm text-ink outline-none focus:border-brand tabular-nums"
+                  />
+                  <button
+                    onClick={handlePinCheck}
+                    disabled={isCheckingPin || pinInput.length !== 6}
+                    className="gl-press h-11 px-5 rounded-xl border border-ink text-ink font-bold text-sm hover:bg-ink hover:text-paper transition-colors disabled:opacity-40 shrink-0"
+                  >
+                    {isCheckingPin ? 'Checking…' : 'Check'}
+                  </button>
+                </div>
+                {pinStatus && (
+                  pinStatus.ok ? (
+                    <div className="mt-2 text-sm font-semibold text-save">
+                      ✓ {pinStatus.msg}
+                      <span className="block text-xs font-medium text-muted mt-0.5">
+                        Expected delivery by {pinStatus.eta}{pinStatus.charge != null && <> · Shipping {inr(pinStatus.charge)}</>}
+                      </span>
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-sm font-semibold text-brand">✕ {pinStatus.msg}</p>
+                  )
                 )}
               </div>
 
@@ -435,9 +533,37 @@ const ProductDetailPage = () => {
               </div>
             </div>
 
+            {/* OFFERS — UPI / EMI / card offers, applied via Razorpay at checkout */}
+            <div className="mt-4 rounded-2xl border border-hair bg-white p-4 md:max-w-md">
+              <div className="flex items-center justify-between mb-3">
+                <p className="gl-lbl text-brand">Available offers</p>
+                <span className="text-[10px] font-bold text-muted uppercase tracking-wider">Powered by Razorpay</span>
+              </div>
+              <ul className="space-y-2.5 text-sm text-ink">
+                <li className="flex items-start gap-2.5">
+                  <i className="fa-solid fa-bolt text-brand text-xs mt-1 w-4 text-center shrink-0" />
+                  <span><b>UPI</b> — pay instantly with GPay, PhonePe, Paytm &amp; more</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <i className="fa-regular fa-credit-card text-brand text-xs mt-1 w-4 text-center shrink-0" />
+                  <span><b>EMI</b> available on eligible credit &amp; debit cards</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <i className="fa-solid fa-tag text-brand text-xs mt-1 w-4 text-center shrink-0" />
+                  <span>Bank &amp; card <b>offers auto-applied</b> on the payment page</span>
+                </li>
+                {product.isCodAvailable && (
+                  <li className="flex items-start gap-2.5">
+                    <i className="fa-solid fa-money-bill-wave text-brand text-xs mt-1 w-4 text-center shrink-0" />
+                    <span><b>Cash on Delivery</b> available for this product</span>
+                  </li>
+                )}
+              </ul>
+            </div>
+
             {/* ZONE C — complete the set (secondary card) */}
             {crossSell && (
-              <div className="mt-4 rounded-2xl border border-hair bg-paper p-4 md:max-w-md">
+              <div className="mt-4 rounded-2xl border border-hair bg-white p-4 md:max-w-md">
                 <div className="flex items-center justify-between mb-3">
                   <p className="gl-lbl text-brand">Complete the set</p>
                   <span className="text-[11px] font-bold text-muted flex items-center gap-1">🔗 Frequently bought together</span>
@@ -465,8 +591,8 @@ const ProductDetailPage = () => {
 
         {/* LOOK CLOSER — full-bleed LIGHT-GREY (surface) band, auto-playing carousel (tap to zoom) */}
         {galleryImages.length > 1 && (
-          <div className="w-screen ml-[calc(50%-50vw)] bg-surface text-ink mt-16">
-            <div className="max-w-[1280px] mx-auto px-5 py-14 md:py-16">
+          <div className="w-screen ml-[calc(50%-50vw)] bg-paper text-ink mt-6">
+            <div className="max-w-[1280px] mx-auto px-5 py-5 md:py-5">
               <div className="flex items-end justify-between mb-6">
                 <div>
                   <p className="gl-lbl text-brand mb-2">— The Details</p>
@@ -496,13 +622,13 @@ const ProductDetailPage = () => {
 
         {/* IN THE WILD — full-bleed BLACK (ink) editorial band from customer review photos */}
         {communityShots.length > 0 && (
-          <div className="w-screen ml-[calc(50%-50vw)] bg-ink text-paper mt-16">
+          <ScrollColorBand className="w-screen ml-[calc(50%-50vw)] mt-16">
             <div className="max-w-[1280px] mx-auto px-5 py-14 md:py-20">
-              <p className="gl-lbl text-paper/50 mb-2">— In the wild</p>
+              <p className="gl-lbl opacity-50 mb-2">— In the wild</p>
               <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight leading-[0.95] mb-1">
-                <span className="text-paper">Seen in</span><br /><span className="text-paper/40">real setups.</span>
+                <span>Seen in</span><br /><span className="opacity-40">real setups.</span>
               </h2>
-              <p className="text-paper/50 text-sm mb-7">Straight from {totalReviews > 0 ? `${totalReviews} verified ` : ''}customers who bought it.</p>
+              <p className="opacity-60 text-sm mb-7">Straight from {totalReviews > 0 ? `${totalReviews} verified ` : ''}customers who bought it.</p>
               <ImageCarousel
                 peek
                 images={communityShotUrls}
@@ -517,7 +643,7 @@ const ProductDetailPage = () => {
                 )}
               />
             </div>
-          </div>
+          </ScrollColorBand>
         )}
 
         {/* WHY URBAN NOOK — comparison / trust table */}
@@ -525,7 +651,7 @@ const ProductDetailPage = () => {
           <p className="gl-lbl text-brand mb-2 text-center">Why Urban Nook</p>
           <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight mb-6 text-center">Made different.</h2>
           <div className="max-w-lg mx-auto rounded-2xl border border-hair overflow-hidden">
-            <div className="grid grid-cols-[1fr_64px_64px] items-center px-4 py-2.5 bg-surface">
+            <div className="grid grid-cols-[1fr_64px_64px] items-center px-4 py-2.5 bg-paper">
               <span />
               <span className="text-center text-[11px] font-extrabold uppercase tracking-wide text-brand">Us</span>
               <span className="text-center text-[11px] font-extrabold uppercase tracking-wide text-faint">Others</span>
@@ -548,8 +674,8 @@ const ProductDetailPage = () => {
         </section>
 
         {/* PRODUCT DETAILS — full-bleed LIGHT-GREY (surface) band: description / specs / shipping */}
-        <div className="w-screen ml-[calc(50%-50vw)] bg-surface mt-16">
-        <section className="max-w-3xl mx-auto px-5 py-14 md:py-16">
+        <div className="w-screen ml-[calc(50%-50vw)] bg-paper mt-16">
+        <section className="max-w-3xl mx-auto px-5 ">
           <p className="gl-lbl text-brand mb-2 text-center">The full rundown</p>
           <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight mb-6 text-center">Product details</h2>
           <div className="divide-y divide-hair border-y border-hair">
@@ -586,8 +712,8 @@ const ProductDetailPage = () => {
         )}
 
         {/* REVIEWS — full-bleed LIGHT-GREY (surface) band */}
-        <div className="w-screen ml-[calc(50%-50vw)] bg-surface mt-16">
-        <div id="reviews" className="max-w-[1280px] mx-auto px-5 py-14 md:py-16 scroll-mt-24">
+        <div className="w-screen ml-[calc(50%-50vw)] bg-paper mt-16">
+        <div id="reviews" className="max-w-[1280px] mx-auto px-5 scroll-mt-24">
           <div className="flex items-start justify-between gap-4 mb-6">
             <div>
               <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">Ratings &amp; Reviews</h2>
@@ -604,12 +730,12 @@ const ProductDetailPage = () => {
 
           <div id="review-form-anchor" />
           {showReviewForm && (
-            <div className="border border-hair rounded-2xl p-6 mb-8 bg-paper">
+            <div className="border border-hair rounded-2xl p-6 mb-8 bg-white">
               <p className="font-bold text-lg mb-3">{editingReviewId ? 'Edit your review' : 'Share your experience'}</p>
               <div className="flex gap-1 mb-3">
                 {[1, 2, 3, 4, 5].map((r) => <button key={r} onClick={() => setReviewForm((f) => ({ ...f, rating: r }))} className={`text-2xl leading-none ${r <= reviewForm.rating ? 'text-star' : 'text-hair'}`}>★</button>)}
               </div>
-              <textarea value={reviewForm.desc} onChange={(e) => setReviewForm((f) => ({ ...f, desc: e.target.value.slice(0, 500) }))} rows={4} placeholder="How's the product? (max 500 chars)" className="w-full border border-hair rounded-xl px-4 py-3 text-sm outline-none focus:border-brand bg-paper resize-none" />
+              <textarea value={reviewForm.desc} onChange={(e) => setReviewForm((f) => ({ ...f, desc: e.target.value.slice(0, 500) }))} rows={4} placeholder="How's the product? (max 500 chars)" className="w-full border border-hair rounded-xl px-4 py-3 text-sm outline-none focus:border-brand bg-white resize-none" />
               <div className="flex items-center gap-2 mt-3 flex-wrap">
                 {reviewImagePreviews.map((src, i) => (
                   <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden border border-hair"><img src={src} alt="" className="w-full h-full object-cover" /><button onClick={() => handleRemoveReviewImage(i)} className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-ink text-white text-xs grid place-items-center">×</button></div>
@@ -642,11 +768,11 @@ const ProductDetailPage = () => {
 
           <div className="grid sm:grid-cols-2 gap-4">
               {reviews.length === 0 ? (
-                <div className="sm:col-span-2 text-muted text-sm bg-paper border border-hair rounded-2xl p-8 text-center">No reviews yet — be the first to review this product.</div>
+                <div className="sm:col-span-2 text-muted text-sm bg-white border border-hair rounded-2xl p-8 text-center">No reviews yet — be the first to review this product.</div>
               ) : reviews.slice(0, visibleReviews).map((rev) => {
                 const imgs = rev.imageUrls?.length ? rev.imageUrls : rev.imageUrl ? [rev.imageUrl] : [];
                 return (
-                  <div key={rev._id} className="bg-paper border border-hair rounded-2xl p-5">
+                  <div key={rev._id} className="bg-white border border-hair rounded-2xl p-5">
                     <div className="flex items-center justify-between"><Stars n={rev.rating} className="text-sm" />{rev.userId && rev.userId === currentUserId && <button onClick={() => handleEditReview(rev)} className="text-xs text-brand font-semibold">Edit</button>}</div>
                     <p className="text-muted text-sm mt-2">{rev.desc}</p>
                     {imgs.length > 0 && (

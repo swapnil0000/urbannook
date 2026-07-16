@@ -4,22 +4,23 @@
 
 :root {
   /* ============================================================
-     URBAN NOOK — GLOBAL DESIGN TOKENS (GullyLabs palette)
+     URBAN NOOK — GLOBAL DESIGN TOKENS (Urban Nook editorial palette)
      Change the whole site's colours here. Stored as "R G B"
      channels so Tailwind opacity modifiers (bg-brand/10) work.
+     4-colour system: Nook Red · Ink Black · Off-White/Paper · Stone Grey.
      ============================================================ */
-  --gl-brand:    223 0 36;    /* #DF0024 primary — buttons, links, accents (GullyLabs red) */
-  --gl-brand-hi: 168 16 26;   /* #A8101A deep red — hover */
-  --gl-sale:     223 0 36;    /* #DF0024 discounts / sale / hot badges */
-  --gl-sale-deep:168 16 26;   /* #A8101A deep red — emphasis */
-  --gl-star:     243 195 59;  /* #F3C33B ratings */
-  --gl-save:     16 132 116;  /* #108474 savings (teal) */
-  --gl-ink:      32 34 35;    /* #202223 near-black text */
-  --gl-paper:    255 255 255; /* #FFFFFF background */
-  --gl-muted:    123 123 123; /* #7B7B7B muted text */
-  --gl-faint:    154 154 154; /* #9A9A9A faint text */
-  --gl-hair:     231 232 236; /* #E7E8EC hairline borders */
-  --gl-surface:  243 244 247; /* #F3F4F7 light gray band — makes white cards pop */
+  --gl-brand:    230 51 41;   /* #E63329 Nook Red — the one accent (buttons, links, dot) */
+  --gl-brand-hi: 201 40 31;   /* #C9281F Red Deep — hover/pressed */
+  --gl-sale:     230 51 41;   /* #E63329 discounts / sale / hot badges */
+  --gl-sale-deep:201 40 31;   /* #C9281F Red Deep — emphasis */
+  --gl-star:     243 195 59;  /* #F3C33B ratings (functional gold — outside the 4-colour brand set) */
+  --gl-save:     16 132 116;  /* #108474 savings (functional teal — outside the 4-colour brand set) */
+  --gl-ink:      20 20 20;    /* #141414 Ink Black — text, header, image frames */
+  --gl-paper:    239 234 224; /* #EFEAE0 Off-White / Paper — page background */
+  --gl-muted:    97 92 80;    /* #615C50 Grey-Dark — muted but readable text */
+  --gl-faint:    140 135 121; /* #8C8779 Stone Grey — faint text */
+  --gl-hair:     216 210 197; /* #D8D2C5 Line — hairline borders (warm) */
+  --gl-surface:  229 223 211; /* #E5DFD3 Cream-2 — secondary panels/bands (white cards pop on it) */
 
   /* Colors - Modern Blue & Teal Palette (legacy) */
   --color-primary: #3B82F6;    /* Blue */
@@ -89,7 +90,12 @@
     transition: background-color 0.3s ease, color 0.3s ease;
     position: relative;
   }
-  
+
+  /* Headings use Archivo (Urban Nook display font); body stays Inter. */
+  h1, h2, h3, h4 {
+    font-family: 'Archivo', ui-sans-serif, sans-serif;
+  }
+
   body::before {
     content: '';
     position: fixed;
@@ -564,7 +570,7 @@
 /* ============================================================
    GULLYLABS-STYLE HELPERS (chosen direction)
    ============================================================ */
-.gl-lbl{font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700}
+.gl-lbl{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:600}
 .gl-pcard{box-shadow:0 1px 2px rgba(20,20,20,.04),0 10px 30px -20px rgba(20,20,20,.18);transition:box-shadow .3s,transform .3s,border-color .3s}
 .gl-pcard:hover{box-shadow:0 18px 44px -18px rgba(20,20,20,.26);transform:translateY(-3px);border-color:rgb(var(--gl-hair))}
 .gl-img{transition:transform .6s cubic-bezier(.2,.7,.2,1),opacity .4s}

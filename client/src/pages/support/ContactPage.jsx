@@ -49,7 +49,7 @@ const ContactPage = () => {
   const field = (bad) => `w-full bg-white border rounded-xl px-4 py-3.5 text-sm outline-none transition-colors ${bad ? 'border-sale' : 'border-hair focus:border-brand'}`;
 
   return (
-    <div className="font-jakarta bg-paper text-ink min-h-screen">
+    <div className="font-inter bg-paper text-ink min-h-screen">
       <SEOHead title="Contact Us" url="/contact-us" description="Get in touch with UrbanNook via WhatsApp, email or phone for product inquiries, order support and custom design requests." />
 
       <section className="max-w-[1280px] mx-auto px-5 pt-14 md:pt-20 pb-8">

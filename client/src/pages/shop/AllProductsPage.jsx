@@ -45,7 +45,7 @@ const AllProductsPage = () => {
   const chip = (c) => `gl-press px-4 py-2 rounded-full text-sm font-semibold transition-colors ${activeCat === c ? 'bg-brand text-white' : 'bg-white border border-hair hover:border-ink'}`;
 
   return (
-    <div className="font-jakarta bg-surface text-ink min-h-screen">
+    <div className="font-inter bg-surface text-ink min-h-screen">
       <SEOHead title="Shop All Products" url="/products" description="Browse UrbanNook's full collection of 3D-printed desk lamps, pen stands & décor. Made in India, fast pan-India delivery." />
 
       <div className="max-w-[1280px] mx-auto px-5 pt-10">
