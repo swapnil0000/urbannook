@@ -559,7 +559,7 @@ const NewHeader = () => {
         !location.pathname.startsWith('/payment-processing/') &&
         !location.pathname.startsWith('/order-confirm/') && (
           <button
-            onClick={() => setShowMiniCart(true)}
+            onClick={openCart}
             className="lg:hidden fixed bottom-0 left-0 right-0 z-40 flex items-center justify-between gap-3 bg-[#1c3026] text-white px-5 py-3 shadow-[0_-6px_20px_rgba(0,0,0,0.25)]"
           >
             <span className="flex items-center gap-2.5">

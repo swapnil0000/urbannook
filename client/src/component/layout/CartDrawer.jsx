@@ -270,8 +270,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
                       </div>
                       
                       {/* Details */}
-                      <div className="flex-1 flex flex-col min-w-0 justify-between min-h-[85px]">
-                        
+                      <div className="flex-1 flex flex-col min-w-0">
                         <div>
                           {/* Name & Delete */}
                           <div className="flex justify-between items-start mb-1">
@@ -287,9 +286,15 @@ const CartDrawer = ({ isOpen, onClose }) => {
                             </button>
                           </div>
                           
-                          <p className="text-xs text-gray-400 mt-1 font-medium tracking-wide">
-                            {item.category || "Standard Variant"}
-                          </p>
+                          {/* Only show a category line when there's a REAL
+                              category — the old "Standard Variant" fallback was
+                              a meaningless filler line above the actual variant,
+                              eating vertical space on short screens. */}
+                          {item.category && (
+                            <p className="text-xs text-gray-400 mt-1 font-medium tracking-wide">
+                              {item.category}
+                            </p>
+                          )}
 
                           {/* Variant Selection (If Exists) */}
                           {(() => {
@@ -297,16 +302,16 @@ const CartDrawer = ({ isOpen, onClose }) => {
                             if (!itemVariant || itemVariant === 'N/A') return null;
 
                             return (
-                              <div className="flex items-center gap-1.5 mb-2">
-                                <div 
-                                  className="w-2.5 h-2.5 rounded-full border border-gray-200 shadow-sm"
-                                  style={{ 
-                                    background: itemVariant.toLowerCase() === 'rainbow' 
-                                      ? 'linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)' 
-                                      : itemVariant.replace(/\s+/g, '').toLowerCase() 
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <div
+                                  className="w-2.5 h-2.5 rounded-full border border-gray-200 shadow-sm shrink-0"
+                                  style={{
+                                    background: itemVariant.toLowerCase() === 'rainbow'
+                                      ? 'linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)'
+                                      : itemVariant.replace(/\s+/g, '').toLowerCase()
                                   }}
                                 ></div>
-                                <span className="text-xs text-gray-400 mt-1 font-medium tracking-wide">{itemVariant}</span>
+                                <span className="text-xs text-gray-400 font-medium tracking-wide">{itemVariant}</span>
                               </div>
                             );
                           })()}
@@ -374,7 +379,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
                   variant="light"
                   showQuantityStepper
                   showProgressBar={false}
-                  className="mt-6"
+                  className="mt-3 sm:mt-6"
                 />
               )}
             </>
@@ -383,8 +388,8 @@ const CartDrawer = ({ isOpen, onClose }) => {
 
         {/* --- FOOTER (CHECKOUT) --- */}
         {cartItems?.length > 0 && (
-          <div className="px-6 py-6 bg-white border-t border-gray-100 z-10 shrink-0">
-            <div className="space-y-3 mb-6">
+          <div className="px-6 py-2 sm:py-6 bg-white border-t border-gray-100 z-10 shrink-0">
+            <div className="space-y-1 sm:space-y-3 mb-3 sm:mb-6">
                 <div className="flex justify-between items-center text-[11px] font-bold text-gray-400 uppercase tracking-widest">
                     <span>Subtotal</span>
                     <span className="font-medium text-[#0a110e]">₹{(Number(subtotal) || 0).toLocaleString()}</span>
@@ -397,18 +402,18 @@ const CartDrawer = ({ isOpen, onClose }) => {
                       <span className="font-medium normal-case tracking-normal text-gray-500 text-right">Calculated at checkout</span>
                     )}
                 </div>
-                <div className="pt-3 border-t border-gray-100 flex justify-between items-center">
+                <div className="pt-1 border-t border-gray-100 flex justify-between items-center">
                     <span className="text-base font-serif text-[#0a110e]">Total</span>
                     <span className="text-xl font-bold text-[#0a110e]">₹{(Number(subtotal) || 0).toLocaleString()}</span>
                 </div>
             </div>
 
             {/* COD availability notice */}
-            <div className="flex items-center gap-2.5 bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3 mb-4">
+            <div className="flex items-center gap-1 bg-amber-50 border border-amber-100 rounded-2xl px-4 py-1 sm:py-3 mb-1 sm:mb-4">
               <i className="fa-solid fa-hand-holding-dollar text-amber-500 text-base shrink-0" />
               <div>
-                <p className="text-[11px] font-bold text-amber-800">Cash on Delivery available</p>
-                <p className="text-[10px] text-amber-600 mt-0.5 leading-snug">Pay a small advance online · rest at your door</p>
+                <p className="text-[9px] font-bold text-amber-800">Cash on Delivery available.</p>
+                <p className="text-[8px] text-amber-600 mt-0.5 leading-snug">Pay a small advance online · rest at your door</p>
               </div>
             </div>
 
