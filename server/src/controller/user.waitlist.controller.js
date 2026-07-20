@@ -82,7 +82,7 @@ const userWaitListController = asyncHandler(async (req, res) => {
         subject: "You're on the UrbanNook Waitlist 🎉",
         html: waitlistTemplate({
           userName,
-          logoUrl: process?.env?.EMAIL_ASSET_LOGO,
+          logoUrl: process?.env?.EMAIL_ASSET_DARK_LOGO,
         }),
       });
       return true;
