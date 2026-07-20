@@ -20,6 +20,13 @@ const uiSlice = createSlice({
     toggleCartModal: (state) => {
       state.showCartModal = !state.showCartModal;
     },
+    // Explicit open/close (as opposed to toggle) for entry points that should
+    // always OPEN the drawer regardless of its current state — e.g. "Go to
+    // Cart" on the PDP or a mini-cart bar tap. Using toggle there would
+    // incorrectly close an already-open drawer instead.
+    setShowCartModal: (state, action) => {
+      state.showCartModal = action.payload;
+    },
     toggleAuthModal: (state) => {
       state.showAuthModal = !state.showAuthModal;
     },
@@ -52,6 +59,7 @@ const uiSlice = createSlice({
 export const {
   setLoading,
   toggleCartModal,
+  setShowCartModal,
   toggleAuthModal,
   setShowLoginModal,
   setLoginCallback,

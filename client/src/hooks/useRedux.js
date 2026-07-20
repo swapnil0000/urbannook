@@ -1,7 +1,7 @@
 import { useSelector, useDispatch } from 'react-redux';
 import { addItem, removeItem, updateQuantity, clearCart } from '../store/slices/cartSlice';
 import { setCredentials, logout } from '../store/slices/authSlice';
-import { toggleCartModal, toggleAuthModal, setShowLoginModal, setLoginCallback, clearLoginCallback, setNotification, clearNotification } from '../store/slices/uiSlice';
+import { toggleCartModal, setShowCartModal, toggleAuthModal, setShowLoginModal, setLoginCallback, clearLoginCallback, setNotification, clearNotification } from '../store/slices/uiSlice';
 
 // Cart hooks
 export const useCart = () => {
@@ -37,6 +37,8 @@ export const useUI = () => {
   return {
     ...ui,
     toggleCart: () => dispatch(toggleCartModal()),
+    openCart: () => dispatch(setShowCartModal(true)),
+    closeCart: () => dispatch(setShowCartModal(false)),
     toggleAuth: () => dispatch(toggleAuthModal()),
     // callback: optional string key to identify what to do after login
     openLoginModal: (callback) => {

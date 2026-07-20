@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense, useRef, Fragment } from "react";
+import { useState, useEffect, useMemo, lazy, Suspense, useRef, Fragment } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 
@@ -13,18 +13,30 @@ import {
   useUpdateCartMutation,
   useUpdateUserProfileMutation,
   useCalculateShippingMutation,
+  useGetFreeShippingOfferQuery,
+  useGetAllFreeShippingBannersQuery,
+  useEvaluateCartRulesQuery,
 } from "../store/api/userApi";
 import { setShowLoginModal, setLoginCallback } from "../store/slices/uiSlice";
 import { useUI } from "../hooks/useRedux";
 import { clearCart, removeItem } from "../store/slices/cartSlice";
 import { fetchCsrfToken } from "../store/api/apiSlice";
 import CouponInput from "../component/CouponInput";
+import FreeShippingBanner from "../component/FreeShippingBanner";
 import { ComponentLoader } from "../component/layout/LoadingSpinner";
 import { trackBeginCheckout, trackPurchase, trackAddShippingInfo, trackAddPaymentInfo, trackPaymentFailed, trackPaymentModalDismissed, trackCheckoutStep, trackOrderCreated, trackSelectPaymentMethod, trackDeliveryCheck, getFbCookies, getAnonymousId, cacheAddressForCapi, setMetaAdvancedMatching } from "../utils/analytics";
 
 const CouponList = lazy(() => import("../component/CouponList"));
 const MobileNumberModal = lazy(() => import("../component/MobileNumberModal"));
 const GoogleAddressFormModal = lazy(() => import("../component/GoogleAddressFormModal"));
+
+// What the courier charges to collect/remit cash at the door — the reason a
+// COD order costs more than the same order paid online. Display-only: the real
+// difference is already baked into the carrier rate returned for paymentType
+// "COD" (see the shipping-rate call below), this range just lets the notice
+// name the figure. A range (not one number) because the courier's exact COD
+// fee varies per order — keep it in step with what they actually charge.
+const COD_HANDLING_FEE = "30–40";
 
 const GUEST_STEPS = [
   { number: 1, label: "Account" },
@@ -69,57 +81,234 @@ const iconInput = (icon, children) => (
   </div>
 );
 
+// Green "You're saving ₹X" banner. Savings = (subtotal + real shipping) −
+// what they're actually paying — i.e. every rupee shaved off, whether from
+// a coupon or from the free-shipping offer, in one honest number.
+const SavingsBanner = ({ amount, freeShipping = false }) => (
+  <div
+    style={{
+      position: "relative",
+      display: "flex",
+      alignItems: "center",
+      gap: 14,
+      width: "100%",
+      minHeight: 64,
+      boxSizing: "border-box",
+      padding: "14px 16px",
+      borderRadius: 16,
+      background:
+        "linear-gradient(135deg, oklch(0.93 0.09 152) 0%, oklch(0.90 0.11 150) 60%, oklch(0.92 0.10 148) 100%)",
+      overflow: "hidden",
+      textAlign: "center",
+    }}
+  >
+    {/* diagonal shine streaks */}
+    <div
+      style={{
+        position: "absolute",
+        top: "-40%",
+        left: "55%",
+        width: 60,
+        height: "220%",
+        background: "linear-gradient(120deg, transparent 0%, oklch(1 0 0 / 0.35) 45%, transparent 100%)",
+        transform: "rotate(18deg)",
+        pointerEvents: "none",
+      }}
+    />
+    <div
+      style={{
+        position: "absolute",
+        top: "-40%",
+        left: "78%",
+        width: 24,
+        height: "220%",
+        background: "linear-gradient(120deg, transparent 0%, oklch(1 0 0 / 0.22) 45%, transparent 100%)",
+        transform: "rotate(18deg)",
+        pointerEvents: "none",
+      }}
+    />
+
+    {/* seal badge */}
+    <div
+      style={{
+        position: "relative",
+        flex: "0 0 auto",
+        width: 38,
+        height: 38,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1,
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          inset: -6,
+          borderRadius: "50%",
+          background: "oklch(0.62 0.14 155 / 0.35)",
+          filter: "blur(6px)",
+        }}
+      />
+      <div
+        style={{
+          position: "relative",
+          width: 36,
+          height: 36,
+          background: "oklch(0.47 0.10 165)",
+          clipPath:
+            "polygon(50% 0%, 61% 7%, 73% 2%, 79% 13%, 91% 15%, 92% 27%, 100% 35%, 95% 46%, 100% 57%, 91% 65%, 89% 77%, 77% 78%, 70% 89%, 58% 84%, 47% 92%, 38% 83%, 26% 87%, 21% 76%, 9% 73%, 11% 61%, 2% 52%, 9% 42%, 5% 30%, 16% 25%, 19% 13%, 31% 14%, 39% 4%)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <span style={{ color: "oklch(0.99 0 0)", fontSize: 16, fontWeight: 700, lineHeight: 1 }}>%</span>
+      </div>
+    </div>
+
+    {/* text */}
+    <div
+      style={{
+        position: "relative",
+        zIndex: 1,
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 3,
+      }}
+    >
+      {/* Big prominent free-shipping line — only when the offer combo has
+          actually zeroed the shipping charge. */}
+      {freeShipping && (
+        <span
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 7,
+            fontSize: 14,
+            fontWeight: 800,
+            letterSpacing: "0.02em",
+            textTransform: "uppercase",
+            lineHeight: 1.1,
+            color: "oklch(0.30 0.05 155)",
+          }}
+        >
+          <i className="fa-solid fa-truck-fast" style={{ color: "oklch(0.47 0.10 165)" }} />
+          Free Shipping Unlocked
+        </span>
+      )}
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "center",
+          flexWrap: "wrap",
+          gap: 5,
+          fontSize: freeShipping ? 13 : 17,
+          fontWeight: 500,
+          color: "oklch(0.30 0.05 155)",
+        }}
+      >
+        <span>You're saving</span>
+        <span style={{ position: "relative", fontWeight: 800, color: "oklch(0.16 0.01 155)", display: "inline-block" }}>
+          ₹{amount.toLocaleString()}
+          <svg
+            viewBox="0 0 100 14"
+            preserveAspectRatio="none"
+            style={{ position: "absolute", left: -2, right: -2, bottom: -7, width: "calc(100% + 4px)", height: 10 }}
+          >
+            <path d="M2,7 Q50,2 98,8" fill="none" stroke="oklch(0.55 0.14 155)" strokeWidth="3.5" strokeLinecap="round" />
+          </svg>
+        </span>
+        <span>on this order</span>
+      </div>
+    </div>
+  </div>
+);
+
 const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, itemCount, isLoadingShipping, paymentMethod }) => {
   const shippingAmount = typeof shipping === "object" ? shipping?.amount : shipping;
+  // COD advance must be based on the REAL carrier rate, not the (possibly
+  // free-shipping-zeroed) charged amount — same real/charged split as the
+  // server. realAmount is only present on the object form; the plain-number
+  // form of `shipping` is legacy/display-only and never feeds COD math.
+  const realShippingAmount = typeof shipping === "object" ? (shipping?.realAmount ?? shipping?.amount) : shipping;
   const isCOD = paymentMethod === "COD";
-  const codPartialAmount = isCOD && shippingAmount ? Math.min(Math.ceil(shippingAmount) * 2, totalToPay) : 0;
+  const codPartialAmount = isCOD && realShippingAmount ? Math.min(Math.ceil(realShippingAmount) * 2, totalToPay) : 0;
   const codRemainingAmount = isCOD ? Math.max(0, totalToPay - codPartialAmount) : 0;
 
+  const isShippingFree = shippingAmount === 0 && realShippingAmount > 0;
+  const hasDiscount = appliedCoupon && discount > 0;
+  // (lamp + stand + ... + real shipping) − what they're actually paying = savings.
+  const totalSavings = Math.max(0, subtotal + (realShippingAmount || 0) - totalToPay);
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <div className="flex justify-between items-center text-sm">
         <span className="text-gray-500">
-          Subtotal{" "}
+          Cart value{" "}
           <span className="text-gray-400">
             ({itemCount} item{itemCount !== 1 ? "s" : ""})
           </span>
         </span>
-        <span className="font-medium text-gray-800">
+        <span className="font-bold text-gray-900">
           ₹{subtotal.toLocaleString()}
         </span>
       </div>
+
       <div className="flex justify-between items-center text-sm">
-        <span className="text-gray-500">Delivery</span>
-        <span className="font-medium text-gray-800">
+        <span className="text-gray-500">Shipping</span>
+        <span className="font-bold text-gray-900">
           {isLoadingShipping ? (
             <span className="inline-block w-16 h-3.5 bg-gray-200 rounded animate-pulse" />
           ) : shippingAmount === null || shippingAmount === undefined ? (
             <span className="text-[10px] text-amber-600 font-bold uppercase tracking-wider">
               Enter address
             </span>
+          ) : isShippingFree ? (
+            // Free shipping applied — show the real carrier amount struck
+            // through with a green FREE beside it, instead of a separate
+            // "shipping discount" line.
+            <span className="flex items-center gap-2">
+              <span className="text-gray-400 font-normal line-through">
+                ₹{Math.ceil(realShippingAmount).toLocaleString()}
+              </span>
+              <span className="text-emerald-600 font-bold uppercase tracking-wider text-xs">Free</span>
+            </span>
+          ) : realShippingAmount ? (
+            `₹${Math.ceil(realShippingAmount).toLocaleString()}`
           ) : (
-            `₹${Math.ceil(shippingAmount).toLocaleString()}`
+            <span className="text-emerald-600 font-bold uppercase tracking-wider text-xs">Free</span>
           )}
         </span>
       </div>
-      {appliedCoupon && discount > 0 && (
-        <div className="flex justify-between items-center text-sm font-semibold text-emerald-600 bg-emerald-50 rounded-xl px-3.5 py-2.5 -mx-1">
-          <span className="flex items-center gap-2">
-            <i className="fa-solid fa-tag text-xs" /> {appliedCoupon}
-          </span>
-          <span>−₹{discount.toLocaleString()}</span>
+
+      {hasDiscount && (
+        <div className="flex justify-between items-center text-sm">
+          <span className="text-rose-700">Discount applied</span>
+          <span className="font-bold text-rose-700">−₹{discount.toLocaleString()}</span>
         </div>
       )}
-      <div className="border-t border-gray-100 pt-3 flex justify-between items-center">
-        <span className="font-bold text-gray-900">Total</span>
-        <div className="text-right">
-          <span className="text-2xl font-bold text-[#2e443c]">
-            ₹{totalToPay.toLocaleString()}
-          </span>
-          <p className="text-[10px] text-gray-400 mt-0.5">Incl. GST</p>
+
+      <div className="border-t border-gray-100 pt-3">
+        <div className="flex justify-between items-center">
+          <span className="font-bold text-gray-900">Total</span>
+          <div className="text-right">
+            <span className="text-2xl font-bold text-[#2e443c]">
+              ₹{totalToPay.toLocaleString()}
+            </span>
+            <p className="text-[10px] text-gray-400 mt-0.5">Incl. GST</p>
+          </div>
         </div>
       </div>
-      {isCOD && shippingAmount > 0 && (
+
+      {totalSavings > 0 && <SavingsBanner amount={totalSavings} freeShipping={isShippingFree} />}
+
+      {isCOD && realShippingAmount > 0 && (
         <div className="border-t border-dashed border-amber-200 pt-3 space-y-0 rounded-xl bg-amber-50/60 -mx-1 px-3 pb-3 mt-1">
           <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-amber-600 mb-2.5 flex items-center gap-1.5">
             <i className="fa-solid fa-receipt text-[8px]" /> COD Breakdown
@@ -237,6 +426,98 @@ const CheckoutPage = () => {
   const { data: savedAddressData, refetch: refetchAddresses } =
     useGetSavedAddressesQuery(undefined, { skip: isGuest });
   const [calculateShipping, { isLoading: isCalculatingShipping }] = useCalculateShippingMutation();
+  const { data: freeShippingOfferData } = useGetFreeShippingOfferQuery();
+  const { data: allFreeShippingBannersData } = useGetAllFreeShippingBannersQuery();
+  // Generic, data-driven cart-promotion rules (server/src/model/cartRule.model.js)
+  // — same evaluator the payment controller uses for the real order total,
+  // ORed into the combo-banner eligibility check below so this page can
+  // never disagree with what checkout actually charges.
+  const cartRuleEvalItems = useMemo(
+    () =>
+      cartItems
+        .map((i) => ({ productId: i.mongoId || i.id?.split(":")[0], quantity: Number(i.quantity) || 0 }))
+        .filter((i) => i.productId && i.quantity > 0),
+    [cartItems],
+  );
+  const { data: cartRuleEvalData } = useEvaluateCartRulesQuery(cartRuleEvalItems, {
+    skip: cartRuleEvalItems.length === 0,
+  });
+
+  // A generic cart rule (e.g. "2+ Lamps => 50% off Pen Stand") may discount
+  // a specific item's price. Mirrors the server's applyBestDiscount exactly
+  // (best resulting price wins if more than one rule discounts the same
+  // product) so what's shown here never disagrees with what actually gets
+  // charged. Used both for per-line-item display AND for correcting the
+  // subtotal fed into the final "amount to pay" below — previously this page
+  // only ever showed the undiscounted price everywhere, so a rule discount
+  // was invisible on checkout even though the real order total (payment
+  // controller) already applied it correctly.
+  const getItemDiscountedPrice = (item) => {
+    const productId = item.mongoId || item.id?.split(":")[0];
+    const candidates = cartRuleEvalData?.data?.discounts?.[productId];
+    const price = Number(item.price) || 0;
+    if (!candidates?.length) return price;
+    const results = candidates.map((c) =>
+      c.type === "percent_off" ? price * (1 - Number(c.value) / 100) : price - Number(c.value),
+    );
+    // Rounded to match the server's applyBestDiscount exactly (50% off ₹299
+    // is ₹149.5 mathematically — both round that to ₹150, consistently).
+    return Math.round(Math.max(Math.min(...results), 0));
+  };
+  // Total ₹ shaved off the cart by matched rule discounts — subtracted from
+  // whatever subtotal this page would otherwise display (guest's direct
+  // calc, or the coupon endpoint's summary.subtotal, which doesn't know
+  // about cart rules at all).
+  const ruleDiscountSavings = cartItems.reduce((sum, item) => {
+    const price = Number(item.price) || 0;
+    const discounted = getItemDiscountedPrice(item);
+    return sum + (price - discounted) * (Number(item.quantity) || 0);
+  }, 0);
+
+  // Checkout-only nudge: if the cart hasn't crossed the free-shipping
+  // threshold yet, show a banner for the first cart item that has one
+  // configured, so a customer who missed it on the PDP gets one more chance
+  // before paying. Free shipping is a product-COMBO rule (source + recommended
+  // both in cart), so we show the banner for a combo whose source product IS
+  // in the cart but whose recommended add-on ISN'T yet — that's the only case
+  // with something left to upsell. If both are already in the cart the combo
+  // is complete (nothing to nudge), and if the source isn't in the cart the
+  // offer doesn't apply to this cart at all.
+  // TODO: only supports a single banner (first match) even if multiple cart
+  // items each have one configured — fine for now (single active offer),
+  // revisit if multiple simultaneous offers are ever needed.
+  const checkoutBannerProductId = useMemo(() => {
+    const offerConfig = freeShippingOfferData?.data;
+    if (!offerConfig?.isActive) return null;
+
+    const banners = allFreeShippingBannersData?.data || [];
+    if (banners.length === 0) return null;
+
+    const cartProductIds = new Set(cartItems.map((i) => i.mongoId || i.id?.split(":")[0]));
+    const match = banners.find(
+      (b) => cartProductIds.has(b.sourceProductId) && !cartProductIds.has(b.recommendedProductId),
+    );
+    return match?.sourceProductId || null;
+  }, [freeShippingOfferData, allFreeShippingBannersData, cartItems]);
+
+  // The moment adding the recommended item pushes the cart over the
+  // threshold, `checkoutBannerProductId` above flips to null in the SAME
+  // render as the cart update — which used to unmount FreeShippingBanner
+  // outright, killing its own bar-fill/confetti/"Unlocked" celebration
+  // sequence mid-flight. Hold the last non-null id visible for a beat after
+  // it goes null so that sequence gets to finish before we actually remove
+  // the banner from the page.
+  const [visibleBannerProductId, setVisibleBannerProductId] = useState(null);
+  useEffect(() => {
+    if (checkoutBannerProductId) {
+      setVisibleBannerProductId(checkoutBannerProductId);
+      return;
+    }
+    if (!visibleBannerProductId) return;
+    const timer = setTimeout(() => setVisibleBannerProductId(null), 1900);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally omits visibleBannerProductId so the timer isn't re-armed by its own update
+  }, [checkoutBannerProductId]);
 
   // When user logs in mid-checkout (guest → auth), AUTH_STEPS has fewer steps.
   // Clamp currentStep so STEPS[currentStep-1] is never undefined.
@@ -299,8 +580,21 @@ const CheckoutPage = () => {
   }, [cartItems.length, cartItems.reduce((s, i) => s + Number(i.quantity || 0), 0)]);
 
   useEffect(() => {
-    // Run shipping calculation on Review page when address/pincode is available
-    if (currentStep !== reviewStep || !pinCode || pinCode.toString().length !== 6 || cartItems.length === 0) {
+    // Run shipping calculation on Review page when address/pincode is available.
+    // Also wait for the free-shipping config to finish loading first — without
+    // this, the calc can run while freeShippingOfferData is still undefined,
+    // compute eligibility as false, and never re-run once the config arrives
+    // (it wasn't a dependency), leaving the wrong shipping amount stuck in the
+    // UI even though the backend — which recomputes fresh at order-submission
+    // time — applies free shipping correctly. Symptom: frontend shows a
+    // charge, Razorpay/backend charges the correct (free) amount.
+    if (
+      currentStep !== reviewStep ||
+      !pinCode ||
+      pinCode.toString().length !== 6 ||
+      cartItems.length === 0 ||
+      freeShippingOfferData === undefined
+    ) {
       return;
     }
 
@@ -326,10 +620,43 @@ const CheckoutPage = () => {
         if (cancelled) return;
 
         if (result.success && result.data) {
-          const shippingAmount = parseFloat(result.data.total_charges);
+          // Free shipping: product-COMBO rule. Still call the rate API above to
+          // confirm the pincode is serviceable, but zero the charged amount
+          // only when the cart contains a full offer combo (source +
+          // recommended product). Mirrors the server's isFreeShippingEligible.
+          const offerConfig = freeShippingOfferData?.data;
+          const banners = allFreeShippingBannersData?.data || [];
+          const cartProductIds = new Set(cartItems.map((i) => i.mongoId || i.id?.split(":")[0]));
+          const comboEligible =
+            !!offerConfig?.isActive &&
+            banners.some(
+              (b) => cartProductIds.has(b.sourceProductId) && cartProductIds.has(b.recommendedProductId),
+            );
+          // Plain cart-value threshold — whole cart, any products count.
+          // Mirrors the server's direct subtotal >= thresholdAmount check,
+          // computed AFTER rule discounts (server discounts items first,
+          // then compares the resulting subtotal to the threshold).
+          const cartSubtotal =
+            cartItems.reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0) - ruleDiscountSavings;
+          const thresholdEligible =
+            !!offerConfig?.isActive && (offerConfig?.thresholdAmount || 0) > 0 && cartSubtotal >= offerConfig.thresholdAmount;
+          // Either the old combo-banner offer, any active generic cart
+          // rule's free_shipping effect, or the cart-value threshold is
+          // enough — mirrors the OR logic in rp.payment.controller.js exactly.
+          const isFreeShippingEligible = comboEligible || !!cartRuleEvalData?.data?.freeShipping || thresholdEligible;
+          console.log(
+            `[FreeShipping][Client] cartIds=[${[...cartProductIds].join(",")}] isActive=${offerConfig?.isActive} comboEligible=${comboEligible} ruleEligible=${!!cartRuleEvalData?.data?.freeShipping} thresholdEligible=${thresholdEligible} → eligible=${isFreeShippingEligible}`,
+          );
+          // realAmount = actual carrier rate, always — this is what the COD
+          // 2x-advance must be based on (matches the server's realShippingAmount).
+          // amount = what the customer's total/display reflects — 0 when free
+          // shipping applies. Keeping both on the object prevents the COD math
+          // from silently inheriting the free-shipping zero.
+          const realAmount = parseFloat(result.data.total_charges);
+          const shippingAmount = isFreeShippingEligible ? 0 : realAmount;
           setPricingDetails(prev => ({
             ...prev,
-            shipping: { ...result.data, amount: shippingAmount }
+            shipping: { ...result.data, amount: shippingAmount, realAmount }
           }));
           setShippingError("");
           trackDeliveryCheck({ pincode: pinCode, serviceable: true, shippingAmount, paymentMethod });
@@ -349,7 +676,7 @@ const CheckoutPage = () => {
 
     fetchShippingRate();
     return () => { cancelled = true; };
-  }, [currentStep, reviewStep, pinCode, cartItems.length, cartItems.reduce((s, i) => s + Number(i.quantity || 0), 0), paymentMethod]);
+  }, [currentStep, reviewStep, pinCode, cartItems.length, cartItems.reduce((s, i) => s + Number(i.quantity || 0), 0), paymentMethod, freeShippingOfferData, allFreeShippingBannersData, cartRuleEvalData, ruleDiscountSavings]);
 
   useEffect(() => {
     if (savedAddressData?.success) {
@@ -393,7 +720,8 @@ const CheckoutPage = () => {
   }, [userProfile, address, pinCode, senderMobile]);
 
   const cartItemsLength = cartItems?.length;
-  const cartTotalAmount = cartItems.reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0);
+  const cartTotalAmount =
+    cartItems.reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0) - ruleDiscountSavings;
   const userEmail = userProfile?.email;
 
   useEffect(() => {
@@ -408,21 +736,24 @@ const CheckoutPage = () => {
       if (!cartItemsLength) return;
       try {
         const r = await applyCouponMutation({ couponCode: appliedCoupon || null, email: userEmail }).unwrap();
+        // r.data.summary.subtotal comes from the coupon endpoint, which
+        // doesn't know about cart-rule discounts — subtract ruleDiscountSavings
+        // so this matches what the real order total will charge.
         if (r.success && r.data?.summary)
-          setPricingDetails(prev => ({ ...prev, subtotal: r.data.summary.subtotal || 0, discount: r.data.summary.discount || 0 }));
+          setPricingDetails(prev => ({ ...prev, subtotal: (r.data.summary.subtotal || 0) - ruleDiscountSavings, discount: r.data.summary.discount || 0 }));
       } catch (err) {
         if (err?.data?.statusCode === 400 && appliedCoupon) {
           setAppliedCoupon(null);
           try {
             const r2 = await applyCouponMutation({ couponCode: null, email: userEmail }).unwrap();
             if (r2.success && r2.data?.summary)
-              setPricingDetails(prev => ({ ...prev, subtotal: r2.data.summary.subtotal || 0, discount: r2.data.summary.discount || 0 }));
+              setPricingDetails(prev => ({ ...prev, subtotal: (r2.data.summary.subtotal || 0) - ruleDiscountSavings, discount: r2.data.summary.discount || 0 }));
           } catch (_) {}
         }
       }
     };
     fetchPricing();
-  }, [cartItemsLength, cartTotalAmount, applyCouponMutation, appliedCoupon, userEmail, isGuest]);
+  }, [cartItemsLength, cartTotalAmount, applyCouponMutation, appliedCoupon, userEmail, isGuest, ruleDiscountSavings]);
 
   // Fire begin_checkout ONCE per checkout. React Router remounts this page on
   // navigate-away-and-back, and the Redux cart hydrates asynchronously AFTER mount,
@@ -565,7 +896,7 @@ const CheckoutPage = () => {
       const r = await applyCouponMutation({ couponCode: couponData.code, email: userEmail }).unwrap();
       if (r.success && r.data?.summary) {
         setAppliedCoupon(couponData.code);
-        setPricingDetails(prev => ({ ...prev, subtotal: r.data.summary.subtotal || 0, discount: r.data.summary.discount || 0 }));
+        setPricingDetails(prev => ({ ...prev, subtotal: (r.data.summary.subtotal || 0) - ruleDiscountSavings, discount: r.data.summary.discount || 0 }));
         showNotification(r.message || "Coupon applied!", "success");
         setShowCouponModal(false);
       }
@@ -583,7 +914,7 @@ const CheckoutPage = () => {
       const r = await applyCouponMutation({ couponCode: null, email: userEmail }).unwrap();
       if (r.success && r.data?.summary) {
         setAppliedCoupon(null);
-        setPricingDetails(prev => ({ ...prev, subtotal: r.data.summary.subtotal || 0, discount: r.data.summary.discount || 0 }));
+        setPricingDetails(prev => ({ ...prev, subtotal: (r.data.summary.subtotal || 0) - ruleDiscountSavings, discount: r.data.summary.discount || 0 }));
         showNotification("Coupon removed", "success");
       }
     } catch (e) { showNotification(e?.data?.message || "Failed to remove coupon", "error"); }
@@ -809,6 +1140,11 @@ const CheckoutPage = () => {
   const shippingAmount = typeof pricingDetails.shipping === "number"
     ? pricingDetails.shipping
     : (pricingDetails.shipping?.amount ?? 0);
+  // Real carrier rate — COD's 2x advance must be based on this, never on
+  // `shippingAmount` above (which is 0 when free shipping applies).
+  const realShippingAmount = typeof pricingDetails.shipping === "number"
+    ? pricingDetails.shipping
+    : (pricingDetails.shipping?.realAmount ?? pricingDetails.shipping?.amount ?? 0);
   const totalToPay = pricingDetails.subtotal + shippingAmount - pricingDetails.discount;
   const userName = isGuest ? guestName : (userProfile?.userName || userProfile?.name || "");
   const userInitials = userName ? userName.split(" ").filter(Boolean).map((w) => w[0]).join("").toUpperCase().slice(0, 2) : "?";
@@ -827,7 +1163,6 @@ const CheckoutPage = () => {
 
   return (
     <div className="bg-[#f5f7f5]">
-
       {/* ── Step wizard ────────────────────────────────────────────────── */}
       <div className="bg-white border-b border-gray-100 pt-28 lg:pt-36">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 pb-6">
@@ -1285,20 +1620,55 @@ const CheckoutPage = () => {
                   <div className="divide-y divide-gray-50 max-h-64 overflow-y-auto">
                     {cartItems.map((item) => (
                       <div key={`${item.id}-${item.selectedVariant || "default"}`} className="flex items-center gap-3 px-5 py-3">
-                        <div className="w-10 h-10 rounded-lg bg-gray-50 border border-gray-100 overflow-hidden shrink-0">
-                          <img src={item.image || "/placeholder.jpg"} alt={item.name} className="w-full h-full object-contain mix-blend-multiply" />
+                        <div className="relative shrink-0">
+                          <div className="w-10 h-10 rounded-lg bg-gray-50 border border-gray-100 overflow-hidden">
+                            <img src={item.image || "/placeholder.jpg"} alt={item.name} className="w-full h-full object-contain mix-blend-multiply" />
+                          </div>
+                          <button
+                            onClick={() => handleRemoveItem(item.id, item.selectedVariant)}
+                            title={`Remove ${item.name}`}
+                            aria-label={`Remove ${item.name}`}
+                            className="absolute -top-1.5 -left-1.5 z-10 w-5 h-5 flex items-center justify-center rounded-full bg-[#f5deb3] border border-[#e0c896] shadow-sm text-[#1c3026] hover:bg-[#E63329] hover:text-white hover:border-[#E63329] transition-colors"
+                          >
+                            <i className="fa-solid fa-xmark text-[9px]" />
+                          </button>
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-semibold text-gray-800 truncate">{item.name}</p>
                           {item.selectedVariant && item.selectedVariant !== "N/A" && <p className="text-[10px] text-gray-400">{item.selectedVariant}</p>}
                           <p className="text-[10px] text-gray-400">Qty {item.quantity}</p>
                         </div>
-                        <p className="text-sm font-bold text-gray-800 shrink-0">₹{(Number(item.price) * Number(item.quantity)).toLocaleString()}</p>
+                        {(() => {
+                          const discountedPrice = getItemDiscountedPrice(item);
+                          const rawPrice = Number(item.price) || 0;
+                          const hasDiscount = discountedPrice < rawPrice;
+                          const percentOff = hasDiscount
+                            ? Math.round(((rawPrice - discountedPrice) / rawPrice) * 100)
+                            : 0;
+                          return hasDiscount ? (
+                            <div className="text-right shrink-0">
+                              <p className="text-sm font-bold text-[#157a44]">₹{(discountedPrice * Number(item.quantity)).toLocaleString()}</p>
+                              <div className="flex items-center justify-end gap-1">
+                                <span className="text-[10px] text-gray-400 line-through">₹{(rawPrice * Number(item.quantity)).toLocaleString()}</span>
+                                <span className="text-[9px] font-bold uppercase rounded-full bg-[#157a44] text-white px-1.5 py-px">
+                                  {percentOff}% OFF
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-sm font-bold text-gray-800 shrink-0">₹{(rawPrice * Number(item.quantity)).toLocaleString()}</p>
+                          );
+                        })()}
                       </div>
                     ))}
                   </div>
                   <div className="px-5 py-4 border-t border-gray-50"><PriceRows subtotal={pricingDetails.subtotal} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} isLoadingShipping={isCalculatingShipping} paymentMethod={paymentMethod} /></div>
                 </div>
+                {visibleBannerProductId && (
+                  <div className="px-5 pb-5">
+                    <FreeShippingBanner productId={visibleBannerProductId} variant="light" showQuantityStepper showProgressBar={false} />
+                  </div>
+                )}
               </div>
 
               {/* Payment Method Selection */}
@@ -1363,9 +1733,9 @@ const CheckoutPage = () => {
                         <p className={`text-sm font-bold transition-colors ${paymentMethod === "COD" ? "text-[#a89068]" : "text-gray-800"}`}>
                           Cash on Delivery
                         </p>
-                        {paymentMethod === "COD" && shippingAmount > 0 ? (
+                        {paymentMethod === "COD" && realShippingAmount > 0 ? (
                           <p className="text-xs text-[#a89068]/80 font-medium mt-0.5">
-                            ₹{Math.min(Math.ceil(shippingAmount) * 2, totalToPay).toLocaleString()} now · ₹{Math.max(0, totalToPay - Math.min(Math.ceil(shippingAmount) * 2, totalToPay)).toLocaleString()} at delivery
+                            ₹{Math.min(Math.ceil(realShippingAmount) * 2, totalToPay).toLocaleString()} now · ₹{Math.max(0, totalToPay - Math.min(Math.ceil(realShippingAmount) * 2, totalToPay)).toLocaleString()} at delivery
                           </p>
                         ) : (
                           <p className="text-xs text-gray-400 mt-0.5">Small advance online · rest at your door</p>
@@ -1378,12 +1748,29 @@ const CheckoutPage = () => {
                       </div>
                     </div>
                   </button>
+                  {paymentMethod === "COD" && (
+                <div className="flex items-center gap-1   rounded-xl px-4 ">
+                  <i className="fa-solid fa-circle-info text-[#a89068] text-xs shrink-0" />
+                  <p className="text-[10px] font-medium text-gray-600">
+                    Additional ₹{COD_HANDLING_FEE} COD handling fee applies.
+                  </p>
+                </div>
+              )}
                 </div>
                
               </div>
 
-              {/* COD notice — compact, shown only when COD is selected */}
-          
+              {/* COD notice — single-line disclosure, the standard e-commerce
+                  pattern ("₹X COD handling fee applies"). Names the fee so the
+                  higher COD total never reads as a hidden markup. */}
+              {/* {paymentMethod === "COD" && (
+                <div className="flex items-center gap-1   rounded-xl px-4 ">
+                  <i className="fa-solid fa-circle-info text-[#a89068] text-xs shrink-0" />
+                  <p className="text-[10px] font-medium text-gray-600">
+                    Additional ₹{COD_HANDLING_FEE} COD handling fee applies.
+                  </p>
+                </div>
+              )} */}
 
               {/* Coupon — available to all (guests + members) */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -1480,6 +1867,14 @@ const CheckoutPage = () => {
                     <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-[#2e443c] rounded-full flex items-center justify-center">
                       <span className="text-[9px] font-bold text-white">{item.quantity}</span>
                     </div>
+                    <button
+                      onClick={() => handleRemoveItem(item.id, item.selectedVariant)}
+                      title={`Remove ${item.name}`}
+                      aria-label={`Remove ${item.name}`}
+                      className="absolute -top-1.5 -left-1.5 z-10 w-5 h-5 flex items-center justify-center rounded-full bg-[#f5deb3] border border-[#e0c896] shadow-sm text-[#1c3026] hover:bg-[#E63329] hover:text-white hover:border-[#E63329] transition-colors"
+                    >
+                      <i className="fa-solid fa-xmark text-[9px]" />
+                    </button>
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-gray-800 truncate leading-tight">{item.name}</p>
@@ -1487,9 +1882,29 @@ const CheckoutPage = () => {
                       <p className="text-[10px] text-gray-400 mt-0.5">{item.selectedVariant}</p>
                     )}
                   </div>
-                  <p className="text-xs font-bold text-gray-800 shrink-0">
-                    ₹{(Number(item.price) * Number(item.quantity)).toLocaleString()}
-                  </p>
+                  {(() => {
+                    const discountedPrice = getItemDiscountedPrice(item);
+                    const rawPrice = Number(item.price) || 0;
+                    const hasDiscount = discountedPrice < rawPrice;
+                    const percentOff = hasDiscount
+                      ? Math.round(((rawPrice - discountedPrice) / rawPrice) * 100)
+                      : 0;
+                    return hasDiscount ? (
+                      <div className="text-right shrink-0">
+                        <p className="text-xs font-bold text-[#157a44]">₹{(discountedPrice * Number(item.quantity)).toLocaleString()}</p>
+                        <div className="flex items-center justify-end gap-1">
+                          <span className="text-[9px] text-gray-400 line-through">₹{(rawPrice * Number(item.quantity)).toLocaleString()}</span>
+                          <span className="text-[9px] font-bold uppercase rounded-full bg-[#157a44] text-white px-1.5 py-px">
+                            {percentOff}% OFF
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs font-bold text-gray-800 shrink-0">
+                        ₹{(rawPrice * Number(item.quantity)).toLocaleString()}
+                      </p>
+                    );
+                  })()}
                 </div>
               ))}
             </div>
@@ -1498,6 +1913,12 @@ const CheckoutPage = () => {
             <div className="px-5 py-5 border-t border-gray-100">
               <PriceRows subtotal={pricingDetails.subtotal} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} isLoadingShipping={isCalculatingShipping} paymentMethod={paymentMethod} />
             </div>
+
+            {visibleBannerProductId && (
+              <div className="px-5 pb-5">
+                <FreeShippingBanner productId={visibleBannerProductId} variant="light" showQuantityStepper showProgressBar={false} />
+              </div>
+            )}
 
             {/* Pay button (review step only) */}
             {currentStep === reviewStep && (
@@ -1511,8 +1932,8 @@ const CheckoutPage = () => {
                     ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Processing…</>
                     : isCalculatingShipping
                     ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Calculating…</>
-                    : paymentMethod === "COD" && shippingAmount > 0
-                    ? <><i className="fa-solid fa-hand-holding-dollar text-xs opacity-70" /> Pay ₹{Math.min(Math.ceil(shippingAmount) * 2, totalToPay).toLocaleString()} Advance</>
+                    : paymentMethod === "COD" && realShippingAmount > 0
+                    ? <><i className="fa-solid fa-hand-holding-dollar text-xs opacity-70" /> Pay ₹{Math.min(Math.ceil(realShippingAmount) * 2, totalToPay).toLocaleString()} Advance</>
                     : <><i className="fa-solid fa-lock text-xs opacity-70" /> Pay ₹{totalToPay.toLocaleString()}</>
                   }
                 </button>
@@ -1538,8 +1959,8 @@ const CheckoutPage = () => {
                   {paymentMethod === "COD" ? "Pay Now" : "Total"}
                 </p>
                 <p className="text-lg font-bold text-[#2e443c]">
-                  ₹{(paymentMethod === "COD" && shippingAmount > 0
-                    ? Math.min(Math.ceil(shippingAmount) * 2, totalToPay)
+                  ₹{(paymentMethod === "COD" && realShippingAmount > 0
+                    ? Math.min(Math.ceil(realShippingAmount) * 2, totalToPay)
                     : totalToPay
                   ).toLocaleString()}
                 </p>
@@ -1553,7 +1974,7 @@ const CheckoutPage = () => {
                   ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Processing…</>
                   : isCalculatingShipping
                   ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Calculating…</>
-                  : paymentMethod === "COD" && shippingAmount > 0
+                  : paymentMethod === "COD" && realShippingAmount > 0
                   ? <> Pay Advance</>
                   : <><i className="fa-solid fa-lock text-[10px] opacity-70" /> Pay Now</>
                 }
