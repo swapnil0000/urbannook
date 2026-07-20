@@ -1177,13 +1177,15 @@ const ProductDetailPage = () => {
               )}
             </div>
 
-            {/* Standalone Disclaimer Section */}
+            {/* Standalone Disclaimer Section — brake caliper lamp only */}
+            {(product.productName || "").toLowerCase().includes("caliper") && (
               <p className="text-[12px] leading-relaxed text-gray-400 italic font-light">
-                <strong className="text-[#F5DEB3]/70 not-italic mr-1">Disclaimer:</strong> 
-                This product is an aftermarket decorative lamp inspired by automotive brake disc designs. 
-                Urbannook is not affiliated with, endorsed by, or connected to BMW, Porsche, Lamborghini, 
+                <strong className="text-[#F5DEB3]/70 not-italic mr-1">Disclaimer:</strong>
+                This product is an aftermarket decorative lamp inspired by automotive brake disc designs.
+                Urbannook is not affiliated with, endorsed by, or connected to BMW, Porsche, Lamborghini,
                 or any other automotive brand.
               </p>
+            )}
           </div>
         </div>
 
