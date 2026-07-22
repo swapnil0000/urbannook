@@ -74,6 +74,11 @@ async function validateNewCoupon({ coupon, cartProductTotal, email, mobile, isLo
     console.log(`${tag} REJECT "${coupon.code}" — internal coupon must be TARGETED scope`);
     throw new ValidationError("This coupon is restricted. Contact admin.");
   }
+  // Internal test coupons require a signed-in account so the assigned email is verified.
+  if (isValidInternal && !isLoggedIn) {
+    console.log(`${tag} REJECT "${coupon.code}" — internal coupon requires login`);
+    throw new ValidationError("This coupon is only available to signed-in team members. Please sign in to use it.");
+  }
   if (coupon.validFrom && now < new Date(coupon.validFrom)) {
     console.log(`${tag} REJECT "${coupon.code}" — not valid yet (starts ${coupon.validFrom})`);
     throw new ValidationError("This coupon is not valid yet.");
@@ -95,8 +100,13 @@ async function validateNewCoupon({ coupon, cartProductTotal, email, mobile, isLo
   const normMobile = normalizeMobile(mobile);
   const identifiers = [normEmail, normMobile].filter(Boolean);
 
-  // Per-user cap
-  if (identifiers.length > 0) {
+  // Internal test coupons skip only the TARGETED single-use (usedAt) gate, so an assigned
+  // team member can redeem repeatedly. Their per-user limit is still enforced below via
+  // maxUsesPerUser (blank/null = unlimited).
+  const skipSingleUseGate = isValidInternal;
+
+  // Per-user cap — enforced whenever a maxUsesPerUser limit is set (null = unlimited).
+  if (identifiers.length > 0 && coupon.maxUsesPerUser) {
     const priorCount = await CouponUsage.countDocuments({
       couponId: coupon.couponId,
       $or: [
@@ -124,7 +134,7 @@ async function validateNewCoupon({ coupon, cartProductTotal, email, mobile, isLo
       console.log(`${tag} REJECT "${coupon.code}" — TARGETED: not assigned to ${identifiers.join(" / ")}`);
       throw new ValidationError("This coupon has not been assigned to you.");
     }
-    if (assignment.usedAt) {
+    if (assignment.usedAt && !skipSingleUseGate) {
       console.log(`${tag} REJECT "${coupon.code}" — TARGETED: already used`);
       throw new ValidationError("Your personal coupon has already been used.");
     }

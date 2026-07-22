@@ -10,13 +10,17 @@ const COURIER_PRIORITY = ["delhivery", "dtdc", "bluedart", "xpressbees"];
 const FALLBACK_SHIPPING_CHARGE = 179;
 
 // The API's own slab field, e.g. "0.5 KG" / "10 KG". Authoritative — this drives selection.
+// Unit detection is independent of word order (handles "2 KG" and a hypothetical "KG 2" the
+// same way) — grams only when "g" appears without "kg" anywhere in the string; kg otherwise.
 const parseSlabKg = (value) => {
   if (value == null) return null;
-  const match = String(value).match(/([\d.]+)\s*(kg|g)?/i);
-  if (!match) return null;
-  const amount = parseFloat(match[1]);
+  const str = String(value);
+  const numMatch = str.match(/[\d.]+/);
+  if (!numMatch) return null;
+  const amount = parseFloat(numMatch[0]);
   if (isNaN(amount)) return null;
-  return match[2]?.toLowerCase() === "g" ? amount / 1000 : amount;
+  const isGrams = !/kg/i.test(str) && /g/i.test(str);
+  return isGrams ? amount / 1000 : amount;
 };
 
 // The slab as advertised in the service name, e.g. "Delhivery 2Kg" -> 2. Used only to
@@ -41,6 +45,7 @@ const safeFloat = (val, fallback = 0) => {
 // serves the required slab (caller falls back to the flat rate).
 const selectCourierService = (allServices, chargeableWeightInKg) => {
   const candidates = allServices
+    .filter((svc) => svc != null) // guard against a malformed null/undefined row in the API array
     .map((svc) => {
       const nameLower = String(svc.name || "").toLowerCase();
       return {
@@ -282,4 +287,4 @@ const calculateShippingRate = async ({ pincode, cartItems, paymentType = "PREPAI
   }
 };
 
-export { calculateShippingRate, selectCourierService };
+export { calculateShippingRate, selectCourierService, FALLBACK_SHIPPING_CHARGE };
