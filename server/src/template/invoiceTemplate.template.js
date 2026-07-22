@@ -9,22 +9,23 @@ export const generateInvoiceHtmlTemplate = (order) => {
   <head>
     <meta charset="UTF-8" />
     <style>
-      body { font-family: 'Segoe UI', sans-serif; background-color: #f3f4f6; padding: 30px; margin: 0; }
-      .card { max-width: 850px; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); overflow: hidden; }
-      .header { background: #F5DEB3; padding: 25px 40px; display: flex; justify-content: space-between; align-items: center; }
-      .header h1 { margin: 0; color: #1C3026; font-size: 24px; }
+      body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #FAFAF8; padding: 30px; margin: 0; }
+      .card { max-width: 850px; margin: 0 auto; background: #fff; border: 1px solid #EEE8DC; overflow: hidden; }
+      .header { background: #2E443C; padding: 32px 40px; display: flex; justify-content: space-between; align-items: center; }
+      .header h1 { margin: 0; color: #ffffff; font-size: 22px; font-weight: 600; letter-spacing: -0.3px; }
       .content { padding: 40px; color: #333; }
       .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 30px; }
-      .section-title { font-weight: bold; color: #1C3026; border-bottom: 2px solid #F5DEB3; margin-bottom: 10px; padding-bottom: 5px; text-transform: uppercase; font-size: 11px; }
-      .info-text { font-size: 13px; line-height: 1.6; margin: 0; }
+      .section-title { font-weight: 700; color: #2E443C; border-bottom: 1px solid #F5DEB3; margin-bottom: 10px; padding-bottom: 6px; text-transform: uppercase; font-size: 9px; letter-spacing: 2px; }
+      .info-text { font-size: 13px; line-height: 1.6; margin: 0; color: #444; }
       table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
-      th { background: #1C3026; color: #fff; padding: 12px; text-align: left; }
-      td { padding: 12px; border-bottom: 1px solid #eee; }
+      th { background: #F7F4EF; color: #2E443C; padding: 12px; text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; border-bottom: 1px solid #F5DEB3; }
+      td { padding: 12px; border-bottom: 1px solid #F5ECD0; color: #444; }
       .totals-wrapper { display: flex; justify-content: flex-end; margin-top: 30px; }
-      .totals-box { background: #F5DEB3; padding: 20px; border-radius: 8px; width: 250px; }
-      .totals-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 14px; }
-      .grand-total { font-weight: bold; border-top: 1px solid #1C3026; padding-top: 10px; margin-top: 10px; font-size: 16px; }
-      .footer { text-align: center; margin-top: 50px; font-size: 11px; color: #888; }
+      .totals-box { background: #F7F4EF; border: 1px solid #F5DEB3; padding: 20px; width: 250px; }
+      .totals-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 14px; color: #444; }
+      .grand-total { font-weight: 700; color: #2E443C; border-top: 1px solid #2E443C; padding-top: 10px; margin-top: 10px; font-size: 16px; }
+      .footer { text-align: center; margin-top: 50px; font-size: 11px; color: #AAAAAA; }
+      .center { text-align: center; }
     </style>
   </head>
   <body>
@@ -32,8 +33,8 @@ export const generateInvoiceHtmlTemplate = (order) => {
       <div class="header">
         <h1>UrbanNook</h1>
         <div style="text-align: right;">
-          <h2 style="margin:0; font-size:18px;">INVOICE</h2>
-          <p style="margin:0; font-size:12px;">#INV-${order.orderId.slice(-6)}</p>
+          <h2 style="margin:0; font-size:16px; color:#F5DEB3; font-weight:600; letter-spacing:1px;">INVOICE</h2>
+          <p style="margin:0; font-size:11px; color:rgba(255,255,255,0.65);">#INV-${order.orderId.slice(-6)}</p>
         </div>
       </div>
       <div class="content">

@@ -756,6 +756,8 @@ const razorpayWebHookController = async (req, res) => {
           // 2. EMAIL NOTIFICATION LOGIC
           try {
             if (order.userEmail) {
+              const isCOD = order.paymentMethod === "COD";
+
               const orderDetails = {
                 orderId: order.orderId,
                 items: order.items.map((item) => ({
@@ -767,6 +769,8 @@ const razorpayWebHookController = async (req, res) => {
                 orderDate: order.createdAt,
                 senderMobile: order.senderMobile,
                 receiverMobile: order.receiverMobile,
+                paymentMethod: order.paymentMethod,
+                codDetails: order.codDetails,
               };
 
               // Send order confirmation email
@@ -779,11 +783,15 @@ const razorpayWebHookController = async (req, res) => {
                 },
               );
 
+              // For COD, only the advance was actually captured via Razorpay right now —
+              // the receipt must reflect that amount, not the full order total.
               const paymentDetails = {
                 paymentId: payment.id,
-                amount: order.amount,
+                amount: isCOD ? order.codDetails?.partialAmountPaid ?? order.amount : order.amount,
                 orderId: order.orderId,
                 date: new Date(),
+                paymentMethod: isCOD ? "COD" : "Razorpay",
+                codDetails: isCOD ? order.codDetails : null,
               };
               await sendPaymentReceipt(order.userEmail, paymentDetails).catch(
                 (err) => {

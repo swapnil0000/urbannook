@@ -1,146 +1,149 @@
 import env from "../config/envConfigSetup.js";
+
 const contactNotificationTemplate = ({ name, email, subject, message, mobile, timestamp }) => {
-  const formattedDate = new Date(timestamp).toLocaleString('en-US', {
+  const formattedDate = new Date(timestamp).toLocaleString('en-IN', {
     dateStyle: 'full',
-    timeStyle: 'short'
+    timeStyle: 'short',
   });
 
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>New Contact Form Submission</title>
-    </head>
-    <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f5f5;">
-      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5; padding: 40px 20px;">
-        <tr>
-          <td align="center">
-            <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-              
-              <!-- Header -->
-              <tr>
-                <td style="background: linear-gradient(135deg, #2e443c 0%, #1c3026 100%); padding: 40px 30px; text-align: center;">
-                  <h1 style="margin: 0; color: #F5DEB3; font-size: 28px; font-weight: 600; letter-spacing: -0.5px;">
-                    🔔 New Contact Submission
-                  </h1>
-                  <p style="margin: 10px 0 0 0; color: #e8e6e1; font-size: 14px; opacity: 0.9;">
-                    Urban Nook Contact Form
-                  </p>
-                </td>
-              </tr>
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<style>
+  :root { color-scheme: light dark; supported-color-schemes: light dark; }
+  .bg-page { background-color:#FAFAF8; }
+  .bg-card { background-color:#ffffff; }
+  .bg-soft { background-color:#F7F4EF; }
+  .divider { background-color:#F5DEB3; }
+  .h-text { color:#2E443C !important; }
+  .b-text { color:#666666 !important; }
+  .m-text { color:#AAAAAA !important; }
+  @media (prefers-color-scheme: dark) {
+    .bg-page { background-color:#12181A !important; }
+    .bg-card { background-color:#1A211D !important; }
+    .bg-soft { background-color:#212B24 !important; }
+    .divider { background-color:#4A6155 !important; }
+    .h-text { color:#F3EFE3 !important; }
+    .b-text { color:#C7C2B4 !important; }
+    .m-text { color:#8B9089 !important; }
+  }
+  @media only screen and (max-width:600px) {
+    .pad-mobile { padding-left:24px !important; padding-right:24px !important; }
+  }
+</style>
+</head>
 
-              <!-- Content -->
-              <tr>
-                <td style="padding: 40px 30px;">
-                  
-                  <!-- Timestamp -->
-                  <div style="background-color: #f8f9fa; border-left: 4px solid #F5DEB3; padding: 15px 20px; margin-bottom: 30px; border-radius: 8px;">
-                    <p style="margin: 0; color: #6c757d; font-size: 13px; font-weight: 600;">
-                      📅 Received: ${formattedDate}
-                    </p>
-                  </div>
+<body class="bg-page" style="margin:0; padding:0; background-color:#FAFAF8; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
 
-                  <!-- Submission Details -->
-                  <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 20px;">
-                    
-                    <!-- Name -->
-                    <tr>
-                      <td style="padding: 15px 0; border-bottom: 1px solid #e9ecef;">
-                        <p style="margin: 0 0 5px 0; color: #6c757d; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                          Name
-                        </p>
-                        <p style="margin: 0; color: #2e443c; font-size: 16px; font-weight: 500;">
-                          ${name}
-                        </p>
-                      </td>
-                    </tr>
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" class="bg-page"
+       style="width:100%; background-color:#FAFAF8; padding:40px 20px;">
+  <tr><td align="center">
 
-                    <!-- Email -->
-                    <tr>
-                      <td style="padding: 15px 0; border-bottom: 1px solid #e9ecef;">
-                        <p style="margin: 0 0 5px 0; color: #6c757d; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                          Email
-                        </p>
-                        <p style="margin: 0;">
-                          <a href="mailto:${email}" style="color: #2e443c; font-size: 16px; font-weight: 500; text-decoration: none;">
-                            ${email}
-                          </a>
-                        </p>
-                      </td>
-                    </tr>
+    <table width="600" cellpadding="0" cellspacing="0" role="presentation" class="bg-card"
+           style="width:100%; max-width:600px; background-color:#ffffff;">
 
-                    <!-- Subject -->
-                    <tr>
-                      <td style="padding: 15px 0; border-bottom: 1px solid #e9ecef;">
-                        <p style="margin: 0 0 5px 0; color: #6c757d; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                          Mobile
-                        </p>
-                        <p style="margin: 0; color: #2e443c; font-size: 16px; font-weight: 500;">
-                          ${mobile ? `<a href="tel:${mobile}" style="color: #2e443c; text-decoration: none;">${mobile}</a>` : '<span style="color: #adb5bd; font-style: italic;">Not provided</span>'}
-                        </p>
-                      </td>
-                    </tr>
+      <!-- HEADER -->
+      <tr>
+        <td align="center" class="pad-mobile" style="padding:36px 40px 28px;">
+          <table cellpadding="0" cellspacing="0" role="presentation">
+            <tr>
+              <td class="bg-soft divider" style="background-color:#F7F4EF; border:1px solid #F5DEB3; border-radius:20px; padding:5px 16px;">
+                <span class="h-text" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:10px; font-weight:700; color:#2E443C; letter-spacing:2.5px; text-transform:uppercase;">
+                  New Contact Submission
+                </span>
+              </td>
+            </tr>
+          </table>
+          <h2 class="h-text" style="margin:20px 0 8px; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:22px; font-weight:600; color:#2E443C; line-height:1.3; letter-spacing:-0.3px;">
+            UrbanNook Contact Form
+          </h2>
+          <p class="m-text" style="margin:0; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:13px; color:#AAAAAA;">
+            Received ${formattedDate}
+          </p>
+        </td>
+      </tr>
 
-                    <!-- Inquiry Type -->
-                    <tr>
-                      <td style="padding: 15px 0; border-bottom: 1px solid #e9ecef;">
-                        <p style="margin: 0 0 5px 0; color: #6c757d; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                          Subject
-                        </p>
-                        <p style="margin: 0;">
-                          <span style="display: inline-block; background-color: #F5DEB3; color: #2e443c; padding: 6px 12px; border-radius: 6px; font-size: 14px; font-weight: 600;">
-                            ${subject}
-                          </span>
-                        </p>
-                      </td>
-                    </tr>
+      <!-- SECTION DIVIDER -->
+      <tr><td style="padding:0 40px;"><div class="divider" style="height:1px; background-color:#F5DEB3;"></div></td></tr>
 
-                    <!-- Message -->
-                    <tr>
-                      <td style="padding: 15px 0;">
-                        <p style="margin: 0 0 10px 0; color: #6c757d; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                          Message
-                        </p>
-                        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #e9ecef;">
-                          <p style="margin: 0; color: #2e443c; font-size: 15px; line-height: 1.6; white-space: pre-wrap;">
-${message}
-                          </p>
-                        </div>
-                      </td>
-                    </tr>
+      <!-- DETAILS -->
+      <tr>
+        <td class="pad-mobile" style="padding:32px 40px 0;">
+          <table cellpadding="0" cellspacing="0" role="presentation">
+            <tr>
+              <td class="m-text" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:9px; color:#AAAAAA; text-transform:uppercase; letter-spacing:1px; padding-bottom:16px; padding-right:20px; white-space:nowrap; vertical-align:top;">Name</td>
+              <td class="h-text" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:14px; font-weight:600; color:#2E443C; padding-bottom:16px;">${name}</td>
+            </tr>
+            <tr>
+              <td class="m-text" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:9px; color:#AAAAAA; text-transform:uppercase; letter-spacing:1px; padding-bottom:16px; padding-right:20px; white-space:nowrap; vertical-align:top;">Email</td>
+              <td style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:14px; padding-bottom:16px;">
+                <a href="mailto:${email}" class="h-text" style="color:#2E443C; font-weight:600; text-decoration:none;">${email}</a>
+              </td>
+            </tr>
+            <tr>
+              <td class="m-text" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:9px; color:#AAAAAA; text-transform:uppercase; letter-spacing:1px; padding-bottom:16px; padding-right:20px; white-space:nowrap; vertical-align:top;">Mobile</td>
+              <td class="h-text" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:14px; font-weight:600; color:#2E443C; padding-bottom:16px;">
+                ${mobile ? `<a href="tel:${mobile}" style="color:#2E443C; text-decoration:none;">${mobile}</a>` : '<span class="m-text" style="color:#CCCCCC; font-style:italic; font-weight:400;">Not provided</span>'}
+              </td>
+            </tr>
+            <tr>
+              <td class="m-text" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:9px; color:#AAAAAA; text-transform:uppercase; letter-spacing:1px; padding-right:20px; white-space:nowrap; vertical-align:top;">Subject</td>
+              <td style="padding-bottom:0;">
+                <span style="display:inline-block; background-color:#F5DEB3; color:#2E443C; padding:4px 12px; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:12px; font-weight:600;">${subject}</span>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
 
-                  </table>
+      <!-- MESSAGE -->
+      <tr>
+        <td class="pad-mobile" style="padding:28px 40px 40px;">
+          <p class="m-text" style="margin:0 0 10px; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:9px; font-weight:700; color:#AAAAAA; text-transform:uppercase; letter-spacing:3px;">
+            Message
+          </p>
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation" class="bg-soft divider" style="background-color:#F7F4EF; border:1px solid #F5DEB3; border-radius:2px;">
+            <tr>
+              <td class="b-text" style="padding:20px 24px; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:14px; color:#444444; line-height:1.7; white-space:pre-wrap;">${message}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
 
-                  <!-- Action Button -->
-                  <div style="text-align: center; margin-top: 30px;">
-                    <a href="${env.ADMIN_DASHBOARD_URL || 'http://localhost:3000/admin'}/contacts" 
-                       style="display: inline-block; background-color: #2e443c; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; letter-spacing: 0.5px;">
-                      View in Dashboard →
-                    </a>
-                  </div>
+      <!-- SECTION DIVIDER -->
+      <tr><td style="padding:0 40px;"><div class="divider" style="height:1px; background-color:#F5DEB3;"></div></td></tr>
 
-                </td>
-              </tr>
+      <!-- CTA -->
+      <tr>
+        <td align="center" style="padding:36px 40px 44px;">
+          <a href="${env.ADMIN_DASHBOARD_URL || 'http://localhost:3000/admin'}/contacts"
+             style="display:inline-block; background-color:#2E443C; color:#ffffff; text-decoration:none; padding:14px 44px; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:12px; font-weight:600; letter-spacing:2.5px; text-transform:uppercase;">
+            View In Dashboard
+          </a>
+        </td>
+      </tr>
 
-              <!-- Footer -->
-              <tr>
-                <td style="background-color: #f8f9fa; padding: 25px 30px; text-align: center; border-top: 1px solid #e9ecef;">
-                  <p style="margin: 0; color: #6c757d; font-size: 12px; line-height: 1.5;">
-                    This is an automated notification from Urban Nook Contact Form.<br>
-                    Please respond to the customer at <a href="mailto:${email}" style="color: #2e443c; text-decoration: none; font-weight: 600;">${email}</a>
-                  </p>
-                </td>
-              </tr>
+      <!-- BOTTOM BAR -->
+      <tr>
+        <td style="background-color:#2E443C; padding:20px 40px; text-align:center;">
+          <p style="margin:0; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:10px; color:rgba(245,222,179,0.65); letter-spacing:0.5px;">
+            UrbanNook Contact Form &mdash; automated notification &middot; &copy; ${new Date().getFullYear()} Urban Nook. All rights reserved.
+          </p>
+        </td>
+      </tr>
 
-            </table>
-          </td>
-        </tr>
-      </table>
-    </body>
-    </html>
-  `;
+    </table>
+
+  </td></tr>
+</table>
+
+</body>
+</html>
+`;
 };
 
 export default contactNotificationTemplate;
