@@ -13,6 +13,23 @@ import { useCookies } from "react-cookie";
 import { fireAddToCartConfetti } from "../../utils/celebration";
 import SEOHead from "../../component/SEOHead";
 import ComparisonTable from "../../component/ComparisonTable";
+import SetupShowcase from "../../component/SetupShowcase";
+
+// TEMP: hardcoded showcase slides until wired to flagged review images
+// (e.g. a `showInSetup` boolean on each review image, toggled from admin).
+// Module-scope so the array reference stays stable across renders.
+// TODO(wiring): map flagged review images →
+//   { url: img, quote: review.desc, author: review.name } from reviewsData.
+const SETUP_SHOWCASE_IMG =
+  "https://d1dhs7xre1cv0d.cloudfront.net/prod/reviews/019da690-729b-7428-8ae1-0273f030d2a8/019da759-db13-76ec-b7cf-8005fd5ab150-1779439962727.jpeg";
+const SETUP_SHOWCASE_ITEMS = [
+  { url: SETUP_SHOWCASE_IMG, quote: "Absolutely lights up my desk — everyone who visits asks about it.", author: "Aditya R." },
+  { url: SETUP_SHOWCASE_IMG, quote: "Build quality is insane for the price. Looks premium on my shelf.", author: "Priya S." },
+  { url: SETUP_SHOWCASE_IMG, quote: "The glow is exactly like a real hot rotor. Perfect gift for a car guy.", author: "Karan M." },
+  { url: SETUP_SHOWCASE_IMG, quote: "Sits right next to my monitor and completely changed the vibe.", author: "Neha T." },
+  { url: SETUP_SHOWCASE_IMG, quote: "Ordered a second one for my brother. Packaging was top notch.", author: "Rohit V." },
+  { url: SETUP_SHOWCASE_IMG, quote: "Way brighter than I expected — genuinely a conversation starter.", author: "Sanya K." },
+];
 // FreeShippingBanner render moved off the PDP into the cart — import kept
 // commented so restoring the PDP banner is a one-line change.
 // import FreeShippingBanner from "../../component/FreeShippingBanner";
@@ -717,9 +734,11 @@ const ProductDetailPage = () => {
                   {galleryImages.map((img, idx) => (
                     <div
                       key={idx}
-                      className="absolute inset-0 flex items-center justify-center transition-opacity duration-300"
+                      className="absolute inset-0 flex items-center justify-center"
                       style={{
                         opacity: idx === currentImageIndex ? 1 : 0,
+                        transition: "opacity 600ms cubic-bezier(0.4, 0, 0.2, 1)",
+                        willChange: "opacity",
                         pointerEvents:
                           idx === currentImageIndex ? "auto" : "none",
                       }}
@@ -751,7 +770,28 @@ const ProductDetailPage = () => {
                   </button>
                 </>
               )}
+
             </div>
+
+            {/* Dot indicators — below the image box, small; active one is a
+                slightly wider pill. Replaces the old thumbnail strip. */}
+            {galleryImages.length > 1 && (
+              <div className="w-full max-w-[500px] mt-4 flex items-center justify-center gap-1.5">
+                {galleryImages.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setCurrentImageIndex(idx)}
+                    aria-label={`View image ${idx + 1}`}
+                    style={{ transition: "width 400ms cubic-bezier(0.4,0,0.2,1), background-color 400ms ease" }}
+                    className={`h-1.5 rounded-full ${
+                      idx === currentImageIndex
+                        ? "w-4 bg-[#F5DEB3]"
+                        : "w-1.5 bg-[#F5DEB3]/25 hover:bg-[#F5DEB3]/50"
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
 
             {/* NAYA: Variant Selection Block - Ab yahan aayega (Badi image ke neeche aur thumbnails se pehle) */}
             {availableVariants && availableVariants.length > 0 && (
@@ -876,7 +916,11 @@ const ProductDetailPage = () => {
               </div>
             )}
 
-            {/* Gallery Thumbnails with Carousel Indicator */}
+            {/* Gallery Thumbnails with Carousel Indicator — COMMENTED OUT
+                (kept for reference, not deleted). The main image now uses the
+                dot indicators overlaid above instead of this thumbnail strip.
+                Flip `false` → `true` to bring it back. */}
+            {false && (
             <div className="w-full max-w-[500px] mt-6 relative">
               {/* Scroll Container */}
               <div
@@ -924,23 +968,40 @@ const ProductDetailPage = () => {
                 </div>
               )}
             </div>
+            )}
           </div>
 
           <div className="lg:col-span-5 flex flex-col ml-auto w-full lg:max-w-[calc(100%-530px)]">
             {productId === config.specialProductId && (
               <ProductTimer timeLeft={timeLeft} />
             )}
-            <div className="mb-1 lg:mb-2 border-b border-[#F5DEB3]/10 pb-2 lg:pb-3">
-              <div className="flex justify-between items-start mb-4">
-                <span className="text-[#1c3026] text-[9px] lg:text-[10px] font-bold tracking-[0.2em] uppercase bg-[#F5DEB3] px-3 py-1.5 rounded-full shadow-lg shadow-[#F5DEB3]/10">
+            <div className="mb-1 mt-4 lg:mb-2 border-b border-[#F5DEB3]/10 pb-2 lg:pb-3">
+              {/* Category label + live rating pill (real avgRating / count).
+                  The rating pill balances the row on the right; only shown
+                  once the product actually has reviews. */}
+              <div className="flex items-center justify-between gap-2 mb-2.5">
+                <span className="text-[#1c3026] text-[9px] lg:text-[10px] font-bold tracking-[0.2em] uppercase bg-[#F5DEB3] px-3 py-1 rounded-full shadow-lg shadow-[#F5DEB3]/10">
                   {product.productCategory || "Featured"}
                 </span>
-                <div className="flex text-[#F5DEB3] text-xs gap-1 items-center bg-white/5 px-3 py-1 rounded-full">
-                  {/* <i className="fa-solid fa-star text-[10px]"></i> */}
-                  {/* <span className="ml-1 text-gray-300 font-mono text-[10px]">
-                    4.8
-                  </span> */}
-                </div>
+                {reviewsData?.data?.totalReviews > 0 && (
+                  <button
+                    onClick={() =>
+                      document
+                        .getElementById("pdp-all-reviews")
+                        ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                    }
+                    className="flex items-center gap-1.5 bg-white/5 border border-[#F5DEB3]/15 px-2.5 py-1 rounded-full hover:bg-white/10 transition-colors"
+                    title={`${reviewsData.data.totalReviews} review${reviewsData.data.totalReviews !== 1 ? "s" : ""}`}
+                  >
+                    <i className="fa-solid fa-star text-[#C8A96E] text-[10px]"></i>
+                    <span className="text-[#F5DEB3] font-bold text-[11px] tabular-nums leading-none">
+                      {reviewsData.data.avgRating}
+                    </span>
+                    <span className="text-gray-400 text-[10px] leading-none">
+                      ({reviewsData.data.totalReviews})
+                    </span>
+                  </button>
+                )}
               </div>
 
               <h1 className="text-3xl lg:text-6xl font-serif text-[#F5DEB3] leading-tight mb-4">
@@ -1192,46 +1253,24 @@ const ProductDetailPage = () => {
         {/* ===== COMPARISON TABLE ===== */}
         <ComparisonTable productName={product.productName} />
 
-        {/* ===== REVIEWS SECTION ===== */}
-        <div className="mt-16 pt-12 border-t border-[#1c3026]/10">
-          {/* Header row */}
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 mb-10">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <span className="h-[1px] w-8 bg-[#F5DEB3]"></span>
-                <span className="text-[#F5DEB3] font-bold tracking-[0.2em] uppercase text-[10px]">
-                  Customer Reviews
-                </span>
-              </div>
-              <h2 className="text-3xl lg:text-4xl font-serif text-white">
-                What customers{" "}
-                <span className="italic text-[#F5DEB3]">say.</span>
-              </h2>
-            </div>
+        {/* ===== REAL-LIFE SETUP SHOWCASE (lazy-mounted marquee) ===== */}
+        <SetupShowcase items={SETUP_SHOWCASE_ITEMS} />
 
-            {(reviewsData?.data?.totalReviews > 0 ||
-              reviewsData?.data?.canReview) && (
-              <button
-                onClick={() => {
-                  const hasToken = !!localStorage.getItem("authToken");
-                  if (!isAuthenticated && !hasToken) {
-                    openLoginModal("openReviewForm");
-                    return;
-                  }
-                  setEditingReviewId(null);
-                  setReviewForm({ rating: 5, desc: "" });
-                  setReviewImages([]);
-                  setReviewImagePreviews([]);
-                  setShowReviewForm((v) => !v);
-                }}
-                className="px-5 py-3 rounded-full border border-[#F5DEB3]/30 text-[#F5DEB3] text-[10px] font-bold uppercase tracking-widest hover:bg-[#F5DEB3] hover:text-[#1c3026] transition-all flex items-center gap-2 self-start sm:self-auto"
-              >
-                <i
-                  className={`fa-solid ${showReviewForm ? "fa-xmark" : "fa-pen"}`}
-                ></i>
-                {showReviewForm ? "Cancel" : "Write a Review"}
-              </button>
-            )}
+        {/* ===== REVIEWS SECTION ===== */}
+        <div className="mt-8 pt-4 ">
+          {/* Header row — eyebrow + heading. The "Write a Review" action now
+              lives only in the 1d summary block below (top button removed to
+              avoid duplication); functionality is identical. */}
+          <div className="mb-7">
+            <div className="mb-2">
+              <span className="text-[#F5DEB3] font-bold tracking-[0.2em] uppercase text-[10px]">
+                Customer Reviews
+              </span>
+            </div>
+            <h2 className="text-3xl lg:text-4xl font-serif text-white">
+              What our customers{" "}
+              <span className="italic text-[#F5DEB3]">say.</span>
+            </h2>
           </div>
 
           {/* Review Form — full width, above the two-column grid */}
@@ -1353,70 +1392,40 @@ const ProductDetailPage = () => {
               className="md:sticky md:top-24 md:max-h-[calc(100vh-6rem)]"
               style={{ overflow: "clip" }}
             >
-              {/* Compact Rating Summary + Histogram */}
+              {/* ===== Reviews Summary — Claude Design "1d", wired to real
+                   data. Compact confident review line + category pills (big
+                   cream box + histogram removed per this direction). ===== */}
+
+              {/* 1d — confident single review line (all items vertically
+                  centered on one baseline; FA star aligns cleaner than the
+                  unicode glyph). */}
               {reviewsData?.data?.totalReviews > 0 && (
-                <div className="mb-6 bg-[#FAF7F2] rounded-2xl p-4 border border-[#1c3026]/8 shadow-sm">
-                  {/* 5-star box — compact */}
-                  <div className="flex flex-col items-center text-center">
-                    <span className="text-4xl font-serif text-[#1c3026] leading-none">
-                      {reviewsData.data.avgRating}
-                    </span>
-                    <span className="text-xs text-[#1c3026]/40 mt-1 mb-2">
-                      out of 5
-                    </span>
-                    <div className="flex gap-0.5">
-                      {[1, 2, 3, 4, 5].map((s) => (
-                        <i
-                          key={s}
-                          className={`fa-star text-sm ${s <= Math.round(reviewsData.data.avgRating) ? "fa-solid text-[#C8A96E]" : "fa-regular text-[#1c3026]/15"}`}
-                        ></i>
-                      ))}
-                    </div>
-                    <span className="text-[10px] text-[#1c3026]/40 mt-2 uppercase tracking-wider">
-                      {reviewsData.data.totalReviews} rating
-                      {reviewsData.data.totalReviews !== 1 ? "s" : ""}
-                    </span>
-                  </div>
-                  {/* Divider */}
-                  <div className="h-px bg-[#1c3026]/8 my-4"></div>
-                  {/* Histogram */}
-                  <div className="flex flex-col space-y-3">
-                    {[5, 4, 3, 2, 1].map((star) => {
-                      const count = (reviewsData.data.reviews || []).filter(
-                        (r) => Math.round(r.rating) === star,
-                      ).length;
-                      const pct = reviewsData.data.totalReviews
-                        ? Math.round(
-                            (count / reviewsData.data.totalReviews) * 100,
-                          )
-                        : 0;
-                      return (
-                        <div key={star} className="flex items-center gap-3">
-                          <div className="flex items-center gap-1 w-10 shrink-0">
-                            <span className="text-xs text-[#1c3026]/70 font-medium tabular-nums">
-                              {star}
-                            </span>
-                            <i className="fa-solid fa-star text-[#C8A96E] text-[9px]"></i>
-                          </div>
-                          <div className="flex-1 bg-[#1c3026]/8 rounded-full h-2 overflow-hidden">
-                            <div
-                              style={{ width: `${pct}%` }}
-                              className={`h-2 rounded-full transition-all duration-700 ${star >= 4 ? "bg-[#C8A96E]" : star === 3 ? "bg-amber-400" : "bg-red-400"}`}
-                            ></div>
-                          </div>
-                          <span className="text-[10px] text-[#1c3026]/40 w-6 text-right shrink-0 tabular-nums">
-                            {count}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
+                <div className="mb-4 flex items-center gap-2.5 px-4 py-3 rounded-2xl border border-[#C8A96E]/30 bg-[#C8A96E]/[0.06]">
+                  <span className="font-serif text-xl leading-none text-[#F5DEB3]">
+                    {reviewsData.data.avgRating}
+                  </span>
+                  <i className="fa-solid fa-star text-[#C8A96E] text-sm leading-none"></i>
+                  <span className="w-px h-4 bg-white/15" />
+                  <span className="text-[13px] font-semibold text-white/70 leading-none">
+                    {reviewsData.data.totalReviews} review
+                    {reviewsData.data.totalReviews !== 1 ? "s" : ""}
+                  </span>
+                  <button
+                    onClick={() =>
+                      document
+                        .getElementById("pdp-all-reviews")
+                        ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                    }
+                    className="ml-auto text-[12px] font-bold text-[#C8A96E] hover:text-[#F5DEB3] transition-colors leading-none"
+                  >
+                    Read ›
+                  </button>
                 </div>
               )}
 
-              {/* Category Ratings */}
+              {/* 1d — category pills (horizontal scroll, hidden scrollbar) */}
               {reviewsData?.data?.totalReviews > 0 && (
-                <div className="mb-6 flex flex-wrap gap-3">
+                <div className="flex gap-2 overflow-x-auto pb-0.5 mb-[18px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   {[
                     { label: "Quality", rating: 4 },
                     { label: "Build", rating: 5 },
@@ -1425,21 +1434,22 @@ const ProductDetailPage = () => {
                   ].map(({ label, rating }) => (
                     <div
                       key={label}
-                      className="flex items-center gap-2 bg-[#FAF7F2] border border-[#1c3026]/10 rounded-full px-4 py-2 shadow-sm"
+                      className="flex-none flex items-center gap-1.5 bg-white/[0.04] border border-white/[0.12] rounded-full pl-2.5 pr-2 py-1.5"
                     >
-                      <span className="text-[#1c3026]/70 text-xs font-medium">
+                      <span className="text-[10px] font-semibold text-white/60 leading-none">
                         {label}
                       </span>
-                      <span className="text-[#C8A96E] font-bold text-xs tabular-nums">
+                      <span className="flex items-center gap-0.5 text-[10px] font-bold text-[#F5DEB3] leading-none">
                         {rating}
+                        <i className="fa-solid fa-star text-[8px] text-[#C8A96E]"></i>
                       </span>
-                      <i className="fa-solid fa-star text-[#C8A96E] text-[9px]"></i>
                     </div>
                   ))}
                 </div>
               )}
 
-              {/* Customer Photos Gallery + mobile text-only reviews + Lightboxes */}
+              {/* 1d — Customer Photos: header + horizontal strip (hidden
+                   scrollbar). Lightbox behaviour preserved. */}
               {(() => {
                 const allImgsWithReview = (
                   reviewsData?.data?.reviews || []
@@ -1452,114 +1462,82 @@ const ProductDetailPage = () => {
                   ).map((url) => ({ url, review: r })),
                 );
                 if (allImgsWithReview.length === 0) return null;
-                const GRID_MAX = 5;
-                const gridItems = allImgsWithReview.slice(0, GRID_MAX);
-                const extra = allImgsWithReview.length - GRID_MAX;
+                const STRIP_MAX = 5;
+                const stripItems = allImgsWithReview.slice(0, STRIP_MAX);
+                const extra = allImgsWithReview.length - STRIP_MAX;
                 return (
-                  <div className="mb-6">
-                      <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-[#F5DEB3]/50 mb-3">
+                  <div className="mb-5">
+                    <div className="flex items-baseline justify-between mb-2.5">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/50">
                         Customer Photos
-                      </p>
-
-                      {/* ── DESKTOP: horizontal row of 5 small squares ── */}
-                      <div className="hidden md:flex gap-2">
-                        {gridItems.map(({ url }, i) => {
-                          const isLast = i === GRID_MAX - 1 && extra > 0;
-                          return (
-                            <div
-                              key={i}
-                              className="relative w-24 h-24 shrink-0 rounded-xl overflow-hidden cursor-pointer"
-                              onClick={() =>
-                                setLightboxData({
-                                  imgList: allImgsWithReview,
-                                  currentIdx: i,
-                                })
-                              }
-                            >
-                              <ReviewImg
-                                src={url}
-                                alt={`Customer photo ${i + 1}`}
-                                className="w-full h-full hover:brightness-90 transition-all"
-                              />
-                              {isLast && (
-                                <div className="absolute inset-0 bg-black/55 flex items-center justify-center pointer-events-none">
-                                  <span className="text-white font-bold text-sm">
-                                    +{extra}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* ── MOBILE: Flipkart grid — 1 large + 2×2 small ── */}
-                      <div className="md:hidden flex gap-1 h-[180px] sm:h-[220px] rounded-2xl overflow-hidden">
-                        {gridItems[0] && (
-                          <ReviewImg
-                            src={gridItems[0].url}
-                            alt="Customer photo 1"
-                            className="flex-[2] min-w-0 cursor-pointer hover:brightness-90 transition-all"
-                            onClick={() =>
-                              setLightboxData({
-                                imgList: allImgsWithReview,
-                                currentIdx: 0,
-                              })
-                            }
-                          />
-                        )}
-                        {gridItems.length > 1 && (
-                          <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-1">
-                            {gridItems.slice(1).map(({ url }, i) => {
-                              const globalIdx = i + 1;
-                              const isLast =
-                                globalIdx === GRID_MAX - 1 && extra > 0;
-                              return (
-                                <div
-                                  key={i}
-                                  className="relative overflow-hidden cursor-pointer"
-                                  onClick={() =>
-                                    setLightboxData({
-                                      imgList: allImgsWithReview,
-                                      currentIdx: globalIdx,
-                                    })
-                                  }
-                                >
-                                  <ReviewImg
-                                    src={url}
-                                    alt={`Customer photo ${globalIdx + 1}`}
-                                    className="w-full h-full hover:brightness-90 transition-all"
-                                  />
-                                  {isLast && (
-                                    <div className="absolute inset-0 bg-black/55 flex items-center justify-center pointer-events-none">
-                                      <span className="text-white font-bold text-base">
-                                        +{extra}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                            {Array.from({
-                              length: Math.max(0, 4 - (gridItems.length - 1)),
-                            }).map((_, i) => (
-                              <div
-                                key={`ph-${i}`}
-                                className="bg-[#1c3026]/20"
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                      </span>
+                      <button
+                        onClick={() =>
+                          setLightboxData({ imgList: allImgsWithReview, currentIdx: 0 })
+                        }
+                        className="text-[11px] font-bold text-[#C8A96E] hover:text-[#F5DEB3] transition-colors"
+                      >
+                        View all ›
+                      </button>
                     </div>
-
+                    <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      {stripItems.map(({ url }, i) => {
+                        const isLast = i === STRIP_MAX - 1 && extra > 0;
+                        return (
+                          <div
+                            key={i}
+                            onClick={() =>
+                              setLightboxData({ imgList: allImgsWithReview, currentIdx: i })
+                            }
+                            className="relative flex-none w-[62px] h-[62px] rounded-[10px] overflow-hidden cursor-pointer"
+                          >
+                            <ReviewImg
+                              src={url}
+                              alt={`Customer photo ${i + 1}`}
+                              className="w-full h-full hover:brightness-90 transition-all"
+                            />
+                            {isLast && (
+                              <div className="absolute inset-0 bg-[#0f1c16]/55 flex items-center justify-center pointer-events-none">
+                                <span className="text-white font-extrabold text-[15px]">
+                                  +{extra}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 );
               })()}
+
+              {/* 1d — Write a Review (full-width outlined gold pill) */}
+              {(reviewsData?.data?.totalReviews > 0 ||
+                reviewsData?.data?.canReview) && (
+                <button
+                  onClick={() => {
+                    const hasToken = !!localStorage.getItem("authToken");
+                    if (!isAuthenticated && !hasToken) {
+                      openLoginModal("openReviewForm");
+                      return;
+                    }
+                    setEditingReviewId(null);
+                    setReviewForm({ rating: 5, desc: "" });
+                    setReviewImages([]);
+                    setReviewImagePreviews([]);
+                    setShowReviewForm((v) => !v);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 border border-[#C8A96E]/55 text-[#F5DEB3] rounded-full px-5 py-3 text-[11px] font-bold uppercase tracking-[0.14em] hover:bg-[#C8A96E]/[0.12] transition-colors"
+                >
+                  <span className="text-[13px]">✎</span> Write a Review
+                </button>
+              )}
             </div>
             {/* end LEFT COLUMN */}
 
             {/* ── RIGHT COLUMN: Reviews ── */}
             <div
+              id="pdp-all-reviews"
               className="md:max-h-[calc(100vh-6rem)] md:overflow-y-auto"
               style={{ scrollbarWidth: "none" }}
             >
