@@ -1,10 +1,16 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { useUpdateCartMutation, useEvaluateCartRulesQuery } from '../../store/api/userApi';
+import {
+  useUpdateCartMutation,
+  useEvaluateCartRulesQuery,
+  useGetFreeShippingOfferQuery,
+  useGetAllFreeShippingBannersQuery,
+} from '../../store/api/userApi';
 import { updateQuantity, removeItem } from '../../store/slices/cartSlice';
 import { setShowLoginModal, setLoginCallback } from '../../store/slices/uiSlice';
 import { trackViewCart, trackRemoveFromCart, track } from '../../utils/analytics';
+import FreeShippingBanner from '../FreeShippingBanner';
 
 const OptimizedImage = lazy(() => import('../OptimizedImage'));
 
@@ -32,6 +38,14 @@ const CartDrawer = ({ isOpen, onClose }) => {
   const { data: cartRuleEvalData } = useEvaluateCartRulesQuery(cartRuleEvalItems, {
     skip: cartRuleEvalItems.length === 0,
   });
+
+  // Free-shipping eligibility for the "Shipping" line below — mirrors the
+  // same OR logic used at checkout/payment (rp.payment.controller.js): the
+  // admin combo-banner offer, any active generic cart rule's free_shipping
+  // effect, or the plain cart-value threshold. Previously this drawer never
+  // showed shipping status at all, so the customer only found out at checkout.
+  const { data: offerRes } = useGetFreeShippingOfferQuery();
+  const { data: bannersRes } = useGetAllFreeShippingBannersQuery();
   const getItemDiscountedPrice = (item) => {
     const productId = item.mongoId || item.id;
     const candidates = cartRuleEvalData?.data?.discounts?.[productId];
@@ -147,6 +161,32 @@ const CartDrawer = ({ isOpen, onClose }) => {
   }, 0);
   const subtotal = totalAmount - ruleDiscountSavings;
 
+  // Same three-path eligibility used at checkout: admin combo banner (source
+  // + recommended product both in cart), any active generic cart rule whose
+  // effects include free_shipping, or the plain cart-value threshold.
+  const offerConfig = offerRes?.data;
+  const banners = bannersRes?.data || [];
+  const cartProductIds = new Set(cartItems.map((i) => i.mongoId || i.id));
+  const comboEligible =
+    !!offerConfig?.isActive &&
+    banners.some((b) => cartProductIds.has(b.sourceProductId) && cartProductIds.has(b.recommendedProductId));
+  const thresholdEligible =
+    !!offerConfig?.isActive && (offerConfig?.thresholdAmount || 0) > 0 && subtotal >= offerConfig.thresholdAmount;
+  const isFreeShippingEligible = comboEligible || !!cartRuleEvalData?.data?.freeShipping || thresholdEligible;
+
+  // Cross-sell nudge: when the offer's SOURCE product is in the cart but its
+  // RECOMMENDED add-on isn't, show that offer's FreeShippingBanner in the
+  // drawer so the customer can complete the free-shipping combo here, or just
+  // proceed to checkout. Same selection the checkout page uses; gated on the
+  // offer being active so toggling it off in admin hides this too.
+  const nudgeBannerProductId = (() => {
+    if (!offerConfig?.isActive || banners.length === 0) return null;
+    const match = banners.find(
+      (b) => cartProductIds.has(b.sourceProductId) && !cartProductIds.has(b.recommendedProductId),
+    );
+    return match?.sourceProductId || null;
+  })();
+
   return (
     <div className="fixed inset-0 z-[9999] flex justify-end">
       
@@ -230,8 +270,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
                       </div>
                       
                       {/* Details */}
-                      <div className="flex-1 flex flex-col min-w-0 justify-between min-h-[85px]">
-                        
+                      <div className="flex-1 flex flex-col min-w-0">
                         <div>
                           {/* Name & Delete */}
                           <div className="flex justify-between items-start mb-1">
@@ -247,9 +286,15 @@ const CartDrawer = ({ isOpen, onClose }) => {
                             </button>
                           </div>
                           
-                          <p className="text-xs text-gray-400 mt-1 font-medium tracking-wide">
-                            {item.category || "Standard Variant"}
-                          </p>
+                          {/* Only show a category line when there's a REAL
+                              category — the old "Standard Variant" fallback was
+                              a meaningless filler line above the actual variant,
+                              eating vertical space on short screens. */}
+                          {item.category && (
+                            <p className="text-xs text-gray-400 mt-1 font-medium tracking-wide">
+                              {item.category}
+                            </p>
+                          )}
 
                           {/* Variant Selection (If Exists) */}
                           {(() => {
@@ -257,16 +302,16 @@ const CartDrawer = ({ isOpen, onClose }) => {
                             if (!itemVariant || itemVariant === 'N/A') return null;
 
                             return (
-                              <div className="flex items-center gap-1.5 mb-2">
-                                <div 
-                                  className="w-2.5 h-2.5 rounded-full border border-gray-200 shadow-sm"
-                                  style={{ 
-                                    background: itemVariant.toLowerCase() === 'rainbow' 
-                                      ? 'linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)' 
-                                      : itemVariant.replace(/\s+/g, '').toLowerCase() 
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <div
+                                  className="w-2.5 h-2.5 rounded-full border border-gray-200 shadow-sm shrink-0"
+                                  style={{
+                                    background: itemVariant.toLowerCase() === 'rainbow'
+                                      ? 'linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)'
+                                      : itemVariant.replace(/\s+/g, '').toLowerCase()
                                   }}
                                 ></div>
-                                <span className="text-xs text-gray-400 mt-1 font-medium tracking-wide">{itemVariant}</span>
+                                <span className="text-xs text-gray-400 font-medium tracking-wide">{itemVariant}</span>
                               </div>
                             );
                           })()}
@@ -300,10 +345,18 @@ const CartDrawer = ({ isOpen, onClose }) => {
                             const discountedPrice = getItemDiscountedPrice(item);
                             const rawPrice = Number(item.price) || 0;
                             const hasDiscount = discountedPrice < rawPrice;
+                            const percentOff = hasDiscount
+                              ? Math.round(((rawPrice - discountedPrice) / rawPrice) * 100)
+                              : 0;
                             return hasDiscount ? (
                               <div className="text-right">
                                 <p className="text-sm font-bold text-[#157a44]">₹{Math.round(discountedPrice).toLocaleString()}</p>
-                                <p className="text-[10px] text-gray-400 line-through">₹{rawPrice.toLocaleString()}</p>
+                                <div className="flex items-center justify-end gap-1">
+                                  <span className="text-[10px] text-gray-400 line-through">₹{rawPrice.toLocaleString()}</span>
+                                  <span className="text-[9px] font-bold uppercase rounded-full bg-[#157a44] text-white px-1.5 py-px">
+                                    {percentOff}% OFF
+                                  </span>
+                                </div>
                               </div>
                             ) : (
                               <p className="text-sm font-bold text-[#0a110e]">₹{rawPrice.toLocaleString()}</p>
@@ -316,30 +369,51 @@ const CartDrawer = ({ isOpen, onClose }) => {
                   );
                 })}
               </div>
+
+              {/* Add-on nudge — only when the offer's source product is in the
+                  cart but the add-on isn't. Lets the customer complete the
+                  free-shipping combo without leaving the drawer. */}
+              {nudgeBannerProductId && (
+                <FreeShippingBanner
+                  productId={nudgeBannerProductId}
+                  variant="light"
+                  showQuantityStepper
+                  showProgressBar={false}
+                  className="mt-3 sm:mt-6"
+                />
+              )}
             </>
           )}
         </div>
 
         {/* --- FOOTER (CHECKOUT) --- */}
         {cartItems?.length > 0 && (
-          <div className="px-6 py-6 bg-white border-t border-gray-100 z-10 shrink-0">
-            <div className="space-y-3 mb-6">
+          <div className="px-6 py-2 sm:py-6 bg-white border-t border-gray-100 z-10 shrink-0">
+            <div className="space-y-1 sm:space-y-3 mb-3 sm:mb-6">
                 <div className="flex justify-between items-center text-[11px] font-bold text-gray-400 uppercase tracking-widest">
                     <span>Subtotal</span>
                     <span className="font-medium text-[#0a110e]">₹{(Number(subtotal) || 0).toLocaleString()}</span>
                 </div>
-                <div className="pt-3 border-t border-gray-100 flex justify-between items-center">
+                <div className="flex justify-between items-center gap-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest">
+                    <span className="shrink-0">Shipping</span>
+                    {isFreeShippingEligible ? (
+                      <span className="font-extrabold text-green-600 text-right">Free</span>
+                    ) : (
+                      <span className="font-medium normal-case tracking-normal text-gray-500 text-right">Calculated at checkout</span>
+                    )}
+                </div>
+                <div className="pt-1 border-t border-gray-100 flex justify-between items-center">
                     <span className="text-base font-serif text-[#0a110e]">Total</span>
                     <span className="text-xl font-bold text-[#0a110e]">₹{(Number(subtotal) || 0).toLocaleString()}</span>
                 </div>
             </div>
 
             {/* COD availability notice */}
-            <div className="flex items-center gap-2.5 bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3 mb-4">
+            <div className="flex items-center gap-1 bg-amber-50 border border-amber-100 rounded-2xl px-4 py-1 sm:py-3 mb-1 sm:mb-4">
               <i className="fa-solid fa-hand-holding-dollar text-amber-500 text-base shrink-0" />
               <div>
-                <p className="text-[11px] font-bold text-amber-800">Cash on Delivery available</p>
-                <p className="text-[10px] text-amber-600 mt-0.5 leading-snug">Pay a small advance online · rest at your door</p>
+                <p className="text-[9px] font-bold text-amber-800">Cash on Delivery available.</p>
+                <p className="text-[8px] text-amber-600 mt-0.5 leading-snug">Pay a small advance online · rest at your door</p>
               </div>
             </div>
 

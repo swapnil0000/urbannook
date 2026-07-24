@@ -30,6 +30,14 @@ const CouponList = lazy(() => import("../component/CouponList"));
 const MobileNumberModal = lazy(() => import("../component/MobileNumberModal"));
 const GoogleAddressFormModal = lazy(() => import("../component/GoogleAddressFormModal"));
 
+// What the courier charges to collect/remit cash at the door — the reason a
+// COD order costs more than the same order paid online. Display-only: the real
+// difference is already baked into the carrier rate returned for paymentType
+// "COD" (see the shipping-rate call below), this range just lets the notice
+// name the figure. A range (not one number) because the courier's exact COD
+// fee varies per order — keep it in step with what they actually charge.
+const COD_HANDLING_FEE = "30–40";
+
 const GUEST_STEPS = [
   { number: 1, label: "Account" },
   { number: 2, label: "Contact" },
@@ -180,7 +188,7 @@ const SavingsBanner = ({ amount, freeShipping = false }) => (
             display: "flex",
             alignItems: "center",
             gap: 7,
-            fontSize: 17,
+            fontSize: 14,
             fontWeight: 800,
             letterSpacing: "0.02em",
             textTransform: "uppercase",
@@ -636,9 +644,9 @@ const CheckoutPage = () => {
           // rule's free_shipping effect, or the cart-value threshold is
           // enough — mirrors the OR logic in rp.payment.controller.js exactly.
           const isFreeShippingEligible = comboEligible || !!cartRuleEvalData?.data?.freeShipping || thresholdEligible;
-          console.log(
-            `[FreeShipping][Client] cartIds=[${[...cartProductIds].join(",")}] isActive=${offerConfig?.isActive} comboEligible=${comboEligible} ruleEligible=${!!cartRuleEvalData?.data?.freeShipping} thresholdEligible=${thresholdEligible} → eligible=${isFreeShippingEligible}`,
-          );
+          // console.log(
+          //   `[FreeShipping][Client] cartIds=[${[...cartProductIds].join(",")}] isActive=${offerConfig?.isActive} comboEligible=${comboEligible} ruleEligible=${!!cartRuleEvalData?.data?.freeShipping} thresholdEligible=${thresholdEligible} → eligible=${isFreeShippingEligible}`,
+          // );
           // realAmount = actual carrier rate, always — this is what the COD
           // 2x-advance must be based on (matches the server's realShippingAmount).
           // amount = what the customer's total/display reflects — 0 when free
@@ -1612,8 +1620,18 @@ const CheckoutPage = () => {
                   <div className="divide-y divide-gray-50 max-h-64 overflow-y-auto">
                     {cartItems.map((item) => (
                       <div key={`${item.id}-${item.selectedVariant || "default"}`} className="flex items-center gap-3 px-5 py-3">
-                        <div className="w-10 h-10 rounded-lg bg-gray-50 border border-gray-100 overflow-hidden shrink-0">
-                          <img src={item.image || "/placeholder.jpg"} alt={item.name} className="w-full h-full object-contain mix-blend-multiply" />
+                        <div className="relative shrink-0">
+                          <div className="w-10 h-10 rounded-lg bg-gray-50 border border-gray-100 overflow-hidden">
+                            <img src={item.image || "/placeholder.jpg"} alt={item.name} className="w-full h-full object-contain mix-blend-multiply" />
+                          </div>
+                          <button
+                            onClick={() => handleRemoveItem(item.id, item.selectedVariant)}
+                            title={`Remove ${item.name}`}
+                            aria-label={`Remove ${item.name}`}
+                            className="absolute -top-1.5 -left-1.5 z-10 w-5 h-5 flex items-center justify-center rounded-full bg-[#f5deb3] border border-[#e0c896] shadow-sm text-[#1c3026] hover:bg-[#E63329] hover:text-white hover:border-[#E63329] transition-colors"
+                          >
+                            <i className="fa-solid fa-xmark text-[9px]" />
+                          </button>
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-semibold text-gray-800 truncate">{item.name}</p>
@@ -1622,14 +1640,23 @@ const CheckoutPage = () => {
                         </div>
                         {(() => {
                           const discountedPrice = getItemDiscountedPrice(item);
-                          const hasDiscount = discountedPrice < Number(item.price);
+                          const rawPrice = Number(item.price) || 0;
+                          const hasDiscount = discountedPrice < rawPrice;
+                          const percentOff = hasDiscount
+                            ? Math.round(((rawPrice - discountedPrice) / rawPrice) * 100)
+                            : 0;
                           return hasDiscount ? (
                             <div className="text-right shrink-0">
                               <p className="text-sm font-bold text-[#157a44]">₹{(discountedPrice * Number(item.quantity)).toLocaleString()}</p>
-                              <p className="text-[10px] text-gray-400 line-through">₹{(Number(item.price) * Number(item.quantity)).toLocaleString()}</p>
+                              <div className="flex items-center justify-end gap-1">
+                                <span className="text-[10px] text-gray-400 line-through">₹{(rawPrice * Number(item.quantity)).toLocaleString()}</span>
+                                <span className="text-[9px] font-bold uppercase rounded-full bg-[#157a44] text-white px-1.5 py-px">
+                                  {percentOff}% OFF
+                                </span>
+                              </div>
                             </div>
                           ) : (
-                            <p className="text-sm font-bold text-gray-800 shrink-0">₹{(Number(item.price) * Number(item.quantity)).toLocaleString()}</p>
+                            <p className="text-sm font-bold text-gray-800 shrink-0">₹{(rawPrice * Number(item.quantity)).toLocaleString()}</p>
                           );
                         })()}
                       </div>
@@ -1639,7 +1666,7 @@ const CheckoutPage = () => {
                 </div>
                 {visibleBannerProductId && (
                   <div className="px-5 pb-5">
-                    <FreeShippingBanner productId={visibleBannerProductId} variant="light" showQuantityStepper />
+                    <FreeShippingBanner productId={visibleBannerProductId} variant="light" showQuantityStepper showProgressBar={false} />
                   </div>
                 )}
               </div>
@@ -1721,12 +1748,29 @@ const CheckoutPage = () => {
                       </div>
                     </div>
                   </button>
+                  {paymentMethod === "COD" && (
+                <div className="flex items-center gap-1   rounded-xl px-4 ">
+                  <i className="fa-solid fa-circle-info text-[#a89068] text-xs shrink-0" />
+                  <p className="text-[10px] font-medium text-gray-600">
+                    Additional ₹{COD_HANDLING_FEE} COD handling fee applies.
+                  </p>
+                </div>
+              )}
                 </div>
                
               </div>
 
-              {/* COD notice — compact, shown only when COD is selected */}
-          
+              {/* COD notice — single-line disclosure, the standard e-commerce
+                  pattern ("₹X COD handling fee applies"). Names the fee so the
+                  higher COD total never reads as a hidden markup. */}
+              {/* {paymentMethod === "COD" && (
+                <div className="flex items-center gap-1   rounded-xl px-4 ">
+                  <i className="fa-solid fa-circle-info text-[#a89068] text-xs shrink-0" />
+                  <p className="text-[10px] font-medium text-gray-600">
+                    Additional ₹{COD_HANDLING_FEE} COD handling fee applies.
+                  </p>
+                </div>
+              )} */}
 
               {/* Coupon — available to all (guests + members) */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -1823,6 +1867,14 @@ const CheckoutPage = () => {
                     <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-[#2e443c] rounded-full flex items-center justify-center">
                       <span className="text-[9px] font-bold text-white">{item.quantity}</span>
                     </div>
+                    <button
+                      onClick={() => handleRemoveItem(item.id, item.selectedVariant)}
+                      title={`Remove ${item.name}`}
+                      aria-label={`Remove ${item.name}`}
+                      className="absolute -top-1.5 -left-1.5 z-10 w-5 h-5 flex items-center justify-center rounded-full bg-[#f5deb3] border border-[#e0c896] shadow-sm text-[#1c3026] hover:bg-[#E63329] hover:text-white hover:border-[#E63329] transition-colors"
+                    >
+                      <i className="fa-solid fa-xmark text-[9px]" />
+                    </button>
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-gray-800 truncate leading-tight">{item.name}</p>
@@ -1832,15 +1884,24 @@ const CheckoutPage = () => {
                   </div>
                   {(() => {
                     const discountedPrice = getItemDiscountedPrice(item);
-                    const hasDiscount = discountedPrice < Number(item.price);
+                    const rawPrice = Number(item.price) || 0;
+                    const hasDiscount = discountedPrice < rawPrice;
+                    const percentOff = hasDiscount
+                      ? Math.round(((rawPrice - discountedPrice) / rawPrice) * 100)
+                      : 0;
                     return hasDiscount ? (
                       <div className="text-right shrink-0">
                         <p className="text-xs font-bold text-[#157a44]">₹{(discountedPrice * Number(item.quantity)).toLocaleString()}</p>
-                        <p className="text-[9px] text-gray-400 line-through">₹{(Number(item.price) * Number(item.quantity)).toLocaleString()}</p>
+                        <div className="flex items-center justify-end gap-1">
+                          <span className="text-[9px] text-gray-400 line-through">₹{(rawPrice * Number(item.quantity)).toLocaleString()}</span>
+                          <span className="text-[9px] font-bold uppercase rounded-full bg-[#157a44] text-white px-1.5 py-px">
+                            {percentOff}% OFF
+                          </span>
+                        </div>
                       </div>
                     ) : (
                       <p className="text-xs font-bold text-gray-800 shrink-0">
-                        ₹{(Number(item.price) * Number(item.quantity)).toLocaleString()}
+                        ₹{(rawPrice * Number(item.quantity)).toLocaleString()}
                       </p>
                     );
                   })()}
@@ -1855,7 +1916,7 @@ const CheckoutPage = () => {
 
             {visibleBannerProductId && (
               <div className="px-5 pb-5">
-                <FreeShippingBanner productId={visibleBannerProductId} variant="light" showQuantityStepper />
+                <FreeShippingBanner productId={visibleBannerProductId} variant="light" showQuantityStepper showProgressBar={false} />
               </div>
             )}
 

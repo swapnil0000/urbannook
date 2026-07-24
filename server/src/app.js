@@ -221,6 +221,11 @@ app.use(
   cartRuleRouter,
 );
 
+// TEMP deploy-verification log — remove once cart-rules deploy is confirmed
+// live on staging. Prints once at process boot so it's easy to grep PM2
+// logs after a redeploy to confirm this build actually replaced the old one.
+// console.log("[DEPLOY CHECK] cart-rules route mounted — build marker v1");
+
 app.use(errorHandler);
 
 export default app;

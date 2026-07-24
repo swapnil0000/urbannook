@@ -20,7 +20,30 @@ import { uploadInvoiceToS3 } from "../utils/s3.utils.js";
 import Address from "../model/address.new.model.js";
 import html_to_pdf from "html-pdf-node";
 import { generateInvoiceHtmlTemplate } from "../template/invoiceTemplate.template.js";
-import { calculateShippingRate } from "../services/shipping.service.js";
+import { calculateShippingRate, FALLBACK_SHIPPING_CHARGE } from "../services/shipping.service.js";
+
+// Genuinely unserviceable pincode must still block checkout — we cannot accept an
+// order we cannot ship. Any OTHER failure (API down, network timeout after all
+// retries, transient error) falls back to a flat rate instead, so a shipping-API
+// outage doesn't take checkout down with it.
+const getShippingRateOrFallback = async (params) => {
+  try {
+    return await calculateShippingRate(params);
+  } catch (error) {
+    if (error.message?.includes("Pincode not serviceable")) throw error;
+    console.error(`[SHIPPING] pin ${params.pincode} | rate calc failed, using flat fallback ₹${FALLBACK_SHIPPING_CHARGE}: ${error.message}`);
+    return {
+      total_charges: FALLBACK_SHIPPING_CHARGE,
+      type: "fallback",
+      totalWeight: 0,
+      expectedNoOfBoxes: params.cartItems?.length || 0,
+      serviceName: null,
+      courierName: null,
+      estimatedDays: "3-4 Days",
+      paymentType: params.paymentType || "PREPAID",
+    };
+  }
+};
 import { isFreeShippingEligible, getFreeShippingConfig } from "../utils/freeShippingOffer.util.js";
 import { getActiveCartRules, evaluateCartRules, applyBestDiscount } from "../utils/cartRule.util.js";
 import { sendMetaCapiEvent } from "../services/meta.capi.service.js";
@@ -309,7 +332,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   };
 
   // Re-calculate shipping to get enriched data (type, weight, boxes)
-  const shippingResult = await calculateShippingRate({
+  const shippingResult = await getShippingRateOrFallback({
     pincode: deliveryAddressSnapshot.pinCode,
     paymentType: reqPaymentMethod === "COD" ? "COD" : "PREPAID",
     cartItems: items.map(i => ({
@@ -430,7 +453,9 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     // ── Per-user limit re-check (race condition guard) ────────────────────────
     // IMPORTANT: use the authenticated user's DB record for identity, NOT req.body values.
     // req.body.userEmail / senderMobile are client-controlled and could be faked to bypass limits.
-    if (isApplied && !isInternalTestOrder) {
+    // Internal coupons are included now — their per-user limit (maxUsesPerUser, null = unlimited)
+    // is enforced the same way; only the single-use usedAt gate is skipped for them elsewhere.
+    if (isApplied) {
       const normEmailCheck  = user?.email?.toLowerCase().trim() || null;
       const normMobileCheck = user?.mobileNumber?.toString().replace(/\D/g, "").slice(-10) || finalSenderMobile || null;
       const identifiers     = [normEmailCheck, normMobileCheck].filter(Boolean);
@@ -668,6 +693,9 @@ const razorpayWebHookController = async (req, res) => {
               const couponCode = order.coupon.couponCodeName;
               const discount   = order.coupon.discountAmount || 0;
 
+              // Internal coupons ARE tracked here (usageCount + CouponUsage) so their per-user
+              // limit can be enforced. They are still kept out of analytics — the admin filters
+              // them by isInternal coupon id, not by the presence/absence of usage records.
               const normMobile = (order.userMobile || order.senderMobile || "")
                 .replace(/\D/g, "").slice(-10) || null;
               const normEmail  = order.userEmail?.toLowerCase().trim() || null;
@@ -756,6 +784,8 @@ const razorpayWebHookController = async (req, res) => {
           // 2. EMAIL NOTIFICATION LOGIC
           try {
             if (order.userEmail) {
+              const isCOD = order.paymentMethod === "COD";
+
               const orderDetails = {
                 orderId: order.orderId,
                 items: order.items.map((item) => ({
@@ -767,6 +797,8 @@ const razorpayWebHookController = async (req, res) => {
                 orderDate: order.createdAt,
                 senderMobile: order.senderMobile,
                 receiverMobile: order.receiverMobile,
+                paymentMethod: order.paymentMethod,
+                codDetails: order.codDetails,
               };
 
               // Send order confirmation email
@@ -779,11 +811,15 @@ const razorpayWebHookController = async (req, res) => {
                 },
               );
 
+              // For COD, only the advance was actually captured via Razorpay right now —
+              // the receipt must reflect that amount, not the full order total.
               const paymentDetails = {
                 paymentId: payment.id,
-                amount: order.amount,
+                amount: isCOD ? order.codDetails?.partialAmountPaid ?? order.amount : order.amount,
                 orderId: order.orderId,
                 date: new Date(),
+                paymentMethod: isCOD ? "COD" : "Razorpay",
+                codDetails: isCOD ? order.codDetails : null,
               };
               await sendPaymentReceipt(order.userEmail, paymentDetails).catch(
                 (err) => {
@@ -1017,7 +1053,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   // inline during the map above — mirrors the authenticated-user path.
   const subtotal = orderItems.reduce((s, i) => s + i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity, 0);
 
-  const shippingResult = await calculateShippingRate({
+  const shippingResult = await getShippingRateOrFallback({
     pincode: deliveryAddress.pinCode,
     paymentType: reqPaymentMethod === "COD" ? "COD" : "PREPAID",
     cartItems: rawItemsForShipping
@@ -1060,6 +1096,11 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     if (liveCoupon.isInternal && !isValidInternal) {
       throw new ValidationError("Invalid or inactive coupon.");
     }
+    // Internal test coupons require a signed-in account so the assigned email is verified —
+    // guests are not allowed to redeem them.
+    if (isValidInternal) {
+      throw new ValidationError("This coupon is only available to signed-in team members. Please sign in to use it.");
+    }
     const now = new Date();
     if (liveCoupon.validFrom && now < new Date(liveCoupon.validFrom)) {
       throw new ValidationError("This coupon is not valid yet.");
@@ -1094,7 +1135,8 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
       }
     }
 
-    // TARGETED scope: must be in assignedTo list
+    // TARGETED scope: must be in assignedTo list (internal coupons are already rejected above
+    // for guests, so this path only handles normal targeted coupons here).
     if (liveCoupon.scope === "TARGETED") {
       const assignment = (liveCoupon.assignedTo || []).find(a => identifiers.includes(a.identifier));
       if (!assignment) {

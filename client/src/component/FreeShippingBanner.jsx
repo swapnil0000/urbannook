@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
-import confetti from "canvas-confetti";
+import { fireCelebrationConfetti } from "../utils/celebration";
 import {
   useGetFreeShippingBannerQuery,
   useGetFreeShippingOfferQuery,
@@ -14,23 +15,9 @@ import { addItem, removeItem, updateQuantity, updateSelection } from "../store/s
 import { useCartData } from "../hooks/useCartSync";
 import { trackAddToCart } from "../utils/analytics";
 
-// Multi-burst "cannon" confetti — several bursts at different angles, speeds
-// and shapes fired in quick succession, which reads as far more festive than
-// a single flat confetti() call. Pure canvas-confetti (already a project
-// dependency), no extra libraries needed.
-const fireCelebrationConfetti = () => {
-  const colors = ["#F5DEB3", "#1c3026", "#a89068", "#ffffff", "#4ade80", "#fbbf24"];
-  const defaults = { origin: { y: 0.7 }, colors, shapes: ["circle", "square", "star"] };
-
-  const fire = (particleRatio, opts) =>
-    confetti({ ...defaults, ...opts, particleCount: Math.floor(200 * particleRatio) });
-
-  fire(0.25, { spread: 26, startVelocity: 55 });
-  fire(0.2, { spread: 60 });
-  fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
-  fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
-  fire(0.1, { spread: 120, startVelocity: 45 });
-};
+// Confetti comes from the shared worker-backed pipeline in
+// src/utils/celebration.js — see that file for why it must never be a plain
+// main-thread confetti() call (it was hanging buttons on low-end phones).
 
 // Same variant-name → colour lookup used on the PDP (ProductDetailPage.jsx),
 // so a "Rust Orange" variant renders as the same swatch colour everywhere.
@@ -76,7 +63,15 @@ const SMOKE_LIFE = 950;
  * threshold) instead of just a remove button — the PDP keeps the simpler
  * single-item add/remove since that's not the point of the PDP banner.
  */
-const FreeShippingBanner = ({ productId, showQuantityStepper = false, className = "mt-4" }) => {
+const FreeShippingBanner = ({
+  productId,
+  showQuantityStepper = false,
+  className = "mt-4",
+  // When false, the truck/progress "track" section is not rendered — used in
+  // the mini-cart and side-cart, which want just the product details + CTA,
+  // not the full progress animation. PDP/checkout leave it on (default).
+  showProgressBar = true,
+}) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { isAuthenticated } = useSelector((state) => state.auth);
@@ -97,6 +92,12 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
   // clicking its own toggle again, picking an option, or clicking outside.
   const [variantMenuOpen, setVariantMenuOpen] = useState(false);
   const variantMenuRef = useRef(null);
+  // The dropdown popup itself is portaled to document.body (see below) so it
+  // can't be clipped by this card's own overflow-hidden rounded corners —
+  // that also means it's no longer a DOM descendant of variantMenuRef, so
+  // the click-outside check needs its own ref to recognise clicks inside it.
+  const variantMenuPortalRef = useRef(null);
+  const [variantMenuPos, setVariantMenuPos] = useState(null);
 
   // The slider IS the loader for the add-to-cart click: button shows
   // "Adding…" (disabled, no other visual change) from click until the truck
@@ -114,8 +115,13 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
   // the customer, in a dedicated moment, that they still need the source
   // product for the offer to actually apply. Replaces cramming that message
   // into the CTA button's label.
+  // Flip to true to bring back the "add the source product" bottom sheet that
+  // used to pop after adding the add-on without the source in cart. Disabled
+  // per request — the banner's inline top-copy line covers that case now.
+  const SOURCE_PROMPT_ENABLED = false;
   const [showSourcePrompt, setShowSourcePrompt] = useState(false);
   const [sourcePromptMounted, setSourcePromptMounted] = useState(false);
+  const [sourceAdding, setSourceAdding] = useState(false);
 
   const { data: bannerRes } = useGetFreeShippingBannerQuery(productId, { skip: !productId });
   const banner = bannerRes?.data;
@@ -228,27 +234,24 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
     [debouncedCartItems],
   );
   const { data: ruleEvalRes } = useEvaluateCartRulesQuery(ruleEvalItems, { skip: ruleEvalItems.length === 0 });
-  const ruleEval = ruleEvalRes?.data;
+  // RTK Query keeps serving the LAST successful result once a query is
+  // skipped — it doesn't clear `data` just because the cart emptied out.
+  // Without this guard, removing the last rule-eligible item left the
+  // "closest rule" nudge text and progress bar frozen at whatever they were
+  // before, instead of resetting to the plain default state.
+  const ruleEval = ruleEvalItems.length > 0 ? ruleEvalRes?.data : undefined;
 
-  // Confetti when a rule discount on the recommended product (e.g. "2+
-  // Lamps => 50% off Pen Stand") becomes active — fires even when the Lamps
-  // were added elsewhere entirely (the cart page, a +/- stepper, not this
-  // banner's own button), since the discount itself isn't tied to any click
-  // here. Fired IMMEDIATELY and synchronously inside the effect (not queued
-  // for a later animation-completion callback like the free-shipping
-  // confetti is) — that's deliberate: the earlier "fire for any path"
-  // free-shipping version double-fired because it queued into a list a
-  // second effect run could add to again before the first drained. Setting
-  // the guard in the same synchronous tick as the fire call closes that gap
-  // entirely — there's no window for a second run to see the guard unset.
-  const wasDiscountActiveRef = useRef(false);
-  useEffect(() => {
-    const active = !!ruleEval?.discounts?.[recommendedProduct?.productId]?.length;
-    if (active && !wasDiscountActiveRef.current) {
-      fireCelebrationConfetti();
-    }
-    wasDiscountActiveRef.current = active;
-  }, [ruleEval, recommendedProduct?.productId]);
+  // NOTE: confetti is fired from exactly ONE place — handleAddToCart, on this
+  // banner's own CTA click. There is deliberately no state-derived "a discount
+  // became active" confetti effect here. A previous version had one, and it
+  // misfired constantly: its `useRef` guard resets to false on every mount, and
+  // the rules engine reports a discount for its target product whenever the
+  // rule matches — even if that product isn't in the cart. So simply MOUNTING
+  // the banner with 2 Lamps already in the cart (landing on the PDP, opening
+  // checkout, or — most visibly — removing the Pen Stand on checkout, which is
+  // what makes this banner appear in the first place) looked like a fresh
+  // "unlock" and fired confetti. Celebration must stay tied to the click, not
+  // to derived cart state.
 
   // The primary product still blocking the closest generic rule (if any) —
   // fetched only when actually needed, for its display name in the nudge copy.
@@ -448,11 +451,15 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
     setTimeout(() => setShowSourcePrompt(false), 300);
   };
 
-  // Closes the custom variant dropdown when clicking anywhere outside it.
+  // Closes the custom variant dropdown when clicking anywhere outside it —
+  // checks both the trigger button AND the portaled popup, since the popup
+  // is no longer a DOM descendant of the trigger once portaled.
   useEffect(() => {
     if (!variantMenuOpen) return;
     const handleClickOutside = (e) => {
-      if (variantMenuRef.current && !variantMenuRef.current.contains(e.target)) {
+      const insideTrigger = variantMenuRef.current?.contains(e.target);
+      const insidePortal = variantMenuPortalRef.current?.contains(e.target);
+      if (!insideTrigger && !insidePortal) {
         setVariantMenuOpen(false);
       }
     };
@@ -464,6 +471,39 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
     };
   }, [variantMenuOpen]);
 
+  // Recomputes the portaled dropdown's position from the trigger button's
+  // actual on-screen location every time it opens (fixed positioning, so no
+  // continuous tracking needed) — and closes it on scroll/resize rather than
+  // trying to keep repositioning it live, since it's a short-lived popup.
+  useEffect(() => {
+    if (!variantMenuOpen) return;
+    const rect = variantMenuRef.current?.getBoundingClientRect();
+    if (rect) {
+      setVariantMenuPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+    }
+    // Close when the PAGE scrolls (the popup is fixed-positioned, so it would
+    // otherwise detach from its trigger) — but NOT when the scroll came from
+    // inside the popup's own scrollable option list, which is a capture-phase
+    // scroll event too and was closing the menu the moment you scrolled it.
+    const handleScroll = (e) => {
+      if (variantMenuPortalRef.current?.contains(e.target)) return;
+      setVariantMenuOpen(false);
+    };
+    const close = () => setVariantMenuOpen(false);
+    window.addEventListener("scroll", handleScroll, true);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", handleScroll, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [variantMenuOpen]);
+
+  // Hide the whole card when the admin has switched the offer off
+  // (offerConfig.isActive === false). Previously this only checked that a
+  // banner existed, so a disabled offer still rendered the cross-sell card on
+  // the PDP — only its progress bar hid. Gating on offerActive too makes the
+  // admin toggle fully remove it everywhere, consistent with checkout/cart.
+  if (!banner || !recommendedProduct || !offerActive) return null;
   // eslint-disable-next-line no-console -- TEMP debug, remove after checkout discount bug is diagnosed
   console.log("[FSB debug top]", {
     productIdProp: productId,
@@ -522,23 +562,30 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
     // specific click completes the combo, independent of the add itself.
     const willCompleteCombo = sourceInCart;
 
-    let safetyTimer = null;
     if (willCompleteCombo) {
-      // Button shows "Adding…"/disabled starting now. The scroll-triggered
-      // effect further down will notice progressPct flip to 100 once the
-      // cart updates below and animate the bar to it; onFillCompleteRef is
-      // what that animation calls the moment it truly finishes.
-      setAddLoading(true);
-      // Safety net: if the bar is somehow never in view to animate (so the
-      // fill-driving effect never runs), don't leave the button stuck on
-      // "Adding…" forever.
-      safetyTimer = setTimeout(() => setAddLoading(false), 3000);
+      // OPTIMISTIC celebration, driven by the CLICK — not by the server.
+      // Previously the fill only started once the add-to-cart POST *and* the
+      // follow-up cart refetch had both returned (the bar is derived from
+      // Redux cart state), so on a slow connection the button sat frozen on
+      // "Adding…" for seconds and the confetti landed long after, detached
+      // from the bar. The visual reward now runs on a fixed ~900ms timeline
+      // no matter how slow the network is; the real cart sync continues
+      // underneath and simply reconciles when it lands (progressPct is
+      // already 100 by then, so `lastTargetRef` below stops the effect from
+      // re-animating the same fill a second time).
+      lastTargetRef.current = 1;
       onFillCompleteRef.current = () => {
-        clearTimeout(safetyTimer);
-        setAddLoading(false);
-        fireCelebrationConfetti();
+        // Small beat after the fill visually lands, so the confetti reads as
+        // a reaction to the truck arriving rather than firing on the same frame.
+        setTimeout(fireCelebrationConfetti, 120);
       };
+      animateTruckTo(1, 900);
     }
+
+    // Tracks the real network state only — the button stays in its animated
+    // "Adding…" state (spinner, not a frozen label) until the cart genuinely
+    // reflects the item, then swaps to the unlocked badge.
+    setAddLoading(true);
 
     if (isLoggedIn) {
       try {
@@ -550,15 +597,20 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
         }).unwrap();
         dispatch(updateSelection({ productId: recommendedProduct.productId, quantity: 1, variant: effectiveVariant }));
         await refetchCart().unwrap();
+        setAddLoading(false);
       } catch {
+        // Add failed — roll the optimistic fill back to whatever the cart
+        // actually justifies, and make sure no queued confetti fires.
+        setAddLoading(false);
         if (willCompleteCombo) {
-          clearTimeout(safetyTimer);
           onFillCompleteRef.current = null;
-          setAddLoading(false);
+          lastTargetRef.current = progressPct / 100;
+          animateTruckTo(progressPct / 100, 500);
         }
         return; // swallow — this card is a nudge, not the primary add-to-cart flow
       }
     } else {
+      // Guest cart is purely local — no network, so this is already instant.
       dispatch(
         addItem({
           id: recommendedProduct.productId,
@@ -570,6 +622,7 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
           selectedVariant: effectiveVariant,
         }),
       );
+      setAddLoading(false);
     }
 
     trackAddToCart({
@@ -580,15 +633,71 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
       quantity: 1,
     });
 
-    if (!willCompleteCombo) {
-      // This add just left the cart with ONLY the add-on and not the source
-      // product — free shipping isn't actually active. Say so in a dedicated
-      // moment (bottom sheet) rather than folding it into the CTA label.
-      setShowSourcePrompt(true);
-    }
+    // Pop-up removed per request: when the add-on is in the cart but the
+    // source product isn't, we no longer open a bottom sheet. The banner's own
+    // top copy line already tells the customer to add {source} to unlock the
+    // offer (see the `added && !sourceInCart` branch in the render below), so
+    // that single inline message covers this case without a modal.
+    // if (!willCompleteCombo) {
+    //   setShowSourcePrompt(true);
+    // }
     // No local "added" flag to set — cartItems updates (dispatch above, or
     // refetchCart) and cartMatch/added/progressPct derive from that
     // automatically, which is what drives the bar animation above.
+  };
+
+  // The bottom sheet's "Add" button — adds the SOURCE product (the one this
+  // banner is attached to, e.g. the Brake Caliper Lamp) straight to the cart.
+  // It used to only navigate to that product's page, which meant the button
+  // labelled "Add" never actually added anything. Uses the source product's
+  // first variant, since the sheet has no variant picker of its own.
+  const handleAddSourceToCart = async () => {
+    if (!sourceProduct?.productId || sourceAdding) return;
+    const sourceVariant = sourceProduct.variantDetails?.[0];
+    const variantName = sourceVariant?.variantName || "Standard Variant";
+    const sourceImage =
+      sourceVariant?.variantImage?.[0] || sourceProduct.productImg || displayImage;
+    const sourcePrice = sourceVariant?.variantPrice ?? 0;
+
+    setSourceAdding(true);
+    if (isLoggedIn) {
+      try {
+        await addToCartAPI({
+          productId: sourceProduct.productId,
+          quantity: 1,
+          variant: variantName,
+          image: sourceImage,
+        }).unwrap();
+        dispatch(updateSelection({ productId: sourceProduct.productId, quantity: 1, variant: variantName }));
+        await refetchCart().unwrap();
+      } catch {
+        setSourceAdding(false);
+        return; // leave the sheet open so they can retry
+      }
+    } else {
+      dispatch(
+        addItem({
+          id: sourceProduct.productId,
+          mongoId: sourceProduct.productId,
+          name: sourceProduct.productName,
+          price: sourcePrice,
+          image: sourceImage,
+          quantity: 1,
+          selectedVariant: variantName,
+        }),
+      );
+    }
+
+    trackAddToCart({
+      itemId: sourceProduct.productId,
+      itemName: sourceProduct.productName,
+      itemVariant: variantName,
+      price: sourcePrice,
+      quantity: 1,
+    });
+
+    setSourceAdding(false);
+    closeSourcePrompt();
   };
 
   const handleRemove = async () => {
@@ -743,9 +852,16 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
                     (font-bold → font-semibold) — same font-size, just less
                     heavy, so this fits on one line on mobile without
                     shrinking the text. */}
-                <p className="text-[10px] font-semibold uppercase tracking-[0.05em] text-[#1c3026]">
-                  Add {recommendedProduct.productName} & unlock{" "}
-                  <span className="font-bold text-[#E63329]">
+                {/* whitespace-nowrap keeps the whole sentence on ONE line;
+                    the clamp() font-size shrinks it on very small screens
+                    (e.g. iPhone SE) so it fits without wrapping, and caps at
+                    11px on normal widths. */}
+                <p
+                  className="font-semibold tracking-[0.01em] text-[#1c3026] whitespace-nowrap"
+                  style={{ fontSize: "clamp(8px, 3vw, 11px)" }}
+                >
+                  Add {recommendedProduct.productName} &amp; unlock{" "}
+                  <span className="font-bold uppercase text-[#E63329]">
                     free shipping
                   </span>
                 </p>
@@ -826,36 +942,55 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
                     />
                   </button>
 
-                  {variantMenuOpen && (
-                    <div className="absolute z-20 top-full left-0 right-0 mt-1 rounded-lg border border-[#157a44]/30 bg-[#FAF7F0] shadow-lg overflow-hidden max-h-48 overflow-y-auto">
-                      {variants.map((v) => {
-                        const isSelected = v.variantName === selectedVariant;
-                        return (
-                          <button
-                            key={v.variantName}
-                            type="button"
-                            onClick={() => {
-                              setSelectedVariant(v.variantName);
-                              setVariantMenuOpen(false);
-                            }}
-                            className={`w-full flex items-center gap-1.5 text-left px-2.5 py-1.5 text-xs font-bold transition-colors ${
-                              isSelected
-                                ? "bg-[#d6f2dd] text-[#157a44]"
-                                : "text-[#1c3026] hover:bg-[#d6f2dd] hover:text-[#157a44]"
-                            }`}
-                          >
-                            <span
-                              className="shrink-0 w-2.5 h-2.5 rounded-full border border-black/15"
-                              style={{
-                                background: variantColor(v.variantName),
-                              }}
-                            />
-                            <span className="truncate">{v.variantName}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
+                  {variantMenuOpen &&
+                    variantMenuPos &&
+                    createPortal(
+                      <>
+                        {/* Solid, always-visible scrollbar (not the thin,
+                            auto-hiding native one) — scoped to this dropdown
+                            only via its own class so it doesn't leak into
+                            any other scroll container on the page. */}
+                        <style>{`
+                          .fsb-variant-scroll { scrollbar-width: thin; scrollbar-color: #157a44 #e7ded0; }
+                          .fsb-variant-scroll::-webkit-scrollbar { width: 8px; }
+                          .fsb-variant-scroll::-webkit-scrollbar-track { background: #e7ded0; border-radius: 999px; }
+                          .fsb-variant-scroll::-webkit-scrollbar-thumb { background: #157a44; border-radius: 999px; }
+                        `}</style>
+                        <div
+                          ref={variantMenuPortalRef}
+                          className="fsb-variant-scroll fixed z-[10050] rounded-lg border border-[#157a44]/30 bg-[#FAF7F0] shadow-lg overflow-y-scroll max-h-48"
+                          style={{ top: variantMenuPos.top, left: variantMenuPos.left, width: variantMenuPos.width }}
+                        >
+                          {variants.map((v) => {
+                            const isSelected = v.variantName === selectedVariant;
+                            return (
+                              <button
+                                key={v.variantName}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedVariant(v.variantName);
+                                  setVariantMenuOpen(false);
+                                }}
+                                className={`w-full flex items-center gap-1.5 text-left px-2.5 py-1.5 text-xs font-bold transition-colors ${
+                                  isSelected
+                                    ? "bg-[#d6f2dd] text-[#157a44]"
+                                    : "text-[#1c3026] hover:bg-[#d6f2dd] hover:text-[#157a44]"
+                                }`}
+                              >
+                                <span
+                                  className="shrink-0 w-2.5 h-2.5 rounded-full border border-black/15"
+                                  style={{
+                                    background: variantColor(v.variantName),
+                                  }}
+                                />
+                                <span className="truncate">{v.variantName}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </>,
+                      document.body,
+                    )}
                 </div>
               </div>
             )}
@@ -876,6 +1011,11 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
                   // badge below; a real reward is never hidden behind a fake one.
                   const lineDiscounted =
                     Math.round(ruleDiscountedPrice) * lineQty;
+                  // Derived from the actual prices rather than read off the
+                  // rule, so a flat_off rule (₹X off) shows a correct % too.
+                  const rulePercent = Math.round(
+                    ((lineDisplayPrice - lineDiscounted) / lineDisplayPrice) * 100,
+                  );
                   return (
                     <>
                       <span className="text-lg font-bold tabular-nums text-[#E63329]">
@@ -885,7 +1025,7 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
                         ₹{lineDisplayPrice.toLocaleString()}
                       </span>
                       <span className="text-[10px] font-bold uppercase rounded-full bg-[#157a44] text-white px-1.5 py-0.5">
-                        🎉 Discount Unlocked!
+                        {rulePercent}% OFF
                       </span>
                     </>
                   );
@@ -893,8 +1033,9 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
 
                 if (discountPercent > 0) {
                   // A genuine price difference between this product's own
-                  // variants (not a cart rule) — same "Save ₹X" treatment as
-                  // before, just now quantity-scaled too.
+                  // variants (not a cart rule), quantity-scaled. Leads with the
+                  // % (the headline the eye catches) and keeps the rupee saving
+                  // as the supporting detail.
                   const lineMax = maxVariantPrice * lineQty;
                   return (
                     <>
@@ -905,7 +1046,7 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
                         ₹{lineMax.toLocaleString()}
                       </span>
                       <span className="text-[10px] font-bold uppercase bg-black text-white px-1.5 py-0.5">
-                        Save ₹{(lineMax - lineDisplayPrice).toLocaleString()}
+                        {discountPercent}% OFF · Save ₹{(lineMax - lineDisplayPrice).toLocaleString()}
                       </span>
                     </>
                   );
@@ -956,7 +1097,7 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
           never disrupted by a hide/show cycle — only its own opacity/height
           transition, eased smoothly both ways, changes. Un-hides the same
           way if the item's later removed. */}
-        {offerActive && (
+        {offerActive && showProgressBar && (
           <div
             className="px-4 overflow-hidden"
             style={{
@@ -1254,23 +1395,37 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
         <div
           className="px-4 pb-4"
           style={{
-            paddingTop: barHidden ? 12 : 0,
+            // Gap above the CTA when there's no visible progress bar directly
+            // above it — either the bar has collapsed (barHidden) OR it's not
+            // rendered at all (showProgressBar false, e.g. mini-cart/cart).
+            paddingTop: barHidden || !showProgressBar ? 12 : 0,
             transition: "padding-top 450ms ease-in-out",
           }}
         >
           {addLoading ? (
-            // The slider above IS the loader for this: cart is already updated
-            // (`added` is already true underneath) but we hold this exact same
-            // button — just disabled, label swapped to "Adding…" — until the
-            // bar's fill animation actually reaches 100%, instead of a
-            // different frozen-looking block or a fixed timeout. The queued
-            // callback pushed in handleAddToCart is what flips addLoading
-            // back off, at the moment the bar visually finishes.
+            // Tracks the real network round-trip (add + cart refetch). It must
+            // keep MOVING the whole time — a spinner plus a sweeping shimmer —
+            // because on a slow connection this can sit here for seconds, and a
+            // static label reads as a hung/broken button. The truck fill and
+            // confetti above are deliberately NOT gated on this; they run on
+            // their own fixed ~900ms timeline from the click.
             <button
               disabled
-              className="w-full py-3.5 rounded-full flex items-center justify-center gap-2.5 text-sm font-extrabold uppercase tracking-wide bg-[#f5deb3] text-black opacity-70"
+              className="relative w-full py-3.5 rounded-full overflow-hidden flex items-center justify-center gap-2.5 text-sm font-extrabold uppercase tracking-wide bg-[#f5deb3] text-[#1c3026] cursor-wait"
             >
-              Adding…
+              <style>{`@keyframes fsbLoadSweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }`}</style>
+              <span
+                aria-hidden="true"
+                className="absolute inset-y-0 w-1/2"
+                style={{
+                  background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.65), transparent)",
+                  animation: "fsbLoadSweep 1.1s linear infinite",
+                }}
+              />
+              <span className="relative z-10 flex items-center gap-2.5">
+                <i className="fa-solid fa-spinner fa-spin text-xs" />
+                Adding…
+              </span>
             </button>
           ) : added ? (
             <div className="flex items-center gap-2">
@@ -1341,19 +1496,14 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
             <button
               onClick={handleAddToCart}
               disabled={isAdding}
-              className="group relative w-full py-3.5 rounded-full overflow-hidden flex items-center justify-center gap-2.5 text-sm font-medium uppercase tracking-wide disabled:opacity-50 bg-[#f5deb3]"
+              // Press state instead of the old hover-fill sweep: touch devices
+              // have no hover, so on mobile that green fill simply never
+              // appeared and the tap had no visual feedback at all. `active:`
+              // fires on touch AND on mouse-down, so the press reads the same
+              // everywhere — instant dark-brown fill, no transition delay.
+              className="w-full py-3.5 rounded-full flex items-center justify-center gap-2.5 text-sm font-medium uppercase tracking-wide disabled:opacity-50 bg-[#f5deb3] text-[#1c3026] active:bg-[#4a2f1b] active:text-[#f5deb3] active:scale-[0.98] transition-[background-color,color,transform] duration-100"
             >
-              {/* Green fill that flows in from the left on hover — the label
-                sits above it (z-10) and flips to cream as it sweeps past.
-                (Label color is set via group-hover on the span itself below,
-                not a hover: class on the button — a child's own explicit
-                text color always wins over a parent's hover:text utility,
-                so setting it on the button alone silently does nothing.) */}
-              <span
-                aria-hidden="true"
-                className="absolute inset-0 bg-[#1c3026] -translate-x-full transition-transform duration-500 ease-out group-hover:translate-x-0"
-              />
-              <span className="relative z-10 flex items-center justify-center gap-2.5 text-[#1c3026] transition-colors duration-500 group-hover:text-[#f5deb3]">
+              <span className="flex items-center justify-center gap-2.5">
                 {isAdding ? (
                   "Adding…"
                 ) : hasRuleDiscount ? (
@@ -1377,22 +1527,24 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
         </div>
       </div>
 
-      {/* "You still need the source product" bottom sheet — shown after adding
-        the recommended add-on when that leaves the cart with ONLY the add-on
-        (source product not in cart), so free shipping isn't actually active
-        yet. Slides up from the bottom, backdrop-dismissible, with a single
-        clear action: go add the source product (its own page, so the
-        customer picks their own variant rather than one being guessed here). */}
-      {showSourcePrompt && (
-        <div className="fixed inset-0 z-[70] flex items-end justify-center">
+      {/* "You still need the source product" bottom sheet — DISABLED per
+        request (the `false &&` guard keeps it out of the render but preserves
+        the whole block for easy restore; flip it back to just `showSourcePrompt`
+        to re-enable). Replaced by the inline top-copy line in the banner that
+        already nudges "Add {source} to unlock free shipping" for this exact
+        case (the `added && !sourceInCart` branch above). */}
+      {SOURCE_PROMPT_ENABLED && showSourcePrompt &&
+        createPortal(
+          <div className="fixed inset-0 z-[200] flex items-end justify-center">
           <div
             className={`absolute inset-0 bg-black/50 transition-opacity duration-300 ${sourcePromptMounted ? "opacity-100" : "opacity-0"}`}
             onClick={closeSourcePrompt}
           />
           <div
-            className={`relative w-full max-w-md bg-[#FAF7F2] rounded-t-3xl px-5 pt-5 pb-6 shadow-2xl transition-transform duration-300 ease-out ${
+            className={`relative w-full max-w-md bg-[#FAF7F2] rounded-t-3xl px-5 pt-5 shadow-2xl transition-transform duration-300 ease-out ${
               sourcePromptMounted ? "translate-y-0" : "translate-y-full"
             }`}
+            style={{ paddingBottom: "max(1.5rem, calc(env(safe-area-inset-bottom) + 1rem))" }}
           >
             <div className="mx-auto w-10 h-1 rounded-full bg-black/15 mb-4" />
 
@@ -1418,27 +1570,30 @@ const FreeShippingBanner = ({ productId, showQuantityStepper = false, className 
             <div className="flex items-center gap-2.5 mt-5">
               <button
                 onClick={closeSourcePrompt}
-                className="flex-1 py-3 rounded-xl text-[11px] font-extrabold uppercase tracking-[0.1em] text-black/60 border border-black/15"
+                disabled={sourceAdding}
+                className="flex-1 py-3 rounded-xl text-[11px] font-extrabold uppercase tracking-[0.1em] text-black/60 border border-black/15 disabled:opacity-50"
               >
                 Maybe Later
               </button>
               <button
-                onClick={() => {
-                  closeSourcePrompt();
-                  if (sourceProduct?.productId)
-                    navigate(`/product/${sourceProduct.productId}`);
-                }}
-                className="flex-1 py-3 rounded-xl text-[11px] font-extrabold uppercase tracking-[0.1em] text-white bg-[#1c3026]"
+                onClick={handleAddSourceToCart}
+                disabled={sourceAdding}
+                className="flex-1 py-3 rounded-xl text-[11px] font-extrabold uppercase tracking-[0.1em] text-white bg-[#1c3026] active:bg-[#4a2f1b] disabled:opacity-70 transition-colors duration-100"
               >
-                Add{" "}
-                {sourceProduct?.productName
-                  ? sourceProduct.productName.split(" ")[0]
-                  : "Product"}
+                {sourceAdding ? (
+                  <>
+                    <i className="fa-solid fa-spinner fa-spin mr-1.5" />
+                    Adding…
+                  </>
+                ) : (
+                  "Add"
+                )}
               </button>
             </div>
           </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </>
   );
 };

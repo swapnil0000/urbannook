@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
-import { useSelector } from "react-redux";
-import { useEvaluateCartRulesQuery } from "../../store/api/userApi";
+import { useSelector, useDispatch } from "react-redux";
+import {
+  useEvaluateCartRulesQuery,
+  useGetFreeShippingOfferQuery,
+  useGetAllFreeShippingBannersQuery,
+  useUpdateCartMutation,
+} from "../../store/api/userApi";
+import { removeItem } from "../../store/slices/cartSlice";
+import FreeShippingBanner from "../FreeShippingBanner";
 
 /**
  * Lightweight cart preview — a compact bottom sheet showing what's in the
@@ -20,7 +27,33 @@ const itemQty = (q) => (typeof q === "object" && q !== null ? Number(q.quantity)
 
 const MiniCartPreview = ({ onClose, onViewCart }) => {
   const { items: cartItems, totalAmount } = useSelector((state) => state.cart);
+  const { isAuthenticated } = useSelector((state) => state.auth);
+  const dispatch = useDispatch();
+  const [updateCart] = useUpdateCartMutation();
   const [mounted, setMounted] = useState(false);
+
+  // Remove a line item straight from the mini-cart, so a customer who isn't
+  // interested can drop it without opening the full cart. Same dual path as
+  // CartDrawer: server cart for logged-in users, local Redux cart for guests.
+  const handleRemoveItem = async (item) => {
+    const effectiveVariant = item.selectedVariant || "N/A";
+    const hasToken = !!localStorage.getItem("authToken");
+    const isLoggedIn = isAuthenticated || hasToken;
+    if (isLoggedIn) {
+      try {
+        await updateCart({
+          productId: item.mongoId || item.id,
+          quantity: 1,
+          action: "remove",
+          variant: effectiveVariant,
+        }).unwrap();
+      } catch (err) {
+        console.error("Failed to remove item:", err);
+      }
+    } else {
+      dispatch(removeItem({ id: item.id || item.mongoId, selectedVariant: effectiveVariant }));
+    }
+  };
 
   // Generic, data-driven cart-promotion rules (server/src/model/cartRule.model.js)
   // — same evaluator the payment controller uses for the real order total,
@@ -31,6 +64,13 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
   const { data: cartRuleEvalData } = useEvaluateCartRulesQuery(cartRuleEvalItems, {
     skip: cartRuleEvalItems.length === 0,
   });
+
+  // Same eligibility check used at checkout (rp.payment.controller.js): the
+  // admin combo-banner offer, any active generic cart rule's free_shipping
+  // effect, or the plain cart-value threshold. Previously this preview
+  // always said "calculated at checkout" regardless of actual eligibility.
+  const { data: offerRes } = useGetFreeShippingOfferQuery();
+  const { data: bannersRes } = useGetAllFreeShippingBannersQuery();
   const getItemDiscountedPrice = (item) => {
     const productId = item.mongoId || item.id;
     const candidates = cartRuleEvalData?.data?.discounts?.[productId];
@@ -51,6 +91,31 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
     const rawPrice = Number(item.price) || 0;
     return sum + (rawPrice - getItemDiscountedPrice(item)) * itemQty(item.quantity);
   }, 0);
+  const subtotal = (Number(totalAmount) || 0) - ruleDiscountSavings;
+
+  const offerConfig = offerRes?.data;
+  const banners = bannersRes?.data || [];
+  const cartProductIds = new Set(cartItems.map((i) => i.mongoId || i.id));
+  const comboEligible =
+    !!offerConfig?.isActive &&
+    banners.some((b) => cartProductIds.has(b.sourceProductId) && cartProductIds.has(b.recommendedProductId));
+  const thresholdEligible =
+    !!offerConfig?.isActive && (offerConfig?.thresholdAmount || 0) > 0 && subtotal >= offerConfig.thresholdAmount;
+  const isFreeShippingEligible = comboEligible || !!cartRuleEvalData?.data?.freeShipping || thresholdEligible;
+
+  // Cross-sell nudge: when the offer's SOURCE product (e.g. Brake Caliper Lamp)
+  // is in the cart but its RECOMMENDED add-on (e.g. Pen Stand) isn't yet, show
+  // that offer's FreeShippingBanner right here so the customer can add the
+  // add-on without leaving the cart — or just continue to checkout. Same
+  // selection the checkout page uses; gated on the offer being active, so
+  // toggling it off in admin hides this too.
+  const nudgeBannerProductId = (() => {
+    if (!offerConfig?.isActive || banners.length === 0) return null;
+    const match = banners.find(
+      (b) => cartProductIds.has(b.sourceProductId) && !cartProductIds.has(b.recommendedProductId),
+    );
+    return match?.sourceProductId || null;
+  })();
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setMounted(true));
@@ -86,8 +151,23 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
             <div className="flex flex-col gap-3">
               {cartItems.map((item, idx) => (
                 <div key={`${item.id || item.mongoId}-${item.selectedVariant || idx}`} className="flex items-center gap-3">
-                  <div className="shrink-0 w-12 h-12 rounded-lg overflow-hidden border border-black/10 bg-white">
-                    <img src={item.image || "/placeholder.jpg"} alt={item.name} className="w-full h-full object-contain" />
+                  {/* Outer wrapper is NOT overflow-hidden so the remove badge can
+                      poke out past the top-left corner; the inner div clips the
+                      image to rounded corners. */}
+                  <div className="relative shrink-0 w-12 h-12">
+                    <div className="w-full h-full rounded-lg overflow-hidden border border-black/10 bg-white">
+                      <img src={item.image || "/placeholder.jpg"} alt={item.name} className="w-full h-full object-contain" />
+                    </div>
+                    {/* Remove — top-left of the thumbnail. Lets the customer
+                        drop a product they don't want right from the mini-cart. */}
+                    <button
+                      onClick={() => handleRemoveItem(item)}
+                      title={`Remove ${item.name}`}
+                      aria-label={`Remove ${item.name}`}
+                      className="absolute -top-1.5 -left-1.5 z-10 w-5 h-5 flex items-center justify-center rounded-full bg-[#f5deb3] border border-[#e0c896] shadow-sm text-[#1c3026] hover:bg-[#E63329] hover:text-white hover:border-[#E63329] transition-colors"
+                    >
+                      <i className="fa-solid fa-xmark text-[9px]" />
+                    </button>
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-bold text-black truncate">{item.name}</p>
@@ -100,10 +180,18 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
                     const discountedPrice = getItemDiscountedPrice(item);
                     const rawPrice = Number(item.price) || 0;
                     const hasDiscount = discountedPrice < rawPrice;
+                    const percentOff = hasDiscount
+                      ? Math.round(((rawPrice - discountedPrice) / rawPrice) * 100)
+                      : 0;
                     return hasDiscount ? (
                       <div className="text-right shrink-0">
                         <p className="text-xs font-bold text-[#157a44]">₹{Math.round(discountedPrice * itemQty(item.quantity)).toLocaleString()}</p>
-                        <p className="text-[9px] text-black/40 line-through">₹{(rawPrice * itemQty(item.quantity)).toLocaleString()}</p>
+                        <div className="flex items-center justify-end gap-1">
+                          <span className="text-[9px] text-black/40 line-through">₹{(rawPrice * itemQty(item.quantity)).toLocaleString()}</span>
+                          <span className="text-[9px] font-bold uppercase rounded-full bg-[#157a44] text-white px-1.5 py-px">
+                            {percentOff}% OFF
+                          </span>
+                        </div>
                       </div>
                     ) : (
                       <p className="text-xs font-bold text-black shrink-0">
@@ -115,14 +203,42 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
               ))}
             </div>
           )}
+
+          {/* Add-on nudge — only when the offer's source product is in the cart
+              but the add-on isn't. Lets the customer complete the free-shipping
+              combo without leaving the cart. */}
+          {nudgeBannerProductId && (
+            // Scaled down slightly so the full card fits comfortably inside the
+            // compact bottom sheet. transform-origin top keeps it anchored under
+            // the items; the negative bottom margin reclaims the space the
+            // scale leaves behind so the footer doesn't get an odd gap.
+            <div className="mt-3" style={{ transform: "scale(0.9)", transformOrigin: "top center", marginBottom: "-8%" }}>
+              <FreeShippingBanner
+                productId={nudgeBannerProductId}
+                variant="light"
+                showQuantityStepper
+                showProgressBar={false}
+                className=""
+              />
+            </div>
+          )}
         </div>
 
         <div className="px-5 pt-3 pb-5 border-t border-black/10 shrink-0">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs font-bold uppercase tracking-wide text-black/60">Total</span>
-            <span className="text-base font-extrabold text-black">₹{((Number(totalAmount) || 0) - ruleDiscountSavings).toLocaleString()}</span>
+          {/* Shipping — label left, value right, same two-column row as Total
+              below it (rather than a footnote line under the total). */}
+          <div className="flex items-center justify-between gap-3 mb-1.5">
+            <span className="text-xs font-bold uppercase tracking-wide text-black/60 shrink-0">Shipping</span>
+            {isFreeShippingEligible ? (
+              <span className="text-xs font-extrabold text-green-600 text-right">Free</span>
+            ) : (
+              <span className="text-[11px] font-medium text-black/50 text-right">Calculated at checkout</span>
+            )}
           </div>
-          <p className="text-[10px] text-black/45 mb-4">Shipping will be calculated at checkout.</p>
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-xs font-bold uppercase tracking-wide text-black/60">Total</span>
+            <span className="text-base font-extrabold text-black">₹{subtotal.toLocaleString()}</span>
+          </div>
 
           <button
             onClick={onViewCart}
