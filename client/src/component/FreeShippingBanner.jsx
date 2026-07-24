@@ -504,6 +504,16 @@ const FreeShippingBanner = ({
   // the PDP — only its progress bar hid. Gating on offerActive too makes the
   // admin toggle fully remove it everywhere, consistent with checkout/cart.
   if (!banner || !recommendedProduct || !offerActive) return null;
+  // eslint-disable-next-line no-console -- TEMP debug, remove after checkout discount bug is diagnosed
+  console.log("[FSB debug top]", {
+    productIdProp: productId,
+    banner,
+    recommendedProductId: banner?.recommendedProductId,
+    recommendedProduct,
+    ruleEvalItems,
+    ruleEval,
+  });
+  if (!banner || !recommendedProduct) return null;
 
   const activeVariant =
     variants.find((v) => v.variantName === selectedVariant) || variants[0];
