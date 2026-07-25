@@ -89,6 +89,11 @@ const getCartService = async ({ userId }) => {
         productId: "$p.productId",
         cartKey: "$items.k",
         name: "$p.productName",
+        // Optional per-product title template (e.g. "{variant} Cosplay Wooden
+        // Katana ({variant} Inspired, 104cm)"). Frontend substitutes
+        // {variant} with `selectedVariant` below; blank/missing = use `name`
+        // as-is, so this can't affect products that never set it.
+        variantTitleTemplate: { $ifNull: ["$p.variantTitleTemplate", ""] },
         // SELF-HEALING VARIANT NAME
         selectedVariant: {
           $let: {

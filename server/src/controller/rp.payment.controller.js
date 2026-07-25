@@ -269,6 +269,10 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
         priceAtPurchase: priceAtPurchase,
         shipping: String(summary?.shipping ?? ""),
         selectedVariant: itemVariant,
+        // Snapshotted so order history/invoices keep showing the title as it
+        // was worded at purchase time, even if the product's template is
+        // edited later. Blank when the product never set one.
+        variantTitleTemplate: product.variantTitleTemplate || "",
       },
     };
   });
@@ -1029,6 +1033,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
         productSubCategory: product.productSubCategory,
         priceAtPurchase,
         selectedVariant: itemVariant,
+        variantTitleTemplate: product.variantTitleTemplate || "",
       },
     };
   });

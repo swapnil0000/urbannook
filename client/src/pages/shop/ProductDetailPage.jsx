@@ -11,8 +11,26 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { useCookies } from "react-cookie";
 import { fireAddToCartConfetti } from "../../utils/celebration";
+import { resolveVariantTitle, splitTitleForDisplay } from "../../utils/variantTitle";
 import SEOHead from "../../component/SEOHead";
 import ComparisonTable from "../../component/ComparisonTable";
+import SetupShowcase from "../../component/SetupShowcase";
+
+// TEMP: hardcoded showcase slides until wired to flagged review images
+// (e.g. a `showInSetup` boolean on each review image, toggled from admin).
+// Module-scope so the array reference stays stable across renders.
+// TODO(wiring): map flagged review images →
+//   { url: img, quote: review.desc, author: review.name } from reviewsData.
+const SETUP_SHOWCASE_IMG =
+  "https://d1dhs7xre1cv0d.cloudfront.net/prod/reviews/019da690-729b-7428-8ae1-0273f030d2a8/019da759-db13-76ec-b7cf-8005fd5ab150-1779439962727.jpeg";
+const SETUP_SHOWCASE_ITEMS = [
+  { url: SETUP_SHOWCASE_IMG, quote: "Absolutely lights up my desk — everyone who visits asks about it.", author: "Aditya R." },
+  { url: SETUP_SHOWCASE_IMG, quote: "Build quality is insane for the price. Looks premium on my shelf.", author: "Priya S." },
+  { url: SETUP_SHOWCASE_IMG, quote: "The glow is exactly like a real hot rotor. Perfect gift for a car guy.", author: "Karan M." },
+  { url: SETUP_SHOWCASE_IMG, quote: "Sits right next to my monitor and completely changed the vibe.", author: "Neha T." },
+  { url: SETUP_SHOWCASE_IMG, quote: "Ordered a second one for my brother. Packaging was top notch.", author: "Rohit V." },
+  { url: SETUP_SHOWCASE_IMG, quote: "Way brighter than I expected — genuinely a conversation starter.", author: "Sanya K." },
+];
 // FreeShippingBanner render moved off the PDP into the cart — import kept
 // commented so restoring the PDP banner is a one-line change.
 // import FreeShippingBanner from "../../component/FreeShippingBanner";
@@ -137,6 +155,28 @@ const ProductDetailPage = () => {
   const [activeAccordion, setActiveAccordion] = useState("description");
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  // Drag/swipe slider — pointer events unify mouse-drag and touch-swipe in
+  // one handler set, so the same code drives it on desktop and mobile.
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isGalleryHovering, setIsGalleryHovering] = useState(false);
+  const [suppressSlideTransition, setSuppressSlideTransition] = useState(false);
+  // Autoplay is a desktop-only nicety — on mobile the customer's thumb is the
+  // primary way to browse images, and an automatic 1s cycle fighting a swipe
+  // gesture reads as "scrolling by itself, too fast." matchMedia (not a
+  // one-time innerWidth check) so rotating the phone updates it live.
+  const [isMobileViewport, setIsMobileViewport] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const handler = (e) => setIsMobileViewport(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+  const currentImageIndexRef = useRef(0);
+  const dragStartXRef = useRef(0);
+  const dragWidthRef = useRef(0);
   const [showSignup, setShowSignup] = useState(false);
   const [selectedVariant, setSelectedVariant] = useState("");
 
@@ -165,6 +205,9 @@ const ProductDetailPage = () => {
   const [reviewImages, setReviewImages] = useState([]); // up to 3 File objects
   const [reviewImagePreviews, setReviewImagePreviews] = useState([]); // preview URLs
   const reviewImageRef = useRef(null);
+  const variantScrollRef = useRef(null);
+  const [variantScrollAtStart, setVariantScrollAtStart] = useState(true);
+  const [variantScrollAtEnd, setVariantScrollAtEnd] = useState(true);
   const [lightboxData, setLightboxData] = useState(null); // { imgList: [{url, review}], currentIdx }
   const [showMobileAllReviews, setShowMobileAllReviews] = useState(false);
   const mobileReviewScrollRef = useRef(null);
@@ -200,7 +243,12 @@ const ProductDetailPage = () => {
     return 0;
   }, [product, selectedVariant]);
 
-  // Calculate the max variant price (acts as MRP) and discount percentage
+  // TODO(pricing-migration): this strike price is SYNTHETIC — an 18% markup
+  // or 25% markdown formula, not a real admin-set value. The admin panel now
+  // has a real `variantDetails[].variantMrp` field (with a live discount-%
+  // calculator) that admins are filling in per variant. Once MRP data is
+  // populated across the catalog, switch this to read the selected variant's
+  // real `variantMrp` (fall back to this formula only where MRP is unset/0).
   // Struck "compare-at" price + its discount %.
   //  • Non-top variant (a pricier variant exists, e.g. BMW/Porsche below
   //    Lambo) → 18% markup reference.
@@ -221,10 +269,53 @@ const ProductDetailPage = () => {
     return { strikePrice: strike, discountPercent: discount };
   }, [product, currentPrice]);
 
+  // Per-variant description — admin can set a distinct description per
+  // variant (e.g. each anime-character katana has its own blurb). Falls back
+  // to the product-level description when the selected variant has none set.
+  const displayDescription = useMemo(() => {
+    if (!product) return "";
+    const selectedDetail = product.variantDetails?.find(v => v.variantName === selectedVariant);
+    return (selectedDetail?.variantDes && selectedDetail.variantDes.trim()) || product.productDes || "";
+  }, [product, selectedVariant]);
+
+  // Optional per-product title template (admin-set `variantTitleTemplate`,
+  // e.g. "{variant} Cosplay Wooden Katana ({variant} Inspired, 104cm)").
+  // Blank template (the default for every existing product) falls straight
+  // back to the plain productName, so this can't affect products that never
+  // opted in.
+  const displayTitle = useMemo(() => {
+    if (!product) return "";
+    return resolveVariantTitle(product.productName, product.variantTitleTemplate, selectedVariant);
+  }, [product, selectedVariant]);
+
+  // Splits a template-resolved title like "Sasuke Cosplay Wooden Katana
+  // (Sasuke Inspired, 104cm)" into a bold main heading and a smaller,
+  // normal-weight parenthetical sub-line shown underneath it.
+  const { main: displayTitleMain, sub: displayTitleSub } = useMemo(
+    () => splitTitleForDisplay(displayTitle),
+    [displayTitle]
+  );
+
   const availableVariants = useMemo(() => {
     if (!product || !product.variantDetails) return [];
     return product.variantDetails.map(v => v.variantName);
   }, [product]);
+
+  // Keeps the Amazon-style ‹ › arrows in sync with actual scroll position —
+  // both show whenever there's more to scroll to in that direction, and fade
+  // out at the strip's start/end (or entirely, if everything already fits).
+  const updateVariantScrollState = () => {
+    const el = variantScrollRef.current;
+    if (!el) return;
+    setVariantScrollAtStart(el.scrollLeft <= 4);
+    setVariantScrollAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 4);
+  };
+  useEffect(() => {
+    updateVariantScrollState();
+  }, [availableVariants]);
+  const scrollVariants = (direction) => {
+    variantScrollRef.current?.scrollBy({ left: direction * 180, behavior: "smooth" });
+  };
 
   const galleryImages = useMemo(() => {
     if (!product) return [];
@@ -271,6 +362,56 @@ const ProductDetailPage = () => {
     setCurrentImageIndex(0);
   }, [selectedVariant]);
 
+  // Keeps a ref mirror of the current index so the interval below can read
+  // it synchronously without depending on (and re-creating the interval
+  // for) currentImageIndex itself.
+  useEffect(() => {
+    currentImageIndexRef.current = currentImageIndex;
+  }, [currentImageIndex]);
+
+  // Auto-advance the gallery every second — desktop only (see
+  // isMobileViewport above), and paused while the customer is actually
+  // interacting with it (mouse hovering, or mid-drag/swipe) so autoplay
+  // never fights a manual gesture. On mobile there's no autoplay at all —
+  // swipe is the only way to move between images there.
+  // Advances WITHOUT wrapping via modulo — it's allowed to walk one step past
+  // the last real image, onto a cloned copy of image 1 appended to the track
+  // (see `extendedGalleryImages`/`handleTrackTransitionEnd` below). Letting it
+  // slide forward onto the clone (instead of snapping backward to index 0)
+  // is what makes the loop look continuous instead of rewinding.
+  useEffect(() => {
+    if (isMobileViewport || galleryImages.length <= 1 || isGalleryHovering || isDragging) return;
+    const id = setInterval(() => {
+      setCurrentImageIndex(currentImageIndexRef.current + 1);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [isMobileViewport, galleryImages.length, isGalleryHovering, isDragging]);
+
+  // The instant the forward slide onto the cloned last-slot finishes, snap
+  // back to the real index 0 with the transition disabled. The clone and the
+  // real first image are pixel-identical, so this snap is invisible — unlike
+  // trying to time a CSS transition toggle around a backward jump, this only
+  // fires once the browser confirms the animation actually completed.
+  const handleTrackTransitionEnd = () => {
+    if (currentImageIndex >= galleryImages.length) {
+      setSuppressSlideTransition(true);
+      setCurrentImageIndex(0);
+    }
+  };
+  useEffect(() => {
+    if (!suppressSlideTransition) return;
+    const id = requestAnimationFrame(() => setSuppressSlideTransition(false));
+    return () => cancelAnimationFrame(id);
+  }, [suppressSlideTransition]);
+
+  // The track renders one extra slide (a clone of image 1) after the real
+  // last image, purely so autoplay has somewhere to slide FORWARD into
+  // instead of snapping backward.
+  const extendedGalleryImages = useMemo(
+    () => (galleryImages.length > 1 ? [...galleryImages, galleryImages[0]] : galleryImages),
+    [galleryImages]
+  );
+
   // Track product view ONCE per product. Switching variant/color must NOT re-fire
   // ViewContent (that inflated it 2-5x); variant interest is captured by the separate
   // trackVariantSelect event. Guard on the product id so only a genuine new product fires.
@@ -316,14 +457,31 @@ const ProductDetailPage = () => {
     window.scrollTo(0, 0);
   }, []);
 
-  const nextImage = () => {
-    setCurrentImageIndex((prev) => (prev + 1) % galleryImages.length);
+  const handleImageDragStart = (e) => {
+    if (galleryImages.length <= 1) return;
+    setIsDragging(true);
+    dragStartXRef.current = e.clientX;
+    dragWidthRef.current = e.currentTarget.offsetWidth || 1;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
   };
-
-  const prevImage = () => {
-    setCurrentImageIndex(
-      (prev) => (prev - 1 + galleryImages.length) % galleryImages.length,
-    );
+  const handleImageDragMove = (e) => {
+    if (!isDragging) return;
+    let dx = e.clientX - dragStartXRef.current;
+    // Resistance at the ends — can't endlessly drag past the first/last image.
+    if (currentImageIndex === 0 && dx > 0) dx *= 0.35;
+    if (currentImageIndex === galleryImages.length - 1 && dx < 0) dx *= 0.35;
+    setDragOffset(dx);
+  };
+  const handleImageDragEnd = () => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    const threshold = dragWidthRef.current * 0.15;
+    if (dragOffset <= -threshold && currentImageIndex < galleryImages.length - 1) {
+      setCurrentImageIndex((i) => i + 1);
+    } else if (dragOffset >= threshold && currentImageIndex > 0) {
+      setCurrentImageIndex((i) => i - 1);
+    }
+    setDragOffset(0);
   };
 
   const handleInitialAddToCart = async () => {
@@ -708,50 +866,71 @@ const ProductDetailPage = () => {
             className="lg:col-span-6 max-w-[500px] w-full lg:sticky lg:top-24 flex flex-col items-start"
           >
             <div className="relative max-w-[500px] aspect-square md:aspect-auto md:h-[520px] rounded-2xl overflow-hidden shadow-2xl group w-full bg-[#e8e6e1]">
-              <div className="w-full h-full relative cursor-pointer flex items-center justify-center">
+              <div
+                className={`w-full h-full relative flex ${galleryImages.length > 1 ? "cursor-grab active:cursor-grabbing" : ""}`}
+                style={{ touchAction: "pan-y" }}
+                onPointerDown={handleImageDragStart}
+                onPointerMove={handleImageDragMove}
+                onPointerUp={handleImageDragEnd}
+                onPointerLeave={(e) => { handleImageDragEnd(e); setIsGalleryHovering(false); }}
+                onPointerCancel={handleImageDragEnd}
+                onMouseEnter={() => setIsGalleryHovering(true)}
+              >
                 <Suspense
                   fallback={
                     <div className="w-full h-full bg-gray-200 animate-pulse rounded-lg"></div>
                   }
                 >
-                  {galleryImages.map((img, idx) => (
-                    <div
-                      key={idx}
-                      className="absolute inset-0 flex items-center justify-center transition-opacity duration-300"
-                      style={{
-                        opacity: idx === currentImageIndex ? 1 : 0,
-                        pointerEvents:
-                          idx === currentImageIndex ? "auto" : "none",
-                      }}
-                    >
-                      <OptimizedImage
-                        src={img || "/placeholder.jpg"}
-                        alt={product.productName}
-                        className="object-contain"
-                        loading={idx === 0 ? "eager" : "lazy"}
-                      />
-                    </div>
-                  ))}
+                  <div
+                    className="flex w-full h-full"
+                    onTransitionEnd={handleTrackTransitionEnd}
+                    style={{
+                      transform: `translateX(calc(${-currentImageIndex * 100}% + ${dragOffset}px))`,
+                      transition: (isDragging || suppressSlideTransition) ? "none" : "transform 400ms cubic-bezier(0.4, 0, 0.2, 1)",
+                    }}
+                  >
+                    {extendedGalleryImages.map((img, idx) => (
+                      <div
+                        key={idx}
+                        className="w-full h-full shrink-0 flex items-center justify-center"
+                      >
+                        <OptimizedImage
+                          src={img || "/placeholder.jpg"}
+                          alt={product.productName}
+                          className="object-contain pointer-events-none select-none"
+                          loading={idx === 0 ? "eager" : "lazy"}
+                          draggable={false}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </Suspense>
               </div>
-
-              {galleryImages.length > 1 && (
-                <>
-                  <button
-                    onClick={prevImage}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full border border-[#1c3026]/10 flex items-center justify-center text-[#1c3026] bg-white/20 backdrop-blur-sm hover:bg-[#1c3026] hover:text-[#F5DEB3] transition-all z-20"
-                  >
-                    <i className="fa-solid fa-arrow-left text-sm"></i>
-                  </button>
-                  <button
-                    onClick={nextImage}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full border border-[#1c3026]/10 flex items-center justify-center text-[#1c3026] bg-white/20 backdrop-blur-sm hover:bg-[#1c3026] hover:text-[#F5DEB3] transition-all z-20"
-                  >
-                    <i className="fa-solid fa-arrow-right text-sm"></i>
-                  </button>
-                </>
-              )}
             </div>
+
+            {/* Dot indicators — below the image box, small; active one is a
+                slightly wider pill. Replaces the old thumbnail strip. */}
+            {galleryImages.length > 1 && (
+              <div className="w-full max-w-[500px] mt-4 flex items-center justify-center gap-1.5">
+                {galleryImages.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setCurrentImageIndex(idx)}
+                    aria-label={`View image ${idx + 1}`}
+                    style={{ transition: "width 400ms cubic-bezier(0.4,0,0.2,1), background-color 400ms ease" }}
+                    className={`h-1.5 rounded-full ${
+                      // Modulo, not a direct match — autoplay briefly pushes
+                      // currentImageIndex to galleryImages.length (the cloned
+                      // slide) while sliding forward, and that clone IS
+                      // visually image 1, so its dot should still light up.
+                      idx === currentImageIndex % galleryImages.length
+                        ? "w-4 bg-[#F5DEB3]"
+                        : "w-1.5 bg-[#F5DEB3]/25 hover:bg-[#F5DEB3]/50"
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
 
             {/* NAYA: Variant Selection Block - Ab yahan aayega (Badi image ke neeche aur thumbnails se pehle) */}
             {availableVariants && availableVariants.length > 0 && (
@@ -768,115 +947,109 @@ const ProductDetailPage = () => {
                   </span>
                 </div>
 
-                <div className="flex flex-nowrap gap-2 items-center">
-                  {availableVariants.map((variantName, idx) => {
+                <div className="relative">
+                  {!variantScrollAtStart && (
+                    <button
+                      type="button"
+                      onClick={() => scrollVariants(-1)}
+                      aria-label="Scroll variants left"
+                      className="absolute -left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full flex items-center justify-center bg-[#1c3026] border border-[#F5DEB3]/30 text-[#F5DEB3] shadow-lg hover:bg-[#25382f] transition-colors"
+                    >
+                      <i className="fa-solid fa-chevron-left text-xs" />
+                    </button>
+                  )}
+                  {!variantScrollAtEnd && (
+                    <button
+                      type="button"
+                      onClick={() => scrollVariants(1)}
+                      aria-label="Scroll variants right"
+                      className="absolute -right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full flex items-center justify-center bg-[#1c3026] border border-[#F5DEB3]/30 text-[#F5DEB3] shadow-lg hover:bg-[#25382f] transition-colors"
+                    >
+                      <i className="fa-solid fa-chevron-right text-xs" />
+                    </button>
+                  )}
+                  <div
+                    ref={variantScrollRef}
+                    onScroll={updateVariantScrollState}
+                    className="flex flex-nowrap gap-2 items-center overflow-x-auto no-scrollbar scroll-smooth px-1"
+                  >
+                  {(product.variantDetails || []).map((detail, idx) => {
+                    const variantName = detail.variantName;
                     const isSelected = selectedVariant === variantName;
-                    const lowerName = variantName.toLowerCase();
-                    const isBrand = lowerName.includes('bmw') || lowerName.includes('porsche') || lowerName.includes('lambo');
-                    
-                    const getVariantIcon = (name) => {
-                      if (isBrand) {
-                        let logoSrc = "";
-                        let logoClass = "w-5 h-5";
-                        
-                        if (lowerName.includes('bmw')) {
-                          logoSrc = "https://upload.wikimedia.org/wikipedia/commons/4/44/BMW.svg";
-                          logoClass = "w-4 h-4";
-                        } else if (lowerName.includes('porsche')) {
-                          logoSrc = "https://pngimg.com/uploads/porsche_logo/porsche_logo_PNG1.png";
-                        } else if (lowerName.includes('lambo')) {
-                          logoSrc = "https://upload.wikimedia.org/wikipedia/en/d/df/Lamborghini_Logo.svg";
-                        }
-                        
-                        return (
-                          <img 
-                            src={logoSrc} 
-                            alt={name} 
-                            className={`${logoClass} object-contain ${isSelected ? '' : 'grayscale-[40%] opacity-80 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300'}`} 
-                          />
-                        );
-                      }
-                      
-                      const colorMap = {
-                        'rainbow': 'linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)',
-                        'sky blue': '#87CEEB',
-                        'white': '#FFFFFF',
-                        'black': '#000000',
-                        'red': '#FF0000',
-                        'blue': '#0000FF',
-                        'yellow': '#FFFF00',
-                        'orange': '#FFA500',
-                        'grey': '#808080',
-                        'purple': '#800080'
-                      };
-
-                      return (
-                        <div 
-                          className={`w-full h-full rounded-full border ${isSelected ? 'border-white/20' : 'border-white/10 opacity-80 group-hover:opacity-100 transition-opacity'}`} 
-                          style={{ 
-                            background: colorMap[lowerName] || lowerName.replace(/\s+/g, '') 
-                          }}
-                        />
-                      );
-                    };
-
-                    if (isBrand) {
-                      return (
-                        <button
-                          key={idx}
-                          onClick={() => {
-                            setSelectedVariant(variantName);
-                            if (galleryImages[idx]) setCurrentImageIndex(idx);
-                            trackVariantSelect({ itemId: product.productId, itemName: product.productName, variantName, price: currentPrice });
-                            const vSku = product.variantDetails?.find(v => v.variantName === variantName)?.sku;
-                            navigate(`/product/${productId}/${vSku || variantName}`);
-                          }}
-                          className={`group flex-1 min-w-0 flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl border transition-all duration-300 ${
-                            isSelected
-                              ? "bg-[#F5DEB3] border-[#F5DEB3] text-[#1c3026] shadow-[0_8px_20px_rgba(245,222,179,0.15)]"
-                              : "bg-white/10 border-white/20 text-gray-200 hover:bg-white/15 hover:border-white/40"
-                          }`}
-                        >
-                          <span className="shrink-0">{getVariantIcon(variantName)}</span>
-                          <div className="flex flex-col items-start leading-none min-w-0">
-                            <span className={`text-[11px] font-bold uppercase tracking-wide truncate max-w-full ${isSelected ? 'text-[#1c3026]' : 'text-white group-hover:text-[#F5DEB3]'}`}>
-                              {variantName}
-                            </span>
-                            <span className={`text-[7px] uppercase tracking-tighter ${isSelected ? 'text-[#1c3026]/60' : 'text-gray-400 group-hover:text-[#F5DEB3]/60'} font-bold mt-0.5`}>
-                              Inspired
-                            </span>
-                          </div>
-                        </button>
-                      );
-                    }
+                    // Swatch is admin-set per variant, not guessed from the
+                    // name — "image" (logo/photo URL, falls back to the
+                    // variant's first product image) or "color" (any CSS
+                    // color). See variantSwatchType/variantSwatchValue.
+                    const swatchType = detail.variantSwatchType === "color" ? "color" : "image";
+                    const swatchValue =
+                      (detail.variantSwatchValue && detail.variantSwatchValue.trim()) ||
+                      (swatchType === "image" ? detail.variantImage?.[0] : "");
 
                     return (
                       <button
-                        key={idx}
+                        key={detail._id || idx}
                         onClick={() => {
                           setSelectedVariant(variantName);
                           if (galleryImages[idx]) setCurrentImageIndex(idx);
-                          const vSku = product.variantDetails?.find(v => v.variantName === variantName)?.sku;
-                          navigate(`/product/${productId}/${vSku || variantName}`);
+                          trackVariantSelect({ itemId: product.productId, itemName: product.productName, variantName, price: currentPrice });
+                          // replace, not push — switching variants updates the
+                          // URL's SKU segment for sharing/refresh, but must NOT
+                          // add a browser-history entry. Otherwise the back
+                          // button (or a mobile back-swipe) just cycles
+                          // through previously-viewed variants on this same
+                          // page instead of leaving it, since each variant
+                          // click would otherwise push a new history entry.
+                          navigate(`/product/${productId}/${detail.sku || variantName}`, { replace: true });
                         }}
-                        className={`group relative w-7 h-7 rounded-full transition-all duration-300 ${
+                        className={`group flex items-center gap-1.5 px-2.5 py-2 rounded-xl border transition-all duration-300 ${
                           isSelected
-                            ? "ring-2 ring-offset-2 ring-offset-[#1c3026] ring-[#F5DEB3] scale-110 shadow-lg shadow-[#F5DEB3]/20"
-                            : "bg-white/5 hover:scale-110 border border-white/10"
+                            ? "bg-[#F5DEB3] border-[#F5DEB3] text-[#1c3026] shadow-[0_8px_20px_rgba(245,222,179,0.15)]"
+                            : "bg-white/10 border-white/20 text-gray-200 hover:bg-white/15 hover:border-white/40"
                         }`}
                         title={variantName}
                       >
-                        <div className="w-full h-full p-0.5">
-                          {getVariantIcon(variantName)}
+                        <span
+                          className={`shrink-0 w-6 h-6 rounded-full overflow-hidden flex items-center justify-center border ${
+                            isSelected ? "border-white/20" : "border-white/10"
+                          }`}
+                        >
+                          {swatchType === "color" && swatchValue ? (
+                            <span className="w-full h-full block" style={{ background: swatchValue }} />
+                          ) : swatchValue ? (
+                            <img
+                              src={swatchValue}
+                              alt={variantName}
+                              className={`w-full h-full object-cover ${isSelected ? "" : "opacity-80 group-hover:opacity-100 transition-opacity"}`}
+                            />
+                          ) : (
+                            <span className={`text-[10px] font-bold uppercase ${isSelected ? "text-[#1c3026]" : "text-[#F5DEB3]"}`}>
+                              {variantName?.charAt(0)}
+                            </span>
+                          )}
+                        </span>
+                        <div className="flex flex-col items-start leading-none min-w-0">
+                          <span className={`text-[11px] font-bold uppercase tracking-wide truncate max-w-[110px] ${isSelected ? 'text-[#1c3026]' : 'text-white group-hover:text-[#F5DEB3]'}`}>
+                            {variantName}
+                          </span>
+                          {swatchType === "image" && swatchValue && (
+                            <span className={`text-[7px] uppercase tracking-tighter ${isSelected ? 'text-[#1c3026]/60' : 'text-gray-400 group-hover:text-[#F5DEB3]/60'} font-bold mt-0.5`}>
+                              Inspired
+                            </span>
+                          )}
                         </div>
                       </button>
                     );
                   })}
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* Gallery Thumbnails with Carousel Indicator */}
+            {/* Gallery Thumbnails with Carousel Indicator — COMMENTED OUT
+                (kept for reference, not deleted). The main image now uses the
+                dot indicators overlaid above instead of this thumbnail strip.
+                Flip `false` → `true` to bring it back. */}
+            {false && (
             <div className="w-full max-w-[500px] mt-6 relative">
               {/* Scroll Container */}
               <div
@@ -924,28 +1097,50 @@ const ProductDetailPage = () => {
                 </div>
               )}
             </div>
+            )}
           </div>
 
           <div className="lg:col-span-5 flex flex-col ml-auto w-full lg:max-w-[calc(100%-530px)]">
             {productId === config.specialProductId && (
               <ProductTimer timeLeft={timeLeft} />
             )}
-            <div className="mb-1 lg:mb-2 border-b border-[#F5DEB3]/10 pb-2 lg:pb-3">
-              <div className="flex justify-between items-start mb-4">
-                <span className="text-[#1c3026] text-[9px] lg:text-[10px] font-bold tracking-[0.2em] uppercase bg-[#F5DEB3] px-3 py-1.5 rounded-full shadow-lg shadow-[#F5DEB3]/10">
+            <div className="mb-1 mt-4 lg:mb-2 border-b border-[#F5DEB3]/10 pb-2 lg:pb-3">
+              {/* Category label + live rating pill (real avgRating / count).
+                  The rating pill balances the row on the right; only shown
+                  once the product actually has reviews. */}
+              <div className="flex items-center justify-between gap-2 mb-2.5">
+                <span className="text-[#1c3026] text-[9px] lg:text-[10px] font-bold tracking-[0.2em] uppercase bg-[#F5DEB3] px-3 py-1 rounded-full shadow-lg shadow-[#F5DEB3]/10">
                   {product.productCategory || "Featured"}
                 </span>
-                <div className="flex text-[#F5DEB3] text-xs gap-1 items-center bg-white/5 px-3 py-1 rounded-full">
-                  {/* <i className="fa-solid fa-star text-[10px]"></i> */}
-                  {/* <span className="ml-1 text-gray-300 font-mono text-[10px]">
-                    4.8
-                  </span> */}
-                </div>
+                {reviewsData?.data?.totalReviews > 0 && (
+                  <button
+                    onClick={() =>
+                      document
+                        .getElementById("pdp-all-reviews")
+                        ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                    }
+                    className="flex items-center gap-1.5 bg-white/5 border border-[#F5DEB3]/15 px-2.5 py-1 rounded-full hover:bg-white/10 transition-colors"
+                    title={`${reviewsData.data.totalReviews} review${reviewsData.data.totalReviews !== 1 ? "s" : ""}`}
+                  >
+                    <i className="fa-solid fa-star text-[#C8A96E] text-[10px]"></i>
+                    <span className="text-[#F5DEB3] font-bold text-[11px] tabular-nums leading-none">
+                      {reviewsData.data.avgRating}
+                    </span>
+                    <span className="text-gray-400 text-[10px] leading-none">
+                      ({reviewsData.data.totalReviews})
+                    </span>
+                  </button>
+                )}
               </div>
 
-              <h1 className="text-3xl lg:text-6xl font-serif text-[#F5DEB3] leading-tight mb-4">
-                {product.productName}
+              <h1 className={`text-4xl lg:text-6xl font-serif text-[#F5DEB3] leading-tight ${displayTitleSub ? "mb-1" : "mb-4"}`}>
+                {displayTitleMain}
               </h1>
+              {displayTitleSub && (
+                <p className="text-base lg:text-xl font-serif font-normal text-[#F5DEB3]/70 leading-snug mb-4">
+                  {displayTitleSub}
+                </p>
+              )}
 
               <div className="flex items-baseline gap-4 mb-2">
                 <p className="text-2xl lg:text-3xl font-light text-white">
@@ -976,7 +1171,7 @@ const ProductDetailPage = () => {
             </div>
 
             <p className="text-gray-300 leading-relaxed mb-8 font-light text-sm lg:text-md">
-              {product.productSubDes}
+              {product.productDes}
             </p>
 
             {/* Desktop: "Add to Collection" box and the free-shipping banner
@@ -1074,7 +1269,7 @@ const ProductDetailPage = () => {
             </div>
 
             <div className="border-t border-[#F5DEB3]/10">
-              {product.productDes && (
+              {displayDescription && (
                 <AccordionItem
                   title="Description"
                   isOpen={activeAccordion === "description"}
@@ -1084,7 +1279,7 @@ const ProductDetailPage = () => {
                     )
                   }
                 >
-                  <p className="whitespace-pre-line">{product.productDes}</p>
+                  <p className="whitespace-pre-line">{displayDescription}</p>
                 </AccordionItem>
               )}
 
@@ -1177,62 +1372,56 @@ const ProductDetailPage = () => {
               )}
             </div>
 
-            {/* Standalone Disclaimer Section — brake caliper lamp only */}
-            {(product.productName || "").toLowerCase().includes("caliper") && (
-              <p className="text-[12px] leading-relaxed text-gray-400 italic font-light">
-                <strong className="text-[#F5DEB3]/70 not-italic mr-1">Disclaimer:</strong>
-                This product is an aftermarket decorative lamp inspired by automotive brake disc designs.
-                Urbannook is not affiliated with, endorsed by, or connected to BMW, Porsche, Lamborghini,
-                or any other automotive brand.
-              </p>
-            )}
+            {/* Standalone Disclaimer Section — driven by the admin-set
+                `disclaimer` field so ANY product can have one, not just the
+                brake caliper lamp. Falls back to the old hardcoded caliper
+                text only when that product's disclaimer field is still
+                empty, so nothing regresses before someone fills it in. */}
+            {(() => {
+              const isCaliperLamp = (product.productName || "").toLowerCase().includes("caliper");
+              const disclaimerText =
+                product.disclaimer?.trim() ||
+                (isCaliperLamp
+                  ? "This product is an aftermarket decorative lamp inspired by automotive brake disc designs. Urbannook is not affiliated with, endorsed by, or connected to BMW, Porsche, Lamborghini, or any other automotive brand."
+                  : "");
+              if (!disclaimerText) return null;
+              return (
+                <p className="text-[12px] leading-relaxed text-gray-400 italic font-light">
+                  <strong className="text-[#F5DEB3]/70 not-italic mr-1">Disclaimer:</strong>
+                  {disclaimerText}
+                </p>
+              );
+            })()}
           </div>
         </div>
 
         {/* ===== COMPARISON TABLE ===== */}
         <ComparisonTable productName={product.productName} />
 
+        {/* ===== REAL-LIFE SETUP SHOWCASE (lazy-mounted marquee) ===== */}
+        {/* <SetupShowcase items={SETUP_SHOWCASE_ITEMS} /> */}
+
         {/* ===== REVIEWS SECTION ===== */}
-        <div className="mt-16 pt-12 border-t border-[#1c3026]/10">
-          {/* Header row */}
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 mb-10">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <span className="h-[1px] w-8 bg-[#F5DEB3]"></span>
+        <div className="mt-8 pt-4 ">
+          {/* Header row — eyebrow + heading. Only makes sense once this
+              product actually has reviews to show off; hidden otherwise so
+              a brand-new product doesn't claim customers already "said"
+              anything. The "Write a Review" action lives only in the 1d
+              summary block below (top button removed to avoid duplication);
+              functionality is identical. */}
+          {reviewsData?.data?.totalReviews > 0 && (
+            <div className="mb-7">
+              <div className="mb-2">
                 <span className="text-[#F5DEB3] font-bold tracking-[0.2em] uppercase text-[10px]">
                   Customer Reviews
                 </span>
               </div>
               <h2 className="text-3xl lg:text-4xl font-serif text-white">
-                What customers{" "}
+                What our customers{" "}
                 <span className="italic text-[#F5DEB3]">say.</span>
               </h2>
             </div>
-
-            {(reviewsData?.data?.totalReviews > 0 ||
-              reviewsData?.data?.canReview) && (
-              <button
-                onClick={() => {
-                  const hasToken = !!localStorage.getItem("authToken");
-                  if (!isAuthenticated && !hasToken) {
-                    openLoginModal("openReviewForm");
-                    return;
-                  }
-                  setEditingReviewId(null);
-                  setReviewForm({ rating: 5, desc: "" });
-                  setReviewImages([]);
-                  setReviewImagePreviews([]);
-                  setShowReviewForm((v) => !v);
-                }}
-                className="px-5 py-3 rounded-full border border-[#F5DEB3]/30 text-[#F5DEB3] text-[10px] font-bold uppercase tracking-widest hover:bg-[#F5DEB3] hover:text-[#1c3026] transition-all flex items-center gap-2 self-start sm:self-auto"
-              >
-                <i
-                  className={`fa-solid ${showReviewForm ? "fa-xmark" : "fa-pen"}`}
-                ></i>
-                {showReviewForm ? "Cancel" : "Write a Review"}
-              </button>
-            )}
-          </div>
+          )}
 
           {/* Review Form — full width, above the two-column grid */}
           <div id="review-form-anchor"></div>
@@ -1353,70 +1542,40 @@ const ProductDetailPage = () => {
               className="md:sticky md:top-24 md:max-h-[calc(100vh-6rem)]"
               style={{ overflow: "clip" }}
             >
-              {/* Compact Rating Summary + Histogram */}
+              {/* ===== Reviews Summary — Claude Design "1d", wired to real
+                   data. Compact confident review line + category pills (big
+                   cream box + histogram removed per this direction). ===== */}
+
+              {/* 1d — confident single review line (all items vertically
+                  centered on one baseline; FA star aligns cleaner than the
+                  unicode glyph). */}
               {reviewsData?.data?.totalReviews > 0 && (
-                <div className="mb-6 bg-[#FAF7F2] rounded-2xl p-4 border border-[#1c3026]/8 shadow-sm">
-                  {/* 5-star box — compact */}
-                  <div className="flex flex-col items-center text-center">
-                    <span className="text-4xl font-serif text-[#1c3026] leading-none">
-                      {reviewsData.data.avgRating}
-                    </span>
-                    <span className="text-xs text-[#1c3026]/40 mt-1 mb-2">
-                      out of 5
-                    </span>
-                    <div className="flex gap-0.5">
-                      {[1, 2, 3, 4, 5].map((s) => (
-                        <i
-                          key={s}
-                          className={`fa-star text-sm ${s <= Math.round(reviewsData.data.avgRating) ? "fa-solid text-[#C8A96E]" : "fa-regular text-[#1c3026]/15"}`}
-                        ></i>
-                      ))}
-                    </div>
-                    <span className="text-[10px] text-[#1c3026]/40 mt-2 uppercase tracking-wider">
-                      {reviewsData.data.totalReviews} rating
-                      {reviewsData.data.totalReviews !== 1 ? "s" : ""}
-                    </span>
-                  </div>
-                  {/* Divider */}
-                  <div className="h-px bg-[#1c3026]/8 my-4"></div>
-                  {/* Histogram */}
-                  <div className="flex flex-col space-y-3">
-                    {[5, 4, 3, 2, 1].map((star) => {
-                      const count = (reviewsData.data.reviews || []).filter(
-                        (r) => Math.round(r.rating) === star,
-                      ).length;
-                      const pct = reviewsData.data.totalReviews
-                        ? Math.round(
-                            (count / reviewsData.data.totalReviews) * 100,
-                          )
-                        : 0;
-                      return (
-                        <div key={star} className="flex items-center gap-3">
-                          <div className="flex items-center gap-1 w-10 shrink-0">
-                            <span className="text-xs text-[#1c3026]/70 font-medium tabular-nums">
-                              {star}
-                            </span>
-                            <i className="fa-solid fa-star text-[#C8A96E] text-[9px]"></i>
-                          </div>
-                          <div className="flex-1 bg-[#1c3026]/8 rounded-full h-2 overflow-hidden">
-                            <div
-                              style={{ width: `${pct}%` }}
-                              className={`h-2 rounded-full transition-all duration-700 ${star >= 4 ? "bg-[#C8A96E]" : star === 3 ? "bg-amber-400" : "bg-red-400"}`}
-                            ></div>
-                          </div>
-                          <span className="text-[10px] text-[#1c3026]/40 w-6 text-right shrink-0 tabular-nums">
-                            {count}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
+                <div className="mb-4 flex items-center gap-2.5 px-4 py-3 rounded-2xl border border-[#C8A96E]/30 bg-[#C8A96E]/[0.06]">
+                  <span className="font-serif text-xl leading-none text-[#F5DEB3]">
+                    {reviewsData.data.avgRating}
+                  </span>
+                  <i className="fa-solid fa-star text-[#C8A96E] text-sm leading-none"></i>
+                  <span className="w-px h-4 bg-white/15" />
+                  <span className="text-[13px] font-semibold text-white/70 leading-none">
+                    {reviewsData.data.totalReviews} review
+                    {reviewsData.data.totalReviews !== 1 ? "s" : ""}
+                  </span>
+                  <button
+                    onClick={() =>
+                      document
+                        .getElementById("pdp-all-reviews")
+                        ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                    }
+                    className="ml-auto text-[12px] font-bold text-[#C8A96E] hover:text-[#F5DEB3] transition-colors leading-none"
+                  >
+                    Read ›
+                  </button>
                 </div>
               )}
 
-              {/* Category Ratings */}
+              {/* 1d — category pills (horizontal scroll, hidden scrollbar) */}
               {reviewsData?.data?.totalReviews > 0 && (
-                <div className="mb-6 flex flex-wrap gap-3">
+                <div className="flex gap-2 overflow-x-auto pb-0.5 mb-[18px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   {[
                     { label: "Quality", rating: 4 },
                     { label: "Build", rating: 5 },
@@ -1425,21 +1584,22 @@ const ProductDetailPage = () => {
                   ].map(({ label, rating }) => (
                     <div
                       key={label}
-                      className="flex items-center gap-2 bg-[#FAF7F2] border border-[#1c3026]/10 rounded-full px-4 py-2 shadow-sm"
+                      className="flex-none flex items-center gap-1.5 bg-white/[0.04] border border-white/[0.12] rounded-full pl-2.5 pr-2 py-1.5"
                     >
-                      <span className="text-[#1c3026]/70 text-xs font-medium">
+                      <span className="text-[10px] font-semibold text-white/60 leading-none">
                         {label}
                       </span>
-                      <span className="text-[#C8A96E] font-bold text-xs tabular-nums">
+                      <span className="flex items-center gap-0.5 text-[10px] font-bold text-[#F5DEB3] leading-none">
                         {rating}
+                        <i className="fa-solid fa-star text-[8px] text-[#C8A96E]"></i>
                       </span>
-                      <i className="fa-solid fa-star text-[#C8A96E] text-[9px]"></i>
                     </div>
                   ))}
                 </div>
               )}
 
-              {/* Customer Photos Gallery + mobile text-only reviews + Lightboxes */}
+              {/* 1d — Customer Photos: header + horizontal strip (hidden
+                   scrollbar). Lightbox behaviour preserved. */}
               {(() => {
                 const allImgsWithReview = (
                   reviewsData?.data?.reviews || []
@@ -1452,114 +1612,82 @@ const ProductDetailPage = () => {
                   ).map((url) => ({ url, review: r })),
                 );
                 if (allImgsWithReview.length === 0) return null;
-                const GRID_MAX = 5;
-                const gridItems = allImgsWithReview.slice(0, GRID_MAX);
-                const extra = allImgsWithReview.length - GRID_MAX;
+                const STRIP_MAX = 5;
+                const stripItems = allImgsWithReview.slice(0, STRIP_MAX);
+                const extra = allImgsWithReview.length - STRIP_MAX;
                 return (
-                  <div className="mb-6">
-                      <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-[#F5DEB3]/50 mb-3">
+                  <div className="mb-5">
+                    <div className="flex items-baseline justify-between mb-2.5">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/50">
                         Customer Photos
-                      </p>
-
-                      {/* ── DESKTOP: horizontal row of 5 small squares ── */}
-                      <div className="hidden md:flex gap-2">
-                        {gridItems.map(({ url }, i) => {
-                          const isLast = i === GRID_MAX - 1 && extra > 0;
-                          return (
-                            <div
-                              key={i}
-                              className="relative w-24 h-24 shrink-0 rounded-xl overflow-hidden cursor-pointer"
-                              onClick={() =>
-                                setLightboxData({
-                                  imgList: allImgsWithReview,
-                                  currentIdx: i,
-                                })
-                              }
-                            >
-                              <ReviewImg
-                                src={url}
-                                alt={`Customer photo ${i + 1}`}
-                                className="w-full h-full hover:brightness-90 transition-all"
-                              />
-                              {isLast && (
-                                <div className="absolute inset-0 bg-black/55 flex items-center justify-center pointer-events-none">
-                                  <span className="text-white font-bold text-sm">
-                                    +{extra}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* ── MOBILE: Flipkart grid — 1 large + 2×2 small ── */}
-                      <div className="md:hidden flex gap-1 h-[180px] sm:h-[220px] rounded-2xl overflow-hidden">
-                        {gridItems[0] && (
-                          <ReviewImg
-                            src={gridItems[0].url}
-                            alt="Customer photo 1"
-                            className="flex-[2] min-w-0 cursor-pointer hover:brightness-90 transition-all"
-                            onClick={() =>
-                              setLightboxData({
-                                imgList: allImgsWithReview,
-                                currentIdx: 0,
-                              })
-                            }
-                          />
-                        )}
-                        {gridItems.length > 1 && (
-                          <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-1">
-                            {gridItems.slice(1).map(({ url }, i) => {
-                              const globalIdx = i + 1;
-                              const isLast =
-                                globalIdx === GRID_MAX - 1 && extra > 0;
-                              return (
-                                <div
-                                  key={i}
-                                  className="relative overflow-hidden cursor-pointer"
-                                  onClick={() =>
-                                    setLightboxData({
-                                      imgList: allImgsWithReview,
-                                      currentIdx: globalIdx,
-                                    })
-                                  }
-                                >
-                                  <ReviewImg
-                                    src={url}
-                                    alt={`Customer photo ${globalIdx + 1}`}
-                                    className="w-full h-full hover:brightness-90 transition-all"
-                                  />
-                                  {isLast && (
-                                    <div className="absolute inset-0 bg-black/55 flex items-center justify-center pointer-events-none">
-                                      <span className="text-white font-bold text-base">
-                                        +{extra}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                            {Array.from({
-                              length: Math.max(0, 4 - (gridItems.length - 1)),
-                            }).map((_, i) => (
-                              <div
-                                key={`ph-${i}`}
-                                className="bg-[#1c3026]/20"
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                      </span>
+                      <button
+                        onClick={() =>
+                          setLightboxData({ imgList: allImgsWithReview, currentIdx: 0 })
+                        }
+                        className="text-[11px] font-bold text-[#C8A96E] hover:text-[#F5DEB3] transition-colors"
+                      >
+                        View all ›
+                      </button>
                     </div>
-
+                    <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      {stripItems.map(({ url }, i) => {
+                        const isLast = i === STRIP_MAX - 1 && extra > 0;
+                        return (
+                          <div
+                            key={i}
+                            onClick={() =>
+                              setLightboxData({ imgList: allImgsWithReview, currentIdx: i })
+                            }
+                            className="relative flex-none w-[62px] h-[62px] rounded-[10px] overflow-hidden cursor-pointer"
+                          >
+                            <ReviewImg
+                              src={url}
+                              alt={`Customer photo ${i + 1}`}
+                              className="w-full h-full hover:brightness-90 transition-all"
+                            />
+                            {isLast && (
+                              <div className="absolute inset-0 bg-[#0f1c16]/55 flex items-center justify-center pointer-events-none">
+                                <span className="text-white font-extrabold text-[15px]">
+                                  +{extra}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 );
               })()}
+
+              {/* 1d — Write a Review (full-width outlined gold pill) */}
+              {(reviewsData?.data?.totalReviews > 0 ||
+                reviewsData?.data?.canReview) && (
+                <button
+                  onClick={() => {
+                    const hasToken = !!localStorage.getItem("authToken");
+                    if (!isAuthenticated && !hasToken) {
+                      openLoginModal("openReviewForm");
+                      return;
+                    }
+                    setEditingReviewId(null);
+                    setReviewForm({ rating: 5, desc: "" });
+                    setReviewImages([]);
+                    setReviewImagePreviews([]);
+                    setShowReviewForm((v) => !v);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 border border-[#C8A96E]/55 text-[#F5DEB3] rounded-full px-5 py-3 text-[11px] font-bold uppercase tracking-[0.14em] hover:bg-[#C8A96E]/[0.12] transition-colors"
+                >
+                  <span className="text-[13px]">✎</span> Write a Review
+                </button>
+              )}
             </div>
             {/* end LEFT COLUMN */}
 
             {/* ── RIGHT COLUMN: Reviews ── */}
             <div
+              id="pdp-all-reviews"
               className="md:max-h-[calc(100vh-6rem)] md:overflow-y-auto"
               style={{ scrollbarWidth: "none" }}
             >
