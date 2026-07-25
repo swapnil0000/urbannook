@@ -8,6 +8,7 @@ import {
   useGetAllFreeShippingBannersQuery,
 } from '../../store/api/userApi';
 import { updateQuantity, removeItem } from '../../store/slices/cartSlice';
+import { resolveVariantTitle } from '../../utils/variantTitle';
 import { setShowLoginModal, setLoginCallback } from '../../store/slices/uiSlice';
 import { trackViewCart, trackRemoveFromCart, track } from '../../utils/analytics';
 import FreeShippingBanner from '../FreeShippingBanner';
@@ -253,29 +254,30 @@ const CartDrawer = ({ isOpen, onClose }) => {
                   // Mongoose bug safe extraction
                   const itemQty = typeof item.quantity === 'object' ? Number(item.quantity?.quantity || 0) : Number(item.quantity || 0);
                   const itemId = item.mongoId || item.productId || item.id;
+                  const displayName = resolveVariantTitle(item.name, item.variantTitleTemplate, item.selectedVariant);
 
                   return (
                     <div key={`${itemId}-${item.selectedVariant || 'N/A'}`} className="flex items-stretch gap-4 group relative pb-6 border-b border-gray-50 last:border-0 last:pb-0">
-                      
+
                       {/* Image */}
                       <div className="w-[85px] h-[85px] bg-gray-50 rounded-2xl overflow-hidden shrink-0 relative border border-gray-100 flex items-center justify-center">
                         <Suspense fallback={<div className="w-full h-full bg-gray-100 animate-pulse"></div>}>
                           <OptimizedImage
                             src={item.image || '/placeholder.jpg'}
-                            alt={item.name}
+                            alt={displayName}
                             className="w-full h-full object-contain mix-blend-multiply"
                             loading="lazy"
                           />
                         </Suspense>
                       </div>
-                      
+
                       {/* Details */}
                       <div className="flex-1 flex flex-col min-w-0">
                         <div>
                           {/* Name & Delete */}
                           <div className="flex justify-between items-start mb-1">
                             <h4 className="text-base font-serif text-[#0a110e] leading-snug pr-4 hover:text-emerald-700 transition-colors cursor-pointer">
-                              {item.name}
+                              {displayName}
                             </h4>
                             <button 
                               onClick={() => handleRemoveItem(itemId, item.selectedVariant, item.mongoId)}

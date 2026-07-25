@@ -11,6 +11,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { useCookies } from "react-cookie";
 import { fireAddToCartConfetti } from "../../utils/celebration";
+import { resolveVariantTitle, splitTitleForDisplay } from "../../utils/variantTitle";
 import SEOHead from "../../component/SEOHead";
 import ComparisonTable from "../../component/ComparisonTable";
 import SetupShowcase from "../../component/SetupShowcase";
@@ -182,6 +183,9 @@ const ProductDetailPage = () => {
   const [reviewImages, setReviewImages] = useState([]); // up to 3 File objects
   const [reviewImagePreviews, setReviewImagePreviews] = useState([]); // preview URLs
   const reviewImageRef = useRef(null);
+  const variantScrollRef = useRef(null);
+  const [variantScrollAtStart, setVariantScrollAtStart] = useState(true);
+  const [variantScrollAtEnd, setVariantScrollAtEnd] = useState(true);
   const [lightboxData, setLightboxData] = useState(null); // { imgList: [{url, review}], currentIdx }
   const [showMobileAllReviews, setShowMobileAllReviews] = useState(false);
   const mobileReviewScrollRef = useRef(null);
@@ -217,7 +221,12 @@ const ProductDetailPage = () => {
     return 0;
   }, [product, selectedVariant]);
 
-  // Calculate the max variant price (acts as MRP) and discount percentage
+  // TODO(pricing-migration): this strike price is SYNTHETIC — an 18% markup
+  // or 25% markdown formula, not a real admin-set value. The admin panel now
+  // has a real `variantDetails[].variantMrp` field (with a live discount-%
+  // calculator) that admins are filling in per variant. Once MRP data is
+  // populated across the catalog, switch this to read the selected variant's
+  // real `variantMrp` (fall back to this formula only where MRP is unset/0).
   // Struck "compare-at" price + its discount %.
   //  • Non-top variant (a pricier variant exists, e.g. BMW/Porsche below
   //    Lambo) → 18% markup reference.
@@ -238,10 +247,53 @@ const ProductDetailPage = () => {
     return { strikePrice: strike, discountPercent: discount };
   }, [product, currentPrice]);
 
+  // Per-variant description — admin can set a distinct description per
+  // variant (e.g. each anime-character katana has its own blurb). Falls back
+  // to the product-level description when the selected variant has none set.
+  const displayDescription = useMemo(() => {
+    if (!product) return "";
+    const selectedDetail = product.variantDetails?.find(v => v.variantName === selectedVariant);
+    return (selectedDetail?.variantDes && selectedDetail.variantDes.trim()) || product.productDes || "";
+  }, [product, selectedVariant]);
+
+  // Optional per-product title template (admin-set `variantTitleTemplate`,
+  // e.g. "{variant} Cosplay Wooden Katana ({variant} Inspired, 104cm)").
+  // Blank template (the default for every existing product) falls straight
+  // back to the plain productName, so this can't affect products that never
+  // opted in.
+  const displayTitle = useMemo(() => {
+    if (!product) return "";
+    return resolveVariantTitle(product.productName, product.variantTitleTemplate, selectedVariant);
+  }, [product, selectedVariant]);
+
+  // Splits a template-resolved title like "Sasuke Cosplay Wooden Katana
+  // (Sasuke Inspired, 104cm)" into a bold main heading and a smaller,
+  // normal-weight parenthetical sub-line shown underneath it.
+  const { main: displayTitleMain, sub: displayTitleSub } = useMemo(
+    () => splitTitleForDisplay(displayTitle),
+    [displayTitle]
+  );
+
   const availableVariants = useMemo(() => {
     if (!product || !product.variantDetails) return [];
     return product.variantDetails.map(v => v.variantName);
   }, [product]);
+
+  // Keeps the Amazon-style ‹ › arrows in sync with actual scroll position —
+  // both show whenever there's more to scroll to in that direction, and fade
+  // out at the strip's start/end (or entirely, if everything already fits).
+  const updateVariantScrollState = () => {
+    const el = variantScrollRef.current;
+    if (!el) return;
+    setVariantScrollAtStart(el.scrollLeft <= 4);
+    setVariantScrollAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 4);
+  };
+  useEffect(() => {
+    updateVariantScrollState();
+  }, [availableVariants]);
+  const scrollVariants = (direction) => {
+    variantScrollRef.current?.scrollBy({ left: direction * 180, behavior: "smooth" });
+  };
 
   const galleryImages = useMemo(() => {
     if (!product) return [];
@@ -808,110 +860,93 @@ const ProductDetailPage = () => {
                   </span>
                 </div>
 
-                <div className="flex flex-nowrap gap-2 items-center">
-                  {availableVariants.map((variantName, idx) => {
+                <div className="relative">
+                  {!variantScrollAtStart && (
+                    <button
+                      type="button"
+                      onClick={() => scrollVariants(-1)}
+                      aria-label="Scroll variants left"
+                      className="absolute -left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full flex items-center justify-center bg-[#1c3026] border border-[#F5DEB3]/30 text-[#F5DEB3] shadow-lg hover:bg-[#25382f] transition-colors"
+                    >
+                      <i className="fa-solid fa-chevron-left text-xs" />
+                    </button>
+                  )}
+                  {!variantScrollAtEnd && (
+                    <button
+                      type="button"
+                      onClick={() => scrollVariants(1)}
+                      aria-label="Scroll variants right"
+                      className="absolute -right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full flex items-center justify-center bg-[#1c3026] border border-[#F5DEB3]/30 text-[#F5DEB3] shadow-lg hover:bg-[#25382f] transition-colors"
+                    >
+                      <i className="fa-solid fa-chevron-right text-xs" />
+                    </button>
+                  )}
+                  <div
+                    ref={variantScrollRef}
+                    onScroll={updateVariantScrollState}
+                    className="flex flex-nowrap gap-2 items-center overflow-x-auto no-scrollbar scroll-smooth px-1"
+                  >
+                  {(product.variantDetails || []).map((detail, idx) => {
+                    const variantName = detail.variantName;
                     const isSelected = selectedVariant === variantName;
-                    const lowerName = variantName.toLowerCase();
-                    const isBrand = lowerName.includes('bmw') || lowerName.includes('porsche') || lowerName.includes('lambo');
-                    
-                    const getVariantIcon = (name) => {
-                      if (isBrand) {
-                        let logoSrc = "";
-                        let logoClass = "w-5 h-5";
-                        
-                        if (lowerName.includes('bmw')) {
-                          logoSrc = "https://upload.wikimedia.org/wikipedia/commons/4/44/BMW.svg";
-                          logoClass = "w-4 h-4";
-                        } else if (lowerName.includes('porsche')) {
-                          logoSrc = "https://pngimg.com/uploads/porsche_logo/porsche_logo_PNG1.png";
-                        } else if (lowerName.includes('lambo')) {
-                          logoSrc = "https://upload.wikimedia.org/wikipedia/en/d/df/Lamborghini_Logo.svg";
-                        }
-                        
-                        return (
-                          <img 
-                            src={logoSrc} 
-                            alt={name} 
-                            className={`${logoClass} object-contain ${isSelected ? '' : 'grayscale-[40%] opacity-80 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300'}`} 
-                          />
-                        );
-                      }
-                      
-                      const colorMap = {
-                        'rainbow': 'linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)',
-                        'sky blue': '#87CEEB',
-                        'white': '#FFFFFF',
-                        'black': '#000000',
-                        'red': '#FF0000',
-                        'blue': '#0000FF',
-                        'yellow': '#FFFF00',
-                        'orange': '#FFA500',
-                        'grey': '#808080',
-                        'purple': '#800080'
-                      };
-
-                      return (
-                        <div 
-                          className={`w-full h-full rounded-full border ${isSelected ? 'border-white/20' : 'border-white/10 opacity-80 group-hover:opacity-100 transition-opacity'}`} 
-                          style={{ 
-                            background: colorMap[lowerName] || lowerName.replace(/\s+/g, '') 
-                          }}
-                        />
-                      );
-                    };
-
-                    if (isBrand) {
-                      return (
-                        <button
-                          key={idx}
-                          onClick={() => {
-                            setSelectedVariant(variantName);
-                            if (galleryImages[idx]) setCurrentImageIndex(idx);
-                            trackVariantSelect({ itemId: product.productId, itemName: product.productName, variantName, price: currentPrice });
-                            const vSku = product.variantDetails?.find(v => v.variantName === variantName)?.sku;
-                            navigate(`/product/${productId}/${vSku || variantName}`);
-                          }}
-                          className={`group flex-1 min-w-0 flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl border transition-all duration-300 ${
-                            isSelected
-                              ? "bg-[#F5DEB3] border-[#F5DEB3] text-[#1c3026] shadow-[0_8px_20px_rgba(245,222,179,0.15)]"
-                              : "bg-white/10 border-white/20 text-gray-200 hover:bg-white/15 hover:border-white/40"
-                          }`}
-                        >
-                          <span className="shrink-0">{getVariantIcon(variantName)}</span>
-                          <div className="flex flex-col items-start leading-none min-w-0">
-                            <span className={`text-[11px] font-bold uppercase tracking-wide truncate max-w-full ${isSelected ? 'text-[#1c3026]' : 'text-white group-hover:text-[#F5DEB3]'}`}>
-                              {variantName}
-                            </span>
-                            <span className={`text-[7px] uppercase tracking-tighter ${isSelected ? 'text-[#1c3026]/60' : 'text-gray-400 group-hover:text-[#F5DEB3]/60'} font-bold mt-0.5`}>
-                              Inspired
-                            </span>
-                          </div>
-                        </button>
-                      );
-                    }
+                    // Swatch is admin-set per variant, not guessed from the
+                    // name — "image" (logo/photo URL, falls back to the
+                    // variant's first product image) or "color" (any CSS
+                    // color). See variantSwatchType/variantSwatchValue.
+                    const swatchType = detail.variantSwatchType === "color" ? "color" : "image";
+                    const swatchValue =
+                      (detail.variantSwatchValue && detail.variantSwatchValue.trim()) ||
+                      (swatchType === "image" ? detail.variantImage?.[0] : "");
 
                     return (
                       <button
-                        key={idx}
+                        key={detail._id || idx}
                         onClick={() => {
                           setSelectedVariant(variantName);
                           if (galleryImages[idx]) setCurrentImageIndex(idx);
-                          const vSku = product.variantDetails?.find(v => v.variantName === variantName)?.sku;
-                          navigate(`/product/${productId}/${vSku || variantName}`);
+                          trackVariantSelect({ itemId: product.productId, itemName: product.productName, variantName, price: currentPrice });
+                          navigate(`/product/${productId}/${detail.sku || variantName}`);
                         }}
-                        className={`group relative w-7 h-7 rounded-full transition-all duration-300 ${
+                        className={`group flex items-center gap-1.5 px-2.5 py-2 rounded-xl border transition-all duration-300 ${
                           isSelected
-                            ? "ring-2 ring-offset-2 ring-offset-[#1c3026] ring-[#F5DEB3] scale-110 shadow-lg shadow-[#F5DEB3]/20"
-                            : "bg-white/5 hover:scale-110 border border-white/10"
+                            ? "bg-[#F5DEB3] border-[#F5DEB3] text-[#1c3026] shadow-[0_8px_20px_rgba(245,222,179,0.15)]"
+                            : "bg-white/10 border-white/20 text-gray-200 hover:bg-white/15 hover:border-white/40"
                         }`}
                         title={variantName}
                       >
-                        <div className="w-full h-full p-0.5">
-                          {getVariantIcon(variantName)}
+                        <span
+                          className={`shrink-0 w-6 h-6 rounded-full overflow-hidden flex items-center justify-center border ${
+                            isSelected ? "border-white/20" : "border-white/10"
+                          }`}
+                        >
+                          {swatchType === "color" && swatchValue ? (
+                            <span className="w-full h-full block" style={{ background: swatchValue }} />
+                          ) : swatchValue ? (
+                            <img
+                              src={swatchValue}
+                              alt={variantName}
+                              className={`w-full h-full object-cover ${isSelected ? "" : "opacity-80 group-hover:opacity-100 transition-opacity"}`}
+                            />
+                          ) : (
+                            <span className={`text-[10px] font-bold uppercase ${isSelected ? "text-[#1c3026]" : "text-[#F5DEB3]"}`}>
+                              {variantName?.charAt(0)}
+                            </span>
+                          )}
+                        </span>
+                        <div className="flex flex-col items-start leading-none min-w-0">
+                          <span className={`text-[11px] font-bold uppercase tracking-wide truncate max-w-[110px] ${isSelected ? 'text-[#1c3026]' : 'text-white group-hover:text-[#F5DEB3]'}`}>
+                            {variantName}
+                          </span>
+                          {swatchType === "image" && swatchValue && (
+                            <span className={`text-[7px] uppercase tracking-tighter ${isSelected ? 'text-[#1c3026]/60' : 'text-gray-400 group-hover:text-[#F5DEB3]/60'} font-bold mt-0.5`}>
+                              Inspired
+                            </span>
+                          )}
                         </div>
                       </button>
                     );
                   })}
+                  </div>
                 </div>
               </div>
             )}
@@ -1004,9 +1039,14 @@ const ProductDetailPage = () => {
                 )}
               </div>
 
-              <h1 className="text-3xl lg:text-6xl font-serif text-[#F5DEB3] leading-tight mb-4">
-                {product.productName}
+              <h1 className={`text-4xl lg:text-6xl font-serif text-[#F5DEB3] leading-tight ${displayTitleSub ? "mb-1" : "mb-4"}`}>
+                {displayTitleMain}
               </h1>
+              {displayTitleSub && (
+                <p className="text-base lg:text-xl font-serif font-normal text-[#F5DEB3]/70 leading-snug mb-4">
+                  {displayTitleSub}
+                </p>
+              )}
 
               <div className="flex items-baseline gap-4 mb-2">
                 <p className="text-2xl lg:text-3xl font-light text-white">
@@ -1037,7 +1077,7 @@ const ProductDetailPage = () => {
             </div>
 
             <p className="text-gray-300 leading-relaxed mb-8 font-light text-sm lg:text-md">
-              {product.productSubDes}
+              {product.productDes}
             </p>
 
             {/* Desktop: "Add to Collection" box and the free-shipping banner
@@ -1135,7 +1175,7 @@ const ProductDetailPage = () => {
             </div>
 
             <div className="border-t border-[#F5DEB3]/10">
-              {product.productDes && (
+              {displayDescription && (
                 <AccordionItem
                   title="Description"
                   isOpen={activeAccordion === "description"}
@@ -1145,7 +1185,7 @@ const ProductDetailPage = () => {
                     )
                   }
                 >
-                  <p className="whitespace-pre-line">{product.productDes}</p>
+                  <p className="whitespace-pre-line">{displayDescription}</p>
                 </AccordionItem>
               )}
 
@@ -1238,15 +1278,26 @@ const ProductDetailPage = () => {
               )}
             </div>
 
-            {/* Standalone Disclaimer Section — brake caliper lamp only */}
-            {(product.productName || "").toLowerCase().includes("caliper") && (
-              <p className="text-[12px] leading-relaxed text-gray-400 italic font-light">
-                <strong className="text-[#F5DEB3]/70 not-italic mr-1">Disclaimer:</strong>
-                This product is an aftermarket decorative lamp inspired by automotive brake disc designs.
-                Urbannook is not affiliated with, endorsed by, or connected to BMW, Porsche, Lamborghini,
-                or any other automotive brand.
-              </p>
-            )}
+            {/* Standalone Disclaimer Section — driven by the admin-set
+                `disclaimer` field so ANY product can have one, not just the
+                brake caliper lamp. Falls back to the old hardcoded caliper
+                text only when that product's disclaimer field is still
+                empty, so nothing regresses before someone fills it in. */}
+            {(() => {
+              const isCaliperLamp = (product.productName || "").toLowerCase().includes("caliper");
+              const disclaimerText =
+                product.disclaimer?.trim() ||
+                (isCaliperLamp
+                  ? "This product is an aftermarket decorative lamp inspired by automotive brake disc designs. Urbannook is not affiliated with, endorsed by, or connected to BMW, Porsche, Lamborghini, or any other automotive brand."
+                  : "");
+              if (!disclaimerText) return null;
+              return (
+                <p className="text-[12px] leading-relaxed text-gray-400 italic font-light">
+                  <strong className="text-[#F5DEB3]/70 not-italic mr-1">Disclaimer:</strong>
+                  {disclaimerText}
+                </p>
+              );
+            })()}
           </div>
         </div>
 
@@ -1254,7 +1305,7 @@ const ProductDetailPage = () => {
         <ComparisonTable productName={product.productName} />
 
         {/* ===== REAL-LIFE SETUP SHOWCASE (lazy-mounted marquee) ===== */}
-        <SetupShowcase items={SETUP_SHOWCASE_ITEMS} />
+        {/* <SetupShowcase items={SETUP_SHOWCASE_ITEMS} /> */}
 
         {/* ===== REVIEWS SECTION ===== */}
         <div className="mt-8 pt-4 ">
