@@ -155,6 +155,28 @@ const ProductDetailPage = () => {
   const [activeAccordion, setActiveAccordion] = useState("description");
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  // Drag/swipe slider — pointer events unify mouse-drag and touch-swipe in
+  // one handler set, so the same code drives it on desktop and mobile.
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isGalleryHovering, setIsGalleryHovering] = useState(false);
+  const [suppressSlideTransition, setSuppressSlideTransition] = useState(false);
+  // Autoplay is a desktop-only nicety — on mobile the customer's thumb is the
+  // primary way to browse images, and an automatic 1s cycle fighting a swipe
+  // gesture reads as "scrolling by itself, too fast." matchMedia (not a
+  // one-time innerWidth check) so rotating the phone updates it live.
+  const [isMobileViewport, setIsMobileViewport] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const handler = (e) => setIsMobileViewport(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+  const currentImageIndexRef = useRef(0);
+  const dragStartXRef = useRef(0);
+  const dragWidthRef = useRef(0);
   const [showSignup, setShowSignup] = useState(false);
   const [selectedVariant, setSelectedVariant] = useState("");
 
@@ -340,6 +362,56 @@ const ProductDetailPage = () => {
     setCurrentImageIndex(0);
   }, [selectedVariant]);
 
+  // Keeps a ref mirror of the current index so the interval below can read
+  // it synchronously without depending on (and re-creating the interval
+  // for) currentImageIndex itself.
+  useEffect(() => {
+    currentImageIndexRef.current = currentImageIndex;
+  }, [currentImageIndex]);
+
+  // Auto-advance the gallery every second — desktop only (see
+  // isMobileViewport above), and paused while the customer is actually
+  // interacting with it (mouse hovering, or mid-drag/swipe) so autoplay
+  // never fights a manual gesture. On mobile there's no autoplay at all —
+  // swipe is the only way to move between images there.
+  // Advances WITHOUT wrapping via modulo — it's allowed to walk one step past
+  // the last real image, onto a cloned copy of image 1 appended to the track
+  // (see `extendedGalleryImages`/`handleTrackTransitionEnd` below). Letting it
+  // slide forward onto the clone (instead of snapping backward to index 0)
+  // is what makes the loop look continuous instead of rewinding.
+  useEffect(() => {
+    if (isMobileViewport || galleryImages.length <= 1 || isGalleryHovering || isDragging) return;
+    const id = setInterval(() => {
+      setCurrentImageIndex(currentImageIndexRef.current + 1);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [isMobileViewport, galleryImages.length, isGalleryHovering, isDragging]);
+
+  // The instant the forward slide onto the cloned last-slot finishes, snap
+  // back to the real index 0 with the transition disabled. The clone and the
+  // real first image are pixel-identical, so this snap is invisible — unlike
+  // trying to time a CSS transition toggle around a backward jump, this only
+  // fires once the browser confirms the animation actually completed.
+  const handleTrackTransitionEnd = () => {
+    if (currentImageIndex >= galleryImages.length) {
+      setSuppressSlideTransition(true);
+      setCurrentImageIndex(0);
+    }
+  };
+  useEffect(() => {
+    if (!suppressSlideTransition) return;
+    const id = requestAnimationFrame(() => setSuppressSlideTransition(false));
+    return () => cancelAnimationFrame(id);
+  }, [suppressSlideTransition]);
+
+  // The track renders one extra slide (a clone of image 1) after the real
+  // last image, purely so autoplay has somewhere to slide FORWARD into
+  // instead of snapping backward.
+  const extendedGalleryImages = useMemo(
+    () => (galleryImages.length > 1 ? [...galleryImages, galleryImages[0]] : galleryImages),
+    [galleryImages]
+  );
+
   // Track product view ONCE per product. Switching variant/color must NOT re-fire
   // ViewContent (that inflated it 2-5x); variant interest is captured by the separate
   // trackVariantSelect event. Guard on the product id so only a genuine new product fires.
@@ -385,14 +457,31 @@ const ProductDetailPage = () => {
     window.scrollTo(0, 0);
   }, []);
 
-  const nextImage = () => {
-    setCurrentImageIndex((prev) => (prev + 1) % galleryImages.length);
+  const handleImageDragStart = (e) => {
+    if (galleryImages.length <= 1) return;
+    setIsDragging(true);
+    dragStartXRef.current = e.clientX;
+    dragWidthRef.current = e.currentTarget.offsetWidth || 1;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
   };
-
-  const prevImage = () => {
-    setCurrentImageIndex(
-      (prev) => (prev - 1 + galleryImages.length) % galleryImages.length,
-    );
+  const handleImageDragMove = (e) => {
+    if (!isDragging) return;
+    let dx = e.clientX - dragStartXRef.current;
+    // Resistance at the ends — can't endlessly drag past the first/last image.
+    if (currentImageIndex === 0 && dx > 0) dx *= 0.35;
+    if (currentImageIndex === galleryImages.length - 1 && dx < 0) dx *= 0.35;
+    setDragOffset(dx);
+  };
+  const handleImageDragEnd = () => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    const threshold = dragWidthRef.current * 0.15;
+    if (dragOffset <= -threshold && currentImageIndex < galleryImages.length - 1) {
+      setCurrentImageIndex((i) => i + 1);
+    } else if (dragOffset >= threshold && currentImageIndex > 0) {
+      setCurrentImageIndex((i) => i - 1);
+    }
+    setDragOffset(0);
   };
 
   const handleInitialAddToCart = async () => {
@@ -777,52 +866,46 @@ const ProductDetailPage = () => {
             className="lg:col-span-6 max-w-[500px] w-full lg:sticky lg:top-24 flex flex-col items-start"
           >
             <div className="relative max-w-[500px] aspect-square md:aspect-auto md:h-[520px] rounded-2xl overflow-hidden shadow-2xl group w-full bg-[#e8e6e1]">
-              <div className="w-full h-full relative cursor-pointer flex items-center justify-center">
+              <div
+                className={`w-full h-full relative flex ${galleryImages.length > 1 ? "cursor-grab active:cursor-grabbing" : ""}`}
+                style={{ touchAction: "pan-y" }}
+                onPointerDown={handleImageDragStart}
+                onPointerMove={handleImageDragMove}
+                onPointerUp={handleImageDragEnd}
+                onPointerLeave={(e) => { handleImageDragEnd(e); setIsGalleryHovering(false); }}
+                onPointerCancel={handleImageDragEnd}
+                onMouseEnter={() => setIsGalleryHovering(true)}
+              >
                 <Suspense
                   fallback={
                     <div className="w-full h-full bg-gray-200 animate-pulse rounded-lg"></div>
                   }
                 >
-                  {galleryImages.map((img, idx) => (
-                    <div
-                      key={idx}
-                      className="absolute inset-0 flex items-center justify-center"
-                      style={{
-                        opacity: idx === currentImageIndex ? 1 : 0,
-                        transition: "opacity 600ms cubic-bezier(0.4, 0, 0.2, 1)",
-                        willChange: "opacity",
-                        pointerEvents:
-                          idx === currentImageIndex ? "auto" : "none",
-                      }}
-                    >
-                      <OptimizedImage
-                        src={img || "/placeholder.jpg"}
-                        alt={product.productName}
-                        className="object-contain"
-                        loading={idx === 0 ? "eager" : "lazy"}
-                      />
-                    </div>
-                  ))}
+                  <div
+                    className="flex w-full h-full"
+                    onTransitionEnd={handleTrackTransitionEnd}
+                    style={{
+                      transform: `translateX(calc(${-currentImageIndex * 100}% + ${dragOffset}px))`,
+                      transition: (isDragging || suppressSlideTransition) ? "none" : "transform 400ms cubic-bezier(0.4, 0, 0.2, 1)",
+                    }}
+                  >
+                    {extendedGalleryImages.map((img, idx) => (
+                      <div
+                        key={idx}
+                        className="w-full h-full shrink-0 flex items-center justify-center"
+                      >
+                        <OptimizedImage
+                          src={img || "/placeholder.jpg"}
+                          alt={product.productName}
+                          className="object-contain pointer-events-none select-none"
+                          loading={idx === 0 ? "eager" : "lazy"}
+                          draggable={false}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </Suspense>
               </div>
-
-              {galleryImages.length > 1 && (
-                <>
-                  <button
-                    onClick={prevImage}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full border border-[#1c3026]/10 flex items-center justify-center text-[#1c3026] bg-white/20 backdrop-blur-sm hover:bg-[#1c3026] hover:text-[#F5DEB3] transition-all z-20"
-                  >
-                    <i className="fa-solid fa-arrow-left text-sm"></i>
-                  </button>
-                  <button
-                    onClick={nextImage}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full border border-[#1c3026]/10 flex items-center justify-center text-[#1c3026] bg-white/20 backdrop-blur-sm hover:bg-[#1c3026] hover:text-[#F5DEB3] transition-all z-20"
-                  >
-                    <i className="fa-solid fa-arrow-right text-sm"></i>
-                  </button>
-                </>
-              )}
-
             </div>
 
             {/* Dot indicators — below the image box, small; active one is a
@@ -836,7 +919,11 @@ const ProductDetailPage = () => {
                     aria-label={`View image ${idx + 1}`}
                     style={{ transition: "width 400ms cubic-bezier(0.4,0,0.2,1), background-color 400ms ease" }}
                     className={`h-1.5 rounded-full ${
-                      idx === currentImageIndex
+                      // Modulo, not a direct match — autoplay briefly pushes
+                      // currentImageIndex to galleryImages.length (the cloned
+                      // slide) while sliding forward, and that clone IS
+                      // visually image 1, so its dot should still light up.
+                      idx === currentImageIndex % galleryImages.length
                         ? "w-4 bg-[#F5DEB3]"
                         : "w-1.5 bg-[#F5DEB3]/25 hover:bg-[#F5DEB3]/50"
                     }`}
@@ -905,7 +992,14 @@ const ProductDetailPage = () => {
                           setSelectedVariant(variantName);
                           if (galleryImages[idx]) setCurrentImageIndex(idx);
                           trackVariantSelect({ itemId: product.productId, itemName: product.productName, variantName, price: currentPrice });
-                          navigate(`/product/${productId}/${detail.sku || variantName}`);
+                          // replace, not push — switching variants updates the
+                          // URL's SKU segment for sharing/refresh, but must NOT
+                          // add a browser-history entry. Otherwise the back
+                          // button (or a mobile back-swipe) just cycles
+                          // through previously-viewed variants on this same
+                          // page instead of leaving it, since each variant
+                          // click would otherwise push a new history entry.
+                          navigate(`/product/${productId}/${detail.sku || variantName}`, { replace: true });
                         }}
                         className={`group flex items-center gap-1.5 px-2.5 py-2 rounded-xl border transition-all duration-300 ${
                           isSelected
@@ -1309,20 +1403,25 @@ const ProductDetailPage = () => {
 
         {/* ===== REVIEWS SECTION ===== */}
         <div className="mt-8 pt-4 ">
-          {/* Header row — eyebrow + heading. The "Write a Review" action now
-              lives only in the 1d summary block below (top button removed to
-              avoid duplication); functionality is identical. */}
-          <div className="mb-7">
-            <div className="mb-2">
-              <span className="text-[#F5DEB3] font-bold tracking-[0.2em] uppercase text-[10px]">
-                Customer Reviews
-              </span>
+          {/* Header row — eyebrow + heading. Only makes sense once this
+              product actually has reviews to show off; hidden otherwise so
+              a brand-new product doesn't claim customers already "said"
+              anything. The "Write a Review" action lives only in the 1d
+              summary block below (top button removed to avoid duplication);
+              functionality is identical. */}
+          {reviewsData?.data?.totalReviews > 0 && (
+            <div className="mb-7">
+              <div className="mb-2">
+                <span className="text-[#F5DEB3] font-bold tracking-[0.2em] uppercase text-[10px]">
+                  Customer Reviews
+                </span>
+              </div>
+              <h2 className="text-3xl lg:text-4xl font-serif text-white">
+                What our customers{" "}
+                <span className="italic text-[#F5DEB3]">say.</span>
+              </h2>
             </div>
-            <h2 className="text-3xl lg:text-4xl font-serif text-white">
-              What our customers{" "}
-              <span className="italic text-[#F5DEB3]">say.</span>
-            </h2>
-          </div>
+          )}
 
           {/* Review Form — full width, above the two-column grid */}
           <div id="review-form-anchor"></div>

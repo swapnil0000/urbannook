@@ -175,7 +175,9 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-bold text-black truncate">{displayName}</p>
                     {item.selectedVariant && item.selectedVariant !== "N/A" && (
-                      <p className="text-[10px] text-black/50">{item.selectedVariant}</p>
+                      <span className="inline-block mt-0.5 mb-0.5 px-2 py-0.5 rounded-full bg-[#1c3026] text-white text-[10px] font-semibold">
+                        {item.selectedVariant}
+                      </span>
                     )}
                     <p className="text-[10px] text-black/50">Qty {itemQty(item.quantity)}</p>
                   </div>

@@ -1638,7 +1638,11 @@ const CheckoutPage = () => {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-semibold text-gray-800 truncate">{displayName}</p>
-                          {item.selectedVariant && item.selectedVariant !== "N/A" && <p className="text-[10px] text-gray-400">{item.selectedVariant}</p>}
+                          {item.selectedVariant && item.selectedVariant !== "N/A" && (
+                            <span className="inline-block mt-1 mb-0.5 px-2 py-0.5 rounded-full bg-[#2e443c] text-white text-[10px] font-semibold">
+                              {item.selectedVariant}
+                            </span>
+                          )}
                           <p className="text-[10px] text-gray-400">Qty {item.quantity}</p>
                         </div>
                         {(() => {
@@ -1885,7 +1889,9 @@ const CheckoutPage = () => {
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-gray-800 truncate leading-tight">{displayName}</p>
                     {item.selectedVariant && item.selectedVariant !== "N/A" && (
-                      <p className="text-[10px] text-gray-400 mt-0.5">{item.selectedVariant}</p>
+                      <span className="inline-block mt-1 mb-0.5 px-2 py-0.5 rounded-full bg-[#2e443c] text-white text-[10px] font-semibold">
+                        {item.selectedVariant}
+                      </span>
                     )}
                   </div>
                   {(() => {

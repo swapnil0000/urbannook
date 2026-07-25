@@ -298,23 +298,19 @@ const CartDrawer = ({ isOpen, onClose }) => {
                             </p>
                           )}
 
-                          {/* Variant Selection (If Exists) */}
+                          {/* Variant Selection (If Exists) — was a color dot
+                              guessed from the variant name (e.g. background:
+                              "tanjiro", invalid CSS → renders blank) instead
+                              of an actual swatch. A plain dark pill is
+                              correct here regardless of variant type. */}
                           {(() => {
                             const itemVariant = item.selectedVariant || 'N/A';
                             if (!itemVariant || itemVariant === 'N/A') return null;
 
                             return (
-                              <div className="flex items-center gap-1.5 mt-1">
-                                <div
-                                  className="w-2.5 h-2.5 rounded-full border border-gray-200 shadow-sm shrink-0"
-                                  style={{
-                                    background: itemVariant.toLowerCase() === 'rainbow'
-                                      ? 'linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)'
-                                      : itemVariant.replace(/\s+/g, '').toLowerCase()
-                                  }}
-                                ></div>
-                                <span className="text-xs text-gray-400 font-medium tracking-wide">{itemVariant}</span>
-                              </div>
+                              <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-[#1c3026] text-white text-[10px] font-semibold tracking-wide">
+                                {itemVariant}
+                              </span>
                             );
                           })()}
                         </div>
