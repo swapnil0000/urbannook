@@ -492,7 +492,7 @@ const ComparisonTable = ({ productName }) => {
           style={{
             textAlign: "center",
             margin: "28px 0 0",
-            fontSize: 13,
+            fontSize: 10,
             color: "rgba(255,255,255,0.45)",
           }}
         >

@@ -8,6 +8,7 @@ import {
   useGetAllFreeShippingBannersQuery,
 } from '../../store/api/userApi';
 import { updateQuantity, removeItem } from '../../store/slices/cartSlice';
+import { resolveVariantTitle } from '../../utils/variantTitle';
 import { setShowLoginModal, setLoginCallback } from '../../store/slices/uiSlice';
 import { trackViewCart, trackRemoveFromCart, track } from '../../utils/analytics';
 import FreeShippingBanner from '../FreeShippingBanner';
@@ -253,29 +254,30 @@ const CartDrawer = ({ isOpen, onClose }) => {
                   // Mongoose bug safe extraction
                   const itemQty = typeof item.quantity === 'object' ? Number(item.quantity?.quantity || 0) : Number(item.quantity || 0);
                   const itemId = item.mongoId || item.productId || item.id;
+                  const displayName = resolveVariantTitle(item.name, item.variantTitleTemplate, item.selectedVariant);
 
                   return (
                     <div key={`${itemId}-${item.selectedVariant || 'N/A'}`} className="flex items-stretch gap-4 group relative pb-6 border-b border-gray-50 last:border-0 last:pb-0">
-                      
+
                       {/* Image */}
                       <div className="w-[85px] h-[85px] bg-gray-50 rounded-2xl overflow-hidden shrink-0 relative border border-gray-100 flex items-center justify-center">
                         <Suspense fallback={<div className="w-full h-full bg-gray-100 animate-pulse"></div>}>
                           <OptimizedImage
                             src={item.image || '/placeholder.jpg'}
-                            alt={item.name}
+                            alt={displayName}
                             className="w-full h-full object-contain mix-blend-multiply"
                             loading="lazy"
                           />
                         </Suspense>
                       </div>
-                      
+
                       {/* Details */}
                       <div className="flex-1 flex flex-col min-w-0">
                         <div>
                           {/* Name & Delete */}
                           <div className="flex justify-between items-start mb-1">
                             <h4 className="text-base font-serif text-[#0a110e] leading-snug pr-4 hover:text-emerald-700 transition-colors cursor-pointer">
-                              {item.name}
+                              {displayName}
                             </h4>
                             <button 
                               onClick={() => handleRemoveItem(itemId, item.selectedVariant, item.mongoId)}
@@ -296,23 +298,19 @@ const CartDrawer = ({ isOpen, onClose }) => {
                             </p>
                           )}
 
-                          {/* Variant Selection (If Exists) */}
+                          {/* Variant Selection (If Exists) — was a color dot
+                              guessed from the variant name (e.g. background:
+                              "tanjiro", invalid CSS → renders blank) instead
+                              of an actual swatch. A plain dark pill is
+                              correct here regardless of variant type. */}
                           {(() => {
                             const itemVariant = item.selectedVariant || 'N/A';
                             if (!itemVariant || itemVariant === 'N/A') return null;
 
                             return (
-                              <div className="flex items-center gap-1.5 mt-1">
-                                <div
-                                  className="w-2.5 h-2.5 rounded-full border border-gray-200 shadow-sm shrink-0"
-                                  style={{
-                                    background: itemVariant.toLowerCase() === 'rainbow'
-                                      ? 'linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)'
-                                      : itemVariant.replace(/\s+/g, '').toLowerCase()
-                                  }}
-                                ></div>
-                                <span className="text-xs text-gray-400 font-medium tracking-wide">{itemVariant}</span>
-                              </div>
+                              <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-[#1c3026] text-white text-[10px] font-semibold tracking-wide">
+                                {itemVariant}
+                              </span>
                             );
                           })()}
                         </div>

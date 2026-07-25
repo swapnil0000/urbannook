@@ -7,6 +7,7 @@ import {
   useUpdateCartMutation,
 } from "../../store/api/userApi";
 import { removeItem } from "../../store/slices/cartSlice";
+import { resolveVariantTitle } from "../../utils/variantTitle";
 import FreeShippingBanner from "../FreeShippingBanner";
 
 /**
@@ -149,30 +150,34 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
             <p className="text-center text-sm text-black/50 py-8">Your cart is empty</p>
           ) : (
             <div className="flex flex-col gap-3">
-              {cartItems.map((item, idx) => (
+              {cartItems.map((item, idx) => {
+                const displayName = resolveVariantTitle(item.name, item.variantTitleTemplate, item.selectedVariant);
+                return (
                 <div key={`${item.id || item.mongoId}-${item.selectedVariant || idx}`} className="flex items-center gap-3">
                   {/* Outer wrapper is NOT overflow-hidden so the remove badge can
                       poke out past the top-left corner; the inner div clips the
                       image to rounded corners. */}
                   <div className="relative shrink-0 w-12 h-12">
                     <div className="w-full h-full rounded-lg overflow-hidden border border-black/10 bg-white">
-                      <img src={item.image || "/placeholder.jpg"} alt={item.name} className="w-full h-full object-contain" />
+                      <img src={item.image || "/placeholder.jpg"} alt={displayName} className="w-full h-full object-contain" />
                     </div>
                     {/* Remove — top-left of the thumbnail. Lets the customer
                         drop a product they don't want right from the mini-cart. */}
                     <button
                       onClick={() => handleRemoveItem(item)}
-                      title={`Remove ${item.name}`}
-                      aria-label={`Remove ${item.name}`}
+                      title={`Remove ${displayName}`}
+                      aria-label={`Remove ${displayName}`}
                       className="absolute -top-1.5 -left-1.5 z-10 w-5 h-5 flex items-center justify-center rounded-full bg-[#f5deb3] border border-[#e0c896] shadow-sm text-[#1c3026] hover:bg-[#E63329] hover:text-white hover:border-[#E63329] transition-colors"
                     >
                       <i className="fa-solid fa-xmark text-[9px]" />
                     </button>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold text-black truncate">{item.name}</p>
+                    <p className="text-xs font-bold text-black truncate">{displayName}</p>
                     {item.selectedVariant && item.selectedVariant !== "N/A" && (
-                      <p className="text-[10px] text-black/50">{item.selectedVariant}</p>
+                      <span className="inline-block mt-0.5 mb-0.5 px-2 py-0.5 rounded-full bg-[#1c3026] text-white text-[10px] font-semibold">
+                        {item.selectedVariant}
+                      </span>
                     )}
                     <p className="text-[10px] text-black/50">Qty {itemQty(item.quantity)}</p>
                   </div>
@@ -200,7 +205,8 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
                     );
                   })()}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
 

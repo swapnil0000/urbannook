@@ -20,6 +20,7 @@ import {
 import { setShowLoginModal, setLoginCallback } from "../store/slices/uiSlice";
 import { useUI } from "../hooks/useRedux";
 import { clearCart, removeItem } from "../store/slices/cartSlice";
+import { resolveVariantTitle } from "../utils/variantTitle";
 import { fetchCsrfToken } from "../store/api/apiSlice";
 import CouponInput from "../component/CouponInput";
 import FreeShippingBanner from "../component/FreeShippingBanner";
@@ -644,9 +645,9 @@ const CheckoutPage = () => {
           // rule's free_shipping effect, or the cart-value threshold is
           // enough — mirrors the OR logic in rp.payment.controller.js exactly.
           const isFreeShippingEligible = comboEligible || !!cartRuleEvalData?.data?.freeShipping || thresholdEligible;
-          console.log(
-            `[FreeShipping][Client] cartIds=[${[...cartProductIds].join(",")}] isActive=${offerConfig?.isActive} comboEligible=${comboEligible} ruleEligible=${!!cartRuleEvalData?.data?.freeShipping} thresholdEligible=${thresholdEligible} → eligible=${isFreeShippingEligible}`,
-          );
+          // console.log(
+          //   `[FreeShipping][Client] cartIds=[${[...cartProductIds].join(",")}] isActive=${offerConfig?.isActive} comboEligible=${comboEligible} ruleEligible=${!!cartRuleEvalData?.data?.freeShipping} thresholdEligible=${thresholdEligible} → eligible=${isFreeShippingEligible}`,
+          // );
           // realAmount = actual carrier rate, always — this is what the COD
           // 2x-advance must be based on (matches the server's realShippingAmount).
           // amount = what the customer's total/display reflects — 0 when free
@@ -1618,24 +1619,30 @@ const CheckoutPage = () => {
                 </div>
                 <div className="border-t border-gray-50">
                   <div className="divide-y divide-gray-50 max-h-64 overflow-y-auto">
-                    {cartItems.map((item) => (
+                    {cartItems.map((item) => {
+                      const displayName = resolveVariantTitle(item.name, item.variantTitleTemplate, item.selectedVariant);
+                      return (
                       <div key={`${item.id}-${item.selectedVariant || "default"}`} className="flex items-center gap-3 px-5 py-3">
                         <div className="relative shrink-0">
                           <div className="w-10 h-10 rounded-lg bg-gray-50 border border-gray-100 overflow-hidden">
-                            <img src={item.image || "/placeholder.jpg"} alt={item.name} className="w-full h-full object-contain mix-blend-multiply" />
+                            <img src={item.image || "/placeholder.jpg"} alt={displayName} className="w-full h-full object-contain mix-blend-multiply" />
                           </div>
                           <button
                             onClick={() => handleRemoveItem(item.id, item.selectedVariant)}
-                            title={`Remove ${item.name}`}
-                            aria-label={`Remove ${item.name}`}
+                            title={`Remove ${displayName}`}
+                            aria-label={`Remove ${displayName}`}
                             className="absolute -top-1.5 -left-1.5 z-10 w-5 h-5 flex items-center justify-center rounded-full bg-[#f5deb3] border border-[#e0c896] shadow-sm text-[#1c3026] hover:bg-[#E63329] hover:text-white hover:border-[#E63329] transition-colors"
                           >
                             <i className="fa-solid fa-xmark text-[9px]" />
                           </button>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold text-gray-800 truncate">{item.name}</p>
-                          {item.selectedVariant && item.selectedVariant !== "N/A" && <p className="text-[10px] text-gray-400">{item.selectedVariant}</p>}
+                          <p className="text-xs font-semibold text-gray-800 truncate">{displayName}</p>
+                          {item.selectedVariant && item.selectedVariant !== "N/A" && (
+                            <span className="inline-block mt-1 mb-0.5 px-2 py-0.5 rounded-full bg-[#2e443c] text-white text-[10px] font-semibold">
+                              {item.selectedVariant}
+                            </span>
+                          )}
                           <p className="text-[10px] text-gray-400">Qty {item.quantity}</p>
                         </div>
                         {(() => {
@@ -1660,7 +1667,8 @@ const CheckoutPage = () => {
                           );
                         })()}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   <div className="px-5 py-4 border-t border-gray-50"><PriceRows subtotal={pricingDetails.subtotal} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} isLoadingShipping={isCalculatingShipping} paymentMethod={paymentMethod} /></div>
                 </div>
@@ -1858,28 +1866,32 @@ const CheckoutPage = () => {
 
             {/* Items */}
             <div className="divide-y divide-gray-50 max-h-[260px] overflow-y-auto" style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}>
-              {cartItems.map((item) => (
+              {cartItems.map((item) => {
+                const displayName = resolveVariantTitle(item.name, item.variantTitleTemplate, item.selectedVariant);
+                return (
                 <div key={`${item.id}-${item.selectedVariant || "default"}`} className="flex items-center gap-3 px-5 py-3.5 group hover:bg-gray-50/60 transition-colors">
                   <div className="relative shrink-0">
                     <div className="w-12 h-12 rounded-xl bg-gray-50 border border-gray-100 overflow-hidden">
-                      <img src={item.image || "/placeholder.jpg"} alt={item.name} className="w-full h-full object-contain mix-blend-multiply" />
+                      <img src={item.image || "/placeholder.jpg"} alt={displayName} className="w-full h-full object-contain mix-blend-multiply" />
                     </div>
                     <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-[#2e443c] rounded-full flex items-center justify-center">
                       <span className="text-[9px] font-bold text-white">{item.quantity}</span>
                     </div>
                     <button
                       onClick={() => handleRemoveItem(item.id, item.selectedVariant)}
-                      title={`Remove ${item.name}`}
-                      aria-label={`Remove ${item.name}`}
+                      title={`Remove ${displayName}`}
+                      aria-label={`Remove ${displayName}`}
                       className="absolute -top-1.5 -left-1.5 z-10 w-5 h-5 flex items-center justify-center rounded-full bg-[#f5deb3] border border-[#e0c896] shadow-sm text-[#1c3026] hover:bg-[#E63329] hover:text-white hover:border-[#E63329] transition-colors"
                     >
                       <i className="fa-solid fa-xmark text-[9px]" />
                     </button>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-gray-800 truncate leading-tight">{item.name}</p>
+                    <p className="text-xs font-semibold text-gray-800 truncate leading-tight">{displayName}</p>
                     {item.selectedVariant && item.selectedVariant !== "N/A" && (
-                      <p className="text-[10px] text-gray-400 mt-0.5">{item.selectedVariant}</p>
+                      <span className="inline-block mt-1 mb-0.5 px-2 py-0.5 rounded-full bg-[#2e443c] text-white text-[10px] font-semibold">
+                        {item.selectedVariant}
+                      </span>
                     )}
                   </div>
                   {(() => {
@@ -1906,7 +1918,8 @@ const CheckoutPage = () => {
                     );
                   })()}
                 </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Price */}

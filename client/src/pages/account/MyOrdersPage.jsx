@@ -6,6 +6,7 @@ import { useOrderHistoryQuery } from "../../store/api/userApi";
 import { ComponentLoader } from "../../component/layout/LoadingSpinner";
 import { useUI } from "../../hooks/useRedux";
 import { getApiUrl } from "../../config/appUrls";
+import { resolveVariantTitle } from "../../utils/variantTitle";
 
 // Lazy load heavy components
 const OrderTracker = lazy(() => import("../../component/OrderTracker"));
@@ -343,14 +344,20 @@ const MyOrdersPage = () => {
 
                       <div className="grid gap-3 mt-6">
                         <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#2e443c] mb-1 px-1">Purchased Artifacts</h4>
-                        {order.items.map((item, i) => (
+                        {order.items.map((item, i) => {
+                          const displayName = resolveVariantTitle(
+                            item.productSnapshot?.productName || "Product",
+                            item.productSnapshot?.variantTitleTemplate,
+                            item.productSnapshot?.selectedVariant,
+                          );
+                          return (
                           <div key={i} className="flex gap-4 items-center bg-white p-3 rounded-xl border border-gray-100">
                             <div className="w-14 h-14 rounded-lg bg-gray-50 p-2 shrink-0 border border-gray-100">
-                              <img src={item.productSnapshot?.productImg || "/placeholder.jpg"} alt={item.productSnapshot?.productName} className="w-full h-full object-contain" />
+                              <img src={item.productSnapshot?.productImg || "/placeholder.jpg"} alt={displayName} className="w-full h-full object-contain" />
                             </div>
                             <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                               <div>
-                                <h4 className="text-[#2e443c] font-medium text-xs md:text-sm truncate">{item.productSnapshot?.productName || "Product"}</h4>
+                                <h4 className="text-[#2e443c] font-medium text-xs md:text-sm truncate">{displayName}</h4>
                                 <div className="flex items-center gap-2 mt-1">
                                 <div className="px-2 py-0.5 rounded bg-gray-50 border border-gray-100 text-[9px] text-gray-500 font-bold">Qty: {item.quantity}</div>
                                 {item.productSnapshot?.selectedVariant && item.productSnapshot.selectedVariant !== 'N/A' && (
@@ -364,7 +371,8 @@ const MyOrdersPage = () => {
                               </div>
                             </div>
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
 
                       {/* Footer Total */}
