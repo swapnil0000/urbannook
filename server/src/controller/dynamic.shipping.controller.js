@@ -14,10 +14,10 @@ const dynamicShippingCal = asyncHandler(async (req, res) => {
   const { deliveryPinCode, userPincode, cartItems, paymentType } = req.body;
   const pincode = deliveryPinCode || userPincode;
 
-  console.log("[CONTROLLER] Extracted Parameters:");
-  console.log("  - Pincode:", pincode);
-  console.log("  - Payment Type:", paymentType || "PREPAID");
-  console.log("  - Cart Items:", cartItems?.length, "items");
+  // console.log("[CONTROLLER] Extracted Parameters:");
+  // console.log("  - Pincode:", pincode);
+  // console.log("  - Payment Type:", paymentType || "PREPAID");
+  // console.log("  - Cart Items:", cartItems?.length, "items");
 
   if (!pincode) {
     console.error("[CONTROLLER] ❌ Validation Error: Pincode is missing");
@@ -35,7 +35,7 @@ const dynamicShippingCal = asyncHandler(async (req, res) => {
     );
   }
 
-  console.log("[CONTROLLER] ✓ Validation passed, calling calculateShippingRate service...\n");
+  // console.log("[CONTROLLER] ✓ Validation passed, calling calculateShippingRate service...\n");
 
   const selectedService = await calculateShippingRate({ 
     pincode, 
@@ -44,8 +44,8 @@ const dynamicShippingCal = asyncHandler(async (req, res) => {
   });
 
   console.log("\n[CONTROLLER] Service returned result:", JSON.stringify(selectedService, null, 2));
-  console.log("[CONTROLLER] Sending response to client");
-  console.log("*".repeat(80) + "\n");
+  // console.log("[CONTROLLER] Sending response to client");
+  // console.log("*".repeat(80) + "\n");
 
   return res.status(200).json(
     new ApiRes(200, "Shipping rate calculated successfully", selectedService, true)
