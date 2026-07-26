@@ -28,13 +28,9 @@ const AllProductsPage = () => {
   const displayProducts = useMemo(() => {
     let sorted = products.map(p => {
       const firstVariantPrice = p.variantDetails?.[0]?.variantPrice || 0;
-      // Highest-priced variant of this product — same reference the PDP uses
-      // for the struck "compare-at" price, so the two pages agree.
-      const maxVariantPrice = Math.max(...(p.variantDetails || []).map(v => v.variantPrice || 0), 0);
       return {
         ...p,
         effectivePrice: firstVariantPrice,
-        maxVariantPrice,
       };
     });
 
@@ -178,11 +174,8 @@ const AllProductsPage = () => {
                           
                           {/* --- Available Variants Section --- */}
                           {(() => {
-                            const availableVariants = (product?.variantDetails && product.variantDetails.length > 0)
-                              ? product.variantDetails.map(v => v.variantName)
-                              : (product?.color || []);
-
-                            if (availableVariants.length === 0) return null;
+                            const variantDetails = product?.variantDetails || [];
+                            if (variantDetails.length === 0) return null;
 
                             return (
                               <div className="mb-3">
@@ -191,52 +184,47 @@ const AllProductsPage = () => {
                                 </span>
                                 <div className="flex flex-wrap gap-1.5 items-center">
                                   {/* Sirf pehle 5 variants dikhayenge */}
-                                  {availableVariants.slice(0, 5).map((variantName, idx) => {
-                                    // Brand variants (BMW / Porsche / Lambo) aren't CSS colours, so
-                                    // the old `backgroundColor: "bmw"` produced an empty white circle.
-                                    // Show the brand logo for those; keep the colour swatch for real
-                                    // colour variants. Logos are hosted URLs (not bundled assets).
-                                    const lower = variantName.toLowerCase();
-                                    const brandLogo = lower.includes('bmw')
-                                      ? 'https://upload.wikimedia.org/wikipedia/commons/4/44/BMW.svg'
-                                      : lower.includes('porsche')
-                                        ? 'https://pngimg.com/uploads/porsche_logo/porsche_logo_PNG1.png'
-                                        : lower.includes('lambo')
-                                          ? 'https://upload.wikimedia.org/wikipedia/en/d/df/Lamborghini_Logo.svg'
-                                          : null;
+                                  {variantDetails.slice(0, 5).map((detail, idx) => {
+                                    const variantName = detail.variantName;
+                                    // Admin picks the swatch explicitly per variant
+                                    // (image URL, falling back to the variant's own
+                                    // photo — or a flat CSS colour) — same source of
+                                    // truth as the PDP's variant selector, instead of
+                                    // guessing a CSS colour from the name (which
+                                    // rendered blank for anything that wasn't a
+                                    // literal colour word, e.g. every anime character).
+                                    const swatchType = detail.variantSwatchType === "color" ? "color" : "image";
+                                    const swatchValue =
+                                      (detail.variantSwatchValue && detail.variantSwatchValue.trim()) ||
+                                      (swatchType === "image" ? detail.variantImage?.[0] : "");
                                     const goToVariant = (e) => {
                                       e.stopPropagation();
-                                      const vSku = product.variantDetails?.find(v => v.variantName === variantName)?.sku;
-                                      navigate(`/product/${product.productId}/${vSku || variantName}`);
+                                      navigate(`/product/${product.productId}/${detail.sku || variantName}`);
                                     };
-                                    return brandLogo ? (
-                                      <img
-                                        key={idx}
-                                        src={brandLogo}
-                                        alt={variantName}
-                                        title={variantName}
-                                        onClick={goToVariant}
-                                        className="w-4 h-4 rounded-full object-contain bg-white border border-[#d1d5db] shadow-sm transition-transform hover:scale-110 cursor-pointer"
-                                      />
-                                    ) : (
+                                    return (
                                       <div
-                                        key={idx}
+                                        key={detail._id || idx}
                                         title={variantName}
                                         onClick={goToVariant}
-                                        className="w-4 h-4 rounded-full border border-[#d1d5db] shadow-sm transition-transform hover:scale-110 cursor-pointer"
-                                        style={
-                                          lower === 'rainbow'
-                                            ? { background: 'linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)' }
-                                            : { backgroundColor: variantName.replace(/\s+/g, '').toLowerCase() }
-                                        }
-                                      ></div>
+                                        className="w-4 h-4 rounded-full overflow-hidden border border-[#d1d5db] shadow-sm transition-transform hover:scale-110 cursor-pointer flex items-center justify-center bg-white"
+                                      >
+                                        {swatchType === "color" && swatchValue ? (
+                                          <span className="w-full h-full block" style={{ background: swatchValue }} />
+                                        ) : swatchValue ? (
+                                          <img src={swatchValue} alt={variantName} className="w-full h-full object-cover" />
+                                        ) : (
+                                          <span className="text-[7px] font-bold uppercase text-gray-400">
+                                            {variantName?.charAt(0)}
+                                          </span>
+                                        )}
+                                      </div>
                                     );
                                   })}
-                                  
+
                                   {/* 5 se zyada hone par +X dikhayenge */}
-                                  {availableVariants.length > 5 && (
+                                  {variantDetails.length > 5 && (
                                     <span className="text-[10px] font-medium text-gray-500 ml-1">
-                                      +{availableVariants.length - 5}
+                                      +{variantDetails.length - 5}
                                     </span>
                                   )}
                                 </div>
@@ -251,22 +239,11 @@ const AllProductsPage = () => {
                             <span className="text-lg md:text-xl font-semibold text-[#a89068]">
                               ₹{product.effectivePrice?.toLocaleString()}
                             </span>
-                            {(() => {
-                              // Struck "compare-at" price — SAME rule as the PDP:
-                              //  • a non-top variant (a pricier variant exists, e.g.
-                              //    BMW/Porsche below Lambo) → 18% markup;
-                              //  • the top/single variant (e.g. Lambo, Pen Stand) →
-                              //    25%-off reference (price / 0.75).
-                              const isTopVariant = product.effectivePrice >= product.maxVariantPrice;
-                              const strike = isTopVariant
-                                ? Math.round(product.effectivePrice / 0.75)
-                                : Math.round(product.effectivePrice * 1.18);
-                              return (
-                                <span className="text-xs text-gray-400 line-through">
-                                  ₹{strike.toLocaleString()}
-                                </span>
-                              );
-                            })()}
+                            {/* No struck "compare-at" price here — it used to be a
+                                fake 18%-markup/25%-markdown formula, not real admin
+                                data. The listing card only ever shows the base
+                                (first) variant's actual price now; the PDP is where
+                                a real per-variant MRP discount, when set, shows up. */}
                           </div>
                            
                         </div>
