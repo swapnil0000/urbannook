@@ -31,6 +31,10 @@ const SETUP_SHOWCASE_ITEMS = [
   { url: SETUP_SHOWCASE_IMG, quote: "Ordered a second one for my brother. Packaging was top notch.", author: "Rohit V." },
   { url: SETUP_SHOWCASE_IMG, quote: "Way brighter than I expected — genuinely a conversation starter.", author: "Sanya K." },
 ];
+
+// Struck-through MRP shown when a variant has no real variantMrp set yet —
+// see the strikePrice/discountPercent memo in the component below.
+const FALLBACK_MRP = 2000;
 // FreeShippingBanner render moved off the PDP into the cart — import kept
 // commented so restoring the PDP banner is a one-line change.
 // import FreeShippingBanner from "../../component/FreeShippingBanner";
@@ -243,31 +247,26 @@ const ProductDetailPage = () => {
     return 0;
   }, [product, selectedVariant]);
 
-  // TODO(pricing-migration): this strike price is SYNTHETIC — an 18% markup
-  // or 25% markdown formula, not a real admin-set value. The admin panel now
-  // has a real `variantDetails[].variantMrp` field (with a live discount-%
-  // calculator) that admins are filling in per variant. Once MRP data is
-  // populated across the catalog, switch this to read the selected variant's
-  // real `variantMrp` (fall back to this formula only where MRP is unset/0).
-  // Struck "compare-at" price + its discount %.
-  //  • Non-top variant (a pricier variant exists, e.g. BMW/Porsche below
-  //    Lambo) → 18% markup reference.
-  //  • Top/single variant (e.g. Lambo, or a single-variant product like the
-  //    Pen Stand) → 25%-off reference (price / 0.75).
+  // Struck "compare-at" price + its discount % — a direct read of the
+  // selected variant's real `variantMrp`/`variantPrice`. If a variant has no
+  // MRP set (or an invalid one that isn't actually higher than the price),
+  // falls back to a flat ₹2000 rather than a synthetic markup/markdown
+  // formula — a simple placeholder until every variant has a real MRP.
   const { strikePrice, discountPercent } = useMemo(() => {
     if (!product || !product.variantDetails || product.variantDetails.length === 0) {
       return { strikePrice: 0, discountPercent: 0 };
     }
-    const maxPrice = Math.max(...product.variantDetails.map(v => v.variantPrice || 0));
-    const isTopVariant = currentPrice >= maxPrice;
-    const strike = isTopVariant
-      ? Math.round(currentPrice / 0.75)
-      : Math.round(currentPrice * 1.18);
-    const discount = strike > currentPrice
-      ? Math.round(((strike - currentPrice) / strike) * 100)
-      : 0;
-    return { strikePrice: strike, discountPercent: discount };
-  }, [product, currentPrice]);
+
+    const selectedDetail =
+      product.variantDetails.find(v => v.variantName === selectedVariant) || product.variantDetails[0];
+    const realMrp = Number(selectedDetail?.variantMrp) || 0;
+    const mrp = realMrp > currentPrice ? realMrp : FALLBACK_MRP;
+    if (mrp <= currentPrice) {
+      return { strikePrice: 0, discountPercent: 0 };
+    }
+    const discount = Math.round(((mrp - currentPrice) / mrp) * 100);
+    return { strikePrice: mrp, discountPercent: discount };
+  }, [product, currentPrice, selectedVariant]);
 
   // Per-variant description — admin can set a distinct description per
   // variant (e.g. each anime-character katana has its own blurb). Falls back
