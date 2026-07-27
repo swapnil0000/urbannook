@@ -63,10 +63,10 @@ const CustomerSupportPage = () => {
 
 
     return (
-        <div className="bg-ink min-h-screen font-sans text-gray-200 selection:bg-brand selection:text-white">
+        <div className="bg-paper min-h-screen font-inter text-ink selection:bg-brand selection:text-white">
             {/* --- AMBIENT BACKGROUND --- */}
-            <div className="fixed top-0 left-0 w-full h-[600px] bg-gradient-to-b from-ink to-ink pointer-events-none opacity-60"></div>
-            <div className="fixed -bottom-40 -left-40 w-[600px] h-[600px] bg-brand rounded-full blur-[200px] opacity-[0.05] pointer-events-none"></div>
+            <div className="fixed top-0 left-0 w-full h-[600px] bg-gradient-to-b from-surface to-paper pointer-events-none opacity-60"></div>
+            <div className="fixed -bottom-40 -left-40 w-[600px] h-[600px] bg-brand rounded-full blur-[200px] opacity-[0.04] pointer-events-none"></div>
 
             <main className="max-w-5xl mx-auto pt-28 pb-20 px-4 md:px-8 relative z-10">
                 {/* --- HEADER --- */}
@@ -74,17 +74,17 @@ const CustomerSupportPage = () => {
                     <div>
                         <div className="flex items-center gap-3 mb-2">
                             <span className="h-[1px] w-8 bg-brand"></span>
-                            <span className="text-brand font-bold tracking-[0.2em] uppercase text-[10px]">Support</span>
+                            <span className="gl-lbl text-brand text-[10px]">Support</span>
                         </div>
-                        <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif text-white leading-tight">
-                            How can we <span className="italic text-brand">assist you?</span>
+                        <h1 className="text-4xl md:text-5xl lg:text-6xl font-archivo font-extrabold text-ink leading-tight">
+                            How can we <span className="text-brand">assist you?</span>
                         </h1>
                     </div>
                 </div>
 
                 {/* --- TAB SWITCHER --- */}
                 <div className="flex justify-start mb-8">
-                    <div className="bg-[#f5f7f8] p-1.5 rounded-full border border-white/5 backdrop-blur-md flex relative shadow-inner">
+                    <div className="bg-[#f5f7f8] p-1.5 rounded-full border border-hair backdrop-blur-md flex relative shadow-inner">
                         {['contact', 'faq'].map((tab) => (
                             <button
                                 key={tab}
@@ -108,7 +108,7 @@ const CustomerSupportPage = () => {
                         {/* Left: Interactive Form (LIGHT BOX) */}
                         <div className="lg:col-span-8 bg-[#f5f7f8] border border-transparent rounded-[24px] p-6 md:p-8 shadow-xl">
                             <div className="mb-8 border-b border-gray-200 pb-6">
-                                <h3 className="text-2xl font-serif text-ink mb-2">Send a Request</h3>
+                                <h3 className="text-2xl font-archivo font-bold text-ink mb-2">Send a Request</h3>
                                 <p className="text-sm text-gray-500 font-light">Our team typically responds within 2 hours.</p>
                             </div>
 
@@ -208,7 +208,7 @@ const CustomerSupportPage = () => {
                                         <i className="fa-solid fa-phone"></i>
                                     </div>
                                     <div>
-                                        <h4 className="text-ink font-serif text-lg mb-1 group-hover:text-brand transition-colors">Call Support</h4>
+                                        <h4 className="text-ink font-archivo font-bold text-lg mb-1 group-hover:text-brand transition-colors">Call Support</h4>
                                         <p className="text-brand font-mono text-sm mb-2 font-bold">+91 82996 38749</p>
                                         <p className="text-xs text-gray-500">Mon-Sat, 9AM - 7PM</p>
                                     </div>
@@ -222,7 +222,7 @@ const CustomerSupportPage = () => {
                                         <i className="fa-solid fa-envelope"></i>
                                     </div>
                                     <div>
-                                        <h4 className="text-ink font-serif text-lg mb-1 group-hover:text-brand transition-colors">Email Us</h4>
+                                        <h4 className="text-ink font-archivo font-bold text-lg mb-1 group-hover:text-brand transition-colors">Email Us</h4>
                                         <p className="text-brand font-mono text-sm mb-2 hover:underline font-bold">support@urbannook.in</p>
                                         <p className="text-xs text-gray-500">Guaranteed response in 24h</p>
                                     </div>
@@ -236,7 +236,7 @@ const CustomerSupportPage = () => {
                                         <i className="fa-brands fa-whatsapp text-xl"></i>
                                     </div>
                                     <div>
-                                        <h4 className="text-ink font-serif text-lg mb-1 group-hover:text-brand transition-colors">Chat on WhatsApp</h4>
+                                        <h4 className="text-ink font-archivo font-bold text-lg mb-1 group-hover:text-brand transition-colors">Chat on WhatsApp</h4>
                                         <p className="text-brand font-mono text-sm mb-2 font-bold">+91 82996 38749</p>
                                         <p className="text-xs text-gray-500">Available 24/7</p>
                                     </div>
@@ -256,7 +256,7 @@ const CustomerSupportPage = () => {
                                         onClick={() => setExpandedFaq(expandedFaq === index ? null : index)}
                                         className="w-full p-6 md:p-8 flex justify-between items-center text-left group hover:bg-white transition-colors"
                                     >
-                                        <span className={`text-base md:text-lg font-serif transition-colors ${
+                                        <span className={`text-base md:text-lg font-archivo font-bold transition-colors ${
                                             expandedFaq === index ? 'text-brand' : 'text-ink'
                                         }`}>
                                             {faq.question}
@@ -278,10 +278,10 @@ const CustomerSupportPage = () => {
                             ))}
                         </div>
                         <div className="mt-8 text-center">
-                            <p className="text-gray-400 text-xs uppercase tracking-widest mb-4">Still need help?</p>
+                            <p className="text-muted text-xs uppercase tracking-widest mb-4">Still need help?</p>
                             <button
                                 onClick={() => setActiveTab('contact')}
-                                className="text-brand border-b border-brand pb-1 hover:text-white hover:border-white transition-colors text-sm font-serif italic"
+                                className="text-brand border-b border-brand pb-1 hover:text-ink hover:border-ink transition-colors text-sm font-archivo"
                             >
                                 Write to us directly
                             </button>

@@ -20,6 +20,8 @@ import {
   catalogRouter,
   metaCapiRouter,
   adminAnalyticsRouter,
+  freeShippingOfferRouter,
+  passkeyRouter,
 } from "./routes/index.js";
 import cookieParser from "cookie-parser";
 import healthRouter from "./routes/health.route.js";
@@ -215,6 +217,8 @@ app.use(
   catalogRouter,
   metaCapiRouter,
   adminAnalyticsRouter,
+  freeShippingOfferRouter,
+  passkeyRouter,
 );
 
 app.use(errorHandler);

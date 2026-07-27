@@ -586,3 +586,71 @@
 @media(prefers-reduced-motion:reduce){
   .gl-pcard,.gl-img,.gl-img2,.gl-qa{transition:none!important;transform:none!important}
 }
+
+/* ============================================================
+   HARD-EDGED THEME — square corners everywhere.
+   Every card, box, image, panel, input and button renders with
+   0 radius across the whole app (named utilities like rounded-lg
+   AND arbitrary ones like rounded-[1.75rem]). Circles and pills
+   (rounded-full) are preserved on purpose so color swatches, the
+   cart FAB, spinners, avatars and pill chips keep their shape.
+   Delete this block to restore rounded corners.
+   ============================================================ */
+[class*="rounded-"]:not([class*="rounded-full"]),
+.rounded {
+  border-radius: 0 !important;
+}
+
+/* ============================================================
+   Auth sheet entrance — slides up from the bottom on mobile
+   (app-like bottom sheet), gentle zoom-in on desktop.
+   Defined directly because the project has no tailwindcss-animate
+   plugin (the old `animate-in ...` utilities were no-ops).
+   ============================================================ */
+@keyframes authSheetUp {
+  from { opacity: 0; transform: translateY(100%); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes authSheetZoom {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.auth-sheet {
+  animation: authSheetUp 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@media (min-width: 640px) {
+  .auth-sheet {
+    animation: authSheetZoom 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-sheet { animation: none; }
+}
+
+/* ============================================================
+   Animated header wordmark — "urbannook". A soft brand-red
+   highlight sweeps across the paper-coloured letters forever.
+   ============================================================ */
+@keyframes unWordmarkSweep {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+.un-wordmark {
+  background-image: linear-gradient(
+    100deg,
+    #EFEAE0 0%, #EFEAE0 38%,
+    #E63329 50%,
+    #EFEAE0 62%, #EFEAE0 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: unWordmarkSweep 5s linear infinite;
+}
+.un-wordmark:hover { animation-duration: 1.6s; }
+@media (prefers-reduced-motion: reduce) {
+  .un-wordmark { animation: none; -webkit-text-fill-color: #EFEAE0; }
+}
+

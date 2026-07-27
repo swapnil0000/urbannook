@@ -133,15 +133,19 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[100] p-4" onClick={() => {
+    <div className="fixed inset-0 bg-ink/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-[100] sm:p-4 font-inter" onClick={() => {
       dispatch(setShowLoginModal(false));
       onClose();
     }}>
-      <div 
-        className="bg-white rounded-[2rem] w-[96%] md:w-full md:max-w-4xl shadow-2xl relative overflow-hidden flex flex-col md:flex-row animate-in fade-in zoom-in duration-300 max-h-[90vh] md:h-[650px]"
+      <div
+        className="bg-paper w-full md:max-w-4xl shadow-2xl relative overflow-hidden flex flex-col md:flex-row auth-sheet max-h-[94dvh] md:h-[650px]"
         onClick={(e) => e.stopPropagation()}
       >
-        
+        {/* Mobile grab handle */}
+        <div className="sm:hidden absolute top-2.5 inset-x-0 z-30 flex justify-center pointer-events-none">
+          <span className="h-1.5 w-11 rounded-full bg-hair"></span>
+        </div>
+
         {/* --- LEFT SIDE (Hidden on Mobile) --- */}
         <div className="hidden md:flex w-5/12 bg-ink p-10 flex-col justify-between relative overflow-hidden">
           <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
@@ -151,10 +155,10 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
               {/* <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white">
                 <i className="fa-solid fa-leaf text-lg"></i>
               </div> */}
-              <span className="text-white font-serif text-xl">UrbanNook</span>
+              <span className="text-white font-archivo text-xl">UrbanNook</span>
             </div>
             
-            <h2 className="text-3xl font-serif text-white mb-6 leading-tight">
+            <h2 className="text-3xl font-archivo text-white mb-6 leading-tight">
               Design your <br/>
               <span className="italic text-brand">dream space.</span>
             </h2>
@@ -202,7 +206,7 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
         </div>
 
         {/* --- RIGHT SIDE (Scrollable Form Area) --- */}
-        <div ref={scrollContainerRef} className="w-full md:w-7/12 overflow-y-auto px-6 py-8 md:px-12 md:py-10 relative bg-white">
+        <div ref={scrollContainerRef} className="w-full md:w-7/12 overflow-y-auto px-6 py-8 md:px-12 md:py-10 relative bg-paper">
           <button 
             className="absolute top-4 right-4 md:top-6 md:right-6 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:text-ink transition-colors z-20"
             onClick={() => {
@@ -215,7 +219,7 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
 
           <div className="max-w-md mx-auto h-full flex flex-col justify-center">
             <div className="mb-2.5 md:mb-5 text-center md:text-left mt-2 md:mt-0">
-              <h2 className="text-2xl md:text-3xl font-serif text-ink mb-1">Create Account</h2>
+              <h2 className="text-2xl md:text-3xl font-archivo text-ink mb-1">Create Account</h2>
               <p className="text-gray-500 text-xs md:text-sm">Join us for a curated shopping experience.</p>
             </div>
 

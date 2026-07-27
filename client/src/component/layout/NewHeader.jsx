@@ -36,8 +36,6 @@ const NewHeader = () => {
   const [logoutAPI, { isLoading: isLoggingOut }] = useLogoutMutation();
 
   const navLinks = useMemo(() => [
-    { name: 'Summer Sale', path: '/products', key: 'sale', dot: true },
-    { name: 'Bestsellers', path: '/products', key: 'best' },
     { name: 'Shop All', path: '/products', key: 'products' },
     { name: 'Lamps', path: '/products?category=Lamp', key: 'lamp' },
     { name: 'Pen Stands', path: '/products?category=Pen%20Stand', key: 'pen' },
@@ -108,8 +106,8 @@ const NewHeader = () => {
             <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="md:hidden w-9 h-9 grid place-items-center" aria-label="Menu">
               <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">{isMenuOpen ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 6h16M4 12h16M4 18h16" />}</svg>
             </button>
-            <Link to="/" className="flex items-center shrink-0">
-              <span className="font-extrabold text-xl tracking-tight">URBAN&nbsp;NOOK</span>
+            <Link to="/" className="flex items-center shrink-0" aria-label="UrbanNook — home">
+              <span className="un-wordmark font-archivo font-extrabold text-2xl md:text-3xl tracking-tight uppercase select-none">urbannook</span>
             </Link>
           </div>
 
@@ -125,8 +123,6 @@ const NewHeader = () => {
 
           {/* right actions */}
           <div className="flex items-center gap-3 md:gap-4">
-            <button className="w-9 h-9 grid place-items-center hover:text-brand transition-colors" aria-label="Search" onClick={() => navigate('/products')}>{Icon.search}</button>
-
             {user ? (
               <div className="relative hidden sm:block" ref={ddRef}>
                 <button onClick={() => setShowUserDropdown((s) => !s)} className="flex items-center gap-2 pl-1 pr-2.5 py-1.5 rounded-full border border-white/20 hover:border-white/50 transition-colors">

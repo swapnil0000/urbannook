@@ -45,36 +45,36 @@ const Faq = () => {
   };
 
   return (
-    <div className="bg-ink min-h-screen text-gray-300 font-sans relative selection:bg-brand selection:text-white">
+    <div className="bg-paper min-h-screen text-ink font-inter relative selection:bg-brand selection:text-white">
       <SEOHead
         title="FAQs"
         description="Frequently asked questions about UrbanNook — shipping, returns, custom orders, assembly, and more."
         url="/faqs"
         structuredData={faqStructuredData}
       />
-      
+
       {/* Background Elements */}
-      <div className="fixed top-20 left-0 w-full overflow-hidden pointer-events-none opacity-[0.02]">
-        <h1 className="text-[15vw] font-bold text-center leading-none text-white tracking-tighter uppercase whitespace-nowrap">
+      <div className="absolute top-20 left-0 w-full overflow-hidden pointer-events-none opacity-[0.04]">
+        <h1 className="font-archivo text-[15vw] font-extrabold text-center leading-none text-ink tracking-tighter uppercase whitespace-nowrap">
           Questions
         </h1>
       </div>
-      <div className="fixed top-0 right-0 w-[500px] h-[500px] bg-save/10 rounded-full blur-[120px] pointer-events-none"></div>
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-brand/5 rounded-full blur-[120px] pointer-events-none"></div>
 
       <div className="relative z-10 max-w-5xl mx-auto px-6 py-20 md:py-28">
-        
+
         {/* Header */}
-        <div className="mb-16 text-left border-b border-white/10 pb-12">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 w-fit mb-6 backdrop-blur-md mx-auto">
+        <div className="mb-16 text-left border-b border-hair pb-12">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface border border-hair w-fit mb-6">
             <span className="w-1.5 h-1.5 rounded-full bg-brand"></span>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-brand">Help Center</span>
+            <span className="gl-lbl text-[10px] text-brand">Help Center</span>
           </div>
-          
-          <h1 className="text-4xl md:text-6xl font-serif text-white mb-4 leading-tight">
-            Frequently Asked <span className="italic text-brand">Questions</span>
+
+          <h1 className="font-archivo text-4xl md:text-6xl font-extrabold text-ink mb-4 leading-[1.05] tracking-tight">
+            Frequently Asked <span className="text-brand">Questions</span>
           </h1>
-          <p className="  text-left text-gray-400 text-sm md:text-base mx-auto">
-            Everything you need to know about our products and billing. Can't find the answer you're looking for? Chat with us.
+          <p className="text-muted text-sm md:text-base max-w-2xl">
+            Everything you need to know about our products and billing. Can&apos;t find the answer you&apos;re looking for? Chat with us.
           </p>
         </div>
 
@@ -84,19 +84,19 @@ const Faq = () => {
             <div key={idx} className="grid md:grid-cols-3 gap-8 md:gap-12">
               {/* Category Title */}
               <div className="md:col-span-1">
-                <h3 className="text-2xl font-serif text-white sticky top-24">{section.category}</h3>
-                <div className="h-1 w-12 bg-brand mt-4 rounded-full"></div>
+                <h3 className="font-archivo text-2xl font-bold text-ink sticky top-24">{section.category}</h3>
+                <div className="h-1 w-12 bg-brand mt-4"></div>
               </div>
 
               {/* Questions */}
               <div className="md:col-span-2 space-y-10">
                 {section.items.map((item, itemIdx) => (
                   <div key={itemIdx} className="group">
-                    <h4 className="text-white font-bold text-lg mb-3 flex items-start gap-3">
-                      <span className="text-brand text-sm mt-1">0{itemIdx + 1}.</span>
+                    <h4 className="text-ink font-bold text-lg mb-3 flex items-start gap-3">
+                      <span className="gl-lbl text-brand text-sm mt-1">0{itemIdx + 1}.</span>
                       {item.q}
                     </h4>
-                    <p className="text-gray-400 leading-relaxed pl-7 border-l border-white/10 ml-1.5">
+                    <p className="text-muted leading-relaxed pl-7 border-l-2 border-hair ml-1.5">
                       {item.a}
                     </p>
                   </div>

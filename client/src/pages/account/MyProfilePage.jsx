@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useAuth, useUI } from '../../hooks/useRedux';
 import { useGetUserProfileQuery, useUpdateUserProfileMutation } from '../../store/api/userApi';
+import PasskeyEnroll from '../../component/layout/auth/PasskeyEnroll';
 
 const MyProfilePage = () => {
   const { user } = useAuth();
@@ -183,11 +184,11 @@ const MyProfilePage = () => {
   ];
 
   return (
-    <div className="bg-ink min-h-screen font-sans text-gray-200 selection:bg-brand selection:text-white">
+    <div className="bg-paper min-h-screen font-inter text-ink selection:bg-brand selection:text-white">
 
       {/* --- AMBIENT BACKGROUND --- */}
-      <div className="fixed top-0 left-0 w-full h-[600px] bg-gradient-to-b from-ink to-ink pointer-events-none opacity-60"></div>
-      <div className="fixed -bottom-40 -left-40 w-[600px] h-[600px] bg-brand rounded-full blur-[200px] opacity-[0.05] pointer-events-none"></div>
+      <div className="fixed top-0 left-0 w-full h-[600px] bg-gradient-to-b from-surface to-paper pointer-events-none opacity-60"></div>
+      <div className="fixed -bottom-40 -left-40 w-[600px] h-[600px] bg-brand rounded-full blur-[200px] opacity-[0.04] pointer-events-none"></div>
 
       <main className="max-w-5xl mx-auto pt-28 pb-20 px-4 md:px-8 relative z-10">
         
@@ -202,10 +203,10 @@ const MyProfilePage = () => {
            <div>
              <div className="flex items-center gap-3 mb-2">
                  <span className="h-[1px] w-8 bg-brand"></span>
-                 <span className="text-brand font-bold tracking-[0.2em] uppercase text-[10px]">Profile</span>
+                 <span className="gl-lbl text-brand text-[10px]">Profile</span>
              </div>
-             <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif text-white leading-tight">
-               Your <span className="italic text-brand ">Sanctuary.</span>
+             <h1 className="text-4xl md:text-5xl lg:text-6xl font-archivo font-extrabold text-ink leading-tight">
+               Your <span className="text-brand ">Sanctuary.</span>
              </h1>
            </div>
            
@@ -215,7 +216,7 @@ const MyProfilePage = () => {
              className={`px-6 md:px-8 py-2.5 md:py-3 rounded-full font-bold uppercase tracking-widest text-[10px] transition-all duration-300 shadow-lg active:scale-95 flex items-center justify-center gap-2 w-full md:w-auto ${
                isEditing
                  ? 'bg-brand text-white hover:bg-ink'
-                 : 'bg-white/5 border border-white/10 text-white hover:bg-brand hover:text-white hover:border-brand'
+                 : 'bg-surface border border-hair text-ink hover:bg-brand hover:text-white hover:border-brand'
              } ${updating ? 'opacity-50 cursor-not-allowed' : ''}`}
            >
              {updating ? (
@@ -237,7 +238,10 @@ const MyProfilePage = () => {
 
         {/* --- PROFILE LAYOUT --- */}
         <div className="grid grid-cols-1 gap-6">
-          
+
+          {/* Passkey enrollment — enable Face ID / fingerprint sign-in */}
+          <PasskeyEnroll />
+
           {/* Personal Info Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
             {profileFields.map((field, idx) => (
@@ -277,7 +281,7 @@ const MyProfilePage = () => {
                     )
                   ) : (
                     <div className="min-h-[2.5rem] flex items-center">
-                      <p className={`font-serif text-base md:text-lg text-ink ${field.name === 'userEmail' ? 'truncate' : ''}`}>
+                      <p className={`font-archivo text-base md:text-lg text-ink ${field.name === 'userEmail' ? 'truncate' : ''}`}>
                         {field.value || <span className="text-gray-400 text-sm italic">Not set</span>}
                       </p>
                     </div>

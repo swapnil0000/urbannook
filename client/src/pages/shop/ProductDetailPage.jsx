@@ -148,6 +148,15 @@ const ProductDetailPage = () => {
 
   useEffect(() => { window.scrollTo(0, 0); }, []);
 
+  // Reset the pincode check + share row when navigating to another product —
+  // the component stays mounted, and a quote computed for product A's weight/price
+  // must not display under product B.
+  useEffect(() => {
+    setPinStatus(null);
+    setPinInput('');
+    setShowShare(false);
+  }, [product?.productId]);
+
   // Show the sticky mobile CTA only once the main Add-to-Cart box has scrolled out of view.
   useEffect(() => {
     const el = buyBoxRef.current;
@@ -180,6 +189,7 @@ const ProductDetailPage = () => {
 
   const onSelectVariant = (v) => {
     setSelectedVariant(v.variantName);
+    setPinStatus(null); // quote was priced for the previous variant — require a re-check
     trackVariantSelect?.({ itemId: product.productId, itemName: product.productName, itemVariant: v.variantName, price: v.variantPrice });
     if (v.sku) navigate(`/product/${product.productId}/${v.sku}`, { replace: true });
   };
@@ -278,7 +288,7 @@ const ProductDetailPage = () => {
   };
 
   // ── Share — native sheet on mobile, social buttons on desktop ──
-  const shareUrl = `https://www.urbannook.in/shop?product=${product?.productId}`;
+  const shareUrl = `https://www.urbannook.in/product/${product?.productId}`;
   const shareText = `${product?.productName || 'Urban Nook'} — Urban Nook`;
   const openShare = (method, href) => {
     trackShare({ contentType: 'product', itemId: product.productId, method });
@@ -499,7 +509,7 @@ const ProductDetailPage = () => {
                     maxLength={6}
                     value={pinInput}
                     onChange={(e) => { setPinInput(e.target.value.replace(/\D/g, '').slice(0, 6)); if (pinStatus) setPinStatus(null); }}
-                    onKeyDown={(e) => e.key === 'Enter' && pinInput.length === 6 && handlePinCheck()}
+                    onKeyDown={(e) => e.key === 'Enter' && !isCheckingPin && pinInput.length === 6 && handlePinCheck()}
                     placeholder="Enter 6-digit pincode"
                     className="flex-1 min-w-0 h-11 px-3.5 rounded-xl border border-hair bg-white text-sm text-ink outline-none focus:border-brand tabular-nums"
                   />

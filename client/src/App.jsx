@@ -42,6 +42,7 @@ const GlMobileNav = lazy(() => import('./component/layout/GlMobileNav'));
 const SocialMediaFAB = lazy(() => import('./component/layout/WhatsAppButton'));
 const OpenInBrowserBanner = lazy(() => import('./component/OpenInBrowserBanner'));
 const GoogleOneTap = lazy(() => import('./component/GoogleOneTap'));
+const PasskeyPrompt = lazy(() => import('./component/PasskeyPrompt'));
 
 // Component to handle session restoration and token removal detection
 const SessionManager = ({ children }) => {
@@ -163,6 +164,9 @@ function App() {
           <MotionLayer />
           <SessionManager>
             <SyncProvider>
+              <Suspense fallback={null}>
+                <OpenInBrowserBanner />
+              </Suspense>
               <ErrorBoundary>
                 {/* <NewsTicker/> */}
                 <NewHeader/>
@@ -182,6 +186,10 @@ function App() {
                 {/* Global Google One Tap for logged-out visitors (boosts Meta EMQ) */}
                 <ErrorBoundary>
                   <GoogleOneTap />
+                </ErrorBoundary>
+                {/* Post-login passkey upsell (fires once after a fresh login) */}
+                <ErrorBoundary>
+                  <PasskeyPrompt />
                 </ErrorBoundary>
               </Suspense>
             </SyncProvider>

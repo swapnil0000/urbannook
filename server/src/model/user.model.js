@@ -54,6 +54,25 @@ const userSchema = mongoose.Schema(
       default: false,
     },
     userRefreshToken: String,
+    // WebAuthn / passkeys — one entry per registered authenticator (Face ID,
+    // fingerprint, Windows Hello, security key, etc.)
+    passkeys: {
+      type: [
+        {
+          credentialID: { type: String, required: true }, // base64url credential id
+          publicKey: { type: String, required: true }, // base64url-encoded COSE public key
+          counter: { type: Number, default: 0 },
+          transports: { type: [String], default: [] },
+          deviceName: { type: String, default: "Passkey" },
+          createdAt: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
+    },
+    // Transient WebAuthn challenge, held between the options and verify steps
+    currentChallenge: {
+      type: String,
+    },
     role: {
       type: String,
       enum: ["USER", "WAITLIST_USER"],
@@ -67,6 +86,7 @@ const userSchema = mongoose.Schema(
 userSchema.index({ userId: 1 });
 userSchema.index({ email: 1 });
 userSchema.index({ mobileNumber: 1 }, { sparse: true });
+userSchema.index({ "passkeys.credentialID": 1 }, { sparse: true });
 // googleId index is already defined in schema with unique: true, sparse: true
 userSchema.index({ verificationOtp: 1 });
 userSchema.index(

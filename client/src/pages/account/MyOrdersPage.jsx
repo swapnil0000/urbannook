@@ -143,7 +143,7 @@ const MyOrdersPage = () => {
 
   if (isLoading) {
     return (
-      <div className="bg-ink min-h-screen flex items-center justify-center">
+      <div className="bg-paper min-h-screen flex items-center justify-center">
         <div className="w-12 h-12 border-2 border-brand border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
@@ -151,20 +151,20 @@ const MyOrdersPage = () => {
 
   if (error) {
     return (
-      <div className="bg-ink min-h-screen flex items-center justify-center text-white">
+      <div className="bg-paper min-h-screen flex items-center justify-center text-ink">
         <div className="text-center">
-          <h2 className="text-2xl mb-4 font-serif">Failed to load orders</h2>
-          <p className="text-gray-400 text-sm">Please try again later</p>
+          <h2 className="text-2xl mb-4 font-archivo font-extrabold">Failed to load orders</h2>
+          <p className="text-muted text-sm">Please try again later</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-ink min-h-screen font-sans text-gray-200 selection:bg-brand selection:text-white">
+    <div className="bg-paper min-h-screen font-inter text-ink selection:bg-brand selection:text-white">
       {/* --- AMBIENT BACKGROUND --- */}
-      <div className="fixed top-0 left-0 w-full h-[600px] bg-gradient-to-b from-ink to-ink pointer-events-none opacity-60"></div>
-      <div className="fixed -bottom-40 -left-40 w-[600px] h-[600px] bg-brand rounded-full blur-[200px] opacity-[0.05] pointer-events-none"></div>
+      <div className="fixed top-0 left-0 w-full h-[600px] bg-gradient-to-b from-surface to-paper pointer-events-none opacity-60"></div>
+      <div className="fixed -bottom-40 -left-40 w-[600px] h-[600px] bg-brand rounded-full blur-[200px] opacity-[0.04] pointer-events-none"></div>
 
       <main className="max-w-5xl mx-auto pt-28 pb-20 px-4 md:px-8 relative z-10">
         {/* --- HEADER --- */}
@@ -172,20 +172,20 @@ const MyOrdersPage = () => {
           <div>
             <div className="flex items-center gap-3 mb-2">
               <span className="h-[1px] w-8 bg-brand"></span>
-              <span className="text-brand font-bold tracking-[0.2em] uppercase text-[10px]">
+              <span className="gl-lbl text-brand text-[10px]">
                 History
               </span>
             </div>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif text-white leading-tight">
-              Order <span className="italic text-brand">Archive.</span>
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-archivo font-extrabold text-ink leading-[1.05] tracking-tight">
+              Order <span className="text-brand">Archive.</span>
             </h1>
           </div>
 
-          <div className="px-5 py-2 rounded-full border border-white/10 bg-white/5 backdrop-blur-sm flex items-center gap-3">
-            <span className="text-gray-400 text-xs uppercase tracking-wider">
+          <div className="px-5 py-2 rounded-full border border-hair bg-surface flex items-center gap-3">
+            <span className="text-muted text-xs uppercase tracking-wider">
               Total Orders
             </span>
-            <span className="text-brand font-bold font-serif text-xl">
+            <span className="text-brand font-bold font-archivo text-xl">
               {orderResponse?.data?.totalOrders || orders.length}
             </span>
           </div>
@@ -193,11 +193,11 @@ const MyOrdersPage = () => {
 
         {/* --- ORDERS LIST --- */}
         {orders.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 bg-surface rounded-[3rem] border border-white/5 shadow-2xl">
+          <div className="flex flex-col items-center justify-center py-20 bg-surface rounded-[3rem] border border-hair shadow-sm">
             <div className="w-24 h-24 bg-brand/10 rounded-full flex items-center justify-center mb-6 border border-brand/20">
               <i className="fa-solid fa-box-open text-brand text-3xl"></i>
             </div>
-            <h3 className="text-2xl font-serif text-ink mb-2">Your collection is empty.</h3>
+            <h3 className="text-2xl font-archivo text-ink mb-2">Your collection is empty.</h3>
             <button
               onClick={() => navigate("/products")}
               className="px-8 py-3 bg-brand text-white rounded-full font-bold uppercase tracking-widest text-[10px] hover:bg-brandHi hover:scale-105 transition-all duration-300 shadow-lg"
@@ -249,7 +249,7 @@ const MyOrdersPage = () => {
                           onClick={(e) => { e.stopPropagation(); copyToClipboard(order.orderId); }}
                           className="flex items-center gap-1.5 group"
                         >
-                          <span className="font-serif text-ink text-base md:text-lg leading-none">Order #{order.orderId.slice(0, 8)}</span>
+                          <span className="font-archivo text-ink text-base md:text-lg leading-none">Order #{order.orderId.slice(0, 8)}</span>
                           <i className="fa-regular fa-copy text-xs text-gray-300 group-hover:text-brand transition-colors"></i>
                         </button>
                       </div>
@@ -258,7 +258,7 @@ const MyOrdersPage = () => {
                     <div className="flex items-center gap-4">
                       <div className="text-right hidden sm:block">
                         <p className="text-xs text-gray-400 uppercase tracking-widest font-bold">Amount</p>
-                        <p className="text-ink font-serif font-bold">₹{order.amount.toLocaleString()}</p>
+                        <p className="text-ink font-archivo font-bold">₹{order.amount.toLocaleString()}</p>
                       </div>
                       <div className={`w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center transition-transform duration-300 ${isExpanded ? 'rotate-180 bg-ink border-ink' : 'bg-white'}`}>
                         <i className={`fa-solid fa-chevron-down text-xs ${isExpanded ? 'text-white' : 'text-gray-400'}`}></i>
@@ -390,7 +390,7 @@ const MyOrdersPage = () => {
                         </div>
                         <div className="flex justify-between items-center pt-3 border-t border-gray-100 mt-1">
                           <span className="text-[10px] text-ink font-bold uppercase tracking-widest">Grand Total</span>
-                          <span className="text-xl font-serif text-ink font-bold">₹{order.amount.toLocaleString()}</span>
+                          <span className="text-xl font-archivo text-ink font-bold">₹{order.amount.toLocaleString()}</span>
                         </div>
                       </div>
                     </div>

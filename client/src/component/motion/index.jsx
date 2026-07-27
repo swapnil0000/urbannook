@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components -- shared motion primitives + tokens live together intentionally */
 import { Fragment, useRef } from "react";
-import { motion, useScroll, useTransform } from "motion/react";
+import { motion, useScroll, useTransform, useInView, AnimatePresence } from "motion/react";
 
 /**
  * Shared motion primitives for Urban Nook.
@@ -184,4 +184,4 @@ export function TextReveal({
   );
 }
 
-export { motion };
+export { motion, useInView, AnimatePresence };

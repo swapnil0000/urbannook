@@ -44,9 +44,9 @@ const UnProductCard = ({ p, index = 0, listId = 'grid', listName = 'Grid' }) => 
   };
 
   return (
-    <div onClick={go} className="gl-pcard group bg-white rounded-2xl border border-hair overflow-hidden flex flex-col cursor-pointer">
+    <div onClick={go} className="gl-pcard group bg-white rounded-none border border-hair overflow-hidden flex flex-col h-full cursor-pointer">
       <div className="relative aspect-square overflow-hidden bg-surface">
-        {badge && <span className="absolute top-3 left-3 z-10 bg-sale text-white gl-lbl text-[9px] px-2 py-1 rounded shadow-sm">{badge}</span>}
+        {badge && <span className="absolute top-3 left-3 z-10 bg-sale text-white gl-lbl text-[9px] px-2 py-1 rounded-none shadow-sm">{badge}</span>}
         <div className="absolute top-2.5 right-2.5 z-10" onClick={(e) => e.stopPropagation()}>
           <WishlistButton productId={p.productId} />
         </div>
@@ -61,7 +61,7 @@ const UnProductCard = ({ p, index = 0, listId = 'grid', listName = 'Grid' }) => 
                   style={{ backgroundImage: vr.variantImage?.[0] ? `url('${vr.variantImage[0]}')` : undefined }} />
               ))}
             </div>
-            <button title="Quick add" onClick={(e) => addVariant(v, e)} className="w-9 h-9 rounded-lg bg-brand text-white grid place-items-center shrink-0 gl-press hover:bg-brandHi">
+            <button title="Quick add" onClick={(e) => addVariant(v, e)} className="w-9 h-9 rounded-none bg-brand text-white grid place-items-center shrink-0 gl-press hover:bg-brandHi">
               <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>
             </button>
           </div>
@@ -69,7 +69,7 @@ const UnProductCard = ({ p, index = 0, listId = 'grid', listName = 'Grid' }) => 
       </div>
       <div className="p-3.5 flex flex-col flex-1">
         <span className="gl-lbl text-[10px] text-faint">{p.productCategory || 'Urban Nook'}</span>
-        <p className="font-bold text-sm leading-snug line-clamp-2 mt-1">{p.productName}</p>
+        <p className="font-bold text-sm leading-snug line-clamp-2 min-h-[2.75em] mt-1">{p.productName}</p>
         <div className="mt-auto pt-2 flex items-center gap-2">
           <span className="font-extrabold">{inr(v.variantPrice)}</span>
         </div>
