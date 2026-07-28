@@ -413,6 +413,8 @@ const CheckoutPage = () => {
   const [guestEmail, setGuestEmail] = useState(savedCheckout.current.guestEmail || "");
   const [guestMobile, setGuestMobile] = useState(savedCheckout.current.guestMobile || "");
   const [guestErrors, setGuestErrors] = useState({});
+  // UI-only: mobile collapsible order-summary toggle (does not affect checkout logic)
+  const [mobileSummaryOpen, setMobileSummaryOpen] = useState(false);
 
   const { data: userProfileData, isLoading: profileLoading, refetch: refetchProfile } =
     useGetUserProfileQuery(undefined, { skip: isGuest });
@@ -1176,8 +1178,19 @@ const CheckoutPage = () => {
             <span className="text-ink font-semibold">{STEPS[currentStep - 1]?.label}</span>
           </div>
 
-          {/* Step circles */}
-          <div className="flex items-start max-w-sm">
+          {/* Mobile progress bar (app-style) */}
+          <div className="lg:hidden">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-bold uppercase tracking-widest text-ink">{STEPS[currentStep - 1]?.label}</span>
+              <span className="text-[11px] font-bold text-gray-400">Step {currentStep} of {STEPS.length}</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+              <div className="h-full bg-brand rounded-full transition-all duration-500 ease-out" style={{ width: `${(currentStep / STEPS.length) * 100}%` }} />
+            </div>
+          </div>
+
+          {/* Step circles (desktop) */}
+          <div className="hidden lg:flex items-start max-w-sm">
             {STEPS.map((step, idx) => (
               <Fragment key={step.number}>
                 <div className="flex flex-col items-center gap-2">
@@ -1216,14 +1229,16 @@ const CheckoutPage = () => {
       </div>
 
       {/* ── Main ───────────────────────────────────────────────────────── */}
-      <div className={`max-w-5xl mx-auto px-4 sm:px-6 pt-8 lg:pb-14 lg:grid lg:grid-cols-[1fr_360px] lg:gap-10 lg:items-start ${currentStep === reviewStep ? "pb-28" : "pb-8"}`}>
+      <div className={`max-w-5xl mx-auto px-4 sm:px-6 pt-8 lg:pb-14 lg:grid lg:grid-cols-[1fr_360px] lg:gap-10 lg:items-start ${(isGuest && currentStep === 1) ? "pb-8" : "pb-32 lg:pb-14"}`}>
 
         {/* ── Left: form ───────────────────────────────────────────────── */}
         <div className="min-w-0">
 
           {/* ══════════ STEP — ACCOUNT (Guest only) ═══════════════════ */}
           {isGuest && currentStep === 1 && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="space-y-6 step-fade checkout-sheet">
+              {/* mobile sheet grab handle */}
+              <div className="lg:hidden flex justify-center pt-2 pb-1"><span className="h-1.5 w-11 rounded-full bg-gray-200" /></div>
               <div className="text-center">
                 <h1 className="text-2xl sm:text-3xl font-inter text-gray-900 leading-tight">How would you like to continue?</h1>
                 {/* <p className="text-sm text-gray-400 mt-2">Sign in for a faster checkout or continue as a guest</p> */}
@@ -1277,7 +1292,9 @@ const CheckoutPage = () => {
 
           {/* ══════════ STEP — CONTACT ════════════════════════════════ */}
           {currentStep === contactStep && (
-            <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="space-y-5 step-fade checkout-sheet">
+              {/* mobile sheet grab handle */}
+              <div className="lg:hidden flex justify-center pt-2 pb-1"><span className="h-1.5 w-11 rounded-full bg-gray-200" /></div>
               {/* Contact form card */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-50">
@@ -1372,7 +1389,7 @@ const CheckoutPage = () => {
 
               <button
                 onClick={handleStep1Next}
-                className="w-full h-14 bg-brand text-white rounded-2xl font-bold text-sm hover:bg-brandHi active:scale-[0.99] transition-all flex items-center justify-center gap-3 shadow-lg shadow-brand/20"
+                className="w-full h-14 bg-brand text-white rounded-2xl font-bold text-sm hover:bg-brandHi active:scale-[0.99] transition-all hidden lg:flex items-center justify-center gap-3 shadow-lg shadow-brand/20"
               >
                 Continue to Address
                 <i className="fa-solid fa-arrow-right text-xs" />
@@ -1390,7 +1407,7 @@ const CheckoutPage = () => {
 
           {/* ══════════ STEP — ADDRESS ═════════════════════════════════ */}
           {currentStep === addressStep && (
-            <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="space-y-5 step-fade">
 
               <div>
                 <h1 className="text-2xl sm:text-3xl font-inter text-gray-900 leading-tight">Delivery Address</h1>
@@ -1515,7 +1532,7 @@ const CheckoutPage = () => {
                 </div>
               )}
 
-              <div className="flex gap-3">
+              <div className="hidden lg:flex gap-3">
                 <button
                   onClick={() => goToStep(contactStep)}
                   className="h-14 px-5 border border-gray-200 text-gray-600 rounded-2xl font-bold text-sm hover:bg-gray-50 active:scale-[0.99] transition-all flex items-center justify-center gap-2"
@@ -1539,7 +1556,7 @@ const CheckoutPage = () => {
 
           {/* ══════════ STEP — REVIEW & PAY ═══════════════════════════ */}
           {currentStep === reviewStep && (
-            <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="space-y-5 step-fade">
 
               <div>
                 <h1 className="text-2xl sm:text-3xl font-inter text-gray-900 leading-tight">Review Your Order</h1>
@@ -1962,36 +1979,66 @@ const CheckoutPage = () => {
         </div>
       </div>
 
-      {/* ── Mobile sticky footer (review step) ────────────────────────────────── */}
-      {currentStep === reviewStep && (
+      {/* ── Mobile app-style sticky action bar (Contact / Address / Review) ── */}
+      {!(isGuest && currentStep === 1) && (
         <div className="fixed bottom-0 left-0 right-0 z-50 lg:hidden">
+          {/* "more content below" hint on the review step — floats just above the bar */}
+          {currentStep === reviewStep && !mobileSummaryOpen && (
+            <div className="pointer-events-none absolute -top-9 inset-x-0 flex justify-center">
+              <span className="w-7 h-7 rounded-full bg-white shadow-md border border-gray-100 grid place-items-center text-gray-400 animate-bounce">
+                <i className="fa-solid fa-chevron-down text-[11px]" />
+              </span>
+            </div>
+          )}
+          {/* Collapsible order summary — tap the total to expand */}
+          {mobileSummaryOpen && (
+            <div className="bg-white border-t border-gray-100 px-4 pt-3 pb-2 max-h-[45vh] overflow-y-auto shadow-[0_-12px_40px_rgba(0,0,0,0.12)] animate-in fade-in duration-200">
+              <div className="max-w-sm mx-auto">
+                <PriceRows subtotal={pricingDetails.subtotal} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} isLoadingShipping={isCalculatingShipping} paymentMethod={paymentMethod} />
+              </div>
+            </div>
+          )}
           <div className="bg-white/95 backdrop-blur-xl border-t border-gray-100 px-4 py-3 pb-5 shadow-[0_-12px_40px_rgba(0,0,0,0.1)]">
             <div className="max-w-sm mx-auto flex items-center gap-3">
-              <div>
-                <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">
-                  {paymentMethod === "COD" ? "Pay Now" : "Total"}
+              <button onClick={() => setMobileSummaryOpen((o) => !o)} className="text-left shrink-0" aria-label="Toggle order summary">
+                <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest flex items-center gap-1">
+                  {currentStep === reviewStep && paymentMethod === "COD" ? "Pay Now" : "Total"}
+                  <i className={`fa-solid fa-chevron-${mobileSummaryOpen ? "down" : "up"} text-[8px]`} />
                 </p>
-                <p className="text-lg font-bold text-[#2e443c]">
-                  ₹{(paymentMethod === "COD" && realShippingAmount > 0
+                <p className="text-lg font-bold text-ink">
+                  ₹{(currentStep === reviewStep && paymentMethod === "COD" && realShippingAmount > 0
                     ? Math.min(Math.ceil(realShippingAmount) * 2, totalToPay)
                     : totalToPay
                   ).toLocaleString()}
                 </p>
-              </div>
-              <button
-                onClick={handlePayment}
-                disabled={isOrdering || isCalculatingShipping || pricingDetails.shipping === null || shippingError}
-                className="flex-1 h-12 bg-brand text-white rounded-xl font-bold text-sm hover:bg-brandHi active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 shadow-lg disabled:opacity-50"
-              >
-                {isOrdering
-                  ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Processing…</>
-                  : isCalculatingShipping
-                  ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Calculating…</>
-                  : paymentMethod === "COD" && realShippingAmount > 0
-                  ? <> Pay Advance</>
-                  : <><i className="fa-solid fa-lock text-[10px] opacity-70" /> Pay Now</>
-                }
               </button>
+
+              {currentStep === contactStep && (
+                <button onClick={handleStep1Next} className="flex-1 h-12 bg-brand text-white rounded-xl font-bold text-sm hover:bg-brandHi active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-lg">
+                  Continue <i className="fa-solid fa-arrow-right text-xs" />
+                </button>
+              )}
+              {currentStep === addressStep && (
+                <button onClick={handleStep2Next} disabled={!address.trim()} className="flex-1 h-12 bg-brand text-white rounded-xl font-bold text-sm hover:bg-brandHi active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none">
+                  Continue <i className="fa-solid fa-arrow-right text-xs" />
+                </button>
+              )}
+              {currentStep === reviewStep && (
+                <button
+                  onClick={handlePayment}
+                  disabled={isOrdering || isCalculatingShipping || pricingDetails.shipping === null || shippingError}
+                  className="flex-1 h-12 bg-brand text-white rounded-xl font-bold text-sm hover:bg-brandHi active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 shadow-lg disabled:opacity-50"
+                >
+                  {isOrdering
+                    ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Processing…</>
+                    : isCalculatingShipping
+                    ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Calculating…</>
+                    : paymentMethod === "COD" && realShippingAmount > 0
+                    ? <>Pay Advance</>
+                    : <><i className="fa-solid fa-lock text-[10px] opacity-70" /> Pay Now</>
+                  }
+                </button>
+              )}
             </div>
           </div>
         </div>

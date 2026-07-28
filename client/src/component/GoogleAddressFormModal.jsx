@@ -957,25 +957,6 @@ const GoogleAddressFormModal = ({
           />
         </div>
 
-        {/* Save CTA */}
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={isSubmitting}
-          className="w-full py-4 bg-ink text-white rounded-xl font-bold text-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-black transition-colors disabled:opacity-60"
-        >
-          {isSubmitting ? (
-            <>
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Saving...
-            </>
-          ) : (
-            <>
-              <i className="fa-solid fa-floppy-disk text-sm" />
-              Save Address
-            </>
-          )}
-        </button>
       </div>
     </div>
   );
@@ -983,7 +964,7 @@ const GoogleAddressFormModal = ({
   // ─── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-white w-full max-w-4xl h-[93dvh] sm:h-[88vh] rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl flex flex-col">
+      <div className="bg-white w-full max-w-4xl h-[93dvh] sm:h-[88vh] rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl flex flex-col auth-sheet">
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 shrink-0">
@@ -1010,7 +991,7 @@ const GoogleAddressFormModal = ({
           </div>
 
           {/* Form column — fills all remaining height, scrolls independently */}
-          <div className="flex-1 min-h-0 flex flex-col overflow-hidden md:flex-1">
+          <div className="relative flex-1 min-h-0 flex flex-col overflow-hidden md:flex-1">
 
             {/* Search bar — sits below map on mobile, top of right panel on desktop */}
             <div ref={searchBarRef} className="shrink-0 px-3 py-2.5 bg-white border-b border-gray-100">
@@ -1115,8 +1096,34 @@ const GoogleAddressFormModal = ({
             <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
               {FormSection}
             </div>
+            {/* "more content below" hint — subtle fade + bouncing chevron */}
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-9 bg-gradient-to-t from-white via-white/80 to-transparent flex items-end justify-center pb-1.5">
+              <i className="fa-solid fa-chevron-down text-gray-300 text-[11px] animate-bounce" />
+            </div>
           </div>
 
+        </div>
+
+        {/* Sticky footer — Save button ALWAYS visible (never hidden below the fold) */}
+        <div className="shrink-0 border-t border-gray-100 bg-white px-4 py-3" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="w-full py-4 bg-ink text-white rounded-xl font-bold text-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-black transition-colors disabled:opacity-60"
+          >
+            {isSubmitting ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <i className="fa-solid fa-floppy-disk text-sm" />
+                Save Address
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>

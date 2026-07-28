@@ -687,6 +687,50 @@
   }
 }
 
+/* ============================================================
+   Checkout step transition — each step slides/fades in like an
+   app screen. (No tailwindcss-animate plugin, so defined directly.)
+   ============================================================ */
+@keyframes stepFade {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.step-fade { animation: stepFade 0.3s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .step-fade { animation: none; }
+}
+
+/* ============================================================
+   Checkout section as a mobile bottom-sheet — the Login/Guest and
+   Contact steps slide up from the bottom (like the Address form).
+   ONLY on narrow screens; desktop (lg+) keeps the inline layout.
+   Defined AFTER .step-fade so its slide-up animation wins on mobile.
+   ============================================================ */
+@keyframes checkoutSheetUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+@media (max-width: 1023px) {
+  .checkout-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    max-height: 85vh;
+    overflow-y: auto;
+    background: #ffffff;
+    border-top-left-radius: 1.5rem !important;
+    border-top-right-radius: 1.5rem !important;
+    box-shadow: 0 -14px 44px rgba(0, 0, 0, 0.16);
+    padding: 0.25rem 1rem calc(6.5rem + env(safe-area-inset-bottom));
+    animation: checkoutSheetUp 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .checkout-sheet { animation: none; }
+  }
+}
+
 
   /* Hides the scrollbar on horizontally-scrolling strips (e.g. the variant
      selector) while keeping the element natively scrollable/swipeable. */
