@@ -167,10 +167,10 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
         <div className="space-y-3">
           <div className="flex items-center justify-between bg-white px-4 py-3 rounded-xl border border-gray">
             <div className="flex items-center gap-3">
-              <i className="fa-solid fa-circle-check text-[#a89068]"></i>
+              <i className="fa-solid fa-circle-check text-brand"></i>
               <div>
                 <p className="text-sm font-bold text-gray-500 uppercase tracking-wider">{appliedCoupon}</p>
-                <p className="text-xs text-[#a89068]">You saved ₹{discount?.toLocaleString() || 0}</p>
+                <p className="text-xs text-brand">You saved ₹{discount?.toLocaleString() || 0}</p>
               </div>
             </div>
             <button

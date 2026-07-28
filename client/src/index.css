@@ -3,7 +3,26 @@
 @tailwind utilities;
 
 :root {
-  /* Colors - Modern Blue & Teal Palette */
+  /* ============================================================
+     URBAN NOOK — GLOBAL DESIGN TOKENS (Urban Nook editorial palette)
+     Change the whole site's colours here. Stored as "R G B"
+     channels so Tailwind opacity modifiers (bg-brand/10) work.
+     4-colour system: Nook Red · Ink Black · Off-White/Paper · Stone Grey.
+     ============================================================ */
+  --gl-brand:    230 51 41;   /* #E63329 Nook Red — the one accent (buttons, links, dot) */
+  --gl-brand-hi: 201 40 31;   /* #C9281F Red Deep — hover/pressed */
+  --gl-sale:     230 51 41;   /* #E63329 discounts / sale / hot badges */
+  --gl-sale-deep:201 40 31;   /* #C9281F Red Deep — emphasis */
+  --gl-star:     243 195 59;  /* #F3C33B ratings (functional gold — outside the 4-colour brand set) */
+  --gl-save:     16 132 116;  /* #108474 savings (functional teal — outside the 4-colour brand set) */
+  --gl-ink:      20 20 20;    /* #141414 Ink Black — text, header, image frames */
+  --gl-paper:    239 234 224; /* #EFEAE0 Off-White / Paper — page background */
+  --gl-muted:    97 92 80;    /* #615C50 Grey-Dark — muted but readable text */
+  --gl-faint:    140 135 121; /* #8C8779 Stone Grey — faint text */
+  --gl-hair:     216 210 197; /* #D8D2C5 Line — hairline borders (warm) */
+  --gl-surface:  229 223 211; /* #E5DFD3 Cream-2 — secondary panels/bands (white cards pop on it) */
+
+  /* Colors - Modern Blue & Teal Palette (legacy) */
   --color-primary: #3B82F6;    /* Blue */
   --color-secondary: #F0F9FF;  /* Light blue background */
   --color-accent: #06B6D4;     /* Cyan accent */
@@ -71,7 +90,12 @@
     transition: background-color 0.3s ease, color 0.3s ease;
     position: relative;
   }
-  
+
+  /* Headings use Archivo (Urban Nook display font); body stays Inter. */
+  h1, h2, h3, h4 {
+    font-family: 'Archivo', ui-sans-serif, sans-serif;
+  }
+
   body::before {
     content: '';
     position: fixed;
@@ -498,6 +522,215 @@
     0%, 100% { transform: translateY(-50%) scale(1); opacity: 0.7; }
     50%       { transform: translateY(-50%) scale(1.18); opacity: 1; }
   }
+}
+
+/* ============================================================
+   URBAN NOOK — EDITORIAL "2040" MOTION LAYER
+   Cream · Ink · Red. Film grain, custom cursor, tilt, reveals.
+   Prefixed `un-` to avoid clashing with legacy styles.
+   ============================================================ */
+.un-eddy { --un-ease: cubic-bezier(.2,.7,.2,1); --un-ease-out: cubic-bezier(.16,1,.3,1); }
+
+/* film grain */
+.un-grain{position:fixed;inset:-100%;z-index:60;pointer-events:none;opacity:.05;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation:un-grain 8s steps(10) infinite}
+@keyframes un-grain{0%,100%{transform:translate(0,0)}10%{transform:translate(-5%,-8%)}20%{transform:translate(-12%,4%)}30%{transform:translate(6%,-14%)}40%{transform:translate(-4%,12%)}50%{transform:translate(-12%,6%)}60%{transform:translate(10%,0)}70%{transform:translate(0,10%)}80%{transform:translate(-8%,-2%)}90%{transform:translate(4%,6%)}}
+
+/* custom cursor */
+.un-cursor,.un-cursor-ring{position:fixed;top:0;left:0;z-index:2000;pointer-events:none;border-radius:50%;transform:translate(-50%,-50%);will-change:transform}
+.un-cursor{width:8px;height:8px;background:#E63329}
+.un-cursor-ring{width:38px;height:38px;border:1.5px solid #E63329;opacity:.5;transition:width .35s cubic-bezier(.2,.7,.2,1),height .35s cubic-bezier(.2,.7,.2,1),opacity .3s,background-color .3s}
+.un-cursor-ring.is-hover{width:60px;height:60px;background:rgba(230,51,41,.14);border-color:transparent;opacity:1}
+@media(hover:none),(pointer:coarse){.un-cursor,.un-cursor-ring,.un-grain{display:none!important}}
+/* When the editorial cursor is active (set by MotionLayer on fine-pointer devices), hide the
+   native cursor everywhere except text-entry fields so the caret stays usable. */
+@media(hover:hover) and (pointer:fine){
+  html.un-cursor-active,html.un-cursor-active *{cursor:none!important}
+  html.un-cursor-active input,html.un-cursor-active textarea,html.un-cursor-active [contenteditable]{cursor:text!important}
+}
+
+/* 3D tilt + glare cards */
+.un-tiltwrap{perspective:1000px}
+.un-card{transform-style:preserve-3d;will-change:transform;transition:transform .14s cubic-bezier(.2,.7,.2,1),box-shadow .3s cubic-bezier(.2,.7,.2,1)}
+.un-glare{position:absolute;inset:0;z-index:2;pointer-events:none;opacity:0;transition:opacity .3s;
+  background:radial-gradient(420px circle at var(--gx,50%) var(--gy,50%),rgba(239,234,224,.55),transparent 45%)}
+.un-card:hover .un-glare{opacity:1}
+
+/* reveal on scroll */
+.un-reveal{opacity:0;transform:translateY(34px);transition:opacity .8s cubic-bezier(.16,1,.3,1),transform .8s cubic-bezier(.16,1,.3,1)}
+.un-reveal.in{opacity:1;transform:none}
+
+/* char-rise hero */
+@keyframes un-rise{to{transform:none}}
+.un-rise .un-ch{display:inline-block;transform:translateY(115%) rotate(4deg);animation:un-rise .9s cubic-bezier(.16,1,.3,1) forwards}
+
+/* editorial marquee ticker */
+.un-marquee{display:inline-flex;flex-wrap:nowrap;white-space:normal;animation:un-scrollx 26s linear infinite}
+.un-marquee:hover{animation-play-state:paused}
+.un-marquee > *{white-space:normal}
+@keyframes un-scrollx{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+/* button ink-fill */
+.un-btn{position:relative;overflow:hidden;isolation:isolate}
+.un-btn .un-fill{position:absolute;inset:0;z-index:-1;transform:translateY(101%);transition:transform .4s cubic-bezier(.16,1,.3,1)}
+.un-btn:hover .un-fill{transform:translateY(0)}
+
+@media(prefers-reduced-motion:reduce){
+  .un-grain,.un-cursor,.un-cursor-ring{display:none!important}
+  .un-reveal{opacity:1;transform:none}
+  .un-rise .un-ch{transform:none;animation:none}
+  .un-card{transition:none}
+}
+
+/* ============================================================
+   GULLYLABS-STYLE HELPERS (chosen direction)
+   ============================================================ */
+.gl-lbl{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:600}
+.gl-pcard{box-shadow:0 1px 2px rgba(20,20,20,.04),0 10px 30px -20px rgba(20,20,20,.18);transition:box-shadow .3s,transform .3s,border-color .3s}
+.gl-pcard:hover{box-shadow:0 18px 44px -18px rgba(20,20,20,.26);transform:translateY(-3px);border-color:rgb(var(--gl-hair))}
+.gl-img{transition:transform .6s cubic-bezier(.2,.7,.2,1),opacity .4s}
+.gl-pcard:hover .gl-img{transform:scale(1.04)}
+.gl-img2{opacity:0;transition:opacity .5s}
+.gl-pcard:hover .gl-img2{opacity:1}
+.gl-qa{transform:translateY(105%);opacity:0;transition:transform .32s cubic-bezier(.2,.7,.2,1),opacity .3s}
+.gl-pcard:hover .gl-qa{transform:none;opacity:1}
+.gl-hscroll{scrollbar-width:none}.gl-hscroll::-webkit-scrollbar{display:none}
+.gl-swatch.on{outline:2px solid rgb(var(--gl-brand));outline-offset:2px}
+.gl-press{transition:transform .18s ease}.gl-press:active{transform:scale(.97)}
+@media(max-width:767px){ body{ padding-bottom:4rem } }
+@media(prefers-reduced-motion:reduce){
+  .gl-pcard,.gl-img,.gl-img2,.gl-qa{transition:none!important;transform:none!important}
+}
+
+/* ============================================================
+   HARD-EDGED THEME — square corners everywhere.
+   Every card, box, image, panel, input and button renders with
+   0 radius across the whole app (named utilities like rounded-lg
+   AND arbitrary ones like rounded-[1.75rem]). Circles and pills
+   (rounded-full) are preserved on purpose so color swatches, the
+   cart FAB, spinners, avatars and pill chips keep their shape.
+   Delete this block to restore rounded corners.
+   ============================================================ */
+[class*="rounded-"]:not([class*="rounded-full"]),
+.rounded {
+  border-radius: 0 !important;
+}
+
+/* ============================================================
+   Auth sheet entrance — slides up from the bottom on mobile
+   (app-like bottom sheet), gentle zoom-in on desktop.
+   Defined directly because the project has no tailwindcss-animate
+   plugin (the old `animate-in ...` utilities were no-ops).
+   ============================================================ */
+@keyframes authSheetUp {
+  from { opacity: 0; transform: translateY(100%); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes authSheetZoom {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.auth-sheet {
+  animation: authSheetUp 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@media (min-width: 640px) {
+  .auth-sheet {
+    animation: authSheetZoom 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-sheet { animation: none; }
+}
+
+/* ============================================================
+   Animated header wordmark — "urbannook". A soft brand-red
+   highlight sweeps across the paper-coloured letters forever.
+   ============================================================ */
+@keyframes unWordmarkSweep {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+.un-wordmark {
+  background-image: linear-gradient(
+    100deg,
+    #EFEAE0 0%, #EFEAE0 38%,
+    #E63329 50%,
+    #EFEAE0 62%, #EFEAE0 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: unWordmarkSweep 5s linear infinite;
+}
+.un-wordmark:hover { animation-duration: 1.6s; }
+@media (prefers-reduced-motion: reduce) {
+  .un-wordmark { animation: none; -webkit-text-fill-color: #EFEAE0; }
+}
+
+/* ============================================================
+   Stop iOS Safari from auto-zooming when a form field is focused.
+   Mobile browsers zoom in whenever an input's font-size is < 16px
+   (and never zoom back out) — awful UX. Forcing a 16px minimum on
+   touch widths kills the zoom trigger, WITHOUT disabling pinch-zoom
+   (we deliberately keep the viewport zoomable for accessibility —
+   no maximum-scale / user-scalable=no). Desktop keeps its designed
+   sizes; this only applies on narrow/mobile screens.
+   ============================================================ */
+@media screen and (max-width: 640px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* ============================================================
+   Checkout step transition — each step slides/fades in like an
+   app screen. (No tailwindcss-animate plugin, so defined directly.)
+   ============================================================ */
+@keyframes stepFade {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.step-fade { animation: stepFade 0.3s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .step-fade { animation: none; }
+}
+
+/* ============================================================
+   Checkout section as a mobile bottom-sheet — the Login/Guest and
+   Contact steps slide up from the bottom (like the Address form).
+   ONLY on narrow screens; desktop (lg+) keeps the inline layout.
+   Defined AFTER .step-fade so its slide-up animation wins on mobile.
+   ============================================================ */
+@keyframes checkoutSheetUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+@media (max-width: 1023px) {
+  .checkout-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    max-height: 85vh;
+    overflow-y: auto;
+    background: #ffffff;
+    border-top-left-radius: 1.5rem !important;
+    border-top-right-radius: 1.5rem !important;
+    box-shadow: 0 -14px 44px rgba(0, 0, 0, 0.16);
+    padding: 0.25rem 1rem calc(6.5rem + env(safe-area-inset-bottom));
+    animation: checkoutSheetUp 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .checkout-sheet { animation: none; }
+  }
+}
+
 
   /* Hides the scrollbar on horizontally-scrolling strips (e.g. the variant
      selector) while keeping the element natively scrollable/swipeable. */
@@ -508,4 +741,3 @@
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
-}

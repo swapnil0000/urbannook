@@ -21,6 +21,7 @@ import {
   metaCapiRouter,
   adminAnalyticsRouter,
   freeShippingOfferRouter,
+  passkeyRouter,
   cartRuleRouter,
 } from "./routes/index.js";
 import cookieParser from "cookie-parser";
@@ -218,6 +219,7 @@ app.use(
   metaCapiRouter,
   adminAnalyticsRouter,
   freeShippingOfferRouter,
+  passkeyRouter,
   cartRuleRouter,
 );
 

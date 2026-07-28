@@ -89,10 +89,10 @@ const WishlistPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#2e443c] relative font-sans selection:bg-[#F5DEB3] selection:text-[#2e443c] pb-10">
+    <div className="min-h-screen bg-paper relative font-inter text-ink selection:bg-surface selection:text-ink pb-10">
 
       {/* --- Ambient Background Glow --- */}
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#F5DEB3]/5 rounded-full blur-[120px] pointer-events-none"></div>
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-brand/5 rounded-full blur-[120px] pointer-events-none"></div>
 
       {/* Hero Section */}
       <section className="pt-32 pb-8 md:pt-34 md:pb-5 px-6 relative z-10">
@@ -100,17 +100,17 @@ const WishlistPage = () => {
 
           {/* LEFT SIDE: Heading & Description */}
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 backdrop-blur-md border border-white/10 mb-4 md:mb-6">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#F5DEB3] animate-pulse"></span>
-              <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-[0.25em] text-[#F5DEB3]">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface backdrop-blur-md border border-hair mb-4 md:mb-6">
+              <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse"></span>
+              <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-[0.25em] text-brand">
                 Your Selection
               </span>
             </div>
-            <h1 className="text-4xl sm:text-6xl md:text-7xl font-serif text-white leading-[0.9] mb-2">
+            <h1 className="text-4xl sm:text-6xl md:text-7xl font-archivo font-extrabold text-ink leading-[0.9] mb-2">
               Curated{' '}
-              <span className="italic font-light text-[#F5DEB3]">Wishlist.</span>
+              <span className="font-light text-brand">Wishlist.</span>
             </h1>
-            <p className="text-sm md:text-base text-green-50/70 font-light leading-relaxed max-w-md">
+            <p className="text-sm md:text-base text-muted font-light leading-relaxed max-w-md">
               Your handpicked collection of atmospheric pieces.
             </p>
           </div>
@@ -123,16 +123,16 @@ const WishlistPage = () => {
 
           {isLoading ? (
             <div className="flex justify-center py-32">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#F5DEB3]"></div>
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand"></div>
             </div>
           ) : wishlistItems.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-32 bg-black/10 rounded-[2rem] border border-white/5 backdrop-blur-sm">
-              <i className="fa-regular fa-heart text-4xl text-[#F5DEB3]/50 mb-4"></i>
-              <h2 className="text-2xl font-serif text-white mb-2">Your collection is empty</h2>
-              <p className="text-green-50/60 mb-6 font-light">Save your favorite pieces to easily find them later.</p>
+            <div className="flex flex-col items-center justify-center py-32 bg-surface rounded-[2rem] border border-hair backdrop-blur-sm">
+              <i className="fa-regular fa-heart text-4xl text-brand mb-4"></i>
+              <h2 className="text-2xl font-archivo font-bold text-ink mb-2">Your collection is empty</h2>
+              <p className="text-muted mb-6 font-light">Save your favorite pieces to easily find them later.</p>
               <button
                 onClick={() => navigate('/products')}
-                className="bg-[#F5DEB3] text-[#2e443c] px-8 py-3 rounded-full font-bold uppercase tracking-widest text-xs hover:bg-white transition-colors"
+                className="bg-brand text-white px-8 py-3 rounded-full font-bold uppercase tracking-widest text-xs hover:bg-brandHi transition-colors"
               >
                 Explore Collection
               </button>
@@ -142,7 +142,7 @@ const WishlistPage = () => {
               {wishlistItems?.map((item, index) => (
                 <div
                   key={item.productId}
-                  className="group relative rounded-[2rem] overflow-hidden bg-black/20 border border-white/5 shadow-lg hover:shadow-2xl hover:border-[#F5DEB3]/30 transition-all duration-500 flex flex-col animate-in fade-in slide-in-from-bottom-4"
+                  className="group relative rounded-[2rem] overflow-hidden bg-white border border-hair shadow-lg hover:shadow-2xl hover:border-brand/30 transition-all duration-500 flex flex-col animate-in fade-in slide-in-from-bottom-4"
                 >
                   {/* Remove Button (Floating Top Right) */}
                   <div className="absolute top-4 right-4 z-20">
@@ -191,18 +191,18 @@ const WishlistPage = () => {
                     <div className="p-4 md:p-4 flex flex-col flex-grow justify-between bg-[#f5f7f8]">
 
                       <div className="mb-2">
-                        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a89068] block opacity-80">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand block opacity-80">
                           {item.productCategory}
                         </span>
-                        <h3 className="font-serif text-xl md:text-2xl text-gray-500 leading-snug line-clamp-2">
+                        <h3 className="font-archivo text-xl md:text-2xl text-gray-500 leading-snug line-clamp-2">
                           {item.productName}
                         </h3>
                       </div>
 
-                      <div className="flex justify-between items-end pt-2 border-t border-[#F5DEB3]/10 mt-auto">
+                      <div className="flex justify-between items-end pt-2 border-t border-hair mt-auto">
                         <div className="flex flex-col">
                           <span className="text-[10px] uppercase tracking-widest text-gray-500 mb-1">Pricing</span>
-                          <span className="text-lg md:text-xl font-semibold text-[#a89068]">
+                          <span className="text-lg md:text-xl font-semibold text-brand">
                             ₹{(item.variantDetails?.[0]?.variantPrice || 0).toLocaleString()}
                           </span>
                         </div>
@@ -215,12 +215,12 @@ const WishlistPage = () => {
                           }}
                           disabled={item.productStatus === 'out_of_stock' || addingItems.has(item.productId)}
                           className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${item.productStatus !== 'out_of_stock' && !addingItems.has(item.productId)
-                              ? 'bg-[#F5DEB3]/10 text-gray-500 group-hover:bg-[#F5DEB3] group-hover:text-[#2e443c]'
+                              ? 'bg-brand/10 text-brand group-hover:bg-brand group-hover:text-white'
                               : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                             }`}
                         >
                           {addingItems.has(item.productId) ? (
-                            <div className="w-3 h-3 border-2 border-[#a89068] border-t-transparent rounded-full animate-spin"></div>
+                            <div className="w-3 h-3 border-2 border-brand border-t-transparent rounded-full animate-spin"></div>
                           ) : isInCart(item.productId) ? (
                             <i className="fa-solid fa-check text-xs"></i>
                           ) : (

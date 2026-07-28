@@ -16,6 +16,7 @@ import catalogRouter from "./catalog.route.js";
 import metaCapiRouter from "./meta.capi.route.js";
 import adminAnalyticsRouter from "./admin.analytics.route.js";
 import freeShippingOfferRouter from "./freeShippingOffer.route.js";
+import passkeyRouter from "./passkey.route.js";
 import cartRuleRouter from "./cartRule.route.js";
 export {
   userRouter,
@@ -36,5 +37,6 @@ export {
   metaCapiRouter,
   adminAnalyticsRouter,
   freeShippingOfferRouter,
+  passkeyRouter,
   cartRuleRouter,
 };

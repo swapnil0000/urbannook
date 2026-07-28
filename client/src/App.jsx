@@ -13,6 +13,8 @@ import AppRoutes from './store/AppRoutes';
 import NewsTicker from './pages/home/NewsTicker';
 import SEOHead from './component/SEOHead';
 import { trackPageView, setUserId, captureAttribution, setMetaAdvancedMatching } from './utils/analytics';
+import MotionLayer from './component/MotionLayer';
+import SmoothScroll from './component/motion/SmoothScroll';
 // check
 const ORG_STRUCTURED_DATA = {
   '@context': 'https://schema.org',
@@ -36,9 +38,11 @@ const ORG_STRUCTURED_DATA = {
 const NewHeader = lazy(() => import('./component/layout/NewHeader'));
 const Footer = lazy(() => import('./component/layout/Footer'));
 const Notification = lazy(() => import('./component/Notification'));
+const GlMobileNav = lazy(() => import('./component/layout/GlMobileNav'));
 const SocialMediaFAB = lazy(() => import('./component/layout/WhatsAppButton'));
 const OpenInBrowserBanner = lazy(() => import('./component/OpenInBrowserBanner'));
 const GoogleOneTap = lazy(() => import('./component/GoogleOneTap'));
+const PasskeyPrompt = lazy(() => import('./component/PasskeyPrompt'));
 
 // Component to handle session restoration and token removal detection
 const SessionManager = ({ children }) => {
@@ -147,19 +151,24 @@ const SyncProvider = ({ children }) => {
 
 function App() {
   useEffect(() => {
-    console.log("%c URBAN NOOK CLIENT ACTIVE - VERSION 2.1.1 (STRICT VARIANT) ", "background: #2e443c; color: #F5DEB3; font-weight: bold; font-size: 14px; padding: 10px; border-radius: 5px;");
+    console.log("%c URBAN NOOK CLIENT ACTIVE - VERSION 2.1.1 (STRICT VARIANT) ", "background: #141414; color: #E63329; font-weight: bold; font-size: 14px; padding: 10px; border-radius: 5px;");
   }, []);
 
   return (
     <HelmetProvider>
     <Provider store={store}>
-        <Router> 
+        <Router>
+          <SmoothScroll>
           <SEOHead structuredData={ORG_STRUCTURED_DATA} />
           <RouteTracker />
+          <MotionLayer />
           <SessionManager>
             <SyncProvider>
+              <Suspense fallback={null}>
+                <OpenInBrowserBanner />
+              </Suspense>
               <ErrorBoundary>
-                <NewsTicker/>
+                {/* <NewsTicker/> */}
                 <NewHeader/>
               </ErrorBoundary>
               {/* AppRoutes loaded immediately - no lazy loading for critical routing */}
@@ -172,14 +181,20 @@ function App() {
                   <Footer />
                 </ErrorBoundary>
                 <SocialMediaFAB />
+                <GlMobileNav />
                 <Notification />
                 {/* Global Google One Tap for logged-out visitors (boosts Meta EMQ) */}
                 <ErrorBoundary>
                   <GoogleOneTap />
                 </ErrorBoundary>
+                {/* Post-login passkey upsell (fires once after a fresh login) */}
+                <ErrorBoundary>
+                  <PasskeyPrompt />
+                </ErrorBoundary>
               </Suspense>
             </SyncProvider>
           </SessionManager>
+          </SmoothScroll>
         </Router>
     </Provider>
     </HelmetProvider>

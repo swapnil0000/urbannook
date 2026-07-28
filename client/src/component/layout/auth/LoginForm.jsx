@@ -9,6 +9,9 @@ import { setShowLoginModal, clearLoginCallback } from '../../../store/slices/uiS
 import GoogleLoginButton from './GoogleLoginButton';
 import useFormValidation from '../../../hooks/useFormValidation';
 import { trackLogin, trackLoginFailed } from '../../../utils/analytics';
+import { isGoogleAuthSupported } from '../../../utils/browserEnv';
+import { startAuthentication, browserSupportsWebAuthn } from '@simplewebauthn/browser';
+import { usePasskeyLoginOptionsMutation, usePasskeyLoginVerifyMutation } from '../../../store/api/passkeyApi';
 
 const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
   const navigate = useNavigate();
@@ -22,6 +25,45 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
   const [login, { isLoading }] = useLoginMutation();
   const { login: setAuthUser } = useAuth();
   const { showNotification } = useUI();
+
+  const [passkeyLoginOptions] = usePasskeyLoginOptionsMutation();
+  const [passkeyLoginVerify] = usePasskeyLoginVerifyMutation();
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
+  const passkeySupported = typeof window !== 'undefined' && browserSupportsWebAuthn() && isGoogleAuthSupported();
+
+  const handlePasskeyLogin = async () => {
+    const email = formData.identifier?.trim();
+    if (!email) {
+      setFieldError('identifier', 'Enter your email to use a passkey');
+      showNotification('Enter your email first', 'error');
+      return;
+    }
+    setPasskeyBusy(true);
+    try {
+      const optsRes = await passkeyLoginOptions({ email }).unwrap();
+      const assertion = await startAuthentication({ optionsJSON: optsRes.data });
+      const res = await passkeyLoginVerify({ email, assertion }).unwrap();
+      // passkeyLoginVerify.onQueryStarted already did setCredentials + CSRF
+      showNotification('Signed in with passkey!', 'success');
+      trackLogin({ method: 'passkey', userId: res.data?.userId, email: res.data?.email || email, name: res.data?.name });
+      const userData = { name: res.data?.name || 'User', email: res.data?.email || email, userId: res.data?.userId || '' };
+      if (onLoginSuccess) onLoginSuccess(userData);
+      dispatch(setShowLoginModal(false));
+      if (onClose) onClose();
+      if (loginCallback && loginCallback.startsWith('navigate:')) {
+        const path = loginCallback.replace('navigate:', '');
+        dispatch(clearLoginCallback());
+        navigate(path);
+      }
+    } catch (err) {
+      // User dismissed the OS passkey prompt — stay silent
+      if (err?.name === 'NotAllowedError' || err?.name === 'AbortError') return;
+      const msg = err?.data?.message || err?.message || 'Passkey sign-in failed';
+      showNotification(msg, 'error');
+    } finally {
+      setPasskeyBusy(false);
+    }
+  };
 
   // Use validation hook with custom rules for login (password without pattern validation)
   const { 
@@ -143,33 +185,37 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[100] p-4" onClick={() => {
+    <div className="fixed inset-0 bg-ink/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-[100] sm:p-4 font-inter" onClick={() => {
       dispatch(setShowLoginModal(false));
       onClose();
     }}>
-      
-      {/* Matches SignupForm Dimensions & Style */}
-      <div 
-        className="bg-white rounded-[2.5rem] w-full max-w-4xl shadow-2xl relative overflow-hidden flex flex-col md:flex-row animate-in fade-in zoom-in duration-300 h-[600px] md:h-[650px]"
+
+      {/* Bottom-sheet on mobile, centered dialog on desktop */}
+      <div
+        className="bg-paper w-full max-w-4xl shadow-2xl relative overflow-hidden flex flex-col md:flex-row auth-sheet max-h-[94dvh] md:h-[650px]"
         onClick={(e) => e.stopPropagation()}
       >
-        
+        {/* Mobile grab handle */}
+        <div className="sm:hidden absolute top-2.5 inset-x-0 z-30 flex justify-center pointer-events-none">
+          <span className="h-1.5 w-11 rounded-full bg-hair"></span>
+        </div>
+
         {/* --- LEFT SIDE (Visual) --- */}
-        <div className="hidden md:flex w-5/12 bg-[#1c3026] p-10 flex-col justify-between relative overflow-hidden">
+        <div className="hidden md:flex w-5/12 bg-ink p-10 flex-col justify-between relative overflow-hidden">
             {/* Background Pattern */}
             <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
             
             <div className="relative z-10">
                 <div className="flex items-center gap-3 mb-10">
-                    {/* <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white">
+                    {/* <div className="w-10 h-10 bg-save rounded-xl flex items-center justify-center text-white">
                         <i className="fa-solid fa-leaf text-lg"></i>
                     </div> */}
-                    <span className="text-white font-serif text-xl">UrbanNook</span>
+                    <span className="text-white font-archivo text-xl">UrbanNook</span>
                 </div>
                 
-                <h2 className="text-4xl font-serif text-white mb-6 leading-tight">
+                <h2 className="text-4xl font-archivo text-white mb-6 leading-tight">
                     Welcome <br/>
-                    <span className="italic text-[#F5DEB3]">Back.</span>
+                    <span className="italic text-surface">Back.</span>
                 </h2>
                 
                 <p className="text-gray-300 text-sm leading-relaxed max-w-xs">
@@ -182,12 +228,12 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
                 <div className="flex items-center gap-4">
                     <div className="flex -space-x-3">
                         {[1,2,3].map(i => (
-                            <div key={i} className="w-8 h-8 rounded-full bg-[#0a110e] border-2 border-[#1c3026]"></div>
+                            <div key={i} className="w-8 h-8 rounded-full bg-ink border-2 border-ink"></div>
                         ))}
                     </div>
                     <div>
                         <p className="text-white text-xs font-bold">Join 500+ Members</p>
-                        <p className="text-[#F5DEB3] text-[10px] uppercase tracking-widest">Community</p>
+                        <p className="text-surface text-[10px] uppercase tracking-widest">Community</p>
                     </div>
                 </div>
             </div>
@@ -196,7 +242,7 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
         {/* --- RIGHT SIDE (Form) --- */}
         <div className="w-full md:w-7/12 overflow-y-auto px-8 py-10 md:p-12 relative flex flex-col justify-center">
           <button 
-            className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:text-[#1c3026] transition-colors z-20"
+            className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:text-ink transition-colors z-20"
             onClick={() => {
               dispatch(setShowLoginModal(false));
               onClose();
@@ -207,7 +253,7 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
 
           <div className="max-w-md mx-auto w-full">
             <div className="mb-8 text-center md:text-left">
-              <h2 className="text-3xl font-serif text-[#1c3026] mb-2">Sign In</h2>
+              <h2 className="text-3xl font-archivo text-ink mb-2">Sign In</h2>
               <p className="text-gray-500 text-sm">Continue to your curated space.</p>
             </div>
 
@@ -221,7 +267,7 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
                   name="identifier"
                   value={formData.identifier}
                   onChange={handleInputChange}
-                  className={`w-full p-4 bg-white border rounded-2xl focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10 transition-all outline-none text-[#1c3026] text-sm ${
+                  className={`w-full p-4 bg-white border rounded-2xl focus:border-save focus:ring-4 focus:ring-save/10 transition-all outline-none text-ink text-sm ${
                     errors.identifier ? 'border-red-500' : 'border-gray-200'
                   }`}
                   placeholder="you@example.com"
@@ -236,7 +282,7 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
                   <button 
                     type="button" 
                     onClick={() => setShowForgotPassword(true)}
-                    className="text-[10px] font-bold text-emerald-600 hover:underline uppercase tracking-tighter"
+                    className="text-[10px] font-bold text-save hover:underline uppercase tracking-tighter"
                   >
                     Forgot?
                   </button>
@@ -247,7 +293,7 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
                     name="password"
                     value={formData.password}
                     onChange={handleInputChange}
-                    className={`w-full p-4 bg-white border rounded-2xl focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10 transition-all outline-none text-[#1c3026] text-sm pr-12 ${
+                    className={`w-full p-4 bg-white border rounded-2xl focus:border-save focus:ring-4 focus:ring-save/10 transition-all outline-none text-ink text-sm pr-12 ${
                       errors.password ? 'border-red-500' : 'border-gray-200'
                     }`}
                     placeholder="••••••••"
@@ -255,7 +301,7 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-600 transition-colors"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-save transition-colors"
                   >
                     <i className={`fa-solid ${showPassword ? 'fa-eye-slash' : 'fa-eye'} text-xs`}></i>
                   </button>
@@ -266,7 +312,7 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
               <button 
                 type="submit" 
                 disabled={isLoading}
-                className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-bold tracking-widest uppercase hover:bg-emerald-700 transition-all shadow-xl active:scale-[0.98] mt-6 disabled:opacity-50 text-xs"
+                className="w-full py-4 bg-brand text-white rounded-2xl font-bold tracking-widest uppercase hover:bg-brandHi transition-all shadow-xl active:scale-[0.98] mt-6 disabled:opacity-50 text-xs"
               >
                 {isLoading ? (
                   <div className="flex items-center justify-center gap-2">
@@ -283,7 +329,21 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
               )}
             </form>
 
-            {/* Google Login Section */}
+            {/* Passkey (Face ID / fingerprint) — one-tap sign-in for returning users */}
+            {passkeySupported && (
+              <button
+                type="button"
+                onClick={handlePasskeyLogin}
+                disabled={passkeyBusy}
+                className="w-full py-3.5 mt-4 border-2 border-ink text-ink rounded-2xl font-bold uppercase tracking-widest text-xs hover:bg-ink hover:text-white transition-all flex items-center justify-center gap-2 disabled:opacity-50 gl-press"
+              >
+                <i className="fa-solid fa-fingerprint text-sm"></i>
+                {passkeyBusy ? 'Waiting for passkey...' : 'Use a passkey'}
+              </button>
+            )}
+
+            {/* Google Login Section — hidden inside in-app browsers (Instagram/FB), where Google OAuth is blocked */}
+            {isGoogleAuthSupported() && (
             <div className="mt-6">
               <div className="relative flex items-center justify-center my-6">
                 <div className="border-t border-gray-200 w-full"></div>
@@ -311,10 +371,11 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
                 />
               </div>
             </div>
+            )}
 
             <p className="text-sm text-center mt-8 text-gray-500">
               New here?{' '}
-              <span onClick={onSwitchToSignup} className="text-emerald-600 cursor-pointer font-bold hover:underline transition-all">
+              <span onClick={onSwitchToSignup} className="text-save cursor-pointer font-bold hover:underline transition-all">
                 Create an account
               </span>
             </p>

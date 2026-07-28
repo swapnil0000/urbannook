@@ -54,8 +54,8 @@ const OrderConfirm = () => {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="bg-white shadow-xl rounded-2xl p-10 flex flex-col items-center w-full max-w-md">
-          <div className="w-16 h-16 border-4 border-[#A89068]/30 border-t-[#2E443C] rounded-full animate-spin"></div>
-          <p className="mt-6 text-[#A89068] text-center">Loading your order...</p>
+          <div className="w-16 h-16 border-4 border-brand/30 border-t-ink rounded-full animate-spin"></div>
+          <p className="mt-6 text-brand text-center">Loading your order...</p>
         </div>
       </div>
     );
@@ -68,14 +68,14 @@ const OrderConfirm = () => {
   // Authenticated user flow
   if (!isGuestOrder) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4 bg-[#f5f7f5]">
+      <div className="min-h-screen flex items-center justify-center px-4 bg-surface">
         <div className="bg-white shadow-xl rounded-2xl overflow-hidden w-full max-w-md text-center">
-          <div className="bg-[#2E443C] px-8 pt-10 pb-8 flex flex-col items-center">
+          <div className="bg-ink px-8 pt-10 pb-8 flex flex-col items-center">
             <div className="w-16 h-16 rounded-full bg-white/15 flex items-center justify-center mb-4">
               <i className="fa-solid fa-circle-check text-3xl text-white"></i>
             </div>
             <h2 className="text-2xl font-semibold text-white mb-1">Order Confirmed!</h2>
-            <p className="text-[#a89068] text-sm">Thank you for shopping with Urban Nook.</p>
+            <p className="text-brand text-sm">Thank you for shopping with Urban Nook.</p>
           </div>
 
           <div className="px-8 py-6 space-y-4">
@@ -85,7 +85,7 @@ const OrderConfirm = () => {
 
             <button
               onClick={() => navigate("/orders")}
-              className="w-full py-3 bg-[#2E443C] text-white rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-[#1a2822] transition-all"
+              className="w-full py-3 bg-ink text-white rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-ink/90 transition-all"
             >
               <i className="fa-solid fa-box mr-2 opacity-70" />
               Go to My Orders
@@ -105,14 +105,14 @@ const OrderConfirm = () => {
 
   // Guest user flow
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-[#f5f7f5]">
+    <div className="min-h-screen flex items-center justify-center px-4 bg-surface">
       <div className="bg-white shadow-xl rounded-2xl overflow-hidden w-full max-w-md text-center">
-        <div className="bg-[#2E443C] px-8 pt-10 pb-8 flex flex-col items-center">
+        <div className="bg-ink px-8 pt-10 pb-8 flex flex-col items-center">
           <div className="w-16 h-16 rounded-full bg-white/15 flex items-center justify-center mb-4">
             <i className="fa-solid fa-circle-check text-3xl text-white"></i>
           </div>
           <h2 className="text-2xl font-semibold text-white mb-1">Order Confirmed!</h2>
-          <p className="text-[#a89068] text-sm">Thank you for shopping with Urban Nook.</p>
+          <p className="text-brand text-sm">Thank you for shopping with Urban Nook.</p>
         </div>
 
         <div className="px-8 py-6 space-y-4">
@@ -131,7 +131,7 @@ const OrderConfirm = () => {
               </div>
             </div>
           ) : (
-            <div className="bg-[#f5f7f5] rounded-xl p-4 text-center">
+            <div className="bg-surface rounded-xl p-4 text-center">
               <p className="text-sm text-gray-700 font-medium">Sign in to track your order</p>
               {guestEmail && (
                 <p className="text-xs text-gray-500 mt-1">{guestEmail}</p>
@@ -161,7 +161,7 @@ const OrderConfirm = () => {
               dispatch(setLoginCallback("navigate:/orders"));
               dispatch(setShowLoginModal(true));
             }}
-            className="w-full py-3 bg-[#2E443C] text-white rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-[#1a2822] transition-all"
+            className="w-full py-3 bg-ink text-white rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-ink/90 transition-all"
           >
             <i className="fa-solid fa-arrow-right-to-bracket mr-2 opacity-70" />
             {isNewGuestAccount ? "Login with Password" : "Login to Track Order"}
@@ -176,7 +176,7 @@ const OrderConfirm = () => {
                   dispatch(setLoginCallback("navigate:/orders"));
                   dispatch(setShowLoginModal(true));
                 }}
-                className="text-[#2E443C] font-semibold underline underline-offset-2"
+                className="text-ink font-semibold underline underline-offset-2"
               >
                 Use Forgot Password
               </button>

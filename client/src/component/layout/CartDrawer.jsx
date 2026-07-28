@@ -19,7 +19,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const [mounted, setMounted] = useState(false);
-  
+
   const { items: cartItems, totalAmount } = useSelector((state) => state.cart);
   const { isAuthenticated } = useSelector((state) => state.auth);
 
@@ -143,7 +143,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
       dispatch(removeItem({ id: productId, selectedVariant: effectiveVariant }));
     }
   };
-  
+
   const handleCheckout = () => {
     onClose();
     navigate('/checkout');
@@ -189,188 +189,146 @@ const CartDrawer = ({ isOpen, onClose }) => {
   })();
 
   return (
-    <div className="fixed inset-0 z-[9999] flex justify-end">
-      
+    <div className="fixed inset-0 z-[9999] flex justify-end font-inter text-ink">
+
       {/* Backdrop */}
-      <div 
-        className={`absolute inset-0 bg-[#0a110e]/60 backdrop-blur-sm transition-opacity duration-300 ${
-          isOpen ? 'opacity-100' : 'opacity-0'
-        }`}
+      <div
+        className={`absolute inset-0 bg-ink/50 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0'}`}
         onClick={onClose}
       />
 
       {/* Drawer Panel */}
-      <div 
-        className={`relative w-full max-w-[420px] bg-white h-full shadow-2xl flex flex-col transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] transform ${
+      <div
+        className={`relative w-full max-w-[430px] bg-paper h-full shadow-2xl flex flex-col transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
-        
+
         {/* --- HEADER --- */}
-        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-white z-10 shrink-0">
-          <div>
-            <h2 className="text-2xl font-serif text-[#0a110e] tracking-tight">Your Nook</h2>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
-              {cartItems.length} {cartItems.length === 1 ? 'ITEM' : 'ITEMS'}
-            </p>
+        <div className="px-5 py-4 border-b border-hair flex items-center justify-between shrink-0">
+          <div className="flex items-baseline gap-2.5">
+            <h2 className="text-xl font-extrabold tracking-tight">Your Cart</h2>
+            <span className="gl-lbl text-brand text-[11px]">{cartItems.length} {cartItems.length === 1 ? 'item' : 'items'}</span>
           </div>
-          <button 
+          <button
             onClick={onClose}
-            className="group w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-[#0a110e] transition-all duration-300"
+            aria-label="Close cart"
+            className="w-9 h-9 rounded-full border border-hair grid place-items-center text-muted hover:border-ink hover:text-ink transition-colors"
           >
-            <i className="fa-solid fa-xmark text-sm group-hover:rotate-90 transition-transform duration-300"></i>
+            <i className="fa-solid fa-xmark text-sm" />
           </button>
         </div>
 
         {/* --- SCROLLABLE CONTENT --- */}
-        <div className="flex-1 overflow-y-auto p-6 md:p-8 scrollbar-hide">
-          
+        <div className="flex-1 overflow-y-auto px-5 py-5 scrollbar-hide">
+
           {cartItems.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center space-y-6 opacity-80">
-              <div className="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center mb-2 border border-dashed border-gray-200">
-                <i className="fa-solid fa-bag-shopping text-3xl text-gray-300"></i>
+            <div className="h-full flex flex-col items-center justify-center text-center gap-5">
+              <div className="w-20 h-20 rounded-full bg-brand/10 grid place-items-center">
+                <i className="fa-solid fa-bag-shopping text-2xl text-brand" />
               </div>
               <div>
-                <h3 className="text-xl font-serif text-[#0a110e] mb-2">Your Bag is Empty</h3>
-                <p className="text-sm text-gray-500 max-w-[220px] mx-auto leading-relaxed">
-                  Looks like you haven't discovered your perfect piece yet.
-                </p>
+                <h3 className="text-lg font-extrabold mb-1">Your cart is empty</h3>
+                <p className="text-sm text-muted max-w-[240px] mx-auto leading-relaxed">Add a piece you love — it'll show up here.</p>
               </div>
-              <button 
-                onClick={() => {
-                  onClose();
-                  navigate('/products');
-                }}
-                className="px-8 py-3.5 bg-[#0a110e] text-white text-xs font-bold uppercase tracking-[0.15em] rounded-full hover:bg-[#1a2b24] transition-all duration-300"
+              <button
+                onClick={() => { onClose(); navigate('/products'); }}
+                className="gl-press bg-brand text-white text-sm font-bold px-7 py-3 rounded-xl hover:bg-brandHi transition-colors"
               >
-                Start Exploring
+                Start shopping
               </button>
             </div>
           ) : (
             <>
-              {/* Items List */}
-              <div className="space-y-6">
+              <div className="divide-y divide-hair">
                 {cartItems.map((item) => {
-                  // Mongoose bug safe extraction
                   const itemQty = typeof item.quantity === 'object' ? Number(item.quantity?.quantity || 0) : Number(item.quantity || 0);
                   const itemId = item.mongoId || item.productId || item.id;
+                  const variant = item.selectedVariant && item.selectedVariant !== 'N/A' ? item.selectedVariant : null;
                   const displayName = resolveVariantTitle(item.name, item.variantTitleTemplate, item.selectedVariant);
+                  const discountedPrice = getItemDiscountedPrice(item);
+                  const rawPrice = Number(item.price) || 0;
+                  const hasDiscount = discountedPrice < rawPrice;
+                  const percentOff = hasDiscount ? Math.round(((rawPrice - discountedPrice) / rawPrice) * 100) : 0;
 
                   return (
-                    <div key={`${itemId}-${item.selectedVariant || 'N/A'}`} className="flex items-stretch gap-4 group relative pb-6 border-b border-gray-50 last:border-0 last:pb-0">
+                    <div key={`${itemId}-${item.selectedVariant || 'N/A'}`} className="flex gap-4 py-4 first:pt-0">
 
                       {/* Image */}
-                      <div className="w-[85px] h-[85px] bg-gray-50 rounded-2xl overflow-hidden shrink-0 relative border border-gray-100 flex items-center justify-center">
-                        <Suspense fallback={<div className="w-full h-full bg-gray-100 animate-pulse"></div>}>
+                      <button
+                        onClick={() => { onClose(); navigate(`/product/${item.productId || itemId}`); }}
+                        className="w-20 h-20 rounded-xl overflow-hidden border border-hair bg-surface shrink-0"
+                        aria-label={`View ${displayName}`}
+                      >
+                        <Suspense fallback={<div className="w-full h-full bg-hair animate-pulse" />}>
                           <OptimizedImage
                             src={item.image || '/placeholder.jpg'}
                             alt={displayName}
-                            className="w-full h-full object-contain mix-blend-multiply"
+                            className="w-full h-full object-cover"
                             loading="lazy"
                           />
                         </Suspense>
-                      </div>
+                      </button>
 
                       {/* Details */}
-                      <div className="flex-1 flex flex-col min-w-0">
-                        <div>
-                          {/* Name & Delete */}
-                          <div className="flex justify-between items-start mb-1">
-                            <h4 className="text-base font-serif text-[#0a110e] leading-snug pr-4 hover:text-emerald-700 transition-colors cursor-pointer">
-                              {displayName}
-                            </h4>
-                            <button 
-                              onClick={() => handleRemoveItem(itemId, item.selectedVariant, item.mongoId)}
-                              className="text-gray-300 hover:text-red-500 transition-colors p-1 -mt-1 -mr-1 shrink-0"
-                              title="Remove Item"
-                            >
-                              <i className="fa-regular fa-trash-can text-sm"></i>
-                            </button>
-                          </div>
-                          
-                          {/* Only show a category line when there's a REAL
-                              category — the old "Standard Variant" fallback was
-                              a meaningless filler line above the actual variant,
-                              eating vertical space on short screens. */}
-                          {item.category && (
-                            <p className="text-xs text-gray-400 mt-1 font-medium tracking-wide">
-                              {item.category}
-                            </p>
-                          )}
-
-                          {/* Variant Selection (If Exists) — was a color dot
-                              guessed from the variant name (e.g. background:
-                              "tanjiro", invalid CSS → renders blank) instead
-                              of an actual swatch. A plain dark pill is
-                              correct here regardless of variant type. */}
-                          {(() => {
-                            const itemVariant = item.selectedVariant || 'N/A';
-                            if (!itemVariant || itemVariant === 'N/A') return null;
-
-                            return (
-                              <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-[#1c3026] text-white text-[10px] font-semibold tracking-wide">
-                                {itemVariant}
-                              </span>
-                            );
-                          })()}
+                      <div className="flex-1 min-w-0 flex flex-col">
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="text-sm font-bold leading-snug line-clamp-2 pr-1 hover:text-brand transition-colors cursor-pointer"
+                            onClick={() => { onClose(); navigate(`/product/${item.productId || itemId}`); }}>
+                            {displayName}
+                          </h4>
+                          <button
+                            onClick={() => handleRemoveItem(itemId, item.selectedVariant, item.mongoId)}
+                            aria-label="Remove item"
+                            className="shrink-0 -mt-0.5 -mr-1 p-1 text-faint hover:text-brand transition-colors"
+                            title="Remove"
+                          >
+                            <i className="fa-regular fa-trash-can text-xs" />
+                          </button>
                         </div>
 
-                        <div className="flex items-center justify-between mt-2">
-                          {/* Quantity Controls - Exact match to your screenshot inspector */}
-                          <div className="flex items-center gap-4 bg-white border border-gray-200 rounded-full h-8 px-3 shadow-sm">
-                            <button 
+                        {variant && <p className="text-[11px] text-muted mt-0.5 font-semibold uppercase tracking-wide">{variant}</p>}
+
+                        <div className="mt-auto pt-2.5 flex items-center justify-between">
+                          {/* Quantity */}
+                          <div className="flex items-center border border-hair rounded-full h-8">
+                            <button
                               onClick={() => handleQuantityChange(itemId, item.selectedVariant, Math.max(0, itemQty - 1), item.mongoId, itemQty, item.image)}
-                              className="w-4 h-full flex items-center justify-center text-gray-400 hover:text-[#0a110e] transition-colors"
+                              className="w-8 h-full grid place-items-center text-muted hover:text-brand transition-colors"
+                              aria-label="Decrease quantity"
                             >
-                              <i className="fa-solid fa-minus text-[10px]"></i>
+                              <i className="fa-solid fa-minus text-[10px]" />
                             </button>
-                            <span className="text-xs font-bold text-[#0a110e] min-w-[12px] text-center">
-                              {itemQty}
-                            </span>
-                            <button 
+                            <span className="min-w-[20px] text-center text-xs font-bold tabular-nums">{itemQty}</span>
+                            <button
                               onClick={() => handleQuantityChange(itemId, item.selectedVariant, itemQty + 1, item.mongoId, itemQty, item.image)}
-                              className="w-4 h-full flex items-center justify-center text-gray-400 hover:text-[#0a110e] transition-colors"
+                              className="w-8 h-full grid place-items-center text-muted hover:text-brand transition-colors"
+                              aria-label="Increase quantity"
                             >
-                              <i className="fa-solid fa-plus text-[10px]"></i>
+                              <i className="fa-solid fa-plus text-[10px]" />
                             </button>
                           </div>
 
-                          {/* Price — shows the rule-discounted price (if any
-                              active cart rule discounts this item) instead of
-                              always the raw price, so this never disagrees
-                              with what checkout will actually charge. */}
-                          {(() => {
-                            const discountedPrice = getItemDiscountedPrice(item);
-                            const rawPrice = Number(item.price) || 0;
-                            const hasDiscount = discountedPrice < rawPrice;
-                            const percentOff = hasDiscount
-                              ? Math.round(((rawPrice - discountedPrice) / rawPrice) * 100)
-                              : 0;
-                            return hasDiscount ? (
-                              <div className="text-right">
-                                <p className="text-sm font-bold text-[#157a44]">₹{Math.round(discountedPrice).toLocaleString()}</p>
-                                <div className="flex items-center justify-end gap-1">
-                                  <span className="text-[10px] text-gray-400 line-through">₹{rawPrice.toLocaleString()}</span>
-                                  <span className="text-[9px] font-bold uppercase rounded-full bg-[#157a44] text-white px-1.5 py-px">
-                                    {percentOff}% OFF
-                                  </span>
-                                </div>
+                          {/* Price — rule-discounted when a cart rule applies, so this matches checkout */}
+                          {hasDiscount ? (
+                            <div className="text-right">
+                              <p className="text-sm font-extrabold text-save">₹{Math.round(discountedPrice).toLocaleString('en-IN')}</p>
+                              <div className="flex items-center justify-end gap-1">
+                                <span className="text-[10px] text-faint line-through">₹{rawPrice.toLocaleString('en-IN')}</span>
+                                <span className="text-[9px] font-bold uppercase rounded-full bg-save text-white px-1.5 py-px">{percentOff}% OFF</span>
                               </div>
-                            ) : (
-                              <p className="text-sm font-bold text-[#0a110e]">₹{rawPrice.toLocaleString()}</p>
-                            );
-                          })()}
+                            </div>
+                          ) : (
+                            <p className="text-sm font-extrabold">₹{rawPrice.toLocaleString('en-IN')}</p>
+                          )}
                         </div>
-
                       </div>
                     </div>
                   );
                 })}
               </div>
 
-              {/* Add-on nudge — only when the offer's source product is in the
-                  cart but the add-on isn't. Lets the customer complete the
-                  free-shipping combo without leaving the drawer. */}
+              {/* Add-on nudge — complete the free-shipping combo without leaving the drawer */}
               {nudgeBannerProductId && (
                 <FreeShippingBanner
                   productId={nudgeBannerProductId}
@@ -386,45 +344,43 @@ const CartDrawer = ({ isOpen, onClose }) => {
 
         {/* --- FOOTER (CHECKOUT) --- */}
         {cartItems?.length > 0 && (
-          <div className="px-6 py-2 sm:py-6 bg-white border-t border-gray-100 z-10 shrink-0">
-            <div className="space-y-1 sm:space-y-3 mb-3 sm:mb-6">
-                <div className="flex justify-between items-center text-[11px] font-bold text-gray-400 uppercase tracking-widest">
-                    <span>Subtotal</span>
-                    <span className="font-medium text-[#0a110e]">₹{(Number(subtotal) || 0).toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center gap-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest">
-                    <span className="shrink-0">Shipping</span>
-                    {isFreeShippingEligible ? (
-                      <span className="font-extrabold text-green-600 text-right">Free</span>
-                    ) : (
-                      <span className="font-medium normal-case tracking-normal text-gray-500 text-right">Calculated at checkout</span>
-                    )}
-                </div>
-                <div className="pt-1 border-t border-gray-100 flex justify-between items-center">
-                    <span className="text-base font-serif text-[#0a110e]">Total</span>
-                    <span className="text-xl font-bold text-[#0a110e]">₹{(Number(subtotal) || 0).toLocaleString()}</span>
-                </div>
+          <div className="px-5 py-5 border-t border-hair shrink-0">
+            <div className="space-y-2.5 mb-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted font-semibold">Subtotal</span>
+                <span className="font-bold">₹{(Number(subtotal) || 0).toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted font-semibold">Shipping</span>
+                {isFreeShippingEligible ? (
+                  <span className="font-extrabold text-save">Free</span>
+                ) : (
+                  <span className="text-muted">Calculated at checkout</span>
+                )}
+              </div>
+              <div className="flex items-center justify-between pt-2.5 border-t border-hair">
+                <span className="text-sm font-bold">Total</span>
+                <span className="text-xl font-extrabold">₹{(Number(subtotal) || 0).toLocaleString('en-IN')}</span>
+              </div>
             </div>
 
             {/* COD availability notice */}
-            <div className="flex items-center gap-1 bg-amber-50 border border-amber-100 rounded-2xl px-4 py-1 sm:py-3 mb-1 sm:mb-4">
-              <i className="fa-solid fa-hand-holding-dollar text-amber-500 text-base shrink-0" />
+            <div className="flex items-center gap-2.5 bg-surface border border-hair rounded-xl px-4 py-3 mb-4">
+              <i className="fa-solid fa-hand-holding-dollar text-brand text-base shrink-0" />
               <div>
-                <p className="text-[9px] font-bold text-amber-800">Cash on Delivery available.</p>
-                <p className="text-[8px] text-amber-600 mt-0.5 leading-snug">Pay a small advance online · rest at your door</p>
+                <p className="text-[11px] font-bold">Cash on Delivery available</p>
+                <p className="text-[10px] text-muted mt-0.5 leading-snug">Pay a small advance online · rest at your door</p>
               </div>
             </div>
 
             <button
               onClick={handleCheckout}
-              className="w-full py-4 bg-[#0a110e] text-white rounded-full font-bold uppercase tracking-[0.15em] text-[10px] hover:bg-[#1a2b24] transition-all duration-300 active:scale-[0.98] flex items-center justify-between px-6"
+              className="gl-press w-full h-12 bg-brand text-white rounded-xl font-bold text-sm hover:bg-brandHi transition-colors flex items-center justify-center gap-2"
             >
-                <span>Proceed to Checkout</span>
-                <i className="fa-solid fa-arrow-right-long"></i>
+              Proceed to Checkout <i className="fa-solid fa-arrow-right-long text-xs" />
             </button>
-            <div className="mt-4 flex justify-center items-center gap-1.5 text-[9px] text-gray-400 uppercase tracking-widest font-bold">
-                <i className="fa-solid fa-lock"></i>
-                <span>Secure Checkout</span>
+            <div className="mt-3 flex justify-center items-center gap-1.5 text-[10px] text-faint font-bold uppercase tracking-widest">
+              <i className="fa-solid fa-lock" /> Secure Checkout
             </div>
           </div>
         )}

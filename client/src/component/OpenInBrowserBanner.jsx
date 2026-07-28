@@ -1,60 +1,69 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { isInAppBrowser, isAndroid, escapeToExternalBrowser } from '../utils/browserEnv';
 
+const DISMISS_KEY = 'iab_banner_dismissed';
+
+/**
+ * Nudge shown ONLY inside in-app browsers (Instagram/Facebook/TikTok/etc), where
+ * Google login, passkeys and autofill don't work. On Android we offer a one-tap
+ * "Open in Chrome" (intent redirect); on iOS — which can't be force-redirected —
+ * we show instructions to use the browser's menu. Dismissible for the session.
+ *
+ * Sits in normal document flow above <NewHeader/> so it pushes content down and
+ * scrolls away naturally (no overlap with the sticky header).
+ */
 const OpenInBrowserBanner = () => {
-  const [showBanner, setShowBanner] = useState(false);
-
-  const headlines = [
-    "🚚 SHIPPING ₹149 ALL OVER INDIA",
-    "🌿 WAITLIST MEMBERS: USE CODE WLUSER FOR EXCLUSIVE DISCOUNT",
-  ];
+  const [show, setShow] = useState(false);
+  const [android, setAndroid] = useState(false);
 
   useEffect(() => {
-    const ua = navigator.userAgent || navigator.vendor || window.opera;
-    const isInAppBrowser = /Instagram|FBAN|FBAV|TikTok|Line|WeChat/.test(ua);
-    setShowBanner(isInAppBrowser);
+    let dismissed = false;
+    try { dismissed = !!sessionStorage.getItem(DISMISS_KEY); } catch { /* ignore */ }
+    if (!dismissed && isInAppBrowser()) {
+      setShow(true);
+      setAndroid(isAndroid());
+    }
   }, []);
 
-  if (!showBanner) return null;
+  if (!show) return null;
+
+  const dismiss = () => {
+    try { sessionStorage.setItem(DISMISS_KEY, '1'); } catch { /* ignore */ }
+    setShow(false);
+  };
 
   return (
-    <Link 
-      to="/products"
-      className="fixed top-0 left-0 right-0 bg-[#a89068] text-white z-[9999] shadow-lg overflow-hidden block h-9 sm:h-10"
-    >
-      <style>{`
-        @keyframes marquee-banner {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-        .animate-marquee-banner {
-          animation: marquee-banner 25s linear infinite;
-        }
-      `}</style>
-
-      <div className="relative flex items-center h-full">
-        <div className="flex whitespace-nowrap animate-marquee-banner">
-          {[...headlines, ...headlines, ...headlines].map((headline, index) => (
-            <div key={index} className="flex items-center px-8">
-              <span className="text-[10px] sm:text-xs font-bold tracking-[0.1em] uppercase">
-                {headline}
-              </span>
-              <span className="ml-8 text-white/30">
-                <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z" />
-                </svg>
-              </span>
-            </div>
-          ))}
+    <div className="relative z-[60] bg-ink text-paper font-inter border-b border-white/10">
+      <div className="max-w-6xl mx-auto flex items-center gap-3 px-4 py-2.5">
+        <span className="shrink-0 grid place-items-center w-7 h-7 rounded-full bg-brand text-white">
+          <i className="fa-solid fa-arrow-up-right-from-square text-[11px]" />
+        </span>
+        <div className="flex-1 min-w-0">
+          <p className="gl-lbl text-[10px] text-brand leading-none mb-0.5">Better experience</p>
+          <p className="text-[12px] leading-tight text-paper/90 truncate">
+            {android
+              ? 'Login & faster checkout work best in Chrome.'
+              : 'Tap the browser menu (top-right), then "Open in browser".'}
+          </p>
         </div>
+        {android && (
+          <button
+            onClick={() => escapeToExternalBrowser({ force: true })}
+            className="shrink-0 gl-press gl-lbl text-[10px] bg-paper text-ink px-3 py-2 hover:bg-white transition-colors"
+          >
+            Open in Chrome &rarr;
+          </button>
+        )}
+        <button
+          onClick={dismiss}
+          aria-label="Dismiss"
+          className="shrink-0 w-7 h-7 grid place-items-center text-paper/60 hover:text-paper transition-colors"
+        >
+          <i className="fa-solid fa-xmark text-sm" />
+        </button>
       </div>
-      
-      {/* Subtle close hint or indicator if needed, but here we just make it a link */}
-      <div className="absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-[#a89068] to-transparent z-10 pointer-events-none"></div>
-      <div className="absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-[#a89068] to-transparent z-10 pointer-events-none"></div>
-    </Link>
+    </div>
   );
 };
 
 export default OpenInBrowserBanner;
-
