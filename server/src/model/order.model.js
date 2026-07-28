@@ -24,6 +24,10 @@ const orderSchema = new mongoose.Schema(
           priceAtPurchase: { type: Number, required: true },
           shipping: String,
           selectedVariant: { type: String, default: "N/A" },
+          // Snapshotted at purchase time so a later admin edit to the
+          // product's template can't retroactively change how a past order
+          // reads. Blank = order predates this field, or product never set one.
+          variantTitleTemplate: { type: String, default: "" },
         },
       },
     ],

@@ -257,6 +257,37 @@ export const userApi = apiSlice.injectEndpoints({
         body: data,
       }),
     }),
+
+    // Free shipping offer — admin-configured cart-value threshold.
+    // keepUnusedDataFor: 0 so an admin toggle (isActive on/off) is reflected on
+    // the next page load instead of being served from a stale 60s RTK cache —
+    // otherwise flipping the offer off in admin appeared not to work until the
+    // cache expired.
+    getFreeShippingOffer: builder.query({
+      query: () => "free-shipping-offer",
+      keepUnusedDataFor: 0,
+    }),
+    getFreeShippingBanner: builder.query({
+      query: (productId) => `free-shipping-offer/banner/${productId}`,
+      keepUnusedDataFor: 0,
+    }),
+    // Used on checkout to find a banner matching whatever's in the cart —
+    // checkout isn't tied to one product page like the PDP is.
+    getAllFreeShippingBanners: builder.query({
+      query: () => "free-shipping-offer/banners",
+      keepUnusedDataFor: 0,
+    }),
+    // Generic, data-driven cart-promotion rules (server/src/model/cartRule.model.js)
+    // — evaluates the current cart against every active rule and returns
+    // which matched (free shipping / discounts) plus the closest incomplete
+    // one for progress display. `items` is a plain array of
+    // { productId, quantity } — RTK Query serialises it into the cache key,
+    // so this naturally re-fetches whenever cart contents actually change.
+    // Same evaluator the payment controller uses for the real order total,
+    // so this can never disagree with what actually gets charged.
+    evaluateCartRules: builder.query({
+      query: (items) => ({ url: "cart-rules/evaluate", method: "POST", body: { items: items || [] } }),
+    }),
   }),
 });
 
@@ -289,4 +320,8 @@ export const {
   useUpdateAddressMutation,
   useDeleteAddressMutation,
   useCalculateShippingMutation,
+  useGetFreeShippingOfferQuery,
+  useGetFreeShippingBannerQuery,
+  useGetAllFreeShippingBannersQuery,
+  useEvaluateCartRulesQuery,
 } = userApi;

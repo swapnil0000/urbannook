@@ -5,14 +5,16 @@ import { useGetWishlistQuery } from '../../store/api/userApi';
 import { logout as logoutAction } from '../../store/slices/authSlice';
 import { setShowLoginModal, clearLoginCallback } from '../../store/slices/uiSlice';
 import { useLogoutMutation } from '../../store/api/authApi';
-import { useAuth } from '../../hooks/useRedux';
+import { useAuth, useUI } from '../../hooks/useRedux';
 import { clearCsrfToken } from '../../store/api/apiSlice';
 
 const SignupForm = lazy(() => import('./auth/SignupForm'));
 const LoginForm = lazy(() => import('./auth/LoginForm'));
 const CartDrawer = lazy(() => import('./CartDrawer'));
 
-/* GullyLabs-style header — clean white sticky bar. All auth/cart/wishlist logic preserved. */
+/* Dark sticky header with the animated URBANNOOK wordmark.
+   Cart open/close lives in Redux (uiSlice.showCartModal) so the PDP / bottom-nav
+   can open this same drawer instance via useUI().openCart(). */
 const NewHeader = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -21,12 +23,12 @@ const NewHeader = () => {
   const { items: cartItems, totalQuantity } = useSelector((state) => state.cart);
   const { isAuthenticated, user: authUser } = useAuth();
   const { showLoginModal, loginCallback } = useSelector((state) => state.ui);
+  const { showCartModal: showCart, openCart, closeCart } = useUI();
   const wishlistItems = useSelector((state) => state.wishlist.items);
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showSignup, setShowSignup] = useState(false);
-  const [showCart, setShowCart] = useState(false);
   const [user, setUser] = useState(null);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const ddRef = useRef(null);
@@ -65,12 +67,12 @@ const NewHeader = () => {
 
   useEffect(() => { setShowLogin(!!showLoginModal); }, [showLoginModal]);
 
-  // open cart drawer from the mobile bottom-nav
+  // open cart drawer from the mobile bottom-nav (GlMobileNav dispatches this event)
   useEffect(() => {
-    const open = () => setShowCart(true);
+    const open = () => openCart();
     window.addEventListener('openCartDrawer', open);
     return () => window.removeEventListener('openCartDrawer', open);
-  }, []);
+  }, [openCart]);
 
   // close menu/dropdown on route change
   useEffect(() => { setIsMenuOpen(false); setShowUserDropdown(false); }, [location.pathname]);
@@ -91,7 +93,6 @@ const NewHeader = () => {
   const handleMobileNav = (path) => { setIsMenuOpen(false); navigate(path); };
 
   const Icon = {
-    search: <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>,
     user: <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>,
     heart: <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z" /></svg>,
     cart: <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M6 7h12l1 13H5L6 7z" /><path d="M9 7a3 3 0 0 1 6 0" /></svg>,
@@ -115,7 +116,6 @@ const NewHeader = () => {
           <nav className="hidden md:flex items-center gap-6 text-sm font-semibold">
             {navLinks.map((item) => (
               <Link key={item.key} to={item.path} className={`flex items-center gap-1.5 transition-colors ${activeRoute === item.key ? 'text-brand' : 'text-paper/70 hover:text-brand'}`}>
-                {item.dot && <span className="w-1.5 h-1.5 rounded-full bg-sale"></span>}
                 {item.name}
               </Link>
             ))}
@@ -152,7 +152,7 @@ const NewHeader = () => {
               </Link>
             )}
 
-            <button onClick={() => setShowCart(true)} className="relative w-9 h-9 grid place-items-center hover:text-brand transition-colors" aria-label="Cart">
+            <button onClick={openCart} className="relative w-9 h-9 grid place-items-center hover:text-brand transition-colors" aria-label="Cart">
               {Icon.cart}
               {totalQuantity > 0 && <span className="absolute -top-1 -right-1 min-w-[17px] h-[17px] px-1 rounded-full bg-sale text-white text-[10px] font-bold grid place-items-center">{totalQuantity}</span>}
             </button>
@@ -204,7 +204,12 @@ const NewHeader = () => {
             onSwitchToLogin={() => { setShowSignup(false); setShowLogin(true); }}
           />
         )}
-        <CartDrawer isOpen={showCart} onClose={() => setShowCart(false)} cartItems={cartItems} />
+
+        <CartDrawer
+          isOpen={showCart}
+          onClose={closeCart}
+          cartItems={cartItems}
+        />
       </Suspense>
     </>
   );
