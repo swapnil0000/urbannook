@@ -206,7 +206,7 @@ const FAQS = [
 const FaqSection = ({ onContact }) => {
   const [open, setOpen] = useState(0);
   return (
-    <section className="max-w-[860px] mx-auto px-5 py-5 md:py-20">
+    <section className="max-w-[860px] mx-auto px-5 py-5 ">
       <Reveal className="text-center mb-8 md:mb-10">
         <Kicker className="justify-center">Good to know</Kicker>
         <h2 className="font-archivo text-3xl md:text-5xl font-extrabold tracking-tight mt-2">Questions? Answered.</h2>
@@ -296,7 +296,7 @@ const ReferSave = () => {
     } catch { /* user dismissed the share sheet */ }
   };
   return (
-    <section className="max-w-[1280px] mx-auto px-5 py-5 md:py-14">
+    <section className="max-w-[1280px] mx-auto px-5 py-5">
       <Reveal className="relative overflow-hidden bg-ink text-paper border border-white/10 p-8 md:p-14 text-center md:text-left">
         <span aria-hidden="true" className="pointer-events-none select-none absolute -right-2 -bottom-10 md:-bottom-16 font-archivo text-[8rem] md:text-[14rem] font-extrabold text-white/[0.05] leading-none">₹</span>
         <div className="relative md:flex md:items-center md:justify-between gap-8">
@@ -621,7 +621,7 @@ const HomePage = () => {
       )}
 
 
-        <Reveal className="max-w-[1280px] mx-auto px-5 py-5 md:py-7" y={18}>
+        <Reveal className="max-w-[1280px] mx-auto px-5 py-5 " y={18}>
         <div className="border border-hair overflow-hidden">
           <div className="h-1 bg-brand"></div>
           {/* bold stat tiles with hairline grid (gap-px over a hair bg) */}
@@ -665,7 +665,7 @@ const HomePage = () => {
 
       {/* ══ BUNDLE — free-shipping cross-sell (server-driven, interactive) ══ */}
       {showBundle && (
-        <section className="max-w-[1280px] mx-auto px-5  md:py-14">
+        <section className="max-w-[1280px] mx-auto px-5 ">
           <Reveal className={`relative border overflow-hidden grid md:grid-cols-2 transition-colors duration-500 ${bundleUnlocked ? 'border-save/50 bg-surface' : 'border-hair bg-surface'}`}>
             {/* LEFT — the pitch */}
             <div className="p-3 md:p-14 flex flex-col justify-center">
@@ -826,7 +826,7 @@ const HomePage = () => {
       )}
 
       {/* ══ TESTIMONIALS — two-row review wall (opposite directions, hover to pause + zoom, tap to shop) ══ */}
-      <section className="bg-paper py-4 md:py-20 overflow-hidden">
+      <section className="bg-paper py-4 overflow-hidden">
         <Reveal className="max-w-[1280px] mx-auto px-5 flex items-end justify-between gap-4 mb-8">
           <div>
             <Kicker>★ 4.9 · 2,000+ Reviews</Kicker>
@@ -861,7 +861,7 @@ const HomePage = () => {
       <ReferSave />
 
       {/* ══ NEWSLETTER — doubles as the "we're just getting started" beat ══ */}
-      <section className="max-w-[820px] mx-auto px-5 py-5 md:py-20 text-center">
+      <section className="max-w-[820px] mx-auto px-5 py-5  text-center">
         <Kicker className="justify-center mb-3">{isFewProducts ? 'The next drop' : 'Join the list'}</Kicker>
         <TextReveal as="h2" text={isFewProducts ? 'Be first to the next piece' : 'Get first access to drops'} className="font-archivo text-3xl md:text-5xl font-extrabold tracking-tight" />
         <p className="text-muted mt-4">{isFewProducts ? 'We add new made-to-order pieces often. Join for early access + 10% off your first order.' : 'New pieces land often. Members get early access + 10% off the first order.'}</p>
@@ -873,7 +873,7 @@ const HomePage = () => {
       </section>
 
       {/* ══ ABOUT — compact brand intro, kept at the bottom above the footer ══ */}
-      <section className="max-w-[1280px] mx-auto px-5 py-5 md:py-16">
+      <section className="max-w-[1280px] mx-auto px-5 py-5">
         <Reveal className="relative overflow-hidden bg-surface border border-hair p-8 md:p-14">
           <span aria-hidden="true" className="pointer-events-none select-none absolute -right-3 -bottom-10 md:-bottom-16 font-archivo text-[6rem] md:text-[13rem] font-extrabold text-ink/[0.04] leading-none tracking-tight">NOOK</span>
           <div className="relative max-w-2xl">

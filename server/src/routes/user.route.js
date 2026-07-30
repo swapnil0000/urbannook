@@ -87,6 +87,11 @@ import {
   razorpayWebHookController,
   guestCreateOrderController,
 } from "../controller/rp.payment.controller.js";
+import {
+  magicShippingInfoController,
+  magicGetPromotionsController,
+  magicApplyPromotionController,
+} from "../controller/magic.checkout.controller.js";
 import userBulkEmailWaitlistController from "../controller/user.bulk.email.waitlist.controller.js";
 
 const userRouter = Router();
@@ -285,6 +290,31 @@ userRouter.post(
   "/rp/webhook",
   bodyParser.raw({ type: "application/json" }),
   razorpayWebHookController,
+);
+
+/* ===============================================================
+   RAZORPAY MAGIC CHECKOUT (1CC) CALLBACKS (PUBLIC – SERVER TO SERVER)
+   ---------------------------------------------------------------
+   ⚠️ Razorpay calls these mid-checkout. Like the webhook:
+   - RAW body (needed for HMAC signature verification)
+   - No authGuard (Razorpay servers call them; signature is the auth)
+   - Register these URLs in Dashboard → Magic Checkout settings.
+   Inert until MAGIC_CHECKOUT_ENABLED=true AND the URLs are configured.
+================================================================ */
+userRouter.post(
+  "/magic/shipping-info",
+  bodyParser.raw({ type: "application/json" }),
+  magicShippingInfoController,
+);
+userRouter.post(
+  "/magic/promotions",
+  bodyParser.raw({ type: "application/json" }),
+  magicGetPromotionsController,
+);
+userRouter.post(
+  "/magic/promotions/apply",
+  bodyParser.raw({ type: "application/json" }),
+  magicApplyPromotionController,
 );
 
 export default userRouter;

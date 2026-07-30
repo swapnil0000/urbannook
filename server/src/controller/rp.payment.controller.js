@@ -21,6 +21,7 @@ import Address from "../model/address.new.model.js";
 import html_to_pdf from "html-pdf-node";
 import { generateInvoiceHtmlTemplate } from "../template/invoiceTemplate.template.js";
 import { calculateShippingRate, FALLBACK_SHIPPING_CHARGE } from "../services/shipping.service.js";
+import { isMagicCheckoutEnabled, extractMagicShippingAddress } from "../services/magic.checkout.service.js";
 
 // Genuinely unserviceable pincode must still block checkout — we cannot accept an
 // order we cannot ship. Any OTHER failure (API down, network timeout after all
@@ -639,6 +640,20 @@ const razorpayWebHookController = async (req, res) => {
               console.log(`[INFO] Guest account ready - Email: ${guestEmail}, isNew: ${!isExistingUser}`);
             } catch (guestAccountError) {
               console.error("[ERROR] Guest account creation failed:", guestAccountError.message, guestAccountError.stack);
+            }
+          }
+
+          // ── STEP 1b: Magic (1CC) — capture the address Razorpay collected ──
+          // No-op for the standard flow (address already set at order-create)
+          // and when the flag is off. Only fills a Magic order that has none.
+          if (isMagicCheckoutEnabled() && !order.deliveryAddress?.pinCode) {
+            const magicAddr = extractMagicShippingAddress(payload);
+            if (magicAddr) {
+              order.deliveryAddress = {
+                ...(order.deliveryAddress?.toObject?.() || {}),
+                ...magicAddr,
+              };
+              console.log(`[MAGIC] Captured shipping address for order ${order.orderId}`);
             }
           }
 

@@ -172,9 +172,19 @@ app.use(
 /* Health Route */
 app.use("/health", healthRouter);
 
-/*Explicity for webhook because it requires rp webhook requires raw not json */
+/* Razorpay's webhook and Magic Checkout (1CC) callbacks are HMAC-verified over
+   the RAW body, so they must bypass express.json() (their routes apply
+   bodyParser.raw instead). Everything else parses JSON as normal. */
+const RAZORPAY_RAW_BODY_PATHS = new Set([
+  "/api/v1/rp/webhook",
+  "/api/v1/magic/shipping-info",
+  "/api/v1/magic/promotions",
+  "/api/v1/magic/promotions/apply",
+]);
 app.use("/api/v1", (req, res, next) => {
-  if (req.originalUrl === "/api/v1/rp/webhook") {
+  // originalUrl may carry a query string; match on the path only.
+  const path = req.originalUrl.split("?")[0];
+  if (RAZORPAY_RAW_BODY_PATHS.has(path)) {
     next();
   } else {
     express.json()(req, res, next);

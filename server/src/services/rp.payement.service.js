@@ -1,7 +1,10 @@
 import Razorpay from "razorpay";
 import { InternalServerError } from "../utils/errors.js";
 import env from "../config/envConfigSetup.js";
-const razorpayCreateOrderService = async (amount, currency) => {
+// `extraOptions` carries the Razorpay Magic (1CC) fields — line_items,
+// line_items_total, notes, receipt, rto_review, etc. Legacy callers pass only
+// (amount, currency) and are unaffected: the spread below adds nothing.
+const razorpayCreateOrderService = async (amount, currency, extraOptions = {}) => {
   const key_id = env.RP_KEY_ID;
   const key_secret = env.RP_SECRET;
 
@@ -20,6 +23,7 @@ const razorpayCreateOrderService = async (amount, currency) => {
   const razorpayOptions = {
     amount,
     currency,
+    ...extraOptions,
   };
 
   const orderDetails = await razorpay.orders.create(razorpayOptions);
