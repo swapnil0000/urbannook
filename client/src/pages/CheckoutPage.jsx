@@ -426,6 +426,10 @@ const CheckoutPage = () => {
   // amount could be stale (customer pays less → our loss). This queues the pay
   // and an effect fires it only once the amount is settled.
   const [pendingPay, setPendingPay] = useState(null); // null | "ONLINE"
+  // Real ₹ a customer saves by paying online instead of COD = (COD carrier rate
+  // − prepaid carrier rate). 0 when free shipping zeroes both. Drives the
+  // "SAVE ₹X" nudge on the Pay Online button.
+  const [codSaving, setCodSaving] = useState(0);
   const [paymentError, setPaymentError] = useState(null);
   const [showRetry, setShowRetry] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
@@ -635,13 +639,21 @@ const CheckoutPage = () => {
           selectedVariant: item?.selectedVariant,
         }));
 
-        const result = await calculateShippingRef.current({
+        // Fetch BOTH carrier rates so we can show the real prepaid-vs-COD
+        // difference. COD returns a higher rate (carrier COD surcharge); the
+        // selected method's result feeds the actual pricing below.
+        const shipArgs = {
           deliveryPinCode: parseInt(pinCode, 10),
           cartItems: formattedCartItems,
-          paymentType: paymentMethod,
-        }).unwrap();
+        };
+        const [prepaidRes, codRes] = await Promise.all([
+          calculateShippingRef.current({ ...shipArgs, paymentType: "PREPAID" }).unwrap(),
+          calculateShippingRef.current({ ...shipArgs, paymentType: "COD" }).unwrap(),
+        ]);
 
         if (cancelled) return;
+
+        const result = paymentMethod === "COD" ? codRes : prepaidRes;
 
         if (result.success && result.data) {
           // Free shipping: product-COMBO rule. Still call the rate API above to
@@ -683,6 +695,16 @@ const CheckoutPage = () => {
             shipping: { ...result.data, amount: shippingAmount, realAmount }
           }));
           setShippingError("");
+
+          // Honest online-vs-COD saving = the extra delivery COD charges.
+          // Free shipping zeroes shipping for both methods → ₹0 (badge hides).
+          const prepaidReal = parseFloat(prepaidRes?.data?.total_charges);
+          const codReal = parseFloat(codRes?.data?.total_charges);
+          const saving = isFreeShippingEligible || !prepaidReal || !codReal
+            ? 0
+            : Math.max(0, Math.ceil(codReal) - Math.ceil(prepaidReal));
+          setCodSaving(saving);
+
           trackDeliveryCheck({ pincode: pinCode, serviceable: true, shippingAmount, paymentMethod });
         } else {
           showNotificationRef.current?.("Unable to calculate shipping. Please try again.", "error");
@@ -1175,8 +1197,6 @@ const CheckoutPage = () => {
 
   // ── Payment-action helpers (money-critical: never charge a stale amount) ──
   const COD_HANDLING_FEE = 35; // portion of the advance that is the non-refundable COD fee (label only, no math change)
-  // Online saving as a % of the order (the ₹35 COD fee avoided). Honest figure.
-  const codSavePct = totalToPay > 0 ? Math.max(1, Math.round((COD_HANDLING_FEE / totalToPay) * 100)) : 0;
   const isShippingFree = shippingAmount === 0 && realShippingAmount > 0;
   const codAdvance = realShippingAmount > 0 ? Math.min(Math.ceil(realShippingAmount) * 2, totalToPay) : 0;
   const codRemaining = Math.max(0, totalToPay - codAdvance);
@@ -1225,6 +1245,30 @@ const CheckoutPage = () => {
     if (!amountsSettled || isOrdering || paymentMethod !== "COD") return;
     setShowCodSheet(false);
     handlePayment();
+  };
+
+  // The two footer/sidebar buttons double as the payment-method selector.
+  // Tapping the NOT-selected method just switches to it (and lets shipping
+  // re-settle) so the customer can freely toggle and compare totals without
+  // being forced to pay. Tapping the already-selected method performs its
+  // action. This is the only way back to prepaid after choosing COD.
+  const handlePrepaidButton = () => {
+    if (payBusy || !amountsSettled) return;
+    if (paymentMethod !== "PREPAID") {
+      setPaymentMethod("PREPAID");
+      trackSelectPaymentMethod({ paymentMethod: "PREPAID" });
+      return; // just switched — tap again once the amount re-settles to pay
+    }
+    handlePayOnline();
+  };
+  const handleCodButton = () => {
+    if (payBusy || !amountsSettled) return;
+    if (paymentMethod !== "COD") {
+      setPaymentMethod("COD");
+      trackSelectPaymentMethod({ paymentMethod: "COD" });
+      return; // just switched — tap again to open the COD breakdown
+    }
+    handleChooseCod();
   };
 
   if (isLoading) {
@@ -2307,25 +2351,28 @@ const CheckoutPage = () => {
               <div className="px-5 pb-5 space-y-3">
                 {/* Pay Online → primary CTA with fancy Save tooltip */}
                 <div className="relative">
-                  {!payBusy && amountsSettled && (
+                  {!payBusy && amountsSettled && codSaving > 0 && (
                     <div className="pointer-events-none absolute -top-2.5 right-3 z-10">
                       <span className="savings-tip inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-[10px] font-extrabold shadow-md shadow-emerald-600/40">
-                        <i className="fa-solid fa-bolt text-[8px]" /> SAVE{" "}
-                        {codSavePct}%
+                        <i className="fa-solid fa-bolt text-[8px]" /> SAVE ₹{codSaving}
                       </span>
                     </div>
                   )}
                   <button
-                    onClick={handlePayOnline}
+                    onClick={handlePrepaidButton}
                     disabled={payBusy || !amountsSettled}
-                    className="w-full h-14 bg-[#2e443c] text-white rounded-xl font-bold text-sm hover:bg-[#1a2822] active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 shadow-lg shadow-[#2e443c]/25 disabled:opacity-50"
+                    className={`w-full h-14 rounded-xl font-bold text-sm active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 disabled:opacity-50 border-2 ${
+                      paymentMethod === "PREPAID"
+                        ? "bg-[#2e443c] text-white border-[#2e443c] shadow-lg shadow-[#2e443c]/25"
+                        : "bg-white text-[#2e443c] border-[#2e443c] hover:bg-[#2e443c]/5"
+                    }`}
                   >
-                    {isOrdering || pendingPay ? (
+                    {paymentMethod === "PREPAID" && (isOrdering || pendingPay) ? (
                       <>
                         <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />{" "}
                         Processing…
                       </>
-                    ) : isCalculatingShipping ? (
+                    ) : paymentMethod === "PREPAID" && isCalculatingShipping ? (
                       <>
                         <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />{" "}
                         Calculating…
@@ -2338,14 +2385,18 @@ const CheckoutPage = () => {
                     )}
                   </button>
                 </div>
-                {/* Cash / UPI on Delivery → highlighted (gold) but secondary */}
+                {/* Pay on Delivery → filled gold when selected, outline otherwise */}
                 <button
-                  onClick={handleChooseCod}
+                  onClick={handleCodButton}
                   disabled={payBusy || !amountsSettled}
-                  className="w-full h-12 bg-[#a89068]/10 text-[#8a744f] border-2 border-[#a89068] rounded-xl font-bold text-[13px] hover:bg-[#a89068]/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 disabled:opacity-50"
+                  className={`w-full h-12 rounded-xl font-bold text-[13px] active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 disabled:opacity-50 border-2 ${
+                    paymentMethod === "COD"
+                      ? "bg-[#a89068] text-white border-[#a89068] shadow-lg"
+                      : "bg-[#a89068]/10 text-[#8a744f] border-[#a89068] hover:bg-[#a89068]/20"
+                  }`}
                 >
                   <i className="fa-solid fa-hand-holding-dollar text-xs opacity-80" />{" "}
-                  Partial COD
+                  Pay on Delivery
                 </button>
                 <div className="flex items-center justify-center gap-3">
                   <i className="fa-brands fa-cc-visa text-gray-300 text-lg" />
@@ -2373,39 +2424,40 @@ const CheckoutPage = () => {
                   ₹{totalToPay.toLocaleString()}
                 </p>
               </div>
-              {/* Partial COD — highlighted (gold) but secondary; kept on the left */}
+              {/* Pay on Delivery — filled gold when selected, outline otherwise */}
               <button
-                onClick={handleChooseCod}
+                onClick={handleCodButton}
                 disabled={payBusy || !amountsSettled}
-                className="flex-1 h-12 px-3 bg-[#a89068]/10 text-[#8a744f] border-2 border-[#a89068] rounded-xl font-bold text-[12px] hover:bg-[#a89068]/20 active:scale-[0.99] transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                className={`flex-1 basis-0 min-w-0 h-12 px-2 rounded-xl font-bold text-[12px] active:scale-[0.99] transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 border-2 ${
+                  paymentMethod === "COD"
+                    ? "bg-[#a89068] text-white border-[#a89068] shadow-lg"
+                    : "bg-[#a89068]/10 text-[#8a744f] border-[#a89068] hover:bg-[#a89068]/20"
+                }`}
               >
                 <i className="fa-solid fa-hand-holding-dollar text-[11px] opacity-80" />{" "}
-                Partial COD
+                Pay on Delivery
               </button>
-              {/* Pay Online — primary, on the right (more clickable), with fancy Save tooltip */}
-              <div className="relative flex-1">
-                {!payBusy && amountsSettled && (
+              {/* Pay Online — filled dark green when selected, outline otherwise; keeps the Save tooltip */}
+              <div className="relative flex-1 basis-0 min-w-0">
+                {!payBusy && amountsSettled && codSaving > 0 && (
                   <div className="pointer-events-none absolute -top-[26px] left-1/2 -translate-x-1/2 z-10">
                     <div className="savings-tip relative px-2 py-[3px] rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-[9px] font-extrabold tracking-wide shadow-md shadow-emerald-600/40 whitespace-nowrap">
-                      <i className="fa-solid fa-bolt text-[8px] mr-0.5" /> SAVE{" "}
-                      {codSavePct}%
+                      <i className="fa-solid fa-bolt text-[8px] mr-0.5" /> SAVE ₹{codSaving}
                       <span className="absolute left-1/2 -bottom-[3px] -translate-x-1/2 w-1.5 h-1.5 rotate-45 bg-emerald-600" />
                     </div>
                   </div>
                 )}
                 <button
-                  onClick={handlePayOnline}
+                  onClick={handlePrepaidButton}
                   disabled={payBusy || !amountsSettled}
-                  className="w-full h-12 bg-[#2e443c] text-white rounded-xl font-bold text-[13px] hover:bg-[#1a2822] active:scale-[0.99] transition-all flex items-center justify-center gap-1.5 shadow-lg disabled:opacity-50"
+                  className={`w-full h-12 rounded-xl font-bold text-[13px] active:scale-[0.99] transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 border-2 ${
+                    paymentMethod === "PREPAID"
+                      ? "bg-[#2e443c] text-white border-[#2e443c] shadow-lg"
+                      : "bg-white text-[#2e443c] border-[#2e443c] hover:bg-[#2e443c]/5"
+                  }`}
                 >
-                  {isOrdering || pendingPay ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                    </>
-                  ) : isCalculatingShipping ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                    </>
+                  {paymentMethod === "PREPAID" && (isOrdering || pendingPay || isCalculatingShipping) ? (
+                    <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                   ) : (
                     <>
                       <i className="fa-solid fa-lock text-[10px] opacity-70" />{" "}

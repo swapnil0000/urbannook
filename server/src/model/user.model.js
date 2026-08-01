@@ -56,7 +56,7 @@ const userSchema = mongoose.Schema(
     userRefreshToken: String,
     role: {
       type: String,
-      enum: ["USER", "WAITLIST_USER"],
+      enum: ["USER"],
       default: "USER",
     },
   },
