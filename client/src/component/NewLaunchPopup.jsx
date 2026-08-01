@@ -5,7 +5,6 @@ import config from '../config/env';
 
 const NewLaunchPopup = memo(() => {
   const [isVisible, setIsVisible] = useState(false);
-  const [isCopied, setIsCopied] = useState(false);
   const navigate = useNavigate();
   const timeLeft = useTimer(config.offerEndDate);
 
@@ -27,16 +26,6 @@ const NewLaunchPopup = memo(() => {
   const handleNavigate = () => {
     navigate('/products');
     setIsVisible(false);
-  };
-
-  const handleCopyCode = async () => {
-    try {
-      await navigator.clipboard.writeText('WLUSER');
-      setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy text: ', err);
-    }
   };
 
   return (
@@ -101,21 +90,6 @@ const NewLaunchPopup = memo(() => {
             <p className="text-white/80 text-[10px] md:text-sm font-light leading-relaxed">
               <span className="mr-1.5 md:mr-2 text-sm md:text-base">🚚</span> 
               <span className="font-medium text-white">FLAT ₹149 SHIPPING</span> ACROSS INDIA
-            </p>
-            
-            <p className="text-white/80 text-[10px] md:text-sm font-light leading-relaxed flex items-center justify-center flex-wrap gap-1">
-              WAITLIST USER CODE: 
-              <button 
-                onClick={handleCopyCode}
-                title="Click to copy code"
-                className={`font-bold px-2 py-0.5 rounded tracking-widest ml-1 text-[9px] md:text-xs transition-all duration-300 transform active:scale-95 ${
-                  isCopied 
-                    ? 'bg-green-500 text-white shadow-[0_0_10px_rgba(34,197,94,0.5)]' 
-                    : 'bg-[#F5DEB3] text-[#2e443c] hover:bg-white hover:shadow-[0_0_10px_rgba(245,222,179,0.5)] cursor-pointer'
-                }`}
-              >
-                {isCopied ? 'COPIED! ✓' : 'WLUSER'}
-              </button>
             </p>
           </div>
 
