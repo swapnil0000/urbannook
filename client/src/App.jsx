@@ -12,6 +12,7 @@ import { fetchCsrfToken } from './store/api/apiSlice';
 import AppRoutes from './store/AppRoutes';
 import NewsTicker from './pages/home/NewsTicker';
 import SEOHead from './component/SEOHead';
+import ThemeApplier from './component/ThemeApplier';
 import { trackPageView, setUserId, captureAttribution, setMetaAdvancedMatching } from './utils/analytics';
 // check
 const ORG_STRUCTURED_DATA = {
@@ -39,6 +40,7 @@ const Notification = lazy(() => import('./component/Notification'));
 const SocialMediaFAB = lazy(() => import('./component/layout/WhatsAppButton'));
 const OpenInBrowserBanner = lazy(() => import('./component/OpenInBrowserBanner'));
 const GoogleOneTap = lazy(() => import('./component/GoogleOneTap'));
+const BannerRenderer = lazy(() => import('./component/layout/BannerRenderer'));
 
 // Component to handle session restoration and token removal detection
 const SessionManager = ({ children }) => {
@@ -153,7 +155,8 @@ function App() {
   return (
     <HelmetProvider>
     <Provider store={store}>
-        <Router> 
+        <ThemeApplier />
+        <Router>
           <SEOHead structuredData={ORG_STRUCTURED_DATA} />
           <RouteTracker />
           <SessionManager>
@@ -173,6 +176,9 @@ function App() {
                 </ErrorBoundary>
                 <SocialMediaFAB />
                 <Notification />
+                <ErrorBoundary>
+                  <BannerRenderer />
+                </ErrorBoundary>
                 {/* Global Google One Tap for logged-out visitors (boosts Meta EMQ) */}
                 <ErrorBoundary>
                   <GoogleOneTap />
