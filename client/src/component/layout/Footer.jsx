@@ -51,9 +51,9 @@ const Footer = () => {
   };
 
   return (
-    <footer className="w-full bg-[#f5f7f8] selection:bg-[#F5DEB3] selection:text-[#1a1a1a]">
+    <footer className="w-full bg-[var(--color-footer-bg)] selection:bg-[#F5DEB3] selection:text-[#1a1a1a]">
 
-      <div className="mx-auto  relative overflow-hidden  bg-[#faf9f6] text-[#1a1a1a]    shadow-sm isolate">
+      <div className="mx-auto  relative overflow-hidden  bg-[var(--color-footer-bg)] text-[var(--color-footer-text)]    shadow-sm isolate">
 
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full pointer-events-none opacity-[0.03] select-none z-0">
           <h1 className="text-[14vw] font-serif font-bold text-center leading-none text-black tracking-tighter uppercase whitespace-nowrap">
@@ -93,7 +93,7 @@ const Footer = () => {
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="absolute right-2 top-2 bottom-2 px-4 md:px-8 flex items-center justify-center rounded-xl bg-[#1c3026] text-white hover:bg-[#F5DEB3] hover:text-[#050c08] transition-all duration-300 font-bold uppercase tracking-widest text-[9px] md:text-[10px] disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="absolute right-2 top-2 bottom-2 px-4 md:px-8 flex items-center justify-center rounded-xl bg-[var(--color-primary)] text-white hover:brightness-90 transition-all duration-300 font-bold uppercase tracking-widest text-[9px] md:text-[10px] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isSubmitting ? 'Joining...' : 'Join Now'}
                   </button>

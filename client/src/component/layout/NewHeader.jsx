@@ -187,7 +187,7 @@ const NewHeader = () => {
   return (
     <>
       <header
-        className={`fixed top-14 left-3 right-3 md:top-12 md:left-6 md:right-6 z-50 bg-[#e8f8d7]/90 backdrop-blur-xl shadow-lg border border-white/40 transition-all duration-0 md:duration-500 ease-in-out ${
+        className={`fixed top-14 left-3 right-3 md:top-12 md:left-6 md:right-6 z-50 bg-[color-mix(in_srgb,var(--color-header-bg)_90%,transparent)] text-[var(--color-header-text)] backdrop-blur-xl shadow-lg border border-white/40 transition-all duration-0 md:duration-500 ease-in-out ${
           isMenuOpen ? 'rounded-[2rem]' : 'rounded-full'
         }`}
         style={{
@@ -311,7 +311,7 @@ const NewHeader = () => {
               )}
 
               <button
-                className="relative flex items-center px-5 py-2.5 bg-emerald-800 text-white rounded-full hover:bg-emerald-900 hover:shadow-lg transition-all duration-200 shadow-md"
+                className="relative flex items-center px-5 py-2.5 bg-[var(--color-primary)] text-white rounded-full hover:brightness-90 hover:shadow-lg transition-all duration-200 shadow-md"
                 onClick={openCart}
               >
                 <i className="fa-solid fa-cart-shopping text-sm mr-2"></i>
@@ -421,7 +421,7 @@ const NewHeader = () => {
                 <div className="bg-white/40 p-4 rounded-2xl border border-white/50 mb-6 space-y-3">
                     <button 
                         onClick={handleMobileLogin}
-                        className="w-full py-4 bg-emerald-800 text-white rounded-xl font-bold uppercase tracking-widest text-xs shadow-lg hover:bg-emerald-900 flex items-center justify-center gap-3 active:scale-95 transition-all"
+                        className="w-full py-4 bg-[var(--color-primary)] text-white rounded-xl font-bold uppercase tracking-widest text-xs shadow-lg hover:brightness-90 flex items-center justify-center gap-3 active:scale-95 transition-all"
                     >
                         <i className="fa-regular fa-user text-sm"></i> 
                         Login / Create Account
