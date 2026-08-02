@@ -181,6 +181,9 @@ const ProductDetailPage = () => {
   const currentImageIndexRef = useRef(0);
   const dragStartXRef = useRef(0);
   const dragWidthRef = useRef(0);
+  // Guard the move handler off a ref, not `isDragging` state — a fast first
+  // move can fire before the setState from drag-start has committed.
+  const draggingRef = useRef(false);
   const [showSignup, setShowSignup] = useState(false);
   const [selectedVariant, setSelectedVariant] = useState("");
 
@@ -456,23 +459,28 @@ const ProductDetailPage = () => {
     window.scrollTo(0, 0);
   }, []);
 
-  const handleImageDragStart = (e) => {
+  // Shared drag core — driven by pointer events (mouse) AND native touch
+  // events (iOS Safari delivers custom-drag pointermove unreliably, so touch
+  // is the reliable path on iPhones). touch-action: pan-y lets vertical page
+  // scroll through while we own the horizontal swipe.
+  const beginDrag = (clientX, width) => {
     if (galleryImages.length <= 1) return;
+    draggingRef.current = true;
     setIsDragging(true);
-    dragStartXRef.current = e.clientX;
-    dragWidthRef.current = e.currentTarget.offsetWidth || 1;
-    e.currentTarget.setPointerCapture?.(e.pointerId);
+    dragStartXRef.current = clientX;
+    dragWidthRef.current = width || 1;
   };
-  const handleImageDragMove = (e) => {
-    if (!isDragging) return;
-    let dx = e.clientX - dragStartXRef.current;
+  const moveDrag = (clientX) => {
+    if (!draggingRef.current) return;
+    let dx = clientX - dragStartXRef.current;
     // Resistance at the ends — can't endlessly drag past the first/last image.
     if (currentImageIndex === 0 && dx > 0) dx *= 0.35;
     if (currentImageIndex === galleryImages.length - 1 && dx < 0) dx *= 0.35;
     setDragOffset(dx);
   };
-  const handleImageDragEnd = () => {
-    if (!isDragging) return;
+  const endDrag = () => {
+    if (!draggingRef.current) return;
+    draggingRef.current = false;
     setIsDragging(false);
     const threshold = dragWidthRef.current * 0.15;
     if (dragOffset <= -threshold && currentImageIndex < galleryImages.length - 1) {
@@ -481,6 +489,35 @@ const ProductDetailPage = () => {
       setCurrentImageIndex((i) => i - 1);
     }
     setDragOffset(0);
+  };
+
+  // Pointer handlers — MOUSE/PEN ONLY. Touch is handled by the touch* handlers
+  // below so iOS gets a reliable event stream (and the two never double-fire).
+  const handleImageDragStart = (e) => {
+    if (e.pointerType === "touch") return;
+    beginDrag(e.clientX, e.currentTarget.offsetWidth);
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  };
+  const handleImageDragMove = (e) => {
+    if (e.pointerType === "touch") return;
+    moveDrag(e.clientX);
+  };
+  const handleImageDragEnd = (e) => {
+    if (e?.pointerType === "touch") return;
+    endDrag();
+  };
+
+  // Native touch handlers — the reliable path on iOS Safari.
+  const handleImageTouchStart = (e) => {
+    if (!e.touches?.length) return;
+    beginDrag(e.touches[0].clientX, e.currentTarget.offsetWidth);
+  };
+  const handleImageTouchMove = (e) => {
+    if (!e.touches?.length) return;
+    moveDrag(e.touches[0].clientX);
+  };
+  const handleImageTouchEnd = () => {
+    endDrag();
   };
 
   const handleInitialAddToCart = async () => {
@@ -873,6 +910,10 @@ const ProductDetailPage = () => {
                 onPointerUp={handleImageDragEnd}
                 onPointerLeave={(e) => { handleImageDragEnd(e); setIsGalleryHovering(false); }}
                 onPointerCancel={handleImageDragEnd}
+                onTouchStart={handleImageTouchStart}
+                onTouchMove={handleImageTouchMove}
+                onTouchEnd={handleImageTouchEnd}
+                onTouchCancel={handleImageTouchEnd}
                 onMouseEnter={() => setIsGalleryHovering(true)}
               >
                 <Suspense
