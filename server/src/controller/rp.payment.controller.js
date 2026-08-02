@@ -21,6 +21,69 @@ import Address from "../model/address.new.model.js";
 import html_to_pdf from "html-pdf-node";
 import { generateInvoiceHtmlTemplate } from "../template/invoiceTemplate.template.js";
 import { calculateShippingRate, FALLBACK_SHIPPING_CHARGE } from "../services/shipping.service.js";
+import { apiCache } from "../module/cache.manager.module.js";
+
+// ── Per-variant stock decrement ───────────────────────────────────────────────
+// Runs once, atomically, the moment an order is confirmed PAID. For each ordered
+// item we decrement THAT variant's tracked quantity (variantQuantity) by the
+// purchased quantity. Variants with no tracked quantity (null) are skipped —
+// they aren't stock-managed. The update is atomic ($inc on the positionally
+// matched variant) so concurrent orders don't clobber each other. When a
+// quantity crosses 0 the variant auto-derives out-of-stock everywhere (the OOS
+// rule is computed, not stored). Best-effort: never throws into the payment flow.
+const decrementStockForOrder = async (order) => {
+  let anyChanged = false;
+  for (const item of order.items || []) {
+    const qty = item?.productSnapshot?.quantity;
+    const variantName = item?.productSnapshot?.selectedVariant;
+    if (!item.productId || !qty || qty < 1) continue;
+    if (!variantName || variantName === "N/A") continue; // single-design / no variant
+    try {
+      const res = await Product.updateOne(
+        {
+          productId: item.productId,
+          variantDetails: { $elemMatch: { variantName, variantQuantity: { $ne: null } } },
+        },
+        // Decrement the variant AND the product-level total (kept = sum of
+        // tracked variant quantities) so both stay consistent between admin saves.
+        { $inc: { "variantDetails.$.variantQuantity": -qty, productQuantity: -qty } },
+      );
+      if (res.modifiedCount > 0) anyChanged = true;
+    } catch (err) {
+      console.error(`[Stock] decrement failed order=${order.orderId} product=${item.productId} variant=${variantName}:`, err.message);
+    }
+  }
+  // Product responses are cached (10-min TTL) — flush so the storefront reflects
+  // the new stock (and any freshly out-of-stock variant) right away.
+  if (anyChanged) {
+    try { apiCache.clear(); } catch { /* best-effort */ }
+  }
+};
+
+// Effective per-variant out-of-stock — mirrors the admin/storefront rule:
+// manual flag, or a tracked quantity that has reached 0.
+const isVariantOutOfStock = (variant) =>
+  !!variant &&
+  (variant.variantOutOfStock === true ||
+    (variant.variantQuantity != null && Number(variant.variantQuantity) <= 0));
+
+// Guard at order creation: block buying an out-of-stock (or over-ordered)
+// variant. Only enforces when the variant is matched by name and stock-tracked;
+// unmatched / "N/A" (single-design) items pass through untouched.
+const assertVariantAvailable = (product, variantName, qty) => {
+  if (!product?.variantDetails?.length) return;
+  if (!variantName || variantName === "N/A") return;
+  const variant = product.variantDetails.find((v) => v.variantName === variantName);
+  if (!variant) return;
+  if (isVariantOutOfStock(variant)) {
+    throw new ValidationError(`"${product.productName} — ${variantName}" is out of stock.`);
+  }
+  if (variant.variantQuantity != null && qty > variant.variantQuantity) {
+    throw new ValidationError(
+      `Only ${variant.variantQuantity} unit(s) of "${product.productName} — ${variantName}" left.`,
+    );
+  }
+};
 
 // Genuinely unserviceable pincode must still block checkout — we cannot accept an
 // order we cannot ship. Any OTHER failure (API down, network timeout after all
@@ -202,6 +265,8 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     // Find the cart item to get its specific image
     let itemImage = null;
     const itemVariant = item.variant || item.color || "N/A";
+    // Block out-of-stock / over-ordered variants before the order is created.
+    assertVariantAvailable(product, itemVariant, item.quantity);
     const cartKey = `${item.productId}:${itemVariant}`;
 
     // 1. Try to get image from Cart Snapshot (Most accurate for what user saw)
@@ -660,6 +725,10 @@ const razorpayWebHookController = async (req, res) => {
 
           await order.save();
 
+          // Decrement per-variant stock now that the order is confirmed PAID.
+          // Guarded by the `order.status !== "PAID"` block above → runs once.
+          await decrementStockForOrder(order);
+
           // ── STEP 3: Send credentials email now that order is confirmed ────
           if (guestCredentials) {
             await sendGuestAccountCreatedEmail(
@@ -1005,6 +1074,8 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   const orderItems = items.map((item) => {
     const product = products.find((p) => p.productId === item.productId);
     const itemVariant = item.variant || "N/A";
+    // Block out-of-stock / over-ordered variants before the order is created.
+    assertVariantAvailable(product, itemVariant, item.quantity);
 
     let priceAtPurchase = 0;
     if (product.variantDetails && product.variantDetails.length > 0) {

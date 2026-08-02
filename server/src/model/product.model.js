@@ -20,6 +20,13 @@ const productSchema = mongoose.Schema(
         variantName: String,
         variantImage: [String], // Specific images for this variant
         variantPrice: Number,
+        // ── Per-variant stock (managed from the admin panel) ─────────────────
+        // `variantQuantity: null` = not stock-tracked (never auto-OOS by qty).
+        // A number decrements on each paid order and derives out-of-stock at <= 0.
+        variantQuantity: { type: Number, default: null },
+        // Manual admin override — force this variant out of stock.
+        // Effective OOS = variantOutOfStock || (variantQuantity != null && variantQuantity <= 0).
+        variantOutOfStock: { type: Boolean, default: false },
       }
     ],
     uiProductId: {
