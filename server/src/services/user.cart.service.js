@@ -160,8 +160,12 @@ const getCartService = async ({ userId }) => {
         },
         quantity: { $cond: [{ $isNumber: "$items.v" }, "$items.v", { $ifNull: ["$items.v.quantity", 1] }] },
         stock: "$p.productQuantity",
+        // Eligibility is product-level here (status must be in_stock). The
+        // product-level productQuantity gate was removed — stock is now tracked
+        // per-variant, and the per-variant out-of-stock check is enforced at
+        // order creation (see rp.payment.controller assertVariantAvailable).
         isEligibleForCalc: {
-          $cond: [{ $and: [{ $ifNull: ["$p", false] }, { $eq: ["$p.productStatus", "in_stock"] }, { $gt: ["$p.productQuantity", 0] }] }, true, false]
+          $cond: [{ $and: [{ $ifNull: ["$p", false] }, { $eq: ["$p.productStatus", "in_stock"] }] }, true, false]
         }
       }
     },

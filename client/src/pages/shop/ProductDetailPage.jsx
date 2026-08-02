@@ -132,6 +132,18 @@ const OptimizedImage = lazy(() => import("../../component/OptimizedImage"));
 const LoginForm = lazy(() => import("../../component/layout/auth/LoginForm"));
 const SignupForm = lazy(() => import("../../component/layout/auth/SignupForm"));
 
+// Effective per-variant out-of-stock — mirrors the server rule: a manual admin
+// flag, or a tracked quantity (variantQuantity != null) that has reached 0.
+// A null/undefined quantity means "not stock-tracked" → never OOS by quantity.
+const isVariantOutOfStock = (v) =>
+  !!v &&
+  (v.variantOutOfStock === true ||
+    (v.variantQuantity != null && Number(v.variantQuantity) <= 0));
+
+// At or below this many tracked units left, show an urgency "limited stock"
+// badge to nudge the buyer. Tweak freely.
+const LOW_STOCK_THRESHOLD = 5;
+
 const ProductDetailPage = () => {
   // Helper to safely extract quantity
   const itemQty = (q) => {
@@ -297,6 +309,21 @@ const ProductDetailPage = () => {
     () => splitTitleForDisplay(displayTitle),
     [displayTitle]
   );
+
+  // The currently-selected variant object (source for stock-based UI below).
+  const selectedVariantObj = useMemo(
+    () => (product?.variantDetails || []).find((v) => v.variantName === selectedVariant),
+    [product, selectedVariant]
+  );
+  // Is the currently-selected variant out of stock? Drives the prominent badge
+  // shown next to the title (not the tiny per-swatch marker).
+  const selectedVariantOOS = useMemo(() => isVariantOutOfStock(selectedVariantObj), [selectedVariantObj]);
+  // Low but non-zero tracked stock → show an urgency "limited stock" badge.
+  const selectedVariantLowStock = useMemo(() => {
+    const q = selectedVariantObj?.variantQuantity;
+    return q != null && Number(q) > 0 && Number(q) <= LOW_STOCK_THRESHOLD;
+  }, [selectedVariantObj]);
+  const selectedVariantQty = selectedVariantObj?.variantQuantity;
 
   const availableVariants = useMemo(() => {
     if (!product || !product.variantDetails) return [];
@@ -1024,6 +1051,7 @@ const ProductDetailPage = () => {
                     const swatchValue =
                       (detail.variantSwatchValue && detail.variantSwatchValue.trim()) ||
                       (swatchType === "image" ? detail.variantImage?.[0] : "");
+                    const oos = isVariantOutOfStock(detail);
 
                     return (
                       <button
@@ -1068,10 +1096,10 @@ const ProductDetailPage = () => {
                           )}
                         </span>
                         <div className="flex flex-col items-start leading-none min-w-0">
-                          <span className={`text-[11px] font-bold uppercase tracking-wide truncate max-w-[110px] ${isSelected ? 'text-[#1c3026]' : 'text-white group-hover:text-[#F5DEB3]'}`}>
+                          <span className={`text-[11px] font-bold uppercase tracking-wide truncate max-w-[110px] ${oos ? 'line-through opacity-60' : ''} ${isSelected ? 'text-[#1c3026]' : 'text-white group-hover:text-[#F5DEB3]'}`}>
                             {variantName}
                           </span>
-                          {swatchType === "image" && swatchValue && (
+                          {!oos && swatchType === "image" && swatchValue && (
                             <span className={`text-[7px] uppercase tracking-tighter ${isSelected ? 'text-[#1c3026]/60' : 'text-gray-400 group-hover:text-[#F5DEB3]/60'} font-bold mt-0.5`}>
                               Inspired
                             </span>
@@ -1182,6 +1210,31 @@ const ProductDetailPage = () => {
                 </p>
               )}
 
+              {selectedVariantOOS && (
+                <div className="mb-4">
+                  <span className="inline-flex items-center gap-2 text-sm font-black uppercase tracking-wider px-4 py-2 rounded-lg bg-red-500 text-white shadow-[0_0_0_1px_rgba(239,68,68,0.4)]">
+                    <i className="fa-solid fa-circle-xmark" />
+                    Out of Stock
+                  </span>
+                </div>
+              )}
+
+              {!selectedVariantOOS && selectedVariantLowStock && (
+                <div className="mb-4">
+                  {selectedVariantQty === 1 ? (
+                    <span className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wider px-3.5 py-2 rounded-lg bg-[#F5DEB3] text-[#1c3026] shadow-[0_0_18px_rgba(245,222,179,0.5)] animate-pulse">
+                      <i className="fa-solid fa-bolt" />
+                      Only 1 left — order now!
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wider px-3.5 py-2 rounded-lg bg-[#2e443c] text-[#F5DEB3] border border-[#F5DEB3]/30 shadow-[0_0_14px_rgba(46,68,60,0.6)]">
+                      <i className="fa-solid fa-hourglass-half" />
+                      Few left — selling fast!
+                    </span>
+                  )}
+                </div>
+              )}
+
               <div className="flex items-baseline gap-4 mb-2">
                 <p className="text-2xl lg:text-3xl font-light text-white">
                   ₹{currentPrice.toLocaleString()}
@@ -1224,8 +1277,8 @@ const ProductDetailPage = () => {
                 {!isInCart ? (
                   <button
                     onClick={handleInitialAddToCart}
-                    disabled={product.productStatus !== "in_stock" || isAdding}
-                    className="flex-1 h-14 bg-[#F5DEB3] text-[#1c3026] rounded-full font-bold uppercase tracking-[0.2em] text-xs hover:bg-white transition-all shadow-xl shadow-[#F5DEB3]/10"
+                    disabled={product.productStatus !== "in_stock" || selectedVariantOOS || isAdding}
+                    className="flex-1 h-14 bg-[#F5DEB3] text-[#1c3026] rounded-full font-bold uppercase tracking-[0.2em] text-xs hover:bg-white transition-all shadow-xl shadow-[#F5DEB3]/10 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#F5DEB3]"
                   >
                     {isAdding ? "Adding..." : "Add to Collection"}
                   </button>
@@ -2283,8 +2336,8 @@ const ProductDetailPage = () => {
             {!isInCart ? (
               <button
                 onClick={handleInitialAddToCart}
-                disabled={product.productStatus !== "in_stock" || isAdding}
-                className="w-full h-12 bg-[#F5DEB3] text-[#1c3026] rounded-full font-bold uppercase tracking-widest text-[10px] shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2"
+                disabled={product.productStatus !== "in_stock" || selectedVariantOOS || isAdding}
+                className="w-full h-12 bg-[#F5DEB3] text-[#1c3026] rounded-full font-bold uppercase tracking-widest text-[10px] shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {isAdding ? "Adding..." : "Add to Cart"}
                 <span className="w-1 h-1 bg-[#1c3026] rounded-full"></span>
