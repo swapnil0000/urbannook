@@ -148,11 +148,46 @@ const AllProductsPage = () => {
                       {(() => {
                         const thumbnail = (product?.variantDetails && product.variantDetails[0]?.variantImage?.[0]) || "/placeholder.jpg";
                         return (
-                          <img 
-                            src={thumbnail} 
-                            alt={product.productName} 
-                            className="w-full h-full object-cover mix-blend-multiply transition-transform duration-[1.5s] group-hover:scale-110" 
+                          <img
+                            src={thumbnail}
+                            alt={product.productName}
+                            className="w-full h-full object-cover mix-blend-multiply transition-transform duration-[1.5s] group-hover:scale-110"
                           />
+                        );
+                      })()}
+                      {/* Out-of-stock overlay — product is OOS if admin set the status
+                          or every active variant is out of stock. Card still shows
+                          (product stays published). */}
+                      {(() => {
+                        const LOW_STOCK_THRESHOLD = 5;
+                        const active = (product?.variantDetails || []).filter((v) => v.isActive !== false);
+                        const allVariantsOOS = active.length > 0 && active.every(
+                          (v) => v.variantOutOfStock === true || (v.variantQuantity != null && Number(v.variantQuantity) <= 0),
+                        );
+                        // Out of stock takes priority over the low-stock nudge.
+                        if (product?.productStatus === "out_of_stock" || allVariantsOOS) {
+                          return (
+                            <span className="absolute top-3 left-3 z-10 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md bg-red-500 text-white shadow">
+                              Out of Stock
+                            </span>
+                          );
+                        }
+                        // Low-stock urgency — based on total tracked units across
+                        // in-stock variants. Only shows when stock is actually tracked.
+                        const tracked = active.filter(
+                          (v) => v.variantQuantity != null && !v.variantOutOfStock && Number(v.variantQuantity) > 0,
+                        );
+                        if (tracked.length === 0) return null;
+                        const totalLeft = tracked.reduce((s, v) => s + Number(v.variantQuantity || 0), 0);
+                        if (totalLeft > LOW_STOCK_THRESHOLD) return null;
+                        return totalLeft === 1 ? (
+                          <span className="absolute top-3 left-3 z-10 flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md bg-[#F5DEB3] text-[#1c3026] shadow animate-pulse">
+                            <i className="fa-solid fa-bolt text-[9px]" /> Only 1 left
+                          </span>
+                        ) : (
+                          <span className="absolute top-3 left-3 z-10 flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md bg-[#2e443c] text-[#F5DEB3] border border-[#F5DEB3]/30 shadow">
+                            <i className="fa-solid fa-hourglass-half text-[9px]" /> Few left
+                          </span>
                         );
                       })()}
                     </div>
@@ -201,12 +236,13 @@ const AllProductsPage = () => {
                                       e.stopPropagation();
                                       navigate(`/product/${product.productId}/${detail.sku || variantName}`);
                                     };
+                                    const oos = detail.variantOutOfStock === true || (detail.variantQuantity != null && Number(detail.variantQuantity) <= 0);
                                     return (
                                       <div
                                         key={detail._id || idx}
-                                        title={variantName}
+                                        title={oos ? `${variantName} — out of stock` : variantName}
                                         onClick={goToVariant}
-                                        className="w-4 h-4 rounded-full overflow-hidden border border-[#d1d5db] shadow-sm transition-transform hover:scale-110 cursor-pointer flex items-center justify-center bg-white"
+                                        className={`w-4 h-4 rounded-full overflow-hidden border border-[#d1d5db] shadow-sm transition-transform hover:scale-110 cursor-pointer flex items-center justify-center bg-white ${oos ? "opacity-40 grayscale" : ""}`}
                                       >
                                         {swatchType === "color" && swatchValue ? (
                                           <span className="w-full h-full block" style={{ background: swatchValue }} />
