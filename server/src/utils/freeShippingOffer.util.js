@@ -1,4 +1,29 @@
+import Offer from "../model/offer.model.js";
 import FreeShippingOffer from "../model/freeShippingOffer.model.js";
+
+/**
+ * Fetches the free-shipping singleton doc — preferring the new unified
+ * `offers` collection (type: "free_shipping", written by the admin panel's
+ * Offers page). Falls back to the legacy `freeshippingoffers` collection only
+ * when this environment/DB hasn't been seeded into `offers` yet (see
+ * UN-ADMIN-panel .../server/scripts/seedOffersFromLegacy.js) — the legacy
+ * collection is otherwise untouched and frozen once seeded, since the admin
+ * only writes new banners/threshold changes to `offers` now.
+ *
+ * Internal — all reads of the free-shipping config/banners go through this
+ * one function so there is exactly one place the dual-read fallback lives.
+ *
+ * @param {string} projection mongoose .select() string
+ */
+const getFreeShippingDoc = async (projection) => {
+  const offer = await Offer.findOne({ type: "free_shipping" }).select(projection).lean();
+  if (offer) {
+    // console.log("[FreeShipping][source] NEW offers collection");
+    return offer;
+  }
+  // console.log("[FreeShipping][source] LEGACY freeshippingoffers collection (no doc found in offers — not migrated on this DB yet)");
+  return FreeShippingOffer.findOne().select(projection).lean();
+};
 
 /**
  * Returns { isActive, thresholdAmount } — the raw offer config. Used both for
@@ -9,7 +34,7 @@ import FreeShippingOffer from "../model/freeShippingOffer.model.js";
  * generic cart rule, OR the plain cart-value threshold is met.
  */
 export const getFreeShippingConfig = async () => {
-  const offer = await FreeShippingOffer.findOne().select("isActive thresholdAmount").lean();
+  const offer = await getFreeShippingDoc("isActive thresholdAmount");
   return {
     isActive: offer?.isActive ?? false,
     thresholdAmount: offer?.thresholdAmount ?? 0,
@@ -27,7 +52,7 @@ export const getFreeShippingConfig = async () => {
  * @param {string[]} cartProductIds product IDs currently in the cart/order
  */
 export const isFreeShippingEligible = async (cartProductIds = []) => {
-  const offer = await FreeShippingOffer.findOne().select("isActive banners").lean();
+  const offer = await getFreeShippingDoc("isActive banners");
   if (!offer?.isActive) return false;
 
   const ids = new Set((cartProductIds || []).map((id) => String(id)));
@@ -41,4 +66,31 @@ export const isFreeShippingEligible = async (cartProductIds = []) => {
     `[FreeShipping] cartIds=[${[...ids].join(",")}] → eligible=${eligible}`,
   );
   return eligible;
+};
+
+/**
+ * Active banner (if any) for a given product page — used by
+ * getBannerForProductController. A product can have at most one active
+ * banner in practice, but that's not enforced at the schema level; first
+ * match wins.
+ *
+ * @param {string} productId
+ */
+export const getBannerForProduct = async (productId) => {
+  const offer = await getFreeShippingDoc("isActive banners");
+  if (!offer?.isActive) return null;
+  const banner = (offer.banners || []).find(
+    (b) => b.isActive && String(b.sourceProductId) === String(productId),
+  );
+  return banner || null;
+};
+
+/**
+ * All active banners across every product — used by
+ * getAllActiveBannersController (checkout, which isn't tied to one product).
+ */
+export const getAllActiveBanners = async () => {
+  const offer = await getFreeShippingDoc("isActive banners");
+  if (!offer?.isActive) return [];
+  return (offer.banners || []).filter((b) => b.isActive);
 };
