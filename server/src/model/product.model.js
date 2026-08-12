@@ -69,6 +69,12 @@ const productSchema = mongoose.Schema(
       type: Boolean,
       require: true,
     },
+    // Manual sort weight for the listing — higher shows first (default 0).
+    // Set from the admin panel; read by the products listing sort.
+    priority: { type: Number, default: 0 },
+    // Admin-curated related product IDs suggested on the PDP. Written by the
+    // admin panel; the storefront reads these to render "you may also like".
+    recommendedProducts: { type: [String], default: [] },
   },
   {
     timestamps: true,
