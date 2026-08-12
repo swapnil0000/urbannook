@@ -20,7 +20,7 @@ const productListing = asyncHandler(async (req, res) => {
     const perPage = Number(limit) || 10;
     /*category -> Filter by category	Electronics , search -> Keyword search in name	iPhone */
     const query = { isPublished: true };
-    let sort = { createdAt: -1 }; // default: latest products
+    let sort = { priority: -1, createdAt: -1 }; // admin priority first, then latest
 
     if (search) {
       if (search.length <= 2) {
@@ -86,11 +86,31 @@ const specificProductDetails = asyncHandler(async (req, res) => {
     const productDetails = await Product.findOne({
       productId,
       isPublished: true,
-    }).select("-_id -createdAt -updatedAt -__v");
+    })
+      .select("-_id -createdAt -updatedAt -__v")
+      .lean();
 
     if (!productDetails) {
       throw new NotFoundError("Product Doesn't exist");
     }
+
+    // Inline the admin-curated recommended products so the PDP needs no extra
+    // API call. Published only, and the admin-defined order is preserved.
+    const recIds = Array.isArray(productDetails.recommendedProducts)
+      ? productDetails.recommendedProducts.filter(Boolean).map(String)
+      : [];
+    let recommendedProductsDetails = [];
+    if (recIds.length) {
+      const recs = await Product.find({
+        productId: { $in: recIds },
+        isPublished: true,
+      })
+        .select("-_id -createdAt -updatedAt -__v")
+        .lean();
+      const byId = new Map(recs.map((p) => [String(p.productId), p]));
+      recommendedProductsDetails = recIds.map((id) => byId.get(id)).filter(Boolean);
+    }
+    productDetails.recommendedProductsDetails = recommendedProductsDetails;
 
     return productDetails;
   };
