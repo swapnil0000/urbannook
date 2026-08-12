@@ -4,7 +4,7 @@ import { asyncHandler } from "../middleware/errorHandler.middleware.js";
 
 class ContactController {
   submitContactForm = asyncHandler(async (req, res) => {
-    const { name, email, subject, message, mobile } = req.body;
+    const { name, email, subject, message, mobile, productId, productName } = req.body;
 
     const result = await contactService.createSubmission({
       name,
@@ -12,6 +12,8 @@ class ContactController {
       subject,
       message,
       mobile,
+      productId,
+      productName,
     });
 
     return res

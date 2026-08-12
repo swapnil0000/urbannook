@@ -50,7 +50,11 @@ const contactSubmissionSchema = Joi.object({
     .allow('', null)
     .messages({
       'string.pattern.base': 'Please provide a valid 10-digit mobile number'
-    })
+    }),
+
+  productId: Joi.string().trim().optional().allow('', null),
+
+  productName: Joi.string().trim().max(200).optional().allow('', null)
 });
 
 export { contactSubmissionSchema };
