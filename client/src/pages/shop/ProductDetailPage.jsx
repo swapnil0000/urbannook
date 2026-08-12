@@ -15,6 +15,7 @@ import { resolveVariantTitle, splitTitleForDisplay } from "../../utils/variantTi
 import SEOHead from "../../component/SEOHead";
 import ComparisonTable from "../../component/ComparisonTable";
 import SetupShowcase from "../../component/SetupShowcase";
+import RecommendedProducts from "../../component/RecommendedProducts";
 import NotifyMeModal from "../../component/NotifyMeModal";
 
 // TEMP: hardcoded showcase slides until wired to flagged review images
@@ -1505,6 +1506,9 @@ const ProductDetailPage = () => {
 
         {/* ===== REAL-LIFE SETUP SHOWCASE (lazy-mounted marquee) ===== */}
         {/* <SetupShowcase items={SETUP_SHOWCASE_ITEMS} /> */}
+
+        {/* ===== RECOMMENDED PRODUCTS (admin-curated; inlined in product call) ===== */}
+        <RecommendedProducts products={product.recommendedProductsDetails} />
 
         {/* ===== REVIEWS SECTION ===== */}
         <div className="mt-8 pt-4 ">
