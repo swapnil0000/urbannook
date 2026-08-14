@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  // INDEPENDENCE_OFFER,
+  INDEPENDENCE_OFFER,
   isOfferLive,
   offerAmountLabel,
   offerConditionLabel,
