@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useApplyCouponMutation, useGetAvailableCouponsQuery, useLookupCouponMutation } from '../store/api/userApi';
 import { useUI, useAuth } from '../hooks/useRedux';
+import IndependenceOfferBanner from './IndependenceOfferBanner';
 
 function calcLocalDiscount(coupon, subtotal) {
   if (!subtotal || subtotal < (coupon.minCartValue || 0)) return 0;
@@ -25,8 +26,15 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
   const { data: availableCoupons } = useGetAvailableCouponsQuery(undefined, { skip: !isGuest });
   const [lookupCoupon, { isLoading: isLookingUp }] = useLookupCouponMutation();
 
-  const handleApplyCoupon = async () => {
-    if (!couponCode.trim()) {
+  // Takes an optional code so the Independence Day banner can apply through
+  // this exact path rather than duplicating any of it. onClick hands this a
+  // MouseEvent, so only an explicit string counts as an override.
+  const handleApplyCoupon = async (codeOverride) => {
+    const cleanCode = (typeof codeOverride === 'string' ? codeOverride : couponCode)
+      .trim()
+      .toUpperCase();
+
+    if (!cleanCode) {
       setError('Please enter a coupon code');
       return;
     }
@@ -35,7 +43,6 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
     setSuccess('');
 
     if (isGuest) {
-      const cleanCode = couponCode.trim().toUpperCase();
       // 1. Try the cached visible-coupons list first (no extra request)
       let coupon = (availableCoupons?.data || []).find(c => c.code === cleanCode);
 
@@ -67,7 +74,7 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
 
     try {
       const result = await applyCoupon({
-        couponCode: couponCode?.trim()?.toUpperCase(),
+        couponCode: cleanCode,
         email: user?.email
       }).unwrap();
 
@@ -77,7 +84,7 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
         setError('');
         setCouponCode('');
         if (onCouponApplied) {
-          onCouponApplied({ code: couponCode.trim().toUpperCase(), discount: discountAmount, summary: result.data?.summary });
+          onCouponApplied({ code: cleanCode, discount: discountAmount, summary: result.data?.summary });
         }
         setTimeout(() => setSuccess(''), 2000);
       } else {
@@ -126,6 +133,13 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
 
       {!appliedCoupon ? (
         <div className="space-y-3">
+          {/* Names the sale at the point of purchase and applies it in one tap,
+              through the same path as a hand-typed code. */}
+          <IndependenceOfferBanner
+            cartTotal={cartTotal}
+            isApplying={isLoading || isLookingUp}
+            onApply={handleApplyCoupon}
+          />
           <div className="flex gap-2">
             <input
               type="text"
