@@ -8,30 +8,52 @@ import { asyncHandler } from "../middleware/errorHandler.middleware.js";
 const TAG = "[OfferLead]";
 
 /**
- * Terms to show the visitor after they claim.
+ * Load the campaign's coupon.
  *
- * Read from the live coupon document when it exists so the popup can never
- * advertise terms the checkout won't honour. Falls back to campaign config if
- * the coupon hasn't been seeded yet — a missing coupon should not break the
- * lead capture, which is the part that actually has business value.
+ * By couponId first — that is the one identifier the admin panel cannot change,
+ * so renaming the code no longer detaches the campaign from its coupon. Falls
+ * back to a code lookup for the case where the configured id is wrong.
  */
-async function resolveOfferTerms(code) {
-  const coupon = await Coupon.findOne({ code, isArchived: false }).lean();
+async function loadCampaignCoupon() {
+  const { couponId, couponCode } = independenceOffer;
+
+  if (couponId) {
+    const byId = await Coupon.findOne({ couponId, isArchived: false }).lean();
+    if (byId) return byId;
+    console.warn(`${TAG} No coupon with couponId=${couponId} — falling back to code "${couponCode}"`);
+  }
+
+  return Coupon.findOne({ code: couponCode, isArchived: false }).lean();
+}
+
+/**
+ * Terms to show the visitor.
+ *
+ * Read from the live coupon document so the popup can never advertise terms the
+ * checkout won't honour. Falls back to campaign config only if the coupon
+ * cannot be read at all — a missing coupon should not break the lead capture,
+ * which is the part that actually has business value.
+ */
+async function resolveOfferTerms() {
+  const coupon = await loadCampaignCoupon();
 
   if (!coupon) {
     console.warn(
-      `${TAG} Coupon "${code}" not found — serving campaign defaults. ` +
-        `Check INDEPENDENCE_COUPON_CODE, or that the coupon exists in this database.`,
+      `${TAG} Campaign coupon not found (couponId=${independenceOffer.couponId}, ` +
+        `code=${independenceOffer.couponCode}) — serving config defaults.`,
     );
     return {
-      couponCode: code,
+      couponCode: independenceOffer.couponCode,
       discountType: independenceOffer.discountType,
       discountValue: independenceOffer.discountValue,
       maxDiscount: independenceOffer.maxDiscountCap,
       minCartValue: independenceOffer.minCartValue,
       validUntil: independenceOffer.validUntil,
+      available: false,
     };
   }
+
+  const code = coupon.code;
 
   if (!coupon.isActive) {
     console.warn(`${TAG} Coupon "${code}" exists but isActive=false — claims will fail at checkout`);
@@ -52,6 +74,13 @@ async function resolveOfferTerms(code) {
     }
   }
 
+  const now = new Date();
+  const withinWindow =
+    (!coupon.validFrom || now >= new Date(coupon.validFrom)) &&
+    (!coupon.validUntil || now <= new Date(coupon.validUntil));
+  const hasCapacity =
+    coupon.maxTotalUses == null || (coupon.usageCount || 0) < coupon.maxTotalUses;
+
   return {
     couponCode: coupon.code,
     discountType: coupon.discountType ?? independenceOffer.discountType,
@@ -59,8 +88,28 @@ async function resolveOfferTerms(code) {
     maxDiscount: coupon.maxDiscountCap ?? independenceOffer.maxDiscountCap,
     minCartValue: coupon.minCartValue ?? independenceOffer.minCartValue,
     validUntil: coupon.validUntil ?? independenceOffer.validUntil,
+    // Lets the storefront hide the offer rather than promote a code that would
+    // be refused at checkout.
+    available: !!coupon.isActive && !coupon.isTest && withinWindow && hasCapacity,
   };
 }
+
+/**
+ * GET /offer/campaign — public, read-only.
+ *
+ * The storefront asks for the offer's terms instead of hardcoding them, so a
+ * rename or a re-price in the admin panel shows up on the next page load with
+ * no rebuild and no redeploy.
+ */
+const getCampaignController = asyncHandler(async (req, res) => {
+  const terms = await resolveOfferTerms();
+  // Short cache: long enough to spare the DB on a traffic spike, short enough
+  // that an admin edit appears almost immediately.
+  res.set("Cache-Control", "public, max-age=60");
+  return res
+    .status(200)
+    .json(new ApiRes(200, "independenceCampaign", terms, true));
+});
 
 /**
  * POST /offer/claim — public.
@@ -88,7 +137,7 @@ const claimOfferController = asyncHandler(async (req, res) => {
     }
   }
 
-  const terms = await resolveOfferTerms(independenceOffer.couponCode);
+  const terms = await resolveOfferTerms();
 
   const update = {
     $set: {
@@ -149,4 +198,4 @@ const claimOfferController = asyncHandler(async (req, res) => {
   );
 });
 
-export { claimOfferController };
+export { claimOfferController, getCampaignController };

@@ -1,6 +1,9 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
-import { claimOfferController } from "../controller/offerLead.controller.js";
+import {
+  claimOfferController,
+  getCampaignController,
+} from "../controller/offerLead.controller.js";
 import { offerClaimSchema } from "../validation/offerLead.validation.js";
 import { validateRequest } from "../middleware/validation.middleware.js";
 
@@ -25,6 +28,10 @@ const offerClaimLimiter = rateLimit({
     });
   },
 });
+
+// Public read of the live offer terms — what the storefront renders instead of
+// hardcoding the code and amount.
+offerLeadRouter.get("/offer/campaign", getCampaignController);
 
 offerLeadRouter.post(
   "/offer/claim",
