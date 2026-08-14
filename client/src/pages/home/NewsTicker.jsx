@@ -1,33 +1,14 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  INDEPENDENCE_OFFER,
-  isOfferLive,
-  offerAmountLabel,
-  offerConditionLabel,
-} from '../../config/independenceOffer';
-
-const BASE_HEADLINES = [
-  { text: "Free Shipping on orders above ₹1700" },
-  { text: "Ready to ship within 48 hrs" },
-  { text: "Cash on Delivery available" },
-];
 
 const NewsTicker = () => {
   const [isPaused, setIsPaused] = useState(false);
 
-  // The campaign headline leads the loop while the offer is live and drops out
-  // of it by itself once the window closes — no dated copy left stranded here.
-  const headlines = useMemo(() => {
-    if (!isOfferLive()) return BASE_HEADLINES;
-    return [
-      {
-        text: `Independence Day: ${offerAmountLabel()} off ${offerConditionLabel()} — code ${INDEPENDENCE_OFFER.code}`,
-        highlight: true,
-      },
-      ...BASE_HEADLINES,
-    ];
-  }, []);
+  const headlines = [
+    "Free Shipping on orders above ₹1700",
+    "Ready to ship within 48 hrs",
+    "Cash on Delivery available",
+  ];
 
   return (
     <Link to="/products" className="block relative overflow-hidden group">
@@ -57,28 +38,12 @@ const NewsTicker = () => {
           >
             {/* Duplicating array for seamless loop */}
             {[...headlines, ...headlines].map((headline, index) => (
-              <div
+              <div 
                 key={index}
                 className="flex items-center px-6 sm:px-8"
               >
-                {headline.highlight && (
-                  // Tricolour pip — reads as the campaign at a glance without
-                  // fighting the ticker's green for attention.
-                  <span
-                    className="mr-2 inline-flex h-2.5 w-2.5 shrink-0 overflow-hidden rounded-full ring-1 ring-black/10"
-                    aria-hidden="true"
-                  >
-                    <span className="flex-1 bg-[#FF9933]" />
-                    <span className="flex-1 bg-white" />
-                    <span className="flex-1 bg-[#138808]" />
-                  </span>
-                )}
-                <span
-                  className={`text-[9px] sm:text-xs font-bold tracking-[0.15em] uppercase font-extrabold ${
-                    headline.highlight ? 'text-[#9A3412]' : 'text-emerald-700'
-                  }`}
-                >
-                  {headline.text}
+                <span className={`text-[9px] sm:text-xs font-bold tracking-[0.15em] uppercase text-emerald-700 font-extrabold`}>
+                  {headline}
                 </span>
                 {/* Separator Icon */}
                 <span className="ml-6 sm:ml-8 text-emerald-300/50">
