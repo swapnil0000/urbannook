@@ -8,16 +8,22 @@
  * visitor submits, so keep the code and percentage in sync with the server.
  */
 import { captureAttribution } from '../utils/analytics';
+import { getApiUrl } from './appUrls';
 
 const env = import.meta.env;
 
 export const INDEPENDENCE_OFFER = {
   campaignId: 'INDEPENDENCE_DAY_2026',
-  code: (env.VITE_INDEPENDENCE_COUPON_CODE || 'UNFLAT100').toUpperCase(),
+
+  // LAST-RESORT FALLBACKS ONLY. The live terms come from GET /offer/campaign,
+  // which reads the coupon document, so renaming or re-pricing the coupon in
+  // the admin panel reflects here without a rebuild. These values are used only
+  // if that request fails. Do not treat them as the source of truth.
+  code: (env.VITE_INDEPENDENCE_COUPON_CODE || 'UNFREEDOM80').toUpperCase(),
   discountType: 'FLAT',
-  discountValue: 100,
-  maxDiscount: null, 
-  minCartValue: 1499,
+  discountValue: 80,
+  maxDiscount: null,
+  minCartValue: 499,
   startsAt: env.VITE_INDEPENDENCE_STARTS_AT || '2026-08-14T00:00:00+05:30',
 
   endsAt: env.VITE_INDEPENDENCE_ENDS_AT || '2026-08-15T23:59:59+05:30',
@@ -36,6 +42,50 @@ const SUPPRESSED_PREFIXES = [
 export function isSuppressedPath(pathname = '') {
   return SUPPRESSED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
+
+/* ---------------------------------------------------------------------------
+ * Live terms from the server
+ *
+ * The coupon's code, amount and minimum are all editable in the admin panel, so
+ * the storefront asks for them rather than shipping them in the bundle. Cached
+ * in a module-level promise so the popup and the checkout banner share a single
+ * request per page load.
+ * ------------------------------------------------------------------------ */
+
+const CONFIG_FALLBACK = {
+  couponCode: INDEPENDENCE_OFFER.code,
+  discountType: INDEPENDENCE_OFFER.discountType,
+  discountValue: INDEPENDENCE_OFFER.discountValue,
+  maxDiscount: INDEPENDENCE_OFFER.maxDiscount,
+  minCartValue: INDEPENDENCE_OFFER.minCartValue,
+  // Unknown rather than false: a failed request must not silently hide a live
+  // offer, so we let the campaign dates decide instead.
+  available: true,
+  fromServer: false,
+};
+
+let termsPromise = null;
+
+export function fetchCampaignTerms() {
+  if (!termsPromise) {
+    termsPromise = fetch(`${getApiUrl()}/offer/campaign`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body) =>
+        body?.success && body.data
+          ? { ...CONFIG_FALLBACK, ...body.data, fromServer: true }
+          : CONFIG_FALLBACK,
+      )
+      .catch(() => CONFIG_FALLBACK);
+  }
+  return termsPromise;
+}
+
+/** Test/debug helper — drops the cached response so the next call refetches. */
+export function resetCampaignTermsCache() {
+  termsPromise = null;
+}
+
+export { CONFIG_FALLBACK };
 
 /* ---------------------------------------------------------------------------
  * Copy derived from the offer terms

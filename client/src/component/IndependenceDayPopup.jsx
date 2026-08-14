@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, memo } from 'react';
 import { useLocation } from 'react-router-dom';
 import useTimer from '../hooks/useTimer';
+import useOfferTerms from '../hooks/useOfferTerms';
 import { useAuth } from '../hooks/useRedux';
 import { getApiUrl } from '../config/appUrls';
 import {
@@ -188,6 +189,9 @@ const POPUP_STYLES = `
 const IndependenceDayPopup = memo(() => {
   const location = useLocation();
   const { user } = useAuth();
+  // Live coupon terms from the server, so an admin rename or re-price reaches
+  // the popup without a rebuild.
+  const { terms: campaign } = useOfferTerms();
 
   const [offerState, setOfferState] = useState(readOfferState);
   const [isOpen, setIsOpen] = useState(false);
@@ -196,10 +200,8 @@ const IndependenceDayPopup = memo(() => {
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [claimedCode, setClaimedCode] = useState(
-    () => readOfferState()?.code || INDEPENDENCE_OFFER.code,
-  );
-  const [terms, setTerms] = useState(null);
+  // Terms returned by the claim itself — authoritative once we have them.
+  const [claimTerms, setClaimTerms] = useState(null);
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
 
@@ -351,10 +353,9 @@ const IndependenceDayPopup = memo(() => {
       }
 
       const data = body?.data || {};
-      const code = String(data.couponCode || INDEPENDENCE_OFFER.code).toUpperCase();
+      const code = String(data.couponCode || campaign.couponCode).toUpperCase();
 
-      setClaimedCode(code);
-      setTerms(data);
+      setClaimTerms(data);
       setOfferState(markClaimed(code));
       setView('success');
 
@@ -438,20 +439,21 @@ const IndependenceDayPopup = memo(() => {
     });
   };
 
-  if (!offerLive || suppressed) return null;
+  // `available` is false when the coupon is switched off, expired or has used
+  // up its global cap — better to show nothing than to hand out a code that
+  // checkout will refuse.
+  if (!offerLive || suppressed || campaign.available === false) return null;
 
   const hasClaimed = offerState?.status === 'claimed';
 
-  // Before submit these are the configured mirror of the coupon; after submit
-  // they are the coupon's live terms as the server read them. Every discount
-  // phrase below derives from this, so the copy can never advertise something
-  // the coupon does not actually do.
-  const offer = {
-    discountType: terms?.discountType || INDEPENDENCE_OFFER.discountType,
-    discountValue: terms?.discountValue ?? INDEPENDENCE_OFFER.discountValue,
-    maxDiscount: terms?.maxDiscount ?? INDEPENDENCE_OFFER.maxDiscount,
-    minCartValue: terms?.minCartValue ?? INDEPENDENCE_OFFER.minCartValue,
-  };
+  // Before submit these are the live coupon terms from the server; after submit
+  // they are the terms the claim itself returned. Every discount phrase below
+  // derives from this, so the copy can never advertise something the coupon
+  // does not actually do.
+  const offer = claimTerms || campaign;
+  // Always the live code — never a stale one persisted from an earlier visit,
+  // which would be a code the checkout no longer recognises after a rename.
+  const claimedCode = claimTerms?.couponCode || campaign.couponCode;
   const amount = offerAmountLabel(offer); // "₹100" / "10%"
   const condition = offerConditionLabel(offer); // "on orders above ₹1,499"
 

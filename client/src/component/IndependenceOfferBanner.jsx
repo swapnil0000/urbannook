@@ -1,9 +1,5 @@
-import {
-  INDEPENDENCE_OFFER,
-  isOfferLive,
-  offerAmountLabel,
-  offerConditionLabel,
-} from '../config/independenceOffer';
+import { isOfferLive, offerAmountLabel, offerConditionLabel } from '../config/independenceOffer';
+import useOfferTerms from '../hooks/useOfferTerms';
 
 /**
  * Independence Day offer strip for the checkout promo area — the thing that
@@ -34,15 +30,20 @@ const Chakra = ({ className = '' }) => (
 );
 
 const IndependenceOfferBanner = ({ cartTotal = 0, onApply, isApplying = false }) => {
-  if (!isOfferLive()) return null;
+  // Live coupon terms — never the bundled defaults, so the code shown here is
+  // always the one checkout will actually accept.
+  const { terms } = useOfferTerms();
 
-  const code = INDEPENDENCE_OFFER.code;
-  const amount = offerAmountLabel();
-  const condition = offerConditionLabel();
+  // Hooks must run unconditionally, so these gates come after the hook call.
+  if (!isOfferLive() || terms.available === false) return null;
+
+  const code = terms.couponCode;
+  const amount = offerAmountLabel(terms);
+  const condition = offerConditionLabel(terms);
 
   // Below the minimum this coupon applies for ₹0, which reads as a broken
   // offer. Show the gap instead — it doubles as a nudge to add one more item.
-  const minCart = INDEPENDENCE_OFFER.minCartValue || 0;
+  const minCart = terms.minCartValue || 0;
   const shortfall = Math.max(0, minCart - (cartTotal || 0));
   const eligible = shortfall === 0;
 
