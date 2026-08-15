@@ -15,6 +15,8 @@ import { resolveVariantTitle, splitTitleForDisplay } from "../../utils/variantTi
 import SEOHead from "../../component/SEOHead";
 import ComparisonTable from "../../component/ComparisonTable";
 import SetupShowcase from "../../component/SetupShowcase";
+import RecommendedProducts from "../../component/RecommendedProducts";
+import NotifyMeModal from "../../component/NotifyMeModal";
 
 // TEMP: hardcoded showcase slides until wired to flagged review images
 // (e.g. a `showInSetup` boolean on each review image, toggled from admin).
@@ -197,6 +199,7 @@ const ProductDetailPage = () => {
   // move can fire before the setState from drag-start has committed.
   const draggingRef = useRef(false);
   const [showSignup, setShowSignup] = useState(false);
+  const [showNotifyModal, setShowNotifyModal] = useState(false);
   const [selectedVariant, setSelectedVariant] = useState("");
 
   // 3. API Hooks
@@ -318,6 +321,7 @@ const ProductDetailPage = () => {
   // Is the currently-selected variant out of stock? Drives the prominent badge
   // shown next to the title (not the tiny per-swatch marker).
   const selectedVariantOOS = useMemo(() => isVariantOutOfStock(selectedVariantObj), [selectedVariantObj]);
+  const isOutOfStock = product?.productStatus !== "in_stock" || selectedVariantOOS;
   // Low but non-zero tracked stock → show an urgency "limited stock" badge.
   const selectedVariantLowStock = useMemo(() => {
     const q = selectedVariantObj?.variantQuantity;
@@ -1275,13 +1279,22 @@ const ProductDetailPage = () => {
             <div className="hidden lg:block bg-white/5 backdrop-blur-sm p-8 rounded-[2rem] border border-[#F5DEB3]/10 mb-10 lg:mb-0 lg:h-full">
               <div className="flex flex-row gap-4">
                 {!isInCart ? (
-                  <button
-                    onClick={handleInitialAddToCart}
-                    disabled={product.productStatus !== "in_stock" || selectedVariantOOS || isAdding}
-                    className="flex-1 h-14 bg-[#F5DEB3] text-[#1c3026] rounded-full font-bold uppercase tracking-[0.2em] text-xs hover:bg-white transition-all shadow-xl shadow-[#F5DEB3]/10 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#F5DEB3]"
-                  >
-                    {isAdding ? "Adding..." : "Add to Collection"}
-                  </button>
+                  isOutOfStock ? (
+                    <button
+                      onClick={() => setShowNotifyModal(true)}
+                      className="flex-1 h-14 bg-[#F5DEB3] text-[#1c3026] rounded-full font-bold uppercase tracking-[0.2em] text-xs hover:bg-white transition-all shadow-xl shadow-[#F5DEB3]/10"
+                    >
+                      Notify Me
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleInitialAddToCart}
+                      disabled={isAdding}
+                      className="flex-1 h-14 bg-[#F5DEB3] text-[#1c3026] rounded-full font-bold uppercase tracking-[0.2em] text-xs hover:bg-white transition-all shadow-xl shadow-[#F5DEB3]/10 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#F5DEB3]"
+                    >
+                      {isAdding ? "Adding..." : "Add to Collection"}
+                    </button>
+                  )
                 ) : (
                   <>
                     <div className="flex items-center bg-[#1c3026] border border-[#F5DEB3]/20 rounded-full h-14 px-4 gap-4">
@@ -1493,6 +1506,9 @@ const ProductDetailPage = () => {
 
         {/* ===== REAL-LIFE SETUP SHOWCASE (lazy-mounted marquee) ===== */}
         {/* <SetupShowcase items={SETUP_SHOWCASE_ITEMS} /> */}
+
+        {/* ===== RECOMMENDED PRODUCTS (admin-curated; inlined in product call) ===== */}
+        <RecommendedProducts products={product.recommendedProductsDetails} />
 
         {/* ===== REVIEWS SECTION ===== */}
         <div className="mt-8 pt-4 ">
@@ -2334,15 +2350,25 @@ const ProductDetailPage = () => {
         <div className="flex gap-4 items-center p-4 px-6">
           <div className="flex-1">
             {!isInCart ? (
+              isOutOfStock ? (
+                <button
+                  onClick={() => setShowNotifyModal(true)}
+                  className="w-full h-12 bg-[#F5DEB3] text-[#1c3026] rounded-full font-bold uppercase tracking-widest text-[10px] shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2"
+                >
+                  <i className="fa-regular fa-bell text-[10px]"></i>
+                  Notify Me
+                </button>
+              ) : (
               <button
                 onClick={handleInitialAddToCart}
-                disabled={product.productStatus !== "in_stock" || selectedVariantOOS || isAdding}
+                disabled={isAdding}
                 className="w-full h-12 bg-[#F5DEB3] text-[#1c3026] rounded-full font-bold uppercase tracking-widest text-[10px] shadow-lg active:scale-95 transition-transform flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {isAdding ? "Adding..." : "Add to Cart"}
                 <span className="w-1 h-1 bg-[#1c3026] rounded-full"></span>
                 <span>₹{currentPrice.toLocaleString()}</span>
               </button>
+              )
             ) : (
               <div className="flex gap-3 w-full">
                 <div className="flex items-center justify-between bg-[#111f18] border border-[#F5DEB3]/20 rounded-full h-12 px-4 w-[120px]">
@@ -2434,6 +2460,14 @@ const ProductDetailPage = () => {
           />
         )}
       </Suspense>
+
+      {showNotifyModal && (
+        <NotifyMeModal
+          productName={displayTitle || product?.productName}
+          productId={product?.productId}
+          onClose={() => setShowNotifyModal(false)}
+        />
+      )}
     </div>
   );
 };

@@ -39,6 +39,9 @@ const Notification = lazy(() => import('./component/Notification'));
 const SocialMediaFAB = lazy(() => import('./component/layout/WhatsAppButton'));
 const OpenInBrowserBanner = lazy(() => import('./component/OpenInBrowserBanner'));
 const GoogleOneTap = lazy(() => import('./component/GoogleOneTap'));
+// Mounted app-wide, not on the home page: most Instagram ad / bio traffic lands
+// directly on /products or a product page and would never see a home-only popup.
+const IndependenceDayPopup = lazy(() => import('./component/IndependenceDayPopup'));
 
 // Component to handle session restoration and token removal detection
 const SessionManager = ({ children }) => {
@@ -176,6 +179,10 @@ function App() {
                 {/* Global Google One Tap for logged-out visitors (boosts Meta EMQ) */}
                 <ErrorBoundary>
                   <GoogleOneTap />
+                </ErrorBoundary>
+                {/* Independence Day 10%-off lead capture — shows once, everywhere */}
+                <ErrorBoundary>
+                  <IndependenceDayPopup />
                 </ErrorBoundary>
               </Suspense>
             </SyncProvider>
