@@ -1416,9 +1416,11 @@ const CheckoutPage = () => {
       </div>
 
       {/* ── Independence Day offer ─────────────────────────────────────────
-          Sits at the top of checkout for the length of the campaign and takes
-          itself away when the window closes — nothing to remove by hand. */}
-      {isOfferLive() && (
+          Review & Pay only. Account, Contact and Address are all the same
+          /checkout route, so without the step check this rode along on every
+          one of them — and a coupon is noise until there is a total to apply it
+          to. Also takes itself away when the campaign window closes. */}
+      {isOfferLive() && currentStep === reviewStep && (
         <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-6">
           <IndependenceOfferBanner
             cartTotal={cartTotalAmount}
