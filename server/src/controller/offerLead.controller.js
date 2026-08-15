@@ -91,6 +91,11 @@ async function resolveOfferTerms() {
     // Lets the storefront hide the offer rather than promote a code that would
     // be refused at checkout.
     available: !!coupon.isActive && !coupon.isTest && withinWindow && hasCapacity,
+    // True when the coupon already appears in the checkout "Available coupons"
+    // list. The promo banner suppresses itself in that case so the same offer
+    // is not advertised twice on one screen; unhide/hide in admin and the
+    // storefront follows without a code change.
+    isListed: !coupon.isHidden,
   };
 }
 

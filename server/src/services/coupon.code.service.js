@@ -1,4 +1,3 @@
-import CouponCode from "../model/coupon.code.model.js";
 import Coupon from "../model/coupon.model.js";
 import CouponUsage from "../model/couponUsage.model.js";
 import { getCartService } from "../services/user.cart.service.js";
@@ -7,8 +6,6 @@ import {
   ValidationError,
   NotFoundError,
 } from "../utils/errors.js";
-import User from "../model/user.model.js";
-import UserWaistList from "../model/user.waitlist.model.js";
 
 // ── Identity normalizers (must match admin server logic exactly) ───────────────
 
@@ -228,51 +225,11 @@ const applyCouponCodeService = async ({ userId, couponCodeName, email, mobile })
     return { statusCode: 200, message: "Coupon applied successfully", success: true, data: { items: availableItems, summary: snap.summary, isInternalTest: !!newCoupon.isInternal } };
   }
 
-  console.log(`${tag} Not found in new model — trying legacy model`);
-
-  // --- CASE 4: Fall back to legacy coupon model ---
-  const legacyCoupon = await CouponCode.findOne({ name: cleanCode, isPublished: true }).lean();
-
-  if (!legacyCoupon) {
-    console.log(`${tag} REJECT "${cleanCode}" — not found in either model`);
-    throw new NotFoundError("Invalid or inactive coupon");
-  }
-
-  console.log(`${tag} Found in legacy model: ${legacyCoupon.name}`);
-
-  // Legacy waitlist gate
-  if (!email) {
-    throw new ValidationError("User email is required for coupon application");
-  }
-  const isWaitlisted = await UserWaistList.findOne({ userEmail: email });
-  if (!isWaitlisted) {
-    throw new ValidationError("This coupon is only valid for the email address used during waitlist signup.");
-  }
-
-  if (cartSubtotal < legacyCoupon.minCartValue) {
-    throw new ValidationError(`Minimum order of ₹${legacyCoupon.minCartValue} required for this coupon`);
-  }
-
-  let discountAmount = 0;
-  if (legacyCoupon.discountType === "PERCENTAGE") {
-    discountAmount = (cartSubtotal * legacyCoupon.discountValue) / 100;
-    if (legacyCoupon.maxDiscount) discountAmount = Math.min(discountAmount, legacyCoupon.maxDiscount);
-  } else {
-    discountAmount = legacyCoupon.discountValue;
-  }
-  discountAmount = Math.round(discountAmount);
-
-  const grandTotal = Math.max(cartSubtotal - discountAmount, 0);
-  const snap = {
-    couponCodeId: legacyCoupon.couponCodeId,
-    name: legacyCoupon.name,
-    discountValue: discountAmount,
-    isApplied: true,
-    summary: { subtotal: cartSubtotal, shipping: 0, discount: discountAmount, grandTotal },
-  };
-
-  await Cart.updateOne({ userId }, { $set: { appliedCoupon: snap } });
-  return { statusCode: 200, message: "Coupon applied successfully", success: true, data: { items: availableItems, summary: snap.summary } };
+  // --- Not found in the new coupon model — reject. ---
+  // Legacy CouponCode fallback (and its waitlist-signup gate) retired: every coupon
+  // is now served by the new Coupon model.
+  console.log(`${tag} REJECT "${cleanCode}" — not found`);
+  throw new NotFoundError("Invalid or inactive coupon");
 };
 
 // ── List available coupons ─────────────────────────────────────────────────────
@@ -339,36 +296,7 @@ const getAllCouponCodeService = async ({ userId, code }) => {
     });
   }
 
-  // 2. Legacy waitlist coupons — only for users who joined the waitlist
-  if (userId) {
-    const waitlistCheck = await User.aggregate([
-      { $match: { userId, isVerified: true } },
-      { $lookup: { from: "userwaistlists", localField: "email", foreignField: "userEmail", as: "waitlistData" } },
-      { $match: { waitlistData: { $ne: [] } } },
-      { $project: { _id: 0, userId: 1 } },
-    ]);
-
-    if (waitlistCheck?.length > 0) {
-      const legacy = await CouponCode.find(
-        { isPublished: true },
-        { _id: 0, couponCodeId: 1, name: 1, discountType: 1, discountValue: 1, maxDiscount: 1, minCartValue: 1, expiryDate: 1, description: 1 },
-      ).lean();
-
-      for (const c of legacy) {
-        results.push({
-          id:            c.couponCodeId,
-          code:          c.name,
-          title:         c.name,
-          description:   c.description || null,
-          discountType:  c.discountType === "FIXED" ? "FLAT" : c.discountType,
-          discountValue: c.discountValue || 0,
-          maxDiscountCap: c.maxDiscount || null,
-          minCartValue:  c.minCartValue || 0,
-          validUntil:    c.expiryDate || null,
-        });
-      }
-    }
-  }
+  // Legacy waitlist-only coupons retired — all coupons now come from the new model above.
 
   return { statusCode: 200, message: "activeCouponCodeList", data: results, success: true };
 };

@@ -87,7 +87,6 @@ import {
   razorpayWebHookController,
   guestCreateOrderController,
 } from "../controller/rp.payment.controller.js";
-import userBulkEmailWaitlistController from "../controller/user.bulk.email.waitlist.controller.js";
 
 const userRouter = Router();
 const authLimiter = rateLimit({
@@ -111,8 +110,6 @@ const guestOrderLimiter = rateLimit({
    ---------------------------------------------------------------
    Provides CSRF token to authenticated users
 ================================================================ */
-
-userRouter.post('/send/bulk',userBulkEmailWaitlistController)
 
 userRouter.get(
   "/csrf-token",

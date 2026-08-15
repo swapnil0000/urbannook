@@ -107,16 +107,6 @@ const pages = [
       timestamp: new Date(),
     },
   },
-  {
-    file: 'bulk.email.waitlist.template.js',
-    name: 'bulkEmailWaitlist',
-    data: { userName: 'Aarav Mehta', WAITLIST_COUPON_CODE: 'EARLYBIRD20' },
-  },
-  {
-    file: 'waitlist.template.js',
-    name: 'waitlist',
-    data: { userName: 'Aarav Mehta', logoUrl: process.env.EMAIL_ASSET_DARK_LOGO },
-  },
 ];
 
 // community.template.js exports a pre-built string, not a function

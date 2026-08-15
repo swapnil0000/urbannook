@@ -356,7 +356,9 @@ const IndependenceDayPopup = memo(() => {
       const code = String(data.couponCode || campaign.couponCode).toUpperCase();
 
       setClaimTerms(data);
-      setOfferState(markClaimed(code));
+      // Carries the number forward so checkout can prefill it instead of
+      // asking for it a second time.
+      setOfferState(markClaimed(code, mobile));
       setView('success');
 
       // The popup is frequently the first point at which we learn who an ad

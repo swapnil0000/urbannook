@@ -31,7 +31,7 @@ const independenceOffer = {
   // Last-resort display values, used only if the coupon cannot be read at all.
   // The live document is always the authority.
   discountType: env.INDEPENDENCE_DISCOUNT_TYPE || "FLAT", // "FLAT" | "PERCENTAGE"
-  discountValue: num(env.INDEPENDENCE_DISCOUNT_VALUE, 80),
+  discountValue: num(env.INDEPENDENCE_DISCOUNT_VALUE, 100),
   maxDiscountCap: env.INDEPENDENCE_MAX_DISCOUNT ? num(env.INDEPENDENCE_MAX_DISCOUNT, null) : null,
   minCartValue: num(env.INDEPENDENCE_MIN_CART, 499),
   // IST offsets are explicit so the window does not shift with server timezone.

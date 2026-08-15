@@ -6,7 +6,6 @@ const OpenInBrowserBanner = () => {
 
   const headlines = [
     "🚚 SHIPPING ₹149 ALL OVER INDIA",
-    "🌿 WAITLIST MEMBERS: USE CODE WLUSER FOR EXCLUSIVE DISCOUNT",
   ];
 
   useEffect(() => {

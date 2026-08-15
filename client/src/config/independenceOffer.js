@@ -61,6 +61,9 @@ const CONFIG_FALLBACK = {
   // Unknown rather than false: a failed request must not silently hide a live
   // offer, so we let the campaign dates decide instead.
   available: true,
+  // Assume it IS listed when we cannot tell. Being quiet costs one promo strip;
+  // guessing wrong the other way prints the same offer on screen twice.
+  isListed: true,
   fromServer: false,
 };
 
@@ -145,8 +148,27 @@ export function writeOfferState(next) {
 export const markDismissed = () =>
   writeOfferState({ status: 'dismissed', at: new Date().toISOString() });
 
-export const markClaimed = (code) =>
-  writeOfferState({ status: 'claimed', code, at: new Date().toISOString() });
+// The mobile is kept alongside the claim so checkout does not ask a visitor for
+// a number they already typed into the popup a moment earlier. Same browser,
+// same person, same session — asking twice is what makes people abandon.
+export const markClaimed = (code, mobile) =>
+  writeOfferState({
+    status: 'claimed',
+    code,
+    ...(mobile ? { mobile } : {}),
+    at: new Date().toISOString(),
+  });
+
+/**
+ * The mobile number the visitor gave the popup, for prefilling checkout.
+ * Re-validated on read: storage is user-editable and this feeds an order.
+ *
+ * @returns {string} a valid 10-digit Indian mobile, or '' if there isn't one
+ */
+export function getClaimedMobile() {
+  const stored = readOfferState()?.mobile;
+  return /^[6-9]\d{9}$/.test(stored || '') ? stored : '';
+}
 
 /* ---------------------------------------------------------------------------
  * Offer window
