@@ -11,6 +11,7 @@ import {
   WishlistPage,
   CustomerSupportPage,
   RewardsPage,
+  UnCashCalculationPage,
   SettingsPage,
   TermsConditions,
   CancellationPolicy,
@@ -130,6 +131,14 @@ const AppRoutes = () => {
         element={
           <Suspense fallback={<MinimalLoader />}>
             <RewardsPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/uncash-calculation"
+        element={
+          <Suspense fallback={<MinimalLoader />}>
+            <UnCashCalculationPage />
           </Suspense>
         }
       />

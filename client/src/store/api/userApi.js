@@ -17,6 +17,17 @@ export const userApi = apiSlice.injectEndpoints({
       invalidatesTags: ["User"],
     }),
 
+    // Loyalty Points APIs
+    getLoyaltySummary: builder.query({
+      query: () => "user/loyalty",
+      providesTags: ["Loyalty"],
+      keepUnusedDataFor: 0, // balance must always reflect the latest order/redeem
+    }),
+    getRedeemQuote: builder.query({
+      query: (cartValue) => `user/loyalty/redeem-quote?cartValue=${cartValue || 0}`,
+      keepUnusedDataFor: 0,
+    }),
+
     // Cart APIs
     addToCart: builder.mutation({
       query: (data) => ({
@@ -294,6 +305,8 @@ export const userApi = apiSlice.injectEndpoints({
 export const {
   useGetUserProfileQuery,
   useUpdateUserProfileMutation,
+  useGetLoyaltySummaryQuery,
+  useGetRedeemQuoteQuery,
   useAddToCartMutation,
   useUpdateCartMutation,
   useMergeGuestCartMutation,

@@ -110,6 +110,7 @@ const getShippingRateOrFallback = async (params) => {
 import { isFreeShippingEligible, getFreeShippingConfig } from "../utils/freeShippingOffer.util.js";
 import { getActiveCartRules, evaluateCartRules, applyBestDiscount } from "../utils/cartRule.util.js";
 import { sendMetaCapiEvent } from "../services/meta.capi.service.js";
+import { validateAndPriceRedeem, writeLedgerEntry } from "../services/loyalty.service.js";
 
 // Collect Meta CAPI match-quality signals from the order-creation request.
 // The webhook (Razorpay → server) has no browser context, so we persist these on
@@ -172,6 +173,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     addressId,
     deliveryAddress: clientAddress,
     paymentMethod: reqPaymentMethod,
+    pointsToRedeem,
   } = req.body;
   const { userId } = req.user;
   if (!items || !Array.isArray(items) || items.length === 0) {
@@ -548,7 +550,22 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     }
   }
 
-  finalAmount = isInternalTestOrder ? 1 : Math.max(subtotal + chargedShippingAmount - discountAmount, 0);
+  // ── Loyalty points redemption ─────────────────────────────────────────────
+  // Priced against `subtotal` (product value only, shipping excluded per
+  // business rule) — same base the earn-cron will later credit against.
+  // Skipped entirely for internal-test coupon orders (already forced to ₹1).
+  let loyaltyPricing = { pointsRedeemed: 0, discountFromPoints: 0, balanceBeforeOrder: 0 };
+  if (!isInternalTestOrder) {
+    loyaltyPricing = await validateAndPriceRedeem({
+      userId,
+      cartValue: subtotal,
+      requestedPoints: Number(pointsToRedeem) || 0,
+    });
+  }
+
+  finalAmount = isInternalTestOrder
+    ? 1
+    : Math.max(subtotal + chargedShippingAmount - discountAmount - loyaltyPricing.discountFromPoints, 0);
 
   // Sync shipping in snapshots — customer-facing amount (0 when free-shipping offer applies)
   orderItems.forEach(i => { i.productSnapshot.shipping = String(chargedShippingAmount); });
@@ -599,6 +616,16 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       couponCodeName,
       discountAmount,
       isApplied,
+    },
+    loyalty: {
+      balanceBeforeOrder: loyaltyPricing.balanceBeforeOrder,
+      pointsRedeemed: loyaltyPricing.pointsRedeemed,
+      discountFromPoints: loyaltyPricing.discountFromPoints,
+      // Not committed yet — the actual debit ledger entry (and the real
+      // balanceAfterRedeem) is only written once payment is confirmed in the
+      // webhook below, same reasoning as coupon usage tracking: an order that's
+      // created but never paid must not have permanently spent real points.
+      balanceAfterRedeem: loyaltyPricing.balanceBeforeOrder - loyaltyPricing.pointsRedeemed,
     },
     metaTracking: collectMetaTracking(req),
     note: "Amount is the final amount paid by the user",
@@ -851,6 +878,34 @@ const razorpayWebHookController = async (req, res) => {
               }
             } catch (couponErr) {
               console.error(`[Coupon:Apply] Failed to track coupon for order ${order.orderId}:`, couponErr.message);
+            }
+          }
+
+          // 1.6. LOYALTY POINTS REDEMPTION — debit the real ledger only now that
+          // payment is confirmed (mirrors coupon tracking above: an order that
+          // never gets paid must not permanently cost the user real points,
+          // even though the discount was already priced into this order at
+          // creation time).
+          if (order.loyalty?.pointsRedeemed > 0) {
+            try {
+              const ledgerEntry = await writeLedgerEntry({
+                userId: order.userId,
+                orderId: order.orderId,
+                orderType: "WEBSITE",
+                type: "REDEEM_ORDER",
+                points: -order.loyalty.pointsRedeemed,
+                reason: `Redeemed at checkout on order ${order.orderId}`,
+                createdBy: "system",
+              });
+              if (ledgerEntry) {
+                await Order.updateOne(
+                  { _id: order._id },
+                  { $set: { "loyalty.balanceAfterRedeem": ledgerEntry.balanceAfter } },
+                );
+              }
+              console.log(`[Loyalty:Redeem] Order=${order.orderId} pointsRedeemed=${order.loyalty.pointsRedeemed} balanceAfter=${ledgerEntry?.balanceAfter ?? "already-written"}`);
+            } catch (loyaltyErr) {
+              console.error(`[Loyalty:Redeem] Failed to write ledger entry for order ${order.orderId}:`, loyaltyErr.message);
             }
           }
 
