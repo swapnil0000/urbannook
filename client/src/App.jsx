@@ -12,7 +12,6 @@ import { fetchCsrfToken } from './store/api/apiSlice';
 import AppRoutes from './store/AppRoutes';
 import NewsTicker from './pages/home/NewsTicker';
 import SEOHead from './component/SEOHead';
-import ThemeApplier from './component/ThemeApplier';
 import { trackPageView, setUserId, captureAttribution, setMetaAdvancedMatching } from './utils/analytics';
 // check
 const ORG_STRUCTURED_DATA = {
@@ -44,6 +43,7 @@ const GoogleOneTap = lazy(() => import('./component/GoogleOneTap'));
 // directly on /products or a product page and would never see a home-only popup.
 const IndependenceDayPopup = lazy(() => import('./component/IndependenceDayPopup'));
 const BannerRenderer = lazy(() => import('./component/layout/BannerRenderer'));
+
 
 // Component to handle session restoration and token removal detection
 const SessionManager = ({ children }) => {
@@ -158,8 +158,7 @@ function App() {
   return (
     <HelmetProvider>
     <Provider store={store}>
-        <ThemeApplier />
-        <Router>
+        <Router> 
           <SEOHead structuredData={ORG_STRUCTURED_DATA} />
           <RouteTracker />
           <SessionManager>
@@ -179,9 +178,6 @@ function App() {
                 </ErrorBoundary>
                 <SocialMediaFAB />
                 <Notification />
-                <ErrorBoundary>
-                  <BannerRenderer />
-                </ErrorBoundary>
                 {/* Global Google One Tap for logged-out visitors (boosts Meta EMQ) */}
                 <ErrorBoundary>
                   <GoogleOneTap />
@@ -200,5 +196,3 @@ function App() {
 }
 
 export default App;
-
-// trigger build again
