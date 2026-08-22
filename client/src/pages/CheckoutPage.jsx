@@ -322,49 +322,53 @@ const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, it
         </div>
       )}
 
-      {/* Loyalty points row — shown only when there's a real balance to redeem. */}
+      {/* Loyalty points row — same plain-row rhythm as the coupon row above it
+          (icon + label, right-aligned amount/action), no card/overlay. A
+          toggle switch (not a checkbox) applies the max redeemable amount,
+          matching how wallet/credit rows read on Myntra/Flipkart-style
+          checkouts. The conversion rate lives in a hover tooltip instead of
+          a separate modal/page. */}
       {redeemQuote?.isEnabled && redeemQuote.balance > 0 && (
-        <div className="rounded-xl border border-[#e7dfd1] bg-[#fffdf8] px-3 py-2.5 text-sm">
-          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#a89068]">Urbannook Currency</p>
-          <label className="mt-2 flex cursor-pointer items-start gap-2.5">
-            <input
-              type="checkbox"
-              checked={pointsToRedeem > 0}
-              onChange={(event) => onPointsChange?.(event.target.checked ? redeemQuote.maxRedeemable : 0)}
-              aria-label="Use UnCash on this order"
-              className="mt-0.5 h-4 w-4 shrink-0 accent-[#2e443c]"
-            />
-            <span className="min-w-0 flex-1">
-              <span className="flex items-center gap-1.5 font-bold text-gray-800">
-                UnCash
-                <span className="group relative inline-flex">
-                  <button
-                    type="button"
-                    aria-label="Maximum redeemable UnCash"
-                    className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[#a89068] hover:bg-[#f5ead9]"
-                  >
-                    <i className="fa-solid fa-circle-info text-[11px]" />
-                  </button>
-                  <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-44 -translate-x-1/2 rounded-lg bg-[#2e443c] px-2.5 py-1.5 text-center text-[10px] font-semibold leading-4 text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                    You can redeem up to {redeemQuote.maxRedeemable.toLocaleString()} UnCash on this order.
-                    <span className="absolute left-1/2 top-full h-2 w-2 -translate-x-1/2 -translate-y-1 rotate-45 bg-[#2e443c]" />
-                  </span>
-                </span>
-              </span>
-              <span className="mt-0.5 block text-[10px] text-gray-500">
-                Total Available: {redeemQuote.balance.toLocaleString()} pts&nbsp; · &nbsp;Redeemable: {redeemQuote.maxRedeemable.toLocaleString()} pts
+        <div className="flex justify-between items-center text-sm">
+          <span className="flex items-center gap-1.5 text-gray-500">
+            <i className="fa-solid fa-wallet text-[#a89068] text-[11px]" />
+            UnCash
+            <span className="text-[10px] font-bold text-[#a89068] bg-[#a89068]/10 px-1.5 py-0.5 rounded uppercase tracking-wide">
+              {redeemQuote.maxRedeemable.toLocaleString()} avail.
+            </span>
+            <span className="group relative inline-flex">
+              <i className="fa-solid fa-circle-info text-[11px] text-gray-300 hover:text-[#a89068] cursor-help" aria-hidden="true" />
+              <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-max -translate-x-1/2 rounded-lg bg-[#2e443c] px-2.5 py-1.5 text-center text-[10px] font-semibold leading-4 text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                1 UN = ₹1
+                <span className="absolute left-1/2 top-full h-2 w-2 -translate-x-1/2 -translate-y-1 rotate-45 bg-[#2e443c]" />
               </span>
             </span>
-            {pointsToRedeem > 0 && <span className="shrink-0 pt-0.5 font-bold text-emerald-600">−₹{pointsDiscount.toLocaleString()}</span>}
-          </label>
-          <a
-            href="/uncash-calculation"
-            className="mt-2 block border-t border-[#eee6d9] pt-2 text-[10px] font-semibold text-[#a89068] hover:text-[#2e443c]"
-          >
-            See how the calculation is done for loyalty points
-            <i className="fa-solid fa-arrow-up-right-from-square ml-1 text-[9px]" />
-          </a>
+          </span>
+          <span className="flex items-center gap-2.5">
+            {pointsToRedeem > 0 && <span className="font-bold text-emerald-600">−₹{pointsDiscount.toLocaleString()}</span>}
+            <button
+              type="button"
+              role="switch"
+              aria-checked={pointsToRedeem > 0}
+              aria-label="Use UnCash on this order"
+              onClick={() => onPointsChange?.(pointsToRedeem > 0 ? 0 : redeemQuote.maxRedeemable)}
+              className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${pointsToRedeem > 0 ? "bg-[#2e443c]" : "bg-gray-200"}`}
+            >
+              <span
+                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${pointsToRedeem > 0 ? "translate-x-[18px]" : "translate-x-1"}`}
+              />
+            </button>
+          </span>
         </div>
+      )}
+      {redeemQuote?.isEnabled && redeemQuote.balance > 0 && (
+        <a
+          href="/uncash-calculation"
+          className="-mt-1 block text-right text-[10px] font-semibold text-[#a89068] hover:text-[#2e443c]"
+        >
+          How is this calculated?
+          <i className="fa-solid fa-arrow-up-right-from-square ml-1 text-[9px]" />
+        </a>
       )}
 
       <div className="border-t border-gray-100 pt-3">

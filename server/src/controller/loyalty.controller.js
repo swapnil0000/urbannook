@@ -17,6 +17,8 @@ export const userGetLoyalty = asyncHandler(async (req, res) => {
       isEnabled: config.isEnabled,
       balance,
       pointToRupeeRatio: config.pointToRupeeRatio,
+      earnPercent: config.earnPercent,
+      maxRedeemPercentOfCart: config.maxRedeemPercentOfCart,
       entries,
     }, true),
   );

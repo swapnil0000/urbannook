@@ -396,6 +396,29 @@ const MyOrdersPage = () => {
                         <div className="flex justify-between items-center text-[9px] text-gray-400 font-bold uppercase tracking-widest">
                           <span>Discount</span><span className="text-[#a89068]">-₹{order.coupon?.discountAmount?.toLocaleString() || 0}</span>
                         </div>
+                        {order.loyalty?.pointsRedeemed > 0 && (
+                          <div className="flex justify-between items-center text-[9px] text-gray-400 font-bold uppercase tracking-widest">
+                            <span>UnCash used ({order.loyalty.pointsRedeemed} pts)</span>
+                            <span className="text-emerald-600">-₹{order.loyalty.discountFromPoints.toLocaleString()}</span>
+                          </div>
+                        )}
+                        {order.loyalty?.pointsRedeemed > 0 && (
+                          <div className="flex justify-between items-center text-[9px] text-gray-400 font-bold uppercase tracking-widest">
+                            <span>Balance before → after</span>
+                            <span>{order.loyalty.balanceBeforeOrder} → {order.loyalty.balanceAfterRedeem}</span>
+                          </div>
+                        )}
+                        {order.loyalty?.isEarnCredited ? (
+                          <div className="flex justify-between items-center text-[9px] text-gray-400 font-bold uppercase tracking-widest">
+                            <span>UnCash earned</span>
+                            <span className="text-emerald-600">+{order.loyalty.pointsEarned} pts</span>
+                          </div>
+                        ) : order.status === "DELIVERED" ? (
+                          <div className="flex justify-between items-center text-[9px] text-gray-400 font-bold uppercase tracking-widest">
+                            <span>UnCash earning</span>
+                            <span>Credits ~24h after delivery</span>
+                          </div>
+                        ) : null}
                         <div className="flex justify-between items-center pt-3 border-t border-gray-100 mt-1">
                           <span className="text-[10px] text-[#2e443c] font-bold uppercase tracking-widest">Grand Total</span>
                           <span className="text-xl font-serif text-[#2e443c] font-bold">₹{order.amount.toLocaleString()}</span>

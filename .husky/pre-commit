@@ -3,10 +3,12 @@ echo "🔍 Checking files across client and server..."
 FILES=$(git diff --cached --name-only)
 
 for file in $FILES; do
-  if [[ "$file" == *.txt ]] || { [[ "$file" == *.md ]] && [[ "$file" != "README.md" ]] && [[ "$file" != "readme.md" ]]; }; then
-    echo "❌ ERROR: Invalid file type detected -> $file"
-    echo "👉 Only 'README.md' is allowed for text or markdown files."
-    echo "👉 Please remove or unstage this file to proceed with your commit."
-    exit 1
-  fi
+  case "$file" in
+    *.txt)
+      echo "❌ ERROR: Invalid file type detected -> $file"
+      echo "👉 Only 'README.md' is allowed for text or markdown files."
+      echo "👉 Please remove or unstage this file to proceed with your commit."
+      exit 1
+      ;;
+  esac
 done

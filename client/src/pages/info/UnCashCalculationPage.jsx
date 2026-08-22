@@ -1,11 +1,23 @@
 import { useEffect } from "react";
 import SEOHead from "../../component/SEOHead";
+import { useGetLoyaltySummaryQuery } from "../../store/api/userApi";
 
-const UNCASH_VALUE_IN_RUPEES = 1;
-const UNCASH_EARN_PERCENT = 2;
-const UNCASH_MAX_REDEEM_PERCENT = 20;
+// Fallbacks only for logged-out visitors (the live query needs auth) — kept in
+// sync with server/src/services/loyalty.service.js's DEFAULT_CONFIG so a guest
+// viewing this page before signing in still sees numbers that match what
+// they'll actually get once the config has been fetched for real.
+const FALLBACK_VALUE_IN_RUPEES = 1;
+const FALLBACK_EARN_PERCENT = 2;
+const FALLBACK_MAX_REDEEM_PERCENT = 20;
 
 const UnCashCalculationPage = () => {
+  const { data: loyaltyData } = useGetLoyaltySummaryQuery();
+  const loyalty = loyaltyData?.data;
+
+  const UNCASH_VALUE_IN_RUPEES = loyalty?.pointToRupeeRatio ?? FALLBACK_VALUE_IN_RUPEES;
+  const UNCASH_EARN_PERCENT = loyalty?.earnPercent ?? FALLBACK_EARN_PERCENT;
+  const UNCASH_MAX_REDEEM_PERCENT = loyalty?.maxRedeemPercentOfCart ?? FALLBACK_MAX_REDEEM_PERCENT;
+
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);

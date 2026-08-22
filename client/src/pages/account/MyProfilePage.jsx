@@ -297,7 +297,7 @@ const MyProfilePage = () => {
                     <i className="fa-solid fa-coins text-[12px]"></i>
                   </div>
                   <label className="text-[10px] font-bold uppercase tracking-widest text-[#a89068]">
-                    Loyalty Points
+                    UnCash
                   </label>
                 </div>
                 <p className="font-serif text-2xl text-[#2e443c]">
