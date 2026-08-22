@@ -9,8 +9,6 @@ const loyaltyConfigSchema = new mongoose.Schema(
     earnDelayHours: { type: Number, default: 24 },
     maxRedeemPercentOfCart: { type: Number, default: 20 },
     pointToRupeeRatio: { type: Number, default: 1 },
-    referralPointsReferrer: { type: Number, default: 50 },
-    referralPointsReferee: { type: Number, default: 50 },
     pointsExpiryDays: { type: Number, default: null },
   },
   { timestamps: true },

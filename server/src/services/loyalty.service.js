@@ -11,8 +11,6 @@ const DEFAULT_CONFIG = {
   earnDelayHours: 24,
   maxRedeemPercentOfCart: 20,
   pointToRupeeRatio: 1,
-  referralPointsReferrer: 50,
-  referralPointsReferee: 50,
   pointsExpiryDays: null,
 };
 
@@ -68,8 +66,8 @@ export async function validateAndPriceRedeem({ userId, cartValue, requestedPoint
 }
 
 // Append-only ledger write — the ONLY way a balance ever changes. `points` is
-// signed (positive = credit, negative = debit). Idempotent for the four
-// CREDIT_TYPES via a `${orderId}:${type}` dedupeKey (unique+sparse index) —
+// signed (positive = credit, negative = debit). Idempotent for the CREDIT_TYPES
+// via a `${orderId}:${type}` dedupeKey (unique+sparse index) —
 // a duplicate call (retried webhook, re-run cron sweep) is a silent no-op,
 // never a double-credit. REVERSAL / ADMIN_ADJUST are not deduped — an order
 // can legitimately need more than one.

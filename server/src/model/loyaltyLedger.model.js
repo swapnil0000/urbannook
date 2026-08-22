@@ -2,8 +2,8 @@ import mongoose from "mongoose";
 
 // Mirror of the admin LoyaltyLedger model — same collection. Storefront writes
 // REDEEM_ORDER entries at checkout; the admin-side delivery cron writes
-// EARN_ORDER / EARN_REFERRAL_* entries. See admin repo's model comment for the
-// append-only / signed-points / dedupeKey design rationale.
+// EARN_ORDER entries. See admin repo's model comment for the append-only /
+// signed-points / dedupeKey design rationale.
 const loyaltyLedgerSchema = new mongoose.Schema(
   {
     ledgerId: { type: String, required: true, unique: true },
@@ -13,14 +13,7 @@ const loyaltyLedgerSchema = new mongoose.Schema(
     type: {
       type: String,
       required: true,
-      enum: [
-        "EARN_ORDER",
-        "REDEEM_ORDER",
-        "EARN_REFERRAL_REFERRER",
-        "EARN_REFERRAL_REFEREE",
-        "REVERSAL",
-        "ADMIN_ADJUST",
-      ],
+      enum: ["EARN_ORDER", "REDEEM_ORDER", "REVERSAL", "ADMIN_ADJUST"],
     },
     points: { type: Number, required: true },
     balanceAfter: { type: Number, required: true },
@@ -35,6 +28,6 @@ const loyaltyLedgerSchema = new mongoose.Schema(
 loyaltyLedgerSchema.index({ userId: 1, createdAt: -1 });
 loyaltyLedgerSchema.index({ dedupeKey: 1 }, { unique: true, sparse: true });
 
-export const CREDIT_TYPES = ["EARN_ORDER", "REDEEM_ORDER", "EARN_REFERRAL_REFERRER", "EARN_REFERRAL_REFEREE"];
+export const CREDIT_TYPES = ["EARN_ORDER", "REDEEM_ORDER"];
 
 export default mongoose.model("LoyaltyLedger", loyaltyLedgerSchema, "loyaltyledger");
