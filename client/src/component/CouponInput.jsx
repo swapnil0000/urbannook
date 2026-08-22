@@ -1,16 +1,7 @@
 import { useState } from 'react';
 import { useApplyCouponMutation, useGetAvailableCouponsQuery, useLookupCouponMutation } from '../store/api/userApi';
 import { useUI, useAuth } from '../hooks/useRedux';
-
-function calcLocalDiscount(coupon, subtotal) {
-  if (!subtotal || subtotal < (coupon.minCartValue || 0)) return 0;
-  if (coupon.discountType === 'PERCENTAGE') {
-    let amt = Math.floor((subtotal * coupon.discountValue) / 100);
-    if (coupon.maxDiscountCap) amt = Math.min(amt, coupon.maxDiscountCap);
-    return Math.min(amt, subtotal);
-  }
-  return Math.min(coupon.discountValue || 0, subtotal);
-}
+import { calcLocalDiscount } from '../utils/couponDiscount';
 
 const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved, isGuest, cartTotal }) => {
   const [couponCode, setCouponCode] = useState('');
@@ -25,8 +16,15 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
   const { data: availableCoupons } = useGetAvailableCouponsQuery(undefined, { skip: !isGuest });
   const [lookupCoupon, { isLoading: isLookingUp }] = useLookupCouponMutation();
 
-  const handleApplyCoupon = async () => {
-    if (!couponCode.trim()) {
+  // Takes an optional code so the Independence Day banner can apply through
+  // this exact path rather than duplicating any of it. onClick hands this a
+  // MouseEvent, so only an explicit string counts as an override.
+  const handleApplyCoupon = async (codeOverride) => {
+    const cleanCode = (typeof codeOverride === 'string' ? codeOverride : couponCode)
+      .trim()
+      .toUpperCase();
+
+    if (!cleanCode) {
       setError('Please enter a coupon code');
       return;
     }
@@ -35,7 +33,6 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
     setSuccess('');
 
     if (isGuest) {
-      const cleanCode = couponCode.trim().toUpperCase();
       // 1. Try the cached visible-coupons list first (no extra request)
       let coupon = (availableCoupons?.data || []).find(c => c.code === cleanCode);
 
@@ -57,9 +54,31 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
         return;
       }
 
-      const discountAmount = calcLocalDiscount(coupon, cartTotal || 0);
+      // Guests are validated here rather than on the server, so the minimum has
+      // to be checked explicitly. Without this the coupon "applies" for ₹0: the
+      // panel claims success while the summary still offers Apply Coupon, which
+      // reads as a broken screen. (Signed-in users get this from the server.)
+      const subtotal = cartTotal || 0;
+      const minCart = coupon.minCartValue || 0;
+      if (subtotal < minCart) {
+        const msg = `Add ₹${(minCart - subtotal).toLocaleString()} more to use ${cleanCode} (min order ₹${minCart.toLocaleString()})`;
+        setError(msg);
+        showNotification(msg, 'error');
+        setTimeout(() => setError(''), 4000);
+        return;
+      }
+
+      const discountAmount = calcLocalDiscount(coupon, subtotal);
+      if (discountAmount <= 0) {
+        const msg = 'This coupon gives no discount on your current cart';
+        setError(msg);
+        showNotification(msg, 'error');
+        setTimeout(() => setError(''), 4000);
+        return;
+      }
+
       if (onCouponApplied) onCouponApplied({ code: cleanCode, discount: discountAmount });
-      setSuccess(`Coupon applied! You save ₹${discountAmount}`);
+      setSuccess(`Coupon applied! You save ₹${discountAmount.toLocaleString()}`);
       setCouponCode('');
       setTimeout(() => setSuccess(''), 3000);
       return;
@@ -67,7 +86,7 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
 
     try {
       const result = await applyCoupon({
-        couponCode: couponCode?.trim()?.toUpperCase(),
+        couponCode: cleanCode,
         email: user?.email
       }).unwrap();
 
@@ -77,7 +96,7 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
         setError('');
         setCouponCode('');
         if (onCouponApplied) {
-          onCouponApplied({ code: couponCode.trim().toUpperCase(), discount: discountAmount, summary: result.data?.summary });
+          onCouponApplied({ code: cleanCode, discount: discountAmount, summary: result.data?.summary });
         }
         setTimeout(() => setSuccess(''), 2000);
       } else {
@@ -122,7 +141,9 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
   };
 
   return (
-    <div className="bg-white/5 backdrop-blur-md rounded-2xl mt-3  border border-white/10">
+    /* No dark-theme wrapper here: this sits on the white checkout card, where
+       bg-white/5 and border-white/10 render as nothing at all. */
+    <div className="mt-3">
 
       {!appliedCoupon ? (
         <div className="space-y-3">
@@ -165,26 +186,35 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
         </div>
       ) : (
         <div className="space-y-3">
-          <div className="flex items-center justify-between bg-white px-4 py-3 rounded-xl border border-gray">
-            <div className="flex items-center gap-3">
-              <i className="fa-solid fa-circle-check text-[#a89068]"></i>
-              <div>
-                <p className="text-sm font-bold text-gray-500 uppercase tracking-wider">{appliedCoupon}</p>
-                <p className="text-xs text-[#a89068]">You saved ₹{discount?.toLocaleString() || 0}</p>
+          {/* Applied state reads as a win: green, the saving as the biggest
+              thing on the row, and a labelled Remove instead of a bare ✕.
+              (`border-gray` here was not a real Tailwind class, so this box
+              previously had no intentional border colour at all.) */}
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-3.5">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                <i className="fa-solid fa-check text-emerald-600" />
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-extrabold uppercase tracking-wider text-gray-900">
+                  {appliedCoupon}
+                </p>
+                <p className="text-[11px] font-medium text-gray-500">Coupon applied</p>
               </div>
             </div>
-            <button
-              onClick={handleRemoveCoupon}
-              disabled={isLoading}
-              className="text-red-400 hover:text-red-300 transition-colors disabled:opacity-50"
-              title="Remove coupon"
-            >
-              {isLoading ? (
-                <i className="fa-solid fa-spinner fa-spin"></i>
-              ) : (
-                <i className="fa-solid fa-times text-lg"></i>
-              )}
-            </button>
+            <div className="flex shrink-0 items-center gap-3">
+              <span className="text-base font-extrabold text-emerald-600">
+                −₹{discount?.toLocaleString() || 0}
+              </span>
+              <button
+                onClick={handleRemoveCoupon}
+                disabled={isLoading}
+                className="text-[11px] font-bold uppercase tracking-wider text-rose-500 transition-colors hover:text-rose-600 disabled:opacity-50"
+                title="Remove coupon"
+              >
+                {isLoading ? <i className="fa-solid fa-spinner fa-spin" /> : 'Remove'}
+              </button>
+            </div>
           </div>
 
           {error && (

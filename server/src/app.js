@@ -23,6 +23,7 @@ import {
   cartRuleRouter,
   themeRouter,
   siteBannerRouter,
+  offerLeadRouter,
 } from "./routes/index.js";
 import cookieParser from "cookie-parser";
 import healthRouter from "./routes/health.route.js";
@@ -219,8 +220,7 @@ app.use(
   adminAnalyticsRouter,
   freeShippingOfferRouter,
   cartRuleRouter,
-  themeRouter,
-  siteBannerRouter,
+  offerLeadRouter,
 );
 
 // TEMP deploy-verification log — remove once cart-rules deploy is confirmed

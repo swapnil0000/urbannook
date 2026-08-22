@@ -1,3 +1,4 @@
+import Offer from "../model/offer.model.js";
 import CartRule from "../model/cartRule.model.js";
 
 /**
@@ -13,7 +14,23 @@ import CartRule from "../model/cartRule.model.js";
  * @param {{productId: string, quantity: number}[]} cartItems
  */
 export const getActiveCartRules = async () => {
-  return CartRule.find({ isActive: true }).lean();
+  // Preferring the new unified `offers` collection (type: "cart_rule",
+  // written by the admin panel's Offers page). Falls back to the legacy
+  // `cartrules` collection only when this environment/DB hasn't been seeded
+  // into `offers` yet (see UN-ADMIN-panel .../server/scripts/seedOffersFromLegacy.js).
+  // An empty ACTIVE result from `offers` is a legitimate "no rules configured"
+  // state, not a migration signal — so we check for the presence of ANY
+  // cart_rule doc (active or not) to distinguish "migrated, zero active rules"
+  // from "not migrated yet, read the legacy collection instead".
+  const migrated = await Offer.exists({ type: "cart_rule" });
+  if (migrated) {
+    const rules = await Offer.find({ type: "cart_rule", isActive: true }).lean();
+    // console.log(`[CartRule][source] NEW offers collection — ${rules.length} active rule(s)`);
+    return rules;
+  }
+  const rules = await CartRule.find({ isActive: true }).lean();
+  // console.log(`[CartRule][source] LEGACY cartrules collection (no cart_rule doc found in offers — not migrated on this DB yet) — ${rules.length} active rule(s)`);
+  return rules;
 };
 
 const quantityByProduct = (cartItems = []) => {

@@ -25,6 +25,10 @@ import { fetchCsrfToken } from "../store/api/apiSlice";
 import CouponInput from "../component/CouponInput";
 import FreeShippingBanner from "../component/FreeShippingBanner";
 import { ComponentLoader } from "../component/layout/LoadingSpinner";
+import { getClaimedMobile, isOfferLive } from "../config/independenceOffer";
+import IndependenceOfferBanner from "../component/IndependenceOfferBanner";
+import useOfferTerms from "../hooks/useOfferTerms";
+import { calcLocalDiscount } from "../utils/couponDiscount";
 import { trackBeginCheckout, trackPurchase, trackAddShippingInfo, trackAddPaymentInfo, trackPaymentFailed, trackPaymentModalDismissed, trackCheckoutStep, trackOrderCreated, trackSelectPaymentMethod, trackDeliveryCheck, getFbCookies, getAnonymousId, cacheAddressForCapi, setMetaAdvancedMatching } from "../utils/analytics";
 
 const CouponList = lazy(() => import("../component/CouponList"));
@@ -231,6 +235,11 @@ const SavingsBanner = ({ amount, freeShipping = false }) => (
   </div>
 );
 
+// Stand-in for a ₹ figure that is mid-recalculation.
+const AmountPlaceholder = () => (
+  <span className="inline-block h-3.5 w-14 animate-pulse rounded bg-gray-200" aria-label="Calculating" />
+);
+
 const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, itemCount, isLoadingShipping, paymentMethod, onApplyCoupon, onRemoveCoupon }) => {
   const shippingAmount = typeof shipping === "object" ? shipping?.amount : shipping;
   // COD advance must be based on the REAL carrier rate, not the (possibly
@@ -294,7 +303,7 @@ const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, it
           <span className="text-gray-500 flex items-center gap-1.5">
             <i className="fa-solid fa-tag text-[#a89068] text-[11px]" /> Coupon discount
             {hasDiscount && appliedCoupon && (
-              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded uppercase tracking-wide">{appliedCoupon}</span>
+              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-0.5 py-0.5 rounded uppercase tracking-wide">{appliedCoupon}</span>
             )}
           </span>
           {hasDiscount ? (
@@ -434,11 +443,21 @@ const CheckoutPage = () => {
   const [showRetry, setShowRetry] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
   const [showCouponModal, setShowCouponModal] = useState(false);
+  const [isApplyingOffer, setIsApplyingOffer] = useState(false);
+  // Live campaign terms, so the block's own numbers and this page's discount
+  // maths come from the same source as the coupon the server will validate.
+  const { terms: offerTerms } = useOfferTerms();
   const [showMobileModal, setShowMobileModal] = useState(false);
 
   const [guestName, setGuestName] = useState(savedCheckout.current.guestName || "");
   const [guestEmail, setGuestEmail] = useState(savedCheckout.current.guestEmail || "");
-  const [guestMobile, setGuestMobile] = useState(savedCheckout.current.guestMobile || "");
+  // Falls back to the number given to the offer popup: the visitor already
+  // typed it on this site minutes ago, so asking again is a pointless step at
+  // the exact point people drop. Anything they type here still wins, and the
+  // helper re-validates the stored value before it is trusted.
+  const [guestMobile, setGuestMobile] = useState(
+    savedCheckout.current.guestMobile || getClaimedMobile(),
+  );
   const [guestErrors, setGuestErrors] = useState({});
 
   const { data: userProfileData, isLoading: profileLoading, refetch: refetchProfile } =
@@ -762,6 +781,12 @@ const CheckoutPage = () => {
       // Aggressively fill pincode if missing, even if address was partially restored
       if (profilePin && (!pinCode || pinCode.length < 6) && !addressManuallyResetRef.current) setPinCode(String(profilePin));
       if (profileMobile && !senderMobile) setSenderMobile(stripCC(String(profileMobile)));
+      // Account with no mobile on file: the popup already collected one, so use
+      // it rather than making them type it again (or hitting MobileNumberModal).
+      else if (!profileMobile && !senderMobile) {
+        const claimedMobile = getClaimedMobile();
+        if (claimedMobile) setSenderMobile(claimedMobile);
+      }
     }
   }, [userProfile, address, pinCode, senderMobile]);
 
@@ -953,6 +978,43 @@ const CheckoutPage = () => {
     setAppliedCoupon(couponData.code);
     setPricingDetails(prev => ({ ...prev, discount: couponData.discount || 0 }));
     setShowCouponModal(false);
+  };
+
+  // One-tap apply for the offer block at the top of the page. Routes into the
+  // same two handlers the coupon sheet uses, so there is exactly one place that
+  // applies a coupon for guests and one for members.
+  //
+  // Guarded twice against applying the same offer more than once: `appliedCoupon`
+  // blocks a second coupon outright (this cart holds one at a time) and
+  // `isApplyingOffer` swallows a double-tap while the first is still in flight.
+  const handleApplyOfferCode = async (code) => {
+    if (!code || appliedCoupon || isApplyingOffer) return;
+    setIsApplyingOffer(true);
+    try {
+      if (isGuest) {
+        const subtotal = cartTotalAmount;
+        const minCart = offerTerms.minCartValue || 0;
+        if (subtotal < minCart) {
+          showNotification(
+            `Add ₹${(minCart - subtotal).toLocaleString()} more to use ${code} (min order ₹${minCart.toLocaleString()})`,
+            "error",
+          );
+          return;
+        }
+        const discount = calcLocalDiscount(offerTerms, subtotal);
+        if (discount <= 0) {
+          showNotification("This coupon gives no discount on your current cart", "error");
+          return;
+        }
+        handleGuestCouponApplied({ code, discount });
+        showNotification(`Coupon applied! You save ₹${discount.toLocaleString()}`, "success");
+      } else {
+        // Runs the server apply and its own notifications/state.
+        await handleCouponApplied({ code });
+      }
+    } finally {
+      setIsApplyingOffer(false);
+    }
   };
 
   const handleCouponRemoved = async () => {
@@ -1247,27 +1309,24 @@ const CheckoutPage = () => {
     handlePayment();
   };
 
-  // The two footer/sidebar buttons double as the payment-method selector.
-  // Tapping the NOT-selected method just switches to it (and lets shipping
-  // re-settle) so the customer can freely toggle and compare totals without
-  // being forced to pay. Tapping the already-selected method performs its
-  // action. This is the only way back to prepaid after choosing COD.
+  // The two footer/sidebar buttons double as the payment-method selector, but
+  // ONE tap always completes the action.
+  //
+  // These used to switch method on the first tap and return, so a customer on
+  // COD tapping "Pay Online" only re-triggered the shipping calculation and had
+  // to tap a second time to actually pay. Nothing on screen said so, so the
+  // common reading was that the button was broken — a straight drop at the last
+  // step of checkout.
+  //
+  // The amount is still never charged stale: handlePayOnline queues the payment
+  // and the effect above releases it only once `amountsSettled`, and the COD
+  // sheet keeps its own "Calculating…" gate on the confirm button.
   const handlePrepaidButton = () => {
-    if (payBusy || !amountsSettled) return;
-    if (paymentMethod !== "PREPAID") {
-      setPaymentMethod("PREPAID");
-      trackSelectPaymentMethod({ paymentMethod: "PREPAID" });
-      return; // just switched — tap again once the amount re-settles to pay
-    }
+    if (payBusy) return;
     handlePayOnline();
   };
   const handleCodButton = () => {
-    if (payBusy || !amountsSettled) return;
-    if (paymentMethod !== "COD") {
-      setPaymentMethod("COD");
-      trackSelectPaymentMethod({ paymentMethod: "COD" });
-      return; // just switched — tap again to open the COD breakdown
-    }
+    if (payBusy) return;
     handleChooseCod();
   };
 
@@ -1355,6 +1414,22 @@ const CheckoutPage = () => {
           </div>
         </div>
       </div>
+
+      {/* ── Independence Day offer ─────────────────────────────────────────
+          Review & Pay only. Account, Contact and Address are all the same
+          /checkout route, so without the step check this rode along on every
+          one of them — and a coupon is noise until there is a total to apply it
+          to. Also takes itself away when the campaign window closes. */}
+      {isOfferLive() && currentStep === reviewStep && (
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-6">
+          <IndependenceOfferBanner
+            cartTotal={cartTotalAmount}
+            appliedCoupon={appliedCoupon}
+            isApplying={isApplyingOffer}
+            onApply={handleApplyOfferCode}
+          />
+        </div>
+      )}
 
       {/* ── Main ───────────────────────────────────────────────────────── */}
       <div
@@ -2513,9 +2588,15 @@ const CheckoutPage = () => {
                   </span>
                 </div>
               )}
+              {/* One tap now opens this sheet at the same moment the switch to
+                  COD re-triggers the shipping call, so these three figures are
+                  still prepaid-based for a beat. Showing a placeholder beats
+                  showing a number the customer would watch change. */}
               <div className="flex items-center justify-between">
                 <span className="text-gray-500">Shipping</span>
-                {isShippingFree ? (
+                {!amountsSettled ? (
+                  <AmountPlaceholder />
+                ) : isShippingFree ? (
                   <span className="font-semibold">
                     <span className="text-gray-400 line-through mr-1">
                       ₹{Math.ceil(realShippingAmount).toLocaleString()}
@@ -2535,15 +2616,23 @@ const CheckoutPage = () => {
                 <span className="font-bold text-[#2e443c]">
                   Pay now (advance)
                 </span>
-                <span className="font-bold text-[#2e443c]">
-                  ₹{codAdvance.toLocaleString()}
-                </span>
+                {!amountsSettled ? (
+                  <AmountPlaceholder />
+                ) : (
+                  <span className="font-bold text-[#2e443c]">
+                    ₹{codAdvance.toLocaleString()}
+                  </span>
+                )}
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-gray-500">Pay on delivery</span>
-                <span className="font-semibold text-gray-800">
-                  ₹{codRemaining.toLocaleString()}
-                </span>
+                {!amountsSettled ? (
+                  <AmountPlaceholder />
+                ) : (
+                  <span className="font-semibold text-gray-800">
+                    ₹{codRemaining.toLocaleString()}
+                  </span>
+                )}
               </div>
             </div>
 
