@@ -16,6 +16,7 @@ import {
   useGetFreeShippingOfferQuery,
   useGetAllFreeShippingBannersQuery,
   useEvaluateCartRulesQuery,
+  useGetRedeemQuoteQuery,
 } from "../store/api/userApi";
 import { setShowLoginModal, setLoginCallback } from "../store/slices/uiSlice";
 import { useUI } from "../hooks/useRedux";
@@ -240,7 +241,7 @@ const AmountPlaceholder = () => (
   <span className="inline-block h-3.5 w-14 animate-pulse rounded bg-gray-200" aria-label="Calculating" />
 );
 
-const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, itemCount, isLoadingShipping, paymentMethod, onApplyCoupon, onRemoveCoupon }) => {
+const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, itemCount, isLoadingShipping, paymentMethod, onApplyCoupon, onRemoveCoupon, redeemQuote, pointsToRedeem, onPointsChange, pointsDiscount }) => {
   const shippingAmount = typeof shipping === "object" ? shipping?.amount : shipping;
   // COD advance must be based on the REAL carrier rate, not the (possibly
   // free-shipping-zeroed) charged amount — same real/charged split as the
@@ -321,6 +322,51 @@ const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, it
         </div>
       )}
 
+      {/* Loyalty points row — shown only when there's a real balance to redeem. */}
+      {redeemQuote?.isEnabled && redeemQuote.balance > 0 && (
+        <div className="rounded-xl border border-[#e7dfd1] bg-[#fffdf8] px-3 py-2.5 text-sm">
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#a89068]">Urbannook Currency</p>
+          <label className="mt-2 flex cursor-pointer items-start gap-2.5">
+            <input
+              type="checkbox"
+              checked={pointsToRedeem > 0}
+              onChange={(event) => onPointsChange?.(event.target.checked ? redeemQuote.maxRedeemable : 0)}
+              aria-label="Use UnCash on this order"
+              className="mt-0.5 h-4 w-4 shrink-0 accent-[#2e443c]"
+            />
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-1.5 font-bold text-gray-800">
+                UnCash
+                <span className="group relative inline-flex">
+                  <button
+                    type="button"
+                    aria-label="Maximum redeemable UnCash"
+                    className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[#a89068] hover:bg-[#f5ead9]"
+                  >
+                    <i className="fa-solid fa-circle-info text-[11px]" />
+                  </button>
+                  <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-44 -translate-x-1/2 rounded-lg bg-[#2e443c] px-2.5 py-1.5 text-center text-[10px] font-semibold leading-4 text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                    You can redeem up to {redeemQuote.maxRedeemable.toLocaleString()} UnCash on this order.
+                    <span className="absolute left-1/2 top-full h-2 w-2 -translate-x-1/2 -translate-y-1 rotate-45 bg-[#2e443c]" />
+                  </span>
+                </span>
+              </span>
+              <span className="mt-0.5 block text-[10px] text-gray-500">
+                Total Available: {redeemQuote.balance.toLocaleString()} pts&nbsp; · &nbsp;Redeemable: {redeemQuote.maxRedeemable.toLocaleString()} pts
+              </span>
+            </span>
+            {pointsToRedeem > 0 && <span className="shrink-0 pt-0.5 font-bold text-emerald-600">−₹{pointsDiscount.toLocaleString()}</span>}
+          </label>
+          <a
+            href="/uncash-calculation"
+            className="mt-2 block border-t border-[#eee6d9] pt-2 text-[10px] font-semibold text-[#a89068] hover:text-[#2e443c]"
+          >
+            See how the calculation is done for loyalty points
+            <i className="fa-solid fa-arrow-up-right-from-square ml-1 text-[9px]" />
+          </a>
+        </div>
+      )}
+
       <div className="border-t border-gray-100 pt-3">
         <div className="flex justify-between items-center">
           <span className="font-bold text-gray-900">Total</span>
@@ -366,6 +412,7 @@ const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, it
           </div>
         </div>
       )}
+
     </div>
   );
 };
@@ -467,6 +514,10 @@ const CheckoutPage = () => {
   const [createGuestOrder, { isLoading: isOrderingGuest }] = useCreateGuestOrderMutation();
   const isOrdering = isGuest ? isOrderingGuest : isOrderingAuth;
   const [applyCouponMutation] = useApplyCouponMutation();
+  // Loyalty points — guests have no account/balance, so the quote is skipped
+  // for them; cartTotalAmount isn't defined yet at this point in the file, so
+  // the quote query sits just below it (see `redeemQuote` further down).
+  const [pointsToRedeem, setPointsToRedeem] = useState(0);
   const [deleteAddressMutation] = useDeleteAddressMutation();
   const [updateCart] = useUpdateCartMutation();
   const [updateUserProfile] = useUpdateUserProfileMutation();
@@ -794,6 +845,21 @@ const CheckoutPage = () => {
   const cartTotalAmount =
     cartItems.reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0) - ruleDiscountSavings;
   const userEmail = userProfile?.email;
+
+  // Loyalty redeem — guests have no account, so this is skipped for them.
+  // cartValue is deliberately the product subtotal (shipping excluded), same
+  // base the backend prices and caps against.
+  const { data: redeemQuoteData } = useGetRedeemQuoteQuery(cartTotalAmount, {
+    skip: isGuest || !cartTotalAmount,
+  });
+  const redeemQuote = redeemQuoteData?.data;
+  useEffect(() => {
+    // Clamp down if the cart shrank below the previously-picked amount.
+    if (redeemQuote && pointsToRedeem > redeemQuote.maxRedeemable) {
+      setPointsToRedeem(redeemQuote.maxRedeemable || 0);
+    }
+  }, [redeemQuote, pointsToRedeem]);
+  const pointsDiscount = pointsToRedeem * (redeemQuote?.pointToRupeeRatio || 1);
 
   useEffect(() => {
     if (isGuest) {
@@ -1195,6 +1261,7 @@ const CheckoutPage = () => {
           long: selectedFullAddr?.location?.coordinates?.[0] || selectedFullAddr?.long || 0,
         },
         paymentMethod,
+        ...(pointsToRedeem > 0 ? { pointsToRedeem } : {}),
         ...getFbCookies(), // _fbp / _fbc → stored on order for CAPI match quality
       }).unwrap();
 
@@ -1253,7 +1320,7 @@ const CheckoutPage = () => {
   const realShippingAmount = typeof pricingDetails.shipping === "number"
     ? pricingDetails.shipping
     : (pricingDetails.shipping?.realAmount ?? pricingDetails.shipping?.amount ?? 0);
-  const totalToPay = pricingDetails.subtotal + shippingAmount - pricingDetails.discount;
+  const totalToPay = Math.max(0, pricingDetails.subtotal + shippingAmount - pricingDetails.discount - pointsDiscount);
   const userName = isGuest ? guestName : (userProfile?.userName || userProfile?.name || "");
   const userInitials = userName ? userName.split(" ").filter(Boolean).map((w) => w[0]).join("").toUpperCase().slice(0, 2) : "?";
 
@@ -2131,6 +2198,10 @@ const CheckoutPage = () => {
                       onRemoveCoupon={
                         isGuest ? handleGuestCouponRemoved : handleCouponRemoved
                       }
+                      redeemQuote={redeemQuote}
+                      pointsToRedeem={pointsToRedeem}
+                      onPointsChange={setPointsToRedeem}
+                      pointsDiscount={pointsDiscount}
                     />
                   </div>
                 </div>
@@ -2407,6 +2478,10 @@ const CheckoutPage = () => {
                 onRemoveCoupon={
                   isGuest ? handleGuestCouponRemoved : handleCouponRemoved
                 }
+                redeemQuote={redeemQuote}
+                pointsToRedeem={pointsToRedeem}
+                onPointsChange={setPointsToRedeem}
+                pointsDiscount={pointsDiscount}
               />
             </div>
 

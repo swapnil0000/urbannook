@@ -42,6 +42,21 @@ const orderSchema = new mongoose.Schema(
       discountAmount: { type: Number, default: 0 },
       isApplied: { type: Boolean, default: false },
     },
+
+    // Denormalized snapshot for fast order-history display — see admin
+    // repo's order.model.js for the field-by-field rationale. LoyaltyLedger
+    // (this collection, shared) is always the balance source of truth.
+    loyalty: {
+      balanceBeforeOrder: { type: Number, default: 0 },
+      pointsRedeemed: { type: Number, default: 0 },
+      discountFromPoints: { type: Number, default: 0 },
+      balanceAfterRedeem: { type: Number, default: 0 },
+
+      pointsEarned: { type: Number, default: 0 },
+      isEarnCredited: { type: Boolean, default: false },
+      earnCreditedAt: { type: Date, default: null },
+      balanceAfterEarn: { type: Number, default: null },
+    },
     deliveryAddress: {
       addressId: String,
       fullName: String,
@@ -123,6 +138,16 @@ const orderSchema = new mongoose.Schema(
       trackingNumber: { type: String, default: null },
       estimatedDelivery: { type: Date, default: null },
     },
+
+    // Admin-owned fields (admin repo's order.controller.js is the only writer).
+    // Declared here read-only so the storefront can display delivery state and
+    // the loyalty earn-cron's anchor timestamp on the order-history page.
+    fulfillmentStatus: {
+      type: String,
+      enum: ["PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"],
+      default: "PROCESSING",
+    },
+    fulfillmentDeliveredAt: { type: Date, default: null },
 
     paymentMethod: {
       type: String,

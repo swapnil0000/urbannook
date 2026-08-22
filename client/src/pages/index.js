@@ -8,6 +8,7 @@ export const CheckoutPage = lazy(() => import("../pages/CheckoutPage"));
 export const MyOrdersPage = lazy(() => import("./account/MyOrdersPage.jsx"));
 export const WishlistPage = lazy(() => import("./account/WishlistPage.jsx"));
 export const RewardsPage = lazy(() => import("./info/RewardsPage.jsx"));
+export const UnCashCalculationPage = lazy(() => import("./info/UnCashCalculationPage.jsx"));
 export const SettingsPage = lazy(() => import("./account/SettingsPage.jsx"));
 export const TermsConditions = lazy(() => import("./legal/TermsCondition.jsx"));
 export const CancellationPolicy = lazy(() => import("./legal/CancellationPolicy.jsx"));

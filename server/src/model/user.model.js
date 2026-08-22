@@ -59,6 +59,13 @@ const userSchema = mongoose.Schema(
       enum: ["USER"],
       default: "USER",
     },
+    // This user's own shareable referral code. Generated once at signup
+    // (see loyalty service, Chunk 6) — short, unique, human-shareable.
+    referralCode: {
+      type: String,
+      sparse: true,
+      unique: true,
+    },
   },
   {
     timestamps: true,

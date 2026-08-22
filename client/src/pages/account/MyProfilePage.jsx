@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useAuth, useUI } from '../../hooks/useRedux';
-import { useGetUserProfileQuery, useUpdateUserProfileMutation } from '../../store/api/userApi';
+import { useGetUserProfileQuery, useUpdateUserProfileMutation, useGetLoyaltySummaryQuery } from '../../store/api/userApi';
 
 const MyProfilePage = () => {
   const { user } = useAuth();
@@ -9,6 +9,8 @@ const MyProfilePage = () => {
 
   const { data: userProfileData, isLoading: profileLoading, refetch: refetchProfile } = useGetUserProfileQuery();
   const [updateUserProfile, { isLoading: updating }] = useUpdateUserProfileMutation();
+  const { data: loyaltyData, isLoading: loyaltyLoading } = useGetLoyaltySummaryQuery();
+  const loyalty = loyaltyData?.data;
 
   const [formData, setFormData] = useState(() => {
     const localUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -285,6 +287,59 @@ const MyProfilePage = () => {
               </div>
             ))}
           </div>
+
+          {/* Loyalty Points */}
+          {!loyaltyLoading && loyalty?.isEnabled && (
+            <div className="bg-[#f5f7f8] rounded-[24px] p-5 md:p-6 shadow-md">
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-[#a89068]/10 flex items-center justify-center text-[#a89068]">
+                    <i className="fa-solid fa-coins text-[12px]"></i>
+                  </div>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-[#a89068]">
+                    Loyalty Points
+                  </label>
+                </div>
+                <p className="font-serif text-2xl text-[#2e443c]">
+                  {loyalty.balance} <span className="text-sm text-gray-400">pts</span>
+                  <span className="text-sm text-gray-400 ml-2">(≈ ₹{loyalty.balance * (loyalty.pointToRupeeRatio || 1)})</span>
+                </p>
+              </div>
+
+              {loyalty.entries?.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-left text-gray-400 border-b border-gray-200">
+                        <th className="py-2 pr-3">Date</th>
+                        <th className="py-2 pr-3">Detail</th>
+                        <th className="py-2 pr-3">Order</th>
+                        <th className="py-2 pr-3 text-right">Points</th>
+                        <th className="py-2 pr-3 text-right">Balance</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {loyalty.entries.map((e) => (
+                        <tr key={e.ledgerId} className="border-b border-gray-100">
+                          <td className="py-2 pr-3 whitespace-nowrap text-[#2e443c]">{new Date(e.createdAt).toLocaleDateString()}</td>
+                          <td className="py-2 pr-3 text-[#2e443c]">{e.reason || e.type}</td>
+                          <td className="py-2 pr-3 text-gray-400">{e.orderId ? `#${e.orderId.slice(-8)}` : "—"}</td>
+                          <td className={`py-2 pr-3 text-right font-bold ${e.points >= 0 ? "text-green-600" : "text-red-500"}`}>
+                            {e.points >= 0 ? "+" : ""}{e.points}
+                          </td>
+                          <td className="py-2 pr-3 text-right text-[#2e443c]">{e.balanceAfter}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400 italic">
+                  No points yet — you'll earn points on this order 24 hours after it's delivered.
+                </p>
+              )}
+            </div>
+          )}
         </div>
         </Suspense>
       </main>
