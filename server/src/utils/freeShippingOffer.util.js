@@ -1,28 +1,19 @@
 import Offer from "../model/offer.model.js";
-import FreeShippingOffer from "../model/freeShippingOffer.model.js";
 
 /**
- * Fetches the free-shipping singleton doc — preferring the new unified
- * `offers` collection (type: "free_shipping", written by the admin panel's
- * Offers page). Falls back to the legacy `freeshippingoffers` collection only
- * when this environment/DB hasn't been seeded into `offers` yet (see
- * UN-ADMIN-panel .../server/scripts/seedOffersFromLegacy.js) — the legacy
- * collection is otherwise untouched and frozen once seeded, since the admin
- * only writes new banners/threshold changes to `offers` now.
+ * Fetches the free-shipping singleton doc from the unified `offers`
+ * collection (type: "free_shipping", written by the admin panel's Offers
+ * page). Legacy `freeshippingoffers` collection is retired — see
+ * UN-ADMIN-panel .../server/scripts/seedOffersFromLegacy.js for the one-time
+ * backfill that must be run on any environment before this.
  *
  * Internal — all reads of the free-shipping config/banners go through this
- * one function so there is exactly one place the dual-read fallback lives.
+ * one function.
  *
  * @param {string} projection mongoose .select() string
  */
 const getFreeShippingDoc = async (projection) => {
-  const offer = await Offer.findOne({ type: "free_shipping" }).select(projection).lean();
-  if (offer) {
-    // console.log("[FreeShipping][source] NEW offers collection");
-    return offer;
-  }
-  // console.log("[FreeShipping][source] LEGACY freeshippingoffers collection (no doc found in offers — not migrated on this DB yet)");
-  return FreeShippingOffer.findOne().select(projection).lean();
+  return Offer.findOne({ type: "free_shipping" }).select(projection).lean();
 };
 
 /**

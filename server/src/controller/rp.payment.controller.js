@@ -109,6 +109,7 @@ const getShippingRateOrFallback = async (params) => {
 };
 import { isFreeShippingEligible, getFreeShippingConfig } from "../utils/freeShippingOffer.util.js";
 import { getActiveCartRules, evaluateCartRules, applyBestDiscount } from "../utils/cartRule.util.js";
+import { getPublicOfferConfig } from "../utils/offer.util.js";
 import { sendMetaCapiEvent } from "../services/meta.capi.service.js";
 import { validateAndPriceRedeem, writeLedgerEntry } from "../services/loyalty.service.js";
 
@@ -439,6 +440,18 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   //   `[FreeShipping][Order:auth] realShipping=₹${realShippingAmount} chargedShipping=₹${chargedShippingAmount} items=${items.map(i => `${i.productId}x${i.quantity}`).join(",")}`,
   // );
 
+  // Gift wrap: server-authoritative price + intent. `cart.giftWrap` is the
+  // ONLY source for "did they select it" (never req.body); price always comes
+  // fresh from the live offer config, so a stale intent left over after an
+  // admin disables the offer can never add a charge.
+  const giftWrapConfig = await getPublicOfferConfig("gift_wrap");
+  // One gift wrap per distinct GIFT-WRAP-ELIGIBLE product in the order
+  // (admin opt-in per product) — auto-derived, not client-set.
+  const giftWrapQty = products.filter((p) => p.giftWrapEligible === true).length;
+  const giftWrapSelected = !!cart.giftWrap && giftWrapConfig.isActive && giftWrapQty > 0;
+  const giftWrapAmount = giftWrapSelected ? giftWrapConfig.price * giftWrapQty : 0;
+  const giftWrapNoteOptions = giftWrapSelected && cart.giftWrapNoteOptions?.length ? cart.giftWrapNoteOptions : ["none"];
+
   // Always re-derive discount from the live coupon + current subtotal.
   // This fixes: products added after coupon was applied, COD/prepaid toggle, page not refreshed.
   let isInternalTestOrder = false;
@@ -512,7 +525,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       // ── INTERNAL TEST: completely separate path ──────────────────────────────
       // Always ₹1 regardless of cart size, shipping, or payment method.
       isInternalTestOrder = true;
-      discountAmount = Math.max(subtotal + chargedShippingAmount - 1, 0); // stored for audit record
+      discountAmount = Math.max(subtotal + giftWrapAmount + chargedShippingAmount - 1, 0); // stored for audit record
     } else if (liveCoupon.discountType === "PERCENTAGE") {
       let d = Math.floor((subtotal * liveCoupon.discountValue) / 100);
       if (liveCoupon.maxDiscountCap) d = Math.min(d, liveCoupon.maxDiscountCap);
@@ -566,6 +579,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   finalAmount = isInternalTestOrder
     ? 1
     : Math.max(subtotal + chargedShippingAmount - discountAmount - loyaltyPricing.discountFromPoints, 0);
+  finalAmount = isInternalTestOrder ? 1 : Math.max(subtotal + giftWrapAmount + chargedShippingAmount - discountAmount, 0);
 
   // Sync shipping in snapshots — customer-facing amount (0 when free-shipping offer applies)
   orderItems.forEach(i => { i.productSnapshot.shipping = String(chargedShippingAmount); });
@@ -595,6 +609,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     userMobile: deliveryAddressSnapshot.mobileNumber,
     items: orderItems,
     amount: finalAmount,
+    giftWrap: { selected: giftWrapSelected, price: giftWrapAmount, quantity: giftWrapQty, title: giftWrapConfig.title, noteOptions: giftWrapNoteOptions },
     shippingInfo: {
       // Real carrier cost for internal accounting — grouped with the other
       // carrier-enrichment fields below, not the customer-facing amount.
@@ -1103,7 +1118,7 @@ const generateTempPassword = () => {
 };
 
 const guestCreateOrderController = asyncHandler(async (req, res) => {
-  const { items, guestInfo, deliveryAddress, paymentMethod: reqPaymentMethod, couponCode: rawCouponCode } = req.body;
+  const { items, guestInfo, deliveryAddress, paymentMethod: reqPaymentMethod, couponCode: rawCouponCode, giftWrap: reqGiftWrap, giftWrapNoteOptions: reqGiftWrapNoteOptions } = req.body;
 
   if (!guestInfo?.name?.trim()) throw new ValidationError("Full name is required");
   if (!guestInfo?.email?.trim()) throw new ValidationError("Email is required");
@@ -1204,6 +1219,21 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   //   `[FreeShipping][Order:guest] realShipping=₹${realShippingAmount} chargedShipping=₹${chargedShippingAmount} items=${items.map(i => `${i.productId}x${i.quantity}`).join(",")}`,
   // );
 
+  // Gift wrap: guests have no server-side cart to read intent from, so the
+  // boolean (only) comes from req.body — that's safe, it just means "include
+  // it or don't." Price is still never trusted from the client: it's always
+  // the live offer config's price, zeroed automatically if the offer is off.
+  const giftWrapConfig = await getPublicOfferConfig("gift_wrap");
+  // One gift wrap per distinct GIFT-WRAP-ELIGIBLE product (admin opt-in per product).
+  const giftWrapQty = products.filter((p) => p.giftWrapEligible === true).length;
+  const giftWrapSelected = !!reqGiftWrap && giftWrapConfig.isActive && giftWrapQty > 0;
+  const giftWrapAmount = giftWrapSelected ? giftWrapConfig.price * giftWrapQty : 0;
+  const GIFT_NOTE_OPTIONS = ["birthday", "rakhi", "none"];
+  const validReqNotes = Array.isArray(reqGiftWrapNoteOptions)
+    ? reqGiftWrapNoteOptions.filter((n) => GIFT_NOTE_OPTIONS.includes(n))
+    : [];
+  const giftWrapNoteOptions = giftWrapSelected && validReqNotes.length ? validReqNotes : ["none"];
+
   // ── Guest coupon validation ───────────────────────────────────────────────────
   let couponCodeId = null, couponCodeName = null, discountAmount = 0, isApplied = false;
   let isInternalTestOrder = false;
@@ -1281,7 +1311,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     // Calculate discount
     if (isValidInternal) {
       isInternalTestOrder = true;
-      discountAmount = Math.max(subtotal + chargedShippingAmount - 1, 0);
+      discountAmount = Math.max(subtotal + giftWrapAmount + chargedShippingAmount - 1, 0);
     } else if (liveCoupon.discountType === "PERCENTAGE") {
       let d = Math.floor((subtotal * liveCoupon.discountValue) / 100);
       if (liveCoupon.maxDiscountCap) d = Math.min(d, liveCoupon.maxDiscountCap);
@@ -1296,7 +1326,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     console.log(`[Coupon:Guest] Applied "${cleanCode}" — discount ₹${discountAmount} on subtotal ₹${subtotal}`);
   }
 
-  const finalAmount = isInternalTestOrder ? 1 : Math.max(subtotal + chargedShippingAmount - discountAmount, 0);
+  const finalAmount = isInternalTestOrder ? 1 : Math.max(subtotal + giftWrapAmount + chargedShippingAmount - discountAmount, 0);
 
   // Update orderItems with shipping value now that it's calculated — customer-facing amount
   orderItems.forEach(i => { i.productSnapshot.shipping = String(chargedShippingAmount); });
@@ -1321,6 +1351,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     userMobile: cleanMobile,
     items: orderItems,
     amount: finalAmount,
+    giftWrap: { selected: giftWrapSelected, price: giftWrapAmount, quantity: giftWrapQty, title: giftWrapConfig.title, noteOptions: giftWrapNoteOptions },
     shippingInfo: {
       amount: realShippingAmount,
       type: shippingResult?.type || "standard",

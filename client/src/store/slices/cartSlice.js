@@ -3,6 +3,13 @@ import { createSlice } from '@reduxjs/toolkit';
 // --- Guest Cart localStorage helpers ---
 const GUEST_CART_KEY = 'guestCart';
 const GUEST_ID_KEY = 'guestId';
+// Seasonal gift-wrap intent (boolean only — price is never trusted from here,
+// always re-fetched live from the offers config on read and, authoritatively,
+// at checkout). Separate key so it survives independently of the item list.
+const GUEST_GIFT_WRAP_KEY = 'guestGiftWrap';
+// Which note option(s) (birthday/rakhi/none) the guest picked, alongside the
+// gift-wrap boolean above — multi-select, stored as a JSON array.
+const GUEST_GIFT_NOTE_KEY = 'guestGiftWrapNote';
 
 export const getOrCreateGuestId = () => {
   let guestId = localStorage.getItem(GUEST_ID_KEY);
@@ -35,6 +42,34 @@ export const loadGuestCart = () => {
 
 export const clearGuestCart = () => {
   localStorage.removeItem(GUEST_CART_KEY);
+  localStorage.removeItem(GUEST_GIFT_WRAP_KEY);
+  localStorage.removeItem(GUEST_GIFT_NOTE_KEY);
+};
+
+const loadGuestGiftWrap = () => localStorage.getItem(GUEST_GIFT_WRAP_KEY) === 'true';
+const saveGuestGiftWrap = (selected) => {
+  try {
+    localStorage.setItem(GUEST_GIFT_WRAP_KEY, selected ? 'true' : 'false');
+  } catch (e) {
+    console.error('[saveGuestGiftWrap] Failed to save:', e);
+  }
+};
+
+const loadGuestGiftNote = () => {
+  try {
+    const raw = localStorage.getItem(GUEST_GIFT_NOTE_KEY);
+    const parsed = raw ? JSON.parse(raw) : ['none'];
+    return Array.isArray(parsed) && parsed.length ? parsed : ['none'];
+  } catch {
+    return ['none'];
+  }
+};
+const saveGuestGiftNote = (noteOptions) => {
+  try {
+    localStorage.setItem(GUEST_GIFT_NOTE_KEY, JSON.stringify(noteOptions?.length ? noteOptions : ['none']));
+  } catch (e) {
+    console.error('[saveGuestGiftNote] Failed to save:', e);
+  }
 };
 
 const isGuest = () => !localStorage.getItem('authToken');
@@ -47,6 +82,9 @@ const initialState = {
   totalQuantity: persistedItems.reduce((t, i) => t + (i.quantity || 0), 0),
   totalAmount: persistedItems.reduce((t, i) => t + ((i.price || 0) * (i.quantity || 0)), 0),
   selections: {}, // Managed by productId: { quantity, variant }
+  // Boolean only — see GUEST_GIFT_WRAP_KEY comment above for why no price lives here.
+  giftWrap: isLoggedInOnLoad ? false : loadGuestGiftWrap(),
+  giftWrapNoteOptions: isLoggedInOnLoad ? ['none'] : loadGuestGiftNote(),
 };
 
 const cartSlice = createSlice({
@@ -62,7 +100,7 @@ const cartSlice = createSlice({
     },
 
     addItem: (state, action) => {
-      const { id, name, price, image, quantity = 1, mongoId, selectedVariant } = action.payload;
+      const { id, name, price, image, quantity = 1, mongoId, selectedVariant, giftWrapEligible } = action.payload;
       const effectiveVariant = selectedVariant || 'N/A';
       const itemId = mongoId || id;
       
@@ -81,7 +119,8 @@ const cartSlice = createSlice({
           price: Number(price) || 0,
           image,
           quantity,
-          selectedVariant: effectiveVariant
+          selectedVariant: effectiveVariant,
+          giftWrapEligible: !!giftWrapEligible
         });
       }
 
@@ -111,6 +150,18 @@ const cartSlice = createSlice({
         state.items = state.items.filter(item => 
           !((item.id === id || item.mongoId === id) && (item.selectedVariant || 'N/A') === (effectiveVariant))
         );
+      }
+
+      // Cart emptied out via individual removals (not "Clear cart") — gift
+      // wrap must not survive it either, otherwise re-adding any product
+      // later silently resurrects a stale "added" state never re-confirmed.
+      if (state.items.length === 0 && state.giftWrap) {
+        state.giftWrap = false;
+        state.giftWrapNoteOptions = ['none'];
+        if (isGuest()) {
+          saveGuestGiftWrap(false);
+          saveGuestGiftNote(['none']);
+        }
       }
 
       if (isGuest()) {
@@ -144,6 +195,28 @@ const cartSlice = createSlice({
       state.totalQuantity = 0;
       state.totalAmount = 0;
       state.selections = {};
+      state.giftWrap = false;
+      state.giftWrapNoteOptions = ['none'];
+    },
+
+    // Sets the gift-wrap boolean intent + which note option(s) were picked
+    // (multi-select array). Guests persist both to localStorage (same pattern
+    // as guest cart items); logged-in users don't need to — their intent
+    // lives server-side (Cart.giftWrap/giftWrapNoteOptions), toggled via
+    // useToggleGiftWrapMutation, this reducer just mirrors it locally for
+    // immediate UI feedback.
+    setGiftWrap: (state, action) => {
+      const { selected, noteOptions } = typeof action.payload === 'object'
+        ? action.payload
+        : { selected: action.payload, noteOptions: state.giftWrapNoteOptions };
+      state.giftWrap = !!selected;
+      state.giftWrapNoteOptions = state.giftWrap
+        ? (Array.isArray(noteOptions) && noteOptions.length ? noteOptions : ['none'])
+        : ['none'];
+      if (isGuest()) {
+        saveGuestGiftWrap(state.giftWrap);
+        saveGuestGiftNote(state.giftWrapNoteOptions);
+      }
     },
 
     syncCartFromProfile: (state, action) => {
@@ -225,16 +298,27 @@ const cartSlice = createSlice({
           price,
           image: item.image || item.productImage || item.productImg,
           quantity,
-          selectedVariant: item.selectedVariant || 'N/A'
+          selectedVariant: item.selectedVariant || 'N/A',
+          giftWrapEligible: !!item.giftWrapEligible
         };
       });
 
       state.totalQuantity = state.items.reduce((total, item) => total + (item.quantity || 0), 0);
       state.totalAmount = state.items.reduce((total, item) => total + ((item.price || 0) * (item.quantity || 0)), 0);
+
+      // Logged-in gift-wrap intent lives server-side (Cart.giftWrap) — mirror
+      // it into redux whenever the server cart response carries it, so the
+      // widget reads one consistent `state.cart.giftWrap` regardless of
+      // guest vs logged-in.
+      if (cartData && typeof cartData === 'object' && cartData.giftWrap) {
+        state.giftWrap = !!cartData.giftWrap.selected;
+        const serverNotes = cartData.giftWrap.noteOptions;
+        state.giftWrapNoteOptions = Array.isArray(serverNotes) && serverNotes.length ? serverNotes : ['none'];
+      }
     },
   },
 });
 
-export const { addItem, removeItem, updateQuantity, clearCart, syncCartFromProfile, setCartItems, updateSelection } = cartSlice.actions;
+export const { addItem, removeItem, updateQuantity, clearCart, syncCartFromProfile, setCartItems, updateSelection, setGiftWrap } = cartSlice.actions;
 
 export default cartSlice.reducer;

@@ -36,54 +36,103 @@ const ProductCard = ({ product, index = 0, listId = "all_products", listName = "
     <div className="group relative rounded-[1.6rem] overflow-hidden bg-black/20 border border-white/5 shadow-lg hover:shadow-2xl hover:border-[#F5DEB3]/30 transition-all duration-500 flex flex-col h-full">
       {/* Wishlist Button (Floating Top Right) */}
       <div className="absolute top-4 right-4 z-20">
-        <Suspense fallback={<div className="w-8 h-8 bg-white/20 rounded-full animate-pulse"></div>}>
+        <Suspense
+          fallback={
+            <div className="w-8 h-8 bg-white/20 rounded-full animate-pulse"></div>
+          }
+        >
           <WishlistButton productId={product.productId} />
         </Suspense>
       </div>
 
       {/* Clickable Card Area */}
-      <div className="flex flex-col flex-grow cursor-pointer" onClick={goToProduct}>
+      <div
+        className="flex flex-col flex-grow cursor-pointer"
+        onClick={goToProduct}
+      >
         <div className="relative w-full aspect-square bg-[#f8f8f5] overflow-hidden">
           <img
             src={thumbnail}
             alt={product.productName}
             className="w-full h-full object-cover mix-blend-multiply transition-transform duration-[1.5s] group-hover:scale-110"
           />
-          {/* Nook's Special Featured Banner — 3D ribbon top-left corner */}
-          {/* {product?.featured === true && (
-            <div className="absolute top-0 left-0 z-20 w-32 h-32 overflow-hidden">
+
+          {/* Nook's Special: Fixed Ribbon + Positioned Text */}
+          {product?.featured === true && (
+            <>
+              {/* Red Ribbon (fixed position) */}
               <div
-                className="absolute top-0 left-0 w-40 h-16 bg-gradient-to-b from-[#dc2626] to-[#b91c1c] flex items-center justify-center font-black text-white text-lg tracking-wider shadow-2xl"
+                className="absolute z-20 pointer-events-none"
                 style={{
-                  transform: 'rotate(-45deg) translateY(-50%) translateX(-25%)',
-                  transformOrigin: 'top left',
-                  textShadow: '0 2px 8px rgba(0,0,0,0.6)',
-                  boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.2), 0 8px 16px rgba(0,0,0,0.4)',
+                  top: "-10px",
+                  left: "-50px",
+                  width: "200px",
+                  height: "80px",
+                  overflow: "visible",
                 }}
               >
-                Nook's Special
+                <div
+                  style={{
+                    position: "absolute",
+                    width: "160px",
+                    height: "18px",
+                    background:
+                      "linear-gradient(135deg, #EF4444 0%, #DC2626 50%, #991B1B 100%)",
+                    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.4)",
+                    transform: "rotate(-45deg)",
+                    top: "8px",
+                    left: "50%",
+                    marginLeft: "-80px",
+                  }}
+                />
               </div>
+
+              {/* Text Box (diagonally positioned) tweak these to change positions strictly dont change these  */}
               <div
-                className="absolute top-0 left-0 w-40 h-16 bg-gradient-to-b from-[#d4a574] to-[#a68860]"
+                className="absolute z-20 pointer-events-none"
                 style={{
-                  transform: 'rotate(-45deg) translateY(-50%) translateX(-25%)',
-                  transformOrigin: 'top left',
-                  opacity: 0.3,
-                  width: '6px',
-                  left: '155px',
-                  boxShadow: '0 8px 16px rgba(0,0,0,0.3)',
+                  top: "16px",
+                  left: "-20px",
+                  right: "auto",
+                  bottom: "auto",
+                  width: "100px",
+                  height: "22px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transform: "rotate(-45deg)",
                 }}
-              />
-            </div>
-          )} */}
+              >
+                <span
+                  style={{
+                    color: "white",
+                    fontSize: "8px",
+                    fontWeight: "bold",
+                    letterSpacing: "0.1px",
+                    textAlign: "center",
+                    lineHeight: "1.2",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Nook&apos;s Special
+                </span>
+              </div>
+            </>
+          )}
 
           {/* Out-of-stock / low-stock badge */}
           {(() => {
             const LOW_STOCK_THRESHOLD = 5;
-            const active = (product?.variantDetails || []).filter((v) => v.isActive !== false);
-            const allVariantsOOS = active.length > 0 && active.every(
-              (v) => v.variantOutOfStock === true || (v.variantQuantity != null && Number(v.variantQuantity) <= 0),
+            const active = (product?.variantDetails || []).filter(
+              (v) => v.isActive !== false,
             );
+            const allVariantsOOS =
+              active.length > 0 &&
+              active.every(
+                (v) =>
+                  v.variantOutOfStock === true ||
+                  (v.variantQuantity != null && Number(v.variantQuantity) <= 0),
+              );
             if (product?.productStatus === "out_of_stock" || allVariantsOOS) {
               return (
                 <span className="absolute top-3 left-3 z-10 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md bg-red-500 text-white shadow">
@@ -92,10 +141,16 @@ const ProductCard = ({ product, index = 0, listId = "all_products", listName = "
               );
             }
             const tracked = active.filter(
-              (v) => v.variantQuantity != null && !v.variantOutOfStock && Number(v.variantQuantity) > 0,
+              (v) =>
+                v.variantQuantity != null &&
+                !v.variantOutOfStock &&
+                Number(v.variantQuantity) > 0,
             );
             if (tracked.length === 0) return null;
-            const totalLeft = tracked.reduce((s, v) => s + Number(v.variantQuantity || 0), 0);
+            const totalLeft = tracked.reduce(
+              (s, v) => s + Number(v.variantQuantity || 0),
+              0,
+            );
             if (totalLeft > LOW_STOCK_THRESHOLD) return null;
             return totalLeft === 1 ? (
               <span className="absolute top-3 left-3 z-10 flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md bg-[#F5DEB3] text-[#1c3026] shadow animate-pulse">
@@ -107,7 +162,6 @@ const ProductCard = ({ product, index = 0, listId = "all_products", listName = "
               </span>
             );
           })()}
-
         </div>
 
         {/* Text & CTA */}
@@ -161,26 +215,46 @@ const ProductCard = ({ product, index = 0, listId = "all_products", listName = "
                   <>
                     {variantDetails.slice(0, 2).map((detail, idx) => {
                       const variantName = detail.variantName;
-                      const swatchType = detail.variantSwatchType === "color" ? "color" : "image";
+                      const swatchType =
+                        detail.variantSwatchType === "color"
+                          ? "color"
+                          : "image";
                       const swatchValue =
-                        (detail.variantSwatchValue && detail.variantSwatchValue.trim()) ||
-                        (swatchType === "image" ? detail.variantImage?.[0] : "");
+                        (detail.variantSwatchValue &&
+                          detail.variantSwatchValue.trim()) ||
+                        (swatchType === "image"
+                          ? detail.variantImage?.[0]
+                          : "");
                       const goToVariant = (e) => {
                         e.stopPropagation();
-                        navigate(`/product/${product.productId}/${detail.sku || variantName}`);
+                        navigate(
+                          `/product/${product.productId}/${detail.sku || variantName}`,
+                        );
                       };
-                      const oos = detail.variantOutOfStock === true || (detail.variantQuantity != null && Number(detail.variantQuantity) <= 0);
+                      const oos =
+                        detail.variantOutOfStock === true ||
+                        (detail.variantQuantity != null &&
+                          Number(detail.variantQuantity) <= 0);
                       return (
                         <span
                           key={detail._id || idx}
-                          title={oos ? `${variantName} — out of stock` : variantName}
+                          title={
+                            oos ? `${variantName} — out of stock` : variantName
+                          }
                           onClick={goToVariant}
                           className={`w-3 h-3 rounded-full overflow-hidden border border-[#d1d5db] shadow-sm transition-transform hover:scale-110 cursor-pointer flex items-center justify-center bg-white shrink-0 ${oos ? "opacity-40 grayscale" : ""}`}
                         >
                           {swatchType === "color" && swatchValue ? (
-                            <span className="w-full h-full block" style={{ background: swatchValue }} />
+                            <span
+                              className="w-full h-full block"
+                              style={{ background: swatchValue }}
+                            />
                           ) : swatchValue ? (
-                            <img src={swatchValue} alt={variantName} className="w-full h-full object-cover" />
+                            <img
+                              src={swatchValue}
+                              alt={variantName}
+                              className="w-full h-full object-cover"
+                            />
                           ) : (
                             <span className="text-[6px] font-bold uppercase text-gray-400">
                               {variantName?.charAt(0)}

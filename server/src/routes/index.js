@@ -19,6 +19,7 @@ import cartRuleRouter from "./cartRule.route.js";
 import offerLeadRouter from "./offerLead.route.js";
 import themeRouter from "./theme.route.js";
 import siteBannerRouter from "./siteBanner.route.js";
+import offerRouter from "./offer.route.js";
 export {
   userRouter,
   productRouter,
@@ -41,4 +42,5 @@ export {
   offerLeadRouter,
   themeRouter,
   siteBannerRouter,
+  offerRouter,
 };

@@ -53,6 +53,14 @@ export const userApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["Cart"],
     }),
+    toggleGiftWrap: builder.mutation({
+      query: ({ selected, noteOptions } = {}) => ({
+        url: "user/cart/gift-wrap",
+        method: "POST",
+        body: { selected, noteOptions },
+      }),
+      invalidatesTags: ["Cart"],
+    }),
     removeFromCart: builder.mutation({
       query: (productId) => ({
         url: `user/cart/${productId}`,
@@ -278,6 +286,13 @@ export const userApi = apiSlice.injectEndpoints({
       query: () => "free-shipping-offer",
       keepUnusedDataFor: 0,
     }),
+    // Gift wrap offer — seasonal, admin-toggled cart add-on (e.g.
+    // Rakhi/Diwali). Same keepUnusedDataFor: 0 rationale as above: an admin
+    // switching it off must be reflected immediately, not after a stale cache.
+    getGiftWrapOffer: builder.query({
+      query: () => "offers/gift_wrap",
+      keepUnusedDataFor: 0,
+    }),
     getFreeShippingBanner: builder.query({
       query: (productId) => `free-shipping-offer/banner/${productId}`,
       keepUnusedDataFor: 0,
@@ -310,6 +325,7 @@ export const {
   useAddToCartMutation,
   useUpdateCartMutation,
   useMergeGuestCartMutation,
+  useToggleGiftWrapMutation,
   useRemoveFromCartMutation,
   useGetCartQuery,
   useClearCartMutation,
@@ -334,6 +350,7 @@ export const {
   useDeleteAddressMutation,
   useCalculateShippingMutation,
   useGetFreeShippingOfferQuery,
+  useGetGiftWrapOfferQuery,
   useGetFreeShippingBannerQuery,
   useGetAllFreeShippingBannersQuery,
   useEvaluateCartRulesQuery,

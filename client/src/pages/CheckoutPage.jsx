@@ -17,6 +17,7 @@ import {
   useGetAllFreeShippingBannersQuery,
   useEvaluateCartRulesQuery,
   useGetRedeemQuoteQuery,
+  useGetGiftWrapOfferQuery,
 } from "../store/api/userApi";
 import { setShowLoginModal, setLoginCallback } from "../store/slices/uiSlice";
 import { useUI } from "../hooks/useRedux";
@@ -241,7 +242,7 @@ const AmountPlaceholder = () => (
   <span className="inline-block h-3.5 w-14 animate-pulse rounded bg-gray-200" aria-label="Calculating" />
 );
 
-const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, itemCount, isLoadingShipping, paymentMethod, onApplyCoupon, onRemoveCoupon, redeemQuote, pointsToRedeem, onPointsChange, pointsDiscount }) => {
+const PriceRows = ({ subtotal, shipping, discount, giftWrapAmount = 0, appliedCoupon, totalToPay, itemCount, isLoadingShipping, paymentMethod, onApplyCoupon, onRemoveCoupon, redeemQuote, pointsToRedeem, onPointsChange, pointsDiscount }) => {
   const shippingAmount = typeof shipping === "object" ? shipping?.amount : shipping;
   // COD advance must be based on the REAL carrier rate, not the (possibly
   // free-shipping-zeroed) charged amount — same real/charged split as the
@@ -255,7 +256,9 @@ const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, it
   const isShippingFree = shippingAmount === 0 && realShippingAmount > 0;
   const hasDiscount = appliedCoupon && discount > 0;
   // (lamp + stand + ... + real shipping) − what they're actually paying = savings.
-  const totalSavings = Math.max(0, subtotal + (realShippingAmount || 0) - totalToPay);
+  // giftWrapAmount is added to both sides — it's a real add-on charge, not a
+  // discount opportunity, so opting into it must never change this number.
+  const totalSavings = Math.max(0, subtotal + giftWrapAmount + (realShippingAmount || 0) - totalToPay);
 
   return (
     <div className="space-y-2">
@@ -270,6 +273,15 @@ const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, it
           ₹{subtotal.toLocaleString()}
         </span>
       </div>
+
+      {giftWrapAmount > 0 && (
+        <div className="flex justify-between items-center text-sm">
+          <span className="text-gray-500 flex items-center gap-1.5">
+            <i className="fa-solid fa-gift text-[#157a44] text-[11px]" /> Gift wrap
+          </span>
+          <span className="font-bold text-gray-900">₹{giftWrapAmount.toLocaleString()}</span>
+        </div>
+      )}
 
       <div className="flex justify-between items-center text-sm">
         <span className="text-gray-500">Shipping</span>
@@ -428,7 +440,7 @@ const CheckoutPage = () => {
   const showNotificationRef = useRef(showNotification);
   useEffect(() => { showNotificationRef.current = showNotification; }, [showNotification]);
 
-  const { items: cartItems, selections: cartSelections } = useSelector((s) => s.cart);
+  const { items: cartItems, selections: cartSelections, giftWrap: giftWrapSelected, giftWrapNoteOptions } = useSelector((s) => s.cart);
   const { isAuthenticated } = useSelector((s) => s.auth);
   const isGuest = !isAuthenticated && !localStorage.getItem("authToken");
   const STEPS = isGuest ? GUEST_STEPS : AUTH_STEPS;
@@ -529,6 +541,7 @@ const CheckoutPage = () => {
     useGetSavedAddressesQuery(undefined, { skip: isGuest });
   const [calculateShipping, { isLoading: isCalculatingShipping }] = useCalculateShippingMutation();
   const { data: freeShippingOfferData } = useGetFreeShippingOfferQuery();
+  const { data: giftWrapOfferData } = useGetGiftWrapOfferQuery();
   const { data: allFreeShippingBannersData } = useGetAllFreeShippingBannersQuery();
   // Generic, data-driven cart-promotion rules (server/src/model/cartRule.model.js)
   // — same evaluator the payment controller uses for the real order total,
@@ -1185,6 +1198,12 @@ const CheckoutPage = () => {
           },
           paymentMethod,
           ...(appliedCoupon ? { couponCode: appliedCoupon } : {}),
+          // Guests have no server-side cart to read this from — the boolean
+          // intent has to come from the request. Price is still never
+          // trusted from here; the server re-prices from the live offer
+          // config (see rp.payment.controller.js).
+          giftWrap: giftWrapSelected,
+          giftWrapNoteOptions: giftWrapNoteOptions,
           ...getFbCookies(), // _fbp / _fbc → stored on order for CAPI match quality
           anonymousId: getAnonymousId(), // fallback externalId for guest CAPI
         }).unwrap();
@@ -1325,6 +1344,15 @@ const CheckoutPage = () => {
     ? pricingDetails.shipping
     : (pricingDetails.shipping?.realAmount ?? pricingDetails.shipping?.amount ?? 0);
   const totalToPay = Math.max(0, pricingDetails.subtotal + shippingAmount - pricingDetails.discount - pointsDiscount);
+  // Gift wrap — added on top of subtotal, same as the server's finalAmount
+  // formula (subtotal + giftWrap + shipping − discount). Qty auto-scales with
+  // distinct products in the cart, mirroring rp.payment.controller.js exactly.
+  const giftWrapOffer = giftWrapOfferData?.data;
+  const giftWrapAmount =
+    giftWrapSelected && giftWrapOffer?.isActive
+      ? (Number(giftWrapOffer.price) || 0) * cartItems.filter((i) => i.giftWrapEligible).length
+      : 0;
+  const totalToPay = pricingDetails.subtotal + giftWrapAmount + shippingAmount - pricingDetails.discount;
   const userName = isGuest ? guestName : (userProfile?.userName || userProfile?.name || "");
   const userInitials = userName ? userName.split(" ").filter(Boolean).map((w) => w[0]).join("").toUpperCase().slice(0, 2) : "?";
 
@@ -2193,6 +2221,7 @@ const CheckoutPage = () => {
                       subtotal={pricingDetails.subtotal}
                       shipping={pricingDetails.shipping}
                       discount={pricingDetails.discount}
+                      giftWrapAmount={giftWrapAmount}
                       appliedCoupon={appliedCoupon}
                       totalToPay={totalToPay}
                       itemCount={cartItems.length}
@@ -2473,6 +2502,7 @@ const CheckoutPage = () => {
                 subtotal={pricingDetails.subtotal}
                 shipping={pricingDetails.shipping}
                 discount={pricingDetails.discount}
+                giftWrapAmount={giftWrapAmount}
                 appliedCoupon={appliedCoupon}
                 totalToPay={totalToPay}
                 itemCount={cartItems.length}
@@ -2659,6 +2689,14 @@ const CheckoutPage = () => {
                   ₹{pricingDetails.subtotal.toLocaleString()}
                 </span>
               </div>
+              {giftWrapAmount > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500">Gift wrap</span>
+                  <span className="font-semibold text-gray-800">
+                    ₹{giftWrapAmount.toLocaleString()}
+                  </span>
+                </div>
+              )}
               {pricingDetails.discount > 0 && (
                 <div className="flex items-center justify-between">
                   <span className="text-gray-500">Discount</span>

@@ -6,12 +6,14 @@ import {
   useEvaluateCartRulesQuery,
   useGetFreeShippingOfferQuery,
   useGetAllFreeShippingBannersQuery,
+  useGetGiftWrapOfferQuery,
 } from '../../store/api/userApi';
 import { updateQuantity, removeItem } from '../../store/slices/cartSlice';
 import { resolveVariantTitle } from '../../utils/variantTitle';
 import { setShowLoginModal, setLoginCallback } from '../../store/slices/uiSlice';
 import { trackViewCart, trackRemoveFromCart, track } from '../../utils/analytics';
 import FreeShippingBanner from '../FreeShippingBanner';
+import GiftWrapOffer, { GiftWrapLineItem } from '../GiftWrapOffer';
 
 const OptimizedImage = lazy(() => import('../OptimizedImage'));
 
@@ -20,8 +22,9 @@ const CartDrawer = ({ isOpen, onClose }) => {
   const dispatch = useDispatch();
   const [mounted, setMounted] = useState(false);
   
-  const { items: cartItems, totalAmount } = useSelector((state) => state.cart);
+  const { items: cartItems, totalAmount, giftWrap: giftWrapSelected } = useSelector((state) => state.cart);
   const { isAuthenticated } = useSelector((state) => state.auth);
+  const { data: giftWrapOfferRes } = useGetGiftWrapOfferQuery();
 
   const [updateCart] = useUpdateCartMutation();
 
@@ -160,7 +163,17 @@ const CartDrawer = ({ isOpen, onClose }) => {
     const qty = typeof item.quantity === 'object' ? Number(item.quantity?.quantity || 0) : Number(item.quantity || 0);
     return sum + (rawPrice - discounted) * qty;
   }, 0);
-  const subtotal = totalAmount - ruleDiscountSavings;
+  // Gift wrap adds to what's actually charged at checkout — same price the
+  // GiftWrapLineItem row above shows, so this can never disagree with it.
+  const giftWrapOffer = giftWrapOfferRes?.data;
+  // Qty auto-scales with cart line count — same rule the server applies at
+  // checkout (one gift wrap per distinct product).
+  const giftWrapAmount =
+    giftWrapSelected && giftWrapOffer?.isActive
+      ? (Number(giftWrapOffer.price) || 0) * cartItems.filter((i) => i.giftWrapEligible).length
+      : 0;
+
+  const subtotal = totalAmount - ruleDiscountSavings + giftWrapAmount;
 
   // Same three-path eligibility used at checkout: admin combo banner (source
   // + recommended product both in cart), any active generic cart rule whose
@@ -207,7 +220,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
       >
         
         {/* --- HEADER --- */}
-        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-white z-10 shrink-0">
+        <div className="px-6 pt-5 pb-2 border-b border-gray-100 flex items-center justify-between bg-white z-10 shrink-0">
           <div>
             <h2 className="text-2xl font-serif text-[#0a110e] tracking-tight">Your Nook</h2>
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
@@ -223,7 +236,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
         </div>
 
         {/* --- SCROLLABLE CONTENT --- */}
-        <div className="flex-1 overflow-y-auto p-6 md:p-8 scrollbar-hide">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 scrollbar-hide">
           
           {cartItems.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center space-y-6 opacity-80">
@@ -249,7 +262,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
           ) : (
             <>
               {/* Items List */}
-              <div className="space-y-6">
+              <div className="space-y-3 sm:space-y-6">
                 {cartItems.map((item) => {
                   // Mongoose bug safe extraction
                   const itemQty = typeof item.quantity === 'object' ? Number(item.quantity?.quantity || 0) : Number(item.quantity || 0);
@@ -257,15 +270,15 @@ const CartDrawer = ({ isOpen, onClose }) => {
                   const displayName = resolveVariantTitle(item.name, item.variantTitleTemplate, item.selectedVariant);
 
                   return (
-                    <div key={`${itemId}-${item.selectedVariant || 'N/A'}`} className="flex items-stretch gap-4 group relative pb-6 border-b border-gray-50 last:border-0 last:pb-0">
+                    <div key={`${itemId}-${item.selectedVariant || 'N/A'}`} className="flex items-stretch gap-3 sm:gap-4 group relative pb-3 sm:pb-6 border-b border-gray-50 last:border-0 last:pb-0">
 
                       {/* Image */}
-                      <div className="w-[85px] h-[85px] bg-gray-50 rounded-2xl overflow-hidden shrink-0 relative border border-gray-100 flex items-center justify-center">
+                      <div className="w-[74px] h-[74px] sm:w-[85px] sm:h-[85px] bg-gray-50 rounded-xl sm:rounded-2xl overflow-hidden shrink-0 relative border border-gray-100 flex items-center justify-center">
                         <Suspense fallback={<div className="w-full h-full bg-gray-100 animate-pulse"></div>}>
                           <OptimizedImage
                             src={item.image || '/placeholder.jpg'}
                             alt={displayName}
-                            className="w-full h-full object-contain mix-blend-multiply"
+                            className="w-full h-full object-cover mix-blend-multiply"
                             loading="lazy"
                           />
                         </Suspense>
@@ -274,98 +287,93 @@ const CartDrawer = ({ isOpen, onClose }) => {
                       {/* Details */}
                       <div className="flex-1 flex flex-col min-w-0">
                         <div>
-                          {/* Name & Delete */}
-                          <div className="flex justify-between items-start mb-1">
-                            <h4 className="text-base font-serif text-[#0a110e] leading-snug pr-4 hover:text-emerald-700 transition-colors cursor-pointer">
+                          {/* Name & Price — same row, top-aligned, matching the
+                              Comet reference (name left, price right, no
+                              separate delete button up here anymore). */}
+                          <div className="flex justify-between items-start gap-2 sm:gap-3">
+                            <h4 className="text-sm sm:text-base font-bold uppercase tracking-tight text-[#0a110e] leading-snug hover:text-emerald-700 transition-colors cursor-pointer">
                               {displayName}
                             </h4>
-                            <button 
-                              onClick={() => handleRemoveItem(itemId, item.selectedVariant, item.mongoId)}
-                              className="text-gray-300 hover:text-red-500 transition-colors p-1 -mt-1 -mr-1 shrink-0"
-                              title="Remove Item"
-                            >
-                              <i className="fa-regular fa-trash-can text-sm"></i>
-                            </button>
+
+                            {/* Price — shows the rule-discounted price (if any
+                                active cart rule discounts this item) instead of
+                                always the raw price, so this never disagrees
+                                with what checkout will actually charge. */}
+                            {(() => {
+                              const discountedPrice = getItemDiscountedPrice(item);
+                              const rawPrice = Number(item.price) || 0;
+                              const hasDiscount = discountedPrice < rawPrice;
+                              const percentOff = hasDiscount
+                                ? Math.round(((rawPrice - discountedPrice) / rawPrice) * 100)
+                                : 0;
+                              return hasDiscount ? (
+                                <div className="text-right shrink-0">
+                                  <p className="text-sm font-bold text-[#157a44]">₹{Math.round(discountedPrice).toLocaleString()}</p>
+                                  <div className="flex items-center justify-end gap-1">
+                                    <span className="text-[10px] text-gray-400 line-through">₹{rawPrice.toLocaleString()}</span>
+                                    <span className="text-[9px] font-bold uppercase rounded-full bg-[#157a44] text-white px-1.5 py-px">
+                                      {percentOff}% OFF
+                                    </span>
+                                  </div>
+                                </div>
+                              ) : (
+                                <p className="text-sm font-bold text-[#0a110e] shrink-0">₹{rawPrice.toLocaleString()}</p>
+                              );
+                            })()}
                           </div>
-                          
-                          {/* Only show a category line when there's a REAL
-                              category — the old "Standard Variant" fallback was
-                              a meaningless filler line above the actual variant,
-                              eating vertical space on short screens. */}
-                          {item.category && (
-                            <p className="text-xs text-gray-400 mt-1 font-medium tracking-wide">
-                              {item.category}
-                            </p>
-                          )}
 
-                          {/* Variant Selection (If Exists) — was a color dot
-                              guessed from the variant name (e.g. background:
-                              "tanjiro", invalid CSS → renders blank) instead
-                              of an actual swatch. A plain dark pill is
-                              correct here regardless of variant type. */}
+                          {/* Subtitle — category + variant on one plain muted
+                              line ("X lows | Size: 10" style), not a colored
+                              pill, matching the Comet reference. */}
                           {(() => {
-                            const itemVariant = item.selectedVariant || 'N/A';
-                            if (!itemVariant || itemVariant === 'N/A') return null;
-
+                            const itemVariant = item.selectedVariant && item.selectedVariant !== 'N/A' ? item.selectedVariant : null;
+                            const parts = [item.category, itemVariant].filter(Boolean);
+                            if (parts.length === 0) return null;
                             return (
-                              <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-[#1c3026] text-white text-[10px] font-semibold tracking-wide">
-                                {itemVariant}
-                              </span>
+                              <p className="text-xs text-gray-400 mt-0.5 sm:mt-1">
+                                {parts.join(' | ')}
+                              </p>
                             );
                           })()}
                         </div>
 
-                        <div className="flex items-center justify-between mt-2">
-                          {/* Quantity Controls - Exact match to your screenshot inspector */}
-                          <div className="flex items-center gap-4 bg-white border border-gray-200 rounded-full h-8 px-3 shadow-sm">
-                            <button 
-                              onClick={() => handleQuantityChange(itemId, item.selectedVariant, Math.max(0, itemQty - 1), item.mongoId, itemQty, item.image)}
-                              className="w-4 h-full flex items-center justify-center text-gray-400 hover:text-[#0a110e] transition-colors"
+                        {/* Trash + qty + "+" — ONE pill, bottom-right. At qty 1
+                            the left icon is trash (tap removes the item); at
+                            qty 2+ it becomes a minus (tap just decrements) —
+                            one control, two behaviors, matching the reference. */}
+                        <div className="flex justify-end mt-auto pt-1.5 sm:pt-2">
+                          <div className="flex items-center gap-3 sm:gap-4 bg-white border border-gray-200 rounded-full h-7 sm:h-8 px-2.5 sm:px-3 shadow-sm">
+                            <button
+                              onClick={() =>
+                                itemQty <= 1
+                                  ? handleRemoveItem(itemId, item.selectedVariant, item.mongoId)
+                                  : handleQuantityChange(itemId, item.selectedVariant, itemQty - 1, item.mongoId, itemQty, item.image)
+                              }
+                              className="w-4 h-full flex items-center justify-center text-gray-400 hover:text-red-500 transition-colors"
+                              title={itemQty <= 1 ? 'Remove item' : 'Decrease quantity'}
                             >
-                              <i className="fa-solid fa-minus text-[10px]"></i>
+                              {itemQty <= 1 ? (
+                                <i className="fa-regular fa-trash-can text-[10px] sm:text-[11px]"></i>
+                              ) : (
+                                <i className="fa-solid fa-minus text-[9px] sm:text-[10px]"></i>
+                              )}
                             </button>
                             <span className="text-xs font-bold text-[#0a110e] min-w-[12px] text-center">
                               {itemQty}
                             </span>
-                            <button 
+                            <button
                               onClick={() => handleQuantityChange(itemId, item.selectedVariant, itemQty + 1, item.mongoId, itemQty, item.image)}
                               className="w-4 h-full flex items-center justify-center text-gray-400 hover:text-[#0a110e] transition-colors"
                             >
-                              <i className="fa-solid fa-plus text-[10px]"></i>
+                              <i className="fa-solid fa-plus text-[9px] sm:text-[10px]"></i>
                             </button>
                           </div>
-
-                          {/* Price — shows the rule-discounted price (if any
-                              active cart rule discounts this item) instead of
-                              always the raw price, so this never disagrees
-                              with what checkout will actually charge. */}
-                          {(() => {
-                            const discountedPrice = getItemDiscountedPrice(item);
-                            const rawPrice = Number(item.price) || 0;
-                            const hasDiscount = discountedPrice < rawPrice;
-                            const percentOff = hasDiscount
-                              ? Math.round(((rawPrice - discountedPrice) / rawPrice) * 100)
-                              : 0;
-                            return hasDiscount ? (
-                              <div className="text-right">
-                                <p className="text-sm font-bold text-[#157a44]">₹{Math.round(discountedPrice).toLocaleString()}</p>
-                                <div className="flex items-center justify-end gap-1">
-                                  <span className="text-[10px] text-gray-400 line-through">₹{rawPrice.toLocaleString()}</span>
-                                  <span className="text-[9px] font-bold uppercase rounded-full bg-[#157a44] text-white px-1.5 py-px">
-                                    {percentOff}% OFF
-                                  </span>
-                                </div>
-                              </div>
-                            ) : (
-                              <p className="text-sm font-bold text-[#0a110e]">₹{rawPrice.toLocaleString()}</p>
-                            );
-                          })()}
                         </div>
-
                       </div>
                     </div>
                   );
                 })}
+                <GiftWrapLineItem />
               </div>
 
               {/* Add-on nudge — only when the offer's source product is in the
@@ -387,6 +395,12 @@ const CartDrawer = ({ isOpen, onClose }) => {
         {/* --- FOOTER (CHECKOUT) --- */}
         {cartItems?.length > 0 && (
           <div className="px-6 py-2 sm:py-6 bg-white border-t border-gray-100 z-10 shrink-0">
+            {/* Gift wrap — renders nothing unless the admin's turned the
+                seasonal offer on (Admin → Offers → Gift Wrap). */}
+            <div className="border-b border-gray-100">
+              <GiftWrapOffer />
+            </div>
+
             <div className="space-y-1 sm:space-y-3 mb-3 sm:mb-6">
                 <div className="flex justify-between items-center text-[11px] font-bold text-gray-400 uppercase tracking-widest">
                     <span>Subtotal</span>
@@ -411,7 +425,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
               <i className="fa-solid fa-hand-holding-dollar text-amber-500 text-base shrink-0" />
               <div>
                 <p className="text-[9px] font-bold text-amber-800">Cash on Delivery available.</p>
-                <p className="text-[8px] text-amber-600 mt-0.5 leading-snug">Pay a small advance online · rest at your door</p>
+                {/* <p className="text-[8px] text-amber-600 mt-0.5 leading-snug">Pay a small advance online · rest at your door</p> */}
               </div>
             </div>
 
@@ -422,9 +436,9 @@ const CartDrawer = ({ isOpen, onClose }) => {
                 <span>Proceed to Checkout</span>
                 <i className="fa-solid fa-arrow-right-long"></i>
             </button>
-            <div className="mt-4 flex justify-center items-center gap-1.5 text-[9px] text-gray-400 uppercase tracking-widest font-bold">
-                <i className="fa-solid fa-lock"></i>
-                <span>Secure Checkout</span>
+            <div className="mt-1 flex justify-center items-center gap-1.5 text-[9px] text-gray-400 uppercase tracking-widest font-bold">
+                {/* <i className="fa-solid fa-lock"></i>
+                <span>Secure Checkout</span> */}
             </div>
           </div>
         )}

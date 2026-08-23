@@ -35,6 +35,18 @@ const orderSchema = new mongoose.Schema(
       isGenerated: { type: Boolean, default: false },
       s3FileKey: { type: String, default: null },
     },
+    // Seasonal gift-wrap add-on (not a catalog product — see
+    // utils/giftWrapOffer.util.js). price is snapshotted from the live offer
+    // config at order-creation time, exactly like productSnapshot.priceAtPurchase
+    // above, and is what's actually included in `amount`.
+    giftWrap: {
+      selected: { type: Boolean, default: false },
+      price: { type: Number, default: 0 },
+      quantity: { type: Number, default: 0 },
+      title: { type: String, default: "" },
+      // Which note(s) the customer picked when adding gift wrap (multi-select).
+      noteOptions: { type: [String], default: ["none"] },
+    },
     amount: { type: Number, required: true },
     coupon: {
       couponCodeId: { type: String, default: null },
