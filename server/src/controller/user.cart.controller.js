@@ -3,6 +3,7 @@ import {
   getCartService,
   cartQuantityService,
   clearCartService,
+  toggleGiftWrapService,
 } from "../services/user.cart.service.js";
 import { ApiRes } from "../utils/index.js";
 import Order from "../model/order.model.js";
@@ -100,6 +101,16 @@ const userClearCart = asyncHandler(async (req, res) => {
         result.success,
       ),
     );
+});
+
+const userToggleGiftWrap = asyncHandler(async (req, res) => {
+  const { userId } = req.user;
+  const { selected, noteOptions } = req.body || {};
+  const result = await toggleGiftWrapService({ userId, selected, noteOptions });
+
+  return res
+    .status(result.statusCode)
+    .json(new ApiRes(result.statusCode, result.message, null, result.success));
 });
 
 const userOrderPreviousHistory = asyncHandler(async (req, res) => {
@@ -260,4 +271,5 @@ export {
   getOrderStatus,
   generateOrderInvoice,
   userMergeGuestCart,
+  userToggleGiftWrap,
 };

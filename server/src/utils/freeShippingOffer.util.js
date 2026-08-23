@@ -1,28 +1,19 @@
 import Offer from "../model/offer.model.js";
-import FreeShippingOffer from "../model/freeShippingOffer.model.js";
 
 /**
- * Fetches the free-shipping singleton doc — preferring the new unified
- * `offers` collection (type: "free_shipping", written by the admin panel's
- * Offers page). Falls back to the legacy `freeshippingoffers` collection only
- * when this environment/DB hasn't been seeded into `offers` yet (see
- * UN-ADMIN-panel .../server/scripts/seedOffersFromLegacy.js) — the legacy
- * collection is otherwise untouched and frozen once seeded, since the admin
- * only writes new banners/threshold changes to `offers` now.
+ * Fetches the free-shipping singleton doc from the unified `offers`
+ * collection (type: "free_shipping", written by the admin panel's Offers
+ * page). Legacy `freeshippingoffers` collection is retired — see
+ * UN-ADMIN-panel .../server/scripts/seedOffersFromLegacy.js for the one-time
+ * backfill that must be run on any environment before this.
  *
  * Internal — all reads of the free-shipping config/banners go through this
- * one function so there is exactly one place the dual-read fallback lives.
+ * one function.
  *
  * @param {string} projection mongoose .select() string
  */
 const getFreeShippingDoc = async (projection) => {
-  const offer = await Offer.findOne({ type: "free_shipping" }).select(projection).lean();
-  if (offer) {
-    // console.log("[FreeShipping][source] NEW offers collection");
-    return offer;
-  }
-  // console.log("[FreeShipping][source] LEGACY freeshippingoffers collection (no doc found in offers — not migrated on this DB yet)");
-  return FreeShippingOffer.findOne().select(projection).lean();
+  return Offer.findOne({ type: "free_shipping" }).select(projection).lean();
 };
 
 /**
@@ -49,14 +40,19 @@ export const getFreeShippingConfig = async () => {
  * unlock free shipping. Each active banner is one combo; the cart qualifies
  * if it satisfies ANY of them.
  *
+ * Deliberately independent of the parent offer doc's own `isActive` — that
+ * flag is the cart-VALUE-threshold on/off switch only (see
+ * getFreeShippingConfig above). Combo banners are a separate promo with
+ * their own per-banner `isActive`, so admins can turn the threshold off
+ * without silently killing an active combo (and vice versa).
+ *
  * @param {string[]} cartProductIds product IDs currently in the cart/order
  */
 export const isFreeShippingEligible = async (cartProductIds = []) => {
-  const offer = await getFreeShippingDoc("isActive banners");
-  if (!offer?.isActive) return false;
+  const offer = await getFreeShippingDoc("banners");
 
   const ids = new Set((cartProductIds || []).map((id) => String(id)));
-  const eligible = (offer.banners || []).some(
+  const eligible = (offer?.banners || []).some(
     (b) =>
       b.isActive &&
       ids.has(String(b.sourceProductId)) &&
@@ -69,28 +65,94 @@ export const isFreeShippingEligible = async (cartProductIds = []) => {
 };
 
 /**
- * Active banner (if any) for a given product page — used by
- * getBannerForProductController. A product can have at most one active
- * banner in practice, but that's not enforced at the schema level; first
- * match wins.
+ * A cart_rule created for free shipping (e.g. "Katana + Display Stand
+ * Combo") already IS a combo: its `conditions` are the products that must
+ * all be in the cart. Admins used to have to separately add the same combo
+ * again under "Product Page Banners" just to get an on-page suggestion card
+ * — easy to forget (exactly what happened with the Katana rule), and it
+ * meant the same combo lived in two places that could drift apart.
+ *
+ * This derives banner-shaped entries directly from active free-shipping
+ * cart_rules: for a 2-condition rule, each product becomes the "source" with
+ * the other as "recommended" (so it works from either product's page). For
+ * a rule with more than 2 conditions, every OTHER condition becomes its own
+ * recommended entry for a given source — which is exactly what powers the
+ * multi-suggestion carousel on the banner (see FreeShippingBanner.jsx).
+ */
+const getCartRuleDerivedBanners = async () => {
+  const rules = await Offer.find({
+    type: "cart_rule",
+    isActive: true,
+    "effects.type": "free_shipping",
+  })
+    .select("_id name conditions")
+    .lean();
+
+  // De-duped by source+recommended pair — two different rules mentioning the
+  // exact same pair (e.g. one rule for "2+ Lamps" style stacking alongside
+  // another for the plain combo) must not produce two identical carousel
+  // slides for the same suggestion.
+  const seenPairs = new Set();
+  const banners = [];
+  for (const rule of rules) {
+    const conditions = rule.conditions || [];
+    for (const source of conditions) {
+      for (const other of conditions) {
+        if (String(other.productId) === String(source.productId)) continue;
+        const pairKey = `${source.productId}:${other.productId}`;
+        if (seenPairs.has(pairKey)) continue;
+        seenPairs.add(pairKey);
+        banners.push({
+          sourceProductId: source.productId,
+          recommendedProductId: other.productId,
+          text: rule.name || "Unlock Free Shipping",
+          ctaLabel: "Add to Cart",
+          isActive: true,
+          ruleId: rule._id,
+        });
+      }
+    }
+  }
+  return banners;
+};
+
+/**
+ * Merges admin-configured "Product Page Banners" with cart_rule-derived
+ * banners (see getCartRuleDerivedBanners) into one list, de-duplicated by
+ * source+recommended pair (an explicit admin banner for a pair wins over the
+ * auto-derived one, since it may carry custom copy).
+ */
+const getAllBannersMerged = async () => {
+  const offer = await getFreeShippingDoc("banners");
+  const adminBanners = (offer?.banners || []).filter((b) => b.isActive);
+  const ruleBanners = await getCartRuleDerivedBanners();
+
+  const adminPairs = new Set(adminBanners.map((b) => `${b.sourceProductId}:${b.recommendedProductId}`));
+  const dedupedRuleBanners = ruleBanners.filter(
+    (b) => !adminPairs.has(`${b.sourceProductId}:${b.recommendedProductId}`),
+  );
+  return [...adminBanners, ...dedupedRuleBanners];
+};
+
+/**
+ * ALL active banners (admin + cart_rule-derived) for a given product page —
+ * used by getBannerForProductController. A product can now have MULTIPLE
+ * suggestions (carousel on the client) rather than just one. Independent of
+ * the parent doc's `isActive` — see isFreeShippingEligible above for why.
  *
  * @param {string} productId
  */
 export const getBannerForProduct = async (productId) => {
-  const offer = await getFreeShippingDoc("isActive banners");
-  if (!offer?.isActive) return null;
-  const banner = (offer.banners || []).find(
-    (b) => b.isActive && String(b.sourceProductId) === String(productId),
-  );
-  return banner || null;
+  const all = await getAllBannersMerged();
+  return all.filter((b) => String(b.sourceProductId) === String(productId));
 };
 
 /**
  * All active banners across every product — used by
- * getAllActiveBannersController (checkout, which isn't tied to one product).
+ * getAllActiveBannersController (checkout/cart, which aren't tied to one
+ * product). Independent of the parent doc's `isActive` — see
+ * isFreeShippingEligible above for why.
  */
 export const getAllActiveBanners = async () => {
-  const offer = await getFreeShippingDoc("isActive banners");
-  if (!offer?.isActive) return [];
-  return (offer.banners || []).filter((b) => b.isActive);
+  return getAllBannersMerged();
 };

@@ -69,12 +69,31 @@ const productSchema = mongoose.Schema(
       type: Boolean,
       require: true,
     },
+    // Real, cart-addable product that should never appear in the browsable
+    // "All Products" grid (e.g. Gift Wrap) — excluded there, still fetchable
+    // directly by productId for add-on flows like GiftWrapOffer.
+    isAddon: { type: Boolean, default: false },
+    // Opt-in: whether the seasonal Gift Wrap add-on (see GiftWrapOffer) can be
+    // applied to this product. Default false — most products need explicit
+    // admin sign-off (e.g. no gift wrap on a fragile/oversized item). The
+    // widget only counts/charges for products where this is true.
+    giftWrapEligible: { type: Boolean, default: false },
     // Manual sort weight for the listing — higher shows first (default 0).
     // Set from the admin panel; read by the products listing sort.
     priority: { type: Number, default: 0 },
     // Admin-curated related product IDs suggested on the PDP. Written by the
     // admin panel; the storefront reads these to render "you may also like".
     recommendedProducts: { type: [String], default: [] },
+    // Companion productIds offered as a "buy together" combo right after this
+    // product is added to the cart. The customer can drop any of them in the
+    // popup; this product itself is always kept. Separate from
+    // recommendedProducts (display-only); empty = no combo popup.
+    comboProductIds: { type: [String], default: [] },
+    // Copy for that popup. Each blank falls back to a sensible default in the
+    // storefront modal, so an admin only overrides what they want to reword.
+    comboEyebrow: { type: String, default: "" },
+    comboHeading: { type: String, default: "" },
+    comboCtaLabel: { type: String, default: "" },
   },
   {
     timestamps: true,

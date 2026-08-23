@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { fireCelebrationConfetti } from "../utils/celebration";
 import {
-  useGetFreeShippingBannerQuery,
+  useGetAllFreeShippingBannersQuery,
   useGetFreeShippingOfferQuery,
   useAddToCartMutation,
   useUpdateCartMutation,
@@ -71,6 +71,22 @@ const FreeShippingBanner = ({
   // the mini-cart and side-cart, which want just the product details + CTA,
   // not the full progress animation. PDP/checkout leave it on (default).
   showProgressBar = true,
+  // Pre-computed banner list, bypassing the internal by-productId fetch.
+  // Used by the cart drawer/checkout to show EVERY currently-eligible nudge
+  // (across different source products, not just one product's own
+  // suggestions) inside this one persistent card — arrows below page
+  // through them the same way they page through one product's multiple
+  // suggestions, instead of a whole new card mounting/unmounting per nudge.
+  bannersOverride,
+  // "Buy N more of this SAME product, get a lower unit price" mode — one
+  // entry from useEvaluateCartRulesQuery's `data.quantityNudges` (see
+  // server/src/utils/cartRule.util.js findQuantityDiscountNudges). Reuses
+  // this entire card (ribbon, quantity stepper, everything) instead of a
+  // separate component — a quantity-discount rule is single-product, so the
+  // "recommended" product and the "source" product are just the same
+  // product; the existing add/remove-from-cart stepper below already does
+  // exactly what's needed once `recommendedProduct` resolves to it.
+  quantityNudge,
 }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -123,8 +139,39 @@ const FreeShippingBanner = ({
   const [sourcePromptMounted, setSourcePromptMounted] = useState(false);
   const [sourceAdding, setSourceAdding] = useState(false);
 
-  const { data: bannerRes } = useGetFreeShippingBannerQuery(productId, { skip: !productId });
-  const banner = bannerRes?.data;
+  // One shared "all active banners" fetch (admin banners + free-shipping
+  // cart_rules merged server-side — see freeShippingOffer.util.js) — every
+  // call site filters from the same list client-side rather than each
+  // hitting its own per-product endpoint. `bannersOverride` (cart
+  // drawer/checkout) skips the by-productId filter entirely and shows
+  // exactly the pre-computed list it was given (e.g. every currently
+  // eligible nudge across different source products, not just one product's
+  // own suggestions) — same card, arrows page through whichever list applies.
+  const { data: allBannersRes } = useGetAllFreeShippingBannersQuery();
+  const banners = useMemo(() => {
+    if (bannersOverride) return bannersOverride;
+    if (!productId) return [];
+    return (allBannersRes?.data || []).filter((b) => String(b.sourceProductId) === String(productId));
+  }, [bannersOverride, allBannersRes, productId]);
+  const bannersKey = useMemo(
+    () => banners.map((b) => `${b.sourceProductId}:${b.recommendedProductId}`).join(","),
+    [banners],
+  );
+  const [bannerIndex, setBannerIndex] = useState(0);
+  useEffect(() => {
+    setBannerIndex(0);
+  }, [bannersKey]);
+  const safeBannerIndex = banners.length > 0 ? Math.min(bannerIndex, banners.length - 1) : 0;
+  // Quantity-nudge mode: no "different product to recommend" — source and
+  // recommended are the same product, so every query/derivation below that
+  // reads banner.recommendedProductId/sourceProductId just naturally
+  // resolves to it.
+  const banner = quantityNudge
+    ? { sourceProductId: quantityNudge.productId, recommendedProductId: quantityNudge.productId }
+    : banners[safeBannerIndex] || null;
+  const showBannerArrows = !quantityNudge && banners.length > 1;
+  const goToNextBanner = () => setBannerIndex((i) => (i + 1) % banners.length);
+  const goToPrevBanner = () => setBannerIndex((i) => (i - 1 + banners.length) % banners.length);
 
   // Free shipping is a product-COMBO rule (source + recommended both in cart),
   // so this bar tracks combo completion, NOT a rupee total. We only need to
@@ -135,11 +182,44 @@ const FreeShippingBanner = ({
   const offerConfig = offerRes?.data;
   const offerActive = !!offerConfig?.isActive;
 
-  const { data: recommendedRes } = useGetProductByIdQuery(banner?.recommendedProductId, {
-    skip: !banner?.recommendedProductId,
-  });
+  const { data: recommendedRes, isFetching: isFetchingRecommended } = useGetProductByIdQuery(
+    banner?.recommendedProductId,
+    { skip: !banner?.recommendedProductId },
+  );
   const recommendedProduct = recommendedRes?.data;
   const variants = recommendedProduct?.variantDetails || [];
+
+  // Quantity-nudge display math — mirrors the server's applyBestDiscount
+  // rounding exactly (cartRule.util.js). Display only; the real charge is
+  // still always recomputed server-side at checkout from the live rule.
+  const quantityNudgeUnitPrice = Number(variants?.[0]?.variantPrice ?? 0);
+  const quantityNudgeDiscountedUnit = quantityNudge
+    ? quantityNudge.effectType === "percent_off"
+      ? Math.round(Math.max(quantityNudgeUnitPrice * (1 - Number(quantityNudge.effectValue) / 100), 0))
+      : Math.round(Math.max(quantityNudgeUnitPrice - Number(quantityNudge.effectValue), 0))
+    : 0;
+  const quantityNudgeTotal = quantityNudgeDiscountedUnit * (quantityNudge?.needed || 0);
+
+  // A cart_rule can reference a product that's since been deleted/archived —
+  // its auto-derived banner entry would then never resolve a product to
+  // show. Rather than hiding the whole card (which would also hide any
+  // OTHER, perfectly valid suggestions in the same carousel), skip forward
+  // past it once the fetch has actually settled with nothing. Bails out via
+  // triedRef once every slide has been tried, so a fully-broken list still
+  // ends in "show nothing" instead of looping forever.
+  const triedSkipRef = useRef(new Set());
+  useEffect(() => {
+    triedSkipRef.current = new Set();
+  }, [bannersKey]);
+  useEffect(() => {
+    if (!banner?.recommendedProductId) return;
+    if (isFetchingRecommended || recommendedProduct) return;
+    if (banners.length <= 1) return;
+    if (triedSkipRef.current.has(safeBannerIndex)) return;
+    triedSkipRef.current.add(safeBannerIndex);
+    if (triedSkipRef.current.size >= banners.length) return;
+    setBannerIndex((safeBannerIndex + 1) % banners.length);
+  }, [banner?.recommendedProductId, isFetchingRecommended, recommendedProduct, banners.length, safeBannerIndex]);
 
   // Needed for the "you added the add-on but not the main product" copy
   // state below. RTK Query dedupes/caches by id, so on the PDP (where this
@@ -158,15 +238,25 @@ const FreeShippingBanner = ({
   // was still sitting in the cart the whole time. Deriving straight from
   // cartItems means it's always correct, on mount or otherwise, and reverts
   // automatically if the item's removed from elsewhere (e.g. the cart page).
+  // Quantity-nudge mode is variant-AWARE (the customer can pick any variant
+  // from the dropdown, including one not yet in the cart) — so the match
+  // must be for the SPECIFIC selected variant, not just "any line of this
+  // product". Combo mode stays variant-agnostic (unchanged): there's only
+  // ever one line for the recommended product since its dropdown is locked
+  // once added, so matching by productId alone was always correct there.
   const cartMatch = useMemo(() => {
     if (!recommendedProduct) return null;
     return cartItems.find((item) => {
-      return (
+      const idMatches =
         String(item.id) === String(recommendedProduct.productId) ||
-        String(item.mongoId) === String(recommendedProduct.productId)
-      );
+        String(item.mongoId) === String(recommendedProduct.productId);
+      if (!idMatches) return false;
+      if (quantityNudge) {
+        return (item.selectedVariant || "N/A") === (selectedVariant || "N/A");
+      }
+      return true;
     });
-  }, [cartItems, recommendedProduct]);
+  }, [cartItems, recommendedProduct, quantityNudge, selectedVariant]);
   const added = !!cartMatch;
   const addedVariant = cartMatch?.selectedVariant || null;
 
@@ -415,27 +505,39 @@ const FreeShippingBanner = ({
 
   useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
 
-  // Seed the initial selection once variants load — prefers a "purple"
-  // variant if the product has one, otherwise falls back to the first
-  // variant. No auto-cycling: the selection just sits still until the
-  // customer changes it via the dropdown below.
+  // Seed the default selection whenever the recommended product changes —
+  // prefers a "purple" variant if it has one, otherwise the first variant.
+  // Re-seeds (not just seeds once) because the recommended product itself
+  // can change without unmounting this component: paging through carousel
+  // suggestions via the </> arrows swaps `recommendedProduct` in place, and
+  // the previous product's variant name almost never exists on the new
+  // one — this must reset, not just fill in when empty. No auto-cycling
+  // otherwise: the selection just sits still until the customer changes it
+  // via the dropdown below.
   useEffect(() => {
-    if (variants.length > 0 && !selectedVariant) {
+    if (variants.length > 0) {
       const purple = variants.find((v) => v.variantName?.toLowerCase().includes("purple"));
       setSelectedVariant((purple || variants[0]).variantName);
+    } else {
+      setSelectedVariant(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only seed once when variants first load
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately re-seeds on every product change, not just the first
   }, [recommendedProduct?.productId]);
 
   // Keep the displayed image/price in sync with whatever variant is actually
   // in the cart once added (could differ from what's selected in the
-  // dropdown, or from a variant changed elsewhere).
+  // dropdown, or from a variant changed elsewhere). Skipped in quantity-nudge
+  // mode — there the dropdown is the customer's own free choice (which
+  // variant to add/bump next), and cartMatch is already keyed off
+  // selectedVariant itself, so forcing it back to addedVariant here would
+  // just fight the customer's own selection.
   useEffect(() => {
+    if (quantityNudge) return;
     if (addedVariant) {
       setSelectedVariant(addedVariant);
       setVariantMenuOpen(false);
     }
-  }, [addedVariant]);
+  }, [addedVariant, quantityNudge]);
 
   // Mount-then-animate so the sheet slides up from off-screen rather than
   // just appearing; the reverse (closeSourcePrompt) unmounts after the same
@@ -498,12 +600,14 @@ const FreeShippingBanner = ({
     };
   }, [variantMenuOpen]);
 
-  // Hide the whole card when the admin has switched the offer off
-  // (offerConfig.isActive === false). Previously this only checked that a
-  // banner existed, so a disabled offer still rendered the cross-sell card on
-  // the PDP — only its progress bar hid. Gating on offerActive too makes the
-  // admin toggle fully remove it everywhere, consistent with checkout/cart.
-  if (!banner || !recommendedProduct || !offerActive) return null;
+  // `banner` already comes from a server call that only returns banners with
+  // their own isActive === true (getBannerForProduct/getAllActiveBanners) —
+  // that's the real on/off switch for this card. `offerActive` (the parent
+  // offer doc's isActive) is deliberately NOT part of this gate: that flag is
+  // only the cart-VALUE-threshold on/off switch, a separate promo from combo
+  // banners, so turning the threshold off must not also hide an otherwise
+  // still-active combo banner.
+  if (!banner || !recommendedProduct) return null;
 
   const activeVariant =
     variants.find((v) => v.variantName === selectedVariant) || variants[0];
@@ -513,6 +617,14 @@ const FreeShippingBanner = ({
   };
   const displayImage = activeVariant?.variantImage?.[0] || recommendedProduct.productImg || "https://urbannook.in/assets/logo.webp";
   const displayPrice = activeVariant?.variantPrice ?? 0;
+  // Same effective-OOS rule used on the PDP/product cards: a manual admin
+  // flag, or a tracked quantity (non-null) that's reached 0. Recommending a
+  // sold-out variant in this upsell card would let the admin advertise
+  // something the customer can't actually buy.
+  const isActiveVariantOOS =
+    !!activeVariant &&
+    (activeVariant.variantOutOfStock === true ||
+      (activeVariant.variantQuantity != null && Number(activeVariant.variantQuantity) <= 0));
 
   // Same "highest-priced variant as reference MRP" convention already used
   // on the PDP (ProductDetailPage.jsx) — not a fabricated discount, just the
@@ -550,7 +662,10 @@ const FreeShippingBanner = ({
     const effectiveVariant = activeVariant?.variantName || "Standard Variant";
     // Captured BEFORE the cart updates — this is what decides whether this
     // specific click completes the combo, independent of the add itself.
-    const willCompleteCombo = sourceInCart;
+    // Never true in quantity-nudge mode — there's no "combo" to complete
+    // (source and recommended are the same product), so this must not
+    // trigger the truck-fill/confetti celebration sequence.
+    const willCompleteCombo = !quantityNudge && sourceInCart;
 
     if (willCompleteCombo) {
       // OPTIMISTIC celebration, driven by the CLICK — not by the server.
@@ -610,6 +725,7 @@ const FreeShippingBanner = ({
           image: displayImage,
           quantity: 1,
           selectedVariant: effectiveVariant,
+          giftWrapEligible: !!recommendedProduct.giftWrapEligible,
         }),
       );
       setAddLoading(false);
@@ -674,6 +790,7 @@ const FreeShippingBanner = ({
           image: sourceImage,
           quantity: 1,
           selectedVariant: variantName,
+          giftWrapEligible: !!sourceProduct.giftWrapEligible,
         }),
       );
     }
@@ -761,8 +878,51 @@ const FreeShippingBanner = ({
   return (
     <>
       <div
-        className={`rounded-3xl overflow-hidden border border-red-400 bg-[#FBF5E8] shadow-sm ${className}`}
+        // `isolate` pins this card's own z-index stack (arrows, dots) to
+        // stay strictly within it — without this, the arrows' z-20 was
+        // comparing against z-index values from completely unrelated
+        // overlays elsewhere on the page (e.g. GiftWrapOffer's popup),
+        // sometimes winning and rendering on top of them.
+        className={`relative isolate rounded-3xl overflow-hidden border border-red-400 bg-[##ffffff] shadow-sm ${className}`}
       >
+        {/* Steps through other active suggestions for this same source
+            product — e.g. Katana can recommend both a Display Stand and
+            something else, each from its own combo rule. Overlaid on the
+            card (not threaded through the flex layout below) so it works
+            regardless of how the card body is arranged. */}
+        {showBannerArrows && (
+          <>
+            <button
+              type="button"
+              onClick={goToPrevBanner}
+              aria-label="Previous suggestion"
+              className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full flex items-center justify-center border border-[#D8D2C5] bg-white/95 text-[#1c3026] shadow hover:bg-white transition-colors"
+            >
+              <i className="fa-solid fa-chevron-left text-[10px]" />
+            </button>
+            <button
+              type="button"
+              onClick={goToNextBanner}
+              aria-label="Next suggestion"
+              className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full flex items-center justify-center border border-[#D8D2C5] bg-white/95 text-[#1c3026] shadow hover:bg-white transition-colors"
+            >
+              <i className="fa-solid fa-chevron-right text-[10px]" />
+            </button>
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1">
+              {banners.map((_, i) => (
+                <span
+                  key={i}
+                  className="rounded-full transition-all"
+                  style={{
+                    width: i === safeBannerIndex ? 12 : 5,
+                    height: 5,
+                    background: i === safeBannerIndex ? "#E63329" : "rgba(28,48,38,0.25)",
+                  }}
+                />
+              ))}
+            </div>
+          </>
+        )}
         {/* Top offer ribbon — high-contrast strip so this reads as "a deal"
           before anything else on the card is even read. Separate from the
           green progress panel below so it stays legible/unmissable
@@ -771,7 +931,7 @@ const FreeShippingBanner = ({
           <style>{`@keyframes fsbRibbonShine { 0% { transform: translateX(-120%); } 100% { transform: translateX(320%); } }`}</style>
           <i className="fa-solid fa-bolt text-[10px] text-[#F5DEB3]" />
           <span className="text-[12px] font-extrabold uppercase tracking-[0.16em] text-white">
-            Exclusive Combo Offer
+            {quantityNudge ? "Bulk Discount" : "Exclusive Combo Offer"}
           </span>
           <span
             className="absolute inset-y-0 w-1/4"
@@ -797,10 +957,21 @@ const FreeShippingBanner = ({
 
         {/* Combo copy — plain text on the card's own cream background, no
           separate colored panel. Stays fixed near the top; the actual
-          progress bar lives further down, right above the CTA (see below). */}
-        {offerActive && (
-          <div className="px-4 pt-3 text-center">
-            {freeShippingUnlocked ? (
+          progress bar lives further down, right above the CTA (see below).
+          Not gated on offerActive (the threshold on/off switch) — this copy
+          describes the combo banner's own state, which is independent. */}
+        <div className="px-4 pt-3 text-center">
+            {quantityNudge ? (
+              <p
+                className="font-semibold tracking-[0.01em] text-[#1c3026] whitespace-nowrap"
+                style={{ fontSize: "clamp(8px, 3vw, 11px)" }}
+              >
+                Add {quantityNudge.remaining} more &amp; get all {quantityNudge.needed} at{" "}
+                <span className="font-bold uppercase text-[#E63329]">
+                  ₹{quantityNudgeTotal.toLocaleString()}
+                </span>
+              </p>
+            ) : freeShippingUnlocked ? (
               <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#1c3026]">
                 Free shipping unlocked on this order
               </span>
@@ -862,7 +1033,6 @@ const FreeShippingBanner = ({
               </>
             )}
           </div>
-        )}
 
         {/* Product card body */}
         <div className="px-4 pt-3 flex gap-4">
@@ -900,11 +1070,14 @@ const FreeShippingBanner = ({
                 here is exactly what handleAddToCart sends to the cart (via
                 `activeVariant`, derived from `selectedVariant`). Disabled
                 once already in cart since that line is committed to
-                `addedVariant`. */}
+                `addedVariant` — EXCEPT in quantity-nudge mode, where the
+                customer can freely pick any variant (including one not yet
+                in the cart) to add/bump toward the same total; cartMatch is
+                variant-aware there specifically to support this. */}
             {variants.length > 1 && (
               <div className="flex items-center gap-8 mt-1">
                 <label className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.1em] text-gray-500">
-                  {added ? "In cart" : "Variants"}
+                  {added && !quantityNudge ? "In cart" : "Variants"}
                 </label>
                 <div
                   ref={variantMenuRef}
@@ -912,8 +1085,8 @@ const FreeShippingBanner = ({
                 >
                   <button
                     type="button"
-                    onClick={() => !added && setVariantMenuOpen((v) => !v)}
-                    disabled={added}
+                    onClick={() => (!added || quantityNudge) && setVariantMenuOpen((v) => !v)}
+                    disabled={added && !quantityNudge}
                     className="w-full flex items-center justify-between gap-1 rounded-lg border border-black/15 bg-white px-2.5 py-1 text-xs font-bold text-black disabled:opacity-60 disabled:cursor-default focus:outline-none focus:ring-1 focus:ring-[#157a44] focus:border-[#157a44]"
                   >
                     <span className="flex items-center gap-1.5 min-w-0">
@@ -949,10 +1122,15 @@ const FreeShippingBanner = ({
                         <div
                           ref={variantMenuPortalRef}
                           className="fsb-variant-scroll fixed z-[10050] rounded-lg border border-[#157a44]/30 bg-[#FAF7F0] shadow-lg overflow-y-scroll max-h-48"
-                          style={{ top: variantMenuPos.top, left: variantMenuPos.left, width: variantMenuPos.width }}
+                          style={{
+                            top: variantMenuPos.top,
+                            left: variantMenuPos.left,
+                            width: variantMenuPos.width,
+                          }}
                         >
                           {variants.map((v) => {
-                            const isSelected = v.variantName === selectedVariant;
+                            const isSelected =
+                              v.variantName === selectedVariant;
                             return (
                               <button
                                 key={v.variantName}
@@ -973,7 +1151,9 @@ const FreeShippingBanner = ({
                                     background: variantColor(v.variantName),
                                   }}
                                 />
-                                <span className="truncate">{v.variantName}</span>
+                                <span className="truncate">
+                                  {v.variantName}
+                                </span>
                               </button>
                             );
                           })}
@@ -1004,7 +1184,8 @@ const FreeShippingBanner = ({
                   // Derived from the actual prices rather than read off the
                   // rule, so a flat_off rule (₹X off) shows a correct % too.
                   const rulePercent = Math.round(
-                    ((lineDisplayPrice - lineDiscounted) / lineDisplayPrice) * 100,
+                    ((lineDisplayPrice - lineDiscounted) / lineDisplayPrice) *
+                      100,
                   );
                   return (
                     <>
@@ -1036,7 +1217,8 @@ const FreeShippingBanner = ({
                         ₹{lineMax.toLocaleString()}
                       </span>
                       <span className="text-[10px] font-bold uppercase bg-black text-white px-1.5 py-0.5">
-                        {discountPercent}% OFF · Save ₹{(lineMax - lineDisplayPrice).toLocaleString()}
+                        {discountPercent}% OFF · Save ₹
+                        {(lineMax - lineDisplayPrice).toLocaleString()}
                       </span>
                     </>
                   );
@@ -1087,7 +1269,7 @@ const FreeShippingBanner = ({
           never disrupted by a hide/show cycle — only its own opacity/height
           transition, eased smoothly both ways, changes. Un-hides the same
           way if the item's later removed. */}
-        {offerActive && showProgressBar && (
+        {showProgressBar && (
           <div
             className="px-4 overflow-hidden"
             style={{
@@ -1420,7 +1602,12 @@ const FreeShippingBanner = ({
           ) : added ? (
             <div className="flex items-center gap-2">
               <div className="flex-1 h-[50px] flex items-center justify-center rounded-full text-[11px] font-extrabold uppercase tracking-[0.1em] text-center bg-[#f5deb3] text-[#1c3026] border border-[#ffce64]">
-                {freeShippingUnlocked ? (
+                {quantityNudge ? (
+                  <>
+                    <i className="fa-solid fa-circle-check mr-1.5 text-[#E63329]" />{" "}
+                    Added to Cart
+                  </>
+                ) : freeShippingUnlocked ? (
                   <>
                     <i className="fa-solid fa-circle-check mr-1.5 text-[#E63329]" />{" "}
                     Free Shipping Unlocked!
@@ -1485,7 +1672,7 @@ const FreeShippingBanner = ({
           ) : (
             <button
               onClick={handleAddToCart}
-              disabled={isAdding}
+              disabled={isAdding || isActiveVariantOOS}
               // Press state instead of the old hover-fill sweep: touch devices
               // have no hover, so on mobile that green fill simply never
               // appeared and the tap had no visual feedback at all. `active:`
@@ -1494,7 +1681,9 @@ const FreeShippingBanner = ({
               className="w-full py-3.5 rounded-full flex items-center justify-center gap-2.5 text-sm font-medium uppercase tracking-wide disabled:opacity-50 bg-[#f5deb3] text-[#1c3026] active:bg-[#4a2f1b] active:text-[#f5deb3] active:scale-[0.98] transition-[background-color,color,transform] duration-100"
             >
               <span className="flex items-center justify-center gap-2.5">
-                {isAdding ? (
+                {isActiveVariantOOS ? (
+                  "Out of Stock"
+                ) : isAdding ? (
                   "Adding…"
                 ) : hasRuleDiscount ? (
                   // A rule discount is active on this exact product (e.g. "2+
@@ -1503,6 +1692,13 @@ const FreeShippingBanner = ({
                   // so instead of the generic "Add & Ship Free".
                   <>
                     Add for ₹{Math.round(ruleDiscountedPrice).toLocaleString()}
+                    <span className="text-base leading-none">→</span>
+                  </>
+                ) : quantityNudge ? (
+                  // No "ship free" framing here — this variant just isn't in
+                  // the cart yet, plain add.
+                  <>
+                    Add {activeVariant?.variantName || ""}
                     <span className="text-base leading-none">→</span>
                   </>
                 ) : (
@@ -1526,61 +1722,64 @@ const FreeShippingBanner = ({
       {SOURCE_PROMPT_ENABLED && showSourcePrompt &&
         createPortal(
           <div className="fixed inset-0 z-[200] flex items-end justify-center">
-          <div
-            className={`absolute inset-0 bg-black/50 transition-opacity duration-300 ${sourcePromptMounted ? "opacity-100" : "opacity-0"}`}
-            onClick={closeSourcePrompt}
-          />
-          <div
-            className={`relative w-full max-w-md bg-[#FAF7F2] rounded-t-3xl px-5 pt-5 shadow-2xl transition-transform duration-300 ease-out ${
-              sourcePromptMounted ? "translate-y-0" : "translate-y-full"
-            }`}
-            style={{ paddingBottom: "max(1.5rem, calc(env(safe-area-inset-bottom) + 1rem))" }}
-          >
-            <div className="mx-auto w-10 h-1 rounded-full bg-black/15 mb-4" />
+            <div
+              className={`absolute inset-0 bg-black/50 transition-opacity duration-300 ${sourcePromptMounted ? "opacity-100" : "opacity-0"}`}
+              onClick={closeSourcePrompt}
+            />
+            <div
+              className={`relative w-full max-w-md bg-[#FAF7F2] rounded-t-3xl px-5 pt-5 shadow-2xl transition-transform duration-300 ease-out ${
+                sourcePromptMounted ? "translate-y-0" : "translate-y-full"
+              }`}
+              style={{
+                paddingBottom:
+                  "max(1.5rem, calc(env(safe-area-inset-bottom) + 1rem))",
+              }}
+            >
+              <div className="mx-auto w-10 h-1 rounded-full bg-black/15 mb-4" />
 
-            <div className="flex items-start gap-3">
-              <div className="shrink-0 w-11 h-11 rounded-full bg-[#E63329]/10 flex items-center justify-center">
-                <i className="fa-solid fa-truck-fast text-[#E63329] text-sm" />
+              <div className="flex items-start gap-3">
+                <div className="shrink-0 w-11 h-11 rounded-full bg-[#E63329]/10 flex items-center justify-center">
+                  <i className="fa-solid fa-truck-fast text-[#E63329] text-sm" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-extrabold uppercase tracking-wide text-black">
+                    Almost there
+                  </p>
+                  <p className="text-[13px] text-black/70 mt-1 leading-snug">
+                    {recommendedProduct.productName} is in your cart, but free
+                    shipping needs{" "}
+                    <span className="font-bold text-black">
+                      {sourceProduct?.productName || "the main product"}
+                    </span>{" "}
+                    in there too.
+                  </p>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-extrabold uppercase tracking-wide text-black">
-                  Almost there
-                </p>
-                <p className="text-[13px] text-black/70 mt-1 leading-snug">
-                  {recommendedProduct.productName} is in your cart, but free
-                  shipping needs{" "}
-                  <span className="font-bold text-black">
-                    {sourceProduct?.productName || "the main product"}
-                  </span>{" "}
-                  in there too.
-                </p>
+
+              <div className="flex items-center gap-2.5 mt-5">
+                <button
+                  onClick={closeSourcePrompt}
+                  disabled={sourceAdding}
+                  className="flex-1 py-3 rounded-xl text-[11px] font-extrabold uppercase tracking-[0.1em] text-black/60 border border-black/15 disabled:opacity-50"
+                >
+                  Maybe Later
+                </button>
+                <button
+                  onClick={handleAddSourceToCart}
+                  disabled={sourceAdding}
+                  className="flex-1 py-3 rounded-xl text-[11px] font-extrabold uppercase tracking-[0.1em] text-white bg-[#1c3026] active:bg-[#4a2f1b] disabled:opacity-70 transition-colors duration-100"
+                >
+                  {sourceAdding ? (
+                    <>
+                      <i className="fa-solid fa-spinner fa-spin mr-1.5" />
+                      Adding…
+                    </>
+                  ) : (
+                    "Add"
+                  )}
+                </button>
               </div>
             </div>
-
-            <div className="flex items-center gap-2.5 mt-5">
-              <button
-                onClick={closeSourcePrompt}
-                disabled={sourceAdding}
-                className="flex-1 py-3 rounded-xl text-[11px] font-extrabold uppercase tracking-[0.1em] text-black/60 border border-black/15 disabled:opacity-50"
-              >
-                Maybe Later
-              </button>
-              <button
-                onClick={handleAddSourceToCart}
-                disabled={sourceAdding}
-                className="flex-1 py-3 rounded-xl text-[11px] font-extrabold uppercase tracking-[0.1em] text-white bg-[#1c3026] active:bg-[#4a2f1b] disabled:opacity-70 transition-colors duration-100"
-              >
-                {sourceAdding ? (
-                  <>
-                    <i className="fa-solid fa-spinner fa-spin mr-1.5" />
-                    Adding…
-                  </>
-                ) : (
-                  "Add"
-                )}
-              </button>
-            </div>
-          </div>
           </div>,
           document.body,
         )}

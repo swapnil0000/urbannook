@@ -17,6 +17,7 @@ import ComparisonTable from "../../component/ComparisonTable";
 import SetupShowcase from "../../component/SetupShowcase";
 import RecommendedProducts from "../../component/RecommendedProducts";
 import NotifyMeModal from "../../component/NotifyMeModal";
+import ComboBundleSection from "../../component/ComboBundleSection";
 
 // TEMP: hardcoded showcase slides until wired to flagged review images
 // (e.g. a `showInSetup` boolean on each review image, toggled from admin).
@@ -201,6 +202,7 @@ const ProductDetailPage = () => {
   const [showSignup, setShowSignup] = useState(false);
   const [showNotifyModal, setShowNotifyModal] = useState(false);
   const [selectedVariant, setSelectedVariant] = useState("");
+  const [isAddingCombo, setIsAddingCombo] = useState(false);
 
   // 3. API Hooks
   const {
@@ -312,6 +314,11 @@ const ProductDetailPage = () => {
     () => splitTitleForDisplay(displayTitle),
     [displayTitle]
   );
+
+  // Combo companions — the admin-picked "buy together" products, inlined by
+  // the product API. Empty when the admin hasn't set any, which is what keeps
+  // the popup off for every product that doesn't opt in.
+  const comboProducts = product?.comboProductsDetails || [];
 
   // The currently-selected variant object (source for stock-based UI below).
   const selectedVariantObj = useMemo(
@@ -627,6 +634,7 @@ const ProductDetailPage = () => {
           image: selectedImage,
           quantity: 1,
           selectedVariant: effectiveVariant,
+          giftWrapEligible: !!product?.giftWrapEligible,
         }),
       );
 
@@ -641,6 +649,76 @@ const ProductDetailPage = () => {
         price: currentPrice,
         quantity: 1,
       });
+    }
+  };
+
+  // Adds every item the customer kept in the static "buy together" section
+  // (the main product at whatever variant is selected there, plus each kept
+  // companion). This section is standalone — it doesn't assume the main
+  // product is already in the cart, so it always adds it too; the cart
+  // reducer/server merges quantity when the same product+variant is already in.
+  const handleAddComboBundle = async (selections) => {
+    if (!selections?.length) return;
+
+    setIsAddingCombo(true);
+    const isLoggedIn = isAuthenticated || !!localStorage.getItem("authToken");
+
+    try {
+      // Sequential, not Promise.all — the cart endpoint mutates one shared
+      // cart doc, so parallel writes can clobber each other.
+      for (const { product: combo, variantName } of selections) {
+        const variantDetail =
+          combo.variantDetails?.find((v) => v.variantName === variantName) ||
+          combo.variantDetails?.[0];
+        const image =
+          variantDetail?.variantImage?.[0] ||
+          combo.productImg ||
+          "https://urbannook.in/assets/logo.webp";
+        const price = Number(variantDetail?.variantPrice ?? 0);
+        const variant = variantDetail?.variantName || "Standard Variant";
+
+        if (isLoggedIn) {
+          await addToCartAPI({
+            productId: combo.productId,
+            quantity: 1,
+            variant,
+            image,
+          }).unwrap();
+        } else {
+          dispatch(
+            addItem({
+              id: combo.productId,
+              mongoId: combo.productId,
+              name: combo.productName,
+              price,
+              image,
+              quantity: 1,
+              selectedVariant: variant,
+              giftWrapEligible: !!combo.giftWrapEligible,
+            }),
+          );
+        }
+
+        trackAddToCart({
+          itemId: combo.productId,
+          itemName: combo.productName,
+          itemVariant: variant,
+          price,
+          quantity: 1,
+        });
+      }
+
+      if (isLoggedIn) await refetchCart().unwrap();
+
+      setFeedbackMessage(
+        selections.length > 1 ? "Items added to cart" : "Added to cart",
+      );
+      setTimeout(() => setFeedbackMessage(""), 2000);
+    } catch (err) {
+      console.error("Combo bundle add failed:", err);
+      showNotification(err.data?.message || "Could not add the bundle", "error");
+    } finally {
+      setIsAddingCombo(false);
     }
   };
 
@@ -1507,8 +1585,24 @@ const ProductDetailPage = () => {
         {/* ===== REAL-LIFE SETUP SHOWCASE (lazy-mounted marquee) ===== */}
         {/* <SetupShowcase items={SETUP_SHOWCASE_ITEMS} /> */}
 
-        {/* ===== RECOMMENDED PRODUCTS (admin-curated; inlined in product call) ===== */}
-        <RecommendedProducts products={product.recommendedProductsDetails} />
+        {/* ===== COMBO / "BUY TOGETHER" BUNDLE (admin-curated) ===== */}
+        {comboProducts.length > 0 && (
+          <ComboBundleSection
+            mainProduct={product}
+            mainVariantName={selectedVariant}
+            onSelectMainVariant={setSelectedVariant}
+            mainOutOfStock={isOutOfStock}
+            onNotifyMe={() => setShowNotifyModal(true)}
+            comboProducts={comboProducts}
+            copy={{
+              eyebrow: product?.comboEyebrow,
+              heading: product?.comboHeading,
+              cta: product?.comboCtaLabel,
+            }}
+            onAddBundle={handleAddComboBundle}
+            isAdding={isAddingCombo}
+          />
+        )}
 
         {/* ===== REVIEWS SECTION ===== */}
         <div className="mt-8 pt-4 ">
@@ -2201,6 +2295,9 @@ const ProductDetailPage = () => {
             </div>
           )}
         </div>
+
+        {/* ===== RECOMMENDED PRODUCTS (admin-curated; inlined in product call) ===== */}
+        <RecommendedProducts products={product.recommendedProductsDetails} />
       </main>
 
       {/* ── MOBILE: "Show all reviews" fullscreen overlay ── */}
@@ -2468,6 +2565,7 @@ const ProductDetailPage = () => {
           onClose={() => setShowNotifyModal(false)}
         />
       )}
+
     </div>
   );
 };

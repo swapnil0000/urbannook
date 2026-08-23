@@ -16,6 +16,7 @@ import {
   useGetFreeShippingOfferQuery,
   useGetAllFreeShippingBannersQuery,
   useEvaluateCartRulesQuery,
+  useGetGiftWrapOfferQuery,
 } from "../store/api/userApi";
 import { setShowLoginModal, setLoginCallback } from "../store/slices/uiSlice";
 import { useUI } from "../hooks/useRedux";
@@ -240,7 +241,7 @@ const AmountPlaceholder = () => (
   <span className="inline-block h-3.5 w-14 animate-pulse rounded bg-gray-200" aria-label="Calculating" />
 );
 
-const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, itemCount, isLoadingShipping, paymentMethod, onApplyCoupon, onRemoveCoupon }) => {
+const PriceRows = ({ subtotal, shipping, discount, giftWrapAmount = 0, appliedCoupon, totalToPay, itemCount, isLoadingShipping, paymentMethod, onApplyCoupon, onRemoveCoupon }) => {
   const shippingAmount = typeof shipping === "object" ? shipping?.amount : shipping;
   // COD advance must be based on the REAL carrier rate, not the (possibly
   // free-shipping-zeroed) charged amount — same real/charged split as the
@@ -254,7 +255,9 @@ const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, it
   const isShippingFree = shippingAmount === 0 && realShippingAmount > 0;
   const hasDiscount = appliedCoupon && discount > 0;
   // (lamp + stand + ... + real shipping) − what they're actually paying = savings.
-  const totalSavings = Math.max(0, subtotal + (realShippingAmount || 0) - totalToPay);
+  // giftWrapAmount is added to both sides — it's a real add-on charge, not a
+  // discount opportunity, so opting into it must never change this number.
+  const totalSavings = Math.max(0, subtotal + giftWrapAmount + (realShippingAmount || 0) - totalToPay);
 
   return (
     <div className="space-y-2">
@@ -269,6 +272,15 @@ const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, it
           ₹{subtotal.toLocaleString()}
         </span>
       </div>
+
+      {giftWrapAmount > 0 && (
+        <div className="flex justify-between items-center text-sm">
+          <span className="text-gray-500 flex items-center gap-1.5">
+            <i className="fa-solid fa-gift text-[#157a44] text-[11px]" /> Gift wrap
+          </span>
+          <span className="font-bold text-gray-900">₹{giftWrapAmount.toLocaleString()}</span>
+        </div>
+      )}
 
       <div className="flex justify-between items-center text-sm">
         <span className="text-gray-500">Shipping</span>
@@ -377,7 +389,7 @@ const CheckoutPage = () => {
   const showNotificationRef = useRef(showNotification);
   useEffect(() => { showNotificationRef.current = showNotification; }, [showNotification]);
 
-  const { items: cartItems, selections: cartSelections } = useSelector((s) => s.cart);
+  const { items: cartItems, selections: cartSelections, giftWrap: giftWrapSelected, giftWrapNoteOptions } = useSelector((s) => s.cart);
   const { isAuthenticated } = useSelector((s) => s.auth);
   const isGuest = !isAuthenticated && !localStorage.getItem("authToken");
   const STEPS = isGuest ? GUEST_STEPS : AUTH_STEPS;
@@ -474,6 +486,7 @@ const CheckoutPage = () => {
     useGetSavedAddressesQuery(undefined, { skip: isGuest });
   const [calculateShipping, { isLoading: isCalculatingShipping }] = useCalculateShippingMutation();
   const { data: freeShippingOfferData } = useGetFreeShippingOfferQuery();
+  const { data: giftWrapOfferData } = useGetGiftWrapOfferQuery();
   const { data: allFreeShippingBannersData } = useGetAllFreeShippingBannersQuery();
   // Generic, data-driven cart-promotion rules (server/src/model/cartRule.model.js)
   // — same evaluator the payment controller uses for the real order total,
@@ -533,38 +546,40 @@ const CheckoutPage = () => {
   // TODO: only supports a single banner (first match) even if multiple cart
   // items each have one configured — fine for now (single active offer),
   // revisit if multiple simultaneous offers are ever needed.
-  const checkoutBannerProductId = useMemo(() => {
-    const offerConfig = freeShippingOfferData?.data;
-    if (!offerConfig?.isActive) return null;
-
+  // Every banner whose source product is in the cart but the recommended
+  // add-on isn't — one persistent card on checkout too, arrows page through
+  // all of them (see bannersOverride on FreeShippingBanner) instead of a new
+  // card replacing the old one each time the cart's nudge-worthy combo
+  // changes. Combo banners are independent of the offer doc's own `isActive`
+  // — that flag is only the cart-VALUE-threshold on/off switch, not a master
+  // kill switch for banners (each banner has its own isActive; server-side
+  // getAllActiveBanners already only returns those).
+  const checkoutNudgeBanners = useMemo(() => {
     const banners = allFreeShippingBannersData?.data || [];
-    if (banners.length === 0) return null;
-
+    if (banners.length === 0) return [];
     const cartProductIds = new Set(cartItems.map((i) => i.mongoId || i.id?.split(":")[0]));
-    const match = banners.find(
+    return banners.filter(
       (b) => cartProductIds.has(b.sourceProductId) && !cartProductIds.has(b.recommendedProductId),
     );
-    return match?.sourceProductId || null;
-  }, [freeShippingOfferData, allFreeShippingBannersData, cartItems]);
+  }, [allFreeShippingBannersData, cartItems]);
 
-  // The moment adding the recommended item pushes the cart over the
-  // threshold, `checkoutBannerProductId` above flips to null in the SAME
-  // render as the cart update — which used to unmount FreeShippingBanner
-  // outright, killing its own bar-fill/confetti/"Unlocked" celebration
-  // sequence mid-flight. Hold the last non-null id visible for a beat after
-  // it goes null so that sequence gets to finish before we actually remove
-  // the banner from the page.
-  const [visibleBannerProductId, setVisibleBannerProductId] = useState(null);
+  // The moment adding the recommended item completes the last combo,
+  // `checkoutNudgeBanners` above goes empty in the SAME render as the cart
+  // update — which used to unmount FreeShippingBanner outright, killing its
+  // own bar-fill/confetti/"Unlocked" celebration sequence mid-flight. Hold
+  // the last non-empty list visible for a beat after it empties so that
+  // sequence gets to finish before we actually remove the banner from the page.
+  const [visibleNudgeBanners, setVisibleNudgeBanners] = useState([]);
   useEffect(() => {
-    if (checkoutBannerProductId) {
-      setVisibleBannerProductId(checkoutBannerProductId);
+    if (checkoutNudgeBanners.length > 0) {
+      setVisibleNudgeBanners(checkoutNudgeBanners);
       return;
     }
-    if (!visibleBannerProductId) return;
-    const timer = setTimeout(() => setVisibleBannerProductId(null), 1900);
+    if (visibleNudgeBanners.length === 0) return;
+    const timer = setTimeout(() => setVisibleNudgeBanners([]), 1900);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally omits visibleBannerProductId so the timer isn't re-armed by its own update
-  }, [checkoutBannerProductId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally omits visibleNudgeBanners so the timer isn't re-armed by its own update
+  }, [checkoutNudgeBanners]);
 
   // When user logs in mid-checkout (guest → auth), AUTH_STEPS has fewer steps.
   // Clamp currentStep so STEPS[currentStep-1] is never undefined.
@@ -682,11 +697,12 @@ const CheckoutPage = () => {
           const offerConfig = freeShippingOfferData?.data;
           const banners = allFreeShippingBannersData?.data || [];
           const cartProductIds = new Set(cartItems.map((i) => i.mongoId || i.id?.split(":")[0]));
-          const comboEligible =
-            !!offerConfig?.isActive &&
-            banners.some(
-              (b) => cartProductIds.has(b.sourceProductId) && cartProductIds.has(b.recommendedProductId),
-            );
+          // Combo eligibility is independent of the offer doc's own isActive
+          // (that flag is only the cart-value threshold switch) — see the
+          // matching comment on checkoutNudgeBanners above.
+          const comboEligible = banners.some(
+            (b) => cartProductIds.has(b.sourceProductId) && cartProductIds.has(b.recommendedProductId),
+          );
           // Plain cart-value threshold — whole cart, any products count.
           // Mirrors the server's direct subtotal >= thresholdAmount check,
           // computed AFTER rule discounts (server discounts items first,
@@ -1115,6 +1131,12 @@ const CheckoutPage = () => {
           },
           paymentMethod,
           ...(appliedCoupon ? { couponCode: appliedCoupon } : {}),
+          // Guests have no server-side cart to read this from — the boolean
+          // intent has to come from the request. Price is still never
+          // trusted from here; the server re-prices from the live offer
+          // config (see rp.payment.controller.js).
+          giftWrap: giftWrapSelected,
+          giftWrapNoteOptions: giftWrapNoteOptions,
           ...getFbCookies(), // _fbp / _fbc → stored on order for CAPI match quality
           anonymousId: getAnonymousId(), // fallback externalId for guest CAPI
         }).unwrap();
@@ -1253,7 +1275,19 @@ const CheckoutPage = () => {
   const realShippingAmount = typeof pricingDetails.shipping === "number"
     ? pricingDetails.shipping
     : (pricingDetails.shipping?.realAmount ?? pricingDetails.shipping?.amount ?? 0);
-  const totalToPay = pricingDetails.subtotal + shippingAmount - pricingDetails.discount;
+  // Gift wrap — added on top of subtotal, same as the server's finalAmount
+  // formula (subtotal + giftWrap + shipping − discount). Qty auto-scales with
+  // distinct ELIGIBLE PRODUCTS, deduped (not per cart line — two variants of
+  // the same product only count once), mirroring rp.payment.controller.js exactly.
+  const giftWrapOffer = giftWrapOfferData?.data;
+  const giftWrapEligibleCount = new Set(
+    cartItems.filter((i) => i.giftWrapEligible).map((i) => i.mongoId || i.id),
+  ).size;
+  const giftWrapAmount =
+    giftWrapSelected && giftWrapOffer?.isActive
+      ? (Number(giftWrapOffer.price) || 0) * giftWrapEligibleCount
+      : 0;
+  const totalToPay = pricingDetails.subtotal + giftWrapAmount + shippingAmount - pricingDetails.discount;
   const userName = isGuest ? guestName : (userProfile?.userName || userProfile?.name || "");
   const userInitials = userName ? userName.split(" ").filter(Boolean).map((w) => w[0]).join("").toUpperCase().slice(0, 2) : "?";
 
@@ -2122,6 +2156,7 @@ const CheckoutPage = () => {
                       subtotal={pricingDetails.subtotal}
                       shipping={pricingDetails.shipping}
                       discount={pricingDetails.discount}
+                      giftWrapAmount={giftWrapAmount}
                       appliedCoupon={appliedCoupon}
                       totalToPay={totalToPay}
                       itemCount={cartItems.length}
@@ -2134,10 +2169,10 @@ const CheckoutPage = () => {
                     />
                   </div>
                 </div>
-                {visibleBannerProductId && (
+                {visibleNudgeBanners.length > 0 && (
                   <div className="px-5 pb-5">
                     <FreeShippingBanner
-                      productId={visibleBannerProductId}
+                      bannersOverride={visibleNudgeBanners}
                       variant="light"
                       showQuantityStepper
                       showProgressBar={false}
@@ -2398,6 +2433,7 @@ const CheckoutPage = () => {
                 subtotal={pricingDetails.subtotal}
                 shipping={pricingDetails.shipping}
                 discount={pricingDetails.discount}
+                giftWrapAmount={giftWrapAmount}
                 appliedCoupon={appliedCoupon}
                 totalToPay={totalToPay}
                 itemCount={cartItems.length}
@@ -2410,10 +2446,10 @@ const CheckoutPage = () => {
               />
             </div>
 
-            {visibleBannerProductId && (
+            {visibleNudgeBanners.length > 0 && (
               <div className="px-5 pb-5">
                 <FreeShippingBanner
-                  productId={visibleBannerProductId}
+                  bannersOverride={visibleNudgeBanners}
                   variant="light"
                   showQuantityStepper
                   showProgressBar={false}
@@ -2580,6 +2616,14 @@ const CheckoutPage = () => {
                   ₹{pricingDetails.subtotal.toLocaleString()}
                 </span>
               </div>
+              {giftWrapAmount > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500">Gift wrap</span>
+                  <span className="font-semibold text-gray-800">
+                    ₹{giftWrapAmount.toLocaleString()}
+                  </span>
+                </div>
+              )}
               {pricingDetails.discount > 0 && (
                 <div className="flex items-center justify-between">
                   <span className="text-gray-500">Discount</span>
