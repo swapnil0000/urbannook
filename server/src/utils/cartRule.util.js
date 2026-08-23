@@ -119,3 +119,51 @@ export const findClosestUnmatchedRule = (cartItems, activeRules, matchedRuleIds)
   }
   return best;
 };
+
+/**
+ * "Buy N of this SAME product, get a lower unit price" nudges — a distinct
+ * shape from the free-shipping combo banner (which needs a second,
+ * different product to recommend). A quantity-discount rule has exactly one
+ * condition, and its effect (percent_off/flat_off) targets that SAME
+ * product — so there's nothing to "recommend", just "add N more of what's
+ * already in your cart". Returns one entry per such rule where the customer
+ * already has at least 1 unit in cart but hasn't reached minQuantity yet
+ * (below that, showing "buy 5 more" on a product they haven't even touched
+ * is a much weaker nudge than the free-shipping banner already covers via
+ * PDP/product browsing).
+ *
+ * @param {{productId: string, quantity: number}[]} cartItems
+ * @param {object[]} activeRules
+ */
+export const findQuantityDiscountNudges = (cartItems, activeRules) => {
+  const qtyByProduct = quantityByProduct(cartItems);
+  const nudges = [];
+
+  for (const rule of activeRules) {
+    const conditions = rule.conditions || [];
+    if (conditions.length !== 1) continue;
+    const condition = conditions[0];
+    const effect = (rule.effects || []).find(
+      (e) =>
+        (e.type === "percent_off" || e.type === "flat_off") &&
+        String(e.targetProductId) === String(condition.productId),
+    );
+    if (!effect) continue;
+
+    const have = qtyByProduct.get(String(condition.productId)) || 0;
+    const remaining = Math.max(condition.minQuantity - have, 0);
+    if (have <= 0 || remaining <= 0) continue;
+
+    nudges.push({
+      ruleId: rule._id,
+      name: rule.name,
+      productId: condition.productId,
+      have,
+      needed: condition.minQuantity,
+      remaining,
+      effectType: effect.type,
+      effectValue: effect.value,
+    });
+  }
+  return nudges;
+};

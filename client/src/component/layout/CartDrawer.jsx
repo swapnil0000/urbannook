@@ -42,6 +42,12 @@ const CartDrawer = ({ isOpen, onClose }) => {
   const { data: cartRuleEvalData } = useEvaluateCartRulesQuery(cartRuleEvalItems, {
     skip: cartRuleEvalItems.length === 0,
   });
+  // "Buy N more of this same product, get a lower unit price" — reuses this
+  // SAME FreeShippingBanner card (see its `quantityNudge` prop) rather than
+  // a separate component. Stays visible until enough of the product (any
+  // variant) is in the cart — findQuantityDiscountNudges only returns an
+  // entry while remaining > 0.
+  const quantityNudge = cartRuleEvalData?.data?.quantityNudges?.[0] || null;
 
   // Free-shipping eligibility for the "Shipping" line below — mirrors the
   // same OR logic used at checkout/payment (rp.payment.controller.js): the
@@ -166,11 +172,15 @@ const CartDrawer = ({ isOpen, onClose }) => {
   // Gift wrap adds to what's actually charged at checkout — same price the
   // GiftWrapLineItem row above shows, so this can never disagree with it.
   const giftWrapOffer = giftWrapOfferRes?.data;
-  // Qty auto-scales with cart line count — same rule the server applies at
-  // checkout (one gift wrap per distinct product).
+  // Qty auto-scales with distinct ELIGIBLE PRODUCTS, deduped (not per cart
+  // line — two variants of the same product only count once) — same rule
+  // the server applies at checkout.
+  const giftWrapEligibleCount = new Set(
+    cartItems.filter((i) => i.giftWrapEligible).map((i) => i.mongoId || i.id),
+  ).size;
   const giftWrapAmount =
     giftWrapSelected && giftWrapOffer?.isActive
-      ? (Number(giftWrapOffer.price) || 0) * cartItems.filter((i) => i.giftWrapEligible).length
+      ? (Number(giftWrapOffer.price) || 0) * giftWrapEligibleCount
       : 0;
 
   const subtotal = totalAmount - ruleDiscountSavings + giftWrapAmount;
@@ -178,28 +188,33 @@ const CartDrawer = ({ isOpen, onClose }) => {
   // Same three-path eligibility used at checkout: admin combo banner (source
   // + recommended product both in cart), any active generic cart rule whose
   // effects include free_shipping, or the plain cart-value threshold.
+  // Combo banners are independent of the offer doc's own `isActive` — that
+  // flag is only the cart-VALUE-threshold on/off switch, not a master kill
+  // switch for banners (each banner has its own isActive; server-side
+  // getAllActiveBanners already only returns those).
   const offerConfig = offerRes?.data;
   const banners = bannersRes?.data || [];
-  const cartProductIds = new Set(cartItems.map((i) => i.mongoId || i.id));
-  const comboEligible =
-    !!offerConfig?.isActive &&
-    banners.some((b) => cartProductIds.has(b.sourceProductId) && cartProductIds.has(b.recommendedProductId));
+  // .split(":")[0] guards against a composite "productId:variant" id (some
+  // guest-cart paths use that key format) — matches the same parsing used
+  // for this exact check on checkout, so the two can never disagree about
+  // which products are "in the cart" for combo purposes.
+  const cartProductIds = new Set(cartItems.map((i) => i.mongoId || i.id?.split(":")[0]));
+  const comboEligible = banners.some(
+    (b) => cartProductIds.has(b.sourceProductId) && cartProductIds.has(b.recommendedProductId),
+  );
   const thresholdEligible =
     !!offerConfig?.isActive && (offerConfig?.thresholdAmount || 0) > 0 && subtotal >= offerConfig.thresholdAmount;
   const isFreeShippingEligible = comboEligible || !!cartRuleEvalData?.data?.freeShipping || thresholdEligible;
 
-  // Cross-sell nudge: when the offer's SOURCE product is in the cart but its
-  // RECOMMENDED add-on isn't, show that offer's FreeShippingBanner in the
-  // drawer so the customer can complete the free-shipping combo here, or just
-  // proceed to checkout. Same selection the checkout page uses; gated on the
-  // offer being active so toggling it off in admin hides this too.
-  const nudgeBannerProductId = (() => {
-    if (!offerConfig?.isActive || banners.length === 0) return null;
-    const match = banners.find(
-      (b) => cartProductIds.has(b.sourceProductId) && !cartProductIds.has(b.recommendedProductId),
-    );
-    return match?.sourceProductId || null;
-  })();
+  // Cross-sell nudge: every banner whose SOURCE product is in the cart but
+  // RECOMMENDED add-on isn't — one persistent card, arrows page through all
+  // of them (see bannersOverride on FreeShippingBanner) instead of a new
+  // card mounting/unmounting each time the cart's nudge-worthy combo changes.
+  // Each banner's own isActive is the only gate — not the parent offer doc's
+  // threshold toggle (see comment above).
+  const nudgeBanners = banners.filter(
+    (b) => cartProductIds.has(b.sourceProductId) && !cartProductIds.has(b.recommendedProductId),
+  );
 
   return (
     <div className="fixed inset-0 z-[9999] flex justify-end">
@@ -376,12 +391,25 @@ const CartDrawer = ({ isOpen, onClose }) => {
                 <GiftWrapLineItem />
               </div>
 
-              {/* Add-on nudge — only when the offer's source product is in the
-                  cart but the add-on isn't. Lets the customer complete the
-                  free-shipping combo without leaving the drawer. */}
-              {nudgeBannerProductId && (
+              {/* Add-on nudge — one persistent card; if multiple combos are
+                  each missing their add-on, arrows page through all of them
+                  instead of a new card replacing the old one. */}
+              {nudgeBanners.length > 0 && (
                 <FreeShippingBanner
-                  productId={nudgeBannerProductId}
+                  bannersOverride={nudgeBanners}
+                  variant="light"
+                  showQuantityStepper
+                  showProgressBar={false}
+                  className="mt-3 sm:mt-6"
+                />
+              )}
+
+              {/* Quantity-discount nudge — "add N more of this same product,
+                  get a lower unit price". Same card component as the combo
+                  nudge above, just fed a quantityNudge instead of banners. */}
+              {quantityNudge && (
+                <FreeShippingBanner
+                  quantityNudge={quantityNudge}
                   variant="light"
                   showQuantityStepper
                   showProgressBar={false}

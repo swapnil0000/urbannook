@@ -21,13 +21,19 @@ const NOTE_OPTIONS = [
   { value: "none", label: "Gift Wrap" },
 ];
 
-// One gift wrap per distinct GIFT-WRAP-ELIGIBLE product line in the cart
-// (admin opt-in per product — see AddProductForm/EditProductForm's "Allow
-// gift wrap" checkbox). Server enforces this identically and authoritatively
-// at checkout — see rp.payment.controller.js — this is just the matching
-// display count/visibility.
+// One gift wrap per distinct GIFT-WRAP-ELIGIBLE PRODUCT in the cart (admin
+// opt-in per product — see AddProductForm/EditProductForm's "Allow gift
+// wrap" checkbox) — deduped by product, not by cart line, so two variants of
+// the same product only count once. Server enforces this identically and
+// authoritatively at checkout — see rp.payment.controller.js — this is just
+// the matching display count/visibility.
 const useGiftWrapQuantity = () =>
-  useSelector((state) => state.cart.items.filter((i) => i.giftWrapEligible).length);
+  useSelector((state) => {
+    const ids = new Set(
+      state.cart.items.filter((i) => i.giftWrapEligible).map((i) => i.mongoId || i.id),
+    );
+    return ids.size;
+  });
 
 /**
  * The "GIFT WRAP ₹149 x1" row in the cart's items list, shown once selected —
@@ -144,8 +150,9 @@ const GiftWrapOffer = ({ image }) => {
             {offer.title || "Make it a gift"}
           </span>
 
-          {/* (?) — the ONLY trigger for the info popup. "+ Add" below adds
-              directly, no popup in the way. */}
+          {/* (?) opens the info popup. "+ Add" below opens the same popup —
+              so a customer who misses the (?) still gets a chance to pick a
+              note before adding, instead of it silently defaulting. */}
           <button
             type="button"
             onClick={openPopup}
@@ -171,7 +178,7 @@ const GiftWrapOffer = ({ image }) => {
         ) : (
           <button
             type="button"
-            onClick={() => applyToggle(true)}
+            onClick={openPopup}
             className="shrink-0 px-4 py-1.5 rounded-lg border border-gray-300 text-xs font-bold uppercase tracking-widest text-[#1c3026] hover:bg-gray-50 transition-colors"
           >
             Add

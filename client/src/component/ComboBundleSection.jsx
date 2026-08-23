@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
 
 // Copy shown when the admin leaves the corresponding combo text field blank.
 const DEFAULT_EYEBROW = "People also buy along with this";
@@ -50,7 +51,6 @@ const BundleTile = ({
   const activeVariant =
     variants.find((v) => v.variantName === selectedVariant) || variants[0];
   const image = activeVariant?.variantImage?.[0] || product?.productImg;
-  const price = Number(activeVariant?.variantPrice ?? 0);
 
   const goToProduct = () => {
     if (!product?.productId) return;
@@ -210,7 +210,7 @@ const BundleTile = ({
           )}
       </div>
 
-      {/* Variant name + price, clickable through to that product's page */}
+      {/* Variant name, clickable through to that product's page */}
       <button
         type="button"
         onClick={goToProduct}
@@ -221,9 +221,6 @@ const BundleTile = ({
       >
         <span className="block text-[8px] sm:text-[9px] text-white/45 truncate">
           {activeVariant?.variantName}
-        </span>
-        <span className="block text-[10px] sm:text-xs font-bold text-[#F5DEB3] tabular-nums">
-          ₹{price.toLocaleString()}
         </span>
       </button>
     </div>
@@ -288,6 +285,21 @@ const ComboBundleSection = ({
   );
   const [removedIds, setRemovedIds] = useState(() => new Set());
 
+  // "Added" state is derived straight from the cart, not a local flag — so
+  // if the customer removes any bundle item from the cart drawer/page, this
+  // button reverts to "Add Together" on its own instead of staying stuck on
+  // "Added" for something that's no longer actually in the cart.
+  const cartItems = useSelector((state) => state.cart.items);
+  const isInCart = useCallback(
+    (productId, variantName) =>
+      cartItems.some(
+        (i) =>
+          String(i.mongoId || i.id) === String(productId) &&
+          (i.selectedVariant || "N/A") === (variantName || "N/A"),
+      ),
+    [cartItems],
+  );
+
   const selectCompanionVariant = useCallback(
     (productId, variantName) =>
       setChosenVariants((prev) => ({ ...prev, [productId]: variantName })),
@@ -316,6 +328,10 @@ const ComboBundleSection = ({
 
   const kept = offerable.filter((e) => !removedIds.has(e.product.productId));
   const total = mainPrice + kept.reduce((sum, entry) => sum + priceOf(entry).price, 0);
+
+  const bundleAdded =
+    isInCart(mainProduct?.productId, activeMainVariant?.variantName) &&
+    kept.every((entry) => isInCart(entry.product.productId, priceOf(entry).variant?.variantName));
 
   const eyebrow = copy.eyebrow?.trim() || DEFAULT_EYEBROW;
   const ctaLabel = copy.cta?.trim() || DEFAULT_CTA;
@@ -374,23 +390,6 @@ const ComboBundleSection = ({
         </div>
 
         <div className="px-3 sm:px-5 pb-3 sm:pb-4 pt-0.5 flex flex-col items-center justify-center">
-          {/* x + y = z formula, then the Total value on its own line below it. */}
-          <div className="text-center mb-2 sm:mb-2.5">
-            <p className="flex items-center justify-center flex-wrap gap-x-1 text-[10px] sm:text-[11px] text-white/45 tabular-nums">
-              <span>₹{mainPrice.toLocaleString()}</span>
-              {kept.map((entry) => (
-                <span key={entry.product.productId}>
-                  {" + ₹"}
-                  {priceOf(entry).price.toLocaleString()}
-                </span>
-              ))}
-              <span>{" = "}₹{total.toLocaleString()}</span>
-            </p>
-            <p className="mt-0.5 text-white font-bold text-sm sm:text-base tabular-nums">
-              Total: ₹{total.toLocaleString()}
-            </p>
-          </div>
-
           {mainOutOfStock ? (
             <button
               type="button"
@@ -404,10 +403,27 @@ const ComboBundleSection = ({
             <button
               type="button"
               onClick={handleConfirm}
-              disabled={isAdding}
-              className="w-fit h-12 sm:h-12 rounded-full bg-[#F5DEB3] text-[#1c3026] text-[11px] sm:text-[11px] font-bold uppercase tracking-[0.12em] sm:tracking-[0.15em] hover:bg-white transition-colors disabled:opacity-50 px-5"
+              disabled={isAdding || bundleAdded}
+              className={`w-fit h-12 sm:h-12 rounded-full text-[11px] sm:text-[11px] font-bold uppercase tracking-[0.12em] sm:tracking-[0.15em] transition-colors disabled:opacity-100 px-5 flex items-center justify-center gap-1.5 ${
+                bundleAdded
+                  ? "bg-[#1c3026] text-[#F5DEB3] border border-[#F5DEB3]/40"
+                  : "bg-[#F5DEB3] text-[#1c3026] hover:bg-white disabled:opacity-50"
+              }`}
             >
-              {isAdding ? "Adding…" : ctaLabel}
+              {isAdding ? (
+                "Adding…"
+              ) : bundleAdded ? (
+                <>
+                  <i className="fa-solid fa-check text-[10px]" />
+                  Added
+                </>
+              ) : (
+                <>
+                  {ctaLabel}
+                  {" • ₹"}
+                  {total.toLocaleString()}
+                </>
+              )}
             </button>
           )}
         </div>

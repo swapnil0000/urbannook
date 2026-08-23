@@ -590,7 +590,11 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     userName: deliveryAddressSnapshot.fullName,
     userMobile: deliveryAddressSnapshot.mobileNumber,
     items: orderItems,
-    amount: finalAmount,
+    // Whole-rupee, matching exactly what razorpayChargeAmountPaise actually
+    // charges — finalAmount itself can be fractional (realShippingAmount is
+    // a live carrier rate, not guaranteed integer), so storing it unrounded
+    // here could drift a few paise from the real charge in the order record.
+    amount: Math.ceil(finalAmount),
     giftWrap: { selected: giftWrapSelected, price: giftWrapAmount, quantity: giftWrapQty, title: giftWrapConfig.title, noteOptions: giftWrapNoteOptions },
     shippingInfo: {
       // Real carrier cost for internal accounting — grouped with the other
@@ -1294,7 +1298,11 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     userName: guestInfo.name.trim(),
     userMobile: cleanMobile,
     items: orderItems,
-    amount: finalAmount,
+    // Whole-rupee, matching exactly what razorpayChargeAmountPaise actually
+    // charges — finalAmount itself can be fractional (realShippingAmount is
+    // a live carrier rate, not guaranteed integer), so storing it unrounded
+    // here could drift a few paise from the real charge in the order record.
+    amount: Math.ceil(finalAmount),
     giftWrap: { selected: giftWrapSelected, price: giftWrapAmount, quantity: giftWrapQty, title: giftWrapConfig.title, noteOptions: giftWrapNoteOptions },
     shippingInfo: {
       amount: realShippingAmount,

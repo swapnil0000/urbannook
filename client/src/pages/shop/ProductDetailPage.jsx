@@ -710,7 +710,6 @@ const ProductDetailPage = () => {
 
       if (isLoggedIn) await refetchCart().unwrap();
 
-      fireAddToCartConfetti();
       setFeedbackMessage(
         selections.length > 1 ? "Items added to cart" : "Added to cart",
       );

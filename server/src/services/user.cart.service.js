@@ -4,6 +4,7 @@ import User from "../model/user.model.js";
 import { cartDetailsMissing } from "../utils/ValidateRes.js";
 import { applyCouponCodeService } from "../services/coupon.code.service.js";
 import { getPublicOfferConfig } from "../utils/offer.util.js";
+import { getActiveCartRules, evaluateCartRules, applyBestDiscount } from "../utils/cartRule.util.js";
 import {
   ValidationError,
   NotFoundError,
@@ -248,11 +249,16 @@ const getCartService = async ({ userId }) => {
   const cartDoc = await Cart.findOne({ userId }).select("giftWrap giftWrapNoteOptions").lean();
   const giftWrapConfig = await getPublicOfferConfig("gift_wrap");
   const base = cartData[0] || { availableItems: [], unavailableItems: [], cartSubtotal: 0, totalQuantity: 0 };
-  // One gift wrap per distinct GIFT-WRAP-ELIGIBLE product line in the cart
-  // (e.g. 2 eligible products → qty 2) — auto-derived, never a separate
-  // user-editable count. Ineligible products (admin didn't opt them in)
-  // don't count toward this at all.
-  const lineCount = base.availableItems.filter((i) => i.giftWrapEligible).length;
+
+  // Gift wrap is priced per distinct ELIGIBLE PRODUCT, not per cart line —
+  // rp.payment.controller.js counts unique productIds (a product can have
+  // multiple variants as separate cart lines, but only counts once toward
+  // gift wrap). Must match here too, or the cart/checkout display would show
+  // a higher gift-wrap charge than what actually gets billed.
+  const eligibleProductIds = new Set(
+    base.availableItems.filter((i) => i.giftWrapEligible).map((i) => String(i.productId)),
+  );
+  const lineCount = eligibleProductIds.size;
   const giftWrapSelected = !!cartDoc?.giftWrap && giftWrapConfig.isActive && lineCount > 0;
   const giftWrap = {
     selected: giftWrapSelected,
@@ -263,10 +269,24 @@ const getCartService = async ({ userId }) => {
     noteOptions: giftWrapSelected ? (cartDoc?.giftWrapNoteOptions?.length ? cartDoc.giftWrapNoteOptions : ["none"]) : ["none"],
   };
 
+  // cartSubtotal must reflect active cart-rule discounts (e.g. "2+ Lamps =>
+  // 50% off Pen Stand") — this is what applyCouponCodeService uses as the
+  // base for coupon math, and it must be the SAME post-discount subtotal
+  // rp.payment.controller.js actually charges, or the discount shown at
+  // checkout can disagree with what the server applies at payment time.
+  const activeRules = await getActiveCartRules();
+  const ruleEvalItems = base.availableItems.map((i) => ({ productId: i.productId, quantity: i.quantity }));
+  const { discountCandidatesByProduct } = evaluateCartRules(ruleEvalItems, activeRules);
+  const discountedSubtotal = base.availableItems.reduce((sum, i) => {
+    const candidates = discountCandidatesByProduct.get(String(i.productId)) || [];
+    const discountedPrice = applyBestDiscount(i.price, candidates);
+    return sum + discountedPrice * i.quantity;
+  }, 0);
+
   return {
     statusCode: 200,
     message: "Cart fetched",
-    data: { ...base, giftWrap },
+    data: { ...base, cartSubtotal: discountedSubtotal, giftWrap },
     success: true
   };
 };

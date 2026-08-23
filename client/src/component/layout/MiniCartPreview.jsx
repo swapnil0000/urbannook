@@ -96,27 +96,28 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
 
   const offerConfig = offerRes?.data;
   const banners = bannersRes?.data || [];
-  const cartProductIds = new Set(cartItems.map((i) => i.mongoId || i.id));
-  const comboEligible =
-    !!offerConfig?.isActive &&
-    banners.some((b) => cartProductIds.has(b.sourceProductId) && cartProductIds.has(b.recommendedProductId));
+  // .split(":")[0] guards against a composite "productId:variant" id — same
+  // parsing as CartDrawer/CheckoutPage so all three can never disagree.
+  const cartProductIds = new Set(cartItems.map((i) => i.mongoId || i.id?.split(":")[0]));
+  // Combo banners are independent of the offer doc's own `isActive` — that
+  // flag is only the cart-VALUE-threshold on/off switch, not a master kill
+  // switch for banners (each banner has its own isActive; server-side
+  // getAllActiveBanners already only returns those).
+  const comboEligible = banners.some(
+    (b) => cartProductIds.has(b.sourceProductId) && cartProductIds.has(b.recommendedProductId),
+  );
   const thresholdEligible =
     !!offerConfig?.isActive && (offerConfig?.thresholdAmount || 0) > 0 && subtotal >= offerConfig.thresholdAmount;
   const isFreeShippingEligible = comboEligible || !!cartRuleEvalData?.data?.freeShipping || thresholdEligible;
 
-  // Cross-sell nudge: when the offer's SOURCE product (e.g. Brake Caliper Lamp)
-  // is in the cart but its RECOMMENDED add-on (e.g. Pen Stand) isn't yet, show
-  // that offer's FreeShippingBanner right here so the customer can add the
-  // add-on without leaving the cart — or just continue to checkout. Same
-  // selection the checkout page uses; gated on the offer being active, so
-  // toggling it off in admin hides this too.
-  const nudgeBannerProductId = (() => {
-    if (!offerConfig?.isActive || banners.length === 0) return null;
-    const match = banners.find(
-      (b) => cartProductIds.has(b.sourceProductId) && !cartProductIds.has(b.recommendedProductId),
-    );
-    return match?.sourceProductId || null;
-  })();
+  // Cross-sell nudge: every banner whose SOURCE product (e.g. Brake Caliper
+  // Lamp) is in the cart but its RECOMMENDED add-on (e.g. Pen Stand) isn't —
+  // one persistent card, arrows page through all of them (see
+  // bannersOverride on FreeShippingBanner) instead of a new card
+  // mounting/unmounting each time the cart's nudge-worthy combo changes.
+  const nudgeBanners = banners.filter(
+    (b) => cartProductIds.has(b.sourceProductId) && !cartProductIds.has(b.recommendedProductId),
+  );
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setMounted(true));
@@ -210,17 +211,17 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
             </div>
           )}
 
-          {/* Add-on nudge — only when the offer's source product is in the cart
-              but the add-on isn't. Lets the customer complete the free-shipping
-              combo without leaving the cart. */}
-          {nudgeBannerProductId && (
+          {/* Add-on nudge — one persistent card; arrows page through every
+              combo currently missing its add-on instead of a new card
+              replacing the old one. */}
+          {nudgeBanners.length > 0 && (
             // Scaled down slightly so the full card fits comfortably inside the
             // compact bottom sheet. transform-origin top keeps it anchored under
             // the items; the negative bottom margin reclaims the space the
             // scale leaves behind so the footer doesn't get an odd gap.
             <div className="mt-3" style={{ transform: "scale(0.9)", transformOrigin: "top center", marginBottom: "-8%" }}>
               <FreeShippingBanner
-                productId={nudgeBannerProductId}
+                bannersOverride={nudgeBanners}
                 variant="light"
                 showQuantityStepper
                 showProgressBar={false}
