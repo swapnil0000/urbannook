@@ -82,15 +82,21 @@ const OptimizedImage = ({
   const responsiveSrcset = generateSrcset(src);
   const responsiveSizes = generateSizes();
 
-  // `className` lands on the WRAPPER div below, so any object-fit class a
-  // caller passes (object-cover / object-contain) was being applied to the
-  // div — where it does nothing — while the <img> itself had no object-fit at
-  // all and therefore fell back to the CSS default, `fill`: stretched to the
-  // box's dimensions with the aspect ratio thrown away. That's what squished
-  // every non-square image. Forward the caller's intent to the img, and
-  // default to `cover` (crops, never distorts) when they didn't specify.
-  const objectFitClass =
-    className.split(/\s+/).find((c) => c.startsWith('object-')) || 'object-cover';
+  // `className` lands on the WRAPPER div below, so any object-fit/blend class
+  // a caller passes (object-cover, mix-blend-multiply) was being applied to
+  // the div — where object-fit does nothing and blend-mode has no layer
+  // beneath it to blend with — while the <img> itself had no object-fit at
+  // all and fell back to the CSS default, `fill`: stretched to the box's
+  // dimensions with the aspect ratio thrown away. That's what squished every
+  // non-square image. Forward both kinds of class to the img itself, and
+  // default to `cover` (crops, never distorts, never letterboxes) when the
+  // caller didn't specify an object-fit.
+  const classTokens = className.split(/\s+/).filter(Boolean);
+  const hasObjectFit = classTokens.some((c) => c.startsWith('object-'));
+  const objectFitClass = [
+    ...(hasObjectFit ? [] : ['object-cover']),
+    ...classTokens.filter((c) => c.startsWith('object-') || c.startsWith('mix-blend-')),
+  ].join(' ');
 
   useEffect(() => {
     // Skip intersection observer if loading is eager

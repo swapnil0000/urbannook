@@ -513,6 +513,14 @@ const FreeShippingBanner = ({
   };
   const displayImage = activeVariant?.variantImage?.[0] || recommendedProduct.productImg || "https://urbannook.in/assets/logo.webp";
   const displayPrice = activeVariant?.variantPrice ?? 0;
+  // Same effective-OOS rule used on the PDP/product cards: a manual admin
+  // flag, or a tracked quantity (non-null) that's reached 0. Recommending a
+  // sold-out variant in this upsell card would let the admin advertise
+  // something the customer can't actually buy.
+  const isActiveVariantOOS =
+    !!activeVariant &&
+    (activeVariant.variantOutOfStock === true ||
+      (activeVariant.variantQuantity != null && Number(activeVariant.variantQuantity) <= 0));
 
   // Same "highest-priced variant as reference MRP" convention already used
   // on the PDP (ProductDetailPage.jsx) — not a fabricated discount, just the
@@ -610,6 +618,7 @@ const FreeShippingBanner = ({
           image: displayImage,
           quantity: 1,
           selectedVariant: effectiveVariant,
+          giftWrapEligible: !!recommendedProduct.giftWrapEligible,
         }),
       );
       setAddLoading(false);
@@ -674,6 +683,7 @@ const FreeShippingBanner = ({
           image: sourceImage,
           quantity: 1,
           selectedVariant: variantName,
+          giftWrapEligible: !!sourceProduct.giftWrapEligible,
         }),
       );
     }
@@ -761,7 +771,7 @@ const FreeShippingBanner = ({
   return (
     <>
       <div
-        className={`rounded-3xl overflow-hidden border border-red-400 bg-[#FBF5E8] shadow-sm ${className}`}
+        className={`rounded-3xl overflow-hidden border border-red-400 bg-[##ffffff] shadow-sm ${className}`}
       >
         {/* Top offer ribbon — high-contrast strip so this reads as "a deal"
           before anything else on the card is even read. Separate from the
@@ -949,10 +959,15 @@ const FreeShippingBanner = ({
                         <div
                           ref={variantMenuPortalRef}
                           className="fsb-variant-scroll fixed z-[10050] rounded-lg border border-[#157a44]/30 bg-[#FAF7F0] shadow-lg overflow-y-scroll max-h-48"
-                          style={{ top: variantMenuPos.top, left: variantMenuPos.left, width: variantMenuPos.width }}
+                          style={{
+                            top: variantMenuPos.top,
+                            left: variantMenuPos.left,
+                            width: variantMenuPos.width,
+                          }}
                         >
                           {variants.map((v) => {
-                            const isSelected = v.variantName === selectedVariant;
+                            const isSelected =
+                              v.variantName === selectedVariant;
                             return (
                               <button
                                 key={v.variantName}
@@ -973,7 +988,9 @@ const FreeShippingBanner = ({
                                     background: variantColor(v.variantName),
                                   }}
                                 />
-                                <span className="truncate">{v.variantName}</span>
+                                <span className="truncate">
+                                  {v.variantName}
+                                </span>
                               </button>
                             );
                           })}
@@ -1004,7 +1021,8 @@ const FreeShippingBanner = ({
                   // Derived from the actual prices rather than read off the
                   // rule, so a flat_off rule (₹X off) shows a correct % too.
                   const rulePercent = Math.round(
-                    ((lineDisplayPrice - lineDiscounted) / lineDisplayPrice) * 100,
+                    ((lineDisplayPrice - lineDiscounted) / lineDisplayPrice) *
+                      100,
                   );
                   return (
                     <>
@@ -1036,7 +1054,8 @@ const FreeShippingBanner = ({
                         ₹{lineMax.toLocaleString()}
                       </span>
                       <span className="text-[10px] font-bold uppercase bg-black text-white px-1.5 py-0.5">
-                        {discountPercent}% OFF · Save ₹{(lineMax - lineDisplayPrice).toLocaleString()}
+                        {discountPercent}% OFF · Save ₹
+                        {(lineMax - lineDisplayPrice).toLocaleString()}
                       </span>
                     </>
                   );
@@ -1485,7 +1504,7 @@ const FreeShippingBanner = ({
           ) : (
             <button
               onClick={handleAddToCart}
-              disabled={isAdding}
+              disabled={isAdding || isActiveVariantOOS}
               // Press state instead of the old hover-fill sweep: touch devices
               // have no hover, so on mobile that green fill simply never
               // appeared and the tap had no visual feedback at all. `active:`
@@ -1494,7 +1513,9 @@ const FreeShippingBanner = ({
               className="w-full py-3.5 rounded-full flex items-center justify-center gap-2.5 text-sm font-medium uppercase tracking-wide disabled:opacity-50 bg-[#f5deb3] text-[#1c3026] active:bg-[#4a2f1b] active:text-[#f5deb3] active:scale-[0.98] transition-[background-color,color,transform] duration-100"
             >
               <span className="flex items-center justify-center gap-2.5">
-                {isAdding ? (
+                {isActiveVariantOOS ? (
+                  "Out of Stock"
+                ) : isAdding ? (
                   "Adding…"
                 ) : hasRuleDiscount ? (
                   // A rule discount is active on this exact product (e.g. "2+
@@ -1526,61 +1547,64 @@ const FreeShippingBanner = ({
       {SOURCE_PROMPT_ENABLED && showSourcePrompt &&
         createPortal(
           <div className="fixed inset-0 z-[200] flex items-end justify-center">
-          <div
-            className={`absolute inset-0 bg-black/50 transition-opacity duration-300 ${sourcePromptMounted ? "opacity-100" : "opacity-0"}`}
-            onClick={closeSourcePrompt}
-          />
-          <div
-            className={`relative w-full max-w-md bg-[#FAF7F2] rounded-t-3xl px-5 pt-5 shadow-2xl transition-transform duration-300 ease-out ${
-              sourcePromptMounted ? "translate-y-0" : "translate-y-full"
-            }`}
-            style={{ paddingBottom: "max(1.5rem, calc(env(safe-area-inset-bottom) + 1rem))" }}
-          >
-            <div className="mx-auto w-10 h-1 rounded-full bg-black/15 mb-4" />
+            <div
+              className={`absolute inset-0 bg-black/50 transition-opacity duration-300 ${sourcePromptMounted ? "opacity-100" : "opacity-0"}`}
+              onClick={closeSourcePrompt}
+            />
+            <div
+              className={`relative w-full max-w-md bg-[#FAF7F2] rounded-t-3xl px-5 pt-5 shadow-2xl transition-transform duration-300 ease-out ${
+                sourcePromptMounted ? "translate-y-0" : "translate-y-full"
+              }`}
+              style={{
+                paddingBottom:
+                  "max(1.5rem, calc(env(safe-area-inset-bottom) + 1rem))",
+              }}
+            >
+              <div className="mx-auto w-10 h-1 rounded-full bg-black/15 mb-4" />
 
-            <div className="flex items-start gap-3">
-              <div className="shrink-0 w-11 h-11 rounded-full bg-[#E63329]/10 flex items-center justify-center">
-                <i className="fa-solid fa-truck-fast text-[#E63329] text-sm" />
+              <div className="flex items-start gap-3">
+                <div className="shrink-0 w-11 h-11 rounded-full bg-[#E63329]/10 flex items-center justify-center">
+                  <i className="fa-solid fa-truck-fast text-[#E63329] text-sm" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-extrabold uppercase tracking-wide text-black">
+                    Almost there
+                  </p>
+                  <p className="text-[13px] text-black/70 mt-1 leading-snug">
+                    {recommendedProduct.productName} is in your cart, but free
+                    shipping needs{" "}
+                    <span className="font-bold text-black">
+                      {sourceProduct?.productName || "the main product"}
+                    </span>{" "}
+                    in there too.
+                  </p>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-extrabold uppercase tracking-wide text-black">
-                  Almost there
-                </p>
-                <p className="text-[13px] text-black/70 mt-1 leading-snug">
-                  {recommendedProduct.productName} is in your cart, but free
-                  shipping needs{" "}
-                  <span className="font-bold text-black">
-                    {sourceProduct?.productName || "the main product"}
-                  </span>{" "}
-                  in there too.
-                </p>
+
+              <div className="flex items-center gap-2.5 mt-5">
+                <button
+                  onClick={closeSourcePrompt}
+                  disabled={sourceAdding}
+                  className="flex-1 py-3 rounded-xl text-[11px] font-extrabold uppercase tracking-[0.1em] text-black/60 border border-black/15 disabled:opacity-50"
+                >
+                  Maybe Later
+                </button>
+                <button
+                  onClick={handleAddSourceToCart}
+                  disabled={sourceAdding}
+                  className="flex-1 py-3 rounded-xl text-[11px] font-extrabold uppercase tracking-[0.1em] text-white bg-[#1c3026] active:bg-[#4a2f1b] disabled:opacity-70 transition-colors duration-100"
+                >
+                  {sourceAdding ? (
+                    <>
+                      <i className="fa-solid fa-spinner fa-spin mr-1.5" />
+                      Adding…
+                    </>
+                  ) : (
+                    "Add"
+                  )}
+                </button>
               </div>
             </div>
-
-            <div className="flex items-center gap-2.5 mt-5">
-              <button
-                onClick={closeSourcePrompt}
-                disabled={sourceAdding}
-                className="flex-1 py-3 rounded-xl text-[11px] font-extrabold uppercase tracking-[0.1em] text-black/60 border border-black/15 disabled:opacity-50"
-              >
-                Maybe Later
-              </button>
-              <button
-                onClick={handleAddSourceToCart}
-                disabled={sourceAdding}
-                className="flex-1 py-3 rounded-xl text-[11px] font-extrabold uppercase tracking-[0.1em] text-white bg-[#1c3026] active:bg-[#4a2f1b] disabled:opacity-70 transition-colors duration-100"
-              >
-                {sourceAdding ? (
-                  <>
-                    <i className="fa-solid fa-spinner fa-spin mr-1.5" />
-                    Adding…
-                  </>
-                ) : (
-                  "Add"
-                )}
-              </button>
-            </div>
-          </div>
           </div>,
           document.body,
         )}
