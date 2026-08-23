@@ -916,7 +916,8 @@ const FreeShippingBanner = ({
                   style={{
                     width: i === safeBannerIndex ? 12 : 5,
                     height: 5,
-                    background: i === safeBannerIndex ? "#E63329" : "rgba(28,48,38,0.25)",
+                    background:
+                      i === safeBannerIndex ? "#E63329" : "rgba(28,48,38,0.25)",
                   }}
                 />
               ))}
@@ -931,7 +932,7 @@ const FreeShippingBanner = ({
           <style>{`@keyframes fsbRibbonShine { 0% { transform: translateX(-120%); } 100% { transform: translateX(320%); } }`}</style>
           <i className="fa-solid fa-bolt text-[10px] text-[#F5DEB3]" />
           <span className="text-[12px] font-extrabold uppercase tracking-[0.16em] text-white">
-            {quantityNudge ? "Bulk Discount" : "Exclusive Combo Offer"}
+            {quantityNudge ? "Exclusive Combo Offer" : "Exclusive Combo Offer"}
           </span>
           <span
             className="absolute inset-y-0 w-1/4"
@@ -961,78 +962,77 @@ const FreeShippingBanner = ({
           Not gated on offerActive (the threshold on/off switch) — this copy
           describes the combo banner's own state, which is independent. */}
         <div className="px-4 pt-3 text-center">
-            {quantityNudge ? (
+          {quantityNudge ? (
+            <p
+              className="font-semibold tracking-[0.01em] text-[#1c3026] whitespace-nowrap"
+              style={{ fontSize: "clamp(8px, 3vw, 11px)" }}
+            >
+              Add {quantityNudge.remaining} more &amp; get all{" "}
+              {quantityNudge.needed} at{" "}
+              <span className="font-bold uppercase text-[#E63329]">
+                ₹{quantityNudgeTotal.toLocaleString()}
+              </span>
+            </p>
+          ) : freeShippingUnlocked ? (
+            <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#1c3026]">
+              Free shipping unlocked on this order
+            </span>
+          ) : added && !sourceInCart ? (
+            // Recommended add-on is in the cart, but the source product (the
+            // one this banner is actually attached to) isn't — so the combo
+            // isn't real yet. Tell them exactly what's missing instead of
+            // implying it's already done.
+            <>
+              {/* <p className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#1c3026]">
+                  One more step!
+                </p> */}
+              <p className="text-[10px] font-semibold text-[#1c3026]/80">
+                Add {sourceProduct?.productName || "this product"} to your cart
+                to unlock{" "}
+                <span className="font-bold text-[#E63329]">free shipping</span>
+              </p>
+            </>
+          ) : genericIsCloser && closestRuleProduct ? (
+            // A generic cart rule (e.g. "2+ Lamps") is currently closer to
+            // completing than the admin-configured combo above — nudge
+            // toward THAT instead, since it's genuinely nearer.
+            <p className="text-[10px] font-semibold text-[#1c3026]/80">
+              Add{" "}
+              {ruleEval.closestUnmatchedRule.conditions.find(
+                (c) => c.remaining > 0,
+              )?.remaining || 1}{" "}
+              more {closestRuleProduct.productName} to unlock{" "}
+              <span className="font-bold text-[#E63329]">free shipping</span>
+            </p>
+          ) : (
+            <>
+              {/* <p className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#1c3026]">
+                You're almost there!
+              </p> */}
+              {/* One level lighter than the other headline states
+                    (font-bold → font-semibold) — same font-size, just less
+                    heavy, so this fits on one line on mobile without
+                    shrinking the text. */}
+              {/* whitespace-nowrap keeps the whole sentence on ONE line;
+                    the clamp() font-size shrinks it on very small screens
+                    (e.g. iPhone SE) so it fits without wrapping, and caps at
+                    11px on normal widths. */}
               <p
                 className="font-semibold tracking-[0.01em] text-[#1c3026] whitespace-nowrap"
                 style={{ fontSize: "clamp(8px, 3vw, 11px)" }}
               >
-                Add {quantityNudge.remaining} more &amp; get all {quantityNudge.needed} at{" "}
+                Add {recommendedProduct.productName} &amp; unlock{" "}
                 <span className="font-bold uppercase text-[#E63329]">
-                  ₹{quantityNudgeTotal.toLocaleString()}
+                  free shipping
                 </span>
               </p>
-            ) : freeShippingUnlocked ? (
-              <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#1c3026]">
-                Free shipping unlocked on this order
-              </span>
-            ) : added && !sourceInCart ? (
-              // Recommended add-on is in the cart, but the source product (the
-              // one this banner is actually attached to) isn't — so the combo
-              // isn't real yet. Tell them exactly what's missing instead of
-              // implying it's already done.
-              <>
-                {/* <p className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#1c3026]">
-                  One more step!
-                </p> */}
-                <p className="text-[10px] font-semibold text-[#1c3026]/80">
-                  Add {sourceProduct?.productName || "this product"} to your
-                  cart to unlock{" "}
-                  <span className="font-bold text-[#E63329]">
-                    free shipping
-                  </span>
-                </p>
-              </>
-            ) : genericIsCloser && closestRuleProduct ? (
-              // A generic cart rule (e.g. "2+ Lamps") is currently closer to
-              // completing than the admin-configured combo above — nudge
-              // toward THAT instead, since it's genuinely nearer.
-              <p className="text-[10px] font-semibold text-[#1c3026]/80">
-                Add{" "}
-                {ruleEval.closestUnmatchedRule.conditions.find(
-                  (c) => c.remaining > 0,
-                )?.remaining || 1}{" "}
-                more {closestRuleProduct.productName} to unlock{" "}
-                <span className="font-bold text-[#E63329]">free shipping</span>
-              </p>
-            ) : (
-              <>
-                {/* <p className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#1c3026]">
-                You're almost there!
-              </p> */}
-                {/* One level lighter than the other headline states
-                    (font-bold → font-semibold) — same font-size, just less
-                    heavy, so this fits on one line on mobile without
-                    shrinking the text. */}
-                {/* whitespace-nowrap keeps the whole sentence on ONE line;
-                    the clamp() font-size shrinks it on very small screens
-                    (e.g. iPhone SE) so it fits without wrapping, and caps at
-                    11px on normal widths. */}
-                <p
-                  className="font-semibold tracking-[0.01em] text-[#1c3026] whitespace-nowrap"
-                  style={{ fontSize: "clamp(8px, 3vw, 11px)" }}
-                >
-                  Add {recommendedProduct.productName} &amp; unlock{" "}
-                  <span className="font-bold uppercase text-[#E63329]">
-                    free shipping
-                  </span>
-                </p>
 
-                {/* <p className="text-[11px] font-semibold text-[#1c3026]/80">
+              {/* <p className="text-[11px] font-semibold text-[#1c3026]/80">
                   Add {recommendedProduct.productName} & unlock free shipping
                 </p> */}
-              </>
-            )}
-          </div>
+            </>
+          )}
+        </div>
 
         {/* Product card body */}
         <div className="px-4 pt-3 flex gap-4">
@@ -1085,7 +1085,9 @@ const FreeShippingBanner = ({
                 >
                   <button
                     type="button"
-                    onClick={() => (!added || quantityNudge) && setVariantMenuOpen((v) => !v)}
+                    onClick={() =>
+                      (!added || quantityNudge) && setVariantMenuOpen((v) => !v)
+                    }
                     disabled={added && !quantityNudge}
                     className="w-full flex items-center justify-between gap-1 rounded-lg border border-black/15 bg-white px-2.5 py-1 text-xs font-bold text-black disabled:opacity-60 disabled:cursor-default focus:outline-none focus:ring-1 focus:ring-[#157a44] focus:border-[#157a44]"
                   >
@@ -1590,7 +1592,8 @@ const FreeShippingBanner = ({
                 aria-hidden="true"
                 className="absolute inset-y-0 w-1/2"
                 style={{
-                  background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.65), transparent)",
+                  background:
+                    "linear-gradient(90deg, transparent, rgba(255,255,255,0.65), transparent)",
                   animation: "fsbLoadSweep 1.1s linear infinite",
                 }}
               />
@@ -1719,7 +1722,8 @@ const FreeShippingBanner = ({
         to re-enable). Replaced by the inline top-copy line in the banner that
         already nudges "Add {source} to unlock free shipping" for this exact
         case (the `added && !sourceInCart` branch above). */}
-      {SOURCE_PROMPT_ENABLED && showSourcePrompt &&
+      {SOURCE_PROMPT_ENABLED &&
+        showSourcePrompt &&
         createPortal(
           <div className="fixed inset-0 z-[200] flex items-end justify-center">
             <div

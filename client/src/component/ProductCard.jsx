@@ -35,7 +35,7 @@ const ProductCard = ({ product, index = 0, listId = "all_products", listName = "
   return (
     <div className="group relative rounded-[1.6rem] overflow-hidden bg-black/20 border border-white/5 shadow-lg hover:shadow-2xl hover:border-[#F5DEB3]/30 transition-all duration-500 flex flex-col h-full">
       {/* Wishlist Button (Floating Top Right) */}
-      <div className="absolute top-4 right-4 z-20">
+      {/* <div className="absolute top-4 right-4 z-20">
         <Suspense
           fallback={
             <div className="w-8 h-8 bg-white/20 rounded-full animate-pulse"></div>
@@ -43,7 +43,7 @@ const ProductCard = ({ product, index = 0, listId = "all_products", listName = "
         >
           <WishlistButton productId={product.productId} />
         </Suspense>
-      </div>
+      </div> */}
 
       {/* Clickable Card Area */}
       <div
