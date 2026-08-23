@@ -1343,7 +1343,6 @@ const CheckoutPage = () => {
   const realShippingAmount = typeof pricingDetails.shipping === "number"
     ? pricingDetails.shipping
     : (pricingDetails.shipping?.realAmount ?? pricingDetails.shipping?.amount ?? 0);
-  const totalToPay = Math.max(0, pricingDetails.subtotal + shippingAmount - pricingDetails.discount - pointsDiscount);
   // Gift wrap — added on top of subtotal, same as the server's finalAmount
   // formula (subtotal + giftWrap + shipping − discount). Qty auto-scales with
   // distinct products in the cart, mirroring rp.payment.controller.js exactly.
@@ -1352,7 +1351,10 @@ const CheckoutPage = () => {
     giftWrapSelected && giftWrapOffer?.isActive
       ? (Number(giftWrapOffer.price) || 0) * cartItems.filter((i) => i.giftWrapEligible).length
       : 0;
-  const totalToPay = pricingDetails.subtotal + giftWrapAmount + shippingAmount - pricingDetails.discount;
+  const totalToPay = Math.max(
+    0,
+    pricingDetails.subtotal + giftWrapAmount + shippingAmount - pricingDetails.discount - pointsDiscount,
+  );
   const userName = isGuest ? guestName : (userProfile?.userName || userProfile?.name || "");
   const userInitials = userName ? userName.split(" ").filter(Boolean).map((w) => w[0]).join("").toUpperCase().slice(0, 2) : "?";
 
