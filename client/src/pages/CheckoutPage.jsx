@@ -29,6 +29,7 @@ import { ComponentLoader } from "../component/layout/LoadingSpinner";
 import { getClaimedMobile, isOfferLive } from "../config/independenceOffer";
 import IndependenceOfferBanner from "../component/IndependenceOfferBanner";
 import useOfferTerms from "../hooks/useOfferTerms";
+import { useShippingDelayNotice } from "../hooks/useShippingDelayNotice";
 import { calcLocalDiscount } from "../utils/couponDiscount";
 import { trackBeginCheckout, trackPurchase, trackAddShippingInfo, trackAddPaymentInfo, trackPaymentFailed, trackPaymentModalDismissed, trackCheckoutStep, trackOrderCreated, trackSelectPaymentMethod, trackDeliveryCheck, getFbCookies, getAnonymousId, cacheAddressForCapi, setMetaAdvancedMatching } from "../utils/analytics";
 
@@ -391,6 +392,7 @@ const CheckoutPage = () => {
 
   const { items: cartItems, selections: cartSelections, giftWrap: giftWrapSelected, giftWrapNoteOptions } = useSelector((s) => s.cart);
   const { isAuthenticated } = useSelector((s) => s.auth);
+  const shippingDelayMessage = useShippingDelayNotice();
   const isGuest = !isAuthenticated && !localStorage.getItem("authToken");
   const STEPS = isGuest ? GUEST_STEPS : AUTH_STEPS;
   const paymentCompletedRef = useRef(false);
@@ -1448,6 +1450,18 @@ const CheckoutPage = () => {
           </div>
         </div>
       </div>
+
+      {/* ── Shipping delay notice — Review & Pay step only, while the
+          affected product is in cart, auto-hides past its configured expiry
+          (see hooks/useShippingDelayNotice.js). */}
+      {shippingDelayMessage && currentStep === reviewStep && (
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-6">
+          <div className="flex items-center gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <i className="fa-solid fa-triangle-exclamation text-amber-500 text-sm shrink-0" />
+            <p className="text-xs sm:text-sm font-semibold text-amber-800">{shippingDelayMessage}</p>
+          </div>
+        </div>
+      )}
 
       {/* ── Independence Day offer ─────────────────────────────────────────
           Review & Pay only. Account, Contact and Address are all the same
