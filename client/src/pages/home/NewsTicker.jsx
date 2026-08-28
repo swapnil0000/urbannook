@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useShippingDelayNotice } from '../../hooks/useShippingDelayNotice';
 
 const NewsTicker = () => {
   const [isPaused, setIsPaused] = useState(false);
+  const shippingDelayMessage = useShippingDelayNotice();
 
   const headlines = [
     // "Free Shipping on orders above ₹1700",
+    ...(shippingDelayMessage ? [shippingDelayMessage] : []),
     "Ready to ship within 48 hrs",
     "Cash on Delivery available",
   ];
