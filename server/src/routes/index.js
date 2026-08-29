@@ -1,7 +1,6 @@
 import userRouter from "./user.route.js";
 import productRouter from "./product.route.js";
 import commonRouter from "./common.route.js";
-import userWaitListRouter from "./user.waitlist.route.js";
 import userAddressRouter from "./user.address.route.js";
 import userWishListRouter from "./user.wishlist.route.js";
 import userCartRouter from "./user.cart.route.js";
@@ -18,11 +17,12 @@ import adminAnalyticsRouter from "./admin.analytics.route.js";
 import freeShippingOfferRouter from "./freeShippingOffer.route.js";
 import passkeyRouter from "./passkey.route.js";
 import cartRuleRouter from "./cartRule.route.js";
+import offerLeadRouter from "./offerLead.route.js";
+import offerRouter from "./offer.route.js";
 export {
   userRouter,
   productRouter,
   commonRouter,
-  userWaitListRouter,
   userAddressRouter,
   userCartRouter,
   userWishListRouter,
@@ -39,4 +39,6 @@ export {
   freeShippingOfferRouter,
   passkeyRouter,
   cartRuleRouter,
+  offerLeadRouter,
+  offerRouter,
 };

@@ -4,7 +4,7 @@ import { ValidationError, NotFoundError, InternalServerError } from '../utils/er
 import env from '../config/envConfigSetup.js';
 import { sendEmail } from './email.service.js';
 class ContactService {
-  async createSubmission({ name, email, subject, message, mobile }) {
+  async createSubmission({ name, email, subject, message, mobile, productId, productName }) {
     // Create and save contact submission
     const contact = new Contact({
       name,
@@ -12,6 +12,8 @@ class ContactService {
       subject,
       message,
       mobile: mobile || null,
+      productId: productId || null,
+      productName: productName || null,
       status: 'pending'
     });
 
@@ -31,16 +33,18 @@ class ContactService {
       console.error('Failed to send admin notification email:', err);
     });
 
+    // Notify Me (stock alert) submissions carry a productId/productName
+    // alongside the customer's own name — surfaced here so the caller can
+    // confirm which product the alert was registered for.
     return {
       statusCode: 201,
       message: 'Thank you for contacting us! We will get back to you soon.',
       data: {
-        id: contact._id,
         name: contact.name,
+        ...(contact.productName ? { productName: contact.productName } : {}),
         email: contact.email,
         subject: contact.subject,
-        status: contact.status,
-        createdAt: contact.createdAt
+        status: contact.status
       },
       success: true
     };

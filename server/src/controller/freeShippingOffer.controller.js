@@ -1,7 +1,10 @@
 import { ApiRes } from "../utils/index.js";
-import FreeShippingOffer from "../model/freeShippingOffer.model.js";
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
-import { getFreeShippingConfig } from "../utils/freeShippingOffer.util.js";
+import {
+  getFreeShippingConfig,
+  getBannerForProduct,
+  getAllActiveBanners,
+} from "../utils/freeShippingOffer.util.js";
 
 // Public: threshold + active flag only, used by the client to decide when
 // to show "Free" instead of a shipping charge and how far the customer is
@@ -16,12 +19,7 @@ const getFreeShippingConfigController = asyncHandler(async (_req, res) => {
 // the schema level — first match wins.
 const getBannerForProductController = asyncHandler(async (req, res) => {
   const { productId } = req.params;
-  const offer = await FreeShippingOffer.findOne(
-    { isActive: true, "banners.sourceProductId": productId, "banners.isActive": true },
-    { banners: { $elemMatch: { sourceProductId: productId, isActive: true } } },
-  ).lean();
-
-  const banner = offer?.banners?.[0] || null;
+  const banner = await getBannerForProduct(productId);
   return res.status(200).json(new ApiRes(200, "OK", banner, true));
 });
 
@@ -33,9 +31,7 @@ const getBannerForProductController = asyncHandler(async (req, res) => {
 // list and lets the client decide. Revisit if/when multi-banner display on
 // checkout is actually needed — see matching TODO comment in CheckoutPage.jsx.
 const getAllActiveBannersController = asyncHandler(async (_req, res) => {
-  const offer = await FreeShippingOffer.findOne({ isActive: true }).select("banners").lean();
-  const banners = (offer?.banners || []).filter((b) => b.isActive);
-
+  const banners = await getAllActiveBanners();
   return res.status(200).json(new ApiRes(200, "OK", banners, true));
 });
 

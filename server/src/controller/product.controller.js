@@ -19,8 +19,11 @@ const productListing = asyncHandler(async (req, res) => {
     const page = Number(currentPage) || 1;
     const perPage = Number(limit) || 10;
     /*category -> Filter by category	Electronics , search -> Keyword search in name	iPhone */
-    const query = { isPublished: true };
-    let sort = { createdAt: -1 }; // default: latest products
+    // isAddon products (e.g. Gift Wrap) are real, cart-addable products but
+    // never belong in the browsable grid — excluded here only; still
+    // fetchable directly by ID via specificProductDetails below.
+    const query = { isPublished: true, isAddon: { $ne: true } };
+    let sort = { priority: -1, createdAt: -1 }; // admin priority first, then latest
 
     if (search) {
       if (search.length <= 2) {
@@ -86,11 +89,50 @@ const specificProductDetails = asyncHandler(async (req, res) => {
     const productDetails = await Product.findOne({
       productId,
       isPublished: true,
-    }).select("-_id -createdAt -updatedAt -__v");
+    })
+      .select("-_id -createdAt -updatedAt -__v")
+      .lean();
 
     if (!productDetails) {
       throw new NotFoundError("Product Doesn't exist");
     }
+
+    // Inline the admin-curated recommended products so the PDP needs no extra
+    // API call. Published only, and the admin-defined order is preserved.
+    const recIds = Array.isArray(productDetails.recommendedProducts)
+      ? productDetails.recommendedProducts.filter(Boolean).map(String)
+      : [];
+    let recommendedProductsDetails = [];
+    if (recIds.length) {
+      const recs = await Product.find({
+        productId: { $in: recIds },
+        isPublished: true,
+      })
+        .select("-_id -createdAt -updatedAt -__v")
+        .lean();
+      const byId = new Map(recs.map((p) => [String(p.productId), p]));
+      recommendedProductsDetails = recIds.map((id) => byId.get(id)).filter(Boolean);
+    }
+    productDetails.recommendedProductsDetails = recommendedProductsDetails;
+
+    // Inline the admin-picked combo companions (offered as a "buy together"
+    // popup after add-to-cart). Published only, admin order preserved; an
+    // empty result is what switches the popup off for that product.
+    const comboIds = Array.isArray(productDetails.comboProductIds)
+      ? productDetails.comboProductIds.filter(Boolean).map(String)
+      : [];
+    let comboProductsDetails = [];
+    if (comboIds.length) {
+      const combos = await Product.find({
+        productId: { $in: comboIds },
+        isPublished: true,
+      })
+        .select("-_id -createdAt -updatedAt -__v")
+        .lean();
+      const comboById = new Map(combos.map((p) => [String(p.productId), p]));
+      comboProductsDetails = comboIds.map((id) => comboById.get(id)).filter(Boolean);
+    }
+    productDetails.comboProductsDetails = comboProductsDetails;
 
     return productDetails;
   };
@@ -106,6 +148,7 @@ const getProductsByTag = asyncHandler(async (_, res) => {
       {
         $match: {
           isPublished: true,
+          isAddon: { $ne: true },
         },
       },
       {

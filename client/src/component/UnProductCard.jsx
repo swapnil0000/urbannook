@@ -29,6 +29,10 @@ const UnProductCard = ({ p, index = 0, listId = 'grid', listName = 'Grid' }) => 
   const badge = badgeOf(p);
   const img2 = secondImg(p);
   const variants = (p?.variantDetails || []).slice(0, 5);
+  // Struck MRP + % off, same source of truth as ProductCard: the first
+  // variant's own variantMrp (never a synthesised markup).
+  const price = Number(p?.effectivePrice ?? v.variantPrice ?? 0);
+  const mrp = Number(p?.effectiveMrp ?? v.variantMrp ?? 0);
 
   const go = () => {
     trackSelectItem?.({ itemId: p.productId, itemName: p.productName, itemVariant: v.variantName || '', price: v.variantPrice || 0, listId, listName, index });
@@ -70,8 +74,14 @@ const UnProductCard = ({ p, index = 0, listId = 'grid', listName = 'Grid' }) => 
       <div className="p-3.5 flex flex-col flex-1">
         <span className="gl-lbl text-[10px] text-faint">{p.productCategory || 'Urban Nook'}</span>
         <p className="font-bold text-sm leading-snug line-clamp-2 min-h-[2.75em] mt-1">{p.productName}</p>
-        <div className="mt-auto pt-2 flex items-center gap-2">
-          <span className="font-extrabold">{inr(v.variantPrice)}</span>
+        <div className="mt-auto pt-2 flex items-baseline flex-wrap gap-x-2 gap-y-0.5">
+          <span className="font-extrabold">{inr(price)}</span>
+          {mrp > price && (
+            <>
+              <span className="text-xs text-faint line-through">{inr(mrp)}</span>
+              <span className="gl-lbl text-[9px] text-save">{Math.round(((mrp - price) / mrp) * 100)}% off</span>
+            </>
+          )}
         </div>
       </div>
     </div>

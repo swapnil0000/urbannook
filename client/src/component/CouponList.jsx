@@ -1,16 +1,7 @@
 import { useState } from 'react';
 import { useGetAvailableCouponsQuery, useApplyCouponMutation } from '../store/api/userApi';
 import { useUI, useAuth } from '../hooks/useRedux';
-
-function calcLocalDiscount(coupon, subtotal) {
-  if (!subtotal || subtotal < (coupon.minCartValue || 0)) return 0;
-  if (coupon.discountType === 'PERCENTAGE') {
-    let amt = Math.floor((subtotal * coupon.discountValue) / 100);
-    if (coupon.maxDiscountCap) amt = Math.min(amt, coupon.maxDiscountCap);
-    return Math.min(amt, subtotal);
-  }
-  return Math.min(coupon.discountValue || 0, subtotal);
-}
+import { calcLocalDiscount } from '../utils/couponDiscount';
 
 const CouponList = ({ onCouponApplied, userId, isGuest, cartTotal }) => {
   const [applyingCode, setApplyingCode] = useState(null);
@@ -24,7 +15,26 @@ const CouponList = ({ onCouponApplied, userId, isGuest, cartTotal }) => {
     setApplyingCode(coupon.code);
     try {
       if (isGuest) {
-        const discount = calcLocalDiscount(coupon, cartTotal);
+        // Guests are validated client-side, so the minimum has to be enforced
+        // here. Without it calcLocalDiscount quietly returns 0 and the coupon
+        // "applies" for ₹0 — the panel says applied while the summary still
+        // shows Apply Coupon. (Signed-in users get this from the server.)
+        const subtotal = cartTotal || 0;
+        const minCart = coupon.minCartValue || 0;
+        if (subtotal < minCart) {
+          showNotification(
+            `Add ₹${(minCart - subtotal).toLocaleString()} more to use ${coupon.code} (min order ₹${minCart.toLocaleString()})`,
+            'error',
+          );
+          return;
+        }
+
+        const discount = calcLocalDiscount(coupon, subtotal);
+        if (discount <= 0) {
+          showNotification('This coupon gives no discount on your current cart', 'error');
+          return;
+        }
+
         if (onCouponApplied) onCouponApplied({ code: coupon.code, discount, couponData: coupon });
         return;
       }
@@ -42,7 +52,7 @@ const CouponList = ({ onCouponApplied, userId, isGuest, cartTotal }) => {
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3">
-        <div className="w-10 h-10 border-2 border-[#2e443c] border-t-transparent rounded-full animate-spin" />
+        <div className="w-10 h-10 border-2 border-ink border-t-transparent rounded-full animate-spin" />
         <p className="text-xs text-gray-400 font-medium">Finding your coupons…</p>
       </div>
     );
@@ -64,8 +74,8 @@ const CouponList = ({ onCouponApplied, userId, isGuest, cartTotal }) => {
   if (coupons.length === 0) {
     return (
       <div className="flex flex-col items-center gap-4 py-12 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-[#2e443c]/8 flex items-center justify-center">
-          <i className="fa-solid fa-ticket text-[#2e443c]/40 text-2xl" />
+        <div className="w-16 h-16 rounded-2xl bg-ink/8 flex items-center justify-center">
+          <i className="fa-solid fa-ticket text-ink/40 text-2xl" />
         </div>
         <div>
           <p className="text-sm font-bold text-gray-600">No offers right now</p>
@@ -83,6 +93,15 @@ const CouponList = ({ onCouponApplied, userId, isGuest, cartTotal }) => {
 
       {coupons.map((coupon) => {
         const isApplying = applyingCode === coupon.code;
+        // What this coupon is actually worth on the cart as it stands, so the
+        // button can never promise a saving the cart does not qualify for.
+        // If the cart total is unknown, fail OPEN rather than disabling every
+        // coupon — handleApply still blocks a ₹0 apply, and the server is the
+        // authority for signed-in users either way.
+        const knowsCart = typeof cartTotal === 'number' && cartTotal > 0;
+        const shortfall = knowsCart ? Math.max(0, (coupon.minCartValue || 0) - cartTotal) : 0;
+        const savings = knowsCart ? calcLocalDiscount(coupon, cartTotal) : coupon.discountValue || 0;
+        const eligible = !knowsCart || (shortfall === 0 && savings > 0);
 
         const isPct = coupon.discountType === 'PERCENTAGE';
         const discountLabel = isPct
@@ -160,7 +179,7 @@ const CouponList = ({ onCouponApplied, userId, isGuest, cartTotal }) => {
                 className="flex items-center justify-between px-4 py-2.5 rounded-xl"
                 style={{ background: '#fdf8f3', border: '2px dashed rgba(168,144,104,0.4)' }}
               >
-                <code className="font-mono font-black text-[#2e443c] text-base tracking-widest">
+                <code className="font-mono font-black text-ink text-base tracking-widest">
                   {coupon.code}
                 </code>
                 <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#a89068' }}>
@@ -192,9 +211,15 @@ const CouponList = ({ onCouponApplied, userId, isGuest, cartTotal }) => {
               </div>
 
               {/* Apply button */}
+              {!eligible && shortfall > 0 && (
+                <p className="text-[11px] font-semibold text-amber-700">
+                  Add ₹{shortfall.toLocaleString()} more to use this coupon
+                </p>
+              )}
+
               <button
                 onClick={() => handleApply(coupon)}
-                disabled={isApplying}
+                disabled={isApplying || !eligible}
                 className="w-full py-3 rounded-xl font-black text-sm uppercase tracking-widest transition-all duration-200 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 style={{
                   background: isApplying ? '#2e443c' : 'linear-gradient(135deg, #a89068 0%, #c4a87a 100%)',
@@ -213,10 +238,15 @@ const CouponList = ({ onCouponApplied, userId, isGuest, cartTotal }) => {
                     <i className="fa-solid fa-spinner fa-spin" />
                     Applying…
                   </>
+                ) : !eligible ? (
+                  <>
+                    <i className="fa-solid fa-bag-shopping" />
+                    Add ₹{shortfall.toLocaleString()} more
+                  </>
                 ) : (
                   <>
                     <i className="fa-solid fa-tag" />
-                    Apply & Save {isPct ? `${coupon.discountValue}%` : `₹${coupon.discountValue}`}
+                    Apply &amp; Save ₹{savings.toLocaleString()}
                   </>
                 )}
               </button>

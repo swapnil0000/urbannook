@@ -37,6 +37,21 @@ const contactSchema = new mongoose.Schema(
       match: [/^[6-9]\d{9}$/, 'Please provide a valid 10-digit mobile number'],
       default: null
     },
+    // Set only for back-in-stock "Notify Me" submissions — lets the service
+    // tell those apart from a genuine human contact-us message with the same
+    // "Product Inquiry" subject. `name` still holds the customer's own name
+    // for both flows; `productName` carries the product they asked about.
+    productId: {
+      type: String,
+      trim: true,
+      default: null
+    },
+    productName: {
+      type: String,
+      trim: true,
+      maxlength: [200, 'Product name cannot exceed 200 characters'],
+      default: null
+    },
     status: {
       type: String,
       enum: ['pending', 'in-progress', 'resolved', 'closed'],

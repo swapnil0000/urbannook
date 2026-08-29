@@ -43,6 +43,7 @@ const SocialMediaFAB = lazy(() => import('./component/layout/WhatsAppButton'));
 const OpenInBrowserBanner = lazy(() => import('./component/OpenInBrowserBanner'));
 const GoogleOneTap = lazy(() => import('./component/GoogleOneTap'));
 const PasskeyPrompt = lazy(() => import('./component/PasskeyPrompt'));
+const IndependenceDayPopup = lazy(() => import('./component/IndependenceDayPopup'));
 
 // Component to handle session restoration and token removal detection
 const SessionManager = ({ children }) => {
@@ -190,6 +191,10 @@ function App() {
                 {/* Post-login passkey upsell (fires once after a fresh login) */}
                 <ErrorBoundary>
                   <PasskeyPrompt />
+                </ErrorBoundary>
+                {/* Independence Day 10%-off lead capture — shows once, everywhere */}
+                <ErrorBoundary>
+                  <IndependenceDayPopup />
                 </ErrorBoundary>
               </Suspense>
             </SyncProvider>

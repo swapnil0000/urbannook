@@ -16,6 +16,7 @@ import {
   useGetFreeShippingOfferQuery,
   useGetAllFreeShippingBannersQuery,
   useEvaluateCartRulesQuery,
+  useGetGiftWrapOfferQuery,
 } from "../store/api/userApi";
 import { setShowLoginModal, setLoginCallback } from "../store/slices/uiSlice";
 import { useUI } from "../hooks/useRedux";
@@ -25,6 +26,10 @@ import { fetchCsrfToken } from "../store/api/apiSlice";
 import CouponInput from "../component/CouponInput";
 import FreeShippingBanner from "../component/FreeShippingBanner";
 import { ComponentLoader } from "../component/layout/LoadingSpinner";
+import { getClaimedMobile, isOfferLive } from "../config/independenceOffer";
+import IndependenceOfferBanner from "../component/IndependenceOfferBanner";
+import useOfferTerms from "../hooks/useOfferTerms";
+import { calcLocalDiscount } from "../utils/couponDiscount";
 import { trackBeginCheckout, trackPurchase, trackAddShippingInfo, trackAddPaymentInfo, trackPaymentFailed, trackPaymentModalDismissed, trackCheckoutStep, trackOrderCreated, trackSelectPaymentMethod, trackDeliveryCheck, getFbCookies, getAnonymousId, cacheAddressForCapi, setMetaAdvancedMatching } from "../utils/analytics";
 
 const CouponList = lazy(() => import("../component/CouponList"));
@@ -231,7 +236,12 @@ const SavingsBanner = ({ amount, freeShipping = false }) => (
   </div>
 );
 
-const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, itemCount, isLoadingShipping, paymentMethod }) => {
+// Stand-in for a ₹ figure that is mid-recalculation.
+const AmountPlaceholder = () => (
+  <span className="inline-block h-3.5 w-14 animate-pulse rounded bg-gray-200" aria-label="Calculating" />
+);
+
+const PriceRows = ({ subtotal, shipping, discount, giftWrapAmount = 0, appliedCoupon, totalToPay, itemCount, isLoadingShipping, paymentMethod, onApplyCoupon, onRemoveCoupon }) => {
   const shippingAmount = typeof shipping === "object" ? shipping?.amount : shipping;
   // COD advance must be based on the REAL carrier rate, not the (possibly
   // free-shipping-zeroed) charged amount — same real/charged split as the
@@ -245,7 +255,9 @@ const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, it
   const isShippingFree = shippingAmount === 0 && realShippingAmount > 0;
   const hasDiscount = appliedCoupon && discount > 0;
   // (lamp + stand + ... + real shipping) − what they're actually paying = savings.
-  const totalSavings = Math.max(0, subtotal + (realShippingAmount || 0) - totalToPay);
+  // giftWrapAmount is added to both sides — it's a real add-on charge, not a
+  // discount opportunity, so opting into it must never change this number.
+  const totalSavings = Math.max(0, subtotal + giftWrapAmount + (realShippingAmount || 0) - totalToPay);
 
   return (
     <div className="space-y-2">
@@ -260,6 +272,15 @@ const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, it
           ₹{subtotal.toLocaleString()}
         </span>
       </div>
+
+      {giftWrapAmount > 0 && (
+        <div className="flex justify-between items-center text-sm">
+          <span className="text-gray-500 flex items-center gap-1.5">
+            <i className="fa-solid fa-gift text-save text-[11px]" /> Gift wrap
+          </span>
+          <span className="font-bold text-gray-900">₹{giftWrapAmount.toLocaleString()}</span>
+        </div>
+      )}
 
       <div className="flex justify-between items-center text-sm">
         <span className="text-gray-500">Shipping</span>
@@ -288,10 +309,27 @@ const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, it
         </span>
       </div>
 
-      {hasDiscount && (
+      {/* Coupon row — Flipkart-style, sits just above Total */}
+      {(onApplyCoupon || hasDiscount) && (
         <div className="flex justify-between items-center text-sm">
-          <span className="text-rose-700">Discount applied</span>
-          <span className="font-bold text-rose-700">−₹{discount.toLocaleString()}</span>
+          <span className="text-gray-500 flex items-center gap-1.5">
+            <i className="fa-solid fa-tag text-brand text-[11px]" /> Coupon discount
+            {hasDiscount && appliedCoupon && (
+              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-0.5 py-0.5 rounded uppercase tracking-wide">{appliedCoupon}</span>
+            )}
+          </span>
+          {hasDiscount ? (
+            <span className="flex items-center gap-2">
+              <span className="font-bold text-emerald-600">−₹{discount.toLocaleString()}</span>
+              {onRemoveCoupon && (
+                <button onClick={onRemoveCoupon} className="text-[11px] font-bold text-rose-500 hover:text-rose-600">Remove</button>
+              )}
+            </span>
+          ) : (
+            <button onClick={onApplyCoupon} className="text-sm font-bold text-brand hover:opacity-80">
+              Apply Coupon
+            </button>
+          )}
         </div>
       )}
 
@@ -299,7 +337,7 @@ const PriceRows = ({ subtotal, shipping, discount, appliedCoupon, totalToPay, it
         <div className="flex justify-between items-center">
           <span className="font-bold text-gray-900">Total</span>
           <div className="text-right">
-            <span className="text-2xl font-bold text-[#2e443c]">
+            <span className="text-2xl font-bold text-ink">
               ₹{totalToPay.toLocaleString()}
             </span>
             <p className="text-[10px] text-gray-400 mt-0.5">Incl. GST</p>
@@ -351,7 +389,7 @@ const CheckoutPage = () => {
   const showNotificationRef = useRef(showNotification);
   useEffect(() => { showNotificationRef.current = showNotification; }, [showNotification]);
 
-  const { items: cartItems, selections: cartSelections } = useSelector((s) => s.cart);
+  const { items: cartItems, selections: cartSelections, giftWrap: giftWrapSelected, giftWrapNoteOptions } = useSelector((s) => s.cart);
   const { isAuthenticated } = useSelector((s) => s.auth);
   const isGuest = !isAuthenticated && !localStorage.getItem("authToken");
   const STEPS = isGuest ? GUEST_STEPS : AUTH_STEPS;
@@ -403,15 +441,35 @@ const CheckoutPage = () => {
   });
   const [shippingError, setShippingError] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("PREPAID"); // "PREPAID" | "COD"
+  const [showCodSheet, setShowCodSheet] = useState(false); // COD breakdown popup
+  // When the user taps "Pay Online" while still on COD, we must first flip to
+  // PREPAID and let shipping re-calc settle BEFORE charging — otherwise the
+  // amount could be stale (customer pays less → our loss). This queues the pay
+  // and an effect fires it only once the amount is settled.
+  const [pendingPay, setPendingPay] = useState(null); // null | "ONLINE"
+  // Real ₹ a customer saves by paying online instead of COD = (COD carrier rate
+  // − prepaid carrier rate). 0 when free shipping zeroes both. Drives the
+  // "SAVE ₹X" nudge on the Pay Online button.
+  const [codSaving, setCodSaving] = useState(0);
   const [paymentError, setPaymentError] = useState(null);
   const [showRetry, setShowRetry] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
   const [showCouponModal, setShowCouponModal] = useState(false);
+  const [isApplyingOffer, setIsApplyingOffer] = useState(false);
+  // Live campaign terms, so the block's own numbers and this page's discount
+  // maths come from the same source as the coupon the server will validate.
+  const { terms: offerTerms } = useOfferTerms();
   const [showMobileModal, setShowMobileModal] = useState(false);
 
   const [guestName, setGuestName] = useState(savedCheckout.current.guestName || "");
   const [guestEmail, setGuestEmail] = useState(savedCheckout.current.guestEmail || "");
-  const [guestMobile, setGuestMobile] = useState(savedCheckout.current.guestMobile || "");
+  // Falls back to the number given to the offer popup: the visitor already
+  // typed it on this site minutes ago, so asking again is a pointless step at
+  // the exact point people drop. Anything they type here still wins, and the
+  // helper re-validates the stored value before it is trusted.
+  const [guestMobile, setGuestMobile] = useState(
+    savedCheckout.current.guestMobile || getClaimedMobile(),
+  );
   const [guestErrors, setGuestErrors] = useState({});
   // UI-only: mobile collapsible order-summary toggle (does not affect checkout logic)
   const [mobileSummaryOpen, setMobileSummaryOpen] = useState(false);
@@ -430,6 +488,7 @@ const CheckoutPage = () => {
     useGetSavedAddressesQuery(undefined, { skip: isGuest });
   const [calculateShipping, { isLoading: isCalculatingShipping }] = useCalculateShippingMutation();
   const { data: freeShippingOfferData } = useGetFreeShippingOfferQuery();
+  const { data: giftWrapOfferData } = useGetGiftWrapOfferQuery();
   const { data: allFreeShippingBannersData } = useGetAllFreeShippingBannersQuery();
   // Generic, data-driven cart-promotion rules (server/src/model/cartRule.model.js)
   // — same evaluator the payment controller uses for the real order total,
@@ -489,38 +548,40 @@ const CheckoutPage = () => {
   // TODO: only supports a single banner (first match) even if multiple cart
   // items each have one configured — fine for now (single active offer),
   // revisit if multiple simultaneous offers are ever needed.
-  const checkoutBannerProductId = useMemo(() => {
-    const offerConfig = freeShippingOfferData?.data;
-    if (!offerConfig?.isActive) return null;
-
+  // Every banner whose source product is in the cart but the recommended
+  // add-on isn't — one persistent card on checkout too, arrows page through
+  // all of them (see bannersOverride on FreeShippingBanner) instead of a new
+  // card replacing the old one each time the cart's nudge-worthy combo
+  // changes. Combo banners are independent of the offer doc's own `isActive`
+  // — that flag is only the cart-VALUE-threshold on/off switch, not a master
+  // kill switch for banners (each banner has its own isActive; server-side
+  // getAllActiveBanners already only returns those).
+  const checkoutNudgeBanners = useMemo(() => {
     const banners = allFreeShippingBannersData?.data || [];
-    if (banners.length === 0) return null;
-
+    if (banners.length === 0) return [];
     const cartProductIds = new Set(cartItems.map((i) => i.mongoId || i.id?.split(":")[0]));
-    const match = banners.find(
+    return banners.filter(
       (b) => cartProductIds.has(b.sourceProductId) && !cartProductIds.has(b.recommendedProductId),
     );
-    return match?.sourceProductId || null;
-  }, [freeShippingOfferData, allFreeShippingBannersData, cartItems]);
+  }, [allFreeShippingBannersData, cartItems]);
 
-  // The moment adding the recommended item pushes the cart over the
-  // threshold, `checkoutBannerProductId` above flips to null in the SAME
-  // render as the cart update — which used to unmount FreeShippingBanner
-  // outright, killing its own bar-fill/confetti/"Unlocked" celebration
-  // sequence mid-flight. Hold the last non-null id visible for a beat after
-  // it goes null so that sequence gets to finish before we actually remove
-  // the banner from the page.
-  const [visibleBannerProductId, setVisibleBannerProductId] = useState(null);
+  // The moment adding the recommended item completes the last combo,
+  // `checkoutNudgeBanners` above goes empty in the SAME render as the cart
+  // update — which used to unmount FreeShippingBanner outright, killing its
+  // own bar-fill/confetti/"Unlocked" celebration sequence mid-flight. Hold
+  // the last non-empty list visible for a beat after it empties so that
+  // sequence gets to finish before we actually remove the banner from the page.
+  const [visibleNudgeBanners, setVisibleNudgeBanners] = useState([]);
   useEffect(() => {
-    if (checkoutBannerProductId) {
-      setVisibleBannerProductId(checkoutBannerProductId);
+    if (checkoutNudgeBanners.length > 0) {
+      setVisibleNudgeBanners(checkoutNudgeBanners);
       return;
     }
-    if (!visibleBannerProductId) return;
-    const timer = setTimeout(() => setVisibleBannerProductId(null), 1900);
+    if (visibleNudgeBanners.length === 0) return;
+    const timer = setTimeout(() => setVisibleNudgeBanners([]), 1900);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally omits visibleBannerProductId so the timer isn't re-armed by its own update
-  }, [checkoutBannerProductId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally omits visibleNudgeBanners so the timer isn't re-armed by its own update
+  }, [checkoutNudgeBanners]);
 
   // When user logs in mid-checkout (guest → auth), AUTH_STEPS has fewer steps.
   // Clamp currentStep so STEPS[currentStep-1] is never undefined.
@@ -614,13 +675,21 @@ const CheckoutPage = () => {
           selectedVariant: item?.selectedVariant,
         }));
 
-        const result = await calculateShippingRef.current({
+        // Fetch BOTH carrier rates so we can show the real prepaid-vs-COD
+        // difference. COD returns a higher rate (carrier COD surcharge); the
+        // selected method's result feeds the actual pricing below.
+        const shipArgs = {
           deliveryPinCode: parseInt(pinCode, 10),
           cartItems: formattedCartItems,
-          paymentType: paymentMethod,
-        }).unwrap();
+        };
+        const [prepaidRes, codRes] = await Promise.all([
+          calculateShippingRef.current({ ...shipArgs, paymentType: "PREPAID" }).unwrap(),
+          calculateShippingRef.current({ ...shipArgs, paymentType: "COD" }).unwrap(),
+        ]);
 
         if (cancelled) return;
+
+        const result = paymentMethod === "COD" ? codRes : prepaidRes;
 
         if (result.success && result.data) {
           // Free shipping: product-COMBO rule. Still call the rate API above to
@@ -630,11 +699,12 @@ const CheckoutPage = () => {
           const offerConfig = freeShippingOfferData?.data;
           const banners = allFreeShippingBannersData?.data || [];
           const cartProductIds = new Set(cartItems.map((i) => i.mongoId || i.id?.split(":")[0]));
-          const comboEligible =
-            !!offerConfig?.isActive &&
-            banners.some(
-              (b) => cartProductIds.has(b.sourceProductId) && cartProductIds.has(b.recommendedProductId),
-            );
+          // Combo eligibility is independent of the offer doc's own isActive
+          // (that flag is only the cart-value threshold switch) — see the
+          // matching comment on checkoutNudgeBanners above.
+          const comboEligible = banners.some(
+            (b) => cartProductIds.has(b.sourceProductId) && cartProductIds.has(b.recommendedProductId),
+          );
           // Plain cart-value threshold — whole cart, any products count.
           // Mirrors the server's direct subtotal >= thresholdAmount check,
           // computed AFTER rule discounts (server discounts items first,
@@ -662,6 +732,16 @@ const CheckoutPage = () => {
             shipping: { ...result.data, amount: shippingAmount, realAmount }
           }));
           setShippingError("");
+
+          // Honest online-vs-COD saving = the extra delivery COD charges.
+          // Free shipping zeroes shipping for both methods → ₹0 (badge hides).
+          const prepaidReal = parseFloat(prepaidRes?.data?.total_charges);
+          const codReal = parseFloat(codRes?.data?.total_charges);
+          const saving = isFreeShippingEligible || !prepaidReal || !codReal
+            ? 0
+            : Math.max(0, Math.ceil(codReal) - Math.ceil(prepaidReal));
+          setCodSaving(saving);
+
           trackDeliveryCheck({ pincode: pinCode, serviceable: true, shippingAmount, paymentMethod });
         } else {
           showNotificationRef.current?.("Unable to calculate shipping. Please try again.", "error");
@@ -719,6 +799,12 @@ const CheckoutPage = () => {
       // Aggressively fill pincode if missing, even if address was partially restored
       if (profilePin && (!pinCode || pinCode.length < 6) && !addressManuallyResetRef.current) setPinCode(String(profilePin));
       if (profileMobile && !senderMobile) setSenderMobile(stripCC(String(profileMobile)));
+      // Account with no mobile on file: the popup already collected one, so use
+      // it rather than making them type it again (or hitting MobileNumberModal).
+      else if (!profileMobile && !senderMobile) {
+        const claimedMobile = getClaimedMobile();
+        if (claimedMobile) setSenderMobile(claimedMobile);
+      }
     }
   }, [userProfile, address, pinCode, senderMobile]);
 
@@ -912,6 +998,43 @@ const CheckoutPage = () => {
     setShowCouponModal(false);
   };
 
+  // One-tap apply for the offer block at the top of the page. Routes into the
+  // same two handlers the coupon sheet uses, so there is exactly one place that
+  // applies a coupon for guests and one for members.
+  //
+  // Guarded twice against applying the same offer more than once: `appliedCoupon`
+  // blocks a second coupon outright (this cart holds one at a time) and
+  // `isApplyingOffer` swallows a double-tap while the first is still in flight.
+  const handleApplyOfferCode = async (code) => {
+    if (!code || appliedCoupon || isApplyingOffer) return;
+    setIsApplyingOffer(true);
+    try {
+      if (isGuest) {
+        const subtotal = cartTotalAmount;
+        const minCart = offerTerms.minCartValue || 0;
+        if (subtotal < minCart) {
+          showNotification(
+            `Add ₹${(minCart - subtotal).toLocaleString()} more to use ${code} (min order ₹${minCart.toLocaleString()})`,
+            "error",
+          );
+          return;
+        }
+        const discount = calcLocalDiscount(offerTerms, subtotal);
+        if (discount <= 0) {
+          showNotification("This coupon gives no discount on your current cart", "error");
+          return;
+        }
+        handleGuestCouponApplied({ code, discount });
+        showNotification(`Coupon applied! You save ₹${discount.toLocaleString()}`, "success");
+      } else {
+        // Runs the server apply and its own notifications/state.
+        await handleCouponApplied({ code });
+      }
+    } finally {
+      setIsApplyingOffer(false);
+    }
+  };
+
   const handleCouponRemoved = async () => {
     try {
       const r = await applyCouponMutation({ couponCode: null, email: userEmail }).unwrap();
@@ -1010,6 +1133,12 @@ const CheckoutPage = () => {
           },
           paymentMethod,
           ...(appliedCoupon ? { couponCode: appliedCoupon } : {}),
+          // Guests have no server-side cart to read this from — the boolean
+          // intent has to come from the request. Price is still never
+          // trusted from here; the server re-prices from the live offer
+          // config (see rp.payment.controller.js).
+          giftWrap: giftWrapSelected,
+          giftWrapNoteOptions: giftWrapNoteOptions,
           ...getFbCookies(), // _fbp / _fbc → stored on order for CAPI match quality
           anonymousId: getAnonymousId(), // fallback externalId for guest CAPI
         }).unwrap();
@@ -1148,9 +1277,94 @@ const CheckoutPage = () => {
   const realShippingAmount = typeof pricingDetails.shipping === "number"
     ? pricingDetails.shipping
     : (pricingDetails.shipping?.realAmount ?? pricingDetails.shipping?.amount ?? 0);
-  const totalToPay = pricingDetails.subtotal + shippingAmount - pricingDetails.discount;
+  // Gift wrap — added on top of subtotal, same as the server's finalAmount
+  // formula (subtotal + giftWrap + shipping − discount). Qty auto-scales with
+  // distinct ELIGIBLE PRODUCTS, deduped (not per cart line — two variants of
+  // the same product only count once), mirroring rp.payment.controller.js exactly.
+  const giftWrapOffer = giftWrapOfferData?.data;
+  const giftWrapEligibleCount = new Set(
+    cartItems.filter((i) => i.giftWrapEligible).map((i) => i.mongoId || i.id),
+  ).size;
+  const giftWrapAmount =
+    giftWrapSelected && giftWrapOffer?.isActive
+      ? (Number(giftWrapOffer.price) || 0) * giftWrapEligibleCount
+      : 0;
+  const totalToPay = pricingDetails.subtotal + giftWrapAmount + shippingAmount - pricingDetails.discount;
   const userName = isGuest ? guestName : (userProfile?.userName || userProfile?.name || "");
   const userInitials = userName ? userName.split(" ").filter(Boolean).map((w) => w[0]).join("").toUpperCase().slice(0, 2) : "?";
+
+  // ── Payment-action helpers (money-critical: never charge a stale amount) ──
+  const COD_HANDLING_FEE = 35; // portion of the advance that is the non-refundable COD fee (label only, no math change)
+  const isShippingFree = shippingAmount === 0 && realShippingAmount > 0;
+  const codAdvance = realShippingAmount > 0 ? Math.min(Math.ceil(realShippingAmount) * 2, totalToPay) : 0;
+  const codRemaining = Math.max(0, totalToPay - codAdvance);
+  // Amount is safe to charge only once shipping has actually settled.
+  const amountsSettled = !isCalculatingShipping && pricingDetails.shipping !== null && !shippingError;
+  const payBusy = isOrdering || !!pendingPay;
+
+  // Fire the queued online payment only after the toggle to PREPAID has
+  // settled the amount — guarantees full amount, never a stale/lower one.
+  useEffect(() => {
+    if (pendingPay !== "ONLINE") return;
+    if (shippingError) { setPendingPay(null); return; }
+    if (paymentMethod === "PREPAID" && amountsSettled && !isOrdering) {
+      setPendingPay(null);
+      handlePayment();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingPay, paymentMethod, amountsSettled, shippingError, isOrdering]);
+
+  const handlePayOnline = () => {
+    if (payBusy) return;
+    // Already prepaid + settled → charge full immediately. Otherwise flip to
+    // PREPAID and let the effect above charge once the amount settles.
+    if (paymentMethod !== "PREPAID" || !amountsSettled) {
+      if (paymentMethod !== "PREPAID") {
+        setPaymentMethod("PREPAID");
+        trackSelectPaymentMethod({ paymentMethod: "PREPAID" });
+      }
+      setPendingPay("ONLINE");
+      return;
+    }
+    handlePayment();
+  };
+
+  const handleChooseCod = () => {
+    if (payBusy) return;
+    if (paymentMethod !== "COD") {
+      setPaymentMethod("COD");
+      trackSelectPaymentMethod({ paymentMethod: "COD" });
+    }
+    setShowCodSheet(true); // popup shows the breakdown; its Pay btn waits for settle
+  };
+
+  const handleConfirmCod = () => {
+    // Only chargeable once COD shipping/advance has settled.
+    if (!amountsSettled || isOrdering || paymentMethod !== "COD") return;
+    setShowCodSheet(false);
+    handlePayment();
+  };
+
+  // The two footer/sidebar buttons double as the payment-method selector, but
+  // ONE tap always completes the action.
+  //
+  // These used to switch method on the first tap and return, so a customer on
+  // COD tapping "Pay Online" only re-triggered the shipping calculation and had
+  // to tap a second time to actually pay. Nothing on screen said so, so the
+  // common reading was that the button was broken — a straight drop at the last
+  // step of checkout.
+  //
+  // The amount is still never charged stale: handlePayOnline queues the payment
+  // and the effect above releases it only once `amountsSettled`, and the COD
+  // sheet keeps its own "Calculating…" gate on the confirm button.
+  const handlePrepaidButton = () => {
+    if (payBusy) return;
+    handlePayOnline();
+  };
+  const handleCodButton = () => {
+    if (payBusy) return;
+    handleChooseCod();
+  };
 
   if (isLoading) {
     return (
@@ -1195,7 +1409,9 @@ const CheckoutPage = () => {
               <Fragment key={step.number}>
                 <div className="flex flex-col items-center gap-2">
                   <button
-                    onClick={() => currentStep > step.number && goToStep(step.number)}
+                    onClick={() =>
+                      currentStep > step.number && goToStep(step.number)
+                    }
                     disabled={currentStep <= step.number}
                     className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 ${
                       currentStep > step.number
@@ -1205,9 +1421,11 @@ const CheckoutPage = () => {
                         : "bg-gray-100 text-gray-300 cursor-default"
                     }`}
                   >
-                    {currentStep > step.number
-                      ? <i className="fa-solid fa-check text-xs" />
-                      : step.number}
+                    {currentStep > step.number ? (
+                      <i className="fa-solid fa-check text-xs" />
+                    ) : (
+                      step.number
+                    )}
                   </button>
                   <span className={`text-[10px] sm:text-[11px] font-bold uppercase tracking-wider whitespace-nowrap leading-none transition-colors duration-300 ${
                     currentStep === step.number ? "text-ink"
@@ -1228,12 +1446,25 @@ const CheckoutPage = () => {
         </div>
       </div>
 
+      {/* ── Independence Day offer ─────────────────────────────────────────
+          Review & Pay only. Account, Contact and Address are all the same
+          /checkout route, so without the step check this rode along on every
+          one of them — and a coupon is noise until there is a total to apply it
+          to. Also takes itself away when the campaign window closes. */}
+      {isOfferLive() && currentStep === reviewStep && (
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-6">
+          <IndependenceOfferBanner
+            cartTotal={cartTotalAmount}
+            appliedCoupon={appliedCoupon}
+            isApplying={isApplyingOffer}
+            onApply={handleApplyOfferCode}
+          />
+        </div>
+      )}
       {/* ── Main ───────────────────────────────────────────────────────── */}
       <div className={`max-w-5xl mx-auto px-4 sm:px-6 pt-8 lg:pb-14 lg:grid lg:grid-cols-[1fr_360px] lg:gap-10 lg:items-start ${(isGuest && currentStep === 1) ? "pb-8" : "pb-32 lg:pb-14"}`}>
-
         {/* ── Left: form ───────────────────────────────────────────────── */}
         <div className="min-w-0">
-
           {/* ══════════ STEP — ACCOUNT (Guest only) ═══════════════════ */}
           {isGuest && currentStep === 1 && (
             <div className="space-y-6 step-fade checkout-sheet">
@@ -1263,7 +1494,9 @@ const CheckoutPage = () => {
                 {/* OR divider — horizontal on mobile, vertical on desktop */}
                 <div className="flex sm:flex-col items-center justify-center px-4 py-3 sm:py-6 shrink-0">
                   <div className="flex-1 h-px sm:h-full sm:w-px bg-gray-200" />
-                  <span className="px-3 sm:px-0 sm:py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest shrink-0">or</span>
+                  <span className="px-3 sm:px-0 sm:py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest shrink-0">
+                    or
+                  </span>
                   <div className="flex-1 h-px sm:h-full sm:w-px bg-gray-200" />
                 </div>
 
@@ -1275,8 +1508,12 @@ const CheckoutPage = () => {
                   <div className="w-12 h-12 rounded-2xl bg-brand/8 flex items-center justify-center mb-4 group-hover:bg-brand/15 transition-colors">
                     <i className="fa-solid fa-user text-ink text-lg" />
                   </div>
-                  <h3 className="text-base font-bold text-gray-900 mb-1">Sign In / Sign Up</h3>
-                  <p className="text-xs text-gray-400 leading-relaxed">Track orders, save addresses, and get exclusive offers</p>
+                  <h3 className="text-base font-bold text-gray-900 mb-1">
+                    Sign In / Sign Up
+                  </h3>
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    Track orders, save addresses, and get exclusive offers
+                  </p>
                 </button>
               </div>
 
@@ -1285,7 +1522,9 @@ const CheckoutPage = () => {
                 <i className="fa-brands fa-cc-mastercard text-xl" />
                 <i className="fa-brands fa-google-pay text-xl" />
                 <i className="fa-solid fa-shield-halved text-base" />
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-300">100% Secure</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-300">
+                  100% Secure
+                </span>
               </div>
             </div>
           )}
@@ -1302,82 +1541,188 @@ const CheckoutPage = () => {
                     <i className="fa-solid fa-address-card text-ink text-sm" />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-gray-800">Contact Information</p>
-                    <p className="text-xs text-gray-400">Used for delivery updates</p>
+                    <p className="text-sm font-bold text-gray-800">
+                      Contact Information
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Used for delivery updates
+                    </p>
                   </div>
                 </div>
 
                 <div className="p-6 space-y-5">
                   {/* Full Name */}
-                  <Field label="Full Name" required={isGuest} error={guestErrors.name}>
+                  <Field
+                    label="Full Name"
+                    required={isGuest}
+                    error={guestErrors.name}
+                  >
                     {isGuest
-                      ? iconInput("fa-user", <input type="text" value={guestName} onChange={(e) => { setGuestName(e.target.value); setGuestErrors((p) => ({ ...p, name: "" })); }} placeholder="e.g. Priya Sharma" className={`${inputCls(guestErrors.name)} pl-10`} />)
-                      : iconInput("fa-user", <div className={`${inputCls(false)} pl-10 flex items-center bg-gray-50 cursor-default text-gray-500`}>{userProfile?.userName || userProfile?.name || "—"}</div>)
-                    }
+                      ? iconInput(
+                          "fa-user",
+                          <input
+                            type="text"
+                            value={guestName}
+                            onChange={(e) => {
+                              setGuestName(e.target.value);
+                              setGuestErrors((p) => ({ ...p, name: "" }));
+                            }}
+                            placeholder="e.g. Priya Sharma"
+                            className={`${inputCls(guestErrors.name)} pl-10`}
+                          />,
+                        )
+                      : iconInput(
+                          "fa-user",
+                          <div
+                            className={`${inputCls(false)} pl-10 flex items-center bg-gray-50 cursor-default text-gray-500`}
+                          >
+                            {userProfile?.userName || userProfile?.name || "—"}
+                          </div>,
+                        )}
                   </Field>
 
                   {/* Email */}
-                  <Field label="Email Address" required={isGuest} error={guestErrors.email}>
+                  <Field
+                    label="Email Address"
+                    required={isGuest}
+                    error={guestErrors.email}
+                  >
                     {isGuest
-                      ? iconInput("fa-envelope", <input type="email" value={guestEmail} onChange={(e) => { setGuestEmail(e.target.value); setGuestErrors((p) => ({ ...p, email: "" })); }} placeholder="you@example.com" className={`${inputCls(guestErrors.email)} pl-10`} />)
-                      : iconInput("fa-envelope", <div className={`${inputCls(false)} pl-10 flex items-center bg-gray-50 cursor-default text-gray-500`}>{userProfile?.email || "—"}</div>)
-                    }
+                      ? iconInput(
+                          "fa-envelope",
+                          <input
+                            type="email"
+                            value={guestEmail}
+                            onChange={(e) => {
+                              setGuestEmail(e.target.value);
+                              setGuestErrors((p) => ({ ...p, email: "" }));
+                            }}
+                            placeholder="you@example.com"
+                            className={`${inputCls(guestErrors.email)} pl-10`}
+                          />,
+                        )
+                      : iconInput(
+                          "fa-envelope",
+                          <div
+                            className={`${inputCls(false)} pl-10 flex items-center bg-gray-50 cursor-default text-gray-500`}
+                          >
+                            {userProfile?.email || "—"}
+                          </div>,
+                        )}
                   </Field>
 
                   {/* Mobile */}
-                  <Field label="Mobile Number" required error={isGuest ? guestErrors.mobile : ""}>
-                    {isGuest
-                      ? (
-                        <div className="relative">
-                          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                            <span className="text-sm text-gray-400 font-medium">+91</span>
-                          </div>
-                          <input type="tel" maxLength={10} value={guestMobile} onChange={(e) => { setGuestMobile(e.target.value.replace(/\D/g, "").slice(0, 10)); setGuestErrors((p) => ({ ...p, mobile: "" })); }} placeholder="Enter mobile number" className={`${inputCls(guestErrors.mobile)} pl-12`} />
+                  <Field
+                    label="Mobile Number"
+                    required
+                    error={isGuest ? guestErrors.mobile : ""}
+                  >
+                    {isGuest ? (
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                          <span className="text-sm text-gray-400 font-medium">
+                            +91
+                          </span>
                         </div>
-                      )
-                      : (
-                        <div className="relative">
-                          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                            <span className="text-sm text-gray-400 font-medium">+91</span>
-                          </div>
-                          <input
-                            type="tel"
-                            maxLength={10}
-                            value={senderMobile && senderMobile !== "N/A" ? senderMobile : ""}
-                            onChange={(e) => setSenderMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                            placeholder="Enter mobile number"
-                            className={`${inputCls(false)} pl-12`}
-                          />
+                        <input
+                          type="tel"
+                          maxLength={10}
+                          value={guestMobile}
+                          onChange={(e) => {
+                            setGuestMobile(
+                              e.target.value.replace(/\D/g, "").slice(0, 10),
+                            );
+                            setGuestErrors((p) => ({ ...p, mobile: "" }));
+                          }}
+                          placeholder="Enter mobile number"
+                          className={`${inputCls(guestErrors.mobile)} pl-12`}
+                        />
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                          <span className="text-sm text-gray-400 font-medium">
+                            +91
+                          </span>
                         </div>
-                      )
-                    }
+                        <input
+                          type="tel"
+                          maxLength={10}
+                          value={
+                            senderMobile && senderMobile !== "N/A"
+                              ? senderMobile
+                              : ""
+                          }
+                          onChange={(e) =>
+                            setSenderMobile(
+                              e.target.value.replace(/\D/g, "").slice(0, 10),
+                            )
+                          }
+                          placeholder="Enter mobile number"
+                          className={`${inputCls(false)} pl-12`}
+                        />
+                      </div>
+                    )}
                   </Field>
 
                   {/* Different delivery contact */}
                   {!isGuest && (
                     <div className="pt-1 border-t border-gray-50 space-y-3">
                       <button
-                        onClick={() => { setUseDifferentDeliveryContact((p) => !p); if (useDifferentDeliveryContact) { setDeliveryMobile(""); setDeliveryMobileErrors(""); } }}
+                        onClick={() => {
+                          setUseDifferentDeliveryContact((p) => !p);
+                          if (useDifferentDeliveryContact) {
+                            setDeliveryMobile("");
+                            setDeliveryMobileErrors("");
+                          }
+                        }}
                         className="flex items-center gap-3 w-full text-left group"
                       >
                         <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all shrink-0 ${useDifferentDeliveryContact ? "bg-brand border-ink" : "border-gray-200 group-hover:border-brand/60"}`}>
                           {useDifferentDeliveryContact && <i className="fa-solid fa-check text-white text-[9px]" />}
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-gray-700">Deliver to a different person</p>
-                          <p className="text-xs text-gray-400">Gift for someone else?</p>
+                          <p className="text-sm font-medium text-gray-700">
+                            Deliver to a different person
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            Gift for someone else?
+                          </p>
                         </div>
                       </button>
                       {useDifferentDeliveryContact && (
                         <div className="animate-in fade-in slide-in-from-top-1 duration-200 pl-8">
-                          <Field label="Recipient's Mobile" required error={deliveryMobileErrors}>
-                            {iconInput("fa-mobile-screen-button",
-                              <input type="tel" maxLength={10} value={deliveryMobile}
-                                onChange={(e) => setDeliveryMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                                onBlur={() => { if (deliveryMobile && !validateMobile(deliveryMobile)) setDeliveryMobileErrors("Enter a valid 10-digit mobile number (must start with 6–9)"); else setDeliveryMobileErrors(""); }}
+                          <Field
+                            label="Recipient's Mobile"
+                            required
+                            error={deliveryMobileErrors}
+                          >
+                            {iconInput(
+                              "fa-mobile-screen-button",
+                              <input
+                                type="tel"
+                                maxLength={10}
+                                value={deliveryMobile}
+                                onChange={(e) =>
+                                  setDeliveryMobile(
+                                    e.target.value
+                                      .replace(/\D/g, "")
+                                      .slice(0, 10),
+                                  )
+                                }
+                                onBlur={() => {
+                                  if (
+                                    deliveryMobile &&
+                                    !validateMobile(deliveryMobile)
+                                  )
+                                    setDeliveryMobileErrors(
+                                      "Enter a valid 10-digit mobile number (must start with 6–9)",
+                                    );
+                                  else setDeliveryMobileErrors("");
+                                }}
                                 placeholder="Recipient's mobile"
                                 className={`${inputCls(deliveryMobileErrors)} pl-10`}
-                              />
+                              />,
                             )}
                           </Field>
                         </div>
@@ -1400,7 +1745,9 @@ const CheckoutPage = () => {
                 <i className="fa-brands fa-cc-mastercard text-xl" />
                 <i className="fa-brands fa-google-pay text-xl" />
                 <i className="fa-solid fa-shield-halved text-base" />
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-300">100% Secure</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-300">
+                  100% Secure
+                </span>
               </div>
             </div>
           )}
@@ -1428,14 +1775,33 @@ const CheckoutPage = () => {
                         <div className="flex items-center gap-3">
                           <button onClick={() => setShowMapModal(true)} className="text-xs font-bold text-brand hover:text-ink transition-colors">Edit</button>
                           <span className="text-gray-200 text-xs">|</span>
-                          <button onClick={handleResetAddress} className="text-xs font-bold text-red-400 hover:text-red-600 transition-colors">Reset</button>
+                          <button
+                            onClick={handleResetAddress}
+                            className="text-xs font-bold text-red-400 hover:text-red-600 transition-colors"
+                          >
+                            Reset
+                          </button>
                         </div>
                       </div>
                       <div className="p-5">
-                        <p className="text-sm text-gray-700 leading-relaxed">{address}</p>
-                        {pinCode && <p className="text-xs text-gray-400 mt-1.5 font-mono font-medium">PIN — {pinCode}</p>}
-                        {preciseDetails.flatNo && <p className="text-xs text-gray-500 mt-1">{preciseDetails.flatNo}</p>}
-                        {preciseDetails.landmark && <p className="text-xs text-gray-500 mt-0.5">Near {preciseDetails.landmark}</p>}
+                        <p className="text-sm text-gray-700 leading-relaxed">
+                          {address}
+                        </p>
+                        {pinCode && (
+                          <p className="text-xs text-gray-400 mt-1.5 font-mono font-medium">
+                            PIN — {pinCode}
+                          </p>
+                        )}
+                        {preciseDetails.flatNo && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            {preciseDetails.flatNo}
+                          </p>
+                        )}
+                        {preciseDetails.landmark && (
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            Near {preciseDetails.landmark}
+                          </p>
+                        )}
                       </div>
                     </div>
                   ) : (
@@ -1467,14 +1833,33 @@ const CheckoutPage = () => {
                         <div className="flex items-center gap-3">
                           <button onClick={() => setShowMapModal(true)} className="text-xs font-bold text-brand hover:text-ink transition-colors">Edit</button>
                           <span className="text-gray-200 text-xs">|</span>
-                          <button onClick={handleResetAddress} className="text-xs font-bold text-red-400 hover:text-red-600 transition-colors">Reset</button>
+                          <button
+                            onClick={handleResetAddress}
+                            className="text-xs font-bold text-red-400 hover:text-red-600 transition-colors"
+                          >
+                            Reset
+                          </button>
                         </div>
                       </div>
                       <div className="p-5">
-                        <p className="text-sm text-gray-700 leading-relaxed">{address}</p>
-                        {pinCode && <p className="text-xs text-gray-400 mt-1.5 font-mono font-medium">PIN — {pinCode}</p>}
-                        {preciseDetails.flatNo && <p className="text-xs text-gray-500 mt-1">{preciseDetails.flatNo}</p>}
-                        {preciseDetails.landmark && <p className="text-xs text-gray-500 mt-0.5">Near {preciseDetails.landmark}</p>}
+                        <p className="text-sm text-gray-700 leading-relaxed">
+                          {address}
+                        </p>
+                        {pinCode && (
+                          <p className="text-xs text-gray-400 mt-1.5 font-mono font-medium">
+                            PIN — {pinCode}
+                          </p>
+                        )}
+                        {preciseDetails.flatNo && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            {preciseDetails.flatNo}
+                          </p>
+                        )}
+                        {preciseDetails.landmark && (
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            Near {preciseDetails.landmark}
+                          </p>
+                        )}
                       </div>
                     </div>
                   ) : (
@@ -1495,10 +1880,14 @@ const CheckoutPage = () => {
                   {savedAddress.length > 0 && !address && (
                     <div className="space-y-3">
                       <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400 px-1 flex items-center gap-2">
-                        <i className="fa-solid fa-clock-rotate-left text-[9px]" /> Saved Addresses
+                        <i className="fa-solid fa-clock-rotate-left text-[9px]" />{" "}
+                        Saved Addresses
                       </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {(showAllAddresses ? savedAddress : savedAddress.slice(0, 4)).map((addr, i) => (
+                        {(showAllAddresses
+                          ? savedAddress
+                          : savedAddress.slice(0, 4)
+                        ).map((addr, i) => (
                           <div
                             key={addr.addressId || i} onClick={() => selectSavedAddress(addr)}
                             className="bg-white border border-gray-100 hover:border-ink/25 rounded-xl p-4 cursor-pointer transition-all group relative hover:shadow-sm"
@@ -1508,12 +1897,19 @@ const CheckoutPage = () => {
                                 <i className="fa-solid fa-location-dot text-gray-300 text-xs group-hover:text-ink transition-colors" />
                               </div>
                               <div className="flex-1 min-w-0 pr-5">
-                                <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed group-hover:text-gray-800 transition-colors">{addr.formattedAddress}</p>
-                                <p className="text-[10px] text-gray-400 font-mono mt-1">{addr.pinCode}</p>
+                                <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed group-hover:text-gray-800 transition-colors">
+                                  {addr.formattedAddress}
+                                </p>
+                                <p className="text-[10px] text-gray-400 font-mono mt-1">
+                                  {addr.pinCode}
+                                </p>
                               </div>
                             </div>
                             <button
-                              onClick={(e) => { e.stopPropagation(); handleDeleteAddress(addr.addressId); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteAddress(addr.addressId);
+                              }}
                               className="absolute top-3 right-3 w-6 h-6 flex items-center justify-center rounded-full text-gray-200 hover:text-red-400 hover:bg-red-50 transition-all"
                             >
                               <i className="fa-solid fa-xmark text-xs" />
@@ -1570,29 +1966,209 @@ const CheckoutPage = () => {
                     <i className="fa-solid fa-triangle-exclamation text-red-500 text-lg" />
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm font-bold text-red-800 mb-1">Shipping Not Available</p>
-                    <p className="text-xs text-red-600 leading-relaxed">Shipping is not available for this pincode. Please change your pincode and try again.</p>
+                    <p className="text-sm font-bold text-red-800 mb-1">
+                      Shipping Not Available
+                    </p>
+                    <p className="text-xs text-red-600 leading-relaxed">
+                      Shipping is not available for this pincode. Please change
+                      your pincode and try again.
+                    </p>
                     <button
-                      onClick={() => { goToStep(addressStep); setShowMapModal(true); setShippingError(""); }}
+                      onClick={() => {
+                        goToStep(addressStep);
+                        setShowMapModal(true);
+                        setShippingError("");
+                      }}
                       className="mt-3 text-xs font-bold text-red-600 border-2 border-red-300 px-4 py-2 rounded-lg hover:bg-red-100 transition-colors flex items-center gap-2"
                     >
-                      <i className="fa-solid fa-location-dot text-xs" /> Change Address
+                      <i className="fa-solid fa-location-dot text-xs" /> Change
+                      Address
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* Contact + Address combined card */}
+              {/* Mobile order summary accordion */}
+              <div className="lg:hidden bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="flex items-center justify-between px-5 py-4">
+                  <div className="flex items-center gap-3">
+                    <span className="w-6 h-6 rounded-full bg-ink text-white text-[11px] font-bold flex items-center justify-center shrink-0">
+                      1
+                    </span>
+                    <div className="w-7 h-7 rounded-lg bg-ink/8 flex items-center justify-center">
+                      <i className="fa-solid fa-bag-shopping text-ink text-xs" />
+                    </div>
+                    <span className="text-sm font-bold text-gray-800">
+                      Order Summary
+                    </span>
+                    <span className="text-[10px] bg-ink text-white px-2 py-0.5 rounded-md font-bold">
+                      {cartItems.length}
+                    </span>
+                  </div>
+                  <span className="text-sm font-bold text-ink">
+                    ₹{totalToPay.toLocaleString()}
+                  </span>
+                </div>
+                <div className="border-t border-gray-50">
+                  <div className="divide-y divide-gray-50 max-h-64 overflow-y-auto">
+                    {cartItems.map((item) => {
+                      const displayName = resolveVariantTitle(
+                        item.name,
+                        item.variantTitleTemplate,
+                        item.selectedVariant,
+                      );
+                      return (
+                        <div
+                          key={`${item.id}-${item.selectedVariant || "default"}`}
+                          className="flex items-center gap-3 px-5 py-3"
+                        >
+                          <div className="relative shrink-0">
+                            <div className="w-10 h-10 rounded-lg bg-gray-50 border border-gray-100 overflow-hidden">
+                              <img
+                                src={item.image || "/placeholder.jpg"}
+                                alt={displayName}
+                                className="w-full h-full object-contain mix-blend-multiply"
+                              />
+                            </div>
+                            <button
+                              onClick={() =>
+                                handleRemoveItem(item.id, item.selectedVariant)
+                              }
+                              title={`Remove ${displayName}`}
+                              aria-label={`Remove ${displayName}`}
+                              className="absolute -top-1.5 -left-1.5 z-10 w-5 h-5 flex items-center justify-center rounded-full bg-paper border border-hair shadow-sm text-ink hover:bg-brand hover:text-white hover:border-brand transition-colors"
+                            >
+                              <i className="fa-solid fa-xmark text-[9px]" />
+                            </button>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-gray-800 truncate">
+                              {displayName}
+                            </p>
+                            {item.selectedVariant &&
+                              item.selectedVariant !== "N/A" && (
+                                <span className="inline-block mt-1 mb-0.5 px-2 py-0.5 rounded-full bg-ink text-white text-[10px] font-semibold">
+                                  {item.selectedVariant}
+                                </span>
+                              )}
+                            <p className="text-[10px] text-gray-400">
+                              Qty {item.quantity}
+                            </p>
+                          </div>
+                          {(() => {
+                            const discountedPrice =
+                              getItemDiscountedPrice(item);
+                            const rawPrice = Number(item.price) || 0;
+                            const hasDiscount = discountedPrice < rawPrice;
+                            const percentOff = hasDiscount
+                              ? Math.round(
+                                  ((rawPrice - discountedPrice) / rawPrice) *
+                                    100,
+                                )
+                              : 0;
+                            return hasDiscount ? (
+                              <div className="text-right shrink-0">
+                                <p className="text-sm font-bold text-save">
+                                  ₹
+                                  {(
+                                    discountedPrice * Number(item.quantity)
+                                  ).toLocaleString()}
+                                </p>
+                                <div className="flex items-center justify-end gap-1">
+                                  <span className="text-[10px] text-gray-400 line-through">
+                                    ₹
+                                    {(
+                                      rawPrice * Number(item.quantity)
+                                    ).toLocaleString()}
+                                  </span>
+                                  <span className="text-[9px] font-bold uppercase rounded-full bg-save text-white px-1.5 py-px">
+                                    {percentOff}% OFF
+                                  </span>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-sm font-bold text-gray-800 shrink-0">
+                                ₹
+                                {(
+                                  rawPrice * Number(item.quantity)
+                                ).toLocaleString()}
+                              </p>
+                            );
+                          })()}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="px-5 py-4 border-t border-gray-50">
+                    <PriceRows
+                      subtotal={pricingDetails.subtotal}
+                      shipping={pricingDetails.shipping}
+                      discount={pricingDetails.discount}
+                      giftWrapAmount={giftWrapAmount}
+                      appliedCoupon={appliedCoupon}
+                      totalToPay={totalToPay}
+                      itemCount={cartItems.length}
+                      isLoadingShipping={isCalculatingShipping}
+                      paymentMethod={paymentMethod}
+                      onApplyCoupon={() => setShowCouponModal(true)}
+                      onRemoveCoupon={
+                        isGuest ? handleGuestCouponRemoved : handleCouponRemoved
+                      }
+                    />
+                  </div>
+                </div>
+                {visibleNudgeBanners.length > 0 && (
+                  <div className="px-5 pb-5">
+                    <FreeShippingBanner
+                      bannersOverride={visibleNudgeBanners}
+                      variant="light"
+                      showQuantityStepper
+                      showProgressBar={false}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Coupon moved into the price breakdown ("Apply Coupon" row above
+                  Total); the input + available-coupons list now live in the
+                  showCouponModal popup below. */}
+
+              {/* Contact + Address combined card — kept last (name, address, details) */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                {/* Header */}
+                <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-50">
+                  <span className="w-6 h-6 rounded-full bg-ink text-white text-[11px] font-bold flex items-center justify-center shrink-0">
+                    2
+                  </span>
+                  <div className="w-8 h-8 rounded-xl bg-brand/10 flex items-center justify-center">
+                    <i className="fa-solid fa-truck text-brand text-sm" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-gray-800">
+                      Delivery Details
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Where your order will arrive
+                    </p>
+                  </div>
+                </div>
                 {/* Contact row */}
                 <div className="flex items-start gap-3.5 px-5 py-4">
                   <div className="w-8 h-8 rounded-xl bg-brand/10 flex items-center justify-center shrink-0 mt-0.5">
                     <i className="fa-solid fa-user text-brand text-xs" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-gray-800">{isGuest ? guestName : (userProfile?.userName || userProfile?.name)}</p>
-                    <p className="text-xs text-gray-400 mt-0.5 truncate">{isGuest ? guestEmail : userProfile?.email}</p>
-                    <p className="text-xs text-gray-400 mt-0.5 font-medium">{isGuest ? guestMobile : senderMobile}</p>
+                    <p className="text-sm font-bold text-gray-800">
+                      {isGuest
+                        ? guestName
+                        : userProfile?.userName || userProfile?.name}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5 truncate">
+                      {isGuest ? guestEmail : userProfile?.email}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5 font-medium">
+                      {isGuest ? guestMobile : senderMobile}
+                    </p>
                   </div>
                   <button onClick={() => goToStep(contactStep)} className="flex items-center gap-1 text-xs font-bold text-brand hover:text-ink transition-colors shrink-0">
                     <i className="fa-solid fa-pen text-[9px]" /> Edit
@@ -1608,11 +2184,17 @@ const CheckoutPage = () => {
                     <i className="fa-solid fa-location-dot text-brand text-xs" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs text-gray-600 leading-relaxed line-clamp-3">{address}</p>
-                    <p className="text-[11px] text-gray-400 mt-1 font-mono font-medium">PIN {pinCode}</p>
+                    <p className="text-xs text-gray-600 leading-relaxed line-clamp-3">
+                      {address}
+                    </p>
+                    <p className="text-[11px] text-gray-400 mt-1 font-mono font-medium">
+                      PIN {pinCode}
+                    </p>
                     {(preciseDetails.flatNo || preciseDetails.landmark) && (
                       <p className="text-[11px] text-gray-400 mt-0.5">
-                        {[preciseDetails.flatNo, preciseDetails.landmark].filter(Boolean).join(" · ")}
+                        {[preciseDetails.flatNo, preciseDetails.landmark]
+                          .filter(Boolean)
+                          .join(" · ")}
                       </p>
                     )}
                   </div>
@@ -1620,80 +2202,6 @@ const CheckoutPage = () => {
                     <i className="fa-solid fa-pen text-[9px]" /> Edit
                   </button>
                 </div>
-              </div>
-
-              {/* Mobile order summary accordion */}
-              <div className="lg:hidden bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="flex items-center justify-between px-5 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-lg bg-brand/8 flex items-center justify-center">
-                      <i className="fa-solid fa-bag-shopping text-ink text-xs" />
-                    </div>
-                    <span className="text-sm font-bold text-gray-800">Order Summary</span>
-                    <span className="text-[10px] bg-brand text-white px-2 py-0.5 rounded-md font-bold">{cartItems.length}</span>
-                  </div>
-                  <span className="text-sm font-bold text-ink">₹{totalToPay.toLocaleString()}</span>
-                </div>
-                <div className="border-t border-gray-50">
-                  <div className="divide-y divide-gray-50 max-h-64 overflow-y-auto">
-                    {cartItems.map((item) => {
-                      const displayName = resolveVariantTitle(item.name, item.variantTitleTemplate, item.selectedVariant);
-                      return (
-                      <div key={`${item.id}-${item.selectedVariant || "default"}`} className="flex items-center gap-3 px-5 py-3">
-                        <div className="relative shrink-0">
-                          <div className="w-10 h-10 rounded-lg bg-gray-50 border border-gray-100 overflow-hidden">
-                            <img src={item.image || "/placeholder.jpg"} alt={displayName} className="w-full h-full object-contain mix-blend-multiply" />
-                          </div>
-                          <button
-                            onClick={() => handleRemoveItem(item.id, item.selectedVariant)}
-                            title={`Remove ${displayName}`}
-                            aria-label={`Remove ${displayName}`}
-                            className="absolute -top-1.5 -left-1.5 z-10 w-5 h-5 flex items-center justify-center rounded-full bg-[#f5deb3] border border-[#e0c896] shadow-sm text-[#1c3026] hover:bg-[#E63329] hover:text-white hover:border-[#E63329] transition-colors"
-                          >
-                            <i className="fa-solid fa-xmark text-[9px]" />
-                          </button>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold text-gray-800 truncate">{displayName}</p>
-                          {item.selectedVariant && item.selectedVariant !== "N/A" && (
-                            <span className="inline-block mt-1 mb-0.5 px-2 py-0.5 rounded-full bg-[#2e443c] text-white text-[10px] font-semibold">
-                              {item.selectedVariant}
-                            </span>
-                          )}
-                          <p className="text-[10px] text-gray-400">Qty {item.quantity}</p>
-                        </div>
-                        {(() => {
-                          const discountedPrice = getItemDiscountedPrice(item);
-                          const rawPrice = Number(item.price) || 0;
-                          const hasDiscount = discountedPrice < rawPrice;
-                          const percentOff = hasDiscount
-                            ? Math.round(((rawPrice - discountedPrice) / rawPrice) * 100)
-                            : 0;
-                          return hasDiscount ? (
-                            <div className="text-right shrink-0">
-                              <p className="text-sm font-bold text-[#157a44]">₹{(discountedPrice * Number(item.quantity)).toLocaleString()}</p>
-                              <div className="flex items-center justify-end gap-1">
-                                <span className="text-[10px] text-gray-400 line-through">₹{(rawPrice * Number(item.quantity)).toLocaleString()}</span>
-                                <span className="text-[9px] font-bold uppercase rounded-full bg-[#157a44] text-white px-1.5 py-px">
-                                  {percentOff}% OFF
-                                </span>
-                              </div>
-                            </div>
-                          ) : (
-                            <p className="text-sm font-bold text-gray-800 shrink-0">₹{(rawPrice * Number(item.quantity)).toLocaleString()}</p>
-                          );
-                        })()}
-                      </div>
-                      );
-                    })}
-                  </div>
-                  <div className="px-5 py-4 border-t border-gray-50"><PriceRows subtotal={pricingDetails.subtotal} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} isLoadingShipping={isCalculatingShipping} paymentMethod={paymentMethod} /></div>
-                </div>
-                {visibleBannerProductId && (
-                  <div className="px-5 pb-5">
-                    <FreeShippingBanner productId={visibleBannerProductId} variant="light" showQuantityStepper showProgressBar={false} />
-                  </div>
-                )}
               </div>
 
               {/* Payment Method Selection */}
@@ -1759,7 +2267,7 @@ const CheckoutPage = () => {
                           Cash on Delivery
                         </p>
                         {paymentMethod === "COD" && realShippingAmount > 0 ? (
-                          <p className="text-xs text-[#a89068]/80 font-medium mt-0.5">
+                          <p className="text-xs text-brand/80 font-medium mt-0.5">
                             ₹{Math.min(Math.ceil(realShippingAmount) * 2, totalToPay).toLocaleString()} now · ₹{Math.max(0, totalToPay - Math.min(Math.ceil(realShippingAmount) * 2, totalToPay)).toLocaleString()} at delivery
                           </p>
                         ) : (
@@ -1775,7 +2283,7 @@ const CheckoutPage = () => {
                   </button>
                   {paymentMethod === "COD" && (
                 <div className="flex items-center gap-1   rounded-xl px-4 ">
-                  <i className="fa-solid fa-circle-info text-[#a89068] text-xs shrink-0" />
+                  <i className="fa-solid fa-circle-info text-brand text-xs shrink-0" />
                   <p className="text-[10px] font-medium text-gray-600">
                     Additional ₹{COD_HANDLING_FEE} COD handling fee applies.
                   </p>
@@ -1790,7 +2298,7 @@ const CheckoutPage = () => {
                   higher COD total never reads as a hidden markup. */}
               {/* {paymentMethod === "COD" && (
                 <div className="flex items-center gap-1   rounded-xl px-4 ">
-                  <i className="fa-solid fa-circle-info text-[#a89068] text-xs shrink-0" />
+                  <i className="fa-solid fa-circle-info text-brand text-xs shrink-0" />
                   <p className="text-[10px] font-medium text-gray-600">
                     Additional ₹{COD_HANDLING_FEE} COD handling fee applies.
                   </p>
@@ -1800,8 +2308,8 @@ const CheckoutPage = () => {
               {/* Coupon — available to all (guests + members) */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-50">
-                  <div className="w-8 h-8 rounded-xl bg-[#a89068]/10 flex items-center justify-center">
-                    <i className="fa-solid fa-percent text-[#a89068] text-sm" />
+                  <div className="w-8 h-8 rounded-xl bg-brand/10 flex items-center justify-center">
+                    <i className="fa-solid fa-percent text-brand text-sm" />
                   </div>
                   <div>
                     <p className="text-sm font-bold text-gray-800">Promo Code</p>
@@ -1819,7 +2327,7 @@ const CheckoutPage = () => {
                     onCouponRemoved={isGuest ? handleGuestCouponRemoved : handleCouponRemoved}
                   />
                   {!appliedCoupon && (
-                    <button onClick={() => setShowCouponModal(true)} className="w-full py-2.5 border border-dashed border-gray-200 rounded-xl text-xs font-bold text-gray-400 hover:border-[#a89068]/50 hover:text-[#a89068] transition-all flex items-center justify-center gap-2">
+                    <button onClick={() => setShowCouponModal(true)} className="w-full py-2.5 border border-dashed border-gray-200 rounded-xl text-xs font-bold text-gray-400 hover:border-brand/50 hover:text-brand transition-all flex items-center justify-center gap-2">
                       <i className="fa-solid fa-tags" /> Browse available coupons
                     </button>
                   )}
@@ -1834,10 +2342,20 @@ const CheckoutPage = () => {
                     <i className="fa-solid fa-triangle-exclamation text-red-500" />
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm font-bold text-red-800">Payment Failed</p>
-                    <p className="text-xs text-red-600 mt-1 leading-relaxed">{paymentError}</p>
+                    <p className="text-sm font-bold text-red-800">
+                      Payment Failed
+                    </p>
+                    <p className="text-xs text-red-600 mt-1 leading-relaxed">
+                      {paymentError}
+                    </p>
                     {showRetry && (
-                      <button onClick={() => { setPaymentError(null); setShowRetry(false); }} className="mt-3 text-xs font-bold text-red-500 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-100 transition-colors">
+                      <button
+                        onClick={() => {
+                          setPaymentError(null);
+                          setShowRetry(false);
+                        }}
+                        className="mt-3 text-xs font-bold text-red-500 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-100 transition-colors"
+                      >
                         Dismiss &amp; Retry
                       </button>
                     )}
@@ -1867,14 +2385,15 @@ const CheckoutPage = () => {
         {/* ── Right: sticky sidebar ─────────────────────────────────────── */}
         <div className="hidden lg:block sticky top-40 self-start">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
               <div className="flex items-center gap-2.5">
                 <div className="w-7 h-7 rounded-lg bg-brand/8 flex items-center justify-center">
                   <i className="fa-solid fa-bag-shopping text-ink text-xs" />
                 </div>
-                <span className="text-sm font-bold text-gray-800">Your Order</span>
+                <span className="text-sm font-bold text-gray-800">
+                  Your Order
+                </span>
               </div>
               <span className="text-[10px] font-bold bg-brand text-white px-2.5 py-1 rounded-lg">
                 {cartItems.length} item{cartItems.length !== 1 ? "s" : ""}
@@ -1882,9 +2401,19 @@ const CheckoutPage = () => {
             </div>
 
             {/* Items */}
-            <div className="divide-y divide-gray-50 max-h-[260px] overflow-y-auto" style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}>
+            <div
+              className="divide-y divide-gray-50 max-h-[260px] overflow-y-auto"
+              style={{
+                scrollbarWidth: "thin",
+                scrollbarColor: "#e5e7eb transparent",
+              }}
+            >
               {cartItems.map((item) => {
-                const displayName = resolveVariantTitle(item.name, item.variantTitleTemplate, item.selectedVariant);
+                const displayName = resolveVariantTitle(
+                  item.name,
+                  item.variantTitleTemplate,
+                  item.selectedVariant,
+                );
                 return (
                 <div key={`${item.id}-${item.selectedVariant || "default"}`} className="flex items-center gap-3 px-5 py-3.5 group hover:bg-gray-50/60 transition-colors">
                   <div className="relative shrink-0">
@@ -1898,7 +2427,7 @@ const CheckoutPage = () => {
                       onClick={() => handleRemoveItem(item.id, item.selectedVariant)}
                       title={`Remove ${displayName}`}
                       aria-label={`Remove ${displayName}`}
-                      className="absolute -top-1.5 -left-1.5 z-10 w-5 h-5 flex items-center justify-center rounded-full bg-[#f5deb3] border border-[#e0c896] shadow-sm text-[#1c3026] hover:bg-[#E63329] hover:text-white hover:border-[#E63329] transition-colors"
+                      className="absolute -top-1.5 -left-1.5 z-10 w-5 h-5 flex items-center justify-center rounded-full bg-paper border border-hair shadow-sm text-ink hover:bg-brand hover:text-white hover:border-brand transition-colors"
                     >
                       <i className="fa-solid fa-xmark text-[9px]" />
                     </button>
@@ -1906,7 +2435,7 @@ const CheckoutPage = () => {
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-gray-800 truncate leading-tight">{displayName}</p>
                     {item.selectedVariant && item.selectedVariant !== "N/A" && (
-                      <span className="inline-block mt-1 mb-0.5 px-2 py-0.5 rounded-full bg-[#2e443c] text-white text-[10px] font-semibold">
+                      <span className="inline-block mt-1 mb-0.5 px-2 py-0.5 rounded-full bg-ink text-white text-[10px] font-semibold">
                         {item.selectedVariant}
                       </span>
                     )}
@@ -1920,10 +2449,10 @@ const CheckoutPage = () => {
                       : 0;
                     return hasDiscount ? (
                       <div className="text-right shrink-0">
-                        <p className="text-xs font-bold text-[#157a44]">₹{(discountedPrice * Number(item.quantity)).toLocaleString()}</p>
+                        <p className="text-xs font-bold text-save">₹{(discountedPrice * Number(item.quantity)).toLocaleString()}</p>
                         <div className="flex items-center justify-end gap-1">
                           <span className="text-[9px] text-gray-400 line-through">₹{(rawPrice * Number(item.quantity)).toLocaleString()}</span>
-                          <span className="text-[9px] font-bold uppercase rounded-full bg-[#157a44] text-white px-1.5 py-px">
+                          <span className="text-[9px] font-bold uppercase rounded-full bg-save text-white px-1.5 py-px">
                             {percentOff}% OFF
                           </span>
                         </div>
@@ -1941,31 +2470,85 @@ const CheckoutPage = () => {
 
             {/* Price */}
             <div className="px-5 py-5 border-t border-gray-100">
-              <PriceRows subtotal={pricingDetails.subtotal} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} isLoadingShipping={isCalculatingShipping} paymentMethod={paymentMethod} />
+              <PriceRows
+                subtotal={pricingDetails.subtotal}
+                shipping={pricingDetails.shipping}
+                discount={pricingDetails.discount}
+                giftWrapAmount={giftWrapAmount}
+                appliedCoupon={appliedCoupon}
+                totalToPay={totalToPay}
+                itemCount={cartItems.length}
+                isLoadingShipping={isCalculatingShipping}
+                paymentMethod={paymentMethod}
+                onApplyCoupon={() => setShowCouponModal(true)}
+                onRemoveCoupon={
+                  isGuest ? handleGuestCouponRemoved : handleCouponRemoved
+                }
+              />
             </div>
 
-            {visibleBannerProductId && (
+            {visibleNudgeBanners.length > 0 && (
               <div className="px-5 pb-5">
-                <FreeShippingBanner productId={visibleBannerProductId} variant="light" showQuantityStepper showProgressBar={false} />
+                <FreeShippingBanner
+                  bannersOverride={visibleNudgeBanners}
+                  variant="light"
+                  showQuantityStepper
+                  showProgressBar={false}
+                />
               </div>
             )}
 
-            {/* Pay button (review step only) */}
+            {/* Pay buttons (review step only) */}
             {currentStep === reviewStep && (
               <div className="px-5 pb-5 space-y-3">
+                {/* Pay Online → primary CTA with fancy Save tooltip */}
+                <div className="relative">
+                  {!payBusy && amountsSettled && codSaving > 0 && (
+                    <div className="pointer-events-none absolute -top-2.5 right-3 z-10">
+                      <span className="savings-tip inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-[10px] font-extrabold shadow-md shadow-emerald-600/40">
+                        <i className="fa-solid fa-bolt text-[8px]" /> SAVE ₹{codSaving}
+                      </span>
+                    </div>
+                  )}
+                  <button
+                    onClick={handlePrepaidButton}
+                    disabled={payBusy || !amountsSettled}
+                    className={`w-full h-14 rounded-xl font-bold text-sm active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 disabled:opacity-50 border-2 ${
+                      paymentMethod === "PREPAID"
+                        ? "bg-ink text-white border-ink shadow-lg shadow-ink/25"
+                        : "bg-white text-ink border-ink hover:bg-ink/5"
+                    }`}
+                  >
+                    {paymentMethod === "PREPAID" && (isOrdering || pendingPay) ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />{" "}
+                        Processing…
+                      </>
+                    ) : paymentMethod === "PREPAID" && isCalculatingShipping ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />{" "}
+                        Calculating…
+                      </>
+                    ) : (
+                      <>
+                        <i className="fa-solid fa-lock text-xs opacity-70" />{" "}
+                        Pay Online · ₹{totalToPay.toLocaleString()}
+                      </>
+                    )}
+                  </button>
+                </div>
+                {/* Pay on Delivery → filled gold when selected, outline otherwise */}
                 <button
-                  onClick={handlePayment}
-                  disabled={isOrdering || isCalculatingShipping || pricingDetails.shipping === null || shippingError}
-                  className="w-full h-14 bg-brand text-white rounded-xl font-bold text-sm hover:bg-brandHi active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 shadow-lg shadow-brand/25 disabled:opacity-50"
+                  onClick={handleCodButton}
+                  disabled={payBusy || !amountsSettled}
+                  className={`w-full h-14 rounded-xl font-bold text-sm active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 disabled:opacity-50 border-2 ${
+                    paymentMethod === "COD"
+                      ? "bg-brand text-white border-brand shadow-lg shadow-brand/25"
+                      : "bg-brand/10 text-brand border-brand hover:bg-brand/20"
+                  }`}
                 >
-                  {isOrdering
-                    ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Processing…</>
-                    : isCalculatingShipping
-                    ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Calculating…</>
-                    : paymentMethod === "COD" && realShippingAmount > 0
-                    ? <><i className="fa-solid fa-hand-holding-dollar text-xs opacity-70" /> Pay ₹{Math.min(Math.ceil(realShippingAmount) * 2, totalToPay).toLocaleString()} Advance</>
-                    : <><i className="fa-solid fa-lock text-xs opacity-70" /> Pay ₹{totalToPay.toLocaleString()}</>
-                  }
+                  <i className="fa-solid fa-hand-holding-dollar text-xs opacity-80" />{" "}
+                  Pay on Delivery
                 </button>
                 <div className="flex items-center justify-center gap-3">
                   <i className="fa-brands fa-cc-visa text-gray-300 text-lg" />
@@ -2024,22 +2607,183 @@ const CheckoutPage = () => {
                 </button>
               )}
               {currentStep === reviewStep && (
-                <button
-                  onClick={handlePayment}
-                  disabled={isOrdering || isCalculatingShipping || pricingDetails.shipping === null || shippingError}
-                  className="flex-1 h-12 bg-brand text-white rounded-xl font-bold text-sm hover:bg-brandHi active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 shadow-lg disabled:opacity-50"
-                >
-                  {isOrdering
-                    ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Processing…</>
-                    : isCalculatingShipping
-                    ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Calculating…</>
-                    : paymentMethod === "COD" && realShippingAmount > 0
-                    ? <>Pay Advance</>
-                    : <><i className="fa-solid fa-lock text-[10px] opacity-70" /> Pay Now</>
-                  }
-                </button>
+                <>
+                  {/* Pay on Delivery — outline until selected */}
+                  <button
+                    onClick={handleCodButton}
+                    disabled={payBusy || !amountsSettled}
+                    className={`flex-1 basis-0 min-w-0 h-12 px-2 rounded-xl font-bold text-[12px] active:scale-[0.99] transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 border-2 ${
+                      paymentMethod === "COD"
+                        ? "bg-brand text-white border-brand shadow-lg"
+                        : "bg-brand/10 text-brand border-brand hover:bg-brand/20"
+                    }`}
+                  >
+                    <i className="fa-solid fa-hand-holding-dollar text-[11px] opacity-80" /> Pay on Delivery
+                  </button>
+
+                  {/* Pay Online — keeps the prepaid savings tooltip */}
+                  <div className="relative flex-1 basis-0 min-w-0">
+                    {!payBusy && amountsSettled && codSaving > 0 && (
+                      <div className="pointer-events-none absolute -top-[26px] left-1/2 -translate-x-1/2 z-10">
+                        <div className="savings-tip relative px-2 py-[3px] rounded-full bg-save text-white text-[9px] font-extrabold tracking-wide shadow-md shadow-save/40 whitespace-nowrap">
+                          <i className="fa-solid fa-bolt text-[8px] mr-0.5" /> SAVE ₹{codSaving}
+                          <span className="absolute left-1/2 -bottom-[3px] -translate-x-1/2 w-1.5 h-1.5 rotate-45 bg-save" />
+                        </div>
+                      </div>
+                    )}
+                    <button
+                      onClick={handlePrepaidButton}
+                      disabled={payBusy || !amountsSettled}
+                      className={`w-full h-12 rounded-xl font-bold text-[13px] active:scale-[0.99] transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 border-2 ${
+                        paymentMethod === "PREPAID"
+                          ? "bg-ink text-white border-ink shadow-lg"
+                          : "bg-white text-ink border-ink hover:bg-ink/5"
+                      }`}
+                    >
+                      {paymentMethod === "PREPAID" && (isOrdering || pendingPay || isCalculatingShipping) ? (
+                        <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <><i className="fa-solid fa-lock text-[10px] opacity-70" /> Pay Online</>
+                      )}
+                    </button>
+                  </div>
+                </>
               )}
             </div>
+            <style>{`
+              @keyframes savingsFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-2px)} }
+              .savings-tip{ animation: savingsFloat 1.8s ease-in-out infinite; }
+            `}</style>
+          </div>
+        </div>
+      )}
+
+      {/* ── COD advance breakdown popup ──────────────────────────────────── */}
+      {showCodSheet && (
+        <div
+          className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm"
+          onClick={() => !isOrdering && setShowCodSheet(false)}
+        >
+          <div
+            className="w-full sm:max-w-sm bg-white rounded-t-2xl sm:rounded-2xl p-5 pb-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold text-ink">Cash / UPI on Delivery</h3>
+              <button
+                onClick={() => !isOrdering && setShowCodSheet(false)}
+                className="text-gray-400 hover:text-gray-600 disabled:opacity-40"
+                disabled={isOrdering}
+              >
+                <i className="fa-solid fa-xmark text-lg" />
+              </button>
+            </div>
+
+            <div className="space-y-2.5 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500">Cart value</span>
+                <span className="font-semibold text-gray-800">
+                  ₹{pricingDetails.subtotal.toLocaleString()}
+                </span>
+              </div>
+              {giftWrapAmount > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500">Gift wrap</span>
+                  <span className="font-semibold text-gray-800">
+                    ₹{giftWrapAmount.toLocaleString()}
+                  </span>
+                </div>
+              )}
+              {pricingDetails.discount > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500">Discount</span>
+                  <span className="font-semibold text-emerald-600">
+                    −₹{pricingDetails.discount.toLocaleString()}
+                  </span>
+                </div>
+              )}
+              {/* One tap now opens this sheet at the same moment the switch to
+                  COD re-triggers the shipping call, so these three figures are
+                  still prepaid-based for a beat. Showing a placeholder beats
+                  showing a number the customer would watch change. */}
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500">Shipping</span>
+                {!amountsSettled ? (
+                  <AmountPlaceholder />
+                ) : isShippingFree ? (
+                  <span className="font-semibold">
+                    <span className="text-gray-400 line-through mr-1">
+                      ₹{Math.ceil(realShippingAmount).toLocaleString()}
+                    </span>
+                    <span className="text-emerald-600">FREE</span>
+                  </span>
+                ) : (
+                  <span className="font-semibold text-gray-800">
+                    ₹{Math.ceil(realShippingAmount).toLocaleString()}
+                  </span>
+                )}
+              </div>
+
+              <div className="border-t border-dashed border-gray-200 my-1" />
+
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-ink">
+                  Pay now (advance)
+                </span>
+                {!amountsSettled ? (
+                  <AmountPlaceholder />
+                ) : (
+                  <span className="font-bold text-ink">
+                    ₹{codAdvance.toLocaleString()}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500">Pay on delivery</span>
+                {!amountsSettled ? (
+                  <AmountPlaceholder />
+                ) : (
+                  <span className="font-semibold text-gray-800">
+                    ₹{codRemaining.toLocaleString()}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setShowCodSheet(false);
+                handlePayOnline();
+              }}
+              disabled={payBusy || !amountsSettled}
+              className="mt-3 w-full flex items-center justify-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-200 py-2 text-[13px] font-bold text-emerald-700 hover:bg-emerald-100 active:scale-[0.99] transition-all disabled:opacity-50"
+            >
+              <i className="fa-solid fa-bolt text-[11px]" /> Save ₹
+              {COD_HANDLING_FEE} and pay online →
+            </button>
+
+            <button
+              onClick={handleConfirmCod}
+              disabled={!amountsSettled || isOrdering}
+              className="mt-4 w-full h-12 bg-ink text-white rounded-xl font-bold text-sm hover:bg-brandHi active:scale-[0.99] transition-all flex items-center justify-center gap-2.5 shadow-lg disabled:opacity-50"
+            >
+              {isOrdering ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />{" "}
+                  Processing…
+                </>
+              ) : !amountsSettled ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />{" "}
+                  Calculating…
+                </>
+              ) : (
+                <>
+                  <i className="fa-solid fa-lock text-xs opacity-70" /> Pay ₹
+                  {codAdvance.toLocaleString()} Advance
+                </>
+              )}
+            </button>
           </div>
         </div>
       )}
@@ -2051,10 +2795,20 @@ const CheckoutPage = () => {
         </div>
       }>
         <GoogleAddressFormModal
-          isOpen={showMapModal} onClose={() => setShowMapModal(false)}
-          onAddressConfirm={handleAddressConfirm} showNotification={showNotification}
-          prefillName={isGuest ? guestName : (userProfile?.userName || userProfile?.name || "")}
-          prefillPhone={isGuest ? guestMobile : (String(userProfile?.mobileNumber || "") || senderMobile || "")}
+          isOpen={showMapModal}
+          onClose={() => setShowMapModal(false)}
+          onAddressConfirm={handleAddressConfirm}
+          showNotification={showNotification}
+          prefillName={
+            isGuest
+              ? guestName
+              : userProfile?.userName || userProfile?.name || ""
+          }
+          prefillPhone={
+            isGuest
+              ? guestMobile
+              : String(userProfile?.mobileNumber || "") || senderMobile || ""
+          }
           isGuest={isGuest}
           initialData={addressForm}
         />
@@ -2062,15 +2816,24 @@ const CheckoutPage = () => {
 
       <Suspense fallback={null}>
         <MobileNumberModal
-          showMobileModal={showMobileModal} setShowMobileModal={setShowMobileModal}
-          userProfile={userProfile} onSaveMobileNumber={handleSaveMobileNumber}
-          showNotification={showNotification} isSaving={isSavingMobile}
+          showMobileModal={showMobileModal}
+          setShowMobileModal={setShowMobileModal}
+          userProfile={userProfile}
+          onSaveMobileNumber={handleSaveMobileNumber}
+          showNotification={showNotification}
+          isSaving={isSavingMobile}
         />
       </Suspense>
 
       {showCouponModal && (
-        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4" onClick={() => setShowCouponModal(false)}>
-          <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[88vh] overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
+          onClick={() => setShowCouponModal(false)}
+        >
+          <div
+            className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[88vh] overflow-hidden shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-xl bg-brand/10 flex items-center justify-center">
@@ -2078,19 +2841,48 @@ const CheckoutPage = () => {
                 </div>
                 <p className="font-bold text-gray-800">Available Coupons</p>
               </div>
-              <button onClick={() => setShowCouponModal(false)} className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+              <button
+                onClick={() => setShowCouponModal(false)}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+              >
                 <i className="fa-solid fa-xmark text-gray-500 text-sm" />
               </button>
             </div>
-            <div className="p-5 overflow-y-auto max-h-[calc(88vh-72px)]">
-              <Suspense fallback={<ComponentLoader />}>
-                <CouponList
-                  onCouponApplied={isGuest ? handleGuestCouponApplied : handleCouponApplied}
-                  userId={userProfile?.userId}
+            <div className="p-5 overflow-y-auto max-h-[calc(88vh-72px)] space-y-5">
+              {/* Manual code entry — moved here from the checkout page */}
+              <div>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                  Have a coupon code?
+                </p>
+                <CouponInput
+                  key={appliedCoupon || "none"}
+                  appliedCoupon={appliedCoupon}
+                  discount={pricingDetails.discount}
                   isGuest={isGuest}
                   cartTotal={cartTotalAmount}
+                  onCouponApplied={
+                    isGuest ? handleGuestCouponApplied : handleCouponApplied
+                  }
+                  onCouponRemoved={
+                    isGuest ? handleGuestCouponRemoved : handleCouponRemoved
+                  }
                 />
-              </Suspense>
+              </div>
+              <div className="border-t border-gray-100 pt-4">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
+                  Available coupons
+                </p>
+                <Suspense fallback={<ComponentLoader />}>
+                  <CouponList
+                    onCouponApplied={
+                      isGuest ? handleGuestCouponApplied : handleCouponApplied
+                    }
+                    userId={userProfile?.userId}
+                    isGuest={isGuest}
+                    cartTotal={cartTotalAmount}
+                  />
+                </Suspense>
+              </div>
             </div>
           </div>
         </div>

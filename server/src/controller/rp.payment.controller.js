@@ -21,6 +21,69 @@ import Address from "../model/address.new.model.js";
 import html_to_pdf from "html-pdf-node";
 import { generateInvoiceHtmlTemplate } from "../template/invoiceTemplate.template.js";
 import { calculateShippingRate, FALLBACK_SHIPPING_CHARGE } from "../services/shipping.service.js";
+import { apiCache } from "../module/cache.manager.module.js";
+
+// ── Per-variant stock decrement ───────────────────────────────────────────────
+// Runs once, atomically, the moment an order is confirmed PAID. For each ordered
+// item we decrement THAT variant's tracked quantity (variantQuantity) by the
+// purchased quantity. Variants with no tracked quantity (null) are skipped —
+// they aren't stock-managed. The update is atomic ($inc on the positionally
+// matched variant) so concurrent orders don't clobber each other. When a
+// quantity crosses 0 the variant auto-derives out-of-stock everywhere (the OOS
+// rule is computed, not stored). Best-effort: never throws into the payment flow.
+const decrementStockForOrder = async (order) => {
+  let anyChanged = false;
+  for (const item of order.items || []) {
+    const qty = item?.productSnapshot?.quantity;
+    const variantName = item?.productSnapshot?.selectedVariant;
+    if (!item.productId || !qty || qty < 1) continue;
+    if (!variantName || variantName === "N/A") continue; // single-design / no variant
+    try {
+      const res = await Product.updateOne(
+        {
+          productId: item.productId,
+          variantDetails: { $elemMatch: { variantName, variantQuantity: { $ne: null } } },
+        },
+        // Decrement the variant AND the product-level total (kept = sum of
+        // tracked variant quantities) so both stay consistent between admin saves.
+        { $inc: { "variantDetails.$.variantQuantity": -qty, productQuantity: -qty } },
+      );
+      if (res.modifiedCount > 0) anyChanged = true;
+    } catch (err) {
+      console.error(`[Stock] decrement failed order=${order.orderId} product=${item.productId} variant=${variantName}:`, err.message);
+    }
+  }
+  // Product responses are cached (10-min TTL) — flush so the storefront reflects
+  // the new stock (and any freshly out-of-stock variant) right away.
+  if (anyChanged) {
+    try { apiCache.clear(); } catch { /* best-effort */ }
+  }
+};
+
+// Effective per-variant out-of-stock — mirrors the admin/storefront rule:
+// manual flag, or a tracked quantity that has reached 0.
+const isVariantOutOfStock = (variant) =>
+  !!variant &&
+  (variant.variantOutOfStock === true ||
+    (variant.variantQuantity != null && Number(variant.variantQuantity) <= 0));
+
+// Guard at order creation: block buying an out-of-stock (or over-ordered)
+// variant. Only enforces when the variant is matched by name and stock-tracked;
+// unmatched / "N/A" (single-design) items pass through untouched.
+const assertVariantAvailable = (product, variantName, qty) => {
+  if (!product?.variantDetails?.length) return;
+  if (!variantName || variantName === "N/A") return;
+  const variant = product.variantDetails.find((v) => v.variantName === variantName);
+  if (!variant) return;
+  if (isVariantOutOfStock(variant)) {
+    throw new ValidationError(`"${product.productName} — ${variantName}" is out of stock.`);
+  }
+  if (variant.variantQuantity != null && qty > variant.variantQuantity) {
+    throw new ValidationError(
+      `Only ${variant.variantQuantity} unit(s) of "${product.productName} — ${variantName}" left.`,
+    );
+  }
+};
 
 // Genuinely unserviceable pincode must still block checkout — we cannot accept an
 // order we cannot ship. Any OTHER failure (API down, network timeout after all
@@ -46,6 +109,7 @@ const getShippingRateOrFallback = async (params) => {
 };
 import { isFreeShippingEligible, getFreeShippingConfig } from "../utils/freeShippingOffer.util.js";
 import { getActiveCartRules, evaluateCartRules, applyBestDiscount } from "../utils/cartRule.util.js";
+import { getPublicOfferConfig } from "../utils/offer.util.js";
 import { sendMetaCapiEvent } from "../services/meta.capi.service.js";
 
 // Collect Meta CAPI match-quality signals from the order-creation request.
@@ -202,6 +266,8 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     // Find the cart item to get its specific image
     let itemImage = null;
     const itemVariant = item.variant || item.color || "N/A";
+    // Block out-of-stock / over-ordered variants before the order is created.
+    assertVariantAvailable(product, itemVariant, item.quantity);
     const cartKey = `${item.productId}:${itemVariant}`;
 
     // 1. Try to get image from Cart Snapshot (Most accurate for what user saw)
@@ -372,6 +438,18 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   //   `[FreeShipping][Order:auth] realShipping=₹${realShippingAmount} chargedShipping=₹${chargedShippingAmount} items=${items.map(i => `${i.productId}x${i.quantity}`).join(",")}`,
   // );
 
+  // Gift wrap: server-authoritative price + intent. `cart.giftWrap` is the
+  // ONLY source for "did they select it" (never req.body); price always comes
+  // fresh from the live offer config, so a stale intent left over after an
+  // admin disables the offer can never add a charge.
+  const giftWrapConfig = await getPublicOfferConfig("gift_wrap");
+  // One gift wrap per distinct GIFT-WRAP-ELIGIBLE product in the order
+  // (admin opt-in per product) — auto-derived, not client-set.
+  const giftWrapQty = products.filter((p) => p.giftWrapEligible === true).length;
+  const giftWrapSelected = !!cart.giftWrap && giftWrapConfig.isActive && giftWrapQty > 0;
+  const giftWrapAmount = giftWrapSelected ? giftWrapConfig.price * giftWrapQty : 0;
+  const giftWrapNoteOptions = giftWrapSelected && cart.giftWrapNoteOptions?.length ? cart.giftWrapNoteOptions : ["none"];
+
   // Always re-derive discount from the live coupon + current subtotal.
   // This fixes: products added after coupon was applied, COD/prepaid toggle, page not refreshed.
   let isInternalTestOrder = false;
@@ -445,7 +523,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       // ── INTERNAL TEST: completely separate path ──────────────────────────────
       // Always ₹1 regardless of cart size, shipping, or payment method.
       isInternalTestOrder = true;
-      discountAmount = Math.max(subtotal + chargedShippingAmount - 1, 0); // stored for audit record
+      discountAmount = Math.max(subtotal + giftWrapAmount + chargedShippingAmount - 1, 0); // stored for audit record
     } else if (liveCoupon.discountType === "PERCENTAGE") {
       let d = Math.floor((subtotal * liveCoupon.discountValue) / 100);
       if (liveCoupon.maxDiscountCap) d = Math.min(d, liveCoupon.maxDiscountCap);
@@ -483,7 +561,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     }
   }
 
-  finalAmount = isInternalTestOrder ? 1 : Math.max(subtotal + chargedShippingAmount - discountAmount, 0);
+  finalAmount = isInternalTestOrder ? 1 : Math.max(subtotal + giftWrapAmount + chargedShippingAmount - discountAmount, 0);
 
   // Sync shipping in snapshots — customer-facing amount (0 when free-shipping offer applies)
   orderItems.forEach(i => { i.productSnapshot.shipping = String(chargedShippingAmount); });
@@ -512,7 +590,12 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     userName: deliveryAddressSnapshot.fullName,
     userMobile: deliveryAddressSnapshot.mobileNumber,
     items: orderItems,
-    amount: finalAmount,
+    // Whole-rupee, matching exactly what razorpayChargeAmountPaise actually
+    // charges — finalAmount itself can be fractional (realShippingAmount is
+    // a live carrier rate, not guaranteed integer), so storing it unrounded
+    // here could drift a few paise from the real charge in the order record.
+    amount: Math.ceil(finalAmount),
+    giftWrap: { selected: giftWrapSelected, price: giftWrapAmount, quantity: giftWrapQty, title: giftWrapConfig.title, noteOptions: giftWrapNoteOptions },
     shippingInfo: {
       // Real carrier cost for internal accounting — grouped with the other
       // carrier-enrichment fields below, not the customer-facing amount.
@@ -659,6 +742,10 @@ const razorpayWebHookController = async (req, res) => {
           });
 
           await order.save();
+
+          // Decrement per-variant stock now that the order is confirmed PAID.
+          // Guarded by the `order.status !== "PAID"` block above → runs once.
+          await decrementStockForOrder(order);
 
           // ── STEP 3: Send credentials email now that order is confirmed ────
           if (guestCredentials) {
@@ -979,7 +1066,7 @@ const generateTempPassword = () => {
 };
 
 const guestCreateOrderController = asyncHandler(async (req, res) => {
-  const { items, guestInfo, deliveryAddress, paymentMethod: reqPaymentMethod, couponCode: rawCouponCode } = req.body;
+  const { items, guestInfo, deliveryAddress, paymentMethod: reqPaymentMethod, couponCode: rawCouponCode, giftWrap: reqGiftWrap, giftWrapNoteOptions: reqGiftWrapNoteOptions } = req.body;
 
   if (!guestInfo?.name?.trim()) throw new ValidationError("Full name is required");
   if (!guestInfo?.email?.trim()) throw new ValidationError("Email is required");
@@ -1005,6 +1092,8 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   const orderItems = items.map((item) => {
     const product = products.find((p) => p.productId === item.productId);
     const itemVariant = item.variant || "N/A";
+    // Block out-of-stock / over-ordered variants before the order is created.
+    assertVariantAvailable(product, itemVariant, item.quantity);
 
     let priceAtPurchase = 0;
     if (product.variantDetails && product.variantDetails.length > 0) {
@@ -1077,6 +1166,21 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   // console.log(
   //   `[FreeShipping][Order:guest] realShipping=₹${realShippingAmount} chargedShipping=₹${chargedShippingAmount} items=${items.map(i => `${i.productId}x${i.quantity}`).join(",")}`,
   // );
+
+  // Gift wrap: guests have no server-side cart to read intent from, so the
+  // boolean (only) comes from req.body — that's safe, it just means "include
+  // it or don't." Price is still never trusted from the client: it's always
+  // the live offer config's price, zeroed automatically if the offer is off.
+  const giftWrapConfig = await getPublicOfferConfig("gift_wrap");
+  // One gift wrap per distinct GIFT-WRAP-ELIGIBLE product (admin opt-in per product).
+  const giftWrapQty = products.filter((p) => p.giftWrapEligible === true).length;
+  const giftWrapSelected = !!reqGiftWrap && giftWrapConfig.isActive && giftWrapQty > 0;
+  const giftWrapAmount = giftWrapSelected ? giftWrapConfig.price * giftWrapQty : 0;
+  const GIFT_NOTE_OPTIONS = ["birthday", "rakhi", "none"];
+  const validReqNotes = Array.isArray(reqGiftWrapNoteOptions)
+    ? reqGiftWrapNoteOptions.filter((n) => GIFT_NOTE_OPTIONS.includes(n))
+    : [];
+  const giftWrapNoteOptions = giftWrapSelected && validReqNotes.length ? validReqNotes : ["none"];
 
   // ── Guest coupon validation ───────────────────────────────────────────────────
   let couponCodeId = null, couponCodeName = null, discountAmount = 0, isApplied = false;
@@ -1155,7 +1259,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     // Calculate discount
     if (isValidInternal) {
       isInternalTestOrder = true;
-      discountAmount = Math.max(subtotal + chargedShippingAmount - 1, 0);
+      discountAmount = Math.max(subtotal + giftWrapAmount + chargedShippingAmount - 1, 0);
     } else if (liveCoupon.discountType === "PERCENTAGE") {
       let d = Math.floor((subtotal * liveCoupon.discountValue) / 100);
       if (liveCoupon.maxDiscountCap) d = Math.min(d, liveCoupon.maxDiscountCap);
@@ -1170,7 +1274,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     console.log(`[Coupon:Guest] Applied "${cleanCode}" — discount ₹${discountAmount} on subtotal ₹${subtotal}`);
   }
 
-  const finalAmount = isInternalTestOrder ? 1 : Math.max(subtotal + chargedShippingAmount - discountAmount, 0);
+  const finalAmount = isInternalTestOrder ? 1 : Math.max(subtotal + giftWrapAmount + chargedShippingAmount - discountAmount, 0);
 
   // Update orderItems with shipping value now that it's calculated — customer-facing amount
   orderItems.forEach(i => { i.productSnapshot.shipping = String(chargedShippingAmount); });
@@ -1194,7 +1298,12 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     userName: guestInfo.name.trim(),
     userMobile: cleanMobile,
     items: orderItems,
-    amount: finalAmount,
+    // Whole-rupee, matching exactly what razorpayChargeAmountPaise actually
+    // charges — finalAmount itself can be fractional (realShippingAmount is
+    // a live carrier rate, not guaranteed integer), so storing it unrounded
+    // here could drift a few paise from the real charge in the order record.
+    amount: Math.ceil(finalAmount),
+    giftWrap: { selected: giftWrapSelected, price: giftWrapAmount, quantity: giftWrapQty, title: giftWrapConfig.title, noteOptions: giftWrapNoteOptions },
     shippingInfo: {
       amount: realShippingAmount,
       type: shippingResult?.type || "standard",

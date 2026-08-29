@@ -6,6 +6,7 @@ import {
   userClearCart,
   getOrderStatus,
   userMergeGuestCart,
+  userToggleGiftWrap,
 } from "../controller/user.cart.controller.js";
 import { authGuardService, optionalAuthGuard } from "../services/common.auth.service.js";
 import { csrfProtection } from "../middleware/csrf.middleware.js";
@@ -33,6 +34,13 @@ userCartRouter.delete(
   authGuardService("USER"),
   csrfProtection,
   userClearCart,
+);
+
+userCartRouter.post(
+  "/user/cart/gift-wrap",
+  authGuardService("USER"),
+  csrfProtection,
+  userToggleGiftWrap,
 );
 
 // Public — orderId (razorpay order id) is the implicit secret; no sensitive data exposed

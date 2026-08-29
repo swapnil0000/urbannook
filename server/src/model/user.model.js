@@ -75,7 +75,7 @@ const userSchema = mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["USER", "WAITLIST_USER"],
+      enum: ["USER"],
       default: "USER",
     },
   },

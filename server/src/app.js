@@ -6,7 +6,6 @@ import {
   userRouter,
   productRouter,
   commonRouter,
-  userWaitListRouter,
   userAddressRouter,
   userCartRouter,
   userCommunityListRouter,
@@ -23,6 +22,8 @@ import {
   freeShippingOfferRouter,
   passkeyRouter,
   cartRuleRouter,
+  offerLeadRouter,
+  offerRouter,
 } from "./routes/index.js";
 import cookieParser from "cookie-parser";
 import healthRouter from "./routes/health.route.js";
@@ -204,7 +205,6 @@ app.use(
   userRouter,
   productRouter,
   commonRouter,
-  userWaitListRouter,
   userWishListRouter,
   userAddressRouter,
   userCartRouter,
@@ -221,6 +221,8 @@ app.use(
   freeShippingOfferRouter,
   passkeyRouter,
   cartRuleRouter,
+  offerLeadRouter,
+  offerRouter,
 );
 
 // TEMP deploy-verification log — remove once cart-rules deploy is confirmed

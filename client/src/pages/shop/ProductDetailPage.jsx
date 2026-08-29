@@ -5,6 +5,9 @@ import confetti from 'canvas-confetti';
 import SEOHead from '../../component/SEOHead';
 import WishlistButton from '../../component/WishlistButton';
 import UnProductCard from '../../component/UnProductCard';
+import RecommendedProducts from '../../component/RecommendedProducts';
+import NotifyMeModal from '../../component/NotifyMeModal';
+import ComboBundleSection from '../../component/ComboBundleSection';
 import ImageCarousel from '../../component/ImageCarousel';
 import { motion, AnimatePresence } from 'motion/react';
 import { ScrollColorBand } from '../../component/motion';
@@ -24,6 +27,18 @@ const Stars = ({ n = 5, className = '' }) => {
   const r = Math.round(n);
   return <span className={`text-star ${className}`}>{'★'.repeat(Math.max(0, Math.min(5, r)))}{'☆'.repeat(Math.max(0, 5 - r))}</span>;
 };
+
+// Effective per-variant out-of-stock — mirrors the server rule: a manual admin
+// flag, or a tracked quantity (variantQuantity != null) that has reached 0.
+// A null/undefined quantity means "not stock-tracked" → never OOS by quantity.
+const isVariantOutOfStock = (v) =>
+  !!v &&
+  (v.variantOutOfStock === true ||
+    (v.variantQuantity != null && Number(v.variantQuantity) <= 0));
+
+// At or below this many tracked units left, show an urgency "limited stock"
+// badge to nudge the buyer. Tweak freely.
+const LOW_STOCK_THRESHOLD = 5;
 
 const ProductDetailPage = () => {
   const itemQty = (q) => (typeof q === 'object' && q !== null ? q.quantity || 0 : q || 0);
@@ -45,6 +60,8 @@ const ProductDetailPage = () => {
   const [pinInput, setPinInput] = useState('');            // pincode delivery check
   const [pinStatus, setPinStatus] = useState(null);        // { ok, msg, charge, eta }
   const [showShare, setShowShare] = useState(false);       // desktop share row fallback
+  const [showNotifyModal, setShowNotifyModal] = useState(false); // out-of-stock notify-me
+  const [isAddingCombo, setIsAddingCombo] = useState(false);     // combo bundle add in flight
 
   const { data: productResponse, isLoading, error } = useGetProductByIdQuery(productId);
   const [addToCartAPI, { isLoading: isAdding }] = useAddToCartMutation();
@@ -123,6 +140,24 @@ const ProductDetailPage = () => {
   }, [product, currentPrice]);
 
   const availableVariants = useMemo(() => (product?.variantDetails ? product.variantDetails.map((v) => v.variantName) : []), [product]);
+
+  // Admin-curated combo + recommendation rows (empty => sections render nothing).
+  const comboProducts = product?.comboProductsDetails || [];
+  const recommendedProducts = product?.recommendedProductsDetails || [];
+
+  // Stock state for the SELECTED variant — the page-level productStatus is
+  // only half the answer; a single variant can be out while the product is in.
+  const selectedVariantObj = useMemo(
+    () => product?.variantDetails?.find((v) => v.variantName === (selectedVariant || availableVariants[0])) || null,
+    [product, selectedVariant, availableVariants],
+  );
+  const selectedVariantOOS = useMemo(() => isVariantOutOfStock(selectedVariantObj), [selectedVariantObj]);
+  const isOutOfStock = (product && product.productStatus !== 'in_stock') || selectedVariantOOS;
+  const selectedVariantQty = selectedVariantObj?.variantQuantity;
+  const selectedVariantLowStock = useMemo(() => {
+    const q = selectedVariantObj?.variantQuantity;
+    return q != null && Number(q) > 0 && Number(q) <= LOW_STOCK_THRESHOLD;
+  }, [selectedVariantObj]);
 
   const galleryImages = useMemo(() => {
     if (!product?.variantDetails?.length) return ['https://urbannook.in/assets/logo.webp'];
@@ -218,7 +253,7 @@ const ProductDetailPage = () => {
         showNotification(err.data?.message || 'Something went wrong', 'error');
       }
     } else {
-      dispatch(addItem({ id: product?.productId, mongoId: product?.productId, name: product?.productName, price: currentPrice, image: selectedImage, quantity: 1, selectedVariant: effectiveVariant }));
+      dispatch(addItem({ id: product?.productId, mongoId: product?.productId, name: product?.productName, price: currentPrice, image: selectedImage, quantity: 1, selectedVariant: effectiveVariant, giftWrapEligible: !!product?.giftWrapEligible }));
       setSelectedVariant(effectiveVariant);
       setFeedbackMessage('Added to cart'); setTimeout(() => setFeedbackMessage(''), 2000);
       trackAddToCart({ itemId: product.productId, itemName: product.productName, itemVariant: effectiveVariant, price: currentPrice, quantity: 1 });
@@ -241,6 +276,76 @@ const ProductDetailPage = () => {
       trackAddToCart({ itemId: crossSell.productId, itemName: crossSell.productName, itemVariant: vName, price: crossSellPrice, quantity: 1 });
     } catch (err) {
       showNotification(err?.data?.message || 'Something went wrong', 'error');
+    }
+  };
+
+  // Adds every item the customer kept in the static "buy together" section
+  // (the main product at whatever variant is selected there, plus each kept
+  // companion). This section is standalone — it doesn't assume the main
+  // product is already in the cart, so it always adds it too; the cart
+  // reducer/server merges quantity when the same product+variant is already in.
+  const handleAddComboBundle = async (selections) => {
+    if (!selections?.length) return;
+
+    setIsAddingCombo(true);
+    const isLoggedIn = isAuthenticated || !!localStorage.getItem("authToken");
+
+    try {
+      // Sequential, not Promise.all — the cart endpoint mutates one shared
+      // cart doc, so parallel writes can clobber each other.
+      for (const { product: combo, variantName } of selections) {
+        const variantDetail =
+          combo.variantDetails?.find((v) => v.variantName === variantName) ||
+          combo.variantDetails?.[0];
+        const image =
+          variantDetail?.variantImage?.[0] ||
+          combo.productImg ||
+          "https://urbannook.in/assets/logo.webp";
+        const price = Number(variantDetail?.variantPrice ?? 0);
+        const variant = variantDetail?.variantName || "Standard Variant";
+
+        if (isLoggedIn) {
+          await addToCartAPI({
+            productId: combo.productId,
+            quantity: 1,
+            variant,
+            image,
+          }).unwrap();
+        } else {
+          dispatch(
+            addItem({
+              id: combo.productId,
+              mongoId: combo.productId,
+              name: combo.productName,
+              price,
+              image,
+              quantity: 1,
+              selectedVariant: variant,
+              giftWrapEligible: !!combo.giftWrapEligible,
+            }),
+          );
+        }
+
+        trackAddToCart({
+          itemId: combo.productId,
+          itemName: combo.productName,
+          itemVariant: variant,
+          price,
+          quantity: 1,
+        });
+      }
+
+      if (isLoggedIn) await refetchCart().unwrap();
+
+      setFeedbackMessage(
+        selections.length > 1 ? "Items added to cart" : "Added to cart",
+      );
+      setTimeout(() => setFeedbackMessage(""), 2000);
+    } catch (err) {
+      console.error("Combo bundle add failed:", err);
+      showNotification(err.data?.message || "Could not add the bundle", "error");
+    } finally {
+      setIsAddingCombo(false);
     }
   };
 
@@ -472,7 +577,11 @@ const ProductDetailPage = () => {
 
               {/* urgency + delivery */}
               <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs mt-4">
-                {product.productStatus === 'in_stock' && (
+                {isOutOfStock ? (
+                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-faint" /><span className="text-muted font-semibold">Out of stock</span></span>
+                ) : selectedVariantLowStock ? (
+                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-brand animate-pulse" /><span className="text-brand font-semibold">Only {selectedVariantQty} left</span></span>
+                ) : (
                   <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-save" /><span className="text-ink font-semibold">In stock</span></span>
                 )}
                 <span className="text-muted">🚚 Ships in 2–4 days</span>
@@ -480,7 +589,14 @@ const ProductDetailPage = () => {
 
               {/* CTA */}
               <div ref={buyBoxRef} className="flex items-center gap-3 mt-4">
-                {isInCart ? (
+                {isOutOfStock ? (
+                  <button
+                    onClick={() => setShowNotifyModal(true)}
+                    className="gl-press flex-1 h-12 border border-ink text-ink font-bold text-sm rounded-xl hover:bg-ink hover:text-paper transition-colors flex items-center justify-center gap-2"
+                  >
+                    <i className="fa-regular fa-bell text-xs" /> Notify me when back
+                  </button>
+                ) : isInCart ? (
                   <>
                     <div className="flex items-center border border-ink rounded-xl h-12 shrink-0">
                       <button onClick={() => handleUpdateQty(currentCartQty - 1)} className="w-10 h-full text-lg">−</button>
@@ -804,6 +920,30 @@ const ProductDetailPage = () => {
         </div>
 
         {/* related */}
+        {/* Admin-curated combo bundle — "buy these together" */}
+        {comboProducts.length > 0 && (
+          <ComboBundleSection
+            mainProduct={product}
+            mainVariantName={selectedVariant || availableVariants[0]}
+            onSelectMainVariant={onSelectVariant}
+            mainOutOfStock={isOutOfStock}
+            onNotifyMe={() => setShowNotifyModal(true)}
+            comboProducts={comboProducts}
+            copy={{
+              eyebrow: product?.comboEyebrow,
+              heading: product?.comboHeading,
+              cta: product?.comboCtaLabel,
+            }}
+            onAddBundle={handleAddComboBundle}
+            isAdding={isAddingCombo}
+          />
+        )}
+
+        {/* Admin-curated recommendations (distinct from the generic grid below) */}
+        {recommendedProducts.length > 0 && (
+          <RecommendedProducts products={recommendedProducts} />
+        )}
+
         {related.length > 0 && (
           <div className="mt-16">
             <div className="flex items-end justify-between mb-6"><h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">You may also like</h2><button onClick={() => navigate('/products')} className="text-sm font-bold underline underline-offset-4 decoration-2 hover:text-brand">View all →</button></div>
@@ -828,7 +968,9 @@ const ProductDetailPage = () => {
               <p className="text-xs font-bold truncate leading-tight">{product.productName}</p>
               <p className="text-sm font-extrabold">{inr(currentPrice)}</p>
             </div>
-            {isInCart ? (
+            {isOutOfStock ? (
+              <button onClick={() => setShowNotifyModal(true)} className="gl-press border border-ink text-ink font-bold text-sm px-5 h-11 rounded-xl shrink-0 hover:bg-ink hover:text-paper transition-colors">Notify me</button>
+            ) : isInCart ? (
               <button onClick={handleCheckoutClick} className="gl-press bg-brand text-white font-bold text-sm px-6 h-11 rounded-xl shrink-0 hover:bg-brandHi">Checkout</button>
             ) : (
               <button onClick={handleInitialAddToCart} disabled={isAdding} className="gl-press bg-brand text-white font-bold text-sm px-6 h-11 rounded-xl shrink-0 hover:bg-brandHi disabled:opacity-60">{isAdding ? 'Adding…' : 'Add to Cart'}</button>
@@ -836,6 +978,15 @@ const ProductDetailPage = () => {
           </MotionDiv>
         )}
       </AnimatePresence>
+
+      {/* out-of-stock notify-me */}
+      {showNotifyModal && (
+        <NotifyMeModal
+          productName={product?.productName}
+          productId={product?.productId}
+          onClose={() => setShowNotifyModal(false)}
+        />
+      )}
 
       {/* feedback toast */}
       {feedbackMessage && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[120] bg-ink text-white text-sm font-semibold px-5 py-3 rounded-xl shadow-lg">{feedbackMessage}</div>}
