@@ -20,9 +20,9 @@ const COMPARISONS = {
       { label: "Wall mounted + Desk placed", other: "cross" },
       // Asterisk markers commented out per request — restore the `note` keys
       // (and the `footnotes` block below) together to bring the footnotes back.
-      { label: "Controllable LED Brightness", other: "cross" },
+      { label: "Adjustable Brightness Control", other: "cross" },
       {
-        label: "Easy replacement. No questions asked",
+        label: "Hassle-Free Replacement Guarantee",
         /* note: "*", */ other: "cross",
       },
       {
