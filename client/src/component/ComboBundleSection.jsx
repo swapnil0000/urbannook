@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
@@ -99,10 +99,10 @@ const BundleTile = ({
   };
 
   return (
-    <div className="flex-1 min-w-0 max-w-[76px] sm:max-w-[110px] flex flex-col items-center text-center">
+    <div className="flex-1 min-w-0 max-w-[140px] sm:max-w-[190px] flex flex-col items-center text-center">
       <div className="relative w-full">
         <div
-          className={`w-full aspect-square rounded-lg sm:rounded-xl bg-white/5 border overflow-hidden transition-opacity ${
+          className={`w-full aspect-square rounded-xl sm:rounded-2xl bg-white/5 border overflow-hidden transition-opacity ${
             removed ? "opacity-30 border-white/5" : "border-white/10"
           }`}
         >
@@ -112,7 +112,7 @@ const BundleTile = ({
               fixed at whatever variant the customer already picked on the
               page, so it gets no swatches/selector here, only companions do. */}
           {!fixed && variants.length > 1 && !removed && (
-            <div className="absolute bottom-0.5 sm:bottom-1 left-0 right-0 flex items-center justify-center gap-0.5">
+            <div className="absolute bottom-1 sm:bottom-1.5 left-0 right-0 flex items-center justify-center gap-1">
               {swatchSlots.map((v) => {
                 const { type, value } = swatchStyle(v);
                 const isSelected = v.variantName === activeVariant?.variantName;
@@ -122,16 +122,23 @@ const BundleTile = ({
                     type="button"
                     title={v.variantName}
                     onClick={() => onSelectVariant(v.variantName)}
-                    className={`w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 rounded-full overflow-hidden border shadow flex items-center justify-center bg-white shrink-0 transition-transform hover:scale-110 ${
-                      isSelected ? "border-[#F5DEB3]" : "border-white/70"
+                    className={`w-3.5 h-3.5 sm:w-5 sm:h-5 rounded-full overflow-hidden border shadow flex items-center justify-center bg-white shrink-0 transition-transform hover:scale-110 ${
+                      isSelected ? "border-[#e22525]" : "border-[#F5DEB3]"
                     }`}
                   >
                     {type === "color" && value ? (
-                      <span className="w-full h-full block" style={{ background: value }} />
+                      <span
+                        className="w-full h-full block"
+                        style={{ background: value }}
+                      />
                     ) : value ? (
-                      <img src={value} alt={v.variantName} className="w-full h-full object-cover" />
+                      <img
+                        src={value}
+                        alt={v.variantName}
+                        className="w-full h-full object-cover"
+                      />
                     ) : (
-                      <span className="text-[5px] sm:text-[6px] font-bold uppercase text-gray-500">
+                      <span className="text-[6px] sm:text-[8px] font-bold uppercase text-gray-500">
                         {v.variantName?.charAt(0)}
                       </span>
                     )}
@@ -144,7 +151,7 @@ const BundleTile = ({
                   type="button"
                   onClick={() => (menuOpen ? setMenuOpen(false) : openMenu())}
                   title="More variants"
-                  className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 rounded-full bg-[#1c3026] border border-white/70 shadow flex items-center justify-center text-[5px] sm:text-[6px] font-bold text-[#F5DEB3] shrink-0 hover:scale-110 transition-transform"
+                  className="w-3.5 h-3.5 sm:w-5 sm:h-5 rounded-full bg-[#1c3026] border border-white/70 shadow flex items-center justify-center text-[6px] sm:text-[8px] font-bold text-[#F5DEB3] shrink-0 hover:scale-110 transition-transform"
                 >
                   +{overflowCount}
                 </button>
@@ -158,7 +165,7 @@ const BundleTile = ({
             type="button"
             onClick={onToggleRemove}
             aria-label={removed ? `Add ${product?.productName} back` : `Remove ${product?.productName}`}
-            className={`absolute -top-1 -right-1 sm:-top-1.5 sm:-right-1.5 w-4 h-4 sm:w-5 sm:h-5 rounded-full border flex items-center justify-center text-[9px] sm:text-[11px] font-bold transition-colors ${
+            className={`absolute -top-1.5 -right-1.5 sm:-top-2 sm:-right-2 w-5 h-5 sm:w-7 sm:h-7 rounded-full border flex items-center justify-center text-[11px] sm:text-[14px] font-bold transition-colors ${
               removed
                 ? "bg-[#F5DEB3] text-[#1c3026] border-[#F5DEB3]"
                 : "bg-[#1c3026] text-white/70 border-white/25 hover:border-white/50 hover:text-white"
@@ -219,7 +226,7 @@ const BundleTile = ({
           removed ? "opacity-30 pointer-events-none" : "hover:opacity-80"
         }`}
       >
-        <span className="block text-[8px] sm:text-[9px] text-white/45 truncate">
+        <span className="block text-[12px] sm:text-xs text-white/45 truncate">
           {activeVariant?.variantName}
         </span>
       </button>
@@ -347,7 +354,7 @@ const ComboBundleSection = ({
 
   return (
     <section className="mt-5 border-t border-[#F5DEB3]/15  sm:mt-12 px-4 lg:px-12">
-      <div className="max-w-md mx-auto rounded-xl sm:rounded-2xl overflow-hidden">
+      <div className="max-w-xl mx-auto rounded-xl sm:rounded-2xl overflow-hidden">
         <div className="px-3 sm:px-5 pt-8 pb-1 text-center  border-white/[0.07]">
           <span className="text-[#F5DEB3]/70 font-bold tracking-[0.1em] uppercase text-[12px] sm:text-[12px]">
             {eyebrow}
@@ -355,7 +362,7 @@ const ComboBundleSection = ({
         </div>
 
         <div className="px-3 sm:px-5 py-2 sm:py-3">
-          <div className="flex items-start justify-center gap-1 sm:gap-1.5">
+          <div className="flex items-start justify-center gap-3 sm:gap-4">
             <BundleTile
               fixed
               product={mainProduct}
@@ -366,12 +373,16 @@ const ComboBundleSection = ({
             {offerable.map((entry) => {
               const id = entry.product.productId;
               return (
-                <div
-                  key={id}
-                  className="flex items-start gap-1 sm:gap-1.5 flex-1 min-w-0 max-w-[90px] sm:max-w-[128px]"
-                >
-                  <div className="w-2.5 sm:w-3.5 shrink-0 flex justify-center pt-[calc(50%-1.5rem)]">
-                    <span className="text-[#F5DEB3] text-[19px] sm:text-[19px]">
+                // The "+" sits as its OWN flex sibling here, not nested
+                // inside a wrapper around the tile — nesting it made this
+                // companion tile share its allotted width with the icon,
+                // rendering smaller than the main tile (which gets its full
+                // slot to itself). Every BundleTile is now a direct sibling
+                // in the same row, so all of them get the identical
+                // max-w-[140px] sm:max-w-[190px] and render the same size.
+                <Fragment key={id}>
+                  <div className="self-center shrink-0 flex justify-center">
+                    <span className="text-[#F5DEB3] text-[26px] sm:text-[30px]">
                       +
                     </span>
                   </div>
@@ -383,7 +394,7 @@ const ComboBundleSection = ({
                     removed={removedIds.has(id)}
                     onToggleRemove={() => toggleRemoved(id)}
                   />
-                </div>
+                </Fragment>
               );
             })}
           </div>

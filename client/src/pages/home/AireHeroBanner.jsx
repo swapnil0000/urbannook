@@ -80,7 +80,7 @@ const AireHeroBanner = memo(() => {
               {/* 2. Policy */}
               <div className="text-center sm:text-left">
                 <p className="text-2xl font-serif italic text-white">7-Day</p>
-                <p className="text-[10px] text-[#F5DEB3] uppercase tracking-widest font-bold mt-1">Easy Returns</p>
+                <p className="text-[10px] text-[#F5DEB3] uppercase tracking-widest font-bold mt-1">Easy Replacement</p>
               </div>
 
               <div className="hidden sm:block w-px h-10 bg-white/20"></div>
