@@ -250,15 +250,14 @@ const getCartService = async ({ userId }) => {
   const giftWrapConfig = await getPublicOfferConfig("gift_wrap");
   const base = cartData[0] || { availableItems: [], unavailableItems: [], cartSubtotal: 0, totalQuantity: 0 };
 
-  // Gift wrap is priced per distinct ELIGIBLE PRODUCT, not per cart line —
-  // rp.payment.controller.js counts unique productIds (a product can have
-  // multiple variants as separate cart lines, but only counts once toward
-  // gift wrap). Must match here too, or the cart/checkout display would show
-  // a higher gift-wrap charge than what actually gets billed.
-  const eligibleProductIds = new Set(
-    base.availableItems.filter((i) => i.giftWrapEligible).map((i) => String(i.productId)),
+  // Gift wrap is priced per ELIGIBLE UNIT — sums quantity across every
+  // eligible line (2x the same eligible product is 2 gift wraps, not 1).
+  // Must match rp.payment.controller.js's giftWrapQty exactly, or the cart
+  // display would disagree with what actually gets billed.
+  const lineCount = base.availableItems.reduce(
+    (sum, i) => (i.giftWrapEligible ? sum + (Number(i.quantity) || 0) : sum),
+    0,
   );
-  const lineCount = eligibleProductIds.size;
   const giftWrapSelected = !!cartDoc?.giftWrap && giftWrapConfig.isActive && lineCount > 0;
   const giftWrap = {
     selected: giftWrapSelected,

@@ -172,12 +172,14 @@ const CartDrawer = ({ isOpen, onClose }) => {
   // Gift wrap adds to what's actually charged at checkout — same price the
   // GiftWrapLineItem row above shows, so this can never disagree with it.
   const giftWrapOffer = giftWrapOfferRes?.data;
-  // Qty auto-scales with distinct ELIGIBLE PRODUCTS, deduped (not per cart
-  // line — two variants of the same product only count once) — same rule
-  // the server applies at checkout.
-  const giftWrapEligibleCount = new Set(
-    cartItems.filter((i) => i.giftWrapEligible).map((i) => i.mongoId || i.id),
-  ).size;
+  // Qty auto-scales with total ELIGIBLE UNITS in the cart — 2x the same
+  // eligible product is 2 gift wraps, not 1 — same rule the server applies
+  // at checkout.
+  const giftWrapEligibleCount = cartItems.reduce((sum, i) => {
+    if (!i.giftWrapEligible) return sum;
+    const qty = typeof i.quantity === 'object' ? Number(i.quantity?.quantity || 0) : Number(i.quantity || 0);
+    return sum + qty;
+  }, 0);
   const giftWrapAmount =
     giftWrapSelected && giftWrapOffer?.isActive
       ? (Number(giftWrapOffer.price) || 0) * giftWrapEligibleCount

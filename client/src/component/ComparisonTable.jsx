@@ -20,9 +20,16 @@ const COMPARISONS = {
       { label: "Wall mounted + Desk placed", other: "cross" },
       // Asterisk markers commented out per request — restore the `note` keys
       // (and the `footnotes` block below) together to bring the footnotes back.
-      { label: "Easy replacement. No questions asked", /* note: "*", */ other: "cross" },
-      { label: "6-months electronics warranty", /* note: "**", */ other: "cross" },
-      { label: "Heat-resistant PETG build", other: "cross" },
+      { label: "Adjustable Brightness Control", other: "cross" },
+      {
+        label: "Hassle-Free Replacement Guarantee",
+        /* note: "*", */ other: "cross",
+      },
+      {
+        label: "6-months electronics warranty",
+        /* note: "**", */ other: "cross",
+      },
+      // { label: "Heat-resistant PETG build", other: "cross" },
       { label: "Wide light area + Heat vents", other: "cross" },
     ],
     // Footnotes keyed to the asterisks above. Commented out per request —

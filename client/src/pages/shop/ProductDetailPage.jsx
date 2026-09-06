@@ -1181,7 +1181,7 @@ const ProductDetailPage = () => {
                           <span className={`text-[11px] font-bold uppercase tracking-wide truncate max-w-[110px] ${oos ? 'line-through opacity-60' : ''} ${isSelected ? 'text-[#1c3026]' : 'text-white group-hover:text-[#F5DEB3]'}`}>
                             {variantName}
                           </span>
-                          {!oos && swatchType === "image" && swatchValue && (
+                          {!oos && product?.featured === true && swatchType === "image" && swatchValue && (
                             <span className={`text-[7px] uppercase tracking-tighter ${isSelected ? 'text-[#1c3026]/60' : 'text-gray-400 group-hover:text-[#F5DEB3]/60'} font-bold mt-0.5`}>
                               Inspired
                             </span>
