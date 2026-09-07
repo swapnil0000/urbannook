@@ -1279,12 +1279,13 @@ const CheckoutPage = () => {
     : (pricingDetails.shipping?.realAmount ?? pricingDetails.shipping?.amount ?? 0);
   // Gift wrap — added on top of subtotal, same as the server's finalAmount
   // formula (subtotal + giftWrap + shipping − discount). Qty auto-scales with
-  // distinct ELIGIBLE PRODUCTS, deduped (not per cart line — two variants of
-  // the same product only count once), mirroring rp.payment.controller.js exactly.
+  // total ELIGIBLE UNITS in the cart — 2x the same eligible product is 2
+  // gift wraps, not 1 — mirroring rp.payment.controller.js exactly.
   const giftWrapOffer = giftWrapOfferData?.data;
-  const giftWrapEligibleCount = new Set(
-    cartItems.filter((i) => i.giftWrapEligible).map((i) => i.mongoId || i.id),
-  ).size;
+  const giftWrapEligibleCount = cartItems.reduce(
+    (sum, i) => (i.giftWrapEligible ? sum + (Number(i.quantity) || 0) : sum),
+    0,
+  );
   const giftWrapAmount =
     giftWrapSelected && giftWrapOffer?.isActive
       ? (Number(giftWrapOffer.price) || 0) * giftWrapEligibleCount
