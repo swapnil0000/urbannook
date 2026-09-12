@@ -105,7 +105,13 @@ const metaProductFeed = asyncHandler(async (req, res) => {
 
       rows.push(
         [
-          csv(i === 0 ? p.productId : `${p.productId}_${i + 1}`), // variant 1 id = productId (matches Pixel content_ids exactly)
+          // Every variant (including the first) gets an id DISTINCT from
+          // item_group_id — Meta rejects an item whose own id equals its
+          // group id ("ID conflicts with group ID"). Pixel retargeting still
+          // resolves fine: Meta matches content_ids against item_group_id
+          // too (see file header comment), which is productId for every
+          // variant here regardless of this suffix.
+          csv(`${p.productId}_${i + 1}`),
           csv(p.productId), // item_group_id — matches Pixel content_ids
           csv(title),
           csv(description),
