@@ -3,3 +3,19 @@ Disallow: /
 
 # Noindex instruction for crawlers
 Noindex: /
+
+User-agent: Googlebot
+
+Disallow:
+
+User-agent: Googlebot-image
+
+Disallow:
+
+User-agent: AdsBot-Google
+
+Disallow:
+
+User-agent: AdsBot-Google-Mobile
+
+Disallow:
