@@ -445,9 +445,13 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   // fresh from the live offer config, so a stale intent left over after an
   // admin disables the offer can never add a charge.
   const giftWrapConfig = await getPublicOfferConfig("gift_wrap");
-  // One gift wrap per distinct GIFT-WRAP-ELIGIBLE product in the order
-  // (admin opt-in per product) — auto-derived, not client-set.
-  const giftWrapQty = products.filter((p) => p.giftWrapEligible === true).length;
+  // One gift wrap per ELIGIBLE UNIT in the order (admin opt-in per product)
+  // — sums quantity across every line whose product is eligible, so 2x the
+  // same eligible product is 2 gift wraps, not 1. Auto-derived, not client-set.
+  const giftWrapQty = orderItems.reduce((sum, oi) => {
+    const product = products.find((p) => p.productId === oi.productId);
+    return product?.giftWrapEligible ? sum + (Number(oi.productSnapshot.quantity) || 0) : sum;
+  }, 0);
   const giftWrapSelected = !!cart.giftWrap && giftWrapConfig.isActive && giftWrapQty > 0;
   const giftWrapAmount = giftWrapSelected ? giftWrapConfig.price * giftWrapQty : 0;
   const giftWrapNoteOptions = giftWrapSelected && cart.giftWrapNoteOptions?.length ? cart.giftWrapNoteOptions : ["none"];
@@ -608,7 +612,11 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     userName: deliveryAddressSnapshot.fullName,
     userMobile: deliveryAddressSnapshot.mobileNumber,
     items: orderItems,
-    amount: finalAmount,
+    // Whole-rupee, matching exactly what razorpayChargeAmountPaise actually
+    // charges — finalAmount itself can be fractional (realShippingAmount is
+    // a live carrier rate, not guaranteed integer), so storing it unrounded
+    // here could drift a few paise from the real charge in the order record.
+    amount: Math.ceil(finalAmount),
     giftWrap: { selected: giftWrapSelected, price: giftWrapAmount, quantity: giftWrapQty, title: giftWrapConfig.title, noteOptions: giftWrapNoteOptions },
     shippingInfo: {
       // Real carrier cost for internal accounting — grouped with the other
@@ -1224,8 +1232,13 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   // it or don't." Price is still never trusted from the client: it's always
   // the live offer config's price, zeroed automatically if the offer is off.
   const giftWrapConfig = await getPublicOfferConfig("gift_wrap");
-  // One gift wrap per distinct GIFT-WRAP-ELIGIBLE product (admin opt-in per product).
-  const giftWrapQty = products.filter((p) => p.giftWrapEligible === true).length;
+  // One gift wrap per ELIGIBLE UNIT (admin opt-in per product) — sums
+  // quantity across every line whose product is eligible, so 2x the same
+  // eligible product is 2 gift wraps, not 1.
+  const giftWrapQty = orderItems.reduce((sum, oi) => {
+    const product = products.find((p) => p.productId === oi.productId);
+    return product?.giftWrapEligible ? sum + (Number(oi.productSnapshot.quantity) || 0) : sum;
+  }, 0);
   const giftWrapSelected = !!reqGiftWrap && giftWrapConfig.isActive && giftWrapQty > 0;
   const giftWrapAmount = giftWrapSelected ? giftWrapConfig.price * giftWrapQty : 0;
   const GIFT_NOTE_OPTIONS = ["birthday", "rakhi", "none"];
@@ -1350,7 +1363,11 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     userName: guestInfo.name.trim(),
     userMobile: cleanMobile,
     items: orderItems,
-    amount: finalAmount,
+    // Whole-rupee, matching exactly what razorpayChargeAmountPaise actually
+    // charges — finalAmount itself can be fractional (realShippingAmount is
+    // a live carrier rate, not guaranteed integer), so storing it unrounded
+    // here could drift a few paise from the real charge in the order record.
+    amount: Math.ceil(finalAmount),
     giftWrap: { selected: giftWrapSelected, price: giftWrapAmount, quantity: giftWrapQty, title: giftWrapConfig.title, noteOptions: giftWrapNoteOptions },
     shippingInfo: {
       amount: realShippingAmount,

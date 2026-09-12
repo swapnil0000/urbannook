@@ -30,6 +30,7 @@ import { ComponentLoader } from "../component/layout/LoadingSpinner";
 import { getClaimedMobile, isOfferLive } from "../config/independenceOffer";
 import IndependenceOfferBanner from "../component/IndependenceOfferBanner";
 import useOfferTerms from "../hooks/useOfferTerms";
+import { useShippingDelayNotice } from "../hooks/useShippingDelayNotice";
 import { calcLocalDiscount } from "../utils/couponDiscount";
 import { trackBeginCheckout, trackPurchase, trackAddShippingInfo, trackAddPaymentInfo, trackPaymentFailed, trackPaymentModalDismissed, trackCheckoutStep, trackOrderCreated, trackSelectPaymentMethod, trackDeliveryCheck, getFbCookies, getAnonymousId, cacheAddressForCapi, setMetaAdvancedMatching } from "../utils/analytics";
 
@@ -442,6 +443,7 @@ const CheckoutPage = () => {
 
   const { items: cartItems, selections: cartSelections, giftWrap: giftWrapSelected, giftWrapNoteOptions } = useSelector((s) => s.cart);
   const { isAuthenticated } = useSelector((s) => s.auth);
+  const shippingDelayMessage = useShippingDelayNotice();
   const isGuest = !isAuthenticated && !localStorage.getItem("authToken");
   const STEPS = isGuest ? GUEST_STEPS : AUTH_STEPS;
   const paymentCompletedRef = useRef(false);
@@ -601,38 +603,40 @@ const CheckoutPage = () => {
   // TODO: only supports a single banner (first match) even if multiple cart
   // items each have one configured — fine for now (single active offer),
   // revisit if multiple simultaneous offers are ever needed.
-  const checkoutBannerProductId = useMemo(() => {
-    const offerConfig = freeShippingOfferData?.data;
-    if (!offerConfig?.isActive) return null;
-
+  // Every banner whose source product is in the cart but the recommended
+  // add-on isn't — one persistent card on checkout too, arrows page through
+  // all of them (see bannersOverride on FreeShippingBanner) instead of a new
+  // card replacing the old one each time the cart's nudge-worthy combo
+  // changes. Combo banners are independent of the offer doc's own `isActive`
+  // — that flag is only the cart-VALUE-threshold on/off switch, not a master
+  // kill switch for banners (each banner has its own isActive; server-side
+  // getAllActiveBanners already only returns those).
+  const checkoutNudgeBanners = useMemo(() => {
     const banners = allFreeShippingBannersData?.data || [];
-    if (banners.length === 0) return null;
-
+    if (banners.length === 0) return [];
     const cartProductIds = new Set(cartItems.map((i) => i.mongoId || i.id?.split(":")[0]));
-    const match = banners.find(
+    return banners.filter(
       (b) => cartProductIds.has(b.sourceProductId) && !cartProductIds.has(b.recommendedProductId),
     );
-    return match?.sourceProductId || null;
-  }, [freeShippingOfferData, allFreeShippingBannersData, cartItems]);
+  }, [allFreeShippingBannersData, cartItems]);
 
-  // The moment adding the recommended item pushes the cart over the
-  // threshold, `checkoutBannerProductId` above flips to null in the SAME
-  // render as the cart update — which used to unmount FreeShippingBanner
-  // outright, killing its own bar-fill/confetti/"Unlocked" celebration
-  // sequence mid-flight. Hold the last non-null id visible for a beat after
-  // it goes null so that sequence gets to finish before we actually remove
-  // the banner from the page.
-  const [visibleBannerProductId, setVisibleBannerProductId] = useState(null);
+  // The moment adding the recommended item completes the last combo,
+  // `checkoutNudgeBanners` above goes empty in the SAME render as the cart
+  // update — which used to unmount FreeShippingBanner outright, killing its
+  // own bar-fill/confetti/"Unlocked" celebration sequence mid-flight. Hold
+  // the last non-empty list visible for a beat after it empties so that
+  // sequence gets to finish before we actually remove the banner from the page.
+  const [visibleNudgeBanners, setVisibleNudgeBanners] = useState([]);
   useEffect(() => {
-    if (checkoutBannerProductId) {
-      setVisibleBannerProductId(checkoutBannerProductId);
+    if (checkoutNudgeBanners.length > 0) {
+      setVisibleNudgeBanners(checkoutNudgeBanners);
       return;
     }
-    if (!visibleBannerProductId) return;
-    const timer = setTimeout(() => setVisibleBannerProductId(null), 1900);
+    if (visibleNudgeBanners.length === 0) return;
+    const timer = setTimeout(() => setVisibleNudgeBanners([]), 1900);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally omits visibleBannerProductId so the timer isn't re-armed by its own update
-  }, [checkoutBannerProductId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally omits visibleNudgeBanners so the timer isn't re-armed by its own update
+  }, [checkoutNudgeBanners]);
 
   // When user logs in mid-checkout (guest → auth), AUTH_STEPS has fewer steps.
   // Clamp currentStep so STEPS[currentStep-1] is never undefined.
@@ -750,11 +754,12 @@ const CheckoutPage = () => {
           const offerConfig = freeShippingOfferData?.data;
           const banners = allFreeShippingBannersData?.data || [];
           const cartProductIds = new Set(cartItems.map((i) => i.mongoId || i.id?.split(":")[0]));
-          const comboEligible =
-            !!offerConfig?.isActive &&
-            banners.some(
-              (b) => cartProductIds.has(b.sourceProductId) && cartProductIds.has(b.recommendedProductId),
-            );
+          // Combo eligibility is independent of the offer doc's own isActive
+          // (that flag is only the cart-value threshold switch) — see the
+          // matching comment on checkoutNudgeBanners above.
+          const comboEligible = banners.some(
+            (b) => cartProductIds.has(b.sourceProductId) && cartProductIds.has(b.recommendedProductId),
+          );
           // Plain cart-value threshold — whole cart, any products count.
           // Mirrors the server's direct subtotal >= thresholdAmount check,
           // computed AFTER rule discounts (server discounts items first,
@@ -1345,11 +1350,16 @@ const CheckoutPage = () => {
     : (pricingDetails.shipping?.realAmount ?? pricingDetails.shipping?.amount ?? 0);
   // Gift wrap — added on top of subtotal, same as the server's finalAmount
   // formula (subtotal + giftWrap + shipping − discount). Qty auto-scales with
-  // distinct products in the cart, mirroring rp.payment.controller.js exactly.
+  // total ELIGIBLE UNITS in the cart — 2x the same eligible product is 2
+  // gift wraps, not 1 — mirroring rp.payment.controller.js exactly.
   const giftWrapOffer = giftWrapOfferData?.data;
+  const giftWrapEligibleCount = cartItems.reduce(
+    (sum, i) => (i.giftWrapEligible ? sum + (Number(i.quantity) || 0) : sum),
+    0,
+  );
   const giftWrapAmount =
     giftWrapSelected && giftWrapOffer?.isActive
-      ? (Number(giftWrapOffer.price) || 0) * cartItems.filter((i) => i.giftWrapEligible).length
+      ? (Number(giftWrapOffer.price) || 0) * giftWrapEligibleCount
       : 0;
   const totalToPay = Math.max(
     0,
@@ -1515,6 +1525,18 @@ const CheckoutPage = () => {
           </div>
         </div>
       </div>
+
+      {/* ── Shipping delay notice — Review & Pay step only, while the
+          affected product is in cart, auto-hides past its configured expiry
+          (see hooks/useShippingDelayNotice.js). */}
+      {shippingDelayMessage && currentStep === reviewStep && (
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-6">
+          <div className="flex items-center gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <i className="fa-solid fa-triangle-exclamation text-amber-500 text-sm shrink-0" />
+            <p className="text-xs sm:text-sm font-semibold text-amber-800">{shippingDelayMessage}</p>
+          </div>
+        </div>
+      )}
 
       {/* ── Independence Day offer ─────────────────────────────────────────
           Review & Pay only. Account, Contact and Address are all the same
@@ -2240,10 +2262,10 @@ const CheckoutPage = () => {
                     />
                   </div>
                 </div>
-                {visibleBannerProductId && (
+                {visibleNudgeBanners.length > 0 && (
                   <div className="px-5 pb-5">
                     <FreeShippingBanner
-                      productId={visibleBannerProductId}
+                      bannersOverride={visibleNudgeBanners}
                       variant="light"
                       showQuantityStepper
                       showProgressBar={false}
@@ -2521,10 +2543,10 @@ const CheckoutPage = () => {
               />
             </div>
 
-            {visibleBannerProductId && (
+            {visibleNudgeBanners.length > 0 && (
               <div className="px-5 pb-5">
                 <FreeShippingBanner
-                  productId={visibleBannerProductId}
+                  bannersOverride={visibleNudgeBanners}
                   variant="light"
                   showQuantityStepper
                   showProgressBar={false}

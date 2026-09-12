@@ -52,7 +52,7 @@ export const uploadReviewImageToS3 = async (imageBuffer, mimeType, userId, produ
     const command = new PutObjectCommand(params);
     await s3Client.send(command);
     // Return CDN URL directly
-    return `${env.AWS_CDN_BASE_URL}/${fileKey}`;
+    return `${env.ASSET_BASE_URL}/${fileKey}`;
   } catch (error) {
     console.error("❌ Error uploading review image to S3:", error);
     throw error;

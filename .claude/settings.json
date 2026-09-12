@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "additionalDirectories": [
+      "/Users/dheerajpatnaik/Code/UN/URBANNOOK/UN-ADMIN-panel/urbannook-store/urbannook-admin/server/models",
+      "/Users/dheerajpatnaik/Code/UN/URBANNOOK/UN-ADMIN-panel/urbannook-store/urbannook-admin/server/controllers"
+    ]
+  }
+}

@@ -1,7 +1,12 @@
 import { ApiRes } from "../utils/index.js";
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
 import { ValidationError } from "../utils/errors.js";
-import { getActiveCartRules, evaluateCartRules, findClosestUnmatchedRule } from "../utils/cartRule.util.js";
+import {
+  getActiveCartRules,
+  evaluateCartRules,
+  findClosestUnmatchedRule,
+  findQuantityDiscountNudges,
+} from "../utils/cartRule.util.js";
 
 // Public: evaluates the posted cart (productId + quantity pairs — the client
 // already has this from Redux, no need to trust/refetch a server-side cart
@@ -23,6 +28,7 @@ const evaluateCartRulesController = asyncHandler(async (req, res) => {
   const result = evaluateCartRules(items, activeRules);
   const matchedRuleIds = result.matchedRules.map((r) => r._id);
   const closestUnmatchedRule = findClosestUnmatchedRule(items, activeRules, matchedRuleIds);
+  const quantityNudges = findQuantityDiscountNudges(items, activeRules);
 
   // discountCandidatesByProduct is a Map (not JSON-serialisable directly) —
   // flatten to a plain object of productId -> best resulting discount info
@@ -44,6 +50,7 @@ const evaluateCartRulesController = asyncHandler(async (req, res) => {
         matchedRuleIds,
         discounts,
         closestUnmatchedRule,
+        quantityNudges,
       },
       true,
     ),
