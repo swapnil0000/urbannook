@@ -2,7 +2,8 @@ module.exports = {
   apps: [
     {
       name: "urbannook-server",
-      script: "./src/server.js",
+      script: "./pm2-entry.sh",
+      interpreter: "bash",
       watch: false,
 
       env: {

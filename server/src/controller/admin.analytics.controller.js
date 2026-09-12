@@ -1,4 +1,5 @@
 import Event from "../model/event.model.js";
+import User from "../model/user.model.js";
 
 // GA4-style names — these are what analytics.js stores via pushEcommerce/recordEvent
 const FUNNEL_STEPS = [
@@ -12,13 +13,25 @@ function sinceDate(days) {
   return new Date(Date.now() - Math.min(parseInt(days) || 7, 90) * 24 * 60 * 60 * 1000);
 }
 
+// Event documents don't carry isTestOrder (that's denormalized onto Order
+// docs only, per the schema contract) — they only carry the app-level
+// userId. So excluding QA/test-account activity from these rollups means
+// resolving isTestUser accounts first and filtering events by userId.
+// Cheap: there's normally exactly one (or a small handful of) test accounts.
+async function getExcludedTestUserIds() {
+  const testUsers = await User.find({ isTestUser: true }, { userId: 1 }).lean();
+  return testUsers.map((u) => u.userId).filter(Boolean);
+}
+
 // GET /api/v1/admin/analytics/funnel?days=7
 async function getFunnel(req, res) {
   const since = sinceDate(req.query.days);
+  const excludedUserIds = await getExcludedTestUserIds();
+  const userFilter = excludedUserIds.length ? { userId: { $nin: excludedUserIds } } : {};
 
   const counts = await Promise.all(
     FUNNEL_STEPS.map(({ dbName }) =>
-      Event.countDocuments({ eventName: dbName, createdAt: { $gte: since } })
+      Event.countDocuments({ eventName: dbName, createdAt: { $gte: since }, ...userFilter })
     )
   );
 
@@ -40,11 +53,13 @@ async function getFunnel(req, res) {
 // GET /api/v1/admin/analytics/summary?days=7
 async function getSummary(req, res) {
   const since = sinceDate(req.query.days);
+  const excludedUserIds = await getExcludedTestUserIds();
+  const userFilter = excludedUserIds.length ? { userId: { $nin: excludedUserIds } } : {};
 
   const [totalEvents, purchases] = await Promise.all([
-    Event.countDocuments({ createdAt: { $gte: since } }),
+    Event.countDocuments({ createdAt: { $gte: since }, ...userFilter }),
     Event.find(
-      { eventName: "purchase", createdAt: { $gte: since } },
+      { eventName: "purchase", createdAt: { $gte: since }, ...userFilter },
       "properties userId"
     ).lean(),
   ]);
@@ -86,6 +101,7 @@ async function getEvents(req, res) {
 // GET /api/v1/admin/analytics/top-products?days=7
 async function getTopProducts(req, res) {
   const since = sinceDate(req.query.days);
+  const excludedUserIds = await getExcludedTestUserIds();
 
   const rows = await Event.aggregate([
     {
@@ -93,6 +109,7 @@ async function getTopProducts(req, res) {
         eventName: { $in: ["view_item", "add_to_cart", "purchase"] },
         createdAt: { $gte: since },
         "properties.item_id": { $exists: true, $ne: null },
+        ...(excludedUserIds.length ? { userId: { $nin: excludedUserIds } } : {}),
       },
     },
     {

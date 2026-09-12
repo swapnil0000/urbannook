@@ -34,10 +34,18 @@ const sendAlert = async (pushMsg) => {
 
     const webhookUrl = env.ZOHO_WEBHOOK_TOKEN;
 
-    // Masking the token in logs for security
+    // Masking the token in logs for security — never log path/query, since
+    // some webhook URL formats embed the secret token there instead of in
+    // a "zapikey=" param.
     const maskedUrl = webhookUrl.includes("zapikey=")
       ? webhookUrl.replace(/zapikey=([^&]+)/, "zapikey=***")
-      : webhookUrl.substring(0, 50) + "***";
+      : (() => {
+          try {
+            return `${new URL(webhookUrl).origin}/***`;
+          } catch {
+            return "***";
+          }
+        })();
 
     console.log("[INFO] Sending alert to Zoho Cliq...");
     console.log("[DEBUG] Webhook URL (masked):", maskedUrl);

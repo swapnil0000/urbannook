@@ -23,13 +23,21 @@ if (!fs.existsSync(envPath)) {
 }
 
 console.log(`🚀 Mode: ${mode.toUpperCase()}`);
-console.log(`⏳ Loading Environment from: ${envFile}`);
-console.log(`📁 Full path: ${envPath}`);
+
+// Never log key names or values here — only where the config came from.
+const fileExistsOnDisk = fs.existsSync(envPath);
+const hadKeysBeforeDotenv = Boolean(process.env.DB_URI);
 
 const result = dotenv.config({ path: envPath });
-
-if (result.error) {
+if (result.error && fileExistsOnDisk) {
   console.error(`❌ Error loading ${envFile}:`, result.error.message);
 }
+
+const source = fileExistsOnDisk
+  ? `DISK FILE (${envFile} exists on disk — unexpected for dev/staging, see scripts/README-env-sync.md)`
+  : hadKeysBeforeDotenv
+  ? "INFISICAL (live via `infisical run`, no file on disk)"
+  : "NONE FOUND (run via `infisical run`, or see scripts/README-env-sync.md)";
+console.log(`[ENV] Source: ${source}`);
 
 export default process.env;

@@ -624,6 +624,9 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     },
     metaTracking: collectMetaTracking(req),
     note: "Amount is the final amount paid by the user",
+    // Denormalized from the ordering user's isTestUser at creation time so
+    // downstream analytics can filter without a join.
+    isTestOrder: !!user?.isTestUser,
   });
 
   return res.status(200).json(
@@ -1341,6 +1344,11 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     guestInfo: { name: guestInfo.name.trim(), email: guestEmail, mobile: cleanMobile },
     coupon: { couponCodeId, couponCodeName, discountAmount, isApplied },
     metaTracking: collectMetaTracking(req),
+    // Guest checkouts have no signed-in account to carry isTestUser from
+    // (internal/test coupons already require sign-in above), so this is
+    // always false here — left explicit for clarity alongside the
+    // authenticated Order.create above.
+    isTestOrder: false,
   });
 
   return res.status(200).json(

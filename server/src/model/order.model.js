@@ -146,6 +146,11 @@ const orderSchema = new mongoose.Schema(
       remainingAmount: { type: Number, default: 0 },
     },
 
+    // Denormalized copy of the ordering user's isTestUser at order-creation
+    // time (see rp.payment.controller.js) — NOT a virtual/populate field, so
+    // admin analytics/finance aggregations can filter on this directly
+    // (Order.isTestOrder) without joining back to the User collection.
+    isTestOrder: { type: Boolean, default: false, index: true },
     isGuestOrder: { type: Boolean, default: false },
     isNewGuestAccount: { type: Boolean, default: false },
     guestInfo: {

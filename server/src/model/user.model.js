@@ -59,6 +59,14 @@ const userSchema = mongoose.Schema(
       enum: ["USER"],
       default: "USER",
     },
+    // Internal QA account flag. Orders placed while logged in as such a
+    // user get isTestOrder denormalized onto them at creation time (see
+    // order.model.js) so admin-side revenue/order-count analytics can
+    // exclude them without joining back to this collection.
+    isTestUser: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,
