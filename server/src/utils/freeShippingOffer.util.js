@@ -1,4 +1,5 @@
 import Offer from "../model/offer.model.js";
+import Product from "../model/product.model.js";
 
 /**
  * Fetches the free-shipping singleton doc from the unified `offers`
@@ -46,6 +47,12 @@ export const getFreeShippingConfig = async () => {
  * their own per-banner `isActive`, so admins can turn the threshold off
  * without silently killing an active combo (and vice versa).
  *
+ * Reads ONLY the admin's own explicitly-configured banners (never the
+ * cart_rule-derived ones below) — a derived banner just mirrors a cart_rule
+ * that ALREADY grants free shipping via its own `effects` at checkout
+ * (rp.payment.controller.js's cartRuleResult.freeShipping), so having this
+ * function also count it would be redundant, not a gap.
+ *
  * @param {string[]} cartProductIds product IDs currently in the cart/order
  */
 export const isFreeShippingEligible = async (cartProductIds = []) => {
@@ -78,6 +85,13 @@ export const isFreeShippingEligible = async (cartProductIds = []) => {
  * a rule with more than 2 conditions, every OTHER condition becomes its own
  * recommended entry for a given source — which is exactly what powers the
  * multi-suggestion carousel on the banner (see FreeShippingBanner.jsx).
+ *
+ * A condition's own `variantSku` (see utils/cartRule.util.js) carries
+ * straight through as `sourceVariantSku`/`recommendedVariantSku` — so a
+ * variant-scoped rule gets an equally variant-scoped banner, instead of
+ * either being skipped or silently promising the discount for any variant.
+ * `resolveBannerVariantNames` below translates these to names before the
+ * banner ever reaches the client.
  */
 const getCartRuleDerivedBanners = async () => {
   const rules = await Offer.find({
@@ -88,10 +102,12 @@ const getCartRuleDerivedBanners = async () => {
     .select("_id name conditions")
     .lean();
 
-  // De-duped by source+recommended pair — two different rules mentioning the
-  // exact same pair (e.g. one rule for "2+ Lamps" style stacking alongside
-  // another for the plain combo) must not produce two identical carousel
-  // slides for the same suggestion.
+  // De-duped by source+recommended+variant triple — two different rules
+  // mentioning the exact same pair (e.g. one rule for "2+ Lamps" style
+  // stacking alongside another for the plain combo) must not produce two
+  // identical carousel slides for the same suggestion. Keyed with variant so
+  // a whole-product rule and a variant-scoped rule for the same pair (a
+  // legitimate, different combo) both survive.
   const seenPairs = new Set();
   const banners = [];
   for (const rule of rules) {
@@ -99,12 +115,14 @@ const getCartRuleDerivedBanners = async () => {
     for (const source of conditions) {
       for (const other of conditions) {
         if (String(other.productId) === String(source.productId)) continue;
-        const pairKey = `${source.productId}:${other.productId}`;
+        const pairKey = `${source.productId}:${source.variantSku || ""}:${other.productId}:${other.variantSku || ""}`;
         if (seenPairs.has(pairKey)) continue;
         seenPairs.add(pairKey);
         banners.push({
           sourceProductId: source.productId,
           recommendedProductId: other.productId,
+          sourceVariantSku: source.variantSku || null,
+          recommendedVariantSku: other.variantSku || null,
           text: rule.name || "Unlock Free Shipping",
           ctaLabel: "Add to Cart",
           isActive: true,
@@ -116,11 +134,48 @@ const getCartRuleDerivedBanners = async () => {
   return banners;
 };
 
+// Translates every banner's sourceVariantSku/recommendedVariantSku (SKU —
+// the reliable identity, see utils/cartRule.util.js) into
+// sourceVariantName/recommendedVariantName — the client only ever works
+// with variant NAMEs (what a cart line's `selectedVariant` holds), so this
+// is the one place that boundary gets crossed, exactly like
+// controllers/cartRule.controller.js does for `discounts`. Raw SKUs never
+// leave the server. A banner with no variant restriction is untouched
+// (both name fields simply absent) — zero behavior change for every
+// existing, unscoped banner.
+async function resolveBannerVariantNames(banners) {
+  const productIds = [
+    ...new Set(
+      banners.flatMap((b) => [
+        b.sourceVariantSku ? b.sourceProductId : null,
+        b.recommendedVariantSku ? b.recommendedProductId : null,
+      ]).filter(Boolean).map(String),
+    ),
+  ];
+  if (productIds.length === 0) return banners;
+
+  const products = await Product.find({ productId: { $in: productIds } }, { productId: 1, variantDetails: 1 }).lean();
+  const productById = new Map(products.map((p) => [p.productId, p]));
+  const nameBySku = (productId, sku) =>
+    productById.get(String(productId))?.variantDetails?.find((v) => v.sku === sku)?.variantName || undefined;
+
+  return banners.map((b) => {
+    if (!b.sourceVariantSku && !b.recommendedVariantSku) return b;
+    const { sourceVariantSku, recommendedVariantSku, ...rest } = b;
+    return {
+      ...rest,
+      ...(sourceVariantSku ? { sourceVariantName: nameBySku(b.sourceProductId, sourceVariantSku) } : {}),
+      ...(recommendedVariantSku ? { recommendedVariantName: nameBySku(b.recommendedProductId, recommendedVariantSku) } : {}),
+    };
+  });
+}
+
 /**
  * Merges admin-configured "Product Page Banners" with cart_rule-derived
  * banners (see getCartRuleDerivedBanners) into one list, de-duplicated by
  * source+recommended pair (an explicit admin banner for a pair wins over the
- * auto-derived one, since it may carry custom copy).
+ * auto-derived one, since it may carry custom copy), then resolves any
+ * variant SKUs to names before returning — see resolveBannerVariantNames.
  */
 const getAllBannersMerged = async () => {
   const offer = await getFreeShippingDoc("banners");
@@ -131,7 +186,7 @@ const getAllBannersMerged = async () => {
   const dedupedRuleBanners = ruleBanners.filter(
     (b) => !adminPairs.has(`${b.sourceProductId}:${b.recommendedProductId}`),
   );
-  return [...adminBanners, ...dedupedRuleBanners];
+  return resolveBannerVariantNames([...adminBanners, ...dedupedRuleBanners]);
 };
 
 /**

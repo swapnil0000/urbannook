@@ -29,21 +29,52 @@ const quantityByProduct = (cartItems = []) => {
   return map;
 };
 
-const ruleIsMatched = (rule, qtyByProduct) =>
-  rule.conditions.every((cond) => (qtyByProduct.get(String(cond.productId)) || 0) >= cond.minQuantity);
+// Same total, but keyed by product+variant — needed for a condition/effect
+// scoped to one specific variant. Identified by SKU, not variant NAME — a
+// product's variant names aren't guaranteed unique/stable (admins rename
+// them, or two variants can share a display name), while `sku` is the one
+// field this catalog actually treats as a variant's real identity. Callers
+// (rp.payment.controller.js, cartRule.controller.js) are responsible for
+// resolving whatever identifier they have (a variant NAME from the cart) to
+// its `variantSku` before calling into this file — see those two files for
+// how each does it. Key format must match exactly between here and every
+// lookup site.
+const variantKey = (productId, variantSku) => `${productId}::${variantSku}`;
+const quantityByProductVariant = (cartItems = []) => {
+  const map = new Map();
+  for (const item of cartItems) {
+    if (!item.variantSku) continue; // couldn't resolve a SKU for this line — can't match a variant-scoped condition
+    const key = variantKey(String(item.productId), item.variantSku);
+    map.set(key, (map.get(key) || 0) + (Number(item.quantity) || 0));
+  }
+  return map;
+};
+
+// A condition with no variantSku counts every variant of the product toward
+// minQuantity — exactly the original (pre-variant-scoping) behavior. One
+// WITH a variantSku only counts cart lines resolved to that exact SKU.
+const ruleIsMatched = (rule, qtyByProduct, qtyByProductVariant) =>
+  rule.conditions.every((cond) => {
+    const have = cond.variantSku
+      ? qtyByProductVariant.get(variantKey(String(cond.productId), cond.variantSku)) || 0
+      : qtyByProduct.get(String(cond.productId)) || 0;
+    return have >= cond.minQuantity;
+  });
 
 /**
  * Evaluates a cart against a set of active rules.
  *
+ * @param {{productId: string, quantity: number, variantSku?: string}[]} cartItems
  * @returns {{
  *   matchedRules: object[],
  *   freeShipping: boolean,
- *   discountCandidatesByProduct: Map<string, {type: 'percent_off'|'flat_off', value: number}[]>,
+ *   discountCandidatesByProduct: Map<string, {type: 'percent_off'|'flat_off', value: number, variantSku?: string}[]>,
  * }}
  */
 export const evaluateCartRules = (cartItems, activeRules) => {
   const qtyByProduct = quantityByProduct(cartItems);
-  const matchedRules = activeRules.filter((rule) => ruleIsMatched(rule, qtyByProduct));
+  const qtyByProductVariant = quantityByProductVariant(cartItems);
+  const matchedRules = activeRules.filter((rule) => ruleIsMatched(rule, qtyByProduct, qtyByProductVariant));
 
   const freeShipping = matchedRules.some((rule) => rule.effects.some((e) => e.type === "free_shipping"));
 
@@ -51,18 +82,41 @@ export const evaluateCartRules = (cartItems, activeRules) => {
   // every candidate per product; `applyBestDiscount` below picks whichever
   // actually yields the lowest price for the customer, rather than relying
   // on a priority field an admin would have to remember to set correctly.
+  // A candidate optionally carries `variantSku` when the effect targeted one
+  // specific variant — callers (getDiscountCandidatesForItem below) must
+  // filter by the line item's resolved variantSku before using an
+  // untagged-vs-tagged mix; an untagged candidate (no variantSku) still
+  // applies to every variant, unchanged from before this field existed.
   const discountCandidatesByProduct = new Map();
   for (const rule of matchedRules) {
     for (const effect of rule.effects) {
       if (effect.type !== "percent_off" && effect.type !== "flat_off") continue;
       const productId = String(effect.targetProductId);
       const list = discountCandidatesByProduct.get(productId) || [];
-      list.push({ type: effect.type, value: effect.value });
+      list.push({
+        type: effect.type,
+        value: effect.value,
+        ...(effect.targetVariantSku ? { variantSku: effect.targetVariantSku } : {}),
+      });
       discountCandidatesByProduct.set(productId, list);
     }
   }
 
   return { matchedRules, freeShipping, discountCandidatesByProduct };
+};
+
+/**
+ * Filters a product's discount candidates down to the ones that actually
+ * apply to ONE specific cart line — every untagged candidate (applies to
+ * all variants) plus any tagged for exactly this line's resolved variantSku.
+ * Centralizes the filter so every call site does the same one-line thing
+ * instead of re-deriving this logic. When `variantSku` couldn't be resolved
+ * (falsy), only untagged candidates match — never guess at a variant-scoped
+ * discount.
+ */
+export const getDiscountCandidatesForItem = (discountCandidatesByProduct, productId, variantSku) => {
+  const all = discountCandidatesByProduct.get(String(productId)) || [];
+  return all.filter((c) => !c.variantSku || c.variantSku === variantSku);
 };
 
 /**
@@ -95,6 +149,7 @@ export const applyBestDiscount = (unitPrice, candidates = []) => {
  */
 export const findClosestUnmatchedRule = (cartItems, activeRules, matchedRuleIds) => {
   const qtyByProduct = quantityByProduct(cartItems);
+  const qtyByProductVariant = quantityByProductVariant(cartItems);
   const matchedSet = new Set(matchedRuleIds.map(String));
 
   let best = null;
@@ -102,9 +157,12 @@ export const findClosestUnmatchedRule = (cartItems, activeRules, matchedRuleIds)
   for (const rule of activeRules) {
     if (matchedSet.has(String(rule._id))) continue;
     const conditionProgress = rule.conditions.map((cond) => {
-      const have = qtyByProduct.get(String(cond.productId)) || 0;
+      const have = cond.variantSku
+        ? qtyByProductVariant.get(variantKey(String(cond.productId), cond.variantSku)) || 0
+        : qtyByProduct.get(String(cond.productId)) || 0;
       return {
         productId: cond.productId,
+        variantSku: cond.variantSku || undefined,
         have,
         needed: cond.minQuantity,
         remaining: Math.max(cond.minQuantity - have, 0),
@@ -137,6 +195,7 @@ export const findClosestUnmatchedRule = (cartItems, activeRules, matchedRuleIds)
  */
 export const findQuantityDiscountNudges = (cartItems, activeRules) => {
   const qtyByProduct = quantityByProduct(cartItems);
+  const qtyByProductVariant = quantityByProductVariant(cartItems);
   const nudges = [];
 
   for (const rule of activeRules) {
@@ -146,11 +205,14 @@ export const findQuantityDiscountNudges = (cartItems, activeRules) => {
     const effect = (rule.effects || []).find(
       (e) =>
         (e.type === "percent_off" || e.type === "flat_off") &&
-        String(e.targetProductId) === String(condition.productId),
+        String(e.targetProductId) === String(condition.productId) &&
+        (e.targetVariantSku || "") === (condition.variantSku || ""),
     );
     if (!effect) continue;
 
-    const have = qtyByProduct.get(String(condition.productId)) || 0;
+    const have = condition.variantSku
+      ? qtyByProductVariant.get(variantKey(String(condition.productId), condition.variantSku)) || 0
+      : qtyByProduct.get(String(condition.productId)) || 0;
     const remaining = Math.max(condition.minQuantity - have, 0);
     if (have <= 0 || remaining <= 0) continue;
 
@@ -158,6 +220,7 @@ export const findQuantityDiscountNudges = (cartItems, activeRules) => {
       ruleId: rule._id,
       name: rule.name,
       productId: condition.productId,
+      variantSku: condition.variantSku || undefined,
       have,
       needed: condition.minQuantity,
       remaining,

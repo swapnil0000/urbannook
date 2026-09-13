@@ -60,7 +60,7 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
   // — same evaluator the payment controller uses for the real order total,
   // so this preview's prices/total never disagree with what checkout charges.
   const cartRuleEvalItems = cartItems
-    .map((item) => ({ productId: item.mongoId || item.id, quantity: itemQty(item.quantity) }))
+    .map((item) => ({ productId: item.mongoId || item.id, quantity: itemQty(item.quantity), selectedVariant: item.selectedVariant }))
     .filter((i) => i.productId && i.quantity > 0);
   const { data: cartRuleEvalData } = useEvaluateCartRulesQuery(cartRuleEvalItems, {
     skip: cartRuleEvalItems.length === 0,
@@ -74,7 +74,11 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
   const { data: bannersRes } = useGetAllFreeShippingBannersQuery();
   const getItemDiscountedPrice = (item) => {
     const productId = item.mongoId || item.id;
-    const candidates = cartRuleEvalData?.data?.discounts?.[productId];
+    // Untagged candidates apply to every variant (unchanged); a `variantName`
+    // tag restricts to that one variant — see cartRule.util.js.
+    const candidates = (cartRuleEvalData?.data?.discounts?.[productId] || []).filter(
+      (c) => !c.variantName || c.variantName === item.selectedVariant,
+    );
     const price = Number(item.price) || 0;
     if (!candidates?.length) return price;
     const results = candidates.map((c) =>
@@ -99,12 +103,28 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
   // .split(":")[0] guards against a composite "productId:variant" id — same
   // parsing as CartDrawer/CheckoutPage so all three can never disagree.
   const cartProductIds = new Set(cartItems.map((i) => i.mongoId || i.id?.split(":")[0]));
+  // Which selectedVariant name(s) of a product are actually in the cart —
+  // lets a banner scoped to one variant (sourceVariantName/recommendedVariantName,
+  // see freeShippingOffer.util.js) require that exact variant, not just the
+  // product. A banner with no variant name behaves exactly as before.
+  const cartVariantsByProduct = new Map();
+  cartItems.forEach((i) => {
+    const pid = i.mongoId || i.id?.split(":")[0];
+    if (!pid) return;
+    if (!cartVariantsByProduct.has(pid)) cartVariantsByProduct.set(pid, new Set());
+    if (i.selectedVariant) cartVariantsByProduct.get(pid).add(i.selectedVariant);
+  });
+  const hasProductVariant = (productId, variantName) => {
+    if (!cartProductIds.has(productId)) return false;
+    if (!variantName) return true;
+    return (cartVariantsByProduct.get(productId) || new Set()).has(variantName);
+  };
   // Combo banners are independent of the offer doc's own `isActive` — that
   // flag is only the cart-VALUE-threshold on/off switch, not a master kill
   // switch for banners (each banner has its own isActive; server-side
   // getAllActiveBanners already only returns those).
   const comboEligible = banners.some(
-    (b) => cartProductIds.has(b.sourceProductId) && cartProductIds.has(b.recommendedProductId),
+    (b) => hasProductVariant(b.sourceProductId, b.sourceVariantName) && hasProductVariant(b.recommendedProductId, b.recommendedVariantName),
   );
   const thresholdEligible =
     !!offerConfig?.isActive && (offerConfig?.thresholdAmount || 0) > 0 && subtotal >= offerConfig.thresholdAmount;
@@ -116,7 +136,7 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
   // bannersOverride on FreeShippingBanner) instead of a new card
   // mounting/unmounting each time the cart's nudge-worthy combo changes.
   const nudgeBanners = banners.filter(
-    (b) => cartProductIds.has(b.sourceProductId) && !cartProductIds.has(b.recommendedProductId),
+    (b) => hasProductVariant(b.sourceProductId, b.sourceVariantName) && !hasProductVariant(b.recommendedProductId, b.recommendedVariantName),
   );
 
   useEffect(() => {

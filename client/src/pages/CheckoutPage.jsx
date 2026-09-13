@@ -500,7 +500,7 @@ const CheckoutPage = () => {
   const cartRuleEvalItems = useMemo(
     () =>
       cartItems
-        .map((i) => ({ productId: i.mongoId || i.id?.split(":")[0], quantity: Number(i.quantity) || 0 }))
+        .map((i) => ({ productId: i.mongoId || i.id?.split(":")[0], quantity: Number(i.quantity) || 0, selectedVariant: i.selectedVariant }))
         .filter((i) => i.productId && i.quantity > 0),
     [cartItems],
   );
@@ -519,7 +519,11 @@ const CheckoutPage = () => {
   // controller) already applied it correctly.
   const getItemDiscountedPrice = (item) => {
     const productId = item.mongoId || item.id?.split(":")[0];
-    const candidates = cartRuleEvalData?.data?.discounts?.[productId];
+    // Untagged candidates apply to every variant (unchanged); a `variantName`
+    // tag restricts to that one variant — see cartRule.util.js.
+    const candidates = (cartRuleEvalData?.data?.discounts?.[productId] || []).filter(
+      (c) => !c.variantName || c.variantName === item.selectedVariant,
+    );
     const price = Number(item.price) || 0;
     if (!candidates?.length) return price;
     const results = candidates.map((c) =>
@@ -563,8 +567,24 @@ const CheckoutPage = () => {
     const banners = allFreeShippingBannersData?.data || [];
     if (banners.length === 0) return [];
     const cartProductIds = new Set(cartItems.map((i) => i.mongoId || i.id?.split(":")[0]));
+    // Which selectedVariant name(s) of a product are actually in the cart —
+    // lets a banner scoped to one variant (sourceVariantName/recommendedVariantName,
+    // see freeShippingOffer.util.js) require that exact variant, not just the
+    // product. A banner with no variant name behaves exactly as before.
+    const cartVariantsByProduct = new Map();
+    cartItems.forEach((i) => {
+      const pid = i.mongoId || i.id?.split(":")[0];
+      if (!pid) return;
+      if (!cartVariantsByProduct.has(pid)) cartVariantsByProduct.set(pid, new Set());
+      if (i.selectedVariant) cartVariantsByProduct.get(pid).add(i.selectedVariant);
+    });
+    const hasProductVariant = (productId, variantName) => {
+      if (!cartProductIds.has(productId)) return false;
+      if (!variantName) return true;
+      return (cartVariantsByProduct.get(productId) || new Set()).has(variantName);
+    };
     return banners.filter(
-      (b) => cartProductIds.has(b.sourceProductId) && !cartProductIds.has(b.recommendedProductId),
+      (b) => hasProductVariant(b.sourceProductId, b.sourceVariantName) && !hasProductVariant(b.recommendedProductId, b.recommendedVariantName),
     );
   }, [allFreeShippingBannersData, cartItems]);
 
@@ -823,11 +843,27 @@ const CheckoutPage = () => {
           const offerConfig = freeShippingOfferData?.data;
           const banners = allFreeShippingBannersData?.data || [];
           const cartProductIds = new Set(cartItems.map((i) => i.mongoId || i.id?.split(":")[0]));
+          // Which selectedVariant name(s) of a product are actually in the cart —
+          // lets a banner scoped to one variant (sourceVariantName/recommendedVariantName,
+          // see freeShippingOffer.util.js) require that exact variant, not just
+          // the product. A banner with no variant name behaves exactly as before.
+          const cartVariantsByProduct = new Map();
+          cartItems.forEach((i) => {
+            const pid = i.mongoId || i.id?.split(":")[0];
+            if (!pid) return;
+            if (!cartVariantsByProduct.has(pid)) cartVariantsByProduct.set(pid, new Set());
+            if (i.selectedVariant) cartVariantsByProduct.get(pid).add(i.selectedVariant);
+          });
+          const hasProductVariant = (productId, variantName) => {
+            if (!cartProductIds.has(productId)) return false;
+            if (!variantName) return true;
+            return (cartVariantsByProduct.get(productId) || new Set()).has(variantName);
+          };
           // Combo eligibility is independent of the offer doc's own isActive
           // (that flag is only the cart-value threshold switch) — see the
           // matching comment on checkoutNudgeBanners above.
           const comboEligible = banners.some(
-            (b) => cartProductIds.has(b.sourceProductId) && cartProductIds.has(b.recommendedProductId),
+            (b) => hasProductVariant(b.sourceProductId, b.sourceVariantName) && hasProductVariant(b.recommendedProductId, b.recommendedVariantName),
           );
           // Plain cart-value threshold — whole cart, any products count.
           // Mirrors the server's direct subtotal >= thresholdAmount check,
