@@ -395,6 +395,45 @@ const mergeGuestCartService = async ({ userId, guestItems }) => {
   return { statusCode: 200, message: "Merged", success: true };
 };
 
+// Persists a guest's in-progress checkout (Contact-step contact details +
+// current cart) to the SAME collection authenticated carts live in, keyed by
+// `guest_<anonymousId>` (the stable per-browser id from analytics.js) instead
+// of a real user id. Never gated on completing checkout — this is exactly
+// what lets the admin's existing abandoned-cart dashboard (which already
+// reads this collection and looks for cart.guestName/guestEmail/mobileNumber)
+// pick up guests who leave before finishing, same as it already does for
+// logged-in users. Upserts so repeated calls (debounced while typing) just
+// update the one row per guest rather than creating duplicates.
+const syncGuestCartService = async ({ anonymousId, guestName, guestEmail, guestMobile, items }) => {
+  const userId = `guest_${anonymousId}`;
+
+  const products = {};
+  for (const item of items || []) {
+    const variant = item.selectedVariant && item.selectedVariant !== "" ? item.selectedVariant : "N/A";
+    const key = `${item.productId}:${variant}`;
+    products[key] = {
+      quantity: Number(item.quantity) || 1,
+      selectedVariant: variant,
+      image: item.image || null,
+    };
+  }
+
+  await Cart.findOneAndUpdate(
+    { userId },
+    {
+      $set: {
+        products,
+        guestName: guestName || null,
+        guestEmail: guestEmail || null,
+        mobileNumber: guestMobile || null,
+      },
+    },
+    { upsert: true, setDefaultsOnInsert: true },
+  );
+
+  return { statusCode: 200, message: "Guest cart synced", success: true };
+};
+
 export {
   addToCartService,
   getCartService,
@@ -402,4 +441,5 @@ export {
   clearCartService,
   mergeGuestCartService,
   toggleGiftWrapService,
+  syncGuestCartService,
 };

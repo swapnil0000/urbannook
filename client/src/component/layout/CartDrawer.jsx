@@ -21,10 +21,18 @@ const CartDrawer = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const [mounted, setMounted] = useState(false);
-  
+
   const { items: cartItems, totalAmount, giftWrap: giftWrapSelected } = useSelector((state) => state.cart);
   const { isAuthenticated } = useSelector((state) => state.auth);
   const { data: giftWrapOfferRes } = useGetGiftWrapOfferQuery();
+
+  // Replays the ticket's one-time shimmer sweep each time the drawer opens
+  // (not on every re-render while it's already open) by remounting the
+  // shimmer div via `key`.
+  const [shimmerKey, setShimmerKey] = useState(0);
+  useEffect(() => {
+    if (isOpen) setShimmerKey((k) => k + 1);
+  }, [isOpen]);
 
   const [updateCart] = useUpdateCartMutation();
 
@@ -152,7 +160,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
       dispatch(removeItem({ id: productId, selectedVariant: effectiveVariant }));
     }
   };
-  
+
   const handleCheckout = () => {
     onClose();
     navigate('/checkout');
@@ -220,9 +228,28 @@ const CartDrawer = ({ isOpen, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-[9999] flex justify-end">
-      
+      <style>{`
+        .un-cart-ticket-shimmer {
+          animation: ppc-shimmer 1.1s ease-out 1 forwards;
+        }
+        @keyframes un-coupon-star-float {
+          0% { transform: translateY(3px) scale(0.4) rotate(0deg); opacity: 0; }
+          25% { opacity: 1; }
+          100% { transform: translateY(-14px) scale(1) rotate(30deg); opacity: 0; }
+        }
+        .un-coupon-star {
+          position: absolute;
+          pointer-events: none;
+          animation: un-coupon-star-float 2.4s ease-in-out infinite;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .un-cart-ticket-shimmer { animation: none; opacity: 0; }
+          .un-coupon-star { animation: none; opacity: 0; }
+        }
+      `}</style>
+
       {/* Backdrop */}
-      <div 
+      <div
         className={`absolute inset-0 bg-[#0a110e]/60 backdrop-blur-sm transition-opacity duration-300 ${
           isOpen ? 'opacity-100' : 'opacity-0'
         }`}
@@ -230,31 +257,41 @@ const CartDrawer = ({ isOpen, onClose }) => {
       />
 
       {/* Drawer Panel */}
-      <div 
+      <div
         className={`relative w-full max-w-[420px] bg-white h-full shadow-2xl flex flex-col transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] transform ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
-        
+
         {/* --- HEADER --- */}
-        <div className="px-6 pt-5 pb-2 border-b border-gray-100 flex items-center justify-between bg-white z-10 shrink-0">
-          <div>
-            <h2 className="text-2xl font-serif text-[#0a110e] tracking-tight">Your Nook</h2>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
-              {cartItems.length} {cartItems.length === 1 ? 'ITEM' : 'ITEMS'}
-            </p>
+        <div className="px-6 pt-5 pb-3 border-b border-gray-100 bg-white z-10 shrink-0">
+          <div className="flex items-start justify-between gap-4">
+            {/* Title + COD + Item Count */}
+            <div className="min-w-0">
+              <div className="flex items-center gap-3">
+                <h2 className="text-2xl font-serif text-[#0a110e] tracking-tight leading-none whitespace-nowrap">Your Nook</h2>
+                <div className="flex items-center gap-1.5 bg-amber-100 rounded-full px-3 py-1.5 shrink-0">
+                  <i className="fa-solid fa-hand-holding-dollar text-amber-600 text-xs" />
+                  <p className="text-[8px] font-bold text-amber-800 uppercase tracking-widest whitespace-nowrap">COD Available</p>
+                </div>
+              </div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-2">
+                {cartItems.length} {cartItems.length === 1 ? 'ITEM' : 'ITEMS'}
+              </p>
+            </div>
+            {/* Close Button */}
+            <button
+              onClick={onClose}
+              className="group w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-[#0a110e] transition-all duration-300 shrink-0"
+            >
+              <i className="fa-solid fa-xmark text-sm group-hover:rotate-90 transition-transform duration-300"></i>
+            </button>
           </div>
-          <button 
-            onClick={onClose}
-            className="group w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-[#0a110e] transition-all duration-300"
-          >
-            <i className="fa-solid fa-xmark text-sm group-hover:rotate-90 transition-transform duration-300"></i>
-          </button>
         </div>
 
         {/* --- SCROLLABLE CONTENT --- */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 scrollbar-hide">
-          
+
           {cartItems.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center space-y-6 opacity-80">
               <div className="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center mb-2 border border-dashed border-gray-200">
@@ -266,7 +303,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
                   Looks like you haven't discovered your perfect piece yet.
                 </p>
               </div>
-              <button 
+              <button
                 onClick={() => {
                   onClose();
                   navigate('/products');
@@ -431,12 +468,12 @@ const CartDrawer = ({ isOpen, onClose }) => {
               <GiftWrapOffer />
             </div>
 
-            <div className="space-y-1 sm:space-y-3 mb-3 sm:mb-6">
-                <div className="flex justify-between items-center text-[11px] font-bold text-gray-400 uppercase tracking-widest">
-                    <span>Subtotal</span>
-                    <span className="font-medium text-[#0a110e]">₹{(Number(subtotal) || 0).toLocaleString()}</span>
+            <div className="space-y-1 sm:space-y-2 mb-6 sm:mb-6">
+                <div className="flex justify-between items-center">
+                    <span className="text-base font-serif text-[#0a110e]">Subtotal</span>
+                    <span className="text-xl font-bold text-[#0a110e]">₹{(Number(subtotal) || 0).toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between items-center gap-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest">
+                <div className="flex justify-between items-center gap-3 text-[9px] font-bold text-gray-400 uppercase tracking-widest">
                     <span className="shrink-0">Shipping</span>
                     {isFreeShippingEligible ? (
                       <span className="font-extrabold text-green-600 text-right">Free</span>
@@ -444,28 +481,44 @@ const CartDrawer = ({ isOpen, onClose }) => {
                       <span className="font-medium normal-case tracking-normal text-gray-500 text-right">Calculated at checkout</span>
                     )}
                 </div>
-                <div className="pt-1 border-t border-gray-100 flex justify-between items-center">
-                    <span className="text-base font-serif text-[#0a110e]">Total</span>
-                    <span className="text-xl font-bold text-[#0a110e]">₹{(Number(subtotal) || 0).toLocaleString()}</span>
+            </div>
+
+            {/* Static "Avail Coupons at Checkout" badge sitting on the
+                button's shoulder — solid, fully opaque, on TOP of the button.
+                Always shown, unconditionally — not tied to any real coupon
+                count. */}
+            <div className="relative">
+              <div className="absolute left-4 -top-3 z-10 overflow-visible rounded-lg bg-gradient-to-br from-[#e6322a] via-[#d30505] to-[#7a0000] px-3 py-1.5 border border-[#ffffff33]" style={{ boxShadow: '0 4px 12px rgba(211,5,5,0.45), 0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.35)' }}>
+                <span className="un-coupon-star" style={{ top: '-9px', right: '10px', fontSize: '10px', color: '#ffd23f' }} aria-hidden="true">
+                  <i className="fa-solid fa-star" />
+                </span>
+                <span className="un-coupon-star" style={{ top: '-4px', right: '-2px', fontSize: '9px', color: '#ff9ecb', animationDelay: '0.8s' }} aria-hidden="true">
+                  <i className="fa-solid fa-star" />
+                </span>
+                <span className="un-coupon-star" style={{ top: '-10px', right: '-6px', fontSize: '10px', color: '#ffd23f', animationDelay: '1.5s' }} aria-hidden="true">
+                  <i className="fa-solid fa-star" />
+                </span>
+                <div className="relative z-[1] overflow-hidden rounded-lg">
+                  <span className="relative z-[1] flex items-center">
+                    <span className="text-[8px] font-bold text-white uppercase tracking-wide whitespace-nowrap">
+                      Avail Coupons at Checkout
+                    </span>
+                  </span>
+                  <span
+                    key={shimmerKey}
+                    className="un-cart-ticket-shimmer pointer-events-none absolute inset-0 z-0"
+                    style={{ background: 'linear-gradient(100deg, rgba(255,255,255,0) 30%, rgba(255,255,255,0.7) 50%, rgba(255,255,255,0) 70%)' }}
+                  />
                 </div>
-            </div>
-
-            {/* COD availability notice */}
-            <div className="flex items-center gap-1 bg-amber-50 border border-amber-100 rounded-2xl px-4 py-1 sm:py-3 mb-1 sm:mb-4">
-              <i className="fa-solid fa-hand-holding-dollar text-amber-500 text-base shrink-0" />
-              <div>
-                <p className="text-[9px] font-bold text-amber-800">Cash on Delivery available.</p>
-                {/* <p className="text-[8px] text-amber-600 mt-0.5 leading-snug">Pay a small advance online · rest at your door</p> */}
               </div>
+              <button
+                onClick={handleCheckout}
+                className="relative z-0 w-full py-4 bg-[#0a110e] text-white rounded-2xl font-bold uppercase tracking-[0.15em] text-[10px] hover:bg-[#1a2b24] transition-all duration-300 active:scale-[0.98] flex items-center justify-center gap-2 px-6"
+              >
+                  <span>Proceed to Checkout</span>
+                  <i className="fa-solid fa-arrow-right-long"></i>
+              </button>
             </div>
-
-            <button
-              onClick={handleCheckout}
-              className="w-full py-4 bg-[#0a110e] text-white rounded-full font-bold uppercase tracking-[0.15em] text-[10px] hover:bg-[#1a2b24] transition-all duration-300 active:scale-[0.98] flex items-center justify-between px-6"
-            >
-                <span>Proceed to Checkout</span>
-                <i className="fa-solid fa-arrow-right-long"></i>
-            </button>
             <div className="mt-1 flex justify-center items-center gap-1.5 text-[9px] text-gray-400 uppercase tracking-widest font-bold">
                 {/* <i className="fa-solid fa-lock"></i>
                 <span>Secure Checkout</span> */}

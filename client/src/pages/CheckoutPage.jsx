@@ -17,12 +17,14 @@ import {
   useGetAllFreeShippingBannersQuery,
   useEvaluateCartRulesQuery,
   useGetGiftWrapOfferQuery,
+  useSyncGuestCartMutation,
 } from "../store/api/userApi";
 import { setShowLoginModal, setLoginCallback } from "../store/slices/uiSlice";
 import { useUI } from "../hooks/useRedux";
 import { clearCart, removeItem } from "../store/slices/cartSlice";
 import { resolveVariantTitle } from "../utils/variantTitle";
 import { fetchCsrfToken } from "../store/api/apiSlice";
+import { getApiUrl } from "../config/appUrls";
 import CouponInput from "../component/CouponInput";
 import FreeShippingBanner from "../component/FreeShippingBanner";
 import { ComponentLoader } from "../component/layout/LoadingSpinner";
@@ -483,6 +485,7 @@ const CheckoutPage = () => {
   const [applyCouponMutation] = useApplyCouponMutation();
   const [deleteAddressMutation] = useDeleteAddressMutation();
   const [updateCart] = useUpdateCartMutation();
+  const [syncGuestCart] = useSyncGuestCartMutation();
   const [updateUserProfile] = useUpdateUserProfileMutation();
   const { data: savedAddressData, refetch: refetchAddresses } =
     useGetSavedAddressesQuery(undefined, { skip: isGuest });
@@ -617,6 +620,127 @@ const CheckoutPage = () => {
       console.error("[Checkout] Failed to save state to session storage:", err);
     }
   }, [currentStep, address, pinCode, preciseDetails, addressForm, currentAddressId, senderMobile, appliedCoupon, guestName, guestEmail, guestMobile]);
+
+  // Holds a "fire this right now" function for whichever capture below has a
+  // debounce timer pending — set right before the timer starts, cleared once
+  // it actually fires. The unmount-effect and pagehide listener further down
+  // use these to flush immediately if the user navigates away or closes the
+  // tab BEFORE the debounce would have fired on its own, using `keepalive`
+  // fetch (survives page teardown, unlike a normal fetch/RTK mutation call).
+  const pendingGuestFlushRef = useRef(null);
+  const pendingMobileFlushRef = useRef(null);
+
+  // Guest abandoned-cart capture: as soon as a guest's Contact-step details
+  // look valid (not on every keystroke — debounced ~1s after typing stops),
+  // persist name/email/mobile + current cart to the server so this guest
+  // shows up in the admin's abandoned-cart dashboard even if they never
+  // reach Address/payment. Fires again on every relevant change so the row
+  // stays current; harmless/no-op if nothing changed meaningfully. Never
+  // blocks or surfaces errors — this is best-effort capture, not part of the
+  // actual checkout flow.
+  useEffect(() => {
+    if (!isGuest || paymentCompletedRef.current) return;
+    if (cartItems.length === 0) return;
+
+    const emailLooksValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail.trim());
+    const mobileLooksValid = /^[6-9][0-9]{9}$/.test(guestMobile.trim());
+    if (!emailLooksValid && !mobileLooksValid) return;
+
+    const payload = {
+      anonymousId: getAnonymousId(),
+      guestName: guestName.trim(),
+      guestEmail: guestEmail.trim().toLowerCase(),
+      guestMobile: guestMobile.trim(),
+      items: cartItems.map((i) => ({
+        productId: i.mongoId || i.id.split(":")[0],
+        quantity: i.quantity,
+        selectedVariant: (i.selectedVariant && i.selectedVariant !== "N/A") ? i.selectedVariant : (cartSelections[i.id]?.variant || "N/A"),
+        image: i.image,
+      })),
+    };
+
+    pendingGuestFlushRef.current = () => {
+      try {
+        fetch(`${getApiUrl()}/guest-cart/sync`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          keepalive: true,
+        });
+      } catch { /* best-effort, never block navigation/unload */ }
+    };
+
+    const timer = setTimeout(() => {
+      syncGuestCart(payload).catch(() => {});
+      pendingGuestFlushRef.current = null;
+    }, 1000);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGuest, guestName, guestEmail, guestMobile, cartItems]);
+
+  // Same capture gap for LOGGED-IN users: their typed mobile number only
+  // ever saved to the profile inside handleStep1Next, i.e. only if they
+  // clicked "Next" — someone who types it and abandons before that lost the
+  // number entirely, which is exactly why some abandoned-cart rows for
+  // members show an email but no phone. Debounced (~1s) so this doesn't
+  // fire on every keystroke, and skipped entirely if it hasn't actually
+  // changed from what's already on the profile.
+  useEffect(() => {
+    if (isGuest || paymentCompletedRef.current) return;
+    if (!senderMobile) return;
+
+    const m = stripCC(String(senderMobile));
+    if (!validateMobile(m)) return;
+
+    const existingMobile = String(userProfile?.mobileNumber || userProfile?.mobile || "");
+    if (m === existingMobile) return;
+
+    pendingMobileFlushRef.current = () => {
+      try {
+        const token = localStorage.getItem("authToken");
+        fetch(`${getApiUrl()}/user/profile/update`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ mobileNumber: m }),
+          keepalive: true,
+          credentials: "include",
+        });
+      } catch { /* best-effort, never block navigation/unload */ }
+    };
+
+    const timer = setTimeout(() => {
+      updateUserProfile({ mobileNumber: m }).unwrap().then(() => refetchProfile()).catch(() => {});
+      pendingMobileFlushRef.current = null;
+    }, 1000);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGuest, senderMobile, userProfile]);
+
+  // Safety net for BOTH captures above: if the user navigates to a different
+  // route (unmounting this page) or closes/backgrounds the tab BEFORE a
+  // pending debounce timer got to fire on its own, send it right now via
+  // `keepalive` fetch instead of losing it — that's the whole point of the
+  // refs above. `pagehide` covers tab close/refresh/backgrounding (a hard
+  // teardown React never gets an unmount callback for); the empty-deps
+  // cleanup covers an in-app route change away from /checkout.
+  useEffect(() => {
+    const flushAll = () => {
+      pendingGuestFlushRef.current?.();
+      pendingMobileFlushRef.current?.();
+      pendingGuestFlushRef.current = null;
+      pendingMobileFlushRef.current = null;
+    };
+    window.addEventListener("pagehide", flushAll);
+    return () => {
+      window.removeEventListener("pagehide", flushAll);
+      flushAll();
+    };
+  }, []);
 
   // Dynamic Shipping Calculation - triggered by payment method change on Review page
   const calculateShippingRef = useRef(calculateShipping);
