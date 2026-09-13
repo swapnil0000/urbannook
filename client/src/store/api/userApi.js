@@ -53,6 +53,16 @@ export const userApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["Cart"],
     }),
+    // Debounced write of an in-progress GUEST checkout (Contact-step details +
+    // current cart) — no auth needed, keyed by anonymousId. See
+    // guestCart.route.js / server-side syncGuestCartService.
+    syncGuestCart: builder.mutation({
+      query: (data) => ({
+        url: "guest-cart/sync",
+        method: "POST",
+        body: data,
+      }),
+    }),
     toggleGiftWrap: builder.mutation({
       query: ({ selected, noteOptions } = {}) => ({
         url: "user/cart/gift-wrap",
@@ -325,6 +335,7 @@ export const {
   useAddToCartMutation,
   useUpdateCartMutation,
   useMergeGuestCartMutation,
+  useSyncGuestCartMutation,
   useToggleGiftWrapMutation,
   useRemoveFromCartMutation,
   useGetCartQuery,

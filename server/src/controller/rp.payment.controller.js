@@ -1126,7 +1126,7 @@ const generateTempPassword = () => {
 };
 
 const guestCreateOrderController = asyncHandler(async (req, res) => {
-  const { items, guestInfo, deliveryAddress, paymentMethod: reqPaymentMethod, couponCode: rawCouponCode, giftWrap: reqGiftWrap, giftWrapNoteOptions: reqGiftWrapNoteOptions } = req.body;
+  const { items, guestInfo, deliveryAddress, paymentMethod: reqPaymentMethod, couponCode: rawCouponCode, giftWrap: reqGiftWrap, giftWrapNoteOptions: reqGiftWrapNoteOptions, anonymousId } = req.body;
 
   if (!guestInfo?.name?.trim()) throw new ValidationError("Full name is required");
   if (!guestInfo?.email?.trim()) throw new ValidationError("Email is required");
@@ -1359,7 +1359,13 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   const order = await Order.create({
     orderId: uuidv7(),
     userEmail: guestEmail,
-    userId: `guest_${uuidv7()}`,
+    // Reuse the SAME per-browser anonymousId the pre-payment guest-cart-sync
+    // wrote as userId (see guestCart.route.js / syncGuestCartService) — this
+    // is what lets the admin's abandoned-cart job recognize this guest as
+    // converted once the order is PAID, instead of showing them as
+    // permanently abandoned. Falls back to a fresh id only if the client
+    // somehow didn't send one (older client build, etc).
+    userId: anonymousId ? `guest_${anonymousId}` : `guest_${uuidv7()}`,
     userName: guestInfo.name.trim(),
     userMobile: cleanMobile,
     items: orderItems,
