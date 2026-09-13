@@ -23,6 +23,12 @@ const conditionSchema = new mongoose.Schema(
   {
     productId: { type: String, required: true, trim: true },
     minQuantity: { type: Number, required: true, min: 1 },
+    // Optional — scopes the quantity requirement to ONE variant of
+    // productId, identified by the variant's `sku` (Product.variantDetails[].sku)
+    // — SKU, not variant name, since names aren't guaranteed unique/stable.
+    // Blank/absent = counts every variant, exactly like before this field
+    // existed — purely additive. See utils/cartRule.util.js.
+    variantSku: { type: String, trim: true, default: "" },
   },
   { _id: false },
 );
@@ -32,6 +38,10 @@ const effectSchema = new mongoose.Schema(
     type: { type: String, required: true, enum: ["free_shipping", "percent_off", "flat_off"] },
     targetProductId: { type: String, trim: true },
     value: { type: Number, min: 0 },
+    // Optional — restricts the discount to ONE variant of targetProductId,
+    // identified by SKU (see conditionSchema.variantSku above). Blank/absent
+    // = discounts every variant, exactly like before this field existed.
+    targetVariantSku: { type: String, trim: true, default: "" },
   },
   { _id: false },
 );

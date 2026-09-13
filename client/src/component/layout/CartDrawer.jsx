@@ -45,17 +45,19 @@ const CartDrawer = ({ isOpen, onClose }) => {
     .map((item) => ({
       productId: item.mongoId || item.id,
       quantity: typeof item.quantity === 'object' ? Number(item.quantity?.quantity || 0) : Number(item.quantity || 0),
+      selectedVariant: item.selectedVariant,
     }))
     .filter((i) => i.productId && i.quantity > 0);
   const { data: cartRuleEvalData } = useEvaluateCartRulesQuery(cartRuleEvalItems, {
     skip: cartRuleEvalItems.length === 0,
   });
-  // "Buy N more of this same product, get a lower unit price" — reuses this
-  // SAME FreeShippingBanner card (see its `quantityNudge` prop) rather than
-  // a separate component. Stays visible until enough of the product (any
-  // variant) is in the cart — findQuantityDiscountNudges only returns an
-  // entry while remaining > 0.
-  const quantityNudge = cartRuleEvalData?.data?.quantityNudges?.[0] || null;
+  // "Buy N more of this same product, get a lower unit price" — reuses the
+  // SAME FreeShippingBanner card as the cross-sell combo nudges below
+  // (merged into one carousel via __quantityNudge, see nudgeSlides) rather
+  // than a separate component or a second stacked card. Stays a candidate
+  // until enough of the product (any variant) is in the cart —
+  // findQuantityDiscountNudges only returns an entry while remaining > 0.
+  const quantityNudges = cartRuleEvalData?.data?.quantityNudges || [];
 
   // Free-shipping eligibility for the "Shipping" line below — mirrors the
   // same OR logic used at checkout/payment (rp.payment.controller.js): the
@@ -66,7 +68,12 @@ const CartDrawer = ({ isOpen, onClose }) => {
   const { data: bannersRes } = useGetAllFreeShippingBannersQuery();
   const getItemDiscountedPrice = (item) => {
     const productId = item.mongoId || item.id;
-    const candidates = cartRuleEvalData?.data?.discounts?.[productId];
+    // A candidate may be tagged with `variantName` (offer scoped to one
+    // variant) — untagged candidates apply to every variant, unchanged from
+    // before this field existed. See cartRule.util.js getDiscountCandidatesForItem.
+    const candidates = (cartRuleEvalData?.data?.discounts?.[productId] || []).filter(
+      (c) => !c.variantName || c.variantName === item.selectedVariant,
+    );
     const price = Number(item.price) || 0;
     if (!candidates?.length) return price;
     const results = candidates.map((c) =>
@@ -209,22 +216,51 @@ const CartDrawer = ({ isOpen, onClose }) => {
   // for this exact check on checkout, so the two can never disagree about
   // which products are "in the cart" for combo purposes.
   const cartProductIds = new Set(cartItems.map((i) => i.mongoId || i.id?.split(":")[0]));
+  // Which selectedVariant name(s) of a product are actually in the cart —
+  // lets a banner scoped to one variant (sourceVariantName/recommendedVariantName,
+  // see freeShippingOffer.util.js) require that exact variant, not just the
+  // product. A banner with no variant name behaves exactly as before.
+  const cartVariantsByProduct = new Map();
+  cartItems.forEach((i) => {
+    const pid = i.mongoId || i.id?.split(":")[0];
+    if (!pid) return;
+    if (!cartVariantsByProduct.has(pid)) cartVariantsByProduct.set(pid, new Set());
+    if (i.selectedVariant) cartVariantsByProduct.get(pid).add(i.selectedVariant);
+  });
+  const hasProductVariant = (productId, variantName) => {
+    if (!cartProductIds.has(productId)) return false;
+    if (!variantName) return true;
+    return (cartVariantsByProduct.get(productId) || new Set()).has(variantName);
+  };
   const comboEligible = banners.some(
-    (b) => cartProductIds.has(b.sourceProductId) && cartProductIds.has(b.recommendedProductId),
+    (b) => hasProductVariant(b.sourceProductId, b.sourceVariantName) && hasProductVariant(b.recommendedProductId, b.recommendedVariantName),
   );
   const thresholdEligible =
     !!offerConfig?.isActive && (offerConfig?.thresholdAmount || 0) > 0 && subtotal >= offerConfig.thresholdAmount;
   const isFreeShippingEligible = comboEligible || !!cartRuleEvalData?.data?.freeShipping || thresholdEligible;
 
-  // Cross-sell nudge: every banner whose SOURCE product is in the cart but
-  // RECOMMENDED add-on isn't — one persistent card, arrows page through all
-  // of them (see bannersOverride on FreeShippingBanner) instead of a new
-  // card mounting/unmounting each time the cart's nudge-worthy combo changes.
-  // Each banner's own isActive is the only gate — not the parent offer doc's
-  // threshold toggle (see comment above).
+  // Cross-sell nudge: every banner whose SOURCE product (and its required
+  // variant, if any) is in the cart but its RECOMMENDED add-on isn't — one
+  // persistent card, arrows page through all of them (see bannersOverride on
+  // FreeShippingBanner) instead of a new card mounting/unmounting each time
+  // the cart's nudge-worthy combo changes. Each banner's own isActive is the
+  // only gate — not the parent offer doc's threshold toggle (see comment above).
   const nudgeBanners = banners.filter(
-    (b) => cartProductIds.has(b.sourceProductId) && !cartProductIds.has(b.recommendedProductId),
+    (b) => hasProductVariant(b.sourceProductId, b.sourceVariantName) && !hasProductVariant(b.recommendedProductId, b.recommendedVariantName),
   );
+
+  // Combo cross-sell nudges AND same-product quantity-discount nudges are
+  // paged through in ONE shared carousel card (not two stacked cards) — a
+  // quantity nudge is tagged with __quantityNudge so FreeShippingBanner can
+  // tell the two slide kinds apart (see its `quantityNudge` derivation).
+  const nudgeSlides = [
+    ...nudgeBanners,
+    ...quantityNudges.map((q) => ({
+      sourceProductId: q.productId,
+      recommendedProductId: q.productId,
+      __quantityNudge: q,
+    })),
+  ];
 
   return (
     <div className="fixed inset-0 z-[9999] flex justify-end">
@@ -430,25 +466,14 @@ const CartDrawer = ({ isOpen, onClose }) => {
                 <GiftWrapLineItem />
               </div>
 
-              {/* Add-on nudge — one persistent card; if multiple combos are
-                  each missing their add-on, arrows page through all of them
-                  instead of a new card replacing the old one. */}
-              {nudgeBanners.length > 0 && (
+              {/* Add-on nudge — one persistent card covering BOTH cross-sell
+                  combos (add a different product) and quantity-discount
+                  nudges (add more of a product already in the cart); arrows
+                  page through all of them together instead of stacking a
+                  separate card per nudge type. */}
+              {nudgeSlides.length > 0 && (
                 <FreeShippingBanner
-                  bannersOverride={nudgeBanners}
-                  variant="light"
-                  showQuantityStepper
-                  showProgressBar={false}
-                  className="mt-3 sm:mt-6"
-                />
-              )}
-
-              {/* Quantity-discount nudge — "add N more of this same product,
-                  get a lower unit price". Same card component as the combo
-                  nudge above, just fed a quantityNudge instead of banners. */}
-              {quantityNudge && (
-                <FreeShippingBanner
-                  quantityNudge={quantityNudge}
+                  bannersOverride={nudgeSlides}
                   variant="light"
                   showQuantityStepper
                   showProgressBar={false}

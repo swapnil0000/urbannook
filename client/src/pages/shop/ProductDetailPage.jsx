@@ -1010,7 +1010,7 @@ const ProductDetailPage = () => {
           <div
             className="lg:col-span-6 max-w-[500px] w-full lg:sticky lg:top-24 flex flex-col items-start"
           >
-            <div className="relative max-w-[500px] aspect-square md:aspect-auto md:h-[520px] rounded-2xl overflow-hidden shadow-2xl group w-full bg-[#e8e6e1]">
+            <div className="relative max-w-[500px] aspect-square rounded-2xl overflow-hidden shadow-2xl group w-full bg-[#e8e6e1]">
               <div
                 className={`w-full h-full relative flex ${galleryImages.length > 1 ? "cursor-grab active:cursor-grabbing" : ""}`}
                 style={{ touchAction: "pan-y" }}
@@ -1088,12 +1088,12 @@ const ProductDetailPage = () => {
                   <span className="text-[10px] uppercase tracking-[0.2em] text-[#F5DEB3]/70 font-bold">
                     Choose Variant
                   </span>
-                  <span className="text-xs text-gray-400">
+                  {/* <span className="text-xs text-gray-400">
                     Selected:{" "}
                     <strong className="text-white font-medium">
                       {selectedVariant}
                     </strong>
-                  </span>
+                  </span> */}
                 </div>
 
                 <div className="relative">
@@ -1301,19 +1301,12 @@ const ProductDetailPage = () => {
                 </div>
               )}
 
-              {!selectedVariantOOS && selectedVariantLowStock && (
+              {!selectedVariantOOS && selectedVariantLowStock && selectedVariantQty !== 1 && (
                 <div className="mb-4">
-                  {selectedVariantQty === 1 ? (
-                    <span className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wider px-3.5 py-2 rounded-lg bg-[#F5DEB3] text-[#1c3026] shadow-[0_0_18px_rgba(245,222,179,0.5)] animate-pulse">
-                      <i className="fa-solid fa-bolt" />
-                      Only 1 left — order now!
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wider px-3.5 py-2 rounded-lg bg-[#2e443c] text-[#F5DEB3] border border-[#F5DEB3]/30 shadow-[0_0_14px_rgba(46,68,60,0.6)]">
-                      <i className="fa-solid fa-hourglass-half" />
-                      Few left — selling fast!
-                    </span>
-                  )}
+                  <span className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wider px-3.5 py-2 rounded-lg bg-[#2e443c] text-[#F5DEB3] border border-[#F5DEB3]/30 shadow-[0_0_14px_rgba(46,68,60,0.6)]">
+                    <i className="fa-solid fa-hourglass-half" />
+                    Few left — selling fast!
+                  </span>
                 </div>
               )}
 
