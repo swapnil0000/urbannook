@@ -108,7 +108,7 @@ const getShippingRateOrFallback = async (params) => {
   }
 };
 import { isFreeShippingEligible, getFreeShippingConfig } from "../utils/freeShippingOffer.util.js";
-import { getActiveCartRules, evaluateCartRules, applyBestDiscount } from "../utils/cartRule.util.js";
+import { getActiveCartRules, evaluateCartRules, applyBestDiscount, getDiscountCandidatesForItem } from "../utils/cartRule.util.js";
 import { getPublicOfferConfig } from "../utils/offer.util.js";
 import { sendMetaCapiEvent } from "../services/meta.capi.service.js";
 import { validateAndPriceRedeem, writeLedgerEntry } from "../services/loyalty.service.js";
@@ -312,14 +312,15 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
 
     // Find the variant specific price
     let priceAtPurchase = 0;
+    let matchedVariant = null;
     if (product.variantDetails && product.variantDetails.length > 0) {
-      const variant = product.variantDetails.find(v =>
+      matchedVariant = product.variantDetails.find(v =>
         v.variantName === itemVariant ||
         v.variantName === item.variant ||
         v.variantName === item.color
       );
-      if (variant && variant.variantPrice) {
-        priceAtPurchase = variant.variantPrice;
+      if (matchedVariant && matchedVariant.variantPrice) {
+        priceAtPurchase = matchedVariant.variantPrice;
       } else {
         // Default to first variant's price if no match or no price on match
         priceAtPurchase = product.variantDetails[0].variantPrice || 0;
@@ -328,6 +329,13 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
 
     return {
       productId: product.productId,
+      // Temporary, NOT part of the Order schema — used only to resolve this
+      // line's variant identity for cart-rule matching below (variantSku is
+      // the reliable identifier, not the variant name — see
+      // utils/cartRule.util.js). Dropped automatically when this object is
+      // eventually persisted via Order.create (Mongoose ignores fields not
+      // declared on the schema).
+      variantSku: matchedVariant?.sku || "",
       productSnapshot: {
         quantity: item.quantity,
         productImg: itemImage,
@@ -354,11 +362,11 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   // the invoice all agree with each other and with what was charged.
   const activeCartRules = await getActiveCartRules();
   const cartRuleResult = evaluateCartRules(
-    orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity })),
+    orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity, variantSku: oi.variantSku })),
     activeCartRules,
   );
   for (const oi of orderItems) {
-    const candidates = cartRuleResult.discountCandidatesByProduct.get(String(oi.productId));
+    const candidates = getDiscountCandidatesForItem(cartRuleResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
     if (candidates?.length) {
       oi.productSnapshot.priceAtPurchase = applyBestDiscount(oi.productSnapshot.priceAtPurchase, candidates);
     }
@@ -1156,9 +1164,10 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     assertVariantAvailable(product, itemVariant, item.quantity);
 
     let priceAtPurchase = 0;
+    let matchedVariant = null;
     if (product.variantDetails && product.variantDetails.length > 0) {
-      const variant = product.variantDetails.find((v) => v.variantName === itemVariant);
-      priceAtPurchase = variant?.variantPrice || product.variantDetails[0].variantPrice || 0;
+      matchedVariant = product.variantDetails.find((v) => v.variantName === itemVariant);
+      priceAtPurchase = matchedVariant?.variantPrice || product.variantDetails[0].variantPrice || 0;
     }
     // Shipping-rate calculation uses the pre-discount price (weight/rate
     // tiers, not the customer's charged amount) — deliberately NOT touched
@@ -1174,6 +1183,9 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
 
     return {
       productId: product.productId,
+      // Temporary, NOT part of the Order schema — see the identical comment
+      // in razorpayCreateOrderController above.
+      variantSku: matchedVariant?.sku || "",
       productSnapshot: {
         quantity: item.quantity,
         productImg: itemImage,
@@ -1193,11 +1205,11 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   // priceAtPurchase and subtotal/order/invoice all agree.
   const activeCartRules = await getActiveCartRules();
   const cartRuleResult = evaluateCartRules(
-    orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity })),
+    orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity, variantSku: oi.variantSku })),
     activeCartRules,
   );
   for (const oi of orderItems) {
-    const candidates = cartRuleResult.discountCandidatesByProduct.get(String(oi.productId));
+    const candidates = getDiscountCandidatesForItem(cartRuleResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
     if (candidates?.length) {
       oi.productSnapshot.priceAtPurchase = applyBestDiscount(oi.productSnapshot.priceAtPurchase, candidates);
     }

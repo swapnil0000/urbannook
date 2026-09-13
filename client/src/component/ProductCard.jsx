@@ -152,11 +152,8 @@ const ProductCard = ({ product, index = 0, listId = "all_products", listName = "
               0,
             );
             if (totalLeft > LOW_STOCK_THRESHOLD) return null;
-            return totalLeft === 1 ? (
-              <span className="absolute top-3 left-3 z-10 flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md bg-[#F5DEB3] text-[#1c3026] shadow animate-pulse">
-                <i className="fa-solid fa-bolt text-[9px]" /> Only 1 left
-              </span>
-            ) : (
+            if (totalLeft === 1) return null;
+            return (
               <span className="absolute top-3 left-3 z-10 flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md bg-[#2e443c] text-[#F5DEB3] border border-[#F5DEB3]/30 shadow">
                 <i className="fa-solid fa-hourglass-half text-[9px]" /> Few left
               </span>
