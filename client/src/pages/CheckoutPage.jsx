@@ -34,7 +34,7 @@ import IndependenceOfferBanner from "../component/IndependenceOfferBanner";
 import useOfferTerms from "../hooks/useOfferTerms";
 import { useShippingDelayNotice } from "../hooks/useShippingDelayNotice";
 import { calcLocalDiscount } from "../utils/couponDiscount";
-import { trackBeginCheckout, trackPurchase, trackAddShippingInfo, trackAddPaymentInfo, trackPaymentFailed, trackPaymentModalDismissed, trackCheckoutStep, trackOrderCreated, trackSelectPaymentMethod, trackDeliveryCheck, getFbCookies, getAnonymousId, cacheAddressForCapi, setMetaAdvancedMatching } from "../utils/analytics";
+import { trackBeginCheckout, trackPurchase, trackAddShippingInfo, trackAddPaymentInfo, trackPaymentFailed, trackPaymentModalDismissed, trackCheckoutStep, trackOrderCreated, trackSelectPaymentMethod, trackDeliveryCheck, trackApplyCoupon, trackRemoveCoupon, getFbCookies, getAnonymousId, cacheAddressForCapi, setMetaAdvancedMatching } from "../utils/analytics";
 
 const CouponList = lazy(() => import("../component/CouponList"));
 const MobileNumberModal = lazy(() => import("../component/MobileNumberModal"));
@@ -1218,14 +1218,19 @@ const CheckoutPage = () => {
         setPricingDetails(prev => ({ ...prev, subtotal: (r.data.summary.subtotal || 0) - ruleDiscountSavings, discount: r.data.summary.discount || 0 }));
         showNotification(r.message || "Coupon applied!", "success");
         setShowCouponModal(false);
+        trackApplyCoupon({ coupon: couponData.code, discount: r.data.summary.discount || 0, status: "success", isGuest });
       }
-    } catch (e) { showNotification(e?.data?.message || "Failed to apply coupon", "error"); }
+    } catch (e) {
+      trackApplyCoupon({ coupon: couponData.code, status: "failed", errorType: e?.data?.message || "apply_failed", isGuest });
+      showNotification(e?.data?.message || "Failed to apply coupon", "error");
+    }
   };
 
   const handleGuestCouponApplied = (couponData) => {
     setAppliedCoupon(couponData.code);
     setPricingDetails(prev => ({ ...prev, discount: couponData.discount || 0 }));
     setShowCouponModal(false);
+    trackApplyCoupon({ coupon: couponData.code, discount: couponData.discount || 0, status: "success", isGuest: true });
   };
 
   // One-tap apply for the offer block at the top of the page. Routes into the
@@ -1243,6 +1248,7 @@ const CheckoutPage = () => {
         const subtotal = cartTotalAmount;
         const minCart = offerTerms.minCartValue || 0;
         if (subtotal < minCart) {
+          trackApplyCoupon({ coupon: code, status: "failed", errorType: "min_cart_not_met", isGuest: true });
           showNotification(
             `Add ₹${(minCart - subtotal).toLocaleString()} more to use ${code} (min order ₹${minCart.toLocaleString()})`,
             "error",
@@ -1251,6 +1257,7 @@ const CheckoutPage = () => {
         }
         const discount = calcLocalDiscount(offerTerms, subtotal);
         if (discount <= 0) {
+          trackApplyCoupon({ coupon: code, status: "failed", errorType: "no_discount", isGuest: true });
           showNotification("This coupon gives no discount on your current cart", "error");
           return;
         }
@@ -1269,6 +1276,7 @@ const CheckoutPage = () => {
     try {
       const r = await applyCouponMutation({ couponCode: null, email: userEmail }).unwrap();
       if (r.success && r.data?.summary) {
+        trackRemoveCoupon({ coupon: appliedCoupon, isGuest });
         setAppliedCoupon(null);
         setPricingDetails(prev => ({ ...prev, subtotal: (r.data.summary.subtotal || 0) - ruleDiscountSavings, discount: r.data.summary.discount || 0 }));
         showNotification("Coupon removed", "success");
@@ -1277,6 +1285,7 @@ const CheckoutPage = () => {
   };
 
   const handleGuestCouponRemoved = () => {
+    trackRemoveCoupon({ coupon: appliedCoupon, isGuest: true });
     setAppliedCoupon(null);
     setPricingDetails(prev => ({ ...prev, discount: 0 }));
     showNotification("Coupon removed", "success");
@@ -2426,6 +2435,7 @@ const CheckoutPage = () => {
                   <div className="px-5 pb-5">
                     <FreeShippingBanner
                       bannersOverride={visibleNudgeBanners}
+                      surface="checkout"
                       variant="light"
                       showQuantityStepper
                       showProgressBar={false}
@@ -2707,6 +2717,7 @@ const CheckoutPage = () => {
               <div className="px-5 pb-5">
                 <FreeShippingBanner
                   bannersOverride={visibleNudgeBanners}
+                  surface="checkout"
                   variant="light"
                   showQuantityStepper
                   showProgressBar={false}
