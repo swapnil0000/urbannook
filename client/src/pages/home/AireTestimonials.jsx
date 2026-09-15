@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { useGetTestimonialsQuery, useSubmitTestimonialMutation } from '../../store/api/testimonialsApi';
 import { moods } from '../../data/constant';
 
@@ -10,30 +10,10 @@ const AireTestimonials = () => {
   const [userLocation, setUserLocation] = useState("");
   const [formState, setFormState] = useState('idle');
   const [errorMessage, setErrorMessage] = useState("");
-  const [isMuted, setIsMuted] = useState(true);
 
   const { data: testimonialsData, isLoading, error } = useGetTestimonialsQuery();
   const [submitTestimonial, { isLoading: isSubmitting }] = useSubmitTestimonialMutation();
   const testimonials = testimonialsData?.data?.testimonials || [];
-
-  const clickSound = useRef(null);
-  const successSound = useRef(null);
-
-  useEffect(() => {
-    clickSound.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3');
-    successSound.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3');
-    clickSound.current.volume = 0.1;
-    successSound.current.volume = 0.2;
-  }, []);
-
-  const playSound = (type) => {
-    if (isMuted) return;
-    try {
-      const sound = type === 'click' ? clickSound.current : successSound.current;
-      sound.currentTime = 0;
-      sound.play();
-    } catch (e) { console.error(e); }
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -47,7 +27,6 @@ const AireTestimonials = () => {
         rating: mood + 1,
       }).unwrap();
       setFormState('success');
-      playSound('success');
       setReviewText("");
       setUserName("");
       setMood(4);
@@ -258,7 +237,7 @@ const AireTestimonials = () => {
                 </div>
                 <div className="flex justify-between bg-[#FAF7F2] p-1.5 rounded-xl border border-[#1c3026]/10">
                   {moods.map((m, i) => (
-                    <button key={i} type="button" onClick={() => { setMood(i); playSound('click'); }} className={`w-10 h-10 flex items-center justify-center rounded-lg transition-all ${mood === i ? 'bg-[#1c3026] scale-105 shadow-lg text-lg' : 'opacity-40 grayscale hover:grayscale-0 hover:bg-[#1c3026]/10'}`}>
+                    <button key={i} type="button" onClick={() => setMood(i)} className={`w-10 h-10 flex items-center justify-center rounded-lg transition-all ${mood === i ? 'bg-[#1c3026] scale-105 shadow-lg text-lg' : 'opacity-40 grayscale hover:grayscale-0 hover:bg-[#1c3026]/10'}`}>
                       <span>{m.emoji}</span>
                     </button>
                   ))}

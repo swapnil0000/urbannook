@@ -93,9 +93,14 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" />
   <link rel="dns-prefetch" href="https://accounts.google.com" />
 
-  <link rel="preload" as="image" href="/assets/hero21.webp" fetchpriority="high" media="(max-width: 768px)" />
-  <link rel="preload" as="image" href="/assets/hero2.webp" fetchpriority="high" media="(min-width: 769px)" />
-  <link rel="preload" as="script" href="/src/main.jsx" />
+  <!-- AireHeroBanner renders /assets/hero2.webp at every breakpoint, so preload it
+       unconditionally. The previous media-split preload fetched hero21.webp on mobile —
+       an image the hero never uses — and left the real LCP image undiscovered until
+       React had rendered, costing ~2.2s of LCP load delay.
+       Do NOT preload /src/main.jsx here: that path only exists in dev, and Vite inlines
+       it into the built HTML as a base64 data: URI. Vite already injects the correct
+       hashed module script at the end of <body>. -->
+  <link rel="preload" as="image" href="/assets/hero2.webp" fetchpriority="high" />
   
   <link rel="preload" as="font" type="font/woff2"
     href="https://fonts.gstatic.com/s/poppins/v20/pxiEyp8kv8JHgFVrJJfecg.woff2"
