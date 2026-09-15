@@ -13,7 +13,7 @@ import {
 import { useGetProductByIdQuery } from "../store/api/productsApi";
 import { addItem, removeItem, updateQuantity, updateSelection } from "../store/slices/cartSlice";
 import { useCartData } from "../hooks/useCartSync";
-import { trackAddToCart } from "../utils/analytics";
+import { trackAddToCart, trackViewPromotion, trackSelectPromotion } from "../utils/analytics";
 
 // Confetti comes from the shared worker-backed pipeline in
 // src/utils/celebration.js — see that file for why it must never be a plain
@@ -92,6 +92,10 @@ const FreeShippingBanner = ({
   // the `quantityNudge` derivation below, which prefers this prop but falls
   // back to the current slide's tag.
   quantityNudge: quantityNudgeProp,
+  // Which surface this card is rendered on — becomes `creative_slot` on the
+  // offer impression/click events so the same offer can be compared across
+  // the cart drawer, mini-cart and checkout.
+  surface = "unknown",
 }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -242,6 +246,73 @@ const FreeShippingBanner = ({
     skip: !banner?.sourceProductId,
   });
   const sourceProduct = sourceRes?.data;
+
+  // ---------------------------------------------------------------------
+  // Offer identity. One shape for every offer this card can represent, so
+  // the admin side can group add_to_cart / view_promotion / select_promotion
+  // by offer without knowing which subsystem produced it:
+  //   - quantity-discount rule  -> cart_rule, keyed by ruleId
+  //   - cart_rule-derived combo -> cart_rule, keyed by ruleId
+  //   - admin "Product Page Banner" -> admin_banner, keyed by its subdoc _id
+  //     (falls back to the source:recommended pair, which is what the merge
+  //     in freeShippingOffer.util.js de-duplicates on)
+  // ---------------------------------------------------------------------
+  // Read off the primitives, not the `banner` object — in quantity-nudge mode
+  // `banner` is rebuilt on every render, which would otherwise re-run the memo
+  // (and the impression effect below it) on every render.
+  const bannerRuleId = banner?.ruleId;
+  const bannerDocId = banner?._id;
+  const bannerText = banner?.text;
+  const bannerSourceId = banner?.sourceProductId;
+  const bannerRecommendedId = banner?.recommendedProductId;
+  const quantityNudgeRuleId = quantityNudge?.ruleId;
+  const quantityNudgeName = quantityNudge?.name;
+
+  const offerMeta = useMemo(() => {
+    if (quantityNudgeRuleId !== undefined && quantityNudgeRuleId !== null) {
+      return {
+        offerId: String(quantityNudgeRuleId || ""),
+        offerType: "quantity_discount",
+        offerSource: "cart_rule",
+        offerName: quantityNudgeName || "Quantity discount",
+      };
+    }
+    if (!bannerRecommendedId) return null;
+    return {
+      offerId: String(bannerRuleId || bannerDocId || `${bannerSourceId}:${bannerRecommendedId}`),
+      offerType: "combo_free_shipping",
+      offerSource: bannerRuleId ? "cart_rule" : "admin_banner",
+      offerName: bannerText || "Free shipping combo",
+    };
+  }, [
+    quantityNudgeRuleId,
+    quantityNudgeName,
+    bannerRuleId,
+    bannerDocId,
+    bannerText,
+    bannerSourceId,
+    bannerRecommendedId,
+  ]);
+
+  // Offer impression. Fires once per (offer + promoted product + surface) so
+  // paging the carousel back and forth doesn't inflate the denominator of
+  // the offer's take-rate, but genuinely switching to another offer counts.
+  const seenOffersRef = useRef(new Set());
+  useEffect(() => {
+    if (!offerMeta?.offerId || !recommendedProduct) return;
+    const key = `${offerMeta.offerId}:${recommendedProduct.productId}:${surface}`;
+    if (seenOffersRef.current.has(key)) return;
+    seenOffersRef.current.add(key);
+    trackViewPromotion({
+      promotionId: offerMeta.offerId,
+      promotionName: offerMeta.offerName,
+      creativeSlot: surface,
+      itemId: recommendedProduct.productId,
+      itemName: recommendedProduct.productName,
+      price: Number(recommendedProduct.variantDetails?.[0]?.variantPrice ?? 0),
+      ...offerMeta,
+    });
+  }, [offerMeta, recommendedProduct, surface]);
 
   // Source of truth for "added" is the actual cart, read fresh on every
   // render — NOT a local flag. A local "I just added this" boolean resets
@@ -699,6 +770,21 @@ const FreeShippingBanner = ({
 
   const handleAddToCart = async () => {
     const effectiveVariant = activeVariant?.variantName || "Standard Variant";
+
+    // Offer click — fired on the click itself, not after the cart write, so a
+    // failed/slow add still counts as click-through against the impression.
+    if (offerMeta?.offerId) {
+      trackSelectPromotion({
+        promotionId: offerMeta.offerId,
+        promotionName: offerMeta.offerName,
+        creativeSlot: surface,
+        ctaText: banner?.ctaLabel || "Add to Cart",
+        itemId: recommendedProduct?.productId,
+        itemName: recommendedProduct?.productName,
+        price: displayPrice,
+        ...offerMeta,
+      });
+    }
     // Captured BEFORE the cart updates — this is what decides whether this
     // specific click completes the combo, independent of the add itself.
     // Never true in quantity-nudge mode — there's no "combo" to complete
@@ -776,6 +862,8 @@ const FreeShippingBanner = ({
       itemVariant: effectiveVariant,
       price: displayPrice,
       quantity: 1,
+      placement: quantityNudge ? `${surface}_quantity_nudge` : `${surface}_combo_offer`,
+      ...offerMeta,
     });
 
     // Pop-up removed per request: when the add-on is in the cart but the
@@ -846,6 +934,8 @@ const FreeShippingBanner = ({
       itemVariant: variantName,
       price: sourcePrice,
       quantity: 1,
+      placement: `${surface}_combo_source`,
+      ...offerMeta,
     });
 
     setSourceAdding(false);
