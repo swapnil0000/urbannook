@@ -442,6 +442,9 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   const freeShippingUnlocked =
     (await isFreeShippingEligible(items.map((i) => i.productId))) || cartRuleResult.freeShipping || thresholdEligible;
   const chargedShippingAmount = freeShippingUnlocked ? 0 : realShippingAmount;
+  // console.log(
+  //   `[FreeShipping][Order:auth] realShipping=₹${realShippingAmount} chargedShipping=₹${chargedShippingAmount} items=${items.map(i => `${i.productId}x${i.quantity}`).join(",")}`,
+  // );
 
   // Gift wrap: server-authoritative price + intent. `cart.giftWrap` is the
   // ONLY source for "did they select it" (never req.body); price always comes
@@ -1176,6 +1179,9 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   const freeShippingUnlocked =
     (await isFreeShippingEligible(items.map((i) => i.productId))) || cartRuleResult.freeShipping || thresholdEligible;
   const chargedShippingAmount = freeShippingUnlocked ? 0 : realShippingAmount;
+  // console.log(
+  //   `[FreeShipping][Order:guest] realShipping=₹${realShippingAmount} chargedShipping=₹${chargedShippingAmount} items=${items.map(i => `${i.productId}x${i.quantity}`).join(",")}`,
+  // );
 
   // Gift wrap: guests have no server-side cart to read intent from, so the
   // boolean (only) comes from req.body — that's safe, it just means "include
