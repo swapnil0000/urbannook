@@ -22,7 +22,7 @@ import PropTypes from 'prop-types';
  * 2. Custom srcset:
  *    <OptimizedImage 
  *      src="/assets/hero2.webp" 
- *      srcset="/assets/mobilehero.webp 640w, /assets/hero2.webp 1280w"
+ *      srcset="/assets/hero21.webp 640w, /assets/hero2.webp 1280w"
  *      alt="Hero" 
  *    />
  * 
