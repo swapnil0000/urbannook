@@ -1,0 +1,257 @@
+[{
+  "_id": {
+    "$oid": "6a6cde6ee409b03db31031e7"
+  },
+  "type": "free_shipping",
+  "isActive": false,
+  "thresholdAmount": 1700,
+  "banners": [
+    {
+      "sourceProductId": "019da690-729b-7428-8ae1-0273f030d2a8",
+      "recommendedProductId": "019cc7d5-43a9-7c24-a024-e724e6164115",
+      "text": "Avail Free Shipping",
+      "ctaLabel": "Add to Cart",
+      "isActive": true,
+      "_id": {
+        "$oid": "6a6f36ad18d54ec0903d09aa"
+      },
+      "createdAt": {
+        "$date": "2026-08-02T12:23:09.936Z"
+      },
+      "updatedAt": {
+        "$date": "2026-08-02T12:23:09.936Z"
+      }
+    }
+  ],
+  "createdAt": {
+    "$date": "2026-07-31T17:42:07.008Z"
+  },
+  "updatedAt": {
+    "$date": "2026-09-13T11:49:32.382Z"
+  },
+  "__v": 1,
+  "ctaLabel": "Add Gift Wrap"
+},
+{
+  "_id": {
+    "$oid": "6a6f36ae08fcdc154878d41a"
+  },
+  "name": "2+ Brake Caliper Lamps — Free Shipping",
+  "type": "cart_rule",
+  "__v": 0,
+  "conditions": [
+    {
+      "productId": "019da690-729b-7428-8ae1-0273f030d2a8",
+      "minQuantity": 2
+    }
+  ],
+  "createdAt": {
+    "$date": "2026-08-02T12:23:10.023Z"
+  },
+  "effects": [
+    {
+      "type": "free_shipping"
+    }
+  ],
+  "isActive": true,
+  "updatedAt": {
+    "$date": "2026-08-02T12:23:10.023Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "6a6f36ae08fcdc154878d41b"
+  },
+  "name": "Lamp + Pen Stand Combo — Free Shipping",
+  "type": "cart_rule",
+  "__v": 0,
+  "conditions": [
+    {
+      "productId": "019da690-729b-7428-8ae1-0273f030d2a8",
+      "minQuantity": 1
+    },
+    {
+      "productId": "019cc7d5-43a9-7c24-a024-e724e6164115",
+      "minQuantity": 1
+    }
+  ],
+  "createdAt": {
+    "$date": "2026-08-02T12:23:10.056Z"
+  },
+  "effects": [
+    {
+      "type": "free_shipping"
+    }
+  ],
+  "isActive": true,
+  "updatedAt": {
+    "$date": "2026-08-02T12:23:10.056Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "6a6f36ae08fcdc154878d41c"
+  },
+  "type": "cart_rule",
+  "name": "2+ Lamps — 50% Off Pen Stand",
+  "__v": 0,
+  "conditions": [
+    {
+      "productId": "019da690-729b-7428-8ae1-0273f030d2a8",
+      "minQuantity": 2
+    }
+  ],
+  "createdAt": {
+    "$date": "2026-08-02T12:23:10.086Z"
+  },
+  "effects": [
+    {
+      "type": "percent_off",
+      "targetProductId": "019cc7d5-43a9-7c24-a024-e724e6164115",
+      "value": 50
+    }
+  ],
+  "isActive": true,
+  "updatedAt": {
+    "$date": "2026-08-02T12:23:10.086Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "6a8ae3bfc5ca28f5de0c0324"
+  },
+  "type": "gift_wrap",
+  "isActive": true,
+  "price": 149,
+  "title": "Make it a Gift",
+  "note": "Add our exclusive gift wrap to your Lamp, packed in our easy-to-carry gift box.",
+  "ctaLabel": "Add Gift Wrap",
+  "createdAt": {
+    "$date": "2026-08-23T12:12:47.151Z"
+  },
+  "updatedAt": {
+    "$date": "2026-09-12T18:11:06.927Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "6a8ae4f9c5ca28f5de0c0416"
+  },
+  "type": "cart_rule",
+  "isActive": true,
+  "name": "Katana + Display Stand Combo — Free Shipping",
+  "conditions": [
+    {
+      "productId": "85fefd4b-4312-48ac-bf81-5662504db252",
+      "minQuantity": 1,
+      "variantSku": "ANIKSTDBLS"
+    },
+    {
+      "productId": "3e23e89b-16ad-42a1-8251-78bd047a84e9",
+      "minQuantity": 1,
+      "variantSku": ""
+    }
+  ],
+  "effects": [
+    {
+      "type": "free_shipping",
+      "targetVariantSku": ""
+    }
+  ],
+  "ctaLabel": "Add Gift Wrap",
+  "createdAt": {
+    "$date": "2026-08-23T12:18:01.209Z"
+  },
+  "updatedAt": {
+    "$date": "2026-09-13T16:14:45.440Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "6a8b154b3cf38ef2325fbe8f"
+  },
+  "type": "cart_rule",
+  "isActive": true,
+  "name": "Add any other",
+  "conditions": [
+    {
+      "productId": "3e23e89b-16ad-42a1-8251-78bd047a84e9",
+      "minQuantity": 1
+    },
+    {
+      "productId": "019da690-729b-7428-8ae1-0273f030d2a8",
+      "minQuantity": 1
+    }
+  ],
+  "effects": [
+    {
+      "type": "free_shipping"
+    }
+  ],
+  "createdAt": {
+    "$date": "2026-08-23T15:44:11.895Z"
+  },
+  "updatedAt": {
+    "$date": "2026-08-23T19:56:17.025Z"
+  },
+  "__v": 0,
+  "ctaLabel": "Add Gift Wrap"
+},
+{
+  "_id": {
+    "$oid": "6a8b1760a81ff9622df47581"
+  },
+  "type": "cart_rule",
+  "isActive": true,
+  "name": "Buy 5 and Save More",
+  "conditions": [
+    {
+      "productId": "b36adc42-b08a-4273-bc8e-c670429ca1ed",
+      "minQuantity": 5
+    }
+  ],
+  "effects": [
+    {
+      "type": "percent_off",
+      "targetProductId": "b36adc42-b08a-4273-bc8e-c670429ca1ed",
+      "value": 20
+    }
+  ],
+  "ctaLabel": "Add Gift Wrap",
+  "createdAt": {
+    "$date": "2026-08-23T15:53:04.380Z"
+  },
+  "updatedAt": {
+    "$date": "2026-08-23T19:37:24.781Z"
+  },
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "6aa595a1b316e2ef967bcce4"
+  },
+  "type": "cart_rule",
+  "isActive": false,
+  "name": "2+ Katana — Free Shipping",
+  "conditions": [
+    {
+      "productId": "3e23e89b-16ad-42a1-8251-78bd047a84e9",
+      "minQuantity": 2
+    }
+  ],
+  "effects": [
+    {
+      "type": "free_shipping"
+    }
+  ],
+  "ctaLabel": "Add Gift Wrap",
+  "createdAt": {
+    "$date": "2026-09-12T18:10:41.021Z"
+  },
+  "updatedAt": {
+    "$date": "2026-09-12T18:10:41.021Z"
+  },
+  "__v": 0
+}]
