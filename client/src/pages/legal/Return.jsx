@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { SUPPORT_EMAIL } from '../../utils/contactHelper';
 
 const Return = () => {
   // Scroll to top on mount
@@ -8,7 +8,7 @@ const Return = () => {
   }, []);
 
   // Last Updated Date
-  const lastUpdated = "January 6, 2026";
+  const lastUpdated = "September 16, 2026";
 
   return (
     <div className="bg-[#2e443c] min-h-screen text-gray-300 font-sans relative selection:bg-[#F5DEB3] selection:text-white">
@@ -35,7 +35,7 @@ const Return = () => {
           </div>
           
           <h1 className="text-4xl md:text-6xl font-serif text-white mb-4 leading-tight">
-            Return & <span className="italic text-[#F5DEB3]">Exchange</span>
+            Cancellation, Return & <span className="italic text-[#F5DEB3]">Refunds</span>
           </h1>
           <p className="text-gray-400 text-sm md:text-base">
             Last Updated: <span className="text-white">{lastUpdated}</span>
@@ -48,43 +48,63 @@ const Return = () => {
           {/* Section 1 */}
           <section>
             <h2 className="text-xl md:text-2xl font-serif text-white mb-4 flex items-center gap-3">
-              <span className="text-[#F5DEB3] text-sm font-sans font-bold">01.</span> General Policy
+              <span className="text-[#F5DEB3] text-sm font-sans font-bold">01.</span> Order Cancellation
             </h2>
-            <p className="leading-relaxed text-gray-400">
-              At Urban Nook, we take pride in the quality of our craftsmanship. If you are not completely satisfied with your purchase, we offer a comprehensive return policy. You may initiate a return request within <strong>7 days</strong> of receiving your order.
+            <p className="leading-relaxed text-gray-400 mb-4">
+              You may cancel your order at any time <strong>before it has been dispatched</strong> from our warehouse. Once the shipping label is generated and the product leaves our facility, the order cannot be cancelled.
             </p>
+            <div className="bg-white p-6 rounded-[1rem]">
+              <p className="text-sm text-gray-400">
+                To cancel, please email <strong className="text-[#a89068] select-all">{SUPPORT_EMAIL}</strong> with your Order ID immediately.
+              </p>
+            </div>
           </section>
 
           {/* Section 2 */}
           <section>
             <h2 className="text-xl md:text-2xl font-serif text-white mb-4 flex items-center gap-3">
-              <span className="text-[#F5DEB3] text-sm font-sans font-bold">02.</span> Eligibility Criteria
+              <span className="text-[#F5DEB3] text-sm font-sans font-bold">02.</span> Returns & Replacements
             </h2>
             <p className="leading-relaxed text-gray-400 mb-4">
-              To be eligible for a return or exchange, your item must meet the following conditions:
+              At Urban Nook, we take pride in the quality of our craftsmanship. We have a strict <strong>3-day replacement policy</strong> applicable only for damaged, defective, or incorrect items. You may initiate a request within <strong>3 days</strong> of receiving your order. Since our products are made-to-order or limited batch, we do not accept returns for <span className="font-bold text-[#F5DEB3]">"change of mind"</span>.
+            </p>
+            <ul className="list-disc pl-5 space-y-2 text-gray-400 marker:text-[#F5DEB3]">
+              <li><strong>Damaged/Defective:</strong> To claim a replacement or return for a damaged or defective item, customers must provide a clear unboxing video in which the product label is clearly visible, and share it with us within the mentioned time window.</li>
+              <li><strong>Wrong Item:</strong> If you receive the wrong item, please share an unboxing video clearly showing the package label within the specified time period for verification. Once confirmed, we will arrange a reverse pickup and send the correct item at no additional cost.</li>
+            </ul>
+          </section>
+
+          {/* Section 3 */}
+          <section>
+            <h2 className="text-xl md:text-2xl font-serif text-white mb-4 flex items-center gap-3">
+              <span className="text-[#F5DEB3] text-sm font-sans font-bold">03.</span> Eligibility Criteria
+            </h2>
+            <p className="leading-relaxed text-gray-400 mb-4">
+              To be eligible for a return or replacement, your item must meet the following conditions:
             </p>
             <ul className="list-disc pl-5 space-y-2 text-gray-400 marker:text-[#F5DEB3]">
               <li>The item must be unused and in the same condition that you received it.</li>
               <li>It must be in the original packaging with all tags and protective covers intact.</li>
               <li>You must provide the receipt or proof of purchase.</li>
+              <li>A clear unboxing video with the product label visible must be shared with us.</li>
               <li>Items marked as "Final Sale" or "Clearance" are not eligible for return.</li>
             </ul>
           </section>
 
-          {/* Section 3: Distinct Box for Damaged Goods */}
+          {/* Section 4: Distinct Box for Damaged Goods */}
           <section className="bg-white  border-[#F5DEB3] p-6 rounded-[1rem]">
             <h2 className="text-lg md:text-xl font-serif text-[#a89068] mb-2 flex items-center gap-3">
-              <span className="text-[#a89068] text-sm font-sans font-bold">03.</span> Damaged or Defective Items
+              <span className="text-[#a89068] text-sm font-sans font-bold">04.</span> Damaged or Defective Items
             </h2>
             <p className="leading-relaxed text-gray-400 text-sm">
-              Please inspect your order upon reception. If the item is defective, damaged, or if you receive the wrong item, contact us immediately within <strong>48 hours</strong> with unboxing photos/videos so that we can evaluate the issue and make it right.
+              Please inspect your order upon reception. If the item is defective, damaged, or if you receive the wrong item, contact us immediately within <strong>3 days</strong> with unboxing photos/videos so that we can evaluate the issue and make it right.
             </p>
           </section>
 
-          {/* Section 4 */}
+          {/* Section 5 */}
           <section>
             <h2 className="text-xl md:text-2xl font-serif text-white mb-4 flex items-center gap-3">
-              <span className="text-[#F5DEB3] text-sm font-sans font-bold">04.</span> Non-Returnable Items
+              <span className="text-[#F5DEB3] text-sm font-sans font-bold">05.</span> Non-Returnable Items
             </h2>
             <p className="leading-relaxed text-gray-400 mb-4">
               Certain types of items cannot be returned due to their nature:
@@ -101,15 +121,15 @@ const Return = () => {
             </div>
           </section>
 
-          {/* Section 5 */}
+          {/* Section 6 */}
           <section>
             <h2 className="text-xl md:text-2xl font-serif text-white mb-4 flex items-center gap-3">
-              <span className="text-[#F5DEB3] text-sm font-sans font-bold">05.</span> Refund Process
+              <span className="text-[#F5DEB3] text-sm font-sans font-bold">06.</span> Refund Process & Timeline
             </h2>
             <p className="leading-relaxed text-gray-400">
               Once your return is received and inspected, we will send you an email to notify you that we have received your returned item. We will also notify you of the approval or rejection of your refund.
               <br /><br />
-              If approved, your refund will be processed, and a credit will automatically be applied to your original method of payment within <strong>5-7 business days</strong>.
+              If a refund is approved (for cancelled orders, unfulfillable items, or approved returns), it will be processed to your original payment method within <strong>5-7 business days</strong>. Banks may take an additional 3-5 days to reflect the amount in your account.
             </p>
           </section>
         </div>
