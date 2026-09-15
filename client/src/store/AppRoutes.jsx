@@ -160,14 +160,14 @@ const AppRoutes = () => {
           </Suspense>
         }
       />
-      <Route
+      {/* <Route
         path="/cancellation-refund"
         element={
           <Suspense fallback={<MinimalLoader />}>
             <CancellationPolicy />
           </Suspense>
         }
-      />
+      /> */}
       <Route
         path="/privacy-policy"
         element={

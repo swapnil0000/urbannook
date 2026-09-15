@@ -242,6 +242,7 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
             <div className="mt-3" style={{ transform: "scale(0.9)", transformOrigin: "top center", marginBottom: "-8%" }}>
               <FreeShippingBanner
                 bannersOverride={nudgeBanners}
+                surface="mini_cart"
                 variant="light"
                 showQuantityStepper
                 showProgressBar={false}

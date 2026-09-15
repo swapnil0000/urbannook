@@ -25,7 +25,7 @@ const ORG_STRUCTURED_DATA = {
   ],
   contactPoint: {
     '@type': 'ContactPoint',
-    telephone: '+91-82996-38749',
+    telephone: '+91-91240-81005',
     contactType: 'customer service',
     areaServed: 'IN',
     availableLanguage: ['English', 'Hindi'],

@@ -130,9 +130,9 @@ const Footer = () => {
                     <i className="fa-solid fa-envelope text-xs text-gray-400 group-hover:text-[#1c3026]"></i>
                     <span className="text-sm font-medium">support@urbannook.in</span>
                   </a>
-                  <a href="tel:+918299638749" className="flex items-center gap-2 text-gray-500 hover:text-[#1c3026] transition-colors group">
+                  <a href="tel:+919124081005" className="flex items-center gap-2 text-gray-500 hover:text-[#1c3026] transition-colors group">
                     <i className="fa-solid fa-phone text-xs text-gray-400 group-hover:text-[#1c3026]"></i>
-                    <span className="text-sm">+91 82996 38749</span>
+                    <span className="text-sm">+91 91240 81005</span>
                   </a>
                   <span className="text-[10px] text-gray-400">Mon - Sat | 9AM - 7PM</span>
                 </div>
@@ -147,7 +147,7 @@ const Footer = () => {
                   {[
                     { name: 'My Orders', path: '/orders', requiresAuth: true },
                     { name: 'Returns & Exchange', path: '/return-policy' },
-                    { name: 'Cancellation & Refund', path: '/cancellation-refund' },
+                    // { name: 'Cancellation & Refund', path: '/cancellation-refund' },
                     { name: 'FAQs', path: '/faqs' }
                   ].map((item) => (
                     <li key={item.name} className="text-center md:text-left">
