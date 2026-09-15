@@ -11,7 +11,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { useCookies } from "react-cookie";
 import { fireAddToCartConfetti } from "../../utils/celebration";
-import { resolveVariantTitle, splitTitleForDisplay } from "../../utils/variantTitle";
 import SEOHead from "../../component/SEOHead";
 import ComparisonTable from "../../component/ComparisonTable";
 import SetupShowcase from "../../component/SetupShowcase";
@@ -174,6 +173,13 @@ const ProductDetailPage = () => {
   const [activeAccordion, setActiveAccordion] = useState("description");
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  // Which gallery slide *indices* are allowed to actually request their
+  // image over the network. Only the first image of the open variant
+  // downloads up front; each further image downloads only once the visitor
+  // swipes/clicks near it (current + the very next, so the swipe still
+  // feels seamless instead of showing a blank frame). Resets whenever the
+  // variant changes, right alongside currentImageIndex, further down.
+  const [loadedImageIndices, setLoadedImageIndices] = useState(() => new Set([0]));
   // Drag/swipe slider — pointer events unify mouse-drag and touch-swipe in
   // one handler set, so the same code drives it on desktop and mobile.
   const [dragOffset, setDragOffset] = useState(0);
@@ -297,23 +303,14 @@ const ProductDetailPage = () => {
     return (selectedDetail?.variantDes && selectedDetail.variantDes.trim()) || product.productDes || "";
   }, [product, selectedVariant]);
 
-  // Optional per-product title template (admin-set `variantTitleTemplate`,
-  // e.g. "{variant} Cosplay Wooden Katana ({variant} Inspired, 104cm)").
-  // Blank template (the default for every existing product) falls straight
-  // back to the plain productName, so this can't affect products that never
-  // opted in.
-  const displayTitle = useMemo(() => {
+  // Admin-set, per-variant sub tag (e.g. "BMW Inspired, 104cm") shown as a
+  // small line under the main product title — blank when the selected
+  // variant has none set.
+  const selectedVariantSubTag = useMemo(() => {
     if (!product) return "";
-    return resolveVariantTitle(product.productName, product.variantTitleTemplate, selectedVariant);
+    const selectedDetail = product.variantDetails?.find(v => v.variantName === selectedVariant);
+    return (selectedDetail?.variantSubTag && selectedDetail.variantSubTag.trim()) || "";
   }, [product, selectedVariant]);
-
-  // Splits a template-resolved title like "Sasuke Cosplay Wooden Katana
-  // (Sasuke Inspired, 104cm)" into a bold main heading and a smaller,
-  // normal-weight parenthetical sub-line shown underneath it.
-  const { main: displayTitleMain, sub: displayTitleSub } = useMemo(
-    () => splitTitleForDisplay(displayTitle),
-    [displayTitle]
-  );
 
   // Combo companions — the admin-picked "buy together" products, inlined by
   // the product API. Empty when the admin hasn't set any, which is what keeps
@@ -400,7 +397,24 @@ const ProductDetailPage = () => {
   // NAYA: Variant change hone par image index hamesha reset hoga
   useEffect(() => {
     setCurrentImageIndex(0);
+    // New variant, new image list — only its first image should be
+    // considered "allowed to load" again, not whatever indices happened to
+    // be loaded for the previous variant.
+    setLoadedImageIndices(new Set([0]));
   }, [selectedVariant]);
+
+  // Keep the current slide, and the one right after it, marked loadable as
+  // the visitor swipes/taps through the gallery — that one-ahead prefetch is
+  // what keeps swiping feeling seamless without downloading the whole set.
+  useEffect(() => {
+    setLoadedImageIndices((prev) => {
+      if (prev.has(currentImageIndex) && prev.has(currentImageIndex + 1)) return prev;
+      const next = new Set(prev);
+      next.add(currentImageIndex);
+      next.add(currentImageIndex + 1);
+      return next;
+    });
+  }, [currentImageIndex]);
 
   // Keeps a ref mirror of the current index so the interval below can read
   // it synchronously without depending on (and re-creating the interval
@@ -408,6 +422,44 @@ const ProductDetailPage = () => {
   useEffect(() => {
     currentImageIndexRef.current = currentImageIndex;
   }, [currentImageIndex]);
+
+  // Quietly warms the browser's HTTP cache for every OTHER image of this
+  // variant, at low priority, once the page is idle — so a slow connection
+  // never stalls the visitor exactly when autoplay/swipe reaches the next
+  // image (fetching it only at that moment was the previous behavior, and
+  // is exactly the janky-on-weak-network experience this replaces). This
+  // never mounts an <img> or touches layout: it's a detached Image() object
+  // whose only job is to populate cache, so it can't compete with — or
+  // visibly affect — whatever is on screen right now. By the time the real,
+  // gated <OptimizedImage> above actually mounts for that slide, it
+  // resolves from cache instead of starting a fresh request.
+  useEffect(() => {
+    if (!galleryImages || galleryImages.length < 2) return;
+    let cancelled = false;
+
+    const schedule =
+      window.requestIdleCallback || ((cb) => setTimeout(cb, 300));
+    const cancelSchedule = window.cancelIdleCallback || clearTimeout;
+
+    const handle = schedule(() => {
+      if (cancelled) return;
+      galleryImages.slice(1).forEach((src) => {
+        if (!src) return;
+        const img = new Image();
+        // Supported browsers (Chromium) genuinely deprioritize the request;
+        // everywhere else this is just an ignored property — either way it
+        // never blocks anything.
+        img.fetchPriority = "low";
+        img.decoding = "async";
+        img.src = src;
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      cancelSchedule(handle);
+    };
+  }, [galleryImages]);
 
   // Auto-advance the gallery every second — desktop only (see
   // isMobileViewport above), and paused while the customer is actually
@@ -1038,20 +1090,29 @@ const ProductDetailPage = () => {
                       transition: (isDragging || suppressSlideTransition) ? "none" : "transform 400ms cubic-bezier(0.4, 0, 0.2, 1)",
                     }}
                   >
-                    {extendedGalleryImages.map((img, idx) => (
-                      <div
-                        key={idx}
-                        className="w-full h-full shrink-0 flex items-center justify-center"
-                      >
-                        <OptimizedImage
-                          src={img || "/placeholder.jpg"}
-                          alt={product.productName}
-                          className="object-contain pointer-events-none select-none"
-                          loading={idx === 0 ? "eager" : "lazy"}
-                          draggable={false}
-                        />
-                      </div>
-                    ))}
+                    {extendedGalleryImages.map((img, idx) => {
+                      // The cloned trailing slide (autoplay's loop-back to
+                      // image 1) reuses image 0's URL, so it's already
+                      // sitting in cache — safe to show regardless.
+                      const isClone = idx === galleryImages.length;
+                      const canLoad = isClone || loadedImageIndices.has(idx);
+                      return (
+                        <div
+                          key={idx}
+                          className="w-full h-full shrink-0 flex items-center justify-center bg-[#e8e6e1]"
+                        >
+                          {canLoad && (
+                            <OptimizedImage
+                              src={img || "/placeholder.jpg"}
+                              alt={product.productName}
+                              className="object-contain pointer-events-none select-none"
+                              loading={idx === 0 ? "eager" : "lazy"}
+                              draggable={false}
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </Suspense>
               </div>
@@ -1084,17 +1145,17 @@ const ProductDetailPage = () => {
             {/* NAYA: Variant Selection Block - Ab yahan aayega (Badi image ke neeche aur thumbnails se pehle) */}
             {availableVariants && availableVariants.length > 0 && (
               <div className="w-full max-w-[500px] mt-8 bg-white/5 p-5 rounded-2xl border border-[#F5DEB3]/10">
-                <div className="flex justify-between items-baseline mb-3">
+                {/* <div className="flex justify-between items-baseline mb-3">
                   <span className="text-[10px] uppercase tracking-[0.2em] text-[#F5DEB3]/70 font-bold">
                     Choose Variant
                   </span>
-                  {/* <span className="text-xs text-gray-400">
+                  <span className="text-xs text-gray-400">
                     Selected:{" "}
                     <strong className="text-white font-medium">
                       {selectedVariant}
                     </strong>
-                  </span> */}
-                </div>
+                  </span>
+                </div> */}
 
                 <div className="relative">
                   {!variantScrollAtStart && (
@@ -1169,6 +1230,7 @@ const ProductDetailPage = () => {
                             <img
                               src={swatchValue}
                               alt={variantName}
+                              loading="lazy"
                               className={`w-full h-full object-cover ${isSelected ? "" : "opacity-80 group-hover:opacity-100 transition-opacity"}`}
                             />
                           ) : (
@@ -1283,12 +1345,12 @@ const ProductDetailPage = () => {
                 )}
               </div>
 
-              <h1 className={`text-4xl lg:text-6xl font-serif text-[#F5DEB3] leading-tight ${displayTitleSub ? "mb-1" : "mb-4"}`}>
-                {displayTitleMain}
+              <h1 className={`text-4xl lg:text-6xl font-serif text-[#F5DEB3] leading-tight ${selectedVariantSubTag ? "mb-1" : "mb-4"}`}>
+                {product.productName}
               </h1>
-              {displayTitleSub && (
+              {selectedVariantSubTag && (
                 <p className="text-base lg:text-xl font-serif font-normal text-[#F5DEB3]/70 leading-snug mb-4">
-                  {displayTitleSub}
+                  {selectedVariantSubTag}
                 </p>
               )}
 
@@ -2553,7 +2615,7 @@ const ProductDetailPage = () => {
 
       {showNotifyModal && (
         <NotifyMeModal
-          productName={displayTitle || product?.productName}
+          productName={product?.productName}
           productId={product?.productId}
           onClose={() => setShowNotifyModal(false)}
         />

@@ -1,8 +1,117 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { trackSelectItem } from "../utils/analytics";
 
 const WishlistButton = lazy(() => import("./WishlistButton"));
+
+// Shared canvas context reused across every card for text-width measurement
+// — avoids allocating a new <canvas> per card in a grid of a dozen+ cards.
+let measureCtx = null;
+function measureTextWidth(text, font) {
+  if (!measureCtx) measureCtx = document.createElement("canvas").getContext("2d");
+  measureCtx.font = font;
+  return measureCtx.measureText(text).width;
+}
+
+// Title that always renders on exactly one line: it starts at `capPx` and
+// shrinks (down to `floorPx`) only by as much as the actual rendered text
+// needs to fit the card's real width — no wrapping, no ellipsis, no clipped
+// characters, whatever the product name's length turns out to be.
+const FitTitle = ({ text, capPx, floorPx, className }) => {
+  const ref = useRef(null);
+  const [fontSize, setFontSize] = useState(capPx);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const fit = () => {
+      const available = el.clientWidth;
+      if (!available) return;
+      const font = `${capPx}px Georgia, 'Times New Roman', serif`;
+      const textWidth = measureTextWidth(text, font);
+      if (textWidth <= available) {
+        setFontSize(capPx);
+      } else {
+        setFontSize(Math.max(floorPx, capPx * (available / textWidth)));
+      }
+    };
+
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [text, capPx, floorPx]);
+
+  return (
+    <h3
+      ref={ref}
+      className={`${className} whitespace-nowrap overflow-hidden`}
+      style={{ fontSize: `${fontSize}px` }}
+    >
+      {text}
+    </h3>
+  );
+};
+
+// Auto-cycles through a product's own variant photos as a hold-then-crossfade
+// slideshow — each photo sits still, then slowly dissolves into the next
+// (never slides/scrolls). Cycles forward through the list and wraps from the
+// last image back to the first via the same fade, so there's never a
+// direction to "reverse". Paused via IntersectionObserver whenever the card
+// is off-screen, and skipped entirely under prefers-reduced-motion, so idle
+// or motion-sensitive viewers cost nothing.
+const HOLD_MS = 2600; // fully-visible pause on each image
+const FADE_MS = 1500; // crossfade duration into the next image
+
+// Read once at module load, not on every render — this can't change
+// mid-session in any way that matters for a decorative auto-cycle.
+const REDUCE_MOTION =
+  typeof window !== "undefined" &&
+  !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+const VariantSlider = ({ images, alt }) => {
+  const containerRef = useRef(null);
+  const [inView, setInView] = useState(false);
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([entry]) => setInView(entry.isIntersecting), {
+      threshold: 0.15,
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!inView || REDUCE_MOTION || images.length < 2) return;
+    const id = setInterval(() => {
+      setIndex((i) => (i + 1) % images.length);
+    }, HOLD_MS + FADE_MS);
+    return () => clearInterval(id);
+  }, [inView, images.length]);
+
+  return (
+    <div ref={containerRef} className="relative w-full h-full">
+      {images.map((src, i) => (
+        <img
+          key={src}
+          src={src}
+          alt={alt}
+          loading="lazy"
+          className="absolute inset-0 w-full h-full object-cover mix-blend-multiply ease-in-out"
+          style={{
+            opacity: i === index ? 1 : 0,
+            transitionProperty: "opacity",
+            transitionDuration: `${FADE_MS}ms`,
+          }}
+        />
+      ))}
+    </div>
+  );
+};
 
 /**
  * Shared storefront product card — used by the All Products grid AND the PDP
@@ -16,8 +125,16 @@ const ProductCard = ({ product, index = 0, listId = "all_products", listName = "
 
   const firstVariant = product?.variantDetails?.[0];
   const price = Number(product?.effectivePrice ?? firstVariant?.variantPrice ?? 0);
-  const mrp = Number(product?.effectiveMrp ?? firstVariant?.variantMrp ?? 0);
   const thumbnail = firstVariant?.variantImage?.[0] || "/placeholder.jpg";
+  // Distinct variant photos, deduped — a size/color variant that reuses the
+  // same image as another shouldn't create a pointless jump-cut in the loop.
+  // Memoized on the underlying variant data so this isn't rebuilt (a fresh
+  // array + a fresh Set) on every render of a card sitting in a grid.
+  const productVariantDetails = product?.variantDetails;
+  const variantImages = useMemo(
+    () => [...new Set((productVariantDetails || []).map((v) => v.variantImage?.[0]).filter(Boolean))],
+    [productVariantDetails],
+  );
 
   const goToProduct = () => {
     trackSelectItem({
@@ -29,11 +146,11 @@ const ProductCard = ({ product, index = 0, listId = "all_products", listName = "
       listName,
       index,
     });
-    navigate(firstVariant?.sku ? `/product/${product.productId}/${firstVariant.sku}` : `/product/${product.productId}`);
+    navigate(`/products/${product.productId}`);
   };
 
   return (
-    <div className="group relative rounded-[1.6rem] overflow-hidden bg-black/20 border border-white/5 shadow-lg hover:shadow-2xl hover:border-[#F5DEB3]/30 transition-all duration-500 flex flex-col h-full">
+    <div className="group relative rounded-[1.2rem] overflow-hidden bg-black/20 border border-white/5 shadow-lg hover:shadow-2xl hover:border-[#F5DEB3]/30 transition-all duration-500 flex flex-col h-full">
       {/* Wishlist Button (Floating Top Right) */}
       {/* <div className="absolute top-4 right-4 z-20">
         <Suspense
@@ -51,11 +168,15 @@ const ProductCard = ({ product, index = 0, listId = "all_products", listName = "
         onClick={goToProduct}
       >
         <div className="relative w-full aspect-square bg-[#f8f8f5] overflow-hidden">
-          <img
-            src={thumbnail}
-            alt={product.productName}
-            className="w-full h-full object-cover mix-blend-multiply transition-transform duration-[1.5s] group-hover:scale-110"
-          />
+          {variantImages.length > 1 ? (
+            <VariantSlider images={variantImages} alt={product.productName} />
+          ) : (
+            <img
+              src={thumbnail}
+              alt={product.productName}
+              className="w-full h-full object-cover mix-blend-multiply transition-transform duration-[1.5s] group-hover:scale-110"
+            />
+          )}
 
           {/* Nook's Special: Fixed Ribbon + Positioned Text */}
           {product?.featured === true && (
@@ -162,35 +283,36 @@ const ProductCard = ({ product, index = 0, listId = "all_products", listName = "
         </div>
 
         {/* Text & CTA */}
-        <div className="p-4 md:p-4 flex flex-col flex-grow bg-[#f5f7f8] to-transparent backdrop-blur-md">
-          {/* Titles likely to wrap to 2 lines use a smaller font so the block
-              stays compact; short titles reserve only ~1 line of height —
-              previously EVERY card reserved 2-line height even when the name
-              fit on one line, leaving an empty gap above the divider. */}
-          {(() => {
-            const isLongTitle = (product.productName || "").length > 18;
-            return (
-              <div className="mb-2">
-                <h3
-                  className={`font-serif text-gray-500 leading-snug line-clamp-2 ${
-                    isLongTitle
-                      ? "text-sm md:text-lg min-h-[2.4em] md:min-h-[2.6em]"
-                      : "text-base md:text-xl min-h-[1.3em] md:min-h-[1.4em]"
-                  }`}
-                >
-                  {product.productName}
-                </h3>
-              </div>
-            );
-          })()}
+        <div className="p-4 md:p-4 flex flex-col flex-grow bg-white/90 backdrop-blur-md">
+          {/* Always a single line, full title, no cutting — the font is
+              measured against the card's actual rendered width and shrinks
+              only as much as that specific title needs. Two FitTitle
+              instances (mobile/desktop) since the breakpoints have very
+              different card widths and each needs its own cap size. */}
+          <div className="mb-0.5">
+            <FitTitle
+              text={product.productName || ""}
+              capPx={15}
+              floorPx={9}
+              className="font-serif text-[#2e443c] leading-snug text-center block md:hidden"
+            />
+            <FitTitle
+              text={product.productName || ""}
+              capPx={20}
+              floorPx={12}
+              className="font-serif text-[#2e443c] leading-snug text-center hidden md:block"
+            />
+          </div>
 
-          <div className="flex justify-between items-end pt-2 border-t border-[#F5DEB3]/10] gap-2">
-            {/* Price + MRP on left — flex-nowrap keeps this on ONE line */}
+          <div className="flex justify-center md:justify-between items-end pt-1 border-t border-[#F5DEB3]/10] gap-2">
             <div className="flex items-center flex-nowrap gap-1 md:gap-1.5 min-w-0">
-              <span className="text-base md:text-xl font-bold text-[#a89068] whitespace-nowrap">
+              <span className="text-xs md:text-sm font-normal text-[#157a44] whitespace-nowrap">
+                Starting at
+              </span>
+              <span className="text-xs md:text-sm font-normal text-[#157a44] whitespace-nowrap">
                 ₹{price?.toLocaleString()}
               </span>
-              {mrp > price && (
+              {/* {mrp > price && (
                 // % OFF stacked directly above the struck MRP
                 <span className="flex flex-col items-start leading-none whitespace-nowrap">
                   <span className="text-[7px] md:text-[9px] font-bold text-[#157a44]">
@@ -200,77 +322,14 @@ const ProductCard = ({ product, index = 0, listId = "all_products", listName = "
                     ₹{mrp?.toLocaleString()}
                   </span>
                 </span>
-              )}
+              )} */}
             </div>
 
-            {/* Variants on far right — max 2 then +X */}
-            <div className="flex items-center gap-1 shrink-0 ml-auto">
-              {(() => {
-                const variantDetails = product?.variantDetails || [];
-                if (variantDetails.length === 0) return null;
-                return (
-                  <>
-                    {variantDetails.slice(0, 2).map((detail, idx) => {
-                      const variantName = detail.variantName;
-                      const swatchType =
-                        detail.variantSwatchType === "color"
-                          ? "color"
-                          : "image";
-                      const swatchValue =
-                        (detail.variantSwatchValue &&
-                          detail.variantSwatchValue.trim()) ||
-                        (swatchType === "image"
-                          ? detail.variantImage?.[0]
-                          : "");
-                      const goToVariant = (e) => {
-                        e.stopPropagation();
-                        navigate(
-                          `/product/${product.productId}/${detail.sku || variantName}`,
-                        );
-                      };
-                      const oos =
-                        detail.variantOutOfStock === true ||
-                        (detail.variantQuantity != null &&
-                          Number(detail.variantQuantity) <= 0);
-                      return (
-                        <span
-                          key={detail._id || idx}
-                          title={
-                            oos ? `${variantName} — out of stock` : variantName
-                          }
-                          onClick={goToVariant}
-                          className={`w-3 h-3 rounded-full overflow-hidden border border-[#d1d5db] shadow-sm transition-transform hover:scale-110 cursor-pointer flex items-center justify-center bg-white shrink-0 ${oos ? "opacity-40 grayscale" : ""}`}
-                        >
-                          {swatchType === "color" && swatchValue ? (
-                            <span
-                              className="w-full h-full block"
-                              style={{ background: swatchValue }}
-                            />
-                          ) : swatchValue ? (
-                            <img
-                              src={swatchValue}
-                              alt={variantName}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <span className="text-[6px] font-bold uppercase text-gray-400">
-                              {variantName?.charAt(0)}
-                            </span>
-                          )}
-                        </span>
-                      );
-                    })}
-                    {variantDetails.length > 2 && (
-                      <span className="text-[9px] md:text-[10px] font-medium text-gray-500 whitespace-nowrap">
-                        +{variantDetails.length - 2}
-                      </span>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
-
-            {/* Arrow CTA — desktop only */}
+            {/* {(product?.variantDetails?.length || 0) > 1 && (
+              <span className="text-[9px] md:text-[10px] font-medium text-gray-500 whitespace-nowrap shrink-0 ml-auto">
+                {product.variantDetails.length} variants
+              </span>
+            )} */}
             <div className="hidden md:flex w-12 h-12 rounded-full bg-[#F5DEB3]/10 text-gray-500 items-center justify-center group-hover:bg-[#F5DEB3] group-hover:text-[#2e443c] transition-all duration-300">
               <i className="fa-solid fa-arrow-right -rotate-45 group-hover:rotate-0 transition-transform duration-500"></i>
             </div>

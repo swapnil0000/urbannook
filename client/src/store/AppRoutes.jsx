@@ -5,6 +5,7 @@ import {
   ContactPage,
   AllProductsPage,
   ProductDetailPage,
+  ProductVariantsPage,
   CheckoutPage,
   MyProfilePage,
   MyOrdersPage,
@@ -57,6 +58,14 @@ const AppRoutes = () => {
         element={
           <Suspense fallback={<MinimalLoader />}>
             <AllProductsPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/products/:productId"
+        element={
+          <Suspense fallback={<MinimalLoader />}>
+            <ProductVariantsPage />
           </Suspense>
         }
       />
