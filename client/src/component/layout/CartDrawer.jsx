@@ -474,6 +474,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
               {nudgeSlides.length > 0 && (
                 <FreeShippingBanner
                   bannersOverride={nudgeSlides}
+                  surface="cart_drawer"
                   variant="light"
                   showQuantityStepper
                   showProgressBar={false}

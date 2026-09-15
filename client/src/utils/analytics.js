@@ -142,6 +142,22 @@ function toItem({ itemId, itemName, itemVariant, price, quantity, index, listId,
   if (listName) item.item_list_name = listName;
   return item;
 }
+/**
+ * Map offer identity → flat event params. Every offer-driven event carries the
+ * same four keys so the admin side can group by offer without knowing which
+ * subsystem produced it (admin combo banner, cart_rule, quantity nudge, coupon).
+ *   offer_type: combo_free_shipping | quantity_discount | threshold_free_shipping | coupon
+ *   offer_source: admin_banner | cart_rule | coupon
+ */
+function offerParams({ offerId, offerType, offerName, offerSource } = {}) {
+  const out = {};
+  if (offerId) out.offer_id = String(offerId);
+  if (offerType) out.offer_type = offerType;
+  if (offerName) out.offer_name = String(offerName).slice(0, 100);
+  if (offerSource) out.offer_source = offerSource;
+  return out;
+}
+
 const ANON_KEY = 'un_anon_id';
 const SESSION_KEY = 'un_session';
 const CACHED_ADDRESS_KEY = 'un_last_address';         
@@ -507,12 +523,16 @@ export function trackNotifyMe({ itemId, itemVariant }) {
  * Cart
  * ------------------------------------------------------------------------ */
 
-export function trackAddToCart({ itemId, itemName, itemVariant, price, quantity = 1, placement }) {
+export function trackAddToCart({ itemId, itemName, itemVariant, price, quantity = 1, placement, offerId, offerType, offerName, offerSource }) {
   try {
     pushEcommerce('add_to_cart', {
       currency: CURRENCY,
       value: price * quantity,
       ...(placement ? { placement } : {}),
+      // Offer attribution — set only when this add was driven by an offer
+      // (combo/free-shipping nudge, quantity-discount rule). Lets the admin
+      // funnel answer "which offer actually produced this add_to_cart".
+      ...offerParams({ offerId, offerType, offerName, offerSource }),
       items: [toItem({ itemId, itemName, itemVariant, price, quantity })],
     });
     const atcEventId = uuid();
@@ -616,17 +636,29 @@ export function trackSelectPaymentMethod({ paymentMethod }) {
   }
 }
 
-export function trackApplyCoupon({ coupon, discount, status = 'success', errorType }) {
+export function trackApplyCoupon({ coupon, discount, status = 'success', errorType, isGuest }) {
   try {
-    track('apply_coupon', { coupon, discount, status, ...(errorType ? { error_type: errorType } : {}) });
+    track('apply_coupon', {
+      coupon,
+      discount,
+      status,
+      currency: CURRENCY,
+      ...(errorType ? { error_type: errorType } : {}),
+      ...(isGuest != null ? { is_guest: !!isGuest } : {}),
+      ...offerParams({ offerId: coupon, offerType: 'coupon', offerName: coupon, offerSource: 'coupon' }),
+    });
   } catch (error) {
     console.warn('[Analytics] trackApplyCoupon:', error);
   }
 }
 
-export function trackRemoveCoupon({ coupon }) {
+export function trackRemoveCoupon({ coupon, isGuest }) {
   try {
-    track('remove_coupon', { coupon });
+    track('remove_coupon', {
+      coupon,
+      ...(isGuest != null ? { is_guest: !!isGuest } : {}),
+      ...offerParams({ offerId: coupon, offerType: 'coupon', offerName: coupon, offerSource: 'coupon' }),
+    });
   } catch (error) {
     console.warn('[Analytics] trackRemoveCoupon:', error);
   }
@@ -794,19 +826,50 @@ export function trackGenerateLead({ leadType, formName, contactMethod, source })
   }
 }
 
-export function trackViewPromotion({ promotionId, promotionName, creativeSlot }) {
+export function trackViewPromotion({ promotionId, promotionName, creativeSlot, offerId, offerType, offerName, offerSource, itemId, itemName, price }) {
   try {
-    pushEcommerce('view_promotion', { promotion_id: promotionId, promotion_name: promotionName, creative_slot: creativeSlot });
+    pushEcommerce('view_promotion', {
+      promotion_id: promotionId,
+      promotion_name: promotionName,
+      creative_slot: creativeSlot,
+      ...offerParams({ offerId, offerType, offerName, offerSource }),
+      // The promoted product, so offer impression → add_to_cart can be joined per SKU.
+      ...(itemId ? { items: [toItem({ itemId, itemName, price })] } : {}),
+    });
   } catch (error) {
     console.warn('[Analytics] trackViewPromotion:', error);
   }
 }
 
-export function trackSelectPromotion({ promotionId, promotionName, creativeSlot, ctaText }) {
+export function trackSelectPromotion({ promotionId, promotionName, creativeSlot, ctaText, offerId, offerType, offerName, offerSource, itemId, itemName, price }) {
   try {
-    pushEcommerce('select_promotion', { promotion_id: promotionId, promotion_name: promotionName, creative_slot: creativeSlot, ...(ctaText ? { cta_text: ctaText } : {}) });
+    pushEcommerce('select_promotion', {
+      promotion_id: promotionId,
+      promotion_name: promotionName,
+      creative_slot: creativeSlot,
+      ...(ctaText ? { cta_text: ctaText } : {}),
+      ...offerParams({ offerId, offerType, offerName, offerSource }),
+      ...(itemId ? { items: [toItem({ itemId, itemName, price })] } : {}),
+    });
   } catch (error) {
     console.warn('[Analytics] trackSelectPromotion:', error);
+  }
+}
+
+/**
+ * Free-shipping threshold crossed (or lost again) as the cart value changes.
+ * Fired by the cart surfaces, not by the banner, since it's a cart-level state.
+ */
+export function trackFreeShippingUnlocked({ unlocked, cartValue, threshold, offerId, offerType, offerName, offerSource }) {
+  try {
+    track(unlocked ? 'free_shipping_unlocked' : 'free_shipping_lost', {
+      cart_value: cartValue,
+      threshold,
+      currency: CURRENCY,
+      ...offerParams({ offerId, offerType, offerName, offerSource }),
+    });
+  } catch (error) {
+    console.warn('[Analytics] trackFreeShippingUnlocked:', error);
   }
 }
 

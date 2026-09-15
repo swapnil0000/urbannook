@@ -619,6 +619,7 @@ const ProductDetailPage = () => {
           itemVariant: effectiveVariant,
           price: currentPrice,
           quantity: 1,
+          placement: 'pdp_main',
         });
       } catch (err) {
         console.error("Add to cart failed:", err);
@@ -648,6 +649,7 @@ const ProductDetailPage = () => {
         itemVariant: effectiveVariant,
         price: currentPrice,
         quantity: 1,
+        placement: 'pdp_main',
       });
     }
   };
@@ -705,6 +707,7 @@ const ProductDetailPage = () => {
           itemVariant: variant,
           price,
           quantity: 1,
+          placement: 'pdp_buy_together',
         });
       }
 
