@@ -156,6 +156,12 @@ const orderSchema = new mongoose.Schema(
     metaTracking: {
       fbp: { type: String, default: null },
       fbc: { type: String, default: null },
+      // Persistent per-browser device id. Declared explicitly because Mongoose
+      // strict mode silently drops undeclared nested paths — collectMetaTracking
+      // in rp.payment.controller.js has always sent this, but without this line
+      // it never reached the DB, so the guest CAPI externalId fallback and
+      // channel attribution on the server-side purchase both had nothing to use.
+      anonymousId: { type: String, default: null },
       clientIp: { type: String, default: null },
       clientUserAgent: { type: String, default: null },
       eventSourceUrl: { type: String, default: null },

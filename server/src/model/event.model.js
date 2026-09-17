@@ -27,6 +27,14 @@ const eventSchema = new mongoose.Schema(
 
     // Client-side event timestamp (createdAt below = server receive time)
     eventTime: { type: Date, default: null },
+
+    // Idempotency key for events that can legitimately arrive twice from two
+    // different writers — today only `purchase`, which the browser fires on the
+    // Razorpay success handler AND the server fires from the payment.captured
+    // webhook. Both use `purchase:<orderId>`, and the unique index below makes
+    // the second write a no-op instead of double-counting revenue.
+    // Sparse: ordinary events leave it unset and are never deduplicated.
+    dedupeKey: { type: String, default: undefined },
   },
   { timestamps: true } // createdAt / updatedAt
 );
@@ -39,6 +47,12 @@ eventSchema.index({ userId: 1, createdAt: -1 });
 eventSchema.index({ anonymousId: 1, createdAt: -1 });
 // Session reconstruction (chronological within a visit)
 eventSchema.index({ sessionId: 1, createdAt: 1 });
+// Idempotency for dual-writer events (see dedupeKey above). Sparse so the
+// millions of events without a key are not indexed and can never collide.
+eventSchema.index({ dedupeKey: 1 }, { unique: true, sparse: true });
+// Channel reporting — "how much of this came from Google organic search?"
+// (attribution.channel is set client-side by classifyChannel in analytics.js)
+eventSchema.index({ "attribution.channel": 1, createdAt: -1 });
 
 const Event = mongoose.model("Event", eventSchema);
 
