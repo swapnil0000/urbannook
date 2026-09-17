@@ -16,6 +16,7 @@ let User;
 let WhatsAppLoginToken;
 let normalizeIndianMobile;
 let extractInboundText;
+let describePayloadShape;
 
 const WEBHOOK_SECRET = "test-webhook-secret-value";
 const WEBHOOK_PATH = "/api/v1/webhooks/gupshup-inbound";
@@ -32,9 +33,8 @@ beforeAll(async () => {
   ({ default: WhatsAppLoginToken } = await import(
     "../../model/whatsappLoginToken.model.js"
   ));
-  ({ normalizeIndianMobile, extractInboundText } = await import(
-    "../../services/whatsapp.auth.service.js"
-  ));
+  ({ normalizeIndianMobile, extractInboundText, describePayloadShape } =
+    await import("../../services/whatsapp.auth.service.js"));
 });
 
 /** Meta format (v3) inbound text payload, as configured in Gupshup */
@@ -126,6 +126,73 @@ describe("extractInboundText", () => {
       ],
     };
     expect(extractInboundText(statusEvent)).toBeNull();
+  });
+});
+
+describe("describePayloadShape", () => {
+  it("summarises an unknown shape without leaking phone or text", () => {
+    const out = describePayloadShape({
+      app: "urbannookprod",
+      timestamp: 1700000000,
+      type: "message",
+      payload: { type: "text", sender: { phone: "919876543210" } },
+    });
+
+    expect(out).toContain("keys=[app,timestamp,type,payload]");
+    expect(out).toContain("body.type=message");
+    expect(out).toContain("payload.type=text");
+    expect(out).not.toContain("919876543210");
+  });
+
+  it("flags a delivery-status event", () => {
+    const out = describePayloadShape({
+      entry: [{ changes: [{ value: { statuses: [{ status: "delivered" }] } }] }],
+    });
+
+    expect(out).toContain("statuses=1");
+  });
+});
+
+describe("wa.me deep link", () => {
+  it("prefills a readable sentence, not just the bare code", async () => {
+    const res = await request(app).post("/api/v1/auth/whatsapp/start").expect(200);
+    const { token, waLink } = res.body.data;
+
+    expect(waLink).toContain("https://wa.me/919999900000?text=");
+    const sent = decodeURIComponent(waLink.split("?text=")[1]);
+    expect(sent).toBe(`Log me in to UrbanNook. Code: ${token}`);
+  });
+
+  it("still logs in when the code arrives inside a sentence", async () => {
+    const token = await startLogin();
+
+    await request(app)
+      .post(WEBHOOK_PATH)
+      .query({ secret: WEBHOOK_SECRET })
+      .send(metaTextPayload("919876543210", `Log me in to UrbanNook. Code: ${token}`))
+      .expect(200, "EVENT_RECEIVED");
+
+    const verified = await request(app)
+      .get("/api/v1/auth/whatsapp/status")
+      .query({ token })
+      .expect(200);
+    expect(verified.body.data.status).toBe("VERIFIED");
+  });
+
+  it("tolerates lowercase and extra chatter around the code", async () => {
+    const token = await startLogin();
+
+    await request(app)
+      .post(WEBHOOK_PATH)
+      .query({ secret: WEBHOOK_SECRET })
+      .send(metaTextPayload("919876543210", `hi ${token.toLowerCase()} thanks`))
+      .expect(200, "EVENT_RECEIVED");
+
+    const verified = await request(app)
+      .get("/api/v1/auth/whatsapp/status")
+      .query({ token })
+      .expect(200);
+    expect(verified.body.data.status).toBe("VERIFIED");
   });
 });
 
@@ -237,6 +304,30 @@ describe("webhook secret enforcement", () => {
     await request(app)
       .post(WEBHOOK_PATH)
       .query({ secret: "not-the-secret" })
+      .send(metaTextPayload("919876543210", token))
+      .expect(200, "EVENT_RECEIVED");
+
+    const stored = await WhatsAppLoginToken.findOne({ token });
+    expect(stored.status).toBe("PENDING");
+  });
+
+  it("accepts the secret in the URL path", async () => {
+    const token = await startLogin();
+
+    await request(app)
+      .post(`${WEBHOOK_PATH}/${WEBHOOK_SECRET}`)
+      .send(metaTextPayload("919876543210", token))
+      .expect(200, "EVENT_RECEIVED");
+
+    const stored = await WhatsAppLoginToken.findOne({ token });
+    expect(stored.status).toBe("VERIFIED");
+  });
+
+  it("rejects a wrong secret in the URL path", async () => {
+    const token = await startLogin();
+
+    await request(app)
+      .post(`${WEBHOOK_PATH}/definitely-not-the-secret`)
       .send(metaTextPayload("919876543210", token))
       .expect(200, "EVENT_RECEIVED");
 

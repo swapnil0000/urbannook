@@ -74,7 +74,14 @@ const maskMobile = (mobile) => {
  *
  * Ye endpoint login grant karta hai, isliye open chhodna matlab koi bhi
  * banda forged payload POST karke kisi bhi number ka session bana lega.
- * Secret query param (?secret=) ya x-webhook-secret header, dono chalte hain.
+ *
+ * Teen jagah se secret accept karte hain, is order me:
+ *   1. URL path   — /webhooks/gupshup-inbound/<secret>
+ *   2. Query      — ?secret=<secret>
+ *   3. Header     — x-webhook-secret
+ *
+ * Path wala option isliye hai kyunki kuch providers callback URL ka
+ * query-string wala hissa hata dete hain; path kabhi strip nahi hota.
  *
  * @returns {boolean}
  */
@@ -88,17 +95,43 @@ const verifyWebhookSecret = (req) => {
     return false;
   }
 
-  const provided =
-    req.query?.secret || req.headers?.["x-webhook-secret"] || "";
+  const sources = [
+    ["path", req.params?.secret],
+    ["query", req.query?.secret],
+    ["header", req.headers?.["x-webhook-secret"]],
+  ];
+  const found = sources.find(([, value]) => value);
 
-  if (!provided) return false;
+  if (!found) {
+    // Diagnostic: secret pahuncha hi nahi vs galat pahuncha — dono alag
+    // problem hain, isliye alag messages
+    console.warn(
+      "[WHATSAPP AUTH] Request me koi secret aaya hi nahi (path/query/header teeno khaali) — callback URL check karein",
+    );
+    return false;
+  }
+
+  const [source, provided] = found;
 
   const a = Buffer.from(String(provided));
   const b = Buffer.from(String(expected));
 
   // timingSafeEqual same length maangta hai — length mismatch = fail
-  if (a.length !== b.length) return false;
-  return crypto.timingSafeEqual(a, b);
+  if (a.length !== b.length) {
+    console.warn(
+      `[WHATSAPP AUTH] Secret ki length galat hai (${source} se ${a.length} chars aaye, chahiye ${b.length}) — poora value copy nahi hua`,
+    );
+    return false;
+  }
+
+  if (!crypto.timingSafeEqual(a, b)) {
+    console.warn(
+      `[WHATSAPP AUTH] Secret ki length sahi hai par value alag hai (${source}) — kisi aur environment ka secret to nahi?`,
+    );
+    return false;
+  }
+
+  return true;
 };
 
 /**
@@ -144,6 +177,36 @@ const extractInboundText = (body) => {
 };
 
 /**
+ * Payload ka dhaancha ek line me batata hai — sirf keys aur type fields,
+ * koi phone number ya message text nahi.
+ *
+ * Ye tab chalta hai jab payload se text nahi nikal pata. Iske bina pata
+ * hi nahi chalta ki ye delivery-status event tha ya parser hi format
+ * nahi pehchan pa raha.
+ */
+const describePayloadShape = (body) => {
+  if (!body || typeof body !== "object") return `type=${typeof body}`;
+
+  const parts = [`keys=[${Object.keys(body).join(",")}]`];
+
+  if (body.type) parts.push(`body.type=${body.type}`);
+  if (body.payload?.type) parts.push(`payload.type=${body.payload.type}`);
+
+  const value = body.entry?.[0]?.changes?.[0]?.value;
+  if (value) {
+    parts.push(`value.keys=[${Object.keys(value).join(",")}]`);
+    if (value.messages?.[0]?.type) {
+      parts.push(`message.type=${value.messages[0].type}`);
+    }
+    if (Array.isArray(value.statuses)) {
+      parts.push(`statuses=${value.statuses.length}`);
+    }
+  }
+
+  return parts.join(" ");
+};
+
+/**
  * Naya login token banata hai aur wa.me deep link return karta hai.
  */
 const startWhatsAppLogin = async (requestIp = null) => {
@@ -166,13 +229,19 @@ const startWhatsAppLogin = async (requestIp = null) => {
 
   const waNumber = String(businessNumber).replace(/\D/g, "");
 
+  // Sirf raw code bhejne se customer ko samajh nahi aata ki wo kya bhej
+  // raha hai, aur kai log usko edit/delete kar dete hain. Isliye ek chhota
+  // sa vaakya saath me. Parser code ko poore text ke andar se dhoondh leta
+  // hai, to extra shabdon se kuch nahi bigadta.
+  const prefilledText = `Log me in to UrbanNook. Code: ${token}`;
+
   return {
     statusCode: 200,
     message: "WhatsApp login token generated",
     data: {
       token,
       // User ko bas send dabana hai — text pehle se bhara aata hai
-      waLink: `https://wa.me/${waNumber}?text=${encodeURIComponent(token)}`,
+      waLink: `https://wa.me/${waNumber}?text=${encodeURIComponent(prefilledText)}`,
       expiresInSeconds: TOKEN_TTL_SECONDS,
     },
     success: true,
@@ -188,10 +257,22 @@ const startWhatsAppLogin = async (requestIp = null) => {
  */
 const handleInboundMessage = async (body) => {
   const inbound = extractInboundText(body);
-  if (!inbound) return { handled: false, reason: "NOT_A_TEXT_MESSAGE" };
+  if (!inbound) {
+    console.warn(
+      `[WHATSAPP AUTH] Payload se text nahi nikla — ${describePayloadShape(body)}`,
+    );
+    return { handled: false, reason: "NOT_A_TEXT_MESSAGE" };
+  }
 
   const match = inbound.text.toUpperCase().match(TOKEN_REGEX);
-  if (!match) return { handled: false, reason: "NO_TOKEN_IN_TEXT" };
+  if (!match) {
+    // Text aa gaya par code nahi mila — length se pata chalta hai ki
+    // message khaali tha ya user ne kuch aur likha
+    console.warn(
+      `[WHATSAPP AUTH] Message me code nahi mila (text length=${inbound.text.length})`,
+    );
+    return { handled: false, reason: "NO_TOKEN_IN_TEXT" };
+  }
 
   const token = match[0];
   const mobileNumber = normalizeIndianMobile(inbound.phone);
@@ -332,6 +413,7 @@ const checkWhatsAppLoginStatus = async (token) => {
 
 export {
   startWhatsAppLogin,
+  describePayloadShape,
   handleInboundMessage,
   checkWhatsAppLoginStatus,
   verifyWebhookSecret,
