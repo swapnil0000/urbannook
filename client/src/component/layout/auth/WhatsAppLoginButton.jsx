@@ -63,6 +63,8 @@ export default function WhatsAppLoginButton({ onSuccess, onError }) {
   const [errorMessage, setErrorMessage] = useState('');
 
   const pollRef = useRef(null);
+  // Lagatar fail hoti polls — chup-chaap spinner ghumate rehna galat hai
+  const failCountRef = useRef(0);
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) {
@@ -101,6 +103,9 @@ export default function WhatsAppLoginButton({ onSuccess, onError }) {
     async (token) => {
       try {
         const res = await checkStatus(token).unwrap();
+        failCountRef.current = 0;
+        setErrorMessage('');
+
         const status = res?.data?.status;
 
         if (status === 'VERIFIED') {
@@ -112,8 +117,30 @@ export default function WhatsAppLoginButton({ onSuccess, onError }) {
           setPhase('expired');
         }
       } catch (error) {
-        // Network blip ya rate limit — agli tick pe dobara try hoga
-        console.error('[WhatsApp Login] Status poll failed:', error);
+        // Ek-do fail hona normal hai (network blip) — agli tick pe retry.
+        // Par lagatar fail ho to user ko batana zaroori hai, warna spinner
+        // hamesha ghumta rehta hai aur kuch samajh nahi aata.
+        failCountRef.current += 1;
+        console.error(
+          `[WhatsApp Login] Status poll failed (${failCountRef.current}):`,
+          error,
+        );
+
+        if (failCountRef.current >= 3) {
+          const status = error?.status;
+          setErrorMessage(
+            status === 429
+              ? 'Bahut zyada requests. Thodi der baad try karein.'
+              : 'Server se connect nahi ho pa raha. Internet check karke dobara try karein.',
+          );
+        }
+
+        if (failCountRef.current >= 10) {
+          stopPolling();
+          clearSession();
+          setSession(null);
+          setPhase('idle');
+        }
       }
     },
     [checkStatus, handleVerified, stopPolling],
@@ -122,6 +149,7 @@ export default function WhatsAppLoginButton({ onSuccess, onError }) {
   const startPolling = useCallback(
     (activeSession) => {
       stopPolling();
+      failCountRef.current = 0;
       setSession(activeSession);
       setPhase('waiting');
 
@@ -178,11 +206,27 @@ export default function WhatsAppLoginButton({ onSuccess, onError }) {
       writeSession(activeSession);
       startPolling(activeSession);
 
-      // Naya tab preferred hai (polling zinda rehti hai). Instagram jaise
-      // in-app browsers popup block karte hain — wahan same tab me bhejte
-      // hain, aur wapas aane pe session se polling resume ho jaati hai.
-      const opened = window.open(waLink, '_blank', 'noopener,noreferrer');
-      if (!opened) window.location.href = waLink;
+      // Naya tab preferred hai — is tab ki polling zinda rehti hai.
+      //
+      // Yahan 'noopener' feature NAHI de sakte: uske saath window.open()
+      // spec ke hisaab se hamesha null return karta hai, chahe tab khul
+      // bhi jaye. Tab fallback chal padta hai aur current page navigate
+      // ho jaata hai — polling wahin mar jaati hai. Isliye tab kholkar
+      // opener ko manually null karte hain.
+      const opened = window.open(waLink, '_blank');
+
+      if (opened) {
+        try {
+          opened.opener = null;
+        } catch {
+          /* cross-origin ho chuka ho to ignore */
+        }
+      } else {
+        // Popup block ho gaya (Instagram jaise in-app browsers). Same tab
+        // me bhejte hain — wapas aane pe sessionStorage se polling resume
+        // ho jaati hai.
+        window.location.href = waLink;
+      }
     } catch (error) {
       console.error('[WhatsApp Login] Start failed:', error);
       const message =
@@ -219,6 +263,10 @@ export default function WhatsAppLoginButton({ onSuccess, onError }) {
             {session.token}
           </span>
         </p>
+
+        {errorMessage && (
+          <p className="mt-3 text-xs font-semibold text-red-500">{errorMessage}</p>
+        )}
 
         <div className="mt-4 flex items-center justify-center gap-4 text-xs">
           <a
