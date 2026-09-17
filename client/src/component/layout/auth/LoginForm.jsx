@@ -7,6 +7,7 @@ import { useLoginMutation } from '../../../store/api/authApi';
 import { useAuth, useUI } from '../../../hooks/useRedux';
 import { setShowLoginModal, clearLoginCallback } from '../../../store/slices/uiSlice';
 import GoogleLoginButton from './GoogleLoginButton';
+import WhatsAppLoginButton from './WhatsAppLoginButton';
 import useFormValidation from '../../../hooks/useFormValidation';
 import { trackLogin, trackLoginFailed } from '../../../utils/analytics';
 
@@ -306,6 +307,27 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
                   }}
                   onError={(error) => {
                     const errorMessage = error?.data?.message || 'Google login failed. Please try again.';
+                    showNotification(errorMessage);
+                  }}
+                />
+              </div>
+
+              {/* WhatsApp login — Instagram in-app browser me Google popup
+                  block ho jata hai, wahan yahi primary option hai */}
+              <div className="mt-4">
+                <WhatsAppLoginButton
+                  onSuccess={(userData) => {
+                    showNotification('WhatsApp login successful!');
+                    if (onLoginSuccess) {
+                      onLoginSuccess(userData);
+                    }
+                    dispatch(setShowLoginModal(false));
+                    if (onClose) {
+                      onClose();
+                    }
+                  }}
+                  onError={(error) => {
+                    const errorMessage = error?.data?.message || 'WhatsApp login failed. Please try again.';
                     showNotification(errorMessage);
                   }}
                 />
