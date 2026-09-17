@@ -1,32 +1,50 @@
 import express from "express";
+import rateLimit from "express-rate-limit";
+import {
+  whatsappLoginStart,
+  whatsappLoginStatus,
+  gupshupInboundWebhook,
+  gupshupWebhookHealth,
+} from "../controller/whatsapp.auth.controller.js";
 
 const router = express.Router();
+
+/* Login token banane pe limit — ek IP se token farming rokne ke liye.
+   Shared IPs (office/college wifi) ka dhyan rakhte hue thoda khula. */
+const whatsappStartLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: "Too many WhatsApp login attempts, please try again later",
+});
+
+/* Polling har 3s pe hoti hai aur token 5 min ka hai → ~100 hits per login.
+   Limit isse upar rakhi hai warna genuine flow hi block ho jayega. */
+const whatsappStatusLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 240,
+  message: "Too many status checks, please try again later",
+});
 
 /* ===============================================================
    GUPSHUP INBOUND WEBHOOK
    ---------------------------------------------------------------
-   Gupshup ko callback URL save karne ke liye ek live 200 chahiye.
-   Ye abhi sirf acknowledge karta hai — OTP/session validation ka
-   full logic (Redis/DB) baad me isi handler me aayega.
+   Gupshup dashboard me registered callback URL. Inbound messages
+   aur delivery events dono yahin aate hain.
 
-   GET  -> browser/Gupshup ka reachability check
-   POST -> actual inbound message + delivery event callbacks
+   URL me shared secret hona zaroori hai:
+     https://api.urbannook.in/api/v1/webhooks/gupshup-inbound?secret=<GUPSHUP_WEBHOOK_SECRET>
+   (ya x-webhook-secret header). Iske bina handler payload ignore
+   kar dega — kyunki ye endpoint login grant karta hai.
 ================================================================ */
 
-router.get("/webhooks/gupshup-inbound", (_req, res) => {
-  return res.status(200).send("OK");
-});
+router.get("/webhooks/gupshup-inbound", gupshupWebhookHealth);
+router.post("/webhooks/gupshup-inbound", gupshupInboundWebhook);
 
-router.post("/webhooks/gupshup-inbound", (req, res) => {
-  // Payload shape capture karne ke liye — logic add hone tak rakhein
-  console.log(
-    "[GUPSHUP INBOUND]",
-    JSON.stringify({ body: req.body, query: req.query }),
-  );
+/* ===============================================================
+   WHATSAPP LOGIN (frontend-facing)
+================================================================ */
 
-  // Gupshup 200 ke alawa kuch bhi mile to retry/disable kar deta hai,
-  // isliye processing se pehle hi acknowledge kar rahe hain.
-  return res.status(200).send("OK");
-});
+router.post("/auth/whatsapp/start", whatsappStartLimiter, whatsappLoginStart);
+router.get("/auth/whatsapp/status", whatsappStatusLimiter, whatsappLoginStatus);
 
 export default router;

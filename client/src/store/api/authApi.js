@@ -146,6 +146,48 @@ export const authApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['User'],
     }),
+    /**
+     * WhatsApp login step 1 — token + wa.me deep link maangta hai.
+     * Koi credential nahi jaata; phone WhatsApp pe verify hota hai.
+     */
+    whatsappLoginStart: builder.mutation({
+      query: () => ({
+        url: 'auth/whatsapp/start',
+        method: 'POST',
+      }),
+    }),
+    /**
+     * WhatsApp login step 2 — frontend isko poll karta hai.
+     * VERIFIED aate hi backend httpOnly cookies set kar deta hai;
+     * yahan sirf Redux state bharte hain.
+     */
+    whatsappLoginStatus: builder.query({
+      query: (token) => ({
+        url: 'auth/whatsapp/status',
+        params: { token },
+      }),
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data?.success && data?.data?.status === 'VERIFIED') {
+            dispatch(setCredentials({
+              user: {
+                email: data.data.email,
+                name: data.data.name,
+                role: data.data.role,
+                userId: data.data.userId,
+                userMobileNumber: data.data.mobileNumber,
+              },
+              token: data.data.userAccessToken,
+            }));
+
+            await fetchCsrfToken();
+          }
+        } catch (error) {
+          console.error('WhatsApp login status check failed:', error);
+        }
+      },
+    }),
     googleLogin: builder.mutation({
       query: (credentials) => ({
         url: '/user/google-login',
@@ -190,4 +232,6 @@ export const {
   useForgotPasswordRequestMutation,
   useForgotPasswordResetMutation,
   useGoogleLoginMutation,
+  useWhatsappLoginStartMutation,
+  useLazyWhatsappLoginStatusQuery,
 } = authApi;
