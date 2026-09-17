@@ -32,13 +32,18 @@ const whatsappStatusLimiter = rateLimit({
    aur delivery events dono yahin aate hain.
 
    URL me shared secret hona zaroori hai:
-     https://api.urbannook.in/api/v1/webhooks/gupshup-inbound?secret=<GUPSHUP_WEBHOOK_SECRET>
-   (ya x-webhook-secret header). Iske bina handler payload ignore
-   kar dega — kyunki ye endpoint login grant karta hai.
+     https://api.urbannook.in/api/v1/webhooks/gupshup-inbound/<GUPSHUP_WEBHOOK_SECRET>
+   Query param (?secret=) aur x-webhook-secret header bhi chalte hain.
+   Iske bina handler payload ignore kar dega — kyunki ye endpoint
+   login grant karta hai.
 ================================================================ */
 
 router.get("/webhooks/gupshup-inbound", gupshupWebhookHealth);
 router.post("/webhooks/gupshup-inbound", gupshupInboundWebhook);
+
+// Path me secret — un providers ke liye jo callback URL ka query-string
+// wala hissa hata dete hain
+router.post("/webhooks/gupshup-inbound/:secret", gupshupInboundWebhook);
 
 /* ===============================================================
    WHATSAPP LOGIN (frontend-facing)
