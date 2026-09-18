@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { trackSelectItem } from "../utils/analytics";
+import FitTitle from "./FitTitle";
 
 /**
  * Shared variant-level card — one product's single variant (own title,
@@ -48,11 +49,25 @@ const VariantCard = ({ productId, productName, variant, index, listId = "product
       </div>
 
       <div className="p-4 md:p-4 flex flex-col flex-grow bg-[#f5f7f8]">
-        <h3 className="font-serif text-gray-500 text-base md:text-lg leading-snug line-clamp-2 mb-2">
-          {variant?.variantName}
-        </h3>
+        {/* Always exactly one line, whatever the variant name's length —
+            shrinks to fit instead of wrapping to 2 lines, so a row of
+            these cards never ends up with mismatched heights. */}
+        <div className="h-5 md:h-6 flex items-center w-full mb-1">
+          <FitTitle
+            text={variant?.variantName || ""}
+            capPx={16}
+            floorPx={10}
+            className="font-serif text-gray-500 leading-snug text-left w-full block md:hidden"
+          />
+          <FitTitle
+            text={variant?.variantName || ""}
+            capPx={18}
+            floorPx={12}
+            className="font-serif text-gray-500 leading-snug text-left w-full hidden md:block"
+          />
+        </div>
 
-        <div className="flex justify-between items-end pt-2 border-t border-[#F5DEB3]/10 mt-auto">
+        <div className="flex justify-between items-end pt-1 border-t border-[#F5DEB3]/10 mt-auto">
           <div className="flex items-center flex-nowrap gap-1 md:gap-1.5 min-w-0">
             <span className="text-base md:text-xl font-bold text-[#a89068] whitespace-nowrap">
               ₹{price?.toLocaleString()}

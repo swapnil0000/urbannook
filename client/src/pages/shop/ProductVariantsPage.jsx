@@ -51,7 +51,7 @@ const ProductVariantsPage = () => {
 
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#F5DEB3]/5 rounded-full blur-[120px] pointer-events-none"></div>
 
-      <section className="pt-[5rem] pb-8 md:pt-[7rem] md:pb-5 px-6 relative z-10">
+      <section className="pt-[6rem] pb-6 md:pt-[7rem] md:pb-5 px-6 relative z-10">
         <div className="max-w-7xl mx-auto">
           <button
             onClick={() => navigate("/products")}
@@ -65,9 +65,9 @@ const ProductVariantsPage = () => {
               <h1 className="text-4xl sm:text-5xl md:text-6xl font-serif text-white leading-[0.9] mb-2">
                 {product.productName}
               </h1>
-              <p className="text-sm md:text-base text-green-50/70 font-light">
+              {/* <p className="text-sm md:text-base text-green-50/70 font-light">
                 Choose a variant below.
-              </p>
+              </p> */}
             </>
           )}
         </div>
