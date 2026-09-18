@@ -147,29 +147,29 @@ export const authApi = apiSlice.injectEndpoints({
       invalidatesTags: ['User'],
     }),
     /**
-     * WhatsApp login step 1 — token + wa.me deep link maangta hai.
-     * Koi credential nahi jaata; phone WhatsApp pe verify hota hai.
+     * WhatsApp login step 1 — asks for a code and its wa.me deep link.
+     * No credentials are sent; the phone is verified over WhatsApp.
      */
     whatsappLoginStart: builder.mutation({
       query: (existingToken) => ({
         url: 'auth/whatsapp/start',
         method: 'POST',
-        // Pehle se zinda token ho to server wahi wapas dega — naya code
-        // banne se WhatsApp ka purana prefilled message bekaar ho jata hai
+        // If a live code already exists the server returns that one —
+        // minting a new code would invalidate the prefilled WhatsApp message
         body: existingToken ? { token: existingToken } : {},
       }),
     }),
     /**
-     * WhatsApp login step 2 — frontend isko poll karta hai.
-     * VERIFIED aate hi backend httpOnly cookies set kar deta hai;
-     * yahan sirf Redux state bharte hain.
+     * WhatsApp login step 2 — polled by the frontend.
+     * The backend sets httpOnly cookies as soon as it returns VERIFIED;
+     * this only fills in the Redux state.
      */
     whatsappLoginStatus: builder.query({
       query: (token) => ({
         url: 'auth/whatsapp/status',
-        // _t har poll pe badalta hai — URL unique rehta hai to Cloudflare
-        // (jo /api/* pe max-age=7200 laga deta hai) cached jawab nahi de
-        // pata. Iske bina browser ko hamesha pehla "PENDING" hi milta hai.
+        // _t changes on every poll so the URL stays unique and Cloudflare
+        // (which applies max-age=7200 to /api/*) cannot serve a cached
+        // response. Without it the browser keeps getting the first "PENDING".
         params: { token, _t: Date.now() },
       }),
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {

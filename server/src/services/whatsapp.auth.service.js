@@ -9,23 +9,24 @@ import {
   InternalServerError,
 } from "../utils/errors.js";
 
-/* Login token 5 minute me expire — OTP jitna hi window */
+/* Login codes expire in 5 minutes — same window as the email OTP flow */
 const TOKEN_TTL_SECONDS = 5 * 60;
 
-/* Crockford-style alphabet: 0/O aur 1/I/L jaise confusing chars nikaal diye
-   kyunki user ko ye token WhatsApp me type/paste karna hota hai */
+/* Crockford-style alphabet: 0/O and 1/I/L are dropped because the user may
+   have to read or retype this code inside WhatsApp */
 const TOKEN_ALPHABET = "23456789ABCDEFGHJKMNPQRSTVWXYZ";
 const TOKEN_LENGTH = 10;
 const TOKEN_PREFIX = "UN-";
 
-/* Token ka shape — inbound message me isi se match karte hain */
+/* Shape of a login code — used to find it inside an inbound message */
 const TOKEN_REGEX = new RegExp(
   `${TOKEN_PREFIX}[${TOKEN_ALPHABET}]{${TOKEN_LENGTH}}`,
 );
 
 /**
- * Cryptographically random login token banata hai.
- * 30^10 ≈ 5.9e14 combinations — 5 min window me brute-force practical nahi.
+ * Generates a cryptographically random login code.
+ * 30^10 ≈ 5.9e14 combinations, so brute force is impractical inside the
+ * 5 minute window (which is also rate limited).
  */
 const generateTokenString = () => {
   const bytes = crypto.randomBytes(TOKEN_LENGTH);
@@ -37,14 +38,14 @@ const generateTokenString = () => {
 };
 
 /**
- * Indian mobile number ko 10-digit pe normalize karta hai.
+ * Normalizes an Indian mobile number down to 10 digits.
  *
- * Gupshup `from` country code ke saath deta hai (919876543210), jabki
- * existing users ka mobileNumber 10-digit hai. Bina normalize kiye
- * findOne match nahi karega aur same banda ka duplicate account ban jayega.
+ * Gupshup sends `from` with the country code (919876543210), while existing
+ * users are stored as 10 digits. Without normalizing, findOne never matches
+ * and the same person ends up with a duplicate account.
  *
  * @param {string|number} raw
- * @returns {number|null} 10-digit number, ya null agar valid nahi
+ * @returns {number|null} 10 digit number, or null when not a valid mobile
  */
 const normalizeIndianMobile = (raw) => {
   if (raw === null || raw === undefined) return null;
@@ -56,13 +57,13 @@ const normalizeIndianMobile = (raw) => {
   if (local.length === 12 && local.startsWith("91")) local = local.slice(2);
   else if (local.length === 11 && local.startsWith("0")) local = local.slice(1);
 
-  // Indian mobile: 10 digits, 6-9 se shuru
+  // Indian mobile: 10 digits, starting 6-9
   if (!/^[6-9]\d{9}$/.test(local)) return null;
 
   return Number(local);
 };
 
-/** Logs me pura number na jaye — 98XXXXXX10 */
+/** Keeps full numbers out of the logs — 98XXXXXX10 */
 const maskMobile = (mobile) => {
   const s = String(mobile ?? "");
   if (s.length < 4) return "****";
@@ -70,18 +71,18 @@ const maskMobile = (mobile) => {
 };
 
 /**
- * Gupshup webhook ka shared secret verify karta hai.
+ * Verifies the shared secret on an inbound Gupshup webhook.
  *
- * Ye endpoint login grant karta hai, isliye open chhodna matlab koi bhi
- * banda forged payload POST karke kisi bhi number ka session bana lega.
+ * This endpoint grants a login session, so leaving it open would let anyone
+ * POST a forged payload and get a session for any phone number.
  *
- * Teen jagah se secret accept karte hain, is order me:
+ * The secret is accepted from three places, in this order:
  *   1. URL path   — /webhooks/gupshup-inbound/<secret>
  *   2. Query      — ?secret=<secret>
  *   3. Header     — x-webhook-secret
  *
- * Path wala option isliye hai kyunki kuch providers callback URL ka
- * query-string wala hissa hata dete hain; path kabhi strip nahi hota.
+ * The path variant exists because some providers drop the query string from
+ * a configured callback URL; the path is never stripped.
  *
  * @returns {boolean}
  */
@@ -90,7 +91,7 @@ const verifyWebhookSecret = (req) => {
 
   if (!expected) {
     console.error(
-      "[WHATSAPP AUTH] GUPSHUP_WEBHOOK_SECRET set nahi hai — inbound payload process nahi kiya ja raha",
+      "[WHATSAPP AUTH] GUPSHUP_WEBHOOK_SECRET is not set — ignoring inbound payload",
     );
     return false;
   }
@@ -103,10 +104,10 @@ const verifyWebhookSecret = (req) => {
   const found = sources.find(([, value]) => value);
 
   if (!found) {
-    // Diagnostic: secret pahuncha hi nahi vs galat pahuncha — dono alag
-    // problem hain, isliye alag messages
+    // "No secret arrived" and "wrong secret arrived" are different problems,
+    // so they get different messages
     console.warn(
-      "[WHATSAPP AUTH] Request me koi secret aaya hi nahi (path/query/header teeno khaali) — callback URL check karein",
+      "[WHATSAPP AUTH] No secret on request (path, query and header all empty) — check the callback URL",
     );
     return false;
   }
@@ -116,17 +117,17 @@ const verifyWebhookSecret = (req) => {
   const a = Buffer.from(String(provided));
   const b = Buffer.from(String(expected));
 
-  // timingSafeEqual same length maangta hai — length mismatch = fail
+  // timingSafeEqual requires equal lengths — a length mismatch is a fail
   if (a.length !== b.length) {
     console.warn(
-      `[WHATSAPP AUTH] Secret ki length galat hai (${source} se ${a.length} chars aaye, chahiye ${b.length}) — poora value copy nahi hua`,
+      `[WHATSAPP AUTH] Secret has the wrong length (${a.length} chars via ${source}, expected ${b.length}) — value was not copied in full`,
     );
     return false;
   }
 
   if (!crypto.timingSafeEqual(a, b)) {
     console.warn(
-      `[WHATSAPP AUTH] Secret ki length sahi hai par value alag hai (${source}) — kisi aur environment ka secret to nahi?`,
+      `[WHATSAPP AUTH] Secret length matches but the value differs (via ${source}) — possibly another environment's secret`,
     );
     return false;
   }
@@ -135,15 +136,15 @@ const verifyWebhookSecret = (req) => {
 };
 
 /**
- * Inbound payload se sender phone + text nikalta hai.
+ * Pulls the sender phone and message text out of an inbound payload.
  *
- * Do format support karte hain kyunki Gupshup dashboard ka
- * "Payload Format" toggle badal sakta hai:
+ * Two formats are supported because the Gupshup dashboard has a
+ * "Payload Format" toggle:
  *   - Meta format (v3): entry[].changes[].value.messages[]
  *   - Gupshup native:   { type:"message", payload:{ sender, payload:{text} } }
  *
- * Delivery/read status events (value.statuses, type:"message-event") ko
- * yahan ignore kar dete hain — wo bhi isi webhook pe aate hain.
+ * Delivery and read receipts (value.statuses) arrive on the same webhook
+ * and are ignored here.
  *
  * @returns {{ phone: string, text: string }|null}
  */
@@ -177,12 +178,12 @@ const extractInboundText = (body) => {
 };
 
 /**
- * Payload ka dhaancha ek line me batata hai — sirf keys aur type fields,
- * koi phone number ya message text nahi.
+ * Describes a payload's shape in one line — key names and type fields only,
+ * never a phone number or message text.
  *
- * Ye tab chalta hai jab payload se text nahi nikal pata. Iske bina pata
- * hi nahi chalta ki ye delivery-status event tha ya parser hi format
- * nahi pehchan pa raha.
+ * Logged when no text could be extracted. Without it there is no way to tell
+ * a delivery-status event apart from a payload format the parser does not
+ * recognise yet.
  */
 const describePayloadShape = (body) => {
   if (!body || typeof body !== "object") return `type=${typeof body}`;
@@ -206,16 +207,13 @@ const describePayloadShape = (body) => {
   return parts.join(" ");
 };
 
-/**
- * Token ko wa.me deep link ke saath response shape me badalta hai.
- */
+/** Wraps a code into the response shape, along with its wa.me deep link. */
 const buildLoginResponse = (token, businessNumber, expiresInSeconds) => {
   const waNumber = String(businessNumber).replace(/\D/g, "");
 
-  // Sirf raw code bhejne se customer ko samajh nahi aata ki wo kya bhej
-  // raha hai, aur kai log usko edit/delete kar dete hain. Isliye ek chhota
-  // sa vaakya saath me. Parser code ko poore text ke andar se dhoondh leta
-  // hai, to extra shabdon se kuch nahi bigadta.
+  // A bare code gives the customer no idea what they are about to send, and
+  // many people edit or delete it. The parser finds the code anywhere in the
+  // text, so the surrounding sentence costs nothing.
   const prefilledText = `Log me in to UrbanNook. Code: ${token}`;
 
   return {
@@ -223,7 +221,7 @@ const buildLoginResponse = (token, businessNumber, expiresInSeconds) => {
     message: "WhatsApp login token generated",
     data: {
       token,
-      // User ko bas send dabana hai — text pehle se bhara aata hai
+      // The user only has to press send — the text is prefilled
       waLink: `https://wa.me/${waNumber}?text=${encodeURIComponent(prefilledText)}`,
       expiresInSeconds,
     },
@@ -232,16 +230,23 @@ const buildLoginResponse = (token, businessNumber, expiresInSeconds) => {
 };
 
 /**
- * Login token deta hai — zinda pending token ho to wahi, warna naya.
+ * Returns a login code — the caller's existing one if it is still pending,
+ * otherwise a fresh one.
  */
 const startWhatsAppLogin = async (requestIp = null, existingToken = null) => {
   const businessNumber = env.GUPSHUP_WHATSAPP_NUMBER;
   if (!businessNumber) {
     throw new InternalServerError(
-      "GUPSHUP_WHATSAPP_NUMBER .env me configure nahi hai",
+      "GUPSHUP_WHATSAPP_NUMBER is not configured",
     );
   }
 
+  // Reuse a live pending code instead of minting a new one on every click.
+  //
+  // Minting a new code each time fails badly: the old prefilled message is
+  // still sitting in WhatsApp, the user sends that one, the server verifies
+  // it, and the browser keeps waiting on a code that will never arrive.
+  // Handing back the same code keeps those older messages valid.
   if (existingToken && typeof existingToken === "string") {
     const reusable = await WhatsAppLoginToken.findOne({
       token: existingToken.trim().toUpperCase(),
@@ -275,27 +280,27 @@ const startWhatsAppLogin = async (requestIp = null, existingToken = null) => {
 };
 
 /**
- * Inbound WhatsApp message handle karta hai: token match karo, phone
- * verify maano, user find/create karo, token ko VERIFIED mark karo.
+ * Handles an inbound WhatsApp message: match the code, treat the phone as
+ * verified, find or create the user, and mark the code VERIFIED.
  *
- * Ye kabhi throw nahi karta — webhook ko har haal me 200 chahiye.
+ * Never throws — the webhook must answer 200 in every case.
  * @returns {{ handled: boolean, reason?: string }}
  */
 const handleInboundMessage = async (body) => {
   const inbound = extractInboundText(body);
   if (!inbound) {
     console.warn(
-      `[WHATSAPP AUTH] Payload se text nahi nikla — ${describePayloadShape(body)}`,
+      `[WHATSAPP AUTH] No text in payload — ${describePayloadShape(body)}`,
     );
     return { handled: false, reason: "NOT_A_TEXT_MESSAGE" };
   }
 
   const match = inbound.text.toUpperCase().match(TOKEN_REGEX);
   if (!match) {
-    // Text aa gaya par code nahi mila — length se pata chalta hai ki
-    // message khaali tha ya user ne kuch aur likha
+    // Text arrived but held no code. The length tells us whether the message
+    // was empty or the user wrote something of their own.
     console.warn(
-      `[WHATSAPP AUTH] Message me code nahi mila (text length=${inbound.text.length})`,
+      `[WHATSAPP AUTH] No login code in message (text length=${inbound.text.length})`,
     );
     return { handled: false, reason: "NO_TOKEN_IN_TEXT" };
   }
@@ -303,11 +308,11 @@ const handleInboundMessage = async (body) => {
   const token = match[0];
   const mobileNumber = normalizeIndianMobile(inbound.phone);
   if (!mobileNumber) {
-    console.warn("[WHATSAPP AUTH] Sender number normalize nahi hua");
+    console.warn("[WHATSAPP AUTH] Could not normalize the sender number");
     return { handled: false, reason: "INVALID_SENDER" };
   }
 
-  // PENDING + non-expired hi accept — replay/reuse band
+  // Only PENDING and unexpired codes are accepted, which blocks replays
   const loginToken = await WhatsAppLoginToken.findOne({
     token,
     status: "PENDING",
@@ -316,7 +321,7 @@ const handleInboundMessage = async (body) => {
 
   if (!loginToken) {
     console.warn(
-      `[WHATSAPP AUTH] Unknown/expired token ${token} from ${maskMobile(mobileNumber)}`,
+      `[WHATSAPP AUTH] Unknown or expired code ${token} from ${maskMobile(mobileNumber)}`,
     );
     return { handled: false, reason: "TOKEN_NOT_FOUND" };
   }
@@ -328,7 +333,9 @@ const handleInboundMessage = async (body) => {
   loginToken.userId = user.userId;
   await loginToken.save();
 
-
+  // The code is logged because it is single use and already consumed by now.
+  // Without it there is no way to tell whether the code the browser is
+  // waiting on is the one that actually arrived.
   console.log(
     `[WHATSAPP AUTH] Verified ${token} from ${maskMobile(mobileNumber)} -> userId ${user.userId}`,
   );
@@ -337,20 +344,19 @@ const handleInboundMessage = async (body) => {
 };
 
 /**
- * Phone se user dhoondta hai, warna naya banata hai.
+ * Finds the user by phone, creating one when there is no match.
  *
- * WhatsApp se aaye user ke paas email nahi hota, par user.model.js me
- * email/name/userId teeno required hain — isliye placeholder email
- * generate karte hain (@wa.urbannook.in, ek non-routable internal domain)
- * aur userId wahi uuid7() jo Google login use karta hai, taki auth guard
- * ka User.findOne({ userId }) normally kaam kare.
+ * A WhatsApp-only user has no email, but user.model.js requires userId, name
+ * and email. So a placeholder email is generated on @wa.urbannook.in (a
+ * non-routable internal domain), and userId uses the same uuid7() as Google
+ * login so the auth guard's User.findOne({ userId }) keeps working.
  */
 const findOrCreateWhatsAppUser = async (mobileNumber) => {
   let user = await User.findOne({ mobileNumber });
 
   if (user) {
-    // Phone WhatsApp se verify ho chuka hai — purana unverified account
-    // ab verified maana ja sakta hai
+    // WhatsApp has proven the number, so an older unverified account can be
+    // treated as verified
     if (!user.isVerified) {
       user.isVerified = true;
       await user.save();
@@ -372,11 +378,11 @@ const findOrCreateWhatsAppUser = async (mobileNumber) => {
 };
 
 /**
- * Frontend polling: token ka status batata hai.
+ * Reports a code's status to the polling frontend.
  *
- * VERIFIED mile to token wahin delete kar dete hain (one-time use) aur
- * fresh access/refresh tokens mint karte hain. Cookies controller set
- * karta hai — baaki login flows ki tarah.
+ * A VERIFIED code is deleted as it is read (single use) and fresh access and
+ * refresh tokens are minted. The controller sets the cookies, exactly as the
+ * other login flows do.
  */
 const checkWhatsAppLoginStatus = async (token) => {
   if (!token || typeof token !== "string") {
@@ -385,8 +391,8 @@ const checkWhatsAppLoginStatus = async (token) => {
 
   const normalized = token.trim().toUpperCase();
 
-  // VERIFIED ho to atomically nikaal lo — do parallel poll dono ko
-  // session na de dein
+  // Take a VERIFIED code atomically so two parallel polls cannot both be
+  // handed a session
   const verified = await WhatsAppLoginToken.findOneAndDelete({
     token: normalized,
     status: "VERIFIED",

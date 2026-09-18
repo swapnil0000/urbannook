@@ -9,16 +9,16 @@ import {
 
 const router = express.Router();
 
-/* Login token banane pe limit — ek IP se token farming rokne ke liye.
-   Shared IPs (office/college wifi) ka dhyan rakhte hue thoda khula. */
+/* Limits code generation so a single IP cannot farm codes. Kept fairly
+   generous because shared IPs (office or campus wifi) are common. */
 const whatsappStartLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
   message: "Too many WhatsApp login attempts, please try again later",
 });
 
-/* Polling har 3s pe hoti hai aur token 5 min ka hai → ~100 hits per login.
-   Limit isse upar rakhi hai warna genuine flow hi block ho jayega. */
+/* Polling runs every 3s and a code lives 5 min → ~100 hits per login, so
+   the ceiling sits well above that or the genuine flow gets blocked. */
 const whatsappStatusLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
   max: 240,
@@ -28,30 +28,30 @@ const whatsappStatusLimiter = rateLimit({
 /* ===============================================================
    GUPSHUP INBOUND WEBHOOK
    ---------------------------------------------------------------
-   Gupshup dashboard me registered callback URL. Inbound messages
-   aur delivery events dono yahin aate hain.
+   The callback URL registered in the Gupshup dashboard. Inbound
+   messages and delivery events both arrive here.
 
-   URL me shared secret hona zaroori hai:
+   The URL must carry the shared secret:
      https://api.urbannook.in/api/v1/webhooks/gupshup-inbound/<GUPSHUP_WEBHOOK_SECRET>
-   Query param (?secret=) aur x-webhook-secret header bhi chalte hain.
-   Iske bina handler payload ignore kar dega — kyunki ye endpoint
-   login grant karta hai.
+   A ?secret= query param or an x-webhook-secret header work too.
+   Without it the handler ignores the payload, because this endpoint
+   grants a login session.
 ================================================================ */
 
 router.get("/webhooks/gupshup-inbound", gupshupWebhookHealth);
 router.post("/webhooks/gupshup-inbound", gupshupInboundWebhook);
 
-// Path me secret — un providers ke liye jo callback URL ka query-string
-// wala hissa hata dete hain
+// Secret in the path — for providers that drop the query string from a
+// configured callback URL
 router.post("/webhooks/gupshup-inbound/:secret", gupshupInboundWebhook);
 
 /* ===============================================================
    WHATSAPP LOGIN (frontend-facing)
    ---------------------------------------------------------------
-   Ye responses kabhi cache nahi hone chahiye. Status har 3 second me
-   badal sakta hai, aur API Cloudflare ke peeche hai jo bina is header
-   ke GET responses ko cache kar leta hai — phir browser ko hamesha
-   purana "PENDING" milta rehta hai aur login kabhi complete nahi hota.
+   These responses must never be cached. The status changes every few
+   seconds, and the API sits behind Cloudflare, which caches GET
+   responses without this header — the browser then keeps receiving the
+   first "PENDING" forever and the login never completes.
 ================================================================ */
 
 const noStore = (_req, res, next) => {

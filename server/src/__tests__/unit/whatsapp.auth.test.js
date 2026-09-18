@@ -160,7 +160,7 @@ describe("token reuse", () => {
       .send({ token })
       .expect(200);
 
-    // Same code — WhatsApp me pada purana prefilled message valid rehta hai
+    // Same code, so the prefilled message already in WhatsApp stays valid
     expect(second.body.data.token).toBe(token);
     expect(await WhatsAppLoginToken.countDocuments()).toBe(1);
   });
@@ -331,8 +331,8 @@ describe("WhatsApp login flow", () => {
   it("reuses the existing account for a number already stored 10-digit", async () => {
     const existing = await User.create({
       userId: "existing-user-id",
-      name: "Purana User",
-      email: "purana@example.com",
+      name: "Existing User",
+      email: "existing@example.com",
       mobileNumber: 9876543210,
       isVerified: false,
       role: "USER",
@@ -347,7 +347,7 @@ describe("WhatsApp login flow", () => {
     const all = await User.find({ mobileNumber: 9876543210 });
     expect(all).toHaveLength(1); // no duplicate account
     expect(all[0].userId).toBe(existing.userId);
-    expect(all[0].email).toBe("purana@example.com");
+    expect(all[0].email).toBe("existing@example.com");
     expect(all[0].isVerified).toBe(true); // WhatsApp proved the number
   });
 });

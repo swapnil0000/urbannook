@@ -1,13 +1,13 @@
 /**
- * Pending WhatsApp login ka chhota sa global store.
+ * Small global store for a pending WhatsApp login.
  *
- * User WhatsApp pe switch karta hai aur kabhi bhi wapas aata hai — kabhi
- * usi tab me, kabhi page reload ke baad. Isliye session ko kisi ek
- * component ke andar nahi rakh sakte: login modal band ho jaye to
- * polling hi mar jaati hai.
+ * The user switches to WhatsApp and returns at an arbitrary point — often in
+ * the same tab, sometimes after a page reload. So the session cannot live
+ * inside a single component: if the login modal closes, the polling dies
+ * with it.
  *
- * Yahan sessionStorage + ek chhota pub/sub hai, jise global watcher aur
- * login button dono padhte hain.
+ * This is sessionStorage plus a tiny pub/sub, read by both the global
+ * watcher and the login button.
  */
 
 const STORAGE_KEY = 'whatsappLoginSession';
@@ -26,8 +26,8 @@ const readFromStorage = () => {
     }
     return parsed;
   } catch {
-    // Private mode ya blocked storage — session ke bina bhi chalega,
-    // bas page reload pe resume nahi hoga
+    // Private mode or blocked storage — the flow still works, it just will
+    // not resume after a page reload
     return null;
   }
 };
@@ -43,7 +43,7 @@ export const subscribeWhatsAppLogin = (fn) => {
   return () => listeners.delete(fn);
 };
 
-/** useSyncExternalStore ke liye — same object reference lautana zaroori hai */
+/** For useSyncExternalStore — must return a stable object reference */
 export const getWhatsAppLoginSession = () => current;
 
 export const startWhatsAppLoginSession = (session) => {
@@ -51,7 +51,7 @@ export const startWhatsAppLoginSession = (session) => {
   try {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session));
   } catch {
-    /* storage na ho to bhi is tab me chalta rahega */
+    /* with no storage it still works within this tab */
   }
   emit();
 };

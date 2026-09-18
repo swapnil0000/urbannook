@@ -3,18 +3,18 @@ import mongoose from "mongoose";
 /* ===============================================================
    WHATSAPP LOGIN TOKEN
    ---------------------------------------------------------------
-   Short-lived login session ka state. Redis ki jagah Mongo TTL
-   index use kar rahe hain — wahi pattern jo otp.model.js me hai,
-   isliye koi naya infra deploy nahi karna padta.
+   State of a short-lived login session. Uses a Mongo TTL index rather
+   than Redis — the same pattern as otp.model.js — so no new infra has
+   to be deployed.
 
    Lifecycle:
-     PENDING   -> token bana, user ne abhi WhatsApp pe bheja nahi
-     VERIFIED  -> inbound webhook pe phone verify ho gaya
-     (deleted) -> frontend ne status poll karke consume kar liya,
-                  ya TTL expire ho gaya
+     PENDING   -> code issued, user has not sent it on WhatsApp yet
+     VERIFIED  -> the inbound webhook confirmed the phone number
+     (deleted) -> the frontend consumed it while polling, or the TTL
+                  expired
 
-   JWT yahan store NAHI hota — sirf userId rakhte hain aur token
-   consume hote waqt fresh access/refresh mint karte hain.
+   No JWT is stored here. Only the userId is kept, and fresh access and
+   refresh tokens are minted when the code is consumed.
 ================================================================ */
 
 const whatsappLoginTokenSchema = mongoose.Schema(
@@ -31,7 +31,7 @@ const whatsappLoginTokenSchema = mongoose.Schema(
       enum: ["PENDING", "VERIFIED"],
       default: "PENDING",
     },
-    // Verify hone ke baad hi bharte hain — 10-digit normalized
+    // Filled in only after verification — normalized to 10 digits
     mobileNumber: {
       type: Number,
       default: null,
@@ -40,7 +40,7 @@ const whatsappLoginTokenSchema = mongoose.Schema(
       type: String,
       default: null,
     },
-    // Kis IP ne token manga — abuse trace karne ke liye
+    // Which IP asked for the code — useful for tracing abuse
     requestIp: {
       type: String,
       default: null,
@@ -55,7 +55,7 @@ const whatsappLoginTokenSchema = mongoose.Schema(
   },
 );
 
-// TTL index — Mongo expire hote hi document khud delete kar dega
+// TTL index — Mongo deletes the document once it expires
 whatsappLoginTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 const WhatsAppLoginToken = mongoose.model(

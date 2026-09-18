@@ -14,15 +14,15 @@ import {
 const POLL_INTERVAL_MS = 3000;
 
 /**
- * Pending WhatsApp login ko app level pe poll karta hai.
+ * Polls a pending WhatsApp login at the app level.
  *
- * Ye login modal ke bahar isliye rehta hai kyunki user WhatsApp pe chala
- * jaata hai aur wapas aate waqt modal band ho sakta hai (ya page hi
- * reload ho jaata hai). Polling agar button ke andar hoti to wahin ruk
- * jaati aur user ko dobara wahi button dikhta — chahe uska message
- * pahunch chuka ho.
+ * It lives outside the login modal because the user leaves for WhatsApp and
+ * the modal may be closed by the time they return (or the page may have
+ * reloaded entirely). Polling from inside the button would stop there, and
+ * the user would be shown the same button again even though their message
+ * had already arrived.
  *
- * Kuch render nahi karta.
+ * Renders nothing.
  */
 export default function WhatsAppLoginWatcher() {
   const dispatch = useDispatch();
@@ -48,8 +48,8 @@ export default function WhatsAppLoginWatcher() {
 
   const pollOnce = useCallback(
     async (token) => {
-      // Do polls ek saath na chalein — token one-time hai, race me ek ko
-      // VERIFIED aur doosre ko EXPIRED mil jaata
+      // Never run two polls at once — the code is single use, so in a race
+      // one poll gets VERIFIED and the other gets EXPIRED
       if (busyRef.current) return;
       busyRef.current = true;
 
@@ -81,8 +81,8 @@ export default function WhatsAppLoginWatcher() {
           clearWhatsAppLoginSession();
         }
       } catch (error) {
-        // Network blip — agli tick pe dobara. Button khud apna error
-        // dikhata hai, yahan chup rehna theek hai.
+        // Network blip — the next tick retries. The button surfaces its own
+        // error, so staying quiet here is fine.
         console.error('[WhatsApp Login] Status poll failed:', error);
       } finally {
         busyRef.current = false;
@@ -91,14 +91,14 @@ export default function WhatsAppLoginWatcher() {
     [checkStatus, dispatch, loginCallback, navigate, showNotification, stopPolling],
   );
 
-  /* Session hote hi polling chalu, khatam hote hi band */
+  /* Start polling as soon as a session exists, stop when it is gone */
   useEffect(() => {
     if (!session) {
       stopPolling();
       return undefined;
     }
 
-    // Wapas aate hi turant ek poll — 3s ka wait na karna pade
+    // Poll immediately on return so the user does not wait a further 3s
     pollOnce(session.token);
 
     pollRef.current = setInterval(() => {
@@ -113,7 +113,7 @@ export default function WhatsAppLoginWatcher() {
     return stopPolling;
   }, [session, pollOnce, stopPolling]);
 
-  /* Tab wapas saamne aate hi check — mobile pe timers freeze ho jaate hain */
+  /* Check as soon as the tab is visible again — mobile freezes timers */
   useEffect(() => {
     if (!session) return undefined;
 

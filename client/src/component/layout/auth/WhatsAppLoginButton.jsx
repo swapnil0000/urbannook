@@ -10,12 +10,12 @@ import {
 const TOKEN_TTL_MS = 5 * 60 * 1000;
 
 /**
- * WhatsApp login shuru karne wala button.
+ * Starts a WhatsApp login.
  *
- * Ye sirf session banata hai aur WhatsApp kholta hai — polling
- * WhatsAppLoginWatcher karta hai, jo app root pe mounted hai. Isse user
- * kahin se bhi wapas aaye (modal band, page reload, naya tab) login
- * khud complete ho jaata hai.
+ * It only creates the session and opens WhatsApp; the polling is done by
+ * WhatsAppLoginWatcher, which is mounted at the app root. That way the login
+ * completes no matter how the user comes back — modal closed, page reloaded
+ * or a new tab.
  */
 export default function WhatsAppLoginButton({ onError }) {
   const [startWhatsappLogin, { isLoading }] = useWhatsappLoginStartMutation();
@@ -27,22 +27,22 @@ export default function WhatsAppLoginButton({ onError }) {
   );
 
   const openWhatsApp = (waLink) => {
-    // 'noopener' feature yahan NAHI de sakte: uske saath window.open()
-    // hamesha null return karta hai, chahe tab khul bhi jaye — aur tab
-    // fallback current page ko navigate kar deta hai.
+    // The 'noopener' feature cannot be passed here: with it window.open()
+    // always returns null even when the tab does open, which sends us down
+    // the fallback and navigates the current page away.
     const opened = window.open(waLink, '_blank');
 
     if (opened) {
       try {
         opened.opener = null;
       } catch {
-        /* cross-origin ho chuka ho to ignore */
+        /* already cross-origin — nothing to do */
       }
       return;
     }
 
-    // Popup block (Instagram jaise in-app browsers) — same tab me bhejte
-    // hain. Wapas aane pe watcher sessionStorage se resume kar lega.
+    // Popup blocked (in-app browsers such as Instagram) — navigate the
+    // current tab instead. The watcher resumes from sessionStorage on return.
     window.location.href = waLink;
   };
 
@@ -67,7 +67,7 @@ export default function WhatsAppLoginButton({ onError }) {
       console.error('[WhatsApp Login] Start failed:', error);
       const message =
         error?.data?.message ||
-        'WhatsApp login abhi shuru nahi ho paya. Dobara try karein.';
+        'Could not start WhatsApp login. Please try again.';
       setErrorMessage(message);
       if (onError) onError(error);
     }
@@ -78,15 +78,15 @@ export default function WhatsAppLoginButton({ onError }) {
       <div className="w-full text-center">
         <div className="flex items-center justify-center gap-2 text-sm font-semibold text-gray-700">
           <span className="w-4 h-4 border-2 border-[#25D366] border-t-transparent rounded-full animate-spin" />
-          WhatsApp par message bhejne ka intezaar hai…
+          Waiting for your WhatsApp message…
         </div>
 
         <p className="mt-3 text-xs text-gray-500">
-          WhatsApp khul gaya? Bas <span className="font-semibold">Send</span> dabaiye,
-          phir yahan wapas aa jaiye.
+          WhatsApp open? Just hit <span className="font-semibold">Send</span>,
+          then come back to this page.
         </p>
 
-        {/* Deep link ne text prefill na kiya ho to user khud paste kar sake */}
+        {/* Shown so the user can paste it manually if the deep link did not prefill */}
         <p className="mt-2 text-xs text-gray-500">
           Code:{' '}
           <span className="font-mono font-bold tracking-wider text-gray-800">
@@ -100,7 +100,7 @@ export default function WhatsAppLoginButton({ onError }) {
             onClick={() => openWhatsApp(session.waLink)}
             className="font-bold text-[#128C7E] hover:underline"
           >
-            WhatsApp dobara kholein
+            Open WhatsApp again
           </button>
           <button
             type="button"

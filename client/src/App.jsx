@@ -170,8 +170,8 @@ function App() {
               <ErrorBoundary>
                 <AppRoutes />
               </ErrorBoundary>
-              {/* Pending WhatsApp login ko app level pe poll karta hai —
-                  modal band ho ya page reload ho, login complete ho jata hai */}
+              {/* Polls a pending WhatsApp login at the app level, so the login
+                  completes even if the modal closes or the page reloads */}
               <ErrorBoundary>
                 <WhatsAppLoginWatcher />
               </ErrorBoundary>
