@@ -9,6 +9,8 @@ import Cart from "../model/user.cart.model.js";
 import env from "../config/envConfigSetup.js";
 import Coupon from "../model/coupon.model.js";
 import CouponUsage from "../model/couponUsage.model.js";
+import { backfillUserProfileFromCheckout } from "../services/user.profile.service.js";
+import { sendOrderConfirmationWhatsApp } from "../services/whatsapp.send.service.js";
 import {
   sendOrderConfirmation,
   sendPaymentReceipt,
@@ -647,6 +649,17 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     "INR",
   );
 
+  // Checkout is where a WhatsApp-login user first tells us their real name and
+  // email — copy those onto the account so the profile and future order mail
+  // stop showing the generated placeholder. Deliberately not awaited on the
+  // critical path below; it never throws.
+  await backfillUserProfileFromCheckout({
+    userId,
+    email: userEmail,
+    name: deliveryAddressSnapshot.fullName,
+    mobile: deliveryAddressSnapshot.mobileNumber,
+  });
+
   const order = await Order.create({
     orderId: uuidv7(),
     userEmail,
@@ -965,6 +978,18 @@ const razorpayWebHookController = async (req, res) => {
                   );
                 },
               );
+
+              // Same confirmation over WhatsApp. It gets read far more often
+              // than email, and a WhatsApp-login customer may have no real
+              // email address at all. Not awaited — a messaging hiccup must
+              // not hold up the payment response. Silently no-ops until the
+              // template id and API key are configured.
+              sendOrderConfirmationWhatsApp({
+                mobileNumber: order.userMobile,
+                name: order.userName,
+                orderId: order.orderId,
+                amount: order.amount,
+              }).catch(() => {});
 
               // For COD, only the advance was actually captured via Razorpay right now —
               // the receipt must reflect that amount, not the full order total.

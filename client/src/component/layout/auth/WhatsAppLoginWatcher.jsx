@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { useLazyWhatsappLoginStatusQuery } from '../../../store/api/authApi';
@@ -11,7 +11,18 @@ import {
   clearWhatsAppLoginSession,
 } from '../../../utils/whatsappLoginSession';
 
-const POLL_INTERVAL_MS = 3000;
+/* Polling slows down the longer a login goes unanswered.
+   Most people send the message within the first few seconds; after that the
+   odds drop fast, and someone who walked away should not cost us a request
+   every three seconds until the code expires. */
+const POLL_SCHEDULE = [
+  { untilMs: 30_000, everyMs: 2_000 },   // first 30s — they are probably mid-send
+  { untilMs: 90_000, everyMs: 5_000 },   // next minute — slowing down
+  { untilMs: Infinity, everyMs: 10_000 }, // the long tail
+];
+
+const pollDelayFor = (elapsedMs) =>
+  POLL_SCHEDULE.find((step) => elapsedMs < step.untilMs).everyMs;
 
 /**
  * Polls a pending WhatsApp login at the app level.
@@ -36,98 +47,119 @@ export default function WhatsAppLoginWatcher() {
   );
 
   const [checkStatus] = useLazyWhatsappLoginStatusQuery();
-  const pollRef = useRef(null);
-  const busyRef = useRef(false);
 
-  const stopPolling = useCallback(() => {
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
+  /**
+   * What to run once the login is verified, kept in a ref.
+   *
+   * useUI() builds a fresh showNotification on every render, and useSelector
+   * hands back a new loginCallback reference too. Depending on those in the
+   * polling effect made it tear down and restart on every render — which
+   * fired a status request each time, and each response re-rendered us. That
+   * loop hammered the API. The effect below depends only on stable values,
+   * and reads the latest handler from here.
+   */
+  const onVerifiedRef = useRef(null);
+  onVerifiedRef.current = (data) => {
+    trackLogin({
+      method: 'whatsapp',
+      userId: data.userId,
+      email: data.email,
+      name: data.name,
+    });
+
+    showNotification('WhatsApp login successful!');
+    dispatch(setShowLoginModal(false));
+
+    if (loginCallback && loginCallback.startsWith('navigate:')) {
+      const path = loginCallback.replace('navigate:', '');
+      dispatch(clearLoginCallback());
+      navigate(path);
     }
-  }, []);
+  };
 
-  const pollOnce = useCallback(
-    async (token) => {
-      // Never run two polls at once — the code is single use, so in a race
-      // one poll gets VERIFIED and the other gets EXPIRED
-      if (busyRef.current) return;
-      busyRef.current = true;
+  const token = session?.token;
+  const expiresAt = session?.expiresAt;
+
+  useEffect(() => {
+    if (!token) return undefined;
+
+    let stopped = false;
+    let busy = false;
+    let timer = null;
+
+    const stop = () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+      timer = null;
+    };
+
+    const poll = async () => {
+      // The code is single use, so two polls in flight would race: one gets
+      // VERIFIED and the other EXPIRED
+      if (stopped || busy) return;
+      busy = true;
 
       try {
         const res = await checkStatus(token).unwrap();
         const status = res?.data?.status;
 
         if (status === 'VERIFIED') {
-          stopPolling();
+          stop();
           clearWhatsAppLoginSession();
-
-          trackLogin({
-            method: 'whatsapp',
-            userId: res.data.userId,
-            email: res.data.email,
-            name: res.data.name,
-          });
-
-          showNotification('WhatsApp login successful!');
-          dispatch(setShowLoginModal(false));
-
-          if (loginCallback && loginCallback.startsWith('navigate:')) {
-            const path = loginCallback.replace('navigate:', '');
-            dispatch(clearLoginCallback());
-            navigate(path);
-          }
+          onVerifiedRef.current?.(res.data);
         } else if (status === 'EXPIRED') {
-          stopPolling();
+          stop();
           clearWhatsAppLoginSession();
         }
       } catch (error) {
-        // Network blip — the next tick retries. The button surfaces its own
-        // error, so staying quiet here is fine.
+        // Network blip — the next tick retries. The login form surfaces its
+        // own error, so staying quiet here is fine.
         console.error('[WhatsApp Login] Status poll failed:', error);
       } finally {
-        busyRef.current = false;
+        busy = false;
       }
-    },
-    [checkStatus, dispatch, loginCallback, navigate, showNotification, stopPolling],
-  );
+    };
 
-  /* Start polling as soon as a session exists, stop when it is gone */
-  useEffect(() => {
-    if (!session) {
-      stopPolling();
-      return undefined;
-    }
+    const startedAt = Date.now();
 
-    // Poll immediately on return so the user does not wait a further 3s
-    pollOnce(session.token);
+    /* A self-scheduling timeout rather than an interval, so the gap can grow
+       as the attempt gets older. */
+    const tick = async () => {
+      if (stopped) return;
 
-    pollRef.current = setInterval(() => {
-      if (Date.now() > session.expiresAt) {
-        stopPolling();
+      if (expiresAt && Date.now() > expiresAt) {
+        stop();
         clearWhatsAppLoginSession();
         return;
       }
-      pollOnce(session.token);
-    }, POLL_INTERVAL_MS);
 
-    return stopPolling;
-  }, [session, pollOnce, stopPolling]);
+      // While the page is hidden the customer is in WhatsApp, not waiting on
+      // us. Skip the request — coming back fires an immediate poll anyway.
+      if (document.visibilityState === "visible") await poll();
 
-  /* Check as soon as the tab is visible again — mobile freezes timers */
-  useEffect(() => {
-    if (!session) return undefined;
-
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') pollOnce(session.token);
+      if (!stopped) {
+        timer = setTimeout(tick, pollDelayFor(Date.now() - startedAt));
+      }
     };
 
+    // Check immediately on return so the user does not wait for the next tick
+    poll();
+    timer = setTimeout(tick, pollDelayFor(0));
+
+    // Mobile freezes timers in the background, so also check the moment the
+    // tab is shown again
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') poll();
+    };
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', onVisible);
+
     return () => {
+      stop();
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', onVisible);
     };
-  }, [session, pollOnce]);
+  }, [token, expiresAt, checkStatus]);
 
   return null;
 }

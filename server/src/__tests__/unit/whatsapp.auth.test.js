@@ -144,6 +144,44 @@ describe("extractInboundText", () => {
   });
 });
 
+describe("new vs returning customer", () => {
+  it("reports a first-time account as new", async () => {
+    const token = await startLogin();
+
+    await request(app)
+      .post(WEBHOOK_PATH)
+      .query({ secret: WEBHOOK_SECRET })
+      .send(metaTextPayload("919876543210", token))
+      .expect(200, "EVENT_RECEIVED");
+
+    expect(await User.countDocuments({ mobileNumber: 9876543210 })).toBe(1);
+  });
+
+  it("reports an existing account as returning", async () => {
+    await User.create({
+      userId: "returning-user-id",
+      name: "Existing User",
+      email: "returning@example.com",
+      mobileNumber: 9876543210,
+      isVerified: true,
+      role: "USER",
+    });
+
+    const token = await startLogin();
+
+    await request(app)
+      .post(WEBHOOK_PATH)
+      .query({ secret: WEBHOOK_SECRET })
+      .send(metaTextPayload("919876543210", token))
+      .expect(200, "EVENT_RECEIVED");
+
+    // No second account, and the existing one is reused
+    const all = await User.find({ mobileNumber: 9876543210 });
+    expect(all).toHaveLength(1);
+    expect(all[0].userId).toBe("returning-user-id");
+  });
+});
+
 describe("cache headers", () => {
   // API Cloudflare ke peeche hai jo /api/* pe max-age=7200 laga deta hai.
   // Bina no-store ke browser ko hamesha pehla PENDING cached milta hai
@@ -234,7 +272,9 @@ describe("wa.me deep link", () => {
 
     expect(waLink).toContain("https://wa.me/919999900000?text=");
     const sent = decodeURIComponent(waLink.split("?text=")[1]);
-    expect(sent).toBe(`Log me in to UrbanNook. Code: ${token}`);
+    expect(sent).toBe(
+      `Hi UrbanNook \u{1F44B} Please sign me in \u2014 this message verifies my WhatsApp number. Code: ${token}`,
+    );
   });
 
   it("returns an app-scheme link for in-app browsers", async () => {
@@ -243,7 +283,9 @@ describe("wa.me deep link", () => {
 
     expect(waAppLink).toContain("whatsapp://send?phone=919999900000");
     const sent = decodeURIComponent(waAppLink.split("&text=")[1]);
-    expect(sent).toBe(`Log me in to UrbanNook. Code: ${token}`);
+    expect(sent).toBe(
+      `Hi UrbanNook \u{1F44B} Please sign me in \u2014 this message verifies my WhatsApp number. Code: ${token}`,
+    );
   });
 
   it("also returns a desktop link that skips the WhatsApp interstitial", async () => {
@@ -252,7 +294,9 @@ describe("wa.me deep link", () => {
 
     expect(waWebLink).toContain("https://web.whatsapp.com/send?phone=919999900000");
     const sent = decodeURIComponent(waWebLink.split("&text=")[1]);
-    expect(sent).toBe(`Log me in to UrbanNook. Code: ${token}`);
+    expect(sent).toBe(
+      `Hi UrbanNook \u{1F44B} Please sign me in \u2014 this message verifies my WhatsApp number. Code: ${token}`,
+    );
   });
 
   it("still logs in when the code arrives inside a sentence", async () => {
@@ -261,7 +305,12 @@ describe("wa.me deep link", () => {
     await request(app)
       .post(WEBHOOK_PATH)
       .query({ secret: WEBHOOK_SECRET })
-      .send(metaTextPayload("919876543210", `Log me in to UrbanNook. Code: ${token}`))
+      .send(
+        metaTextPayload(
+          "919876543210",
+          `Hi UrbanNook \u{1F44B} Please sign me in. Code: ${token}`,
+        ),
+      )
       .expect(200, "EVENT_RECEIVED");
 
     const verified = await request(app)
