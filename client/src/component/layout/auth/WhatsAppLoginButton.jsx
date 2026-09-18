@@ -113,7 +113,10 @@ export default function WhatsAppLoginButton({ onError }) {
 
       if (!token || !waLink) throw new Error('Invalid response from server');
 
-      const session = {
+      // Named nextSession, not session: a `const session` here would shadow
+      // the store value read above and put it in the temporal dead zone,
+      // making startWhatsappLogin(session?.token) throw a ReferenceError.
+      const nextSession = {
         token,
         waLink,
         waWebLink,
@@ -122,13 +125,19 @@ export default function WhatsAppLoginButton({ onError }) {
           Date.now() + (expiresInSeconds ? expiresInSeconds * 1000 : TOKEN_TTL_MS),
       };
 
-      startWhatsAppLoginSession(session);
-      openWhatsApp(session);
+      startWhatsAppLoginSession(nextSession);
+      openWhatsApp(nextSession);
     } catch (error) {
       console.error('[WhatsApp Login] Start failed:', error);
+
+      // A plain "try again" hides the one case where trying again will not
+      // help, so rate limiting gets its own message
       const message =
-        error?.data?.message ||
-        'Could not start WhatsApp login. Please try again.';
+        error?.status === 429
+          ? 'Too many attempts. Please wait a few minutes and try again.'
+          : error?.data?.message ||
+            'Could not start WhatsApp login. Please try again.';
+
       setErrorMessage(message);
       if (onError) onError(error);
     }

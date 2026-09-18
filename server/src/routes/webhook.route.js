@@ -9,11 +9,14 @@ import {
 
 const router = express.Router();
 
-/* Limits code generation so a single IP cannot farm codes. Kept fairly
-   generous because shared IPs (office or campus wifi) are common. */
+/* Limits code generation so a single IP cannot farm codes.
+   Deliberately generous: Indian mobile carriers put many subscribers behind
+   one CGNAT address, so a tight per-IP cap locks out genuine users. The code
+   itself is the security boundary — 30^10 random, single use, 5 minute life —
+   so this limit only needs to stop bulk abuse. */
 const whatsappStartLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: 60,
   message: "Too many WhatsApp login attempts, please try again later",
 });
 
