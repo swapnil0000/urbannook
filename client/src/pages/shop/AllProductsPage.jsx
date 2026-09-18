@@ -3,6 +3,8 @@ import { useGetProductsQuery } from '../../store/api/productsApi';
 import SEOHead from '../../component/SEOHead';
 import { trackViewItemList } from '../../utils/analytics';
 import ProductCard from '../../component/ProductCard';
+import RevealCard from '../../component/RevealCard';
+import ScrollHint from '../../component/ScrollHint';
 
 const AllProductsPage = () => {
   const [sortBy, setSortBy] = useState('featured');
@@ -113,13 +115,16 @@ const AllProductsPage = () => {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
               {displayProducts?.map((product, index) => (
-                <ProductCard key={product.productId} product={product} index={index} />
+                <RevealCard key={product.productId} index={index}>
+                  <ProductCard product={product} index={index} />
+                </RevealCard>
               ))}
             </div>
           )}
         </div>
       </section>
 
+      <ScrollHint />
     </div>
   );
 };

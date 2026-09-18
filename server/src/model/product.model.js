@@ -28,6 +28,10 @@ const productSchema = mongoose.Schema(
         sku: { type: String, default: "", uppercase: true, trim: true },
         variantImage: [String], // Specific images for this variant
         variantPrice: Number,
+        // Short optional line shown on the PDP under the product title when
+        // this variant is selected (e.g. "BMW Inspired, 104cm"). Set from
+        // the admin panel; blank shows nothing.
+        variantSubTag: { type: String, default: "" },
         // ── Per-variant stock (managed from the admin panel) ─────────────────
         // `variantQuantity: null` = not stock-tracked (never auto-OOS by qty).
         // A number decrements on each paid order and derives out-of-stock at <= 0.

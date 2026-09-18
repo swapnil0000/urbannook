@@ -1,17 +1,21 @@
 import { useRef } from "react";
-import ProductCard from "./ProductCard";
+import { useNavigate } from "react-router-dom";
+import MinimalCard from "./MinimalCard";
+import { trackSelectItem } from "../utils/analytics";
 
 /**
- * Horizontal, arrow-scrollable row of recommended products for the PDP. Uses
- * the shared ProductCard so it looks identical to the All Products grid.
- * Renders nothing when there are no (published) recommendations — the section
- * is admin-curated only, no fallback.
+ * Horizontal, arrow-scrollable row of recommended products for the PDP.
+ * Uses the shared MinimalCard (name + price only) — deliberately its own
+ * look, separate from the shop grid's ProductCard, per how this section was
+ * asked to be redesigned. Renders nothing when there are no (published)
+ * recommendations — the section is admin-curated only, no fallback.
  *
  * @param {object[]} products  full product docs (from product.recommendedProductsDetails)
  * @param {string}   title
  */
 const RecommendedProducts = ({ products = [], title = "You May Also Like" }) => {
   const scrollRef = useRef(null);
+  const navigate = useNavigate();
 
   if (!products?.length) return null;
 
@@ -59,19 +63,50 @@ const RecommendedProducts = ({ products = [], title = "You May Also Like" }) => 
         className="flex gap-5 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         style={{ touchAction: "pan-x" }}
       >
-        {products.map((product, index) => (
-          <div
-            key={product.productId}
-            className="snap-start shrink-0 w-[150px] sm:w-[170px] md:w-[185px]"
-          >
-            <ProductCard
-              product={product}
-              index={index}
-              listId="recommended"
-              listName="Recommended Products"
-            />
-          </div>
-        ))}
+        {products.map((product, index) => {
+          const firstVariant = product?.variantDetails?.[0];
+          const price = Number(product?.effectivePrice ?? firstVariant?.variantPrice ?? 0);
+          const active = (product?.variantDetails || []).filter((v) => v.isActive !== false);
+          const oos =
+            product?.productStatus === "out_of_stock" ||
+            (active.length > 0 &&
+              active.every(
+                (v) =>
+                  v.variantOutOfStock === true ||
+                  (v.variantQuantity != null && Number(v.variantQuantity) <= 0),
+              ));
+          const badge = oos
+            ? { label: "Out of Stock", className: "bg-red-500 text-white" }
+            : null;
+
+          return (
+            <div
+              key={product.productId}
+              className="snap-start shrink-0 w-[150px] sm:w-[170px] md:w-[185px]"
+            >
+              <MinimalCard
+                image={firstVariant?.variantImage?.[0]}
+                alt={product.productName}
+                title={product.productName}
+                price={price}
+                pricePrefix="Starting at"
+                badge={badge}
+                onClick={() => {
+                  trackSelectItem({
+                    itemId: product.productId,
+                    itemName: product.productName,
+                    itemVariant: firstVariant?.variantName,
+                    price,
+                    listId: "recommended",
+                    listName: "Recommended Products",
+                    index,
+                  });
+                  navigate(`/products/${product.productId}`);
+                }}
+              />
+            </div>
+          );
+        })}
       </div>
     </section>
   );
