@@ -9,6 +9,83 @@ import {
 
 const TOKEN_TTL_MS = 5 * 60 * 1000;
 
+/* How long to wait for the app to take over before falling back to a URL */
+const APP_HANDOFF_TIMEOUT_MS = 1500;
+
+const isMobileDevice = () =>
+  /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent || '');
+
+/**
+ * Opens WhatsApp with as few steps as possible.
+ *
+ * Mobile tries the whatsapp:// scheme first. The universal wa.me link is not
+ * good enough here: in-app browsers (Instagram, Facebook) ignore app links,
+ * so wa.me lands on the api.whatsapp.com interstitial AND navigates our page
+ * away — the user comes back to WhatsApp's page instead of ours, and the
+ * status polling dies with the page. The scheme hands off without replacing
+ * the page. If nothing takes over (WhatsApp not installed) we fall back to
+ * wa.me, which at least offers the download.
+ *
+ * Desktop goes straight to web.whatsapp.com/send, which skips the same
+ * interstitial and lands in the chat.
+ */
+const openWhatsApp = ({ waLink, waWebLink, waAppLink }) => {
+  if (!isMobileDevice()) {
+    const target = waWebLink || waLink;
+    const opened = window.open(target, '_blank');
+
+    if (opened) {
+      try {
+        // Cannot pass the 'noopener' feature: with it window.open() always
+        // returns null even when the tab opens, sending us down the fallback
+        // and navigating the current page away.
+        opened.opener = null;
+      } catch {
+        /* already cross-origin — nothing to do */
+      }
+      return;
+    }
+
+    window.location.href = target;
+    return;
+  }
+
+  if (!waAppLink) {
+    window.location.href = waLink;
+    return;
+  }
+
+  let settled = false;
+  let timer = null;
+
+  const cleanup = () => {
+    if (timer) clearTimeout(timer);
+    document.removeEventListener('visibilitychange', onLeave);
+    window.removeEventListener('pagehide', onLeave);
+    window.removeEventListener('blur', onLeave);
+  };
+
+  // The app taking over hides or blurs this page — that means the handoff
+  // worked, so the fallback must not fire
+  function onLeave() {
+    settled = true;
+    cleanup();
+  }
+
+  document.addEventListener('visibilitychange', onLeave);
+  window.addEventListener('pagehide', onLeave);
+  window.addEventListener('blur', onLeave);
+
+  timer = setTimeout(() => {
+    cleanup();
+    if (!settled && document.visibilityState === 'visible') {
+      window.location.href = waLink;
+    }
+  }, APP_HANDOFF_TIMEOUT_MS);
+
+  window.location.href = waAppLink;
+};
+
 /**
  * Starts a WhatsApp login.
  *
@@ -26,43 +103,27 @@ export default function WhatsAppLoginButton({ onError }) {
     getWhatsAppLoginSession,
   );
 
-  const openWhatsApp = (waLink) => {
-    // The 'noopener' feature cannot be passed here: with it window.open()
-    // always returns null even when the tab does open, which sends us down
-    // the fallback and navigates the current page away.
-    const opened = window.open(waLink, '_blank');
-
-    if (opened) {
-      try {
-        opened.opener = null;
-      } catch {
-        /* already cross-origin — nothing to do */
-      }
-      return;
-    }
-
-    // Popup blocked (in-app browsers such as Instagram) — navigate the
-    // current tab instead. The watcher resumes from sessionStorage on return.
-    window.location.href = waLink;
-  };
-
   const handleClick = async () => {
     setErrorMessage('');
 
     try {
       const result = await startWhatsappLogin(session?.token).unwrap();
-      const { token, waLink, expiresInSeconds } = result?.data || {};
+      const { token, waLink, waWebLink, waAppLink, expiresInSeconds } =
+        result?.data || {};
 
       if (!token || !waLink) throw new Error('Invalid response from server');
 
-      startWhatsAppLoginSession({
+      const session = {
         token,
         waLink,
+        waWebLink,
+        waAppLink,
         expiresAt:
           Date.now() + (expiresInSeconds ? expiresInSeconds * 1000 : TOKEN_TTL_MS),
-      });
+      };
 
-      openWhatsApp(waLink);
+      startWhatsAppLoginSession(session);
+      openWhatsApp(session);
     } catch (error) {
       console.error('[WhatsApp Login] Start failed:', error);
       const message =
@@ -97,7 +158,7 @@ export default function WhatsAppLoginButton({ onError }) {
         <div className="mt-4 flex items-center justify-center gap-4 text-xs">
           <button
             type="button"
-            onClick={() => openWhatsApp(session.waLink)}
+            onClick={() => openWhatsApp(session)}
             className="font-bold text-[#128C7E] hover:underline"
           >
             Open WhatsApp again
