@@ -11,6 +11,7 @@ import { setCredentials, logout } from './store/slices/authSlice';
 import { fetchCsrfToken } from './store/api/apiSlice';
 import AppRoutes from './store/AppRoutes';
 import NewsTicker from './pages/home/NewsTicker';
+import WhatsAppLoginWatcher from './component/layout/auth/WhatsAppLoginWatcher';
 import SEOHead from './component/SEOHead';
 import { trackPageView, setUserId, captureAttribution, setMetaAdvancedMatching } from './utils/analytics';
 // check
@@ -168,6 +169,11 @@ function App() {
               {/* AppRoutes loaded immediately - no lazy loading for critical routing */}
               <ErrorBoundary>
                 <AppRoutes />
+              </ErrorBoundary>
+              {/* Pending WhatsApp login ko app level pe poll karta hai —
+                  modal band ho ya page reload ho, login complete ho jata hai */}
+              <ErrorBoundary>
+                <WhatsAppLoginWatcher />
               </ErrorBoundary>
               {/* Only non-critical components are lazy loaded */}
               <Suspense fallback={null}>

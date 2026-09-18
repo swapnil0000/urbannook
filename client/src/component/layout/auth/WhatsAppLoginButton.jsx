@@ -1,250 +1,79 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useState, useSyncExternalStore } from 'react';
+import { useWhatsappLoginStartMutation } from '../../../store/api/authApi';
 import {
-  useWhatsappLoginStartMutation,
-  useLazyWhatsappLoginStatusQuery,
-} from '../../../store/api/authApi';
-import { clearLoginCallback } from '../../../store/slices/uiSlice';
-import { trackLogin } from '../../../utils/analytics';
+  subscribeWhatsAppLogin,
+  getWhatsAppLoginSession,
+  startWhatsAppLoginSession,
+  clearWhatsAppLoginSession,
+} from '../../../utils/whatsappLoginSession';
 
-/* Backend token 5 min me expire karta hai — dono taraf same rakhna zaroori hai */
 const TOKEN_TTL_MS = 5 * 60 * 1000;
-const POLL_INTERVAL_MS = 3000;
 
-/* User WhatsApp pe switch karta hai, isliye session me token rakhte hain.
-   Wapas aane pe (Instagram webview me page reload ho sakta hai) polling
-   wahin se resume ho jaati hai. */
-const STORAGE_KEY = 'whatsappLoginSession';
-
-const readSession = () => {
-  try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed?.token || !parsed?.expiresAt || Date.now() > parsed.expiresAt) {
-      sessionStorage.removeItem(STORAGE_KEY);
-      return null;
-    }
-    return parsed;
-  } catch {
-    return null;
-  }
-};
-
-const writeSession = (session) => {
-  try {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session));
-  } catch {
-    /* private mode — polling phir bhi is tab me chalti rahegi */
-  }
-};
-
-const clearSession = () => {
-  try {
-    sessionStorage.removeItem(STORAGE_KEY);
-  } catch {
-    /* ignore */
-  }
-};
-
-export default function WhatsAppLoginButton({ onSuccess, onError }) {
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const { loginCallback } = useSelector((state) => state.ui);
-
-  const [startWhatsappLogin, { isLoading: isStarting }] =
-    useWhatsappLoginStartMutation();
-  const [checkStatus] = useLazyWhatsappLoginStatusQuery();
-
-  // idle → waiting (user WhatsApp pe hai) → expired
-  const [phase, setPhase] = useState('idle');
-  const [session, setSession] = useState(null);
+/**
+ * WhatsApp login shuru karne wala button.
+ *
+ * Ye sirf session banata hai aur WhatsApp kholta hai — polling
+ * WhatsAppLoginWatcher karta hai, jo app root pe mounted hai. Isse user
+ * kahin se bhi wapas aaye (modal band, page reload, naya tab) login
+ * khud complete ho jaata hai.
+ */
+export default function WhatsAppLoginButton({ onError }) {
+  const [startWhatsappLogin, { isLoading }] = useWhatsappLoginStartMutation();
   const [errorMessage, setErrorMessage] = useState('');
 
-  const pollRef = useRef(null);
-  // Lagatar fail hoti polls — chup-chaap spinner ghumate rehna galat hai
-  const failCountRef = useRef(0);
-
-  const stopPolling = useCallback(() => {
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
-  }, []);
-
-  const handleVerified = useCallback(
-    (data) => {
-      stopPolling();
-      clearSession();
-      setPhase('idle');
-      setSession(null);
-
-      trackLogin({
-        method: 'whatsapp',
-        userId: data.userId,
-        email: data.email,
-        name: data.name,
-      });
-
-      if (onSuccess) onSuccess(data);
-
-      if (loginCallback && loginCallback.startsWith('navigate:')) {
-        const path = loginCallback.replace('navigate:', '');
-        dispatch(clearLoginCallback());
-        navigate(path);
-      }
-    },
-    [dispatch, loginCallback, navigate, onSuccess, stopPolling],
+  const session = useSyncExternalStore(
+    subscribeWhatsAppLogin,
+    getWhatsAppLoginSession,
   );
 
-  /* Ek poll — VERIFIED pe login, EXPIRED pe rok do */
-  const pollOnce = useCallback(
-    async (token) => {
+  const openWhatsApp = (waLink) => {
+    // 'noopener' feature yahan NAHI de sakte: uske saath window.open()
+    // hamesha null return karta hai, chahe tab khul bhi jaye — aur tab
+    // fallback current page ko navigate kar deta hai.
+    const opened = window.open(waLink, '_blank');
+
+    if (opened) {
       try {
-        const res = await checkStatus(token).unwrap();
-        failCountRef.current = 0;
-        setErrorMessage('');
-
-        const status = res?.data?.status;
-
-        if (status === 'VERIFIED') {
-          handleVerified(res.data);
-        } else if (status === 'EXPIRED') {
-          stopPolling();
-          clearSession();
-          setSession(null);
-          setPhase('expired');
-        }
-      } catch (error) {
-        // Ek-do fail hona normal hai (network blip) — agli tick pe retry.
-        // Par lagatar fail ho to user ko batana zaroori hai, warna spinner
-        // hamesha ghumta rehta hai aur kuch samajh nahi aata.
-        failCountRef.current += 1;
-        console.error(
-          `[WhatsApp Login] Status poll failed (${failCountRef.current}):`,
-          error,
-        );
-
-        if (failCountRef.current >= 3) {
-          const status = error?.status;
-          setErrorMessage(
-            status === 429
-              ? 'Bahut zyada requests. Thodi der baad try karein.'
-              : 'Server se connect nahi ho pa raha. Internet check karke dobara try karein.',
-          );
-        }
-
-        if (failCountRef.current >= 10) {
-          stopPolling();
-          clearSession();
-          setSession(null);
-          setPhase('idle');
-        }
+        opened.opener = null;
+      } catch {
+        /* cross-origin ho chuka ho to ignore */
       }
-    },
-    [checkStatus, handleVerified, stopPolling],
-  );
+      return;
+    }
 
-  const startPolling = useCallback(
-    (activeSession) => {
-      stopPolling();
-      failCountRef.current = 0;
-      setSession(activeSession);
-      setPhase('waiting');
-
-      pollRef.current = setInterval(() => {
-        if (Date.now() > activeSession.expiresAt) {
-          stopPolling();
-          clearSession();
-          setSession(null);
-          setPhase('expired');
-          return;
-        }
-        pollOnce(activeSession.token);
-      }, POLL_INTERVAL_MS);
-    },
-    [pollOnce, stopPolling],
-  );
-
-  /* Page reload / WhatsApp se wapas aane pe pending login resume karo */
-  useEffect(() => {
-    const existing = readSession();
-    if (existing) startPolling(existing);
-    return stopPolling;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  /* Tab wapas focus me aate hi turant check — 3s ka wait na karna pade */
-  useEffect(() => {
-    if (phase !== 'waiting' || !session) return undefined;
-
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') pollOnce(session.token);
-    };
-    document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [phase, session, pollOnce]);
+    // Popup block (Instagram jaise in-app browsers) — same tab me bhejte
+    // hain. Wapas aane pe watcher sessionStorage se resume kar lega.
+    window.location.href = waLink;
+  };
 
   const handleClick = async () => {
     setErrorMessage('');
 
     try {
-      const result = await startWhatsappLogin().unwrap();
+      const result = await startWhatsappLogin(session?.token).unwrap();
       const { token, waLink, expiresInSeconds } = result?.data || {};
 
-      if (!token || !waLink) {
-        throw new Error('Invalid response from server');
-      }
+      if (!token || !waLink) throw new Error('Invalid response from server');
 
-      const activeSession = {
+      startWhatsAppLoginSession({
         token,
         waLink,
-        expiresAt: Date.now() + (expiresInSeconds ? expiresInSeconds * 1000 : TOKEN_TTL_MS),
-      };
+        expiresAt:
+          Date.now() + (expiresInSeconds ? expiresInSeconds * 1000 : TOKEN_TTL_MS),
+      });
 
-      writeSession(activeSession);
-      startPolling(activeSession);
-
-      // Naya tab preferred hai — is tab ki polling zinda rehti hai.
-      //
-      // Yahan 'noopener' feature NAHI de sakte: uske saath window.open()
-      // spec ke hisaab se hamesha null return karta hai, chahe tab khul
-      // bhi jaye. Tab fallback chal padta hai aur current page navigate
-      // ho jaata hai — polling wahin mar jaati hai. Isliye tab kholkar
-      // opener ko manually null karte hain.
-      const opened = window.open(waLink, '_blank');
-
-      if (opened) {
-        try {
-          opened.opener = null;
-        } catch {
-          /* cross-origin ho chuka ho to ignore */
-        }
-      } else {
-        // Popup block ho gaya (Instagram jaise in-app browsers). Same tab
-        // me bhejte hain — wapas aane pe sessionStorage se polling resume
-        // ho jaati hai.
-        window.location.href = waLink;
-      }
+      openWhatsApp(waLink);
     } catch (error) {
       console.error('[WhatsApp Login] Start failed:', error);
       const message =
-        error?.data?.message || 'WhatsApp login abhi shuru nahi ho paya. Dobara try karein.';
+        error?.data?.message ||
+        'WhatsApp login abhi shuru nahi ho paya. Dobara try karein.';
       setErrorMessage(message);
-      setPhase('idle');
       if (onError) onError(error);
     }
   };
 
-  const handleCancel = () => {
-    stopPolling();
-    clearSession();
-    setSession(null);
-    setPhase('idle');
-  };
-
-  if (phase === 'waiting' && session) {
+  if (session) {
     return (
       <div className="w-full text-center">
         <div className="flex items-center justify-center gap-2 text-sm font-semibold text-gray-700">
@@ -253,7 +82,8 @@ export default function WhatsAppLoginButton({ onSuccess, onError }) {
         </div>
 
         <p className="mt-3 text-xs text-gray-500">
-          WhatsApp khul gaya? Bas <span className="font-semibold">Send</span> dabaiye.
+          WhatsApp khul gaya? Bas <span className="font-semibold">Send</span> dabaiye,
+          phir yahan wapas aa jaiye.
         </p>
 
         {/* Deep link ne text prefill na kiya ho to user khud paste kar sake */}
@@ -264,22 +94,17 @@ export default function WhatsAppLoginButton({ onSuccess, onError }) {
           </span>
         </p>
 
-        {errorMessage && (
-          <p className="mt-3 text-xs font-semibold text-red-500">{errorMessage}</p>
-        )}
-
         <div className="mt-4 flex items-center justify-center gap-4 text-xs">
-          <a
-            href={session.waLink}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            type="button"
+            onClick={() => openWhatsApp(session.waLink)}
             className="font-bold text-[#128C7E] hover:underline"
           >
             WhatsApp dobara kholein
-          </a>
+          </button>
           <button
             type="button"
-            onClick={handleCancel}
+            onClick={clearWhatsAppLoginSession}
             className="font-bold text-gray-400 hover:text-gray-600"
           >
             Cancel
@@ -294,10 +119,10 @@ export default function WhatsAppLoginButton({ onSuccess, onError }) {
       <button
         type="button"
         onClick={handleClick}
-        disabled={isStarting}
+        disabled={isLoading}
         className="w-full flex items-center justify-center gap-3 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 transition-all hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {isStarting ? (
+        {isLoading ? (
           <span className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
         ) : (
           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#25D366" aria-hidden="true">
@@ -306,12 +131,6 @@ export default function WhatsAppLoginButton({ onSuccess, onError }) {
         )}
         Continue with WhatsApp
       </button>
-
-      {phase === 'expired' && (
-        <p className="mt-2 text-center text-xs font-semibold text-amber-600">
-          Code expire ho gaya. Dobara try karein.
-        </p>
-      )}
 
       {errorMessage && (
         <p className="mt-2 text-center text-xs font-semibold text-red-500">{errorMessage}</p>

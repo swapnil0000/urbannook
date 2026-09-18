@@ -151,9 +151,12 @@ export const authApi = apiSlice.injectEndpoints({
      * Koi credential nahi jaata; phone WhatsApp pe verify hota hai.
      */
     whatsappLoginStart: builder.mutation({
-      query: () => ({
+      query: (existingToken) => ({
         url: 'auth/whatsapp/start',
         method: 'POST',
+        // Pehle se zinda token ho to server wahi wapas dega — naya code
+        // banne se WhatsApp ka purana prefilled message bekaar ho jata hai
+        body: existingToken ? { token: existingToken } : {},
       }),
     }),
     /**
@@ -164,7 +167,10 @@ export const authApi = apiSlice.injectEndpoints({
     whatsappLoginStatus: builder.query({
       query: (token) => ({
         url: 'auth/whatsapp/status',
-        params: { token },
+        // _t har poll pe badalta hai — URL unique rehta hai to Cloudflare
+        // (jo /api/* pe max-age=7200 laga deta hai) cached jawab nahi de
+        // pata. Iske bina browser ko hamesha pehla "PENDING" hi milta hai.
+        params: { token, _t: Date.now() },
       }),
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {

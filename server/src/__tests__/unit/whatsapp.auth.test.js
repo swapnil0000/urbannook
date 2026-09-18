@@ -129,6 +129,74 @@ describe("extractInboundText", () => {
   });
 });
 
+describe("cache headers", () => {
+  // API Cloudflare ke peeche hai jo /api/* pe max-age=7200 laga deta hai.
+  // Bina no-store ke browser ko hamesha pehla PENDING cached milta hai
+  // aur login kabhi complete nahi hota.
+  it("marks the status response as never-cacheable", async () => {
+    const token = await startLogin();
+
+    const res = await request(app)
+      .get("/api/v1/auth/whatsapp/status")
+      .query({ token })
+      .expect(200);
+
+    expect(res.headers["cache-control"]).toContain("no-store");
+  });
+
+  it("marks the start response as never-cacheable", async () => {
+    const res = await request(app).post("/api/v1/auth/whatsapp/start").expect(200);
+    expect(res.headers["cache-control"]).toContain("no-store");
+  });
+});
+
+describe("token reuse", () => {
+  it("returns the same code while one is still pending", async () => {
+    const first = await request(app).post("/api/v1/auth/whatsapp/start").expect(200);
+    const token = first.body.data.token;
+
+    const second = await request(app)
+      .post("/api/v1/auth/whatsapp/start")
+      .send({ token })
+      .expect(200);
+
+    // Same code — WhatsApp me pada purana prefilled message valid rehta hai
+    expect(second.body.data.token).toBe(token);
+    expect(await WhatsAppLoginToken.countDocuments()).toBe(1);
+  });
+
+  it("mints a fresh code once the old one is gone", async () => {
+    const first = await request(app).post("/api/v1/auth/whatsapp/start").expect(200);
+    const token = first.body.data.token;
+
+    await WhatsAppLoginToken.deleteOne({ token });
+
+    const second = await request(app)
+      .post("/api/v1/auth/whatsapp/start")
+      .send({ token })
+      .expect(200);
+
+    expect(second.body.data.token).not.toBe(token);
+  });
+
+  it("never hands back a code that is already verified", async () => {
+    const first = await request(app).post("/api/v1/auth/whatsapp/start").expect(200);
+    const token = first.body.data.token;
+
+    await request(app)
+      .post(WEBHOOK_PATH)
+      .query({ secret: WEBHOOK_SECRET })
+      .send(metaTextPayload("919876543210", token));
+
+    const second = await request(app)
+      .post("/api/v1/auth/whatsapp/start")
+      .send({ token })
+      .expect(200);
+
+    expect(second.body.data.token).not.toBe(token);
+  });
+});
+
 describe("describePayloadShape", () => {
   it("summarises an unknown shape without leaking phone or text", () => {
     const out = describePayloadShape({

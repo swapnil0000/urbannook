@@ -207,26 +207,9 @@ const describePayloadShape = (body) => {
 };
 
 /**
- * Naya login token banata hai aur wa.me deep link return karta hai.
+ * Token ko wa.me deep link ke saath response shape me badalta hai.
  */
-const startWhatsAppLogin = async (requestIp = null) => {
-  const businessNumber = env.GUPSHUP_WHATSAPP_NUMBER;
-  if (!businessNumber) {
-    throw new InternalServerError(
-      "GUPSHUP_WHATSAPP_NUMBER .env me configure nahi hai",
-    );
-  }
-
-  const token = generateTokenString();
-  const expiresAt = new Date(Date.now() + TOKEN_TTL_SECONDS * 1000);
-
-  await WhatsAppLoginToken.create({
-    token,
-    status: "PENDING",
-    requestIp,
-    expiresAt,
-  });
-
+const buildLoginResponse = (token, businessNumber, expiresInSeconds) => {
   const waNumber = String(businessNumber).replace(/\D/g, "");
 
   // Sirf raw code bhejne se customer ko samajh nahi aata ki wo kya bhej
@@ -242,10 +225,53 @@ const startWhatsAppLogin = async (requestIp = null) => {
       token,
       // User ko bas send dabana hai — text pehle se bhara aata hai
       waLink: `https://wa.me/${waNumber}?text=${encodeURIComponent(prefilledText)}`,
-      expiresInSeconds: TOKEN_TTL_SECONDS,
+      expiresInSeconds,
     },
     success: true,
   };
+};
+
+/**
+ * Login token deta hai — zinda pending token ho to wahi, warna naya.
+ */
+const startWhatsAppLogin = async (requestIp = null, existingToken = null) => {
+  const businessNumber = env.GUPSHUP_WHATSAPP_NUMBER;
+  if (!businessNumber) {
+    throw new InternalServerError(
+      "GUPSHUP_WHATSAPP_NUMBER .env me configure nahi hai",
+    );
+  }
+
+  if (existingToken && typeof existingToken === "string") {
+    const reusable = await WhatsAppLoginToken.findOne({
+      token: existingToken.trim().toUpperCase(),
+      status: "PENDING",
+      expiresAt: { $gt: new Date() },
+    });
+
+    if (reusable) {
+      return buildLoginResponse(
+        reusable.token,
+        businessNumber,
+        Math.max(
+          Math.floor((reusable.expiresAt.getTime() - Date.now()) / 1000),
+          1,
+        ),
+      );
+    }
+  }
+
+  const token = generateTokenString();
+  const expiresAt = new Date(Date.now() + TOKEN_TTL_SECONDS * 1000);
+
+  await WhatsAppLoginToken.create({
+    token,
+    status: "PENDING",
+    requestIp,
+    expiresAt,
+  });
+
+  return buildLoginResponse(token, businessNumber, TOKEN_TTL_SECONDS);
 };
 
 /**
@@ -290,7 +316,7 @@ const handleInboundMessage = async (body) => {
 
   if (!loginToken) {
     console.warn(
-      `[WHATSAPP AUTH] Unknown/expired token from ${maskMobile(mobileNumber)}`,
+      `[WHATSAPP AUTH] Unknown/expired token ${token} from ${maskMobile(mobileNumber)}`,
     );
     return { handled: false, reason: "TOKEN_NOT_FOUND" };
   }
@@ -302,8 +328,9 @@ const handleInboundMessage = async (body) => {
   loginToken.userId = user.userId;
   await loginToken.save();
 
+
   console.log(
-    `[WHATSAPP AUTH] Verified ${maskMobile(mobileNumber)} -> userId ${user.userId}`,
+    `[WHATSAPP AUTH] Verified ${token} from ${maskMobile(mobileNumber)} -> userId ${user.userId}`,
   );
 
   return { handled: true };

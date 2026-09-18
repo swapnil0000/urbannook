@@ -315,17 +315,9 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
               {/* WhatsApp login — Instagram in-app browser me Google popup
                   block ho jata hai, wahan yahi primary option hai */}
               <div className="mt-4">
+                {/* Success WhatsAppLoginWatcher handle karta hai (app level) —
+                    taaki modal band hone par bhi login complete ho */}
                 <WhatsAppLoginButton
-                  onSuccess={(userData) => {
-                    showNotification('WhatsApp login successful!');
-                    if (onLoginSuccess) {
-                      onLoginSuccess(userData);
-                    }
-                    dispatch(setShowLoginModal(false));
-                    if (onClose) {
-                      onClose();
-                    }
-                  }}
                   onError={(error) => {
                     const errorMessage = error?.data?.message || 'WhatsApp login failed. Please try again.';
                     showNotification(errorMessage);

@@ -47,9 +47,20 @@ router.post("/webhooks/gupshup-inbound/:secret", gupshupInboundWebhook);
 
 /* ===============================================================
    WHATSAPP LOGIN (frontend-facing)
+   ---------------------------------------------------------------
+   Ye responses kabhi cache nahi hone chahiye. Status har 3 second me
+   badal sakta hai, aur API Cloudflare ke peeche hai jo bina is header
+   ke GET responses ko cache kar leta hai — phir browser ko hamesha
+   purana "PENDING" milta rehta hai aur login kabhi complete nahi hota.
 ================================================================ */
 
-router.post("/auth/whatsapp/start", whatsappStartLimiter, whatsappLoginStart);
-router.get("/auth/whatsapp/status", whatsappStatusLimiter, whatsappLoginStatus);
+const noStore = (_req, res, next) => {
+  res.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+  res.set("Pragma", "no-cache");
+  next();
+};
+
+router.post("/auth/whatsapp/start", whatsappStartLimiter, noStore, whatsappLoginStart);
+router.get("/auth/whatsapp/status", whatsappStatusLimiter, noStore, whatsappLoginStatus);
 
 export default router;

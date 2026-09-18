@@ -13,7 +13,9 @@ import {
  * Login token + wa.me deep link deta hai.
  */
 const whatsappLoginStart = asyncHandler(async (req, res) => {
-  const result = await startWhatsAppLogin(req.ip);
+  // Client apna maujooda token bhejta hai — zinda ho to wahi wapas milega,
+  // taaki WhatsApp me pada purana prefilled message bekaar na ho jaye
+  const result = await startWhatsAppLogin(req.ip, req.body?.token);
   return res
     .status(result.statusCode)
     .json(new ApiRes(result.statusCode, result.message, result.data, true));
