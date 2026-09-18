@@ -11,6 +11,7 @@ import { setCredentials, logout } from './store/slices/authSlice';
 import { fetchCsrfToken } from './store/api/apiSlice';
 import AppRoutes from './store/AppRoutes';
 import NewsTicker from './pages/home/NewsTicker';
+import WhatsAppLoginWatcher from './component/layout/auth/WhatsAppLoginWatcher';
 import SEOHead from './component/SEOHead';
 import { trackPageView, setUserId, captureAttribution, setMetaAdvancedMatching } from './utils/analytics';
 // check
@@ -169,6 +170,11 @@ function App() {
               {/* AppRoutes loaded immediately - no lazy loading for critical routing */}
               <ErrorBoundary>
                 <AppRoutes />
+              </ErrorBoundary>
+              {/* Polls a pending WhatsApp login at the app level, so the login
+                  completes even if the modal closes or the page reloads */}
+              <ErrorBoundary>
+                <WhatsAppLoginWatcher />
               </ErrorBoundary>
               {/* Only non-critical components are lazy loaded */}
               <Suspense fallback={null}>

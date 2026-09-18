@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import ForgotPassword from './ForgotPassword';
@@ -7,6 +7,7 @@ import { useLoginMutation } from '../../../store/api/authApi';
 import { useAuth, useUI } from '../../../hooks/useRedux';
 import { setShowLoginModal, clearLoginCallback } from '../../../store/slices/uiSlice';
 import GoogleLoginButton from './GoogleLoginButton';
+import WhatsAppLoginButton from './WhatsAppLoginButton';
 import useFormValidation from '../../../hooks/useFormValidation';
 import { trackLogin, trackLoginFailed } from '../../../utils/analytics';
 
@@ -20,7 +21,7 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
   const [showPassword, setShowPassword] = useState(false);
 
   const [login, { isLoading }] = useLoginMutation();
-  const { login: setAuthUser } = useAuth();
+  const { login: setAuthUser, isAuthenticated } = useAuth();
   const { showNotification } = useUI();
 
   // Use validation hook with custom rules for login (password without pattern validation)
@@ -38,6 +39,23 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
       }
     }
   });
+
+  /**
+   * Closes this modal once the user is authenticated.
+   *
+   * WhatsApp login finishes outside this component — WhatsAppLoginWatcher
+   * runs at the app level so it keeps working when the modal is closed or
+   * the page reloads. It cannot close this modal on its own: the header
+   * opens it through its own local state, so flipping the Redux flag is a
+   * no-op. Reacting to the auth state covers every login path.
+   */
+  const closedOnAuthRef = useRef(false);
+
+  useEffect(() => {
+    if (!isAuthenticated || closedOnAuthRef.current) return;
+    closedOnAuthRef.current = true;
+    if (onClose) onClose();
+  }, [isAuthenticated, onClose]);
 
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -306,6 +324,19 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
                   }}
                   onError={(error) => {
                     const errorMessage = error?.data?.message || 'Google login failed. Please try again.';
+                    showNotification(errorMessage);
+                  }}
+                />
+              </div>
+
+              {/* WhatsApp login — the Google popup is blocked inside the
+                  Instagram in-app browser, where this is the primary option */}
+              <div className="mt-4">
+                {/* Success is handled by WhatsAppLoginWatcher at the app level,
+                    so the login completes even if this modal is closed */}
+                <WhatsAppLoginButton
+                  onError={(error) => {
+                    const errorMessage = error?.data?.message || 'WhatsApp login failed. Please try again.';
                     showNotification(errorMessage);
                   }}
                 />

@@ -71,11 +71,11 @@ export function clearEcommerce() {
 }
 
 /** Push a GA4 ecommerce event with a guaranteed-clean ecommerce object. */
-function pushEcommerce(eventName, ecommerce) {
+function pushEcommerce(eventName, ecommerce, dedupeKey) {
   clearEcommerce();
   pushEvent({ event: eventName, ecommerce });   // for future GTM (currently inert)
   sendGtag(eventName, ecommerce);                // direct to GA4 via gtag — this one counts today
-  recordEvent(eventName, ecommerce);             // our own DB
+  recordEvent(eventName, ecommerce, dedupeKey);  // our own DB
 }
 
 /**
@@ -253,11 +253,14 @@ function scheduleFlush() {
 }
 
 /** Queue one event for our own backend (batched). Called by the 3 choke points. */
-function recordEvent(eventName, properties = {}) {
+function recordEvent(eventName, properties = {}, dedupeKey) {
   if (!enabled() || typeof window === 'undefined') return;
   try {
     _eventQueue.push({
       eventName,
+      // Set only for events the SERVER also writes (purchase). The server
+      // collapses both writers onto this key, so revenue is never counted twice.
+      ...(dedupeKey ? { dedupeKey } : {}),
       userId: _currentUserId || undefined,
       anonymousId: getAnonymousId(),
       sessionId: getSessionId(),
@@ -359,11 +362,107 @@ export function setMetaAdvancedMatching({ email, phone, firstName, lastName, use
  * MUST run before the first page_view — in an SPA the landing query string is
  * wiped on the first client-side route change. Idempotent: only the first visit is stored.
  */
+/** Hostname of a referrer string, '' if unparseable. Handles android-app:// too. */
+function referrerHost(ref) {
+  try {
+    return new URL(ref).hostname.toLowerCase().replace(/^www\./, '');
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Collapse the raw landing signals into ONE channel string, so queries never
+ * have to re-implement referrer regex. This is the field to group/filter by.
+ *
+ * Google organic vs Google paid: Google Ads auto-tagging always appends `gclid`
+ * (or `gbraid`/`wbraid` on iOS app campaigns), so a google.* referrer WITHOUT
+ * one of those and without a paid utm_medium is genuine organic search.
+ * ⚠️ If auto-tagging is ever turned off in Google Ads AND no utm_medium is set,
+ * paid clicks become indistinguishable from organic — keep auto-tagging on.
+ *
+ * Returns one of: google_organic | google_ads | google_shopping_free |
+ * other_search | meta_ads | meta_organic | whatsapp | email | referral | direct
+ * | <utm_source> (for any campaign we tagged ourselves).
+ */
+function classifyChannel({ utmSource, utmMedium, gclid, fbclid, srsltid, referrer }) {
+  const src = (utmSource || '').toLowerCase();
+  const med = (utmMedium || '').toLowerCase();
+  const isPaidMedium = /^(cpc|ppc|paid|paidsocial|paid_social|display|cpm)$/.test(med);
+
+  // 1. Paid click IDs are unambiguous and beat everything else.
+  if (gclid) return 'google_ads';
+
+  // 2. Campaigns we tagged ourselves.
+  if (src) {
+    if (src === 'google') return isPaidMedium ? 'google_ads' : 'google_organic';
+    if (/^(facebook|fb|instagram|ig|meta)$/.test(src)) return isPaidMedium ? 'meta_ads' : 'meta_organic';
+    return src; // our own named source (whatsapp, newsletter, influencer, …)
+  }
+
+  // 3. fbclid with no utm = a Meta link (organic post or ad without utm tagging).
+  if (fbclid) return 'meta_ads';
+
+  // 4. Google Merchant Center free product listings.
+  if (srsltid) return 'google_shopping_free';
+
+  // 5. Fall back to where the browser says it came from.
+  const host = referrerHost(referrer);
+  if (!host) return 'direct';
+  // Search only — the host must BE google.<tld> (www already stripped), plus
+  // Google News and the Google app on Android. Deliberately anchored so that
+  // mail.google.com / drive.google.com / docs.google.com are NOT counted as
+  // organic search: a Gmail click is email traffic, not a Google search.
+  if (/^google\.[a-z.]+$/.test(host) || host === 'news.google.com' || host.includes('googlequicksearchbox')) {
+    return 'google_organic';
+  }
+  if (host.includes('mail.google') || /(^|\.)(mail|outlook|gmail)\./.test(host)) return 'email';
+  if (/(^|\.)(bing|yahoo|duckduckgo|ecosia|brave|yandex)\./.test(host)) return 'other_search';
+  if (/(^|\.)(facebook|fb|instagram)\./.test(host) || host === 'fb.me') return 'meta_organic';
+  if (host.includes('whatsapp') || host === 'wa.me') return 'whatsapp';
+  return 'referral';
+}
+
+/**
+ * First-touch attribution, locked on the landing hit before client-side routing
+ * destroys the query string.
+ *
+ * First-touch with ONE exception: a stored `direct` is not really a source, it
+ * just means we couldn't see one. If that same device later arrives with a real
+ * source (a Google search, a campaign link), that identifiable source replaces
+ * the earlier `direct` — otherwise every visitor whose very first hit was a bare
+ * URL would be permanently stamped `direct`, and the Google search that actually
+ * brought them back would never be counted. Once a real source is stored, it is
+ * never overwritten. This mirrors how GA4 treats direct.
+ */
 export function captureAttribution() {
   if (typeof window === 'undefined') return null;
   try {
-    const existing = localStorage.getItem(ATTRIBUTION_KEY);
-    if (existing) return JSON.parse(existing);
+    const stored = localStorage.getItem(ATTRIBUTION_KEY);
+    const existing = stored ? JSON.parse(stored) : null;
+    if (existing && existing.channel && existing.channel !== 'direct') return existing;
+
+    // Records written before channel classification existed have utm/referrer
+    // data but no `channel`. Classify them from what they already hold rather
+    // than from the CURRENT visit — otherwise every returning visitor would be
+    // re-stamped with today's source and their real first touch would be lost.
+    if (existing && !existing.channel) {
+      const backfilled = classifyChannel({
+        utmSource: existing.utm_source,
+        utmMedium: existing.utm_medium,
+        gclid: existing.gclid,
+        fbclid: existing.fbclid,
+        srsltid: existing.srsltid,
+        referrer: existing.landing_referrer,
+      });
+      if (backfilled !== 'direct') {
+        const merged = { ...existing, channel: backfilled };
+        localStorage.setItem(ATTRIBUTION_KEY, JSON.stringify(merged));
+        return merged;
+      }
+      // Genuinely unattributable first touch — fall through and let this
+      // visit's real source claim it, same as a stored `direct`.
+    }
 
     const p = new URLSearchParams(window.location.search);
     const attribution = {};
@@ -371,13 +470,29 @@ export function captureAttribution() {
       const v = p.get(k);
       if (v) attribution[k] = v;
     });
-    const gclid = p.get('gclid');
+    const gclid = p.get('gclid') || p.get('gbraid') || p.get('wbraid');
     if (gclid) attribution.gclid = gclid;
     const fbclid = p.get('fbclid');
     if (fbclid) attribution.fbclid = fbclid;
+    const srsltid = p.get('srsltid');
+    if (srsltid) attribution.srsltid = srsltid;
     const ref = document.referrer;
     if (ref && !ref.includes(window.location.hostname)) attribution.landing_referrer = ref;
     attribution.landing_page = window.location.pathname;
+
+    attribution.channel = classifyChannel({
+      utmSource: attribution.utm_source,
+      utmMedium: attribution.utm_medium,
+      gclid,
+      fbclid,
+      srsltid,
+      referrer: attribution.landing_referrer,
+    });
+    attribution.landed_at = new Date().toISOString();
+
+    // Nothing learned this visit — keep the earlier record rather than
+    // rewriting its timestamp on every direct return visit.
+    if (existing && attribution.channel === 'direct') return existing;
 
     localStorage.setItem(ATTRIBUTION_KEY, JSON.stringify(attribution));
     return attribution;
@@ -724,7 +839,11 @@ export function trackPurchase({ transactionId, value, shipping = 0, tax = 0, cou
       ...(paymentMethod ? { payment_method: paymentMethod } : {}),
       ...(eventId ? { event_id: eventId } : {}),
       items: items.map((it) => toItem(it)),
-    });
+    },
+    // Same key the Razorpay webhook writes (`purchase:<orderId>`), so whichever
+    // arrives first creates the row and the other is a no-op. Only set when we
+    // actually have the orderId — a blank key would collide across all orders.
+    eventId ? `purchase:${eventId}` : undefined);
     pushPixelEvent(
       'Purchase',
       {

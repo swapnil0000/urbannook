@@ -111,6 +111,7 @@ import { isFreeShippingEligible, getFreeShippingConfig } from "../utils/freeShip
 import { getActiveCartRules, evaluateCartRules, applyBestDiscount, getDiscountCandidatesForItem } from "../utils/cartRule.util.js";
 import { getPublicOfferConfig } from "../utils/offer.util.js";
 import { sendMetaCapiEvent } from "../services/meta.capi.service.js";
+import { recordServerPurchase } from "../services/purchaseEvent.service.js";
 
 // Collect Meta CAPI match-quality signals from the order-creation request.
 // The webhook (Razorpay → server) has no browser context, so we persist these on
@@ -1062,6 +1063,15 @@ const razorpayWebHookController = async (req, res) => {
           } catch (capiError) {
             console.error("[Meta CAPI] Purchase dispatch error:", capiError.message);
           }
+
+          // First-party purchase → Event collection. Inside the
+          // `order.status !== "PAID"` guard, so it runs exactly once per order
+          // however many times Razorpay replays the webhook. This is what makes
+          // /admin/analytics revenue match reality: the browser-side purchase
+          // is lost to ad-blockers and closed tabs, this one never is.
+          await recordServerPurchase(order, {
+            recoveredFrom: wasFailedByCron ? "FAILED" : undefined,
+          });
         }
 
         console.log("✅ Payment Captured:", payment.id);
