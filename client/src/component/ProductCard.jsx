@@ -1,58 +1,9 @@
-import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { lazy, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { trackSelectItem } from "../utils/analytics";
+import FitTitle from "./FitTitle";
 
 const WishlistButton = lazy(() => import("./WishlistButton"));
-
-// Shared canvas context reused across every card for text-width measurement
-// — avoids allocating a new <canvas> per card in a grid of a dozen+ cards.
-let measureCtx = null;
-function measureTextWidth(text, font) {
-  if (!measureCtx) measureCtx = document.createElement("canvas").getContext("2d");
-  measureCtx.font = font;
-  return measureCtx.measureText(text).width;
-}
-
-// Title that always renders on exactly one line: it starts at `capPx` and
-// shrinks (down to `floorPx`) only by as much as the actual rendered text
-// needs to fit the card's real width — no wrapping, no ellipsis, no clipped
-// characters, whatever the product name's length turns out to be.
-const FitTitle = ({ text, capPx, floorPx, className }) => {
-  const ref = useRef(null);
-  const [fontSize, setFontSize] = useState(capPx);
-
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-
-    const fit = () => {
-      const available = el.clientWidth;
-      if (!available) return;
-      const font = `${capPx}px Georgia, 'Times New Roman', serif`;
-      const textWidth = measureTextWidth(text, font);
-      if (textWidth <= available) {
-        setFontSize(capPx);
-      } else {
-        setFontSize(Math.max(floorPx, capPx * (available / textWidth)));
-      }
-    };
-
-    fit();
-    const ro = new ResizeObserver(fit);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [text, capPx, floorPx]);
-
-  return (
-    <h3
-      ref={ref}
-      className={`${className} whitespace-nowrap overflow-hidden`}
-      style={{ fontSize: `${fontSize}px` }}
-    >
-      {text}
-    </h3>
-  );
-};
 
 // Auto-cycles through a product's own variant photos as a hold-then-crossfade
 // slideshow — each photo sits still, then slowly dissolves into the next
@@ -74,6 +25,14 @@ const VariantSlider = ({ images, alt }) => {
   const containerRef = useRef(null);
   const [inView, setInView] = useState(false);
   const [index, setIndex] = useState(0);
+  // Which slide indices are allowed to actually mount an <img> (and so
+  // request their file). A grid can show a dozen-plus of these cards at
+  // once, each with several variant photos — loading every photo of every
+  // card the moment it scrolls into view would multiply into a genuinely
+  // large burst of requests. Only the currently-shown photo plus the next
+  // one (so the crossfade never has to wait) are ever mounted; the rest
+  // stay unmounted until the auto-cycle actually reaches them.
+  const [loadedIndices, setLoadedIndices] = useState(() => new Set([0, 1 % images.length]));
 
   useEffect(() => {
     const el = containerRef.current;
@@ -88,27 +47,40 @@ const VariantSlider = ({ images, alt }) => {
   useEffect(() => {
     if (!inView || REDUCE_MOTION || images.length < 2) return;
     const id = setInterval(() => {
-      setIndex((i) => (i + 1) % images.length);
+      setIndex((i) => {
+        const next = (i + 1) % images.length;
+        setLoadedIndices((prev) => {
+          const after = (next + 1) % images.length;
+          if (prev.has(next) && prev.has(after)) return prev;
+          const merged = new Set(prev);
+          merged.add(next);
+          merged.add(after);
+          return merged;
+        });
+        return next;
+      });
     }, HOLD_MS + FADE_MS);
     return () => clearInterval(id);
   }, [inView, images.length]);
 
   return (
     <div ref={containerRef} className="relative w-full h-full">
-      {images.map((src, i) => (
-        <img
-          key={src}
-          src={src}
-          alt={alt}
-          loading="lazy"
-          className="absolute inset-0 w-full h-full object-cover mix-blend-multiply ease-in-out"
-          style={{
-            opacity: i === index ? 1 : 0,
-            transitionProperty: "opacity",
-            transitionDuration: `${FADE_MS}ms`,
-          }}
-        />
-      ))}
+      {images.map((src, i) =>
+        loadedIndices.has(i) ? (
+          <img
+            key={src}
+            src={src}
+            alt={alt}
+            loading="lazy"
+            className="absolute inset-0 w-full h-full object-cover mix-blend-multiply ease-in-out"
+            style={{
+              opacity: i === index ? 1 : 0,
+              transitionProperty: "opacity",
+              transitionDuration: `${FADE_MS}ms`,
+            }}
+          />
+        ) : null,
+      )}
     </div>
   );
 };
@@ -282,58 +254,32 @@ const ProductCard = ({ product, index = 0, listId = "all_products", listName = "
           })()}
         </div>
 
-        {/* Text & CTA */}
-        <div className="p-4 md:p-4 flex flex-col flex-grow bg-white/90 backdrop-blur-md">
-          {/* Always a single line, full title, no cutting — the font is
-              measured against the card's actual rendered width and shrinks
-              only as much as that specific title needs. Two FitTitle
-              instances (mobile/desktop) since the breakpoints have very
-              different card widths and each needs its own cap size. */}
-          <div className="mb-0.5">
+        {/* Minimal footer — name, then price, nothing else. A fixed-height
+            title (FitTitle: always exactly one line, whatever the name's
+            length) keeps every card in a row the same height, so a row
+            never looks uneven. */}
+        <div className="p-4 flex flex-col items-center gap-1 bg-white/90 backdrop-blur-md">
+          {/* Fixed-height wrapper, sized to the CAP font size regardless of
+              how much this particular title had to shrink — otherwise a
+              long name (smaller font) leaves a shorter title block than a
+              short name (full font), and the row/card ends up uneven. */}
+          <div className="h-5 md:h-6 flex items-center justify-center w-full">
             <FitTitle
               text={product.productName || ""}
               capPx={15}
               floorPx={9}
-              className="font-serif text-[#2e443c] leading-snug text-center block md:hidden"
+              className="font-serif text-[#2e443c] leading-snug text-center block md:hidden w-full"
             />
             <FitTitle
               text={product.productName || ""}
-              capPx={20}
+              capPx={18}
               floorPx={12}
-              className="font-serif text-[#2e443c] leading-snug text-center hidden md:block"
+              className="font-serif text-[#2e443c] leading-snug text-center hidden md:block w-full"
             />
           </div>
-
-          <div className="flex justify-center md:justify-between items-end pt-1 border-t border-[#F5DEB3]/10] gap-2">
-            <div className="flex items-center flex-nowrap gap-1 md:gap-1.5 min-w-0">
-              <span className="text-xs md:text-sm font-normal text-[#157a44] whitespace-nowrap">
-                Starting at
-              </span>
-              <span className="text-xs md:text-sm font-normal text-[#157a44] whitespace-nowrap">
-                ₹{price?.toLocaleString()}
-              </span>
-              {/* {mrp > price && (
-                // % OFF stacked directly above the struck MRP
-                <span className="flex flex-col items-start leading-none whitespace-nowrap">
-                  <span className="text-[7px] md:text-[9px] font-bold text-[#157a44]">
-                    {Math.round(((mrp - price) / mrp) * 100)}% OFF
-                  </span>
-                  <span className="text-[9px] md:text-xs text-gray-400 line-through mt-0.5">
-                    ₹{mrp?.toLocaleString()}
-                  </span>
-                </span>
-              )} */}
-            </div>
-
-            {/* {(product?.variantDetails?.length || 0) > 1 && (
-              <span className="text-[9px] md:text-[10px] font-medium text-gray-500 whitespace-nowrap shrink-0 ml-auto">
-                {product.variantDetails.length} variants
-              </span>
-            )} */}
-            <div className="hidden md:flex w-12 h-12 rounded-full bg-[#F5DEB3]/10 text-gray-500 items-center justify-center group-hover:bg-[#F5DEB3] group-hover:text-[#2e443c] transition-all duration-300">
-              <i className="fa-solid fa-arrow-right -rotate-45 group-hover:rotate-0 transition-transform duration-500"></i>
-            </div>
-          </div>
+          <span className="text-xs md:text-sm font-medium text-[#157a44]">
+            Starting at ₹{price?.toLocaleString()}
+          </span>
         </div>
       </div>
     </div>

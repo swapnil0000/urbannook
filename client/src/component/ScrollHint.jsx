@@ -37,7 +37,7 @@ const ScrollHint = () => {
 
   return (
     <div
-      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 pointer-events-none transition-opacity duration-300"
+      className="fixed bottom-6 right-6 z-40 pointer-events-none transition-opacity duration-300"
       aria-hidden="true"
     >
       <div className="w-10 h-10 rounded-full bg-[#F5DEB3] text-[#2e443c] flex items-center justify-center shadow-lg animate-bounce">

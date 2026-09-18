@@ -469,21 +469,30 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     const liveCoupon = await Coupon.findOne(
       { couponId: couponCodeId },
       {
-        discountType: 1, discountValue: 1, maxDiscountCap: 1,
+        code: 1, discountType: 1, discountValue: 1, maxDiscountCap: 1,
         isInternal: 1, isArchived: 1, isActive: 1, isTest: 1,
-        maxUsesPerUser: 1, scope: 1,
+        maxUsesPerUser: 1, scope: 1, audience: 1, assignedTo: 1,
         // Fields missing from original projection — caused silent bypass of these rules
         minCartValue: 1, validFrom: 1, validUntil: 1,
         maxTotalUses: 1, usageCount: 1,
       }
     ).lean();
 
+    // console.log(
+    //   `[Coupon:PaymentRecheck] couponId=${couponCodeId} code=${liveCoupon?.code || "-"} ` +
+    //   `found=${!!liveCoupon} scope=${liveCoupon?.scope || "-"} audience=${liveCoupon?.audience || "-"} ` +
+    //   `isActive=${liveCoupon?.isActive} isArchived=${liveCoupon?.isArchived} isTest=${liveCoupon?.isTest} ` +
+    //   `assignedToCount=${liveCoupon?.assignedTo?.length ?? "-"} userId=${userId} userEmail=${userEmail || "-"}`
+    // );
+
     if (!liveCoupon || liveCoupon.isArchived) {
+      // console.log(`[Coupon:PaymentRecheck] REJECT — not found or archived`);
       throw new ValidationError(
         "The coupon you applied is no longer available. Please remove it from your cart and try again."
       );
     }
     if (!liveCoupon.isActive) {
+      // console.log(`[Coupon:PaymentRecheck] REJECT — coupon is paused (isActive=false)`);
       throw new ValidationError(
         "This coupon has been paused. Please remove it from your cart and try again."
       );
@@ -491,6 +500,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
 
     const isValidInternal = liveCoupon.isInternal && liveCoupon.discountType === "INTERNAL_TEST";
     if (liveCoupon.isTest && !isValidInternal) {
+      // console.log(`[Coupon:PaymentRecheck] REJECT — isTest=true and not a valid internal coupon`);
       throw new ValidationError(
         "This coupon is no longer available for customers. Please remove it from your cart and try again."
       );
@@ -503,14 +513,50 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       );
     }
 
+    // Re-check scope/audience — the coupon's targeting rules could have changed
+    // between apply-time (coupon.code.service.js) and this payment step, e.g. an
+    // admin removed this user from the assignedTo list. This function requires
+    // a logged-in user (req.user, checked at the top of this controller), so
+    // audience=MEMBERS_ONLY is always satisfied here — only scope=TARGETED needs
+    // an actual re-check.
+    if (liveCoupon.scope === "TARGETED") {
+      const normEmailForScope  = user?.email?.toLowerCase().trim() || null;
+      const normMobileForScope = user?.mobileNumber?.toString().replace(/\D/g, "").slice(-10) || finalSenderMobile || null;
+      const scopeIdentifiers   = [normEmailForScope, normMobileForScope].filter(Boolean);
+      const assignment = (liveCoupon.assignedTo || []).find((a) => scopeIdentifiers.includes(a.identifier));
+
+      console.log(
+        `[Coupon:PaymentRecheck] TARGETED re-check: identifiers=${scopeIdentifiers.join("/") || "-"} ` +
+        `assignmentFound=${!!assignment} usedAt=${assignment?.usedAt || "-"} isValidInternal=${isValidInternal}`
+      );
+
+      if (!assignment) {
+        console.log(`[Coupon:PaymentRecheck] REJECT — TARGETED: no assignment found for ${scopeIdentifiers.join("/") || "(no identifiers)"}`);
+        throw new ValidationError(
+          "This coupon is no longer assigned to you. Please remove it from your cart and try again."
+        );
+      }
+      // Internal test coupons let the assigned team member reuse them (same
+      // carve-out as validateNewCoupon's skipSingleUseGate) — everyone else's
+      // single-use gate is enforced.
+      if (assignment.usedAt && !isValidInternal) {
+        console.log(`[Coupon:PaymentRecheck] REJECT — TARGETED: assignment already used at ${assignment.usedAt}`);
+        throw new ValidationError(
+          "Your personal coupon has already been used. Please remove it from your cart and try again."
+        );
+      }
+    }
+
     // Re-check validity window — coupon may have expired or not yet started between apply and pay
     const now = new Date();
     if (liveCoupon.validFrom && now < new Date(liveCoupon.validFrom)) {
+      console.log(`[Coupon:PaymentRecheck] REJECT — not valid yet (validFrom=${liveCoupon.validFrom})`);
       throw new ValidationError(
         "This coupon is not valid yet. Please remove it from your cart and try again."
       );
     }
     if (liveCoupon.validUntil && now > new Date(liveCoupon.validUntil)) {
+      console.log(`[Coupon:PaymentRecheck] REJECT — expired (validUntil=${liveCoupon.validUntil})`);
       throw new ValidationError(
         "This coupon has expired. Please remove it from your cart and try again."
       );
@@ -519,6 +565,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     // Re-check minimum cart value against re-derived product subtotal
     // (user may have removed items from cart after applying the coupon)
     if (subtotal < (liveCoupon.minCartValue || 0)) {
+      console.log(`[Coupon:PaymentRecheck] REJECT — subtotal ₹${subtotal} < minCartValue ₹${liveCoupon.minCartValue}`);
       throw new ValidationError(
         `A minimum cart value of ₹${liveCoupon.minCartValue} is required for this coupon. Please remove it from your cart and try again.`
       );
@@ -526,6 +573,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
 
     // Re-check global cap (non-atomic snapshot, main enforcement is atomic $inc in webhook)
     if (liveCoupon.maxTotalUses != null && liveCoupon.usageCount >= liveCoupon.maxTotalUses) {
+      console.log(`[Coupon:PaymentRecheck] REJECT — global cap reached (${liveCoupon.usageCount}/${liveCoupon.maxTotalUses})`);
       throw new ValidationError(
         "This coupon has reached its maximum usage limit. Please remove it from your cart and try again."
       );
@@ -562,7 +610,9 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
             ...(normMobileCheck ? [{ mobile: normMobileCheck }] : []),
           ],
         });
+        console.log(`[Coupon:PaymentRecheck] Per-user check: identifiers=${identifiers.join("/")} priorUses=${priorUses} limit=${liveCoupon.maxUsesPerUser}`);
         if (priorUses >= liveCoupon.maxUsesPerUser) {
+          console.log(`[Coupon:PaymentRecheck] REJECT — per-user limit reached`);
           throw new ValidationError(
             liveCoupon.maxUsesPerUser === 1
               ? "You have already used this coupon. Please remove it from your cart."
@@ -571,6 +621,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
         }
       }
     }
+    console.log(`[Coupon:PaymentRecheck] ✅ PASSED — couponCodeId=${couponCodeId} discountAmount=₹${discountAmount} isInternalTestOrder=${isInternalTestOrder}`);
   }
 
   finalAmount = isInternalTestOrder ? 1 : Math.max(subtotal + giftWrapAmount + chargedShippingAmount - discountAmount, 0);

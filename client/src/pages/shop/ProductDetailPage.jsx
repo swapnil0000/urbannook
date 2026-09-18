@@ -15,6 +15,7 @@ import SEOHead from "../../component/SEOHead";
 import ComparisonTable from "../../component/ComparisonTable";
 import SetupShowcase from "../../component/SetupShowcase";
 import RecommendedProducts from "../../component/RecommendedProducts";
+import OtherVariants from "../../component/OtherVariants";
 import NotifyMeModal from "../../component/NotifyMeModal";
 import ComboBundleSection from "../../component/ComboBundleSection";
 
@@ -1146,9 +1147,9 @@ const ProductDetailPage = () => {
             )}
 
             {/* NAYA: Variant Selection Block - Ab yahan aayega (Badi image ke neeche aur thumbnails se pehle) */}
-            {availableVariants && availableVariants.length > 0 && (
+            {/* {availableVariants && availableVariants.length > 0 && (
               <div className="w-full max-w-[500px] mt-8 bg-white/5 p-5 rounded-2xl border border-[#F5DEB3]/10">
-                {/* <div className="flex justify-between items-baseline mb-3">
+                <div className="flex justify-between items-baseline mb-3">
                   <span className="text-[10px] uppercase tracking-[0.2em] text-[#F5DEB3]/70 font-bold">
                     Choose Variant
                   </span>
@@ -1158,7 +1159,7 @@ const ProductDetailPage = () => {
                       {selectedVariant}
                     </strong>
                   </span>
-                </div> */}
+                </div>
 
                 <div className="relative">
                   {!variantScrollAtStart && (
@@ -1258,7 +1259,7 @@ const ProductDetailPage = () => {
                   </div>
                 </div>
               </div>
-            )}
+            )} */}
 
             {/* Gallery Thumbnails with Carousel Indicator — COMMENTED OUT
                 (kept for reference, not deleted). The main image now uses the
@@ -1349,7 +1350,7 @@ const ProductDetailPage = () => {
               </div>
 
               <h1 className={`text-4xl lg:text-6xl font-serif text-[#F5DEB3] leading-tight ${selectedVariantSubTag ? "mb-1" : "mb-4"}`}>
-                {product.productName}
+                {selectedVariant || product.productName}
               </h1>
               {selectedVariantSubTag && (
                 <p className="text-base lg:text-xl font-serif font-normal text-[#F5DEB3]/70 leading-snug mb-4">
@@ -2353,6 +2354,14 @@ const ProductDetailPage = () => {
             </div>
           )}
         </div>
+
+        {/* ===== OTHER VARIANTS OF THIS PRODUCT (after reviews, before cross-sell) ===== */}
+        <OtherVariants
+          productId={product.productId}
+          productName={product.productName}
+          variants={product.variantDetails || []}
+          currentVariantName={selectedVariant}
+        />
 
         {/* ===== RECOMMENDED PRODUCTS (admin-curated; inlined in product call) ===== */}
         <RecommendedProducts products={product.recommendedProductsDetails} />
