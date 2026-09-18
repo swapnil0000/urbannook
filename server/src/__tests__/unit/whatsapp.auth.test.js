@@ -65,8 +65,23 @@ const metaTextPayload = (from, text) => ({
   ],
 });
 
+/* The rate limiter keys on req.ip and the app trusts one proxy hop, so a
+   unique X-Forwarded-For per call keeps tests from sharing a bucket and
+   tripping the limiter as the suite grows. */
+let ipCounter = 0;
+const nextIp = () => {
+  ipCounter += 1;
+  return `10.0.${Math.floor(ipCounter / 250)}.${(ipCounter % 250) + 1}`;
+};
+
+/** POST /auth/whatsapp/start from a fresh IP */
+const startRequest = () =>
+  request(app)
+    .post("/api/v1/auth/whatsapp/start")
+    .set("X-Forwarded-For", nextIp());
+
 const startLogin = async () => {
-  const res = await request(app).post("/api/v1/auth/whatsapp/start").expect(200);
+  const res = await startRequest().expect(200);
   return res.body.data.token;
 };
 
@@ -145,20 +160,17 @@ describe("cache headers", () => {
   });
 
   it("marks the start response as never-cacheable", async () => {
-    const res = await request(app).post("/api/v1/auth/whatsapp/start").expect(200);
+    const res = await startRequest().expect(200);
     expect(res.headers["cache-control"]).toContain("no-store");
   });
 });
 
 describe("token reuse", () => {
   it("returns the same code while one is still pending", async () => {
-    const first = await request(app).post("/api/v1/auth/whatsapp/start").expect(200);
+    const first = await startRequest().expect(200);
     const token = first.body.data.token;
 
-    const second = await request(app)
-      .post("/api/v1/auth/whatsapp/start")
-      .send({ token })
-      .expect(200);
+    const second = await startRequest().send({ token }).expect(200);
 
     // Same code, so the prefilled message already in WhatsApp stays valid
     expect(second.body.data.token).toBe(token);
@@ -166,21 +178,18 @@ describe("token reuse", () => {
   });
 
   it("mints a fresh code once the old one is gone", async () => {
-    const first = await request(app).post("/api/v1/auth/whatsapp/start").expect(200);
+    const first = await startRequest().expect(200);
     const token = first.body.data.token;
 
     await WhatsAppLoginToken.deleteOne({ token });
 
-    const second = await request(app)
-      .post("/api/v1/auth/whatsapp/start")
-      .send({ token })
-      .expect(200);
+    const second = await startRequest().send({ token }).expect(200);
 
     expect(second.body.data.token).not.toBe(token);
   });
 
   it("never hands back a code that is already verified", async () => {
-    const first = await request(app).post("/api/v1/auth/whatsapp/start").expect(200);
+    const first = await startRequest().expect(200);
     const token = first.body.data.token;
 
     await request(app)
@@ -188,10 +197,7 @@ describe("token reuse", () => {
       .query({ secret: WEBHOOK_SECRET })
       .send(metaTextPayload("919876543210", token));
 
-    const second = await request(app)
-      .post("/api/v1/auth/whatsapp/start")
-      .send({ token })
-      .expect(200);
+    const second = await startRequest().send({ token }).expect(200);
 
     expect(second.body.data.token).not.toBe(token);
   });
@@ -223,11 +229,29 @@ describe("describePayloadShape", () => {
 
 describe("wa.me deep link", () => {
   it("prefills a readable sentence, not just the bare code", async () => {
-    const res = await request(app).post("/api/v1/auth/whatsapp/start").expect(200);
+    const res = await startRequest().expect(200);
     const { token, waLink } = res.body.data;
 
     expect(waLink).toContain("https://wa.me/919999900000?text=");
     const sent = decodeURIComponent(waLink.split("?text=")[1]);
+    expect(sent).toBe(`Log me in to UrbanNook. Code: ${token}`);
+  });
+
+  it("returns an app-scheme link for in-app browsers", async () => {
+    const res = await startRequest().expect(200);
+    const { token, waAppLink } = res.body.data;
+
+    expect(waAppLink).toContain("whatsapp://send?phone=919999900000");
+    const sent = decodeURIComponent(waAppLink.split("&text=")[1]);
+    expect(sent).toBe(`Log me in to UrbanNook. Code: ${token}`);
+  });
+
+  it("also returns a desktop link that skips the WhatsApp interstitial", async () => {
+    const res = await startRequest().expect(200);
+    const { token, waWebLink } = res.body.data;
+
+    expect(waWebLink).toContain("https://web.whatsapp.com/send?phone=919999900000");
+    const sent = decodeURIComponent(waWebLink.split("&text=")[1]);
     expect(sent).toBe(`Log me in to UrbanNook. Code: ${token}`);
   });
 

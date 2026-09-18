@@ -215,14 +215,25 @@ const buildLoginResponse = (token, businessNumber, expiresInSeconds) => {
   // many people edit or delete it. The parser finds the code anywhere in the
   // text, so the surrounding sentence costs nothing.
   const prefilledText = `Log me in to UrbanNook. Code: ${token}`;
+  const encodedText = encodeURIComponent(prefilledText);
 
   return {
     statusCode: 200,
     message: "WhatsApp login token generated",
     data: {
       token,
-      // The user only has to press send — the text is prefilled
-      waLink: `https://wa.me/${waNumber}?text=${encodeURIComponent(prefilledText)}`,
+      // Universal link. On mobile the OS hands this straight to the app; on
+      // desktop it lands on the api.whatsapp.com interstitial that asks
+      // "open app or use web", so the client prefers waWebLink there.
+      waLink: `https://wa.me/${waNumber}?text=${encodedText}`,
+      // Desktop shortcut — opens the chat in WhatsApp Web directly and skips
+      // the interstitial entirely.
+      waWebLink: `https://web.whatsapp.com/send?phone=${waNumber}&text=${encodedText}`,
+      // App scheme. In-app browsers (Instagram, Facebook) do not honour app
+      // links, so waLink lands them on the interstitial and navigates our
+      // page away. This scheme hands off to the app without replacing the
+      // page, which also keeps the status polling alive.
+      waAppLink: `whatsapp://send?phone=${waNumber}&text=${encodedText}`,
       expiresInSeconds,
     },
     success: true,
