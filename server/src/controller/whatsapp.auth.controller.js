@@ -10,10 +10,13 @@ import {
 
 /**
  * POST /api/v1/auth/whatsapp/start
- * Login token + wa.me deep link deta hai.
+ * Returns a login code and its wa.me deep link.
  */
 const whatsappLoginStart = asyncHandler(async (req, res) => {
-  const result = await startWhatsAppLogin(req.ip);
+  // The client sends the code it already holds — if that code is still live
+  // it comes back unchanged, so the prefilled message already sitting in
+  // WhatsApp stays valid.
+  const result = await startWhatsAppLogin(req.ip, req.body?.token);
   return res
     .status(result.statusCode)
     .json(new ApiRes(result.statusCode, result.message, result.data, true));
@@ -21,8 +24,8 @@ const whatsappLoginStart = asyncHandler(async (req, res) => {
 
 /**
  * GET /api/v1/auth/whatsapp/status?token=UN-XXXXXXXXXX
- * Frontend isi ko poll karta hai. VERIFIED pe cookies set hoti hain —
- * wahi httpOnly cookies jo baaki login flows set karte hain.
+ * Polled by the frontend. On VERIFIED it sets the same httpOnly cookies as
+ * every other login flow.
  */
 const whatsappLoginStatus = asyncHandler(async (req, res) => {
   const result = await checkWhatsAppLoginStatus(req.query?.token);
@@ -52,13 +55,12 @@ const whatsappLoginStatus = asyncHandler(async (req, res) => {
 /**
  * POST /api/v1/webhooks/gupshup-inbound
  *
- * Gupshup non-200 pe retry karta hai aur baar-baar fail hone pe webhook
- * disable kar deta hai — isliye har path pe 200 hi jaata hai, error bhi
- * andar hi swallow hota hai.
+ * Gupshup retries on any non-200 and disables the webhook after repeated
+ * failures, so every path here answers 200 and errors are swallowed.
  */
 const gupshupInboundWebhook = asyncHandler(async (req, res) => {
   if (!verifyWebhookSecret(req)) {
-    // Galat/missing secret: acknowledge karo par kuch process mat karo
+    // Wrong or missing secret: acknowledge, but process nothing
     console.warn("[WHATSAPP AUTH] Webhook secret mismatch — payload ignored");
     return res.status(200).send("EVENT_RECEIVED");
   }
@@ -74,7 +76,8 @@ const gupshupInboundWebhook = asyncHandler(async (req, res) => {
 
 /**
  * GET /api/v1/webhooks/gupshup-inbound
- * Sirf reachability check — Gupshup URL save karte waqt aur manual test me.
+ * Reachability check only — used when saving the URL in Gupshup and for
+ * manual testing.
  */
 const gupshupWebhookHealth = (_req, res) => res.status(200).send("OK");
 
