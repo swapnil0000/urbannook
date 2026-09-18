@@ -1,94 +1,10 @@
-import { useState, useSyncExternalStore } from 'react';
-import { useWhatsappLoginStartMutation } from '../../../store/api/authApi';
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useWhatsAppLogin, openWhatsApp } from '../../../hooks/useWhatsAppLogin';
 import {
   subscribeWhatsAppLogin,
   getWhatsAppLoginSession,
-  startWhatsAppLoginSession,
   clearWhatsAppLoginSession,
 } from '../../../utils/whatsappLoginSession';
-
-const TOKEN_TTL_MS = 5 * 60 * 1000;
-
-/* How long to wait for the app to take over before falling back to a URL.
-   Generous on purpose: iOS sometimes shows an "Open in WhatsApp?" prompt
-   first, and the page stays visible while that sits there — a short timeout
-   would navigate away underneath it. When the handoff succeeds the timer is
-   cancelled anyway, so the wait only ever costs the not-installed case. */
-const APP_HANDOFF_TIMEOUT_MS = 2500;
-
-const isMobileDevice = () =>
-  /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent || '');
-
-/**
- * Opens WhatsApp with as few steps as possible.
- *
- * Mobile tries the whatsapp:// scheme first. The universal wa.me link is not
- * good enough here: in-app browsers (Instagram, Facebook) ignore app links,
- * so wa.me lands on the api.whatsapp.com interstitial AND navigates our page
- * away — the user comes back to WhatsApp's page instead of ours, and the
- * status polling dies with the page. The scheme hands off without replacing
- * the page. If nothing takes over (WhatsApp not installed) we fall back to
- * wa.me, which at least offers the download.
- *
- * Desktop goes straight to web.whatsapp.com/send, which skips the same
- * interstitial and lands in the chat.
- */
-const openWhatsApp = ({ waLink, waWebLink, waAppLink }) => {
-  if (!isMobileDevice()) {
-    const target = waWebLink || waLink;
-    const opened = window.open(target, '_blank');
-
-    if (opened) {
-      try {
-        // Cannot pass the 'noopener' feature: with it window.open() always
-        // returns null even when the tab opens, sending us down the fallback
-        // and navigating the current page away.
-        opened.opener = null;
-      } catch {
-        /* already cross-origin — nothing to do */
-      }
-      return;
-    }
-
-    window.location.href = target;
-    return;
-  }
-
-  if (!waAppLink) {
-    window.location.href = waLink;
-    return;
-  }
-
-  let settled = false;
-  let timer = null;
-
-  const cleanup = () => {
-    if (timer) clearTimeout(timer);
-    document.removeEventListener('visibilitychange', onLeave);
-    window.removeEventListener('pagehide', onLeave);
-    window.removeEventListener('blur', onLeave);
-  };
-
-  // The app taking over hides or blurs this page — that means the handoff
-  // worked, so the fallback must not fire
-  function onLeave() {
-    settled = true;
-    cleanup();
-  }
-
-  document.addEventListener('visibilitychange', onLeave);
-  window.addEventListener('pagehide', onLeave);
-  window.addEventListener('blur', onLeave);
-
-  timer = setTimeout(() => {
-    cleanup();
-    if (!settled && document.visibilityState === 'visible') {
-      window.location.href = waLink;
-    }
-  }, APP_HANDOFF_TIMEOUT_MS);
-
-  window.location.href = waAppLink;
-};
 
 /**
  * Starts a WhatsApp login.
@@ -98,51 +14,41 @@ const openWhatsApp = ({ waLink, waWebLink, waAppLink }) => {
  * completes no matter how the user comes back — modal closed, page reloaded
  * or a new tab.
  */
+/* After this long with no message, tell the customer something is off —
+   without giving up. Gupshup has taken up to ~50s to deliver a webhook, so
+   failing outright here would call a working login a failure. */
+const SLOW_NUDGE_AFTER_MS = 45_000;
+
 export default function WhatsAppLoginButton({ onError }) {
-  const [startWhatsappLogin, { isLoading }] = useWhatsappLoginStartMutation();
-  const [errorMessage, setErrorMessage] = useState('');
+  const { startLogin, isStarting, errorMessage } = useWhatsAppLogin();
 
   const session = useSyncExternalStore(
     subscribeWhatsAppLogin,
     getWhatsAppLoginSession,
   );
 
+  /* Tracked per code rather than as a plain boolean, so starting a fresh
+     login clears the nudge on its own instead of needing an effect to reset
+     it — resetting state inside an effect just costs an extra render. */
+  const [slowForToken, setSlowForToken] = useState(null);
+
+  useEffect(() => {
+    if (!session?.startedAt) return undefined;
+
+    const remaining = session.startedAt + SLOW_NUDGE_AFTER_MS - Date.now();
+    const timer = setTimeout(
+      () => setSlowForToken(session.token),
+      Math.max(remaining, 0),
+    );
+    return () => clearTimeout(timer);
+  }, [session?.startedAt, session?.token]);
+
+  const isSlow = Boolean(session) && slowForToken === session.token;
+
   const handleClick = async () => {
-    setErrorMessage('');
-
     try {
-      const result = await startWhatsappLogin(session?.token).unwrap();
-      const { token, waLink, waWebLink, waAppLink, expiresInSeconds } =
-        result?.data || {};
-
-      if (!token || !waLink) throw new Error('Invalid response from server');
-
-      // Named nextSession, not session: a `const session` here would shadow
-      // the store value read above and put it in the temporal dead zone,
-      // making startWhatsappLogin(session?.token) throw a ReferenceError.
-      const nextSession = {
-        token,
-        waLink,
-        waWebLink,
-        waAppLink,
-        expiresAt:
-          Date.now() + (expiresInSeconds ? expiresInSeconds * 1000 : TOKEN_TTL_MS),
-      };
-
-      startWhatsAppLoginSession(nextSession);
-      openWhatsApp(nextSession);
+      await startLogin(session?.token);
     } catch (error) {
-      console.error('[WhatsApp Login] Start failed:', error);
-
-      // A plain "try again" hides the one case where trying again will not
-      // help, so rate limiting gets its own message
-      const message =
-        error?.status === 429
-          ? 'Too many attempts. Please wait a few minutes and try again.'
-          : error?.data?.message ||
-            'Could not start WhatsApp login. Please try again.';
-
-      setErrorMessage(message);
       if (onError) onError(error);
     }
   };
@@ -160,6 +66,12 @@ export default function WhatsAppLoginButton({ onError }) {
           then come back to this page.
         </p>
 
+        {isSlow && (
+          <p className="mt-3 text-xs font-semibold text-amber-600">
+            Taking longer than usual. Did you press Send in WhatsApp?
+          </p>
+        )}
+
         {/* Shown so the user can paste it manually if the deep link did not prefill */}
         <p className="mt-2 text-xs text-gray-500">
           Code:{' '}
@@ -167,6 +79,10 @@ export default function WhatsAppLoginButton({ onError }) {
             {session.token}
           </span>
         </p>
+
+        {errorMessage && (
+          <p className="mt-3 text-xs font-semibold text-red-500">{errorMessage}</p>
+        )}
 
         <div className="mt-4 flex items-center justify-center gap-4 text-xs">
           <button
@@ -193,10 +109,10 @@ export default function WhatsAppLoginButton({ onError }) {
       <button
         type="button"
         onClick={handleClick}
-        disabled={isLoading}
+        disabled={isStarting}
         className="w-full flex items-center justify-center gap-3 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 transition-all hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {isLoading ? (
+        {isStarting ? (
           <span className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
         ) : (
           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#25D366" aria-hidden="true">

@@ -47,11 +47,13 @@ const GoogleAddressFormModal = lazy(() => import("../component/GoogleAddressForm
 // fee varies per order — keep it in step with what they actually charge.
 const COD_HANDLING_FEE = "30–40";
 
+// Guests used to pick "guest or sign in" on a step of its own. That screen
+// only ever cost a tap — the same choice now sits on the Contact step, where
+// they are already typing their details.
 const GUEST_STEPS = [
-  { number: 1, label: "Account" },
-  { number: 2, label: "Contact" },
-  { number: 3, label: "Address" },
-  { number: 4, label: "Review & Pay" },
+  { number: 1, label: "Contact" },
+  { number: 2, label: "Address" },
+  { number: 3, label: "Review & Pay" },
 ];
 
 const AUTH_STEPS = [
@@ -59,6 +61,10 @@ const AUTH_STEPS = [
   { number: 2, label: "Address" },
   { number: 3, label: "Review & Pay" },
 ];
+
+/* Bumped when the step layout changes — a state saved against the old
+   four-step guest flow would drop the customer on the wrong screen. */
+const CHECKOUT_STATE_KEY = "checkoutState_v2";
 
 const Field = ({ label, required, error, children }) => (
   <div className="space-y-1.5">
@@ -410,7 +416,7 @@ const CheckoutPage = () => {
   // Restore checkout state from sessionStorage on mount
   const savedCheckout = useRef((() => {
     try {
-      const saved = JSON.parse(sessionStorage.getItem("checkoutState")) || {};
+      const saved = JSON.parse(sessionStorage.getItem(CHECKOUT_STATE_KEY)) || {};
       // Migration: robustly handle pincode key variations
       const rawPin = saved.pinCode || saved.pincode || saved.userPinCode || "";
       saved.pinCode = String(rawPin).trim();
@@ -623,7 +629,7 @@ const CheckoutPage = () => {
   useEffect(() => {
     if (paymentCompletedRef.current) return;
     try {
-      sessionStorage.setItem("checkoutState", JSON.stringify({
+      sessionStorage.setItem(CHECKOUT_STATE_KEY, JSON.stringify({
         currentStep,
         address,
         pinCode,
@@ -1340,7 +1346,7 @@ const CheckoutPage = () => {
             });
             dispatch(clearCart());
             localStorage.removeItem("guestCart"); localStorage.removeItem("guestId");
-            sessionStorage.removeItem("checkoutState");
+            sessionStorage.removeItem(CHECKOUT_STATE_KEY);
             sessionStorage.removeItem("un_begin_checkout_fired"); // allow begin_checkout again for the next order
             navigate(`/payment-processing/${response.razorpay_order_id}`);
           },
@@ -1417,7 +1423,7 @@ const CheckoutPage = () => {
               email: userProfile?.email, phone: senderMobileStr, name: userProfile?.userName || userProfile?.name, externalId: userProfile?.userId || userProfile?._id || getAnonymousId(),
               items: cartItems.map((i) => ({ itemId: i.mongoId || i.id, itemName: i.name, itemVariant: i.selectedVariant || "N/A", price: i.price, quantity: i.quantity })),
             });
-            sessionStorage.removeItem("checkoutState");
+            sessionStorage.removeItem(CHECKOUT_STATE_KEY);
             sessionStorage.removeItem("un_begin_checkout_fired"); // allow begin_checkout again for the next order
             navigate(`/payment-processing/${response.razorpay_order_id}`);
           } catch (_) { setPaymentError("Payment verification failed. Contact support if amount was debited."); }
@@ -1655,81 +1661,38 @@ const CheckoutPage = () => {
       >
         {/* ── Left: form ───────────────────────────────────────────────── */}
         <div className="min-w-0">
-          {/* ══════════ STEP — ACCOUNT (Guest only) ═══════════════════ */}
-          {isGuest && currentStep === 1 && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <div className="text-center">
-                <h1 className="text-2xl sm:text-3xl font-serif text-gray-900 leading-tight">
-                  How would you like to continue?
-                </h1>
-                {/* <p className="text-sm text-gray-400 mt-2">Sign in for a faster checkout or continue as a guest</p> */}
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-stretch gap-0">
-                {/* Guest option */}
+          {/* ══════════ STEP — CONTACT ════════════════════════════════ */}
+          {currentStep === contactStep && (
+            <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
+              {/* Sign-in nudge for guests. This used to be a screen of its own
+                  before the contact form; as a strip it offers the same choice
+                  without spending a whole step on it. */}
+              {isGuest && (
                 <button
-                  onClick={() => goToStep(contactStep)}
-                  className="group flex-1 bg-white rounded-2xl border-2 border-gray-100 hover:border-[#a89068]/40 p-6 sm:p-8 text-left transition-all hover:shadow-lg"
-                >
-                  <div className="w-12 h-12 rounded-2xl bg-[#a89068]/8 flex items-center justify-center mb-4 group-hover:bg-[#a89068]/15 transition-colors">
-                    <i className="fa-solid fa-bolt text-[#a89068] text-lg" />
-                  </div>
-                  <h3 className="text-base font-bold text-gray-900 mb-1">
-                    Continue as Guest
-                  </h3>
-                  <p className="text-xs text-gray-400 leading-relaxed">
-                    We'll send your login details to your email.
-                  </p>
-                  <div className="mt-4 flex items-center gap-1.5 text-xs font-bold text-[#a89068] uppercase tracking-wider">
-                    No account needed{" "}
-                    <i className="fa-solid fa-arrow-right text-[9px]" />
-                  </div>
-                </button>
-
-                {/* OR divider — horizontal on mobile, vertical on desktop */}
-                <div className="flex sm:flex-col items-center justify-center px-4 py-3 sm:py-6 shrink-0">
-                  <div className="flex-1 h-px sm:h-full sm:w-px bg-gray-200" />
-                  <span className="px-3 sm:px-0 sm:py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest shrink-0">
-                    or
-                  </span>
-                  <div className="flex-1 h-px sm:h-full sm:w-px bg-gray-200" />
-                </div>
-
-                {/* Sign In option */}
-                <button
+                  type="button"
                   onClick={() => {
                     dispatch(setLoginCallback("navigate:/checkout"));
                     dispatch(setShowLoginModal(true));
                   }}
-                  className="group flex-1 bg-white rounded-2xl border-2 border-[#2e443c]/15 hover:border-[#2e443c]/40 p-6 sm:p-8 text-left transition-all hover:shadow-lg"
+                  className="w-full flex items-center justify-between gap-3 bg-[#2e443c]/5 hover:bg-[#2e443c]/10 border border-[#2e443c]/10 rounded-2xl px-5 py-3.5 transition-colors text-left"
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-[#2e443c]/8 flex items-center justify-center mb-4 group-hover:bg-[#2e443c]/15 transition-colors">
-                    <i className="fa-solid fa-user text-[#2e443c] text-lg" />
-                  </div>
-                  <h3 className="text-base font-bold text-gray-900 mb-1">
-                    Sign In / Sign Up
-                  </h3>
-                  <p className="text-xs text-gray-400 leading-relaxed">
-                    Track orders, save addresses, and get exclusive offers
-                  </p>
+                  <span className="flex items-center gap-3 min-w-0">
+                    <i className="fa-solid fa-user text-[#2e443c] text-sm shrink-0" />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-bold text-gray-800">
+                        Have an account?
+                      </span>
+                      <span className="block text-xs text-gray-400">
+                        Sign in to skip typing your details
+                      </span>
+                    </span>
+                  </span>
+                  <span className="text-xs font-black uppercase tracking-wider text-[#2e443c] shrink-0">
+                    Sign in
+                  </span>
                 </button>
-              </div>
+              )}
 
-              <div className="flex items-center justify-center gap-5 text-gray-300 pt-2">
-                <i className="fa-brands fa-cc-visa text-xl" />
-                <i className="fa-brands fa-cc-mastercard text-xl" />
-                <i className="fa-brands fa-google-pay text-xl" />
-                <i className="fa-solid fa-shield-halved text-base" />
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-300">
-                  100% Secure
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* ══════════ STEP — CONTACT ════════════════════════════════ */}
-          {currentStep === contactStep && (
-            <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
               {/* Contact form card */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-50">

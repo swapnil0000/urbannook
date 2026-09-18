@@ -3,6 +3,8 @@ import { v7 as uuid7 } from "uuid";
 import WhatsAppLoginToken from "../model/whatsappLoginToken.model.js";
 import User from "../model/user.model.js";
 import env from "../config/envConfigSetup.js";
+import { buildPlaceholderEmail } from "../utils/placeholderEmail.js";
+import { sendWhatsAppSessionMessage } from "./whatsapp.send.service.js";
 import {
   ValidationError,
   AuthenticationError,
@@ -207,14 +209,24 @@ const describePayloadShape = (body) => {
   return parts.join(" ");
 };
 
+/**
+ * The message the customer sends us. Written in their voice, because they
+ * are the one sending it.
+ *
+ * A bare code reads like spam — people are trained to distrust a random
+ * string, and many edit or delete it before sending. Saying what the message
+ * is for makes it feel like something a person would actually send. The
+ * parser finds the code anywhere in the text, so the wording is free to
+ * change without touching anything else.
+ */
+const buildPrefilledText = (token) =>
+  `Hi UrbanNook 👋 Please sign me in — this message verifies my WhatsApp number. Code: ${token}`;
+
 /** Wraps a code into the response shape, along with its wa.me deep link. */
 const buildLoginResponse = (token, businessNumber, expiresInSeconds) => {
   const waNumber = String(businessNumber).replace(/\D/g, "");
 
-  // A bare code gives the customer no idea what they are about to send, and
-  // many people edit or delete it. The parser finds the code anywhere in the
-  // text, so the surrounding sentence costs nothing.
-  const prefilledText = `Log me in to UrbanNook. Code: ${token}`;
+  const prefilledText = buildPrefilledText(token);
   const encodedText = encodeURIComponent(prefilledText);
 
   return {
@@ -337,7 +349,7 @@ const handleInboundMessage = async (body) => {
     return { handled: false, reason: "TOKEN_NOT_FOUND" };
   }
 
-  const user = await findOrCreateWhatsAppUser(mobileNumber);
+  const { user, isNewUser } = await findOrCreateWhatsAppUser(mobileNumber);
 
   loginToken.status = "VERIFIED";
   loginToken.mobileNumber = mobileNumber;
@@ -351,7 +363,21 @@ const handleInboundMessage = async (body) => {
     `[WHATSAPP AUTH] Verified ${token} from ${maskMobile(mobileNumber)} -> userId ${user.userId}`,
   );
 
-  return { handled: true };
+  // WhatsApp cannot hand the user back to us on its own, so the customer is
+  // left sitting in the chat wondering what happens next. A reply with a link
+  // closes the loop in one tap. The customer just messaged us, so this is a
+  // free-form session message and needs no approved template.
+  //
+  // Not awaited: the webhook has to answer fast, and a failed courtesy
+  // message must never hold up a verified login.
+  const siteUrl = env.CLIENT_BASE_URL || "https://www.urbannook.in";
+  const reply = isNewUser
+    ? `Welcome to UrbanNook 🌿\n\nYou're signed in. From now on your order updates will reach you right here.\n\nStart exploring: ${siteUrl}`
+    : `You're signed in to UrbanNook ✅\n\nTap to continue: ${siteUrl}`;
+
+  sendWhatsAppSessionMessage(mobileNumber, reply).catch(() => {});
+
+  return { handled: true, isNewUser };
 };
 
 /**
@@ -361,6 +387,12 @@ const handleInboundMessage = async (body) => {
  * and email. So a placeholder email is generated on @wa.urbannook.in (a
  * non-routable internal domain), and userId uses the same uuid7() as Google
  * login so the auth guard's User.findOne({ userId }) keeps working.
+ *
+ * Reports whether the account was just created. A first-time customer is
+ * worth a warmer welcome than someone logging back in, and only the former
+ * should ever be worth paying for a marketing message.
+ *
+ * @returns {Promise<{user: object, isNewUser: boolean}>}
  */
 const findOrCreateWhatsAppUser = async (mobileNumber) => {
   let user = await User.findOne({ mobileNumber });
@@ -372,20 +404,20 @@ const findOrCreateWhatsAppUser = async (mobileNumber) => {
       user.isVerified = true;
       await user.save();
     }
-    return user;
+    return { user, isNewUser: false };
   }
 
   user = await User.create({
     userId: uuid7(),
     name: `User ${String(mobileNumber).slice(-4)}`,
-    email: `${mobileNumber}@wa.urbannook.in`,
+    email: buildPlaceholderEmail(mobileNumber),
     password: null,
     mobileNumber,
     isVerified: true,
     role: "USER",
   });
 
-  return user;
+  return { user, isNewUser: true };
 };
 
 /**
