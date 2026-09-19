@@ -190,23 +190,45 @@ export const lineItemsTotalPaise = (lineItems = []) =>
  * @param {number} shippingRupees  shipping charge in RUPEES (0 when free shipping applies)
  * @param {boolean} serviceable
  */
-export const toRazorpayServiceableAddress = (addr, shippingRupees, serviceable = true) => {
+export const toRazorpayServiceableAddress = (
+  addr,
+  shippingRupees,
+  serviceable = true,
+  { estimatedDays } = {},
+) => {
   const shippingFeePaise = Math.round(Math.max(Number(shippingRupees) || 0, 0) * 100);
+  const isServiceable = !!serviceable;
 
+  /* The shipping METHOD id is not the address id — they are separate things.
+     Echoing the address id here breaks a brand-new address, where Razorpay
+     sends id 0: the method comes back as id "0" with an empty name, Razorpay
+     cannot resolve it, and saving the address fails with a 404. A saved address
+     carries a real id, which is why only new addresses broke. We offer exactly
+     one method, so it gets one constant id, and a name Razorpay can display. */
   const method = {
-    id: addr?.id ?? "standard",
-    serviceable: !!serviceable,
-    shipping_fee: serviceable ? shippingFeePaise : 0,
+    id: "standard",
+    name: "Standard Delivery",
+    // Real courier ETA when the rate call gave us one; the generic line is only
+    // for the flat-rate fallback, where we genuinely do not know.
+    description: estimatedDays ? `Delivery in ${estimatedDays}` : "3-5 business days",
+    serviceable: isServiceable,
+    shipping_fee: isServiceable ? shippingFeePaise : 0,
     cod: false, // Magic is prepaid-only here — never let Razorpay take COD
     cod_fee: 0,
   };
 
+  // Flat fields are the older serviceability shape, `shipping_methods` the
+  // newer one; both are emitted so whichever Razorpay reads, it finds. The flat
+  // `id` stays the ADDRESS id it sent us, so the echo still lines up.
   return {
     id: addr?.id ?? "standard",
     zipcode: addr?.zipcode,
     ...(addr?.state ? { state: addr.state } : {}),
     ...(addr?.country ? { country: addr.country } : {}),
-    ...method,
+    serviceable: isServiceable,
+    shipping_fee: isServiceable ? shippingFeePaise : 0,
+    cod: false,
+    cod_fee: 0,
     shipping_methods: [method],
   };
 };
