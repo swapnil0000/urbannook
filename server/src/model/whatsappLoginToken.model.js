@@ -45,6 +45,12 @@ const whatsappLoginTokenSchema = mongoose.Schema(
       type: String,
       default: null,
     },
+    // First time a session was handed out for this code. The code stays
+    // usable until it expires, so this is for visibility, not enforcement.
+    consumedAt: {
+      type: Date,
+      default: null,
+    },
     expiresAt: {
       type: Date,
       required: [true, "Expiration time is required"],

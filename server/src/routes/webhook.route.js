@@ -1,5 +1,7 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
+import whatsappInboxController from "../controller/whatsapp.inbox.controller.js";
+import { authGuardService } from "../services/common.auth.service.js";
 import {
   whatsappLoginStart,
   whatsappLoginStatus,
@@ -65,5 +67,23 @@ const noStore = (_req, res, next) => {
 
 router.post("/auth/whatsapp/start", whatsappStartLimiter, noStore, whatsappLoginStart);
 router.get("/auth/whatsapp/status", whatsappStatusLimiter, noStore, whatsappLoginStatus);
+
+/* ===============================================================
+   ADMIN INBOX
+   ---------------------------------------------------------------
+   An API number cannot be opened in the WhatsApp app, so these
+   endpoints are the only way to read what customers send us.
+================================================================ */
+
+router.get(
+  "/admin/whatsapp/messages",
+  authGuardService("Admin"),
+  whatsappInboxController.listMessages,
+);
+router.patch(
+  "/admin/whatsapp/messages/:id/handled",
+  authGuardService("Admin"),
+  whatsappInboxController.markHandled,
+);
 
 export default router;

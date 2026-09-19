@@ -32,7 +32,52 @@ const readFromStorage = () => {
   }
 };
 
+/* 5 minutes, same as the server's code lifetime */
+const RESUME_TTL_MS = 5 * 60 * 1000;
+
+/**
+ * Picks up a code handed over in the URL, e.g. /?wa=UN-XXXXXXXXXX
+ *
+ * The WhatsApp reply carries this link because the customer does not reliably
+ * come back to the browser they started in — Instagram's in-app browser sends
+ * them to Chrome or Safari, where there is no session. The link seeds one, and
+ * the watcher finishes the login exactly as it would have in the original tab.
+ *
+ * The code is stripped from the address bar straight away so it does not sit
+ * in history or leak through a referrer.
+ */
+const readFromUrl = () => {
+  try {
+    const url = new URL(window.location.href);
+    const code = url.searchParams.get("wa");
+    if (!code) return null;
+
+    url.searchParams.delete("wa");
+    window.history.replaceState({}, "", url.toString());
+
+    return {
+      token: code.trim().toUpperCase(),
+      startedAt: Date.now(),
+      expiresAt: Date.now() + RESUME_TTL_MS,
+    };
+  } catch {
+    return null;
+  }
+};
+
 let current = readFromStorage();
+
+/* A code in the URL wins: the customer just arrived from WhatsApp, so it is
+   newer than anything left in this tab. */
+const fromUrl = readFromUrl();
+if (fromUrl) {
+  current = fromUrl;
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(fromUrl));
+  } catch {
+    /* works within this tab regardless */
+  }
+}
 
 const emit = () => {
   listeners.forEach((fn) => fn());

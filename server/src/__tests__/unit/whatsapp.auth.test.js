@@ -17,6 +17,7 @@ let WhatsAppLoginToken;
 let normalizeIndianMobile;
 let extractInboundText;
 let describePayloadShape;
+let WhatsAppMessage;
 
 const WEBHOOK_SECRET = "test-webhook-secret-value";
 const WEBHOOK_PATH = "/api/v1/webhooks/gupshup-inbound";
@@ -32,6 +33,9 @@ beforeAll(async () => {
   ({ default: User } = await import("../../model/user.model.js"));
   ({ default: WhatsAppLoginToken } = await import(
     "../../model/whatsappLoginToken.model.js"
+  ));
+  ({ default: WhatsAppMessage } = await import(
+    "../../model/whatsappMessage.model.js"
   ));
   ({ normalizeIndianMobile, extractInboundText, describePayloadShape } =
     await import("../../services/whatsapp.auth.service.js"));
@@ -141,6 +145,68 @@ describe("extractInboundText", () => {
       ],
     };
     expect(extractInboundText(statusEvent)).toBeNull();
+  });
+});
+
+describe("inbound message archive", () => {
+  /* The number lives on the API, so it cannot be opened in any WhatsApp app.
+     If these are not stored, a customer question is read for a login code and
+     then silently dropped. */
+
+  const settle = () => new Promise((r) => setTimeout(r, 50));
+
+  it("keeps a message that carries no login code", async () => {
+    await request(app)
+      .post(WEBHOOK_PATH)
+      .query({ secret: WEBHOOK_SECRET })
+      .send(metaTextPayload("919876543210", "Where is my order?"))
+      .expect(200, "EVENT_RECEIVED");
+
+    await settle();
+
+    const stored = await WhatsAppMessage.findOne({ mobileNumber: 9876543210 }).lean();
+    expect(stored.text).toBe("Where is my order?");
+    expect(stored.kind).toBe("CUSTOMER");
+    expect(stored.handledAt).toBeNull();
+  });
+
+  it("marks a successful login as such, not as a customer question", async () => {
+    const token = await startLogin();
+
+    await request(app)
+      .post(WEBHOOK_PATH)
+      .query({ secret: WEBHOOK_SECRET })
+      .send(metaTextPayload("919876543210", token))
+      .expect(200, "EVENT_RECEIVED");
+
+    await settle();
+
+    const stored = await WhatsAppMessage.findOne({ mobileNumber: 9876543210 }).lean();
+    expect(stored.kind).toBe("LOGIN_VERIFIED");
+  });
+
+  it("records a code that matched nothing", async () => {
+    await request(app)
+      .post(WEBHOOK_PATH)
+      .query({ secret: WEBHOOK_SECRET })
+      .send(metaTextPayload("919876543210", "UN-ZZZZZZZZZZ"))
+      .expect(200, "EVENT_RECEIVED");
+
+    await settle();
+
+    const stored = await WhatsAppMessage.findOne({ mobileNumber: 9876543210 }).lean();
+    expect(stored.kind).toBe("LOGIN_FAILED");
+  });
+
+  it("stores nothing for a payload with no text", async () => {
+    await request(app)
+      .post(WEBHOOK_PATH)
+      .query({ secret: WEBHOOK_SECRET })
+      .send({ entry: [{ changes: [{ value: { statuses: [] } }] }] })
+      .expect(200, "EVENT_RECEIVED");
+
+    await settle();
+    expect(await WhatsAppMessage.countDocuments()).toBe(0);
   });
 });
 
@@ -382,23 +448,47 @@ describe("WhatsApp login flow", () => {
     expect(user.email).toBe("9876543210@wa.urbannook.in");
   });
 
-  it("is single-use — a second poll no longer returns a session", async () => {
+  it("still signs in on a second read, because the customer often lands in another browser", async () => {
+    // WhatsApp opens the reply link in the phone's default browser, not the
+    // in-app browser the login started in. Both need to work.
     const token = await startLogin();
     await request(app)
       .post(WEBHOOK_PATH)
       .query({ secret: WEBHOOK_SECRET })
       .send(metaTextPayload("919876543210", token));
 
-    await request(app)
+    const first = await request(app)
       .get("/api/v1/auth/whatsapp/status")
       .query({ token })
       .expect(200);
+    expect(first.body.data.status).toBe("VERIFIED");
 
-    const replay = await request(app)
+    const second = await request(app)
       .get("/api/v1/auth/whatsapp/status")
       .query({ token })
       .expect(200);
-    expect(replay.body.data.status).toBe("EXPIRED");
+    expect(second.body.data.status).toBe("VERIFIED");
+    expect(second.headers["set-cookie"].join(";")).toContain("userAccessToken=");
+  });
+
+  it("stops working once the code has expired", async () => {
+    const token = await startLogin();
+    await request(app)
+      .post(WEBHOOK_PATH)
+      .query({ secret: WEBHOOK_SECRET })
+      .send(metaTextPayload("919876543210", token));
+
+    // Age the code past its five minutes
+    await WhatsAppLoginToken.updateOne(
+      { token },
+      { $set: { expiresAt: new Date(Date.now() - 1000) } },
+    );
+
+    const res = await request(app)
+      .get("/api/v1/auth/whatsapp/status")
+      .query({ token })
+      .expect(200);
+    expect(res.body.data.status).toBe("EXPIRED");
   });
 
   it("reuses the existing account for a number already stored 10-digit", async () => {
