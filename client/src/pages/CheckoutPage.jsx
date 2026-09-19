@@ -25,6 +25,7 @@ import { clearCart, removeItem } from "../store/slices/cartSlice";
 import { resolveVariantTitle } from "../utils/variantTitle";
 import { fetchCsrfToken } from "../store/api/apiSlice";
 import { getApiUrl } from "../config/appUrls";
+import config from "../config/env";
 import CouponInput from "../component/CouponInput";
 import FreeShippingBanner from "../component/FreeShippingBanner";
 import { ComponentLoader } from "../component/layout/LoadingSpinner";
@@ -1063,8 +1064,7 @@ const CheckoutPage = () => {
 
      The server must agree: it only treats an order as Magic when
      MAGIC_CHECKOUT_ENABLED is on AND the request carries `magic: true`. */
-  const magicEnabled =
-    import.meta.env.VITE_MAGIC_CHECKOUT_ENABLED === "true" && paymentMethod !== "COD";
+  const magicEnabled = config.features.enableMagicCheckout && paymentMethod !== "COD";
 
   // Extra checkout.js options that switch the modal into Magic. Note this is a
   // CHECKOUT option — the order itself is made a Magic order by its line_items.
@@ -1327,6 +1327,7 @@ const CheckoutPage = () => {
             long: addressForm?.long || 0,
           },
           paymentMethod,
+          magic: magicEnabled, // server skips address/shipping and sends line_items
           ...(appliedCoupon ? { couponCode: appliedCoupon } : {}),
           // Guests have no server-side cart to read this from — the boolean
           // intent has to come from the request. Price is still never

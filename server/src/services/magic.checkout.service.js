@@ -82,15 +82,18 @@ const timingSafeEqual = (a, b) => {
 export const verifyMagicCallback = (channel, rawBody, headers = {}, query = {}) => {
   const secret = SECRETS[channel]?.();
 
-  // No secret configured ⇒ the dashboard toggle for this callback is off and
-  // Razorpay sends nothing to check. Allowed, but loudly, because it means the
-  // endpoint is open to the internet.
+  // No secret configured ⇒ reject. These endpoints are public, so failing open
+  // here would silently expose every active coupon code to the internet on a
+  // forgotten env var — a misconfiguration that produces no error, only a log
+  // line nobody reads. Failing closed is loud and safe: the worst case is that
+  // coupons do not show in the modal, which never blocks a customer from paying.
   if (!secret) {
-    console.warn(
-      `[MAGIC][auth] ${channel}: no secret configured — request accepted UNAUTHENTICATED. ` +
-        `Enable the secret-key toggle in the Razorpay dashboard and set the matching env var.`,
+    console.error(
+      `[MAGIC][auth] ${channel}: REJECTED — no secret configured. ` +
+        `Set the matching env var (MAGIC_GET_PROMO_SECRET / MAGIC_APPLY_PROMO_SECRET / MAGIC_SHIPPING_SECRET) ` +
+        `and register the callback URL with ?k=<secret>.`,
     );
-    return { ok: true, reason: "no-secret-configured" };
+    return { ok: false, reason: "no-secret-configured" };
   }
 
   // (a) HMAC-SHA256 of the raw body — same trust model as the Razorpay webhook.
