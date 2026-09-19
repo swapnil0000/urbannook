@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import ForgotPassword from './ForgotPassword';
@@ -7,9 +7,10 @@ import { useLoginMutation } from '../../../store/api/authApi';
 import { useAuth, useUI } from '../../../hooks/useRedux';
 import { setShowLoginModal, clearLoginCallback } from '../../../store/slices/uiSlice';
 import GoogleLoginButton from './GoogleLoginButton';
+import WhatsAppLoginButton from './WhatsAppLoginButton';
+import { isGoogleAuthSupported } from '../../../utils/browserEnv';
 import useFormValidation from '../../../hooks/useFormValidation';
 import { trackLogin, trackLoginFailed } from '../../../utils/analytics';
-import { isGoogleAuthSupported } from '../../../utils/browserEnv';
 import { startAuthentication, browserSupportsWebAuthn } from '@simplewebauthn/browser';
 import { usePasskeyLoginOptionsMutation, usePasskeyLoginVerifyMutation } from '../../../store/api/passkeyApi';
 
@@ -23,7 +24,7 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
   const [showPassword, setShowPassword] = useState(false);
 
   const [login, { isLoading }] = useLoginMutation();
-  const { login: setAuthUser } = useAuth();
+  const { login: setAuthUser, isAuthenticated } = useAuth();
   const { showNotification } = useUI();
 
   const [passkeyLoginOptions] = usePasskeyLoginOptionsMutation();
@@ -80,6 +81,23 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
       }
     }
   });
+
+  /**
+   * Closes this modal once the user is authenticated.
+   *
+   * WhatsApp login finishes outside this component — WhatsAppLoginWatcher
+   * runs at the app level so it keeps working when the modal is closed or
+   * the page reloads. It cannot close this modal on its own: the header
+   * opens it through its own local state, so flipping the Redux flag is a
+   * no-op. Reacting to the auth state covers every login path.
+   */
+  const closedOnAuthRef = useRef(false);
+
+  useEffect(() => {
+    if (!isAuthenticated || closedOnAuthRef.current) return;
+    closedOnAuthRef.current = true;
+    if (onClose) onClose();
+  }, [isAuthenticated, onClose]);
 
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -184,6 +202,44 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
     );
   }
 
+  // Google OAuth is actively blocked inside Instagram/Facebook WebViews
+  // (`disallowed_useragent`), so its button is hidden there rather than shown
+  // and left to fail.
+  const googleWorksHere = isGoogleAuthSupported();
+
+  const googleOption = (
+    <div className="flex justify-center [&>div]:w-full [&_iframe]:!w-full">
+      <GoogleLoginButton
+        useOneTap={false}
+        onSuccess={(userData) => {
+          showNotification('Google login successful!');
+          if (onLoginSuccess) {
+            onLoginSuccess(userData);
+          }
+          dispatch(setShowLoginModal(false));
+          if (onClose) {
+            onClose();
+          }
+        }}
+        onError={(error) => {
+          const errorMessage = error?.data?.message || 'Google login failed. Please try again.';
+          showNotification(errorMessage);
+        }}
+      />
+    </div>
+  );
+
+  /* Success is handled by WhatsAppLoginWatcher at the app level, so the
+     login completes even if this modal is closed */
+  const whatsappOption = (
+    <WhatsAppLoginButton
+      onError={(error) => {
+        const errorMessage = error?.data?.message || 'WhatsApp login failed. Please try again.';
+        showNotification(errorMessage);
+      }}
+    />
+  );
+
   return (
     <div className="fixed inset-0 bg-ink/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-[100] sm:p-4 font-inter" onClick={() => {
       dispatch(setShowLoginModal(false));
@@ -255,6 +311,23 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
             <div className="mb-8 text-center md:text-left">
               <h2 className="text-3xl font-archivo text-ink mb-2">Sign In</h2>
               <p className="text-gray-500 text-sm">Continue to your curated space.</p>
+            </div>
+
+            {/* One-tap options come first — most people never reach for the
+                password form, and burying these below it cost us sign-ins.
+                Inside Instagram and other in-app browsers Google is blocked
+                outright, so only WhatsApp is offered there. */}
+            <div className="space-y-3">
+              {googleWorksHere && googleOption}
+              {whatsappOption}
+            </div>
+
+            <div className="relative flex items-center justify-center my-7">
+              <div className="border-t border-gray-200 w-full"></div>
+              <span className="bg-white px-4 text-[10px] text-gray-400 font-black uppercase tracking-widest whitespace-nowrap">
+                or use email
+              </span>
+              <div className="border-t border-gray-200 w-full"></div>
             </div>
 
             <form className="space-y-5" onSubmit={handleSubmit}>
@@ -340,37 +413,6 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
                 <i className="fa-solid fa-fingerprint text-sm"></i>
                 {passkeyBusy ? 'Waiting for passkey...' : 'Use a passkey'}
               </button>
-            )}
-
-            {/* Google Login Section — hidden inside in-app browsers (Instagram/FB), where Google OAuth is blocked */}
-            {isGoogleAuthSupported() && (
-            <div className="mt-6">
-              <div className="relative flex items-center justify-center my-6">
-                <div className="border-t border-gray-200 w-full"></div>
-                <span className="bg-white px-4 text-xs text-gray-400 font-bold uppercase tracking-widest">OR</span>
-                <div className="border-t border-gray-200 w-full"></div>
-              </div>
-              
-              <div className="flex justify-center">
-                <GoogleLoginButton
-                  useOneTap={false}
-                  onSuccess={(userData) => {
-                    showNotification('Google login successful!');
-                    if (onLoginSuccess) {
-                      onLoginSuccess(userData);
-                    }
-                    dispatch(setShowLoginModal(false));
-                    if (onClose) {
-                      onClose();
-                    }
-                  }}
-                  onError={(error) => {
-                    const errorMessage = error?.data?.message || 'Google login failed. Please try again.';
-                    showNotification(errorMessage);
-                  }}
-                />
-              </div>
-            </div>
             )}
 
             <p className="text-sm text-center mt-8 text-gray-500">

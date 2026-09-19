@@ -8,10 +8,11 @@ const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
 const firstVariant = (p) => p?.variantDetails?.[0] || {};
 const productImg = (p) => firstVariant(p)?.variantImage?.[0] || p?.productImg || p?.productImage || '/assets/logo.webp';
 const secondImg = (p) => p?.secondaryImages?.[0] || p?.variantDetails?.[1]?.variantImage?.[0] || null;
-const productHref = (p) => {
-  const sku = firstVariant(p)?.sku;
-  return sku ? `/product/${p.productId}/${sku}` : `/product/${p.productId}`;
-};
+// Shop grid → variant list → PDP. Tapping a product card opens that
+// product's variant page (/products/:id); the PDP is reached from there, per
+// the product flow introduced on main. Products with a single variant still
+// route through it so there is exactly one path into the PDP.
+const productHref = (p) => `/products/${p.productId}`;
 const badgeOf = (p) => {
   const t = p?.tags || [];
   if (t.includes('best_seller')) return 'Bestseller';

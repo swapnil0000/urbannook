@@ -19,6 +19,8 @@ import passkeyRouter from "./passkey.route.js";
 import cartRuleRouter from "./cartRule.route.js";
 import offerLeadRouter from "./offerLead.route.js";
 import offerRouter from "./offer.route.js";
+import guestCartRouter from "./guestCart.route.js";
+import webhookRouter from "./webhook.route.js";
 export {
   userRouter,
   productRouter,
@@ -41,4 +43,6 @@ export {
   cartRuleRouter,
   offerLeadRouter,
   offerRouter,
+  guestCartRouter,
+  webhookRouter,
 };

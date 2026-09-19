@@ -13,7 +13,7 @@ import {
 import { useGetProductByIdQuery } from "../store/api/productsApi";
 import { addItem, removeItem, updateQuantity, updateSelection } from "../store/slices/cartSlice";
 import { useCartData } from "../hooks/useCartSync";
-import { trackAddToCart } from "../utils/analytics";
+import { trackAddToCart, trackViewPromotion, trackSelectPromotion } from "../utils/analytics";
 
 // Confetti comes from the shared worker-backed pipeline in
 // src/utils/celebration.js — see that file for why it must never be a plain
@@ -86,7 +86,16 @@ const FreeShippingBanner = ({
   // "recommended" product and the "source" product are just the same
   // product; the existing add/remove-from-cart stepper below already does
   // exactly what's needed once `recommendedProduct` resolves to it.
-  quantityNudge,
+  // Kept for a caller with exactly one nudge and no carousel; a caller
+  // paging through several (cart drawer) instead tags each quantity-nudge
+  // entry with `__quantityNudge` inside its own `bannersOverride` list — see
+  // the `quantityNudge` derivation below, which prefers this prop but falls
+  // back to the current slide's tag.
+  quantityNudge: quantityNudgeProp,
+  // Which surface this card is rendered on — becomes `creative_slot` on the
+  // offer impression/click events so the same offer can be compared across
+  // the cart drawer, mini-cart and checkout.
+  surface = "unknown",
 }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -162,14 +171,22 @@ const FreeShippingBanner = ({
     setBannerIndex(0);
   }, [bannersKey]);
   const safeBannerIndex = banners.length > 0 ? Math.min(bannerIndex, banners.length - 1) : 0;
+  const slideBanner = banners[safeBannerIndex] || null;
+  // A slide inside a merged bannersOverride carousel can itself BE a
+  // quantity-discount nudge ("buy N more of this same product") rather than
+  // a cross-sell combo — tagged with __quantityNudge (see CartDrawer.jsx,
+  // which pages combo nudges and quantity nudges through one shared card
+  // instead of stacking two separate cards). The standalone `quantityNudge`
+  // prop still works for a caller with exactly one, non-carousel nudge.
+  const quantityNudge = quantityNudgeProp || slideBanner?.__quantityNudge || null;
   // Quantity-nudge mode: no "different product to recommend" — source and
   // recommended are the same product, so every query/derivation below that
   // reads banner.recommendedProductId/sourceProductId just naturally
   // resolves to it.
   const banner = quantityNudge
     ? { sourceProductId: quantityNudge.productId, recommendedProductId: quantityNudge.productId }
-    : banners[safeBannerIndex] || null;
-  const showBannerArrows = !quantityNudge && banners.length > 1;
+    : slideBanner;
+  const showBannerArrows = banners.length > 1;
   const goToNextBanner = () => setBannerIndex((i) => (i + 1) % banners.length);
   const goToPrevBanner = () => setBannerIndex((i) => (i - 1 + banners.length) % banners.length);
 
@@ -230,6 +247,73 @@ const FreeShippingBanner = ({
   });
   const sourceProduct = sourceRes?.data;
 
+  // ---------------------------------------------------------------------
+  // Offer identity. One shape for every offer this card can represent, so
+  // the admin side can group add_to_cart / view_promotion / select_promotion
+  // by offer without knowing which subsystem produced it:
+  //   - quantity-discount rule  -> cart_rule, keyed by ruleId
+  //   - cart_rule-derived combo -> cart_rule, keyed by ruleId
+  //   - admin "Product Page Banner" -> admin_banner, keyed by its subdoc _id
+  //     (falls back to the source:recommended pair, which is what the merge
+  //     in freeShippingOffer.util.js de-duplicates on)
+  // ---------------------------------------------------------------------
+  // Read off the primitives, not the `banner` object — in quantity-nudge mode
+  // `banner` is rebuilt on every render, which would otherwise re-run the memo
+  // (and the impression effect below it) on every render.
+  const bannerRuleId = banner?.ruleId;
+  const bannerDocId = banner?._id;
+  const bannerText = banner?.text;
+  const bannerSourceId = banner?.sourceProductId;
+  const bannerRecommendedId = banner?.recommendedProductId;
+  const quantityNudgeRuleId = quantityNudge?.ruleId;
+  const quantityNudgeName = quantityNudge?.name;
+
+  const offerMeta = useMemo(() => {
+    if (quantityNudgeRuleId !== undefined && quantityNudgeRuleId !== null) {
+      return {
+        offerId: String(quantityNudgeRuleId || ""),
+        offerType: "quantity_discount",
+        offerSource: "cart_rule",
+        offerName: quantityNudgeName || "Quantity discount",
+      };
+    }
+    if (!bannerRecommendedId) return null;
+    return {
+      offerId: String(bannerRuleId || bannerDocId || `${bannerSourceId}:${bannerRecommendedId}`),
+      offerType: "combo_free_shipping",
+      offerSource: bannerRuleId ? "cart_rule" : "admin_banner",
+      offerName: bannerText || "Free shipping combo",
+    };
+  }, [
+    quantityNudgeRuleId,
+    quantityNudgeName,
+    bannerRuleId,
+    bannerDocId,
+    bannerText,
+    bannerSourceId,
+    bannerRecommendedId,
+  ]);
+
+  // Offer impression. Fires once per (offer + promoted product + surface) so
+  // paging the carousel back and forth doesn't inflate the denominator of
+  // the offer's take-rate, but genuinely switching to another offer counts.
+  const seenOffersRef = useRef(new Set());
+  useEffect(() => {
+    if (!offerMeta?.offerId || !recommendedProduct) return;
+    const key = `${offerMeta.offerId}:${recommendedProduct.productId}:${surface}`;
+    if (seenOffersRef.current.has(key)) return;
+    seenOffersRef.current.add(key);
+    trackViewPromotion({
+      promotionId: offerMeta.offerId,
+      promotionName: offerMeta.offerName,
+      creativeSlot: surface,
+      itemId: recommendedProduct.productId,
+      itemName: recommendedProduct.productName,
+      price: Number(recommendedProduct.variantDetails?.[0]?.variantPrice ?? 0),
+      ...offerMeta,
+    });
+  }, [offerMeta, recommendedProduct, surface]);
+
   // Source of truth for "added" is the actual cart, read fresh on every
   // render — NOT a local flag. A local "I just added this" boolean resets
   // to false the instant this component unmounts (e.g. navigating to
@@ -254,9 +338,17 @@ const FreeShippingBanner = ({
       if (quantityNudge) {
         return (item.selectedVariant || "N/A") === (selectedVariant || "N/A");
       }
+      // A combo rule scoped to one variant (banner.recommendedVariantName,
+      // see freeShippingOffer.util.js) only completes when THAT exact
+      // variant is in the cart — some other variant of the same product
+      // wouldn't satisfy the underlying cart_rule at checkout, so it must
+      // not read as "added" here either.
+      if (banner?.recommendedVariantName) {
+        return item.selectedVariant === banner.recommendedVariantName;
+      }
       return true;
     });
-  }, [cartItems, recommendedProduct, quantityNudge, selectedVariant]);
+  }, [cartItems, recommendedProduct, quantityNudge, selectedVariant, banner?.recommendedVariantName]);
   const added = !!cartMatch;
   const addedVariant = cartMatch?.selectedVariant || null;
 
@@ -269,10 +361,16 @@ const FreeShippingBanner = ({
   const sourceInCart = useMemo(() => {
     const sourceId = banner?.sourceProductId;
     if (!sourceId) return false;
-    return cartItems.some(
-      (item) => String(item.id) === String(sourceId) || String(item.mongoId) === String(sourceId),
-    );
-  }, [cartItems, banner?.sourceProductId]);
+    return cartItems.some((item) => {
+      const idMatches = String(item.id) === String(sourceId) || String(item.mongoId) === String(sourceId);
+      if (!idMatches) return false;
+      // Same variant-exactness as cartMatch above — a rule scoped to e.g.
+      // Katana's "Single Layer" variant isn't satisfied by any other Katana
+      // variant sitting in the cart.
+      if (banner?.sourceVariantName) return item.selectedVariant === banner.sourceVariantName;
+      return true;
+    });
+  }, [cartItems, banner?.sourceProductId, banner?.sourceVariantName]);
 
   // Combo progress for the bar: this banner exists to nudge adding the
   // recommended add-on that completes the free-shipping combo. Real
@@ -319,7 +417,7 @@ const FreeShippingBanner = ({
   const ruleEvalItems = useMemo(
     () =>
       debouncedCartItems
-        .map((item) => ({ productId: item.id || item.mongoId, quantity: itemQty(item.quantity) }))
+        .map((item) => ({ productId: item.id || item.mongoId, quantity: itemQty(item.quantity), selectedVariant: item.selectedVariant }))
         .filter((i) => i.productId && i.quantity > 0),
     [debouncedCartItems],
   );
@@ -516,13 +614,19 @@ const FreeShippingBanner = ({
   // via the dropdown below.
   useEffect(() => {
     if (variants.length > 0) {
+      // A combo rule scoped to one variant (banner.recommendedVariantName)
+      // must default to — and, per the lock below, stay on — exactly that
+      // variant, since only it actually completes the combo at checkout.
+      const required = banner?.recommendedVariantName
+        ? variants.find((v) => v.variantName === banner.recommendedVariantName)
+        : null;
       const purple = variants.find((v) => v.variantName?.toLowerCase().includes("purple"));
-      setSelectedVariant((purple || variants[0]).variantName);
+      setSelectedVariant((required || purple || variants[0]).variantName);
     } else {
       setSelectedVariant(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately re-seeds on every product change, not just the first
-  }, [recommendedProduct?.productId]);
+  }, [recommendedProduct?.productId, banner?.recommendedVariantName]);
 
   // Keep the displayed image/price in sync with whatever variant is actually
   // in the cart once added (could differ from what's selected in the
@@ -640,7 +744,13 @@ const FreeShippingBanner = ({
   // rupee) — so what's shown here can never drift from what checkout
   // actually charges (e.g. 50% off ₹299 is ₹149.5 mathematically, but both
   // this and the server round that to ₹150, consistently, everywhere).
-  const ruleDiscountCandidates = ruleEval?.discounts?.[recommendedProduct.productId];
+  // Untagged candidates apply to every variant (unchanged); a `variantName`
+  // tag restricts the discount to one specific variant — filter against the
+  // variant this card is actually showing/would add, so the price shown
+  // here never promises a discount that won't actually apply once added.
+  const ruleDiscountCandidates = (ruleEval?.discounts?.[recommendedProduct.productId] || []).filter(
+    (c) => !c.variantName || c.variantName === activeVariant?.variantName,
+  );
   const ruleDiscountedPrice = ruleDiscountCandidates?.length
     ? Math.round(
         Math.max(
@@ -660,6 +770,21 @@ const FreeShippingBanner = ({
 
   const handleAddToCart = async () => {
     const effectiveVariant = activeVariant?.variantName || "Standard Variant";
+
+    // Offer click — fired on the click itself, not after the cart write, so a
+    // failed/slow add still counts as click-through against the impression.
+    if (offerMeta?.offerId) {
+      trackSelectPromotion({
+        promotionId: offerMeta.offerId,
+        promotionName: offerMeta.offerName,
+        creativeSlot: surface,
+        ctaText: banner?.ctaLabel || "Add to Cart",
+        itemId: recommendedProduct?.productId,
+        itemName: recommendedProduct?.productName,
+        price: displayPrice,
+        ...offerMeta,
+      });
+    }
     // Captured BEFORE the cart updates — this is what decides whether this
     // specific click completes the combo, independent of the add itself.
     // Never true in quantity-nudge mode — there's no "combo" to complete
@@ -737,6 +862,8 @@ const FreeShippingBanner = ({
       itemVariant: effectiveVariant,
       price: displayPrice,
       quantity: 1,
+      placement: quantityNudge ? `${surface}_quantity_nudge` : `${surface}_combo_offer`,
+      ...offerMeta,
     });
 
     // Pop-up removed per request: when the add-on is in the cart but the
@@ -759,7 +886,13 @@ const FreeShippingBanner = ({
   // first variant, since the sheet has no variant picker of its own.
   const handleAddSourceToCart = async () => {
     if (!sourceProduct?.productId || sourceAdding) return;
-    const sourceVariant = sourceProduct.variantDetails?.[0];
+    // If the combo requires a specific source variant (banner.sourceVariantName),
+    // add exactly that one — adding the product's first variant instead could
+    // add a variant that doesn't actually satisfy the underlying cart_rule.
+    const sourceVariant = banner?.sourceVariantName
+      ? sourceProduct.variantDetails?.find((v) => v.variantName === banner.sourceVariantName) ||
+        sourceProduct.variantDetails?.[0]
+      : sourceProduct.variantDetails?.[0];
     const variantName = sourceVariant?.variantName || "Standard Variant";
     const sourceImage =
       sourceVariant?.variantImage?.[0] || sourceProduct.productImg || displayImage;
@@ -801,6 +934,8 @@ const FreeShippingBanner = ({
       itemVariant: variantName,
       price: sourcePrice,
       quantity: 1,
+      placement: `${surface}_combo_source`,
+      ...offerMeta,
     });
 
     setSourceAdding(false);
@@ -1086,9 +1221,11 @@ const FreeShippingBanner = ({
                   <button
                     type="button"
                     onClick={() =>
-                      (!added || quantityNudge) && setVariantMenuOpen((v) => !v)
+                      (!added || quantityNudge) &&
+                      !(banner?.recommendedVariantName && !quantityNudge) &&
+                      setVariantMenuOpen((v) => !v)
                     }
-                    disabled={added && !quantityNudge}
+                    disabled={(added || !!banner?.recommendedVariantName) && !quantityNudge}
                     className="w-full flex items-center justify-between gap-1 rounded-lg border border-black/15 bg-white px-2.5 py-1 text-xs font-bold text-black disabled:opacity-60 disabled:cursor-default focus:outline-none focus:ring-1 focus:ring-save focus:border-save"
                   >
                     <span className="flex items-center gap-1.5 min-w-0">

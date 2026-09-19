@@ -9,6 +9,8 @@ import Cart from "../model/user.cart.model.js";
 import env from "../config/envConfigSetup.js";
 import Coupon from "../model/coupon.model.js";
 import CouponUsage from "../model/couponUsage.model.js";
+import { backfillUserProfileFromCheckout } from "../services/user.profile.service.js";
+import { sendOrderConfirmationWhatsApp } from "../services/whatsapp.send.service.js";
 import {
   sendOrderConfirmation,
   sendPaymentReceipt,
@@ -108,9 +110,10 @@ const getShippingRateOrFallback = async (params) => {
   }
 };
 import { isFreeShippingEligible, getFreeShippingConfig } from "../utils/freeShippingOffer.util.js";
-import { getActiveCartRules, evaluateCartRules, applyBestDiscount } from "../utils/cartRule.util.js";
+import { getActiveCartRules, evaluateCartRules, applyBestDiscount, getDiscountCandidatesForItem } from "../utils/cartRule.util.js";
 import { getPublicOfferConfig } from "../utils/offer.util.js";
 import { sendMetaCapiEvent } from "../services/meta.capi.service.js";
+import { recordServerPurchase } from "../services/purchaseEvent.service.js";
 
 // Collect Meta CAPI match-quality signals from the order-creation request.
 // The webhook (Razorpay → server) has no browser context, so we persist these on
@@ -310,14 +313,15 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
 
     // Find the variant specific price
     let priceAtPurchase = 0;
+    let matchedVariant = null;
     if (product.variantDetails && product.variantDetails.length > 0) {
-      const variant = product.variantDetails.find(v =>
+      matchedVariant = product.variantDetails.find(v =>
         v.variantName === itemVariant ||
         v.variantName === item.variant ||
         v.variantName === item.color
       );
-      if (variant && variant.variantPrice) {
-        priceAtPurchase = variant.variantPrice;
+      if (matchedVariant && matchedVariant.variantPrice) {
+        priceAtPurchase = matchedVariant.variantPrice;
       } else {
         // Default to first variant's price if no match or no price on match
         priceAtPurchase = product.variantDetails[0].variantPrice || 0;
@@ -326,6 +330,13 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
 
     return {
       productId: product.productId,
+      // Temporary, NOT part of the Order schema — used only to resolve this
+      // line's variant identity for cart-rule matching below (variantSku is
+      // the reliable identifier, not the variant name — see
+      // utils/cartRule.util.js). Dropped automatically when this object is
+      // eventually persisted via Order.create (Mongoose ignores fields not
+      // declared on the schema).
+      variantSku: matchedVariant?.sku || "",
       productSnapshot: {
         quantity: item.quantity,
         productImg: itemImage,
@@ -339,6 +350,12 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
         // was worded at purchase time, even if the product's template is
         // edited later. Blank when the product never set one.
         variantTitleTemplate: product.variantTitleTemplate || "",
+        // Stable variant identifier, frozen at purchase time — unlike
+        // selectedVariant (a display name), this never goes stale if an
+        // admin renames the variant afterward. Admin dispatch/analytics
+        // views should key off this first, falling back to name-matching
+        // only for orders placed before this field existed.
+        variantSku: matchedVariant?.sku || "",
       },
     };
   });
@@ -352,11 +369,11 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   // the invoice all agree with each other and with what was charged.
   const activeCartRules = await getActiveCartRules();
   const cartRuleResult = evaluateCartRules(
-    orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity })),
+    orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity, variantSku: oi.variantSku })),
     activeCartRules,
   );
   for (const oi of orderItems) {
-    const candidates = cartRuleResult.discountCandidatesByProduct.get(String(oi.productId));
+    const candidates = getDiscountCandidatesForItem(cartRuleResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
     if (candidates?.length) {
       oi.productSnapshot.priceAtPurchase = applyBestDiscount(oi.productSnapshot.priceAtPurchase, candidates);
     }
@@ -443,9 +460,13 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   // fresh from the live offer config, so a stale intent left over after an
   // admin disables the offer can never add a charge.
   const giftWrapConfig = await getPublicOfferConfig("gift_wrap");
-  // One gift wrap per distinct GIFT-WRAP-ELIGIBLE product in the order
-  // (admin opt-in per product) — auto-derived, not client-set.
-  const giftWrapQty = products.filter((p) => p.giftWrapEligible === true).length;
+  // One gift wrap per ELIGIBLE UNIT in the order (admin opt-in per product)
+  // — sums quantity across every line whose product is eligible, so 2x the
+  // same eligible product is 2 gift wraps, not 1. Auto-derived, not client-set.
+  const giftWrapQty = orderItems.reduce((sum, oi) => {
+    const product = products.find((p) => p.productId === oi.productId);
+    return product?.giftWrapEligible ? sum + (Number(oi.productSnapshot.quantity) || 0) : sum;
+  }, 0);
   const giftWrapSelected = !!cart.giftWrap && giftWrapConfig.isActive && giftWrapQty > 0;
   const giftWrapAmount = giftWrapSelected ? giftWrapConfig.price * giftWrapQty : 0;
   const giftWrapNoteOptions = giftWrapSelected && cart.giftWrapNoteOptions?.length ? cart.giftWrapNoteOptions : ["none"];
@@ -457,21 +478,30 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     const liveCoupon = await Coupon.findOne(
       { couponId: couponCodeId },
       {
-        discountType: 1, discountValue: 1, maxDiscountCap: 1,
+        code: 1, discountType: 1, discountValue: 1, maxDiscountCap: 1,
         isInternal: 1, isArchived: 1, isActive: 1, isTest: 1,
-        maxUsesPerUser: 1, scope: 1,
+        maxUsesPerUser: 1, scope: 1, audience: 1, assignedTo: 1,
         // Fields missing from original projection — caused silent bypass of these rules
         minCartValue: 1, validFrom: 1, validUntil: 1,
         maxTotalUses: 1, usageCount: 1,
       }
     ).lean();
 
+    // console.log(
+    //   `[Coupon:PaymentRecheck] couponId=${couponCodeId} code=${liveCoupon?.code || "-"} ` +
+    //   `found=${!!liveCoupon} scope=${liveCoupon?.scope || "-"} audience=${liveCoupon?.audience || "-"} ` +
+    //   `isActive=${liveCoupon?.isActive} isArchived=${liveCoupon?.isArchived} isTest=${liveCoupon?.isTest} ` +
+    //   `assignedToCount=${liveCoupon?.assignedTo?.length ?? "-"} userId=${userId} userEmail=${userEmail || "-"}`
+    // );
+
     if (!liveCoupon || liveCoupon.isArchived) {
+      // console.log(`[Coupon:PaymentRecheck] REJECT — not found or archived`);
       throw new ValidationError(
         "The coupon you applied is no longer available. Please remove it from your cart and try again."
       );
     }
     if (!liveCoupon.isActive) {
+      // console.log(`[Coupon:PaymentRecheck] REJECT — coupon is paused (isActive=false)`);
       throw new ValidationError(
         "This coupon has been paused. Please remove it from your cart and try again."
       );
@@ -479,6 +509,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
 
     const isValidInternal = liveCoupon.isInternal && liveCoupon.discountType === "INTERNAL_TEST";
     if (liveCoupon.isTest && !isValidInternal) {
+      // console.log(`[Coupon:PaymentRecheck] REJECT — isTest=true and not a valid internal coupon`);
       throw new ValidationError(
         "This coupon is no longer available for customers. Please remove it from your cart and try again."
       );
@@ -491,14 +522,50 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       );
     }
 
+    // Re-check scope/audience — the coupon's targeting rules could have changed
+    // between apply-time (coupon.code.service.js) and this payment step, e.g. an
+    // admin removed this user from the assignedTo list. This function requires
+    // a logged-in user (req.user, checked at the top of this controller), so
+    // audience=MEMBERS_ONLY is always satisfied here — only scope=TARGETED needs
+    // an actual re-check.
+    if (liveCoupon.scope === "TARGETED") {
+      const normEmailForScope  = user?.email?.toLowerCase().trim() || null;
+      const normMobileForScope = user?.mobileNumber?.toString().replace(/\D/g, "").slice(-10) || finalSenderMobile || null;
+      const scopeIdentifiers   = [normEmailForScope, normMobileForScope].filter(Boolean);
+      const assignment = (liveCoupon.assignedTo || []).find((a) => scopeIdentifiers.includes(a.identifier));
+
+      console.log(
+        `[Coupon:PaymentRecheck] TARGETED re-check: identifiers=${scopeIdentifiers.join("/") || "-"} ` +
+        `assignmentFound=${!!assignment} usedAt=${assignment?.usedAt || "-"} isValidInternal=${isValidInternal}`
+      );
+
+      if (!assignment) {
+        console.log(`[Coupon:PaymentRecheck] REJECT — TARGETED: no assignment found for ${scopeIdentifiers.join("/") || "(no identifiers)"}`);
+        throw new ValidationError(
+          "This coupon is no longer assigned to you. Please remove it from your cart and try again."
+        );
+      }
+      // Internal test coupons let the assigned team member reuse them (same
+      // carve-out as validateNewCoupon's skipSingleUseGate) — everyone else's
+      // single-use gate is enforced.
+      if (assignment.usedAt && !isValidInternal) {
+        console.log(`[Coupon:PaymentRecheck] REJECT — TARGETED: assignment already used at ${assignment.usedAt}`);
+        throw new ValidationError(
+          "Your personal coupon has already been used. Please remove it from your cart and try again."
+        );
+      }
+    }
+
     // Re-check validity window — coupon may have expired or not yet started between apply and pay
     const now = new Date();
     if (liveCoupon.validFrom && now < new Date(liveCoupon.validFrom)) {
+      console.log(`[Coupon:PaymentRecheck] REJECT — not valid yet (validFrom=${liveCoupon.validFrom})`);
       throw new ValidationError(
         "This coupon is not valid yet. Please remove it from your cart and try again."
       );
     }
     if (liveCoupon.validUntil && now > new Date(liveCoupon.validUntil)) {
+      console.log(`[Coupon:PaymentRecheck] REJECT — expired (validUntil=${liveCoupon.validUntil})`);
       throw new ValidationError(
         "This coupon has expired. Please remove it from your cart and try again."
       );
@@ -507,6 +574,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     // Re-check minimum cart value against re-derived product subtotal
     // (user may have removed items from cart after applying the coupon)
     if (subtotal < (liveCoupon.minCartValue || 0)) {
+      console.log(`[Coupon:PaymentRecheck] REJECT — subtotal ₹${subtotal} < minCartValue ₹${liveCoupon.minCartValue}`);
       throw new ValidationError(
         `A minimum cart value of ₹${liveCoupon.minCartValue} is required for this coupon. Please remove it from your cart and try again.`
       );
@@ -514,6 +582,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
 
     // Re-check global cap (non-atomic snapshot, main enforcement is atomic $inc in webhook)
     if (liveCoupon.maxTotalUses != null && liveCoupon.usageCount >= liveCoupon.maxTotalUses) {
+      console.log(`[Coupon:PaymentRecheck] REJECT — global cap reached (${liveCoupon.usageCount}/${liveCoupon.maxTotalUses})`);
       throw new ValidationError(
         "This coupon has reached its maximum usage limit. Please remove it from your cart and try again."
       );
@@ -550,7 +619,9 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
             ...(normMobileCheck ? [{ mobile: normMobileCheck }] : []),
           ],
         });
+        console.log(`[Coupon:PaymentRecheck] Per-user check: identifiers=${identifiers.join("/")} priorUses=${priorUses} limit=${liveCoupon.maxUsesPerUser}`);
         if (priorUses >= liveCoupon.maxUsesPerUser) {
+          console.log(`[Coupon:PaymentRecheck] REJECT — per-user limit reached`);
           throw new ValidationError(
             liveCoupon.maxUsesPerUser === 1
               ? "You have already used this coupon. Please remove it from your cart."
@@ -559,6 +630,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
         }
       }
     }
+    console.log(`[Coupon:PaymentRecheck] ✅ PASSED — couponCodeId=${couponCodeId} discountAmount=₹${discountAmount} isInternalTestOrder=${isInternalTestOrder}`);
   }
 
   finalAmount = isInternalTestOrder ? 1 : Math.max(subtotal + giftWrapAmount + chargedShippingAmount - discountAmount, 0);
@@ -582,6 +654,17 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     razorpayChargeAmountPaise,
     "INR",
   );
+
+  // Checkout is where a WhatsApp-login user first tells us their real name and
+  // email — copy those onto the account so the profile and future order mail
+  // stop showing the generated placeholder. Deliberately not awaited on the
+  // critical path below; it never throws.
+  await backfillUserProfileFromCheckout({
+    userId,
+    email: userEmail,
+    name: deliveryAddressSnapshot.fullName,
+    mobile: deliveryAddressSnapshot.mobileNumber,
+  });
 
   const order = await Order.create({
     orderId: uuidv7(),
@@ -902,6 +985,18 @@ const razorpayWebHookController = async (req, res) => {
                 },
               );
 
+              // Same confirmation over WhatsApp. It gets read far more often
+              // than email, and a WhatsApp-login customer may have no real
+              // email address at all. Not awaited — a messaging hiccup must
+              // not hold up the payment response. Silently no-ops until the
+              // template id and API key are configured.
+              sendOrderConfirmationWhatsApp({
+                mobileNumber: order.userMobile,
+                name: order.userName,
+                orderId: order.orderId,
+                amount: order.amount,
+              }).catch(() => {});
+
               // For COD, only the advance was actually captured via Razorpay right now —
               // the receipt must reflect that amount, not the full order total.
               const paymentDetails = {
@@ -999,6 +1094,15 @@ const razorpayWebHookController = async (req, res) => {
           } catch (capiError) {
             console.error("[Meta CAPI] Purchase dispatch error:", capiError.message);
           }
+
+          // First-party purchase → Event collection. Inside the
+          // `order.status !== "PAID"` guard, so it runs exactly once per order
+          // however many times Razorpay replays the webhook. This is what makes
+          // /admin/analytics revenue match reality: the browser-side purchase
+          // is lost to ad-blockers and closed tabs, this one never is.
+          await recordServerPurchase(order, {
+            recoveredFrom: wasFailedByCron ? "FAILED" : undefined,
+          });
         }
 
         console.log("✅ Payment Captured:", payment.id);
@@ -1066,7 +1170,7 @@ const generateTempPassword = () => {
 };
 
 const guestCreateOrderController = asyncHandler(async (req, res) => {
-  const { items, guestInfo, deliveryAddress, paymentMethod: reqPaymentMethod, couponCode: rawCouponCode, giftWrap: reqGiftWrap, giftWrapNoteOptions: reqGiftWrapNoteOptions } = req.body;
+  const { items, guestInfo, deliveryAddress, paymentMethod: reqPaymentMethod, couponCode: rawCouponCode, giftWrap: reqGiftWrap, giftWrapNoteOptions: reqGiftWrapNoteOptions, anonymousId } = req.body;
 
   if (!guestInfo?.name?.trim()) throw new ValidationError("Full name is required");
   if (!guestInfo?.email?.trim()) throw new ValidationError("Email is required");
@@ -1096,9 +1200,10 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     assertVariantAvailable(product, itemVariant, item.quantity);
 
     let priceAtPurchase = 0;
+    let matchedVariant = null;
     if (product.variantDetails && product.variantDetails.length > 0) {
-      const variant = product.variantDetails.find((v) => v.variantName === itemVariant);
-      priceAtPurchase = variant?.variantPrice || product.variantDetails[0].variantPrice || 0;
+      matchedVariant = product.variantDetails.find((v) => v.variantName === itemVariant);
+      priceAtPurchase = matchedVariant?.variantPrice || product.variantDetails[0].variantPrice || 0;
     }
     // Shipping-rate calculation uses the pre-discount price (weight/rate
     // tiers, not the customer's charged amount) — deliberately NOT touched
@@ -1114,6 +1219,9 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
 
     return {
       productId: product.productId,
+      // Temporary, NOT part of the Order schema — see the identical comment
+      // in razorpayCreateOrderController above.
+      variantSku: matchedVariant?.sku || "",
       productSnapshot: {
         quantity: item.quantity,
         productImg: itemImage,
@@ -1123,6 +1231,9 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
         priceAtPurchase,
         selectedVariant: itemVariant,
         variantTitleTemplate: product.variantTitleTemplate || "",
+        // Stable variant identifier — see the matching comment in
+        // razorpayCreateOrderController above.
+        variantSku: matchedVariant?.sku || "",
       },
     };
   });
@@ -1133,11 +1244,11 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   // priceAtPurchase and subtotal/order/invoice all agree.
   const activeCartRules = await getActiveCartRules();
   const cartRuleResult = evaluateCartRules(
-    orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity })),
+    orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity, variantSku: oi.variantSku })),
     activeCartRules,
   );
   for (const oi of orderItems) {
-    const candidates = cartRuleResult.discountCandidatesByProduct.get(String(oi.productId));
+    const candidates = getDiscountCandidatesForItem(cartRuleResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
     if (candidates?.length) {
       oi.productSnapshot.priceAtPurchase = applyBestDiscount(oi.productSnapshot.priceAtPurchase, candidates);
     }
@@ -1172,8 +1283,13 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   // it or don't." Price is still never trusted from the client: it's always
   // the live offer config's price, zeroed automatically if the offer is off.
   const giftWrapConfig = await getPublicOfferConfig("gift_wrap");
-  // One gift wrap per distinct GIFT-WRAP-ELIGIBLE product (admin opt-in per product).
-  const giftWrapQty = products.filter((p) => p.giftWrapEligible === true).length;
+  // One gift wrap per ELIGIBLE UNIT (admin opt-in per product) — sums
+  // quantity across every line whose product is eligible, so 2x the same
+  // eligible product is 2 gift wraps, not 1.
+  const giftWrapQty = orderItems.reduce((sum, oi) => {
+    const product = products.find((p) => p.productId === oi.productId);
+    return product?.giftWrapEligible ? sum + (Number(oi.productSnapshot.quantity) || 0) : sum;
+  }, 0);
   const giftWrapSelected = !!reqGiftWrap && giftWrapConfig.isActive && giftWrapQty > 0;
   const giftWrapAmount = giftWrapSelected ? giftWrapConfig.price * giftWrapQty : 0;
   const GIFT_NOTE_OPTIONS = ["birthday", "rakhi", "none"];
@@ -1294,7 +1410,13 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   const order = await Order.create({
     orderId: uuidv7(),
     userEmail: guestEmail,
-    userId: `guest_${uuidv7()}`,
+    // Reuse the SAME per-browser anonymousId the pre-payment guest-cart-sync
+    // wrote as userId (see guestCart.route.js / syncGuestCartService) — this
+    // is what lets the admin's abandoned-cart job recognize this guest as
+    // converted once the order is PAID, instead of showing them as
+    // permanently abandoned. Falls back to a fresh id only if the client
+    // somehow didn't send one (older client build, etc).
+    userId: anonymousId ? `guest_${anonymousId}` : `guest_${uuidv7()}`,
     userName: guestInfo.name.trim(),
     userMobile: cleanMobile,
     items: orderItems,

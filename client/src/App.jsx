@@ -6,11 +6,14 @@ import { HelmetProvider } from 'react-helmet-async';
 import { store } from './store/store';
 import { useCartSync } from './hooks/useCartSync';
 import { useWishlistSync } from './hooks/useWishlistSync';
+import { useScrollRestoration } from './hooks/useScrollRestoration';
 import ErrorBoundary from './component/ErrorBoundary';
 import { setCredentials, logout } from './store/slices/authSlice';
 import { fetchCsrfToken } from './store/api/apiSlice';
 import AppRoutes from './store/AppRoutes';
 import NewsTicker from './pages/home/NewsTicker';
+import WhatsAppLoginWatcher from './component/layout/auth/WhatsAppLoginWatcher';
+import WhatsAppOneTap from './component/layout/auth/WhatsAppOneTap';
 import SEOHead from './component/SEOHead';
 import { trackPageView, setUserId, captureAttribution, setMetaAdvancedMatching } from './utils/analytics';
 import MotionLayer from './component/MotionLayer';
@@ -27,7 +30,7 @@ const ORG_STRUCTURED_DATA = {
   ],
   contactPoint: {
     '@type': 'ContactPoint',
-    telephone: '+91-82996-38749',
+    telephone: '+91-91240-81005',
     contactType: 'customer service',
     areaServed: 'IN',
     availableLanguage: ['English', 'Hindi'],
@@ -42,8 +45,11 @@ const GlMobileNav = lazy(() => import('./component/layout/GlMobileNav'));
 const SocialMediaFAB = lazy(() => import('./component/layout/WhatsAppButton'));
 const OpenInBrowserBanner = lazy(() => import('./component/OpenInBrowserBanner'));
 const GoogleOneTap = lazy(() => import('./component/GoogleOneTap'));
-const PasskeyPrompt = lazy(() => import('./component/PasskeyPrompt'));
+// Mounted app-wide, not on the home page: most Instagram ad / bio traffic lands
+// directly on /products or a product page and would never see a home-only popup.
 const IndependenceDayPopup = lazy(() => import('./component/IndependenceDayPopup'));
+const ScrollHint = lazy(() => import('./component/ScrollHint'));
+const PasskeyPrompt = lazy(() => import('./component/PasskeyPrompt'));
 
 // Component to handle session restoration and token removal detection
 const SessionManager = ({ children }) => {
@@ -121,9 +127,13 @@ const SessionManager = ({ children }) => {
 
 // Fires a GA4 page_view on every SPA route change and locks first-touch
 // attribution (utm/gclid/fbclid) before the landing query string is lost.
+// Scroll-position restoration on back/forward navigation is a separate
+// concern, owned entirely by useScrollRestoration (hooks/useScrollRestoration.js).
 const RouteTracker = () => {
   const location = useLocation();
   const firstLoad = useRef(true);
+
+  useScrollRestoration();
 
   // Capture first-touch UTMs immediately, before any client-side navigation wipes them.
   useEffect(() => {
@@ -169,12 +179,17 @@ function App() {
                 <OpenInBrowserBanner />
               </Suspense>
               <ErrorBoundary>
-                {/* <NewsTicker/> */}
+                <NewsTicker/>
                 <NewHeader/>
               </ErrorBoundary>
               {/* AppRoutes loaded immediately - no lazy loading for critical routing */}
               <ErrorBoundary>
                 <AppRoutes />
+              </ErrorBoundary>
+              {/* Polls a pending WhatsApp login at the app level, so the login
+                  completes even if the modal closes or the page reloads */}
+              <ErrorBoundary>
+                <WhatsAppLoginWatcher />
               </ErrorBoundary>
               {/* Only non-critical components are lazy loaded */}
               <Suspense fallback={null}>
@@ -182,11 +197,16 @@ function App() {
                   <Footer />
                 </ErrorBoundary>
                 <SocialMediaFAB />
-                <GlMobileNav />
                 <Notification />
+                <GlMobileNav />
                 {/* Global Google One Tap for logged-out visitors (boosts Meta EMQ) */}
                 <ErrorBoundary>
                   <GoogleOneTap />
+                </ErrorBoundary>
+                {/* WhatsApp's equivalent of One Tap — one short prompt per
+                    session for logged-out visitors */}
+                <ErrorBoundary>
+                  <WhatsAppOneTap />
                 </ErrorBoundary>
                 {/* Post-login passkey upsell (fires once after a fresh login) */}
                 <ErrorBoundary>
@@ -195,6 +215,9 @@ function App() {
                 {/* Independence Day 10%-off lead capture — shows once, everywhere */}
                 <ErrorBoundary>
                   <IndependenceDayPopup />
+                </ErrorBoundary>
+                <ErrorBoundary>
+                  <ScrollHint />
                 </ErrorBoundary>
               </Suspense>
             </SyncProvider>

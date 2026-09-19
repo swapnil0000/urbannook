@@ -12,6 +12,26 @@ const cartSchema = mongoose.Schema(
       default: {},
     },
 
+    // Guest-checkout contact details, captured while typing on the Contact
+    // step (before Address, before any order exists) so a guest who never
+    // converts still shows up in the admin's abandoned-cart dashboard —
+    // field names match what abandoned.cart.model.js / the admin sweep jobs
+    // already look for on this same collection (cart.guestName, cart.guestEmail,
+    // cart.mobileNumber). Only ever set for guest carts (userId starts with
+    // "guest_"); left null/undefined for authenticated carts.
+    guestName: {
+      type: String,
+      default: null,
+    },
+    guestEmail: {
+      type: String,
+      default: null,
+    },
+    mobileNumber: {
+      type: String,
+      default: null,
+    },
+
     // Seasonal gift-wrap add-on intent (e.g. Rakhi/Diwali) — a boolean flag
     // ONLY. No price lives here; the actual charge is always looked up live
     // from the offers collection (see utils/giftWrapOffer.util.js) at cart

@@ -21,19 +21,19 @@ const NOTE_OPTIONS = [
   { value: "none", label: "Gift Wrap" },
 ];
 
-// One gift wrap per distinct GIFT-WRAP-ELIGIBLE PRODUCT in the cart (admin
-// opt-in per product — see AddProductForm/EditProductForm's "Allow gift
-// wrap" checkbox) — deduped by product, not by cart line, so two variants of
-// the same product only count once. Server enforces this identically and
-// authoritatively at checkout — see rp.payment.controller.js — this is just
-// the matching display count/visibility.
+// One gift wrap per ELIGIBLE UNIT in the cart (admin opt-in per product —
+// see AddProductForm/EditProductForm's "Allow gift wrap" checkbox) — sums
+// quantity across every eligible line, so 2x the same eligible product is
+// 2 gift wraps, not 1. Server enforces this identically and authoritatively
+// at checkout — see rp.payment.controller.js — this is just the matching
+// display count/visibility.
 const useGiftWrapQuantity = () =>
-  useSelector((state) => {
-    const ids = new Set(
-      state.cart.items.filter((i) => i.giftWrapEligible).map((i) => i.mongoId || i.id),
-    );
-    return ids.size;
-  });
+  useSelector((state) =>
+    state.cart.items.reduce(
+      (sum, i) => (i.giftWrapEligible ? sum + (Number(i.quantity) || 0) : sum),
+      0,
+    ),
+  );
 
 /**
  * The "GIFT WRAP ₹149 x1" row in the cart's items list, shown once selected —

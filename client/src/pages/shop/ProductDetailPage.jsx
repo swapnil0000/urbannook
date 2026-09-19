@@ -6,6 +6,7 @@ import SEOHead from '../../component/SEOHead';
 import WishlistButton from '../../component/WishlistButton';
 import UnProductCard from '../../component/UnProductCard';
 import RecommendedProducts from '../../component/RecommendedProducts';
+import OtherVariants from '../../component/OtherVariants';
 import NotifyMeModal from '../../component/NotifyMeModal';
 import ComboBundleSection from '../../component/ComboBundleSection';
 import ImageCarousel from '../../component/ImageCarousel';
@@ -181,11 +182,18 @@ const ProductDetailPage = () => {
     } else if (!product) setSelectedVariant('');
   }, [product?.productId, availableVariants, cartSelections, product, urlVariantSku]);
 
-  useEffect(() => { window.scrollTo(0, 0); }, []);
-
   // Reset the pincode check + share row when navigating to another product —
   // the component stays mounted, and a quote computed for product A's weight/price
   // must not display under product B.
+  // Admin-set, per-variant sub tag (e.g. "BMW Inspired, 104cm") shown as a
+  // small line under the main product title — blank when the selected
+  // variant has none set.
+  const selectedVariantSubTag = useMemo(() => {
+    if (!product) return '';
+    const selectedDetail = product.variantDetails?.find((v) => v.variantName === selectedVariant);
+    return (selectedDetail?.variantSubTag && selectedDetail.variantSubTag.trim()) || '';
+  }, [product, selectedVariant]);
+
   useEffect(() => {
     setPinStatus(null);
     setPinInput('');
@@ -248,7 +256,7 @@ const ProductDetailPage = () => {
         confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 }, colors: ['#E63329', '#C9281F', '#F3C33B', '#ffffff'] });
         setSelectedVariant(effectiveVariant);
         setFeedbackMessage('Added to cart'); setTimeout(() => setFeedbackMessage(''), 2000);
-        trackAddToCart({ itemId: product.productId, itemName: product.productName, itemVariant: effectiveVariant, price: currentPrice, quantity: 1 });
+        trackAddToCart({ itemId: product.productId, itemName: product.productName, itemVariant: effectiveVariant, price: currentPrice, quantity: 1, placement: 'pdp_main' });
       } catch (err) {
         showNotification(err.data?.message || 'Something went wrong', 'error');
       }
@@ -256,7 +264,7 @@ const ProductDetailPage = () => {
       dispatch(addItem({ id: product?.productId, mongoId: product?.productId, name: product?.productName, price: currentPrice, image: selectedImage, quantity: 1, selectedVariant: effectiveVariant, giftWrapEligible: !!product?.giftWrapEligible }));
       setSelectedVariant(effectiveVariant);
       setFeedbackMessage('Added to cart'); setTimeout(() => setFeedbackMessage(''), 2000);
-      trackAddToCart({ itemId: product.productId, itemName: product.productName, itemVariant: effectiveVariant, price: currentPrice, quantity: 1 });
+      trackAddToCart({ itemId: product.productId, itemName: product.productName, itemVariant: effectiveVariant, price: currentPrice, quantity: 1, placement: 'pdp_main' });
     }
 
   };
@@ -273,7 +281,7 @@ const ProductDetailPage = () => {
         dispatch(addItem({ id: crossSell.productId, mongoId: crossSell.productId, name: crossSell.productName, price: crossSellPrice, image: crossSellImg, quantity: 1, selectedVariant: vName }));
       }
       confetti({ particleCount: 90, spread: 70, origin: { y: 0.7 }, colors: ['#E63329', '#F3C33B', '#ffffff'] });
-      trackAddToCart({ itemId: crossSell.productId, itemName: crossSell.productName, itemVariant: vName, price: crossSellPrice, quantity: 1 });
+      trackAddToCart({ itemId: crossSell.productId, itemName: crossSell.productName, itemVariant: vName, price: crossSellPrice, quantity: 1, placement: 'pdp_buy_together' });
     } catch (err) {
       showNotification(err?.data?.message || 'Something went wrong', 'error');
     }
@@ -522,7 +530,12 @@ const ProductDetailPage = () => {
               )}
             </div>
             <div className="flex items-start justify-between gap-3 mt-2">
-              <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-ink leading-tight">{product.productName}</h1>
+              <div className="min-w-0">
+                <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-ink leading-tight">{selectedVariant || product.productName}</h1>
+                {selectedVariantSubTag && (
+                  <p className="text-base md:text-lg font-normal text-muted leading-snug mt-1">{selectedVariantSubTag}</p>
+                )}
+              </div>
               <div className="shrink-0 pt-1 flex items-center gap-2">
                 <button onClick={handleShareClick} aria-label="Share this product" className="w-9 h-9 grid place-items-center rounded-full border border-hair text-ink hover:border-ink transition-colors">
                   <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="m8.7 13.5 6.6 3.9M15.3 6.6 8.7 10.5" /></svg>
@@ -579,8 +592,8 @@ const ProductDetailPage = () => {
               <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs mt-4">
                 {isOutOfStock ? (
                   <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-faint" /><span className="text-muted font-semibold">Out of stock</span></span>
-                ) : selectedVariantLowStock ? (
-                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-brand animate-pulse" /><span className="text-brand font-semibold">Only {selectedVariantQty} left</span></span>
+                ) : selectedVariantLowStock && selectedVariantQty !== 1 ? (
+                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-brand animate-pulse" /><span className="text-brand font-semibold">Few left — selling fast</span></span>
                 ) : (
                   <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-save" /><span className="text-ink font-semibold">In stock</span></span>
                 )}
@@ -938,6 +951,14 @@ const ProductDetailPage = () => {
             isAdding={isAddingCombo}
           />
         )}
+
+        {/* Other variants of THIS product — after reviews, before cross-sell */}
+        <OtherVariants
+          productId={product.productId}
+          productName={product.productName}
+          variants={product.variantDetails || []}
+          currentVariantName={selectedVariant}
+        />
 
         {/* Admin-curated recommendations (distinct from the generic grid below) */}
         {recommendedProducts.length > 0 && (

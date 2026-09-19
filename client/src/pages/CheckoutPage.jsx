@@ -17,20 +17,23 @@ import {
   useGetAllFreeShippingBannersQuery,
   useEvaluateCartRulesQuery,
   useGetGiftWrapOfferQuery,
+  useSyncGuestCartMutation,
 } from "../store/api/userApi";
 import { setShowLoginModal, setLoginCallback } from "../store/slices/uiSlice";
 import { useUI } from "../hooks/useRedux";
 import { clearCart, removeItem } from "../store/slices/cartSlice";
 import { resolveVariantTitle } from "../utils/variantTitle";
 import { fetchCsrfToken } from "../store/api/apiSlice";
+import { getApiUrl } from "../config/appUrls";
 import CouponInput from "../component/CouponInput";
 import FreeShippingBanner from "../component/FreeShippingBanner";
 import { ComponentLoader } from "../component/layout/LoadingSpinner";
 import { getClaimedMobile, isOfferLive } from "../config/independenceOffer";
 import IndependenceOfferBanner from "../component/IndependenceOfferBanner";
 import useOfferTerms from "../hooks/useOfferTerms";
+import { useShippingDelayNotice } from "../hooks/useShippingDelayNotice";
 import { calcLocalDiscount } from "../utils/couponDiscount";
-import { trackBeginCheckout, trackPurchase, trackAddShippingInfo, trackAddPaymentInfo, trackPaymentFailed, trackPaymentModalDismissed, trackCheckoutStep, trackOrderCreated, trackSelectPaymentMethod, trackDeliveryCheck, getFbCookies, getAnonymousId, cacheAddressForCapi, setMetaAdvancedMatching } from "../utils/analytics";
+import { trackBeginCheckout, trackPurchase, trackAddShippingInfo, trackAddPaymentInfo, trackPaymentFailed, trackPaymentModalDismissed, trackCheckoutStep, trackOrderCreated, trackSelectPaymentMethod, trackDeliveryCheck, trackApplyCoupon, trackRemoveCoupon, getFbCookies, getAnonymousId, cacheAddressForCapi, setMetaAdvancedMatching } from "../utils/analytics";
 
 const CouponList = lazy(() => import("../component/CouponList"));
 const MobileNumberModal = lazy(() => import("../component/MobileNumberModal"));
@@ -44,11 +47,13 @@ const GoogleAddressFormModal = lazy(() => import("../component/GoogleAddressForm
 // fee varies per order — keep it in step with what they actually charge.
 const COD_HANDLING_FEE = "30–40";
 
+// Guests used to pick "guest or sign in" on a step of its own. That screen
+// only ever cost a tap — the same choice now sits on the Contact step, where
+// they are already typing their details.
 const GUEST_STEPS = [
-  { number: 1, label: "Account" },
-  { number: 2, label: "Contact" },
-  { number: 3, label: "Address" },
-  { number: 4, label: "Review & Pay" },
+  { number: 1, label: "Contact" },
+  { number: 2, label: "Address" },
+  { number: 3, label: "Review & Pay" },
 ];
 
 const AUTH_STEPS = [
@@ -56,6 +61,10 @@ const AUTH_STEPS = [
   { number: 2, label: "Address" },
   { number: 3, label: "Review & Pay" },
 ];
+
+/* Bumped when the step layout changes — a state saved against the old
+   four-step guest flow would drop the customer on the wrong screen. */
+const CHECKOUT_STATE_KEY = "checkoutState_v2";
 
 const Field = ({ label, required, error, children }) => (
   <div className="space-y-1.5">
@@ -391,6 +400,7 @@ const CheckoutPage = () => {
 
   const { items: cartItems, selections: cartSelections, giftWrap: giftWrapSelected, giftWrapNoteOptions } = useSelector((s) => s.cart);
   const { isAuthenticated } = useSelector((s) => s.auth);
+  const shippingDelayMessage = useShippingDelayNotice();
   const isGuest = !isAuthenticated && !localStorage.getItem("authToken");
   const STEPS = isGuest ? GUEST_STEPS : AUTH_STEPS;
   const paymentCompletedRef = useRef(false);
@@ -406,7 +416,7 @@ const CheckoutPage = () => {
   // Restore checkout state from sessionStorage on mount
   const savedCheckout = useRef((() => {
     try {
-      const saved = JSON.parse(sessionStorage.getItem("checkoutState")) || {};
+      const saved = JSON.parse(sessionStorage.getItem(CHECKOUT_STATE_KEY)) || {};
       // Migration: robustly handle pincode key variations
       const rawPin = saved.pinCode || saved.pincode || saved.userPinCode || "";
       saved.pinCode = String(rawPin).trim();
@@ -483,6 +493,7 @@ const CheckoutPage = () => {
   const [applyCouponMutation] = useApplyCouponMutation();
   const [deleteAddressMutation] = useDeleteAddressMutation();
   const [updateCart] = useUpdateCartMutation();
+  const [syncGuestCart] = useSyncGuestCartMutation();
   const [updateUserProfile] = useUpdateUserProfileMutation();
   const { data: savedAddressData, refetch: refetchAddresses } =
     useGetSavedAddressesQuery(undefined, { skip: isGuest });
@@ -497,7 +508,7 @@ const CheckoutPage = () => {
   const cartRuleEvalItems = useMemo(
     () =>
       cartItems
-        .map((i) => ({ productId: i.mongoId || i.id?.split(":")[0], quantity: Number(i.quantity) || 0 }))
+        .map((i) => ({ productId: i.mongoId || i.id?.split(":")[0], quantity: Number(i.quantity) || 0, selectedVariant: i.selectedVariant }))
         .filter((i) => i.productId && i.quantity > 0),
     [cartItems],
   );
@@ -516,7 +527,11 @@ const CheckoutPage = () => {
   // controller) already applied it correctly.
   const getItemDiscountedPrice = (item) => {
     const productId = item.mongoId || item.id?.split(":")[0];
-    const candidates = cartRuleEvalData?.data?.discounts?.[productId];
+    // Untagged candidates apply to every variant (unchanged); a `variantName`
+    // tag restricts to that one variant — see cartRule.util.js.
+    const candidates = (cartRuleEvalData?.data?.discounts?.[productId] || []).filter(
+      (c) => !c.variantName || c.variantName === item.selectedVariant,
+    );
     const price = Number(item.price) || 0;
     if (!candidates?.length) return price;
     const results = candidates.map((c) =>
@@ -560,8 +575,24 @@ const CheckoutPage = () => {
     const banners = allFreeShippingBannersData?.data || [];
     if (banners.length === 0) return [];
     const cartProductIds = new Set(cartItems.map((i) => i.mongoId || i.id?.split(":")[0]));
+    // Which selectedVariant name(s) of a product are actually in the cart —
+    // lets a banner scoped to one variant (sourceVariantName/recommendedVariantName,
+    // see freeShippingOffer.util.js) require that exact variant, not just the
+    // product. A banner with no variant name behaves exactly as before.
+    const cartVariantsByProduct = new Map();
+    cartItems.forEach((i) => {
+      const pid = i.mongoId || i.id?.split(":")[0];
+      if (!pid) return;
+      if (!cartVariantsByProduct.has(pid)) cartVariantsByProduct.set(pid, new Set());
+      if (i.selectedVariant) cartVariantsByProduct.get(pid).add(i.selectedVariant);
+    });
+    const hasProductVariant = (productId, variantName) => {
+      if (!cartProductIds.has(productId)) return false;
+      if (!variantName) return true;
+      return (cartVariantsByProduct.get(productId) || new Set()).has(variantName);
+    };
     return banners.filter(
-      (b) => cartProductIds.has(b.sourceProductId) && !cartProductIds.has(b.recommendedProductId),
+      (b) => hasProductVariant(b.sourceProductId, b.sourceVariantName) && !hasProductVariant(b.recommendedProductId, b.recommendedVariantName),
     );
   }, [allFreeShippingBannersData, cartItems]);
 
@@ -590,7 +621,6 @@ const CheckoutPage = () => {
   }, [isGuest]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    window.scrollTo(0, 0);
     if (!isGuest) {
       fetchCsrfToken().catch((e) => console.warn("[Checkout] CSRF fetch failed:", e));
     }
@@ -600,7 +630,7 @@ const CheckoutPage = () => {
   useEffect(() => {
     if (paymentCompletedRef.current) return;
     try {
-      sessionStorage.setItem("checkoutState", JSON.stringify({
+      sessionStorage.setItem(CHECKOUT_STATE_KEY, JSON.stringify({
         currentStep,
         address,
         pinCode,
@@ -617,6 +647,127 @@ const CheckoutPage = () => {
       console.error("[Checkout] Failed to save state to session storage:", err);
     }
   }, [currentStep, address, pinCode, preciseDetails, addressForm, currentAddressId, senderMobile, appliedCoupon, guestName, guestEmail, guestMobile]);
+
+  // Holds a "fire this right now" function for whichever capture below has a
+  // debounce timer pending — set right before the timer starts, cleared once
+  // it actually fires. The unmount-effect and pagehide listener further down
+  // use these to flush immediately if the user navigates away or closes the
+  // tab BEFORE the debounce would have fired on its own, using `keepalive`
+  // fetch (survives page teardown, unlike a normal fetch/RTK mutation call).
+  const pendingGuestFlushRef = useRef(null);
+  const pendingMobileFlushRef = useRef(null);
+
+  // Guest abandoned-cart capture: as soon as a guest's Contact-step details
+  // look valid (not on every keystroke — debounced ~1s after typing stops),
+  // persist name/email/mobile + current cart to the server so this guest
+  // shows up in the admin's abandoned-cart dashboard even if they never
+  // reach Address/payment. Fires again on every relevant change so the row
+  // stays current; harmless/no-op if nothing changed meaningfully. Never
+  // blocks or surfaces errors — this is best-effort capture, not part of the
+  // actual checkout flow.
+  useEffect(() => {
+    if (!isGuest || paymentCompletedRef.current) return;
+    if (cartItems.length === 0) return;
+
+    const emailLooksValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail.trim());
+    const mobileLooksValid = /^[6-9][0-9]{9}$/.test(guestMobile.trim());
+    if (!emailLooksValid && !mobileLooksValid) return;
+
+    const payload = {
+      anonymousId: getAnonymousId(),
+      guestName: guestName.trim(),
+      guestEmail: guestEmail.trim().toLowerCase(),
+      guestMobile: guestMobile.trim(),
+      items: cartItems.map((i) => ({
+        productId: i.mongoId || i.id.split(":")[0],
+        quantity: i.quantity,
+        selectedVariant: (i.selectedVariant && i.selectedVariant !== "N/A") ? i.selectedVariant : (cartSelections[i.id]?.variant || "N/A"),
+        image: i.image,
+      })),
+    };
+
+    pendingGuestFlushRef.current = () => {
+      try {
+        fetch(`${getApiUrl()}/guest-cart/sync`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          keepalive: true,
+        });
+      } catch { /* best-effort, never block navigation/unload */ }
+    };
+
+    const timer = setTimeout(() => {
+      syncGuestCart(payload).catch(() => {});
+      pendingGuestFlushRef.current = null;
+    }, 1000);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGuest, guestName, guestEmail, guestMobile, cartItems]);
+
+  // Same capture gap for LOGGED-IN users: their typed mobile number only
+  // ever saved to the profile inside handleStep1Next, i.e. only if they
+  // clicked "Next" — someone who types it and abandons before that lost the
+  // number entirely, which is exactly why some abandoned-cart rows for
+  // members show an email but no phone. Debounced (~1s) so this doesn't
+  // fire on every keystroke, and skipped entirely if it hasn't actually
+  // changed from what's already on the profile.
+  useEffect(() => {
+    if (isGuest || paymentCompletedRef.current) return;
+    if (!senderMobile) return;
+
+    const m = stripCC(String(senderMobile));
+    if (!validateMobile(m)) return;
+
+    const existingMobile = String(userProfile?.mobileNumber || userProfile?.mobile || "");
+    if (m === existingMobile) return;
+
+    pendingMobileFlushRef.current = () => {
+      try {
+        const token = localStorage.getItem("authToken");
+        fetch(`${getApiUrl()}/user/profile/update`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ mobileNumber: m }),
+          keepalive: true,
+          credentials: "include",
+        });
+      } catch { /* best-effort, never block navigation/unload */ }
+    };
+
+    const timer = setTimeout(() => {
+      updateUserProfile({ mobileNumber: m }).unwrap().then(() => refetchProfile()).catch(() => {});
+      pendingMobileFlushRef.current = null;
+    }, 1000);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGuest, senderMobile, userProfile]);
+
+  // Safety net for BOTH captures above: if the user navigates to a different
+  // route (unmounting this page) or closes/backgrounds the tab BEFORE a
+  // pending debounce timer got to fire on its own, send it right now via
+  // `keepalive` fetch instead of losing it — that's the whole point of the
+  // refs above. `pagehide` covers tab close/refresh/backgrounding (a hard
+  // teardown React never gets an unmount callback for); the empty-deps
+  // cleanup covers an in-app route change away from /checkout.
+  useEffect(() => {
+    const flushAll = () => {
+      pendingGuestFlushRef.current?.();
+      pendingMobileFlushRef.current?.();
+      pendingGuestFlushRef.current = null;
+      pendingMobileFlushRef.current = null;
+    };
+    window.addEventListener("pagehide", flushAll);
+    return () => {
+      window.removeEventListener("pagehide", flushAll);
+      flushAll();
+    };
+  }, []);
 
   // Dynamic Shipping Calculation - triggered by payment method change on Review page
   const calculateShippingRef = useRef(calculateShipping);
@@ -699,11 +850,27 @@ const CheckoutPage = () => {
           const offerConfig = freeShippingOfferData?.data;
           const banners = allFreeShippingBannersData?.data || [];
           const cartProductIds = new Set(cartItems.map((i) => i.mongoId || i.id?.split(":")[0]));
+          // Which selectedVariant name(s) of a product are actually in the cart —
+          // lets a banner scoped to one variant (sourceVariantName/recommendedVariantName,
+          // see freeShippingOffer.util.js) require that exact variant, not just
+          // the product. A banner with no variant name behaves exactly as before.
+          const cartVariantsByProduct = new Map();
+          cartItems.forEach((i) => {
+            const pid = i.mongoId || i.id?.split(":")[0];
+            if (!pid) return;
+            if (!cartVariantsByProduct.has(pid)) cartVariantsByProduct.set(pid, new Set());
+            if (i.selectedVariant) cartVariantsByProduct.get(pid).add(i.selectedVariant);
+          });
+          const hasProductVariant = (productId, variantName) => {
+            if (!cartProductIds.has(productId)) return false;
+            if (!variantName) return true;
+            return (cartVariantsByProduct.get(productId) || new Set()).has(variantName);
+          };
           // Combo eligibility is independent of the offer doc's own isActive
           // (that flag is only the cart-value threshold switch) — see the
           // matching comment on checkoutNudgeBanners above.
           const comboEligible = banners.some(
-            (b) => cartProductIds.has(b.sourceProductId) && cartProductIds.has(b.recommendedProductId),
+            (b) => hasProductVariant(b.sourceProductId, b.sourceVariantName) && hasProductVariant(b.recommendedProductId, b.recommendedVariantName),
           );
           // Plain cart-value threshold — whole cart, any products count.
           // Mirrors the server's direct subtotal >= thresholdAmount check,
@@ -988,14 +1155,19 @@ const CheckoutPage = () => {
         setPricingDetails(prev => ({ ...prev, subtotal: (r.data.summary.subtotal || 0) - ruleDiscountSavings, discount: r.data.summary.discount || 0 }));
         showNotification(r.message || "Coupon applied!", "success");
         setShowCouponModal(false);
+        trackApplyCoupon({ coupon: couponData.code, discount: r.data.summary.discount || 0, status: "success", isGuest });
       }
-    } catch (e) { showNotification(e?.data?.message || "Failed to apply coupon", "error"); }
+    } catch (e) {
+      trackApplyCoupon({ coupon: couponData.code, status: "failed", errorType: e?.data?.message || "apply_failed", isGuest });
+      showNotification(e?.data?.message || "Failed to apply coupon", "error");
+    }
   };
 
   const handleGuestCouponApplied = (couponData) => {
     setAppliedCoupon(couponData.code);
     setPricingDetails(prev => ({ ...prev, discount: couponData.discount || 0 }));
     setShowCouponModal(false);
+    trackApplyCoupon({ coupon: couponData.code, discount: couponData.discount || 0, status: "success", isGuest: true });
   };
 
   // One-tap apply for the offer block at the top of the page. Routes into the
@@ -1013,6 +1185,7 @@ const CheckoutPage = () => {
         const subtotal = cartTotalAmount;
         const minCart = offerTerms.minCartValue || 0;
         if (subtotal < minCart) {
+          trackApplyCoupon({ coupon: code, status: "failed", errorType: "min_cart_not_met", isGuest: true });
           showNotification(
             `Add ₹${(minCart - subtotal).toLocaleString()} more to use ${code} (min order ₹${minCart.toLocaleString()})`,
             "error",
@@ -1021,6 +1194,7 @@ const CheckoutPage = () => {
         }
         const discount = calcLocalDiscount(offerTerms, subtotal);
         if (discount <= 0) {
+          trackApplyCoupon({ coupon: code, status: "failed", errorType: "no_discount", isGuest: true });
           showNotification("This coupon gives no discount on your current cart", "error");
           return;
         }
@@ -1039,6 +1213,7 @@ const CheckoutPage = () => {
     try {
       const r = await applyCouponMutation({ couponCode: null, email: userEmail }).unwrap();
       if (r.success && r.data?.summary) {
+        trackRemoveCoupon({ coupon: appliedCoupon, isGuest });
         setAppliedCoupon(null);
         setPricingDetails(prev => ({ ...prev, subtotal: (r.data.summary.subtotal || 0) - ruleDiscountSavings, discount: r.data.summary.discount || 0 }));
         showNotification("Coupon removed", "success");
@@ -1047,6 +1222,7 @@ const CheckoutPage = () => {
   };
 
   const handleGuestCouponRemoved = () => {
+    trackRemoveCoupon({ coupon: appliedCoupon, isGuest: true });
     setAppliedCoupon(null);
     setPricingDetails(prev => ({ ...prev, discount: 0 }));
     showNotification("Coupon removed", "success");
@@ -1171,7 +1347,7 @@ const CheckoutPage = () => {
             });
             dispatch(clearCart());
             localStorage.removeItem("guestCart"); localStorage.removeItem("guestId");
-            sessionStorage.removeItem("checkoutState");
+            sessionStorage.removeItem(CHECKOUT_STATE_KEY);
             sessionStorage.removeItem("un_begin_checkout_fired"); // allow begin_checkout again for the next order
             navigate(`/payment-processing/${response.razorpay_order_id}`);
           },
@@ -1248,7 +1424,7 @@ const CheckoutPage = () => {
               email: userProfile?.email, phone: senderMobileStr, name: userProfile?.userName || userProfile?.name, externalId: userProfile?.userId || userProfile?._id || getAnonymousId(),
               items: cartItems.map((i) => ({ itemId: i.mongoId || i.id, itemName: i.name, itemVariant: i.selectedVariant || "N/A", price: i.price, quantity: i.quantity })),
             });
-            sessionStorage.removeItem("checkoutState");
+            sessionStorage.removeItem(CHECKOUT_STATE_KEY);
             sessionStorage.removeItem("un_begin_checkout_fired"); // allow begin_checkout again for the next order
             navigate(`/payment-processing/${response.razorpay_order_id}`);
           } catch (_) { setPaymentError("Payment verification failed. Contact support if amount was debited."); }
@@ -1279,12 +1455,13 @@ const CheckoutPage = () => {
     : (pricingDetails.shipping?.realAmount ?? pricingDetails.shipping?.amount ?? 0);
   // Gift wrap — added on top of subtotal, same as the server's finalAmount
   // formula (subtotal + giftWrap + shipping − discount). Qty auto-scales with
-  // distinct ELIGIBLE PRODUCTS, deduped (not per cart line — two variants of
-  // the same product only count once), mirroring rp.payment.controller.js exactly.
+  // total ELIGIBLE UNITS in the cart — 2x the same eligible product is 2
+  // gift wraps, not 1 — mirroring rp.payment.controller.js exactly.
   const giftWrapOffer = giftWrapOfferData?.data;
-  const giftWrapEligibleCount = new Set(
-    cartItems.filter((i) => i.giftWrapEligible).map((i) => i.mongoId || i.id),
-  ).size;
+  const giftWrapEligibleCount = cartItems.reduce(
+    (sum, i) => (i.giftWrapEligible ? sum + (Number(i.quantity) || 0) : sum),
+    0,
+  );
   const giftWrapAmount =
     giftWrapSelected && giftWrapOffer?.isActive
       ? (Number(giftWrapOffer.price) || 0) * giftWrapEligibleCount
@@ -1446,6 +1623,18 @@ const CheckoutPage = () => {
         </div>
       </div>
 
+      {/* ── Shipping delay notice — Review & Pay step only, while the
+          affected product is in cart, auto-hides past its configured expiry
+          (see hooks/useShippingDelayNotice.js). */}
+      {shippingDelayMessage && currentStep === reviewStep && (
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-6">
+          <div className="flex items-center gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <i className="fa-solid fa-triangle-exclamation text-amber-500 text-sm shrink-0" />
+            <p className="text-xs sm:text-sm font-semibold text-amber-800">{shippingDelayMessage}</p>
+          </div>
+        </div>
+      )}
+
       {/* ── Independence Day offer ─────────────────────────────────────────
           Review & Pay only. Account, Contact and Address are all the same
           /checkout route, so without the step check this rode along on every
@@ -1465,75 +1654,40 @@ const CheckoutPage = () => {
       <div className={`max-w-5xl mx-auto px-4 sm:px-6 pt-8 lg:pb-14 lg:grid lg:grid-cols-[1fr_360px] lg:gap-10 lg:items-start ${(isGuest && currentStep === 1) ? "pb-8" : "pb-32 lg:pb-14"}`}>
         {/* ── Left: form ───────────────────────────────────────────────── */}
         <div className="min-w-0">
-          {/* ══════════ STEP — ACCOUNT (Guest only) ═══════════════════ */}
-          {isGuest && currentStep === 1 && (
-            <div className="space-y-6 step-fade checkout-sheet">
-              {/* mobile sheet grab handle */}
-              <div className="lg:hidden flex justify-center pt-2 pb-1"><span className="h-1.5 w-11 rounded-full bg-gray-200" /></div>
-              <div className="text-center">
-                <h1 className="text-2xl sm:text-3xl font-inter text-gray-900 leading-tight">How would you like to continue?</h1>
-                {/* <p className="text-sm text-gray-400 mt-2">Sign in for a faster checkout or continue as a guest</p> */}
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-stretch gap-0">
-                {/* Guest option */}
-                <button
-                  onClick={() => goToStep(contactStep)}
-                  className="group flex-1 bg-white rounded-2xl border-2 border-gray-100 hover:border-brand/40 p-6 sm:p-8 text-left transition-all hover:shadow-lg"
-                >
-                  <div className="w-12 h-12 rounded-2xl bg-brand/8 flex items-center justify-center mb-4 group-hover:bg-brand/15 transition-colors">
-                    <i className="fa-solid fa-bolt text-brand text-lg" />
-                  </div>
-                  <h3 className="text-base font-bold text-gray-900 mb-1">Continue as Guest</h3>
-                  <p className="text-xs text-gray-400 leading-relaxed">We'll send your login details to your email.</p>
-                  <div className="mt-4 flex items-center gap-1.5 text-xs font-bold text-brand uppercase tracking-wider">
-                    No account needed <i className="fa-solid fa-arrow-right text-[9px]" />
-                  </div>
-                </button>
-
-                {/* OR divider — horizontal on mobile, vertical on desktop */}
-                <div className="flex sm:flex-col items-center justify-center px-4 py-3 sm:py-6 shrink-0">
-                  <div className="flex-1 h-px sm:h-full sm:w-px bg-gray-200" />
-                  <span className="px-3 sm:px-0 sm:py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest shrink-0">
-                    or
-                  </span>
-                  <div className="flex-1 h-px sm:h-full sm:w-px bg-gray-200" />
-                </div>
-
-                {/* Sign In option */}
-                <button
-                  onClick={() => { dispatch(setLoginCallback('navigate:/checkout')); dispatch(setShowLoginModal(true)); }}
-                  className="group flex-1 bg-white rounded-2xl border-2 border-ink/15 hover:border-ink/40 p-6 sm:p-8 text-left transition-all hover:shadow-lg"
-                >
-                  <div className="w-12 h-12 rounded-2xl bg-brand/8 flex items-center justify-center mb-4 group-hover:bg-brand/15 transition-colors">
-                    <i className="fa-solid fa-user text-ink text-lg" />
-                  </div>
-                  <h3 className="text-base font-bold text-gray-900 mb-1">
-                    Sign In / Sign Up
-                  </h3>
-                  <p className="text-xs text-gray-400 leading-relaxed">
-                    Track orders, save addresses, and get exclusive offers
-                  </p>
-                </button>
-              </div>
-
-              <div className="flex items-center justify-center gap-5 text-gray-300 pt-2">
-                <i className="fa-brands fa-cc-visa text-xl" />
-                <i className="fa-brands fa-cc-mastercard text-xl" />
-                <i className="fa-brands fa-google-pay text-xl" />
-                <i className="fa-solid fa-shield-halved text-base" />
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-300">
-                  100% Secure
-                </span>
-              </div>
-            </div>
-          )}
-
           {/* ══════════ STEP — CONTACT ════════════════════════════════ */}
           {currentStep === contactStep && (
             <div className="space-y-5 step-fade checkout-sheet">
               {/* mobile sheet grab handle */}
               <div className="lg:hidden flex justify-center pt-2 pb-1"><span className="h-1.5 w-11 rounded-full bg-gray-200" /></div>
+              {/* Sign-in nudge for guests. This used to be a screen of its own
+                  before the contact form; as a strip it offers the same choice
+                  without spending a whole step on it. */}
+              {isGuest && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    dispatch(setLoginCallback("navigate:/checkout"));
+                    dispatch(setShowLoginModal(true));
+                  }}
+                  className="w-full flex items-center justify-between gap-3 bg-surface hover:bg-hair/60 border border-hair rounded-2xl px-5 py-3.5 transition-colors text-left"
+                >
+                  <span className="flex items-center gap-3 min-w-0">
+                    <i className="fa-solid fa-user text-ink text-sm shrink-0" />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-bold text-ink">
+                        Have an account?
+                      </span>
+                      <span className="block text-xs text-gray-400">
+                        Sign in to skip typing your details
+                      </span>
+                    </span>
+                  </span>
+                  <span className="gl-lbl text-[10px] text-brand shrink-0">
+                    Sign in
+                  </span>
+                </button>
+              )}
+
               {/* Contact form card */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-50">
@@ -2121,6 +2275,7 @@ const CheckoutPage = () => {
                   <div className="px-5 pb-5">
                     <FreeShippingBanner
                       bannersOverride={visibleNudgeBanners}
+                      surface="checkout"
                       variant="light"
                       showQuantityStepper
                       showProgressBar={false}
@@ -2491,6 +2646,7 @@ const CheckoutPage = () => {
               <div className="px-5 pb-5">
                 <FreeShippingBanner
                   bannersOverride={visibleNudgeBanners}
+                  surface="checkout"
                   variant="light"
                   showQuantityStepper
                   showProgressBar={false}

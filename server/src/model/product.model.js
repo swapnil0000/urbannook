@@ -18,8 +18,20 @@ const productSchema = mongoose.Schema(
     variantDetails: [
       {
         variantName: String,
+        // Written by the admin panel (server/models/product.model.js) as an
+        // uppercase/trimmed identifier — undeclared here meant any non-.lean()
+        // query (e.g. rp.payment.controller.js's order creation) silently
+        // stripped it via Mongoose hydration, even though .lean() reads
+        // (cartRule.controller.js's eligibility check) saw it fine. That
+        // mismatch made variant-scoped free-shipping/cart-rule offers show as
+        // eligible on the checkout page but never actually apply at payment time.
+        sku: { type: String, default: "", uppercase: true, trim: true },
         variantImage: [String], // Specific images for this variant
         variantPrice: Number,
+        // Short optional line shown on the PDP under the product title when
+        // this variant is selected (e.g. "BMW Inspired, 104cm"). Set from
+        // the admin panel; blank shows nothing.
+        variantSubTag: { type: String, default: "" },
         // ── Per-variant stock (managed from the admin panel) ─────────────────
         // `variantQuantity: null` = not stock-tracked (never auto-OOS by qty).
         // A number decrements on each paid order and derives out-of-stock at <= 0.

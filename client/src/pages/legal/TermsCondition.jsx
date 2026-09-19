@@ -107,7 +107,7 @@ const TermsConditions = () => {
             </p>
             <div className="flex flex-wrap gap-4 mt-6">
               <Link to="/shipping-policy" className="text-sm border border-hair px-4 py-2 rounded bg-white text-faint">Shipping Policy</Link>
-              <Link to="/cancellation-refund" className="text-sm border border-hair px-4 py-2 rounded bg-white text-faint ">Cancellation &amp; Refund</Link>
+              {/* Cancellation & Refund policy retired — link removed on main */}
             </div>
           </section>
 

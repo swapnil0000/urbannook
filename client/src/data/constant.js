@@ -104,7 +104,7 @@ export  const socialLinks = [
       name: 'Chat on WhatsApp',
       icon: 'fa-brands fa-whatsapp',
       color: 'bg-[#25D366]',
-      link: 'https://wa.me/+918299638749?text=Hi! I am interested in Urban Nook products.',
+      link: 'https://wa.me/+919124081005?text=Hi! I am interested in Urban Nook products.',
     },
     {
       id: 'instagram',
@@ -125,7 +125,7 @@ export  const socialLinks = [
       name: 'Call',
       icon: 'fa-solid fa-phone',
       color: 'bg-emerald-700',
-      link: 'tel:+918299638749',
+      link: 'tel:+919124081005',
     }
   ];
 
@@ -144,7 +144,7 @@ export const contactInfo = [
         id: 1,
         icon: "fa-solid fa-phone",
         title: "Contact Number",
-        info: "+91 82996 38749",
+        info: "+91 91240 81005",
         subInfo: "Mon-Sat, 9am - 7pm",
     },
     {

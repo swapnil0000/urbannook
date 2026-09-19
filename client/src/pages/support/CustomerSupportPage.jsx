@@ -202,14 +202,14 @@ const CustomerSupportPage = () => {
                         {/* Right: Contact Cards (LIGHT BOXES) */}
                         <div className="lg:col-span-4 space-y-4">
                             {/* Call Support */}
-                            <a href="tel:+918299638749" className="block p-6 rounded-2xl bg-surface border border-transparent hover:border-brand/50 hover:shadow-lg transition-all group cursor-pointer shadow-md">
+                            <a href="tel:+919124081005" className="block p-6 rounded-2xl bg-surface border border-transparent hover:border-brand/50 hover:shadow-lg transition-all group cursor-pointer shadow-md">
                                 <div className="flex items-start gap-4">
                                     <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center text-brand group-hover:bg-brand group-hover:text-white transition-all">
                                         <i className="fa-solid fa-phone"></i>
                                     </div>
                                     <div>
                                         <h4 className="text-ink font-archivo font-bold text-lg mb-1 group-hover:text-brand transition-colors">Call Support</h4>
-                                        <p className="text-brand font-mono text-sm mb-2 font-bold">+91 82996 38749</p>
+                                        <p className="text-brand font-mono text-sm mb-2 font-bold">+91 91240 81005</p>
                                         <p className="text-xs text-gray-500">Mon-Sat, 9AM - 7PM</p>
                                     </div>
                                 </div>
@@ -230,14 +230,14 @@ const CustomerSupportPage = () => {
                             </a>
 
                             {/* WhatsApp */}
-                            <a href="https://wa.me/918299638749" target="_blank" rel="noreferrer" className="block p-6 rounded-2xl bg-surface border border-transparent hover:border-brand/50 hover:shadow-lg transition-all group cursor-pointer shadow-md">
+                            <a href="https://wa.me/919124081005" target="_blank" rel="noreferrer" className="block p-6 rounded-2xl bg-surface border border-transparent hover:border-brand/50 hover:shadow-lg transition-all group cursor-pointer shadow-md">
                                 <div className="flex items-start gap-4">
                                     <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center text-brand group-hover:bg-brand group-hover:text-white transition-all">
                                         <i className="fa-brands fa-whatsapp text-xl"></i>
                                     </div>
                                     <div>
                                         <h4 className="text-ink font-archivo font-bold text-lg mb-1 group-hover:text-brand transition-colors">Chat on WhatsApp</h4>
-                                        <p className="text-brand font-mono text-sm mb-2 font-bold">+91 82996 38749</p>
+                                        <p className="text-brand font-mono text-sm mb-2 font-bold">+91 91240 81005</p>
                                         <p className="text-xs text-gray-500">Available 24/7</p>
                                     </div>
                                 </div>

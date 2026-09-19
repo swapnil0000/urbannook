@@ -4,6 +4,7 @@ import { useGetProductsQuery } from '../../store/api/productsApi';
 import SEOHead from '../../component/SEOHead';
 import UnProductCard, { firstVariant } from '../../component/UnProductCard';
 import { trackViewItemList } from '../../utils/analytics';
+import RevealCard from '../../component/RevealCard';
 
 const productList = (res) => res?.data?.products || res?.data?.listofPublishedProducts || [];
 
@@ -81,7 +82,11 @@ const AllProductsPage = () => {
           </div>
         ) : (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-            {displayProducts.map((p, i) => <UnProductCard key={p.productId || i} p={p} index={i} listId="all_products" listName="All Products" />)}
+            {displayProducts.map((p, i) => (
+              <RevealCard key={p.productId || i} index={i}>
+                <UnProductCard p={p} index={i} listId="all_products" listName="All Products" />
+              </RevealCard>
+            ))}
           </div>
         )}
       </section>

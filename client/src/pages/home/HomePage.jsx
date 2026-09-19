@@ -644,7 +644,7 @@ const HomePage = () => {
             </div>
             <div className="bg-surface px-3 py-3.5 md:py-6 flex flex-col items-center justify-center text-center">
               <span className="font-archivo text-2xl md:text-4xl font-extrabold text-brand leading-none">7-Day</span>
-              <span className="gl-lbl text-[8px] text-faint mt-1.5">Easy returns</span>
+              <span className="gl-lbl text-[8px] text-faint mt-1.5">Easy replacement</span>
             </div>
           </div>
           {/* secure-checkout + payment strip */}

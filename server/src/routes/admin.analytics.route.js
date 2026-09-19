@@ -8,5 +8,7 @@ router.get("/admin/analytics/funnel", authGuardService("Admin"), adminAnalyticsC
 router.get("/admin/analytics/summary", authGuardService("Admin"), adminAnalyticsController.getSummary);
 router.get("/admin/analytics/events", authGuardService("Admin"), adminAnalyticsController.getEvents);
 router.get("/admin/analytics/top-products", authGuardService("Admin"), adminAnalyticsController.getTopProducts);
+router.get("/admin/analytics/channels", authGuardService("Admin"), adminAnalyticsController.getChannels);
+router.get("/admin/analytics/search-console", authGuardService("Admin"), adminAnalyticsController.getSearchConsole);
 
 export default router;

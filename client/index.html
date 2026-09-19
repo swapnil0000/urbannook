@@ -59,6 +59,9 @@
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="https://www.urbannook.in/" />
 
+  <!-- Google Ads -->
+  <meta name="google-site-verification" content="46CQHlF4g5BYMKcIhKW_UCkjNByyMpEZE4d3j8NwaPE" />
+  
   <!-- Open Graph -->
   <meta property="og:type" content="website" />
   <meta property="og:title" content="UrbanNook — Modern Lifestyle Store" />
@@ -93,9 +96,14 @@
   <!-- Editorial "2040" typography: Anton (display) · Archivo (headings) · Inter (body) · JetBrains Mono (labels) -->
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
 
-  <link rel="preload" as="image" href="/assets/hero21.webp" fetchpriority="high" media="(max-width: 768px)" />
-  <link rel="preload" as="image" href="/assets/hero2.webp" fetchpriority="high" media="(min-width: 769px)" />
-  <link rel="preload" as="script" href="/src/main.jsx" />
+  <!-- The home hero renders /assets/hero2.webp at every breakpoint, so preload it
+       unconditionally. The previous media-split preload fetched hero21.webp on mobile —
+       an image the hero never uses — and left the real LCP image undiscovered until
+       React had rendered, costing ~2.2s of LCP load delay.
+       Do NOT preload /src/main.jsx here: that path only exists in dev, and Vite inlines
+       it into the built HTML as a base64 data: URI. Vite already injects the correct
+       hashed module script at the end of <body>. -->
+  <link rel="preload" as="image" href="/assets/hero2.webp" fetchpriority="high" />
   
   <link rel="preload" as="font" type="font/woff2"
     href="https://fonts.gstatic.com/s/poppins/v20/pxiEyp8kv8JHgFVrJJfecg.woff2"

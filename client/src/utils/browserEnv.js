@@ -81,3 +81,15 @@ export function escapeToExternalBrowser({ force = false } = {}) {
   loc.href = intentUrl;
   return true;
 }
+
+/**
+ * True on phones and tablets.
+ *
+ * Used by WhatsApp login: mobile hands off to the app via the whatsapp://
+ * scheme, while desktop opens web.whatsapp.com instead.
+ */
+export function isMobileDevice() {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || navigator.vendor || '';
+  return /android|iphone|ipad|ipod|mobile/i.test(ua);
+}

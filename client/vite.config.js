@@ -113,6 +113,12 @@ export default defineConfig(({ mode }) => {
     },
   },
 
+  // Vite reads `esbuild` at the top level, NOT under `build`. Keep it here or the
+  // console/debugger stripping silently does nothing.
+  esbuild: {
+    drop: ['console', 'debugger'],
+  },
+
   test: {
     globals: true,
     environment: 'jsdom',
@@ -133,34 +139,27 @@ export default defineConfig(({ mode }) => {
     target: 'es2015',
     cssMinify: true, // CSS minification enabled
     
-    // Esbuild minification options for JavaScript
-    esbuild: {
-      drop: ['console', 'debugger'],
-      platform: 'browser',
-      format: 'esm',
-      minify: true, // Ensure JS minification
-      treeShaking: true // Remove unused code
-    },
-    
     rollupOptions: {
       // Force externalize React Router to separate chunk
       external: (id) => {
         // Don't externalize, but this helps with chunking
         return false;
       },
-      treeshake: {
-        moduleSideEffects: false
-      },
       output: {
-        manualChunks: {
-          // Keep all React-related code together
-          'react-vendor': ['react', 'react-dom', 'react/jsx-runtime'],
-          // Keep Redux ecosystem together
-          'redux-vendor': ['@reduxjs/toolkit', 'react-redux'],
-          // Router in separate chunk
-          'router-vendor': ['react-router-dom'],
-          // Other vendors
-          'utils-vendor': ['axios']
+        // Matched by resolved module path, not by bare specifier. The previous
+        // object form listed 'react-dom', but the app imports 'react-dom/client' —
+        // a different module id — so react-dom never matched and landed in the entry
+        // chunk instead. Same for axios, which left utils-vendor empty (0 bytes).
+        // The trailing slash anchors each match: node_modules/react/ does not match
+        // node_modules/react-redux/ or node_modules/react-router-dom/.
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return;
+          // react + react-dom + scheduler must share one chunk; splitting them apart
+          // reorders initialization and breaks React at runtime.
+          if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'react-vendor';
+          if (/node_modules\/(@reduxjs|react-redux|redux|immer|reselect)\//.test(id)) return 'redux-vendor';
+          if (/node_modules\/react-router(-dom)?\//.test(id)) return 'router-vendor';
+          if (/node_modules\/axios\//.test(id)) return 'utils-vendor';
         },
         // Optimize asset file names
         assetFileNames: (assetInfo) => {

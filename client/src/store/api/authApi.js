@@ -146,6 +146,54 @@ export const authApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['User'],
     }),
+    /**
+     * WhatsApp login step 1 — asks for a code and its wa.me deep link.
+     * No credentials are sent; the phone is verified over WhatsApp.
+     */
+    whatsappLoginStart: builder.mutation({
+      query: (existingToken) => ({
+        url: 'auth/whatsapp/start',
+        method: 'POST',
+        // If a live code already exists the server returns that one —
+        // minting a new code would invalidate the prefilled WhatsApp message
+        body: existingToken ? { token: existingToken } : {},
+      }),
+    }),
+    /**
+     * WhatsApp login step 2 — polled by the frontend.
+     * The backend sets httpOnly cookies as soon as it returns VERIFIED;
+     * this only fills in the Redux state.
+     */
+    whatsappLoginStatus: builder.query({
+      query: (token) => ({
+        url: 'auth/whatsapp/status',
+        // _t changes on every poll so the URL stays unique and Cloudflare
+        // (which applies max-age=7200 to /api/*) cannot serve a cached
+        // response. Without it the browser keeps getting the first "PENDING".
+        params: { token, _t: Date.now() },
+      }),
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data?.success && data?.data?.status === 'VERIFIED') {
+            dispatch(setCredentials({
+              user: {
+                email: data.data.email,
+                name: data.data.name,
+                role: data.data.role,
+                userId: data.data.userId,
+                userMobileNumber: data.data.mobileNumber,
+              },
+              token: data.data.userAccessToken,
+            }));
+
+            await fetchCsrfToken();
+          }
+        } catch (error) {
+          console.error('WhatsApp login status check failed:', error);
+        }
+      },
+    }),
     googleLogin: builder.mutation({
       query: (credentials) => ({
         url: '/user/google-login',
@@ -190,4 +238,6 @@ export const {
   useForgotPasswordRequestMutation,
   useForgotPasswordResetMutation,
   useGoogleLoginMutation,
+  useWhatsappLoginStartMutation,
+  useLazyWhatsappLoginStatusQuery,
 } = authApi;
