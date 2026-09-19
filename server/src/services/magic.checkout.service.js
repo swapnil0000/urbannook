@@ -135,6 +135,27 @@ export const verifyMagicCallback = (channel, rawBody, headers = {}, query = {}) 
 };
 
 /* ===============================================================
+   CALLBACK PAYLOAD HELPERS
+================================================================ */
+
+/**
+ * Pull the Razorpay order id out of a callback payload.
+ *
+ * Razorpay sends `order_id: ""` and puts the real id in `razorpay_order_id`,
+ * WITHOUT the `order_` prefix — e.g. `Te4maQ5e34UZ84` for the order we stored
+ * as `order_Te4maQ5e34UZ84`. Reading `order_id` and matching it raw finds
+ * nothing, so every request fell back to a flat shipping rate on an empty cart.
+ * Both field names and both id shapes are handled here.
+ *
+ * @returns {string|null} the id as stored in order.payment.razorpayOrderId
+ */
+export const resolveRazorpayOrderId = (payload = {}) => {
+  const raw = String(payload.razorpay_order_id || payload.order_id || "").trim();
+  if (!raw) return null;
+  return raw.startsWith("order_") ? raw : `order_${raw}`;
+};
+
+/* ===============================================================
    LINE ITEMS
 ================================================================ */
 
@@ -220,10 +241,13 @@ export const toRazorpayServiceableAddress = (
   // Flat fields are the older serviceability shape, `shipping_methods` the
   // newer one; both are emitted so whichever Razorpay reads, it finds. The flat
   // `id` stays the ADDRESS id it sent us, so the echo still lines up.
+  // Razorpay sends the region as `state_code` (e.g. "UP"); echo back whichever
+  // of the two it actually gave us rather than dropping it.
   return {
     id: addr?.id ?? "standard",
     zipcode: addr?.zipcode,
     ...(addr?.state ? { state: addr.state } : {}),
+    ...(addr?.state_code ? { state_code: addr.state_code } : {}),
     ...(addr?.country ? { country: addr.country } : {}),
     serviceable: isServiceable,
     shipping_fee: isServiceable ? shippingFeePaise : 0,

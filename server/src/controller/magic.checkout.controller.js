@@ -14,6 +14,7 @@ import {
   verifyMagicCallback,
   toRazorpayServiceableAddress,
   stripCountryCode,
+  resolveRazorpayOrderId,
 } from "../services/magic.checkout.service.js";
 
 /**
@@ -85,12 +86,15 @@ export const magicShippingInfoController = asyncHandler(async (req, res) => {
   const payload = authedPayload("shipping", req, res);
   if (!payload) return;
 
-  const { addresses = [], order_id } = payload;
-  const order = await orderForRazorpayId(order_id, { items: 1, amount: 1 });
+  const { addresses = [] } = payload;
+  const razorpayOrderId = resolveRazorpayOrderId(payload);
+  const order = await orderForRazorpayId(razorpayOrderId, { items: 1, amount: 1 });
   const cartItems = cartItemsForOrder(order);
 
   if (!order) {
-    console.warn(`${TAG}[shipping] no DB order for ${order_id} — rating on pincode alone`);
+    // Without the order we have no cart, so ShipMozo cannot weigh anything and
+    // every pincode degrades to the flat fallback rate.
+    console.warn(`${TAG}[shipping] no DB order for ${razorpayOrderId || "(no id in payload)"} — rating on pincode alone`);
   }
 
   // Free shipping is normally decided at order-create, but a Magic order has no
@@ -234,7 +238,8 @@ export const magicApplyPromotionController = asyncHandler(async (req, res) => {
   const payload = authedPayload("applyPromotion", req, res);
   if (!payload) return;
 
-  const { order_id, code, contact, email } = payload;
+  const { code, contact, email } = payload;
+  const razorpayOrderId = resolveRazorpayOrderId(payload);
 
   // Razorpay treats a 200 with failure_code as "coupon rejected, show this
   // reason" — which is what we want for every business rejection.
@@ -252,7 +257,7 @@ export const magicApplyPromotionController = asyncHandler(async (req, res) => {
   // Product subtotal the discount applies to. The DB order's amount is the
   // source of truth; Razorpay's order_amount is a fallback.
   // VERIFY: confirm the field name and whether it already includes shipping.
-  const order = await orderForRazorpayId(order_id, { amount: 1 });
+  const order = await orderForRazorpayId(razorpayOrderId, { amount: 1 });
   const subtotalRupees =
     Number(order?.amount) || Number(payload.order_amount) / 100 || 0;
 
