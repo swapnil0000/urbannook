@@ -57,21 +57,21 @@ const NotifyMeModal = ({ productName, productId, onClose }) => {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm bg-[#1c3026] border border-[#F5DEB3]/20 rounded-3xl p-6"
+        className="w-full max-w-sm bg-ink border border-paper/20 rounded-3xl p-6"
         onClick={(e) => e.stopPropagation()}
       >
         {done ? (
           <div className="text-center py-4 space-y-3">
-            <div className="w-12 h-12 rounded-full bg-[#F5DEB3]/10 flex items-center justify-center mx-auto">
-              <i className="fa-solid fa-check text-[#F5DEB3]"></i>
+            <div className="w-12 h-12 rounded-full bg-paper/10 flex items-center justify-center mx-auto">
+              <i className="fa-solid fa-check text-paper"></i>
             </div>
-            <p className="text-[#F5DEB3] font-serif text-lg">You're on the list</p>
-            <p className="text-[#F5DEB3]/60 text-xs">
+            <p className="text-paper font-serif text-lg">You're on the list</p>
+            <p className="text-paper/60 text-xs">
               We'll reach out the moment "{productName}" is back in stock.
             </p>
             <button
               onClick={onClose}
-              className="w-full h-11 bg-[#F5DEB3] text-[#1c3026] rounded-full font-bold uppercase tracking-widest text-xs mt-2"
+              className="w-full h-11 bg-paper text-ink rounded-full font-bold uppercase tracking-widest text-xs mt-2"
             >
               Close
             </button>
@@ -80,15 +80,15 @@ const NotifyMeModal = ({ productName, productId, onClose }) => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-[#F5DEB3] font-serif text-lg">Notify me</p>
-                <p className="text-[#F5DEB3]/60 text-xs mt-1">
+                <p className="text-paper font-serif text-lg">Notify me</p>
+                <p className="text-paper/60 text-xs mt-1">
                   We'll let you know the moment this is back in stock.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="text-[#F5DEB3]/50 hover:text-[#F5DEB3] shrink-0"
+                className="text-paper/50 hover:text-paper shrink-0"
               >
                 <i className="fa-solid fa-xmark"></i>
               </button>
@@ -101,7 +101,7 @@ const NotifyMeModal = ({ productName, productId, onClose }) => {
             )}
 
             <div>
-              <label className="block text-[10px] uppercase tracking-widest text-[#F5DEB3]/60 mb-1.5">
+              <label className="block text-[10px] uppercase tracking-widest text-paper/60 mb-1.5">
                 Your name
               </label>
               <input
@@ -110,11 +110,11 @@ const NotifyMeModal = ({ productName, productId, onClose }) => {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Full name"
-                className="w-full h-11 rounded-xl bg-white/5 border border-[#F5DEB3]/20 px-3 text-sm text-[#F5DEB3] placeholder:text-[#F5DEB3]/30 focus:outline-none focus:border-[#F5DEB3]/50"
+                className="w-full h-11 rounded-xl bg-white/5 border border-paper/20 px-3 text-sm text-paper placeholder:text-paper/30 focus:outline-none focus:border-paper/50"
               />
             </div>
             <div>
-              <label className="block text-[10px] uppercase tracking-widest text-[#F5DEB3]/60 mb-1.5">
+              <label className="block text-[10px] uppercase tracking-widest text-paper/60 mb-1.5">
                 Email
               </label>
               <input
@@ -123,11 +123,11 @@ const NotifyMeModal = ({ productName, productId, onClose }) => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="w-full h-11 rounded-xl bg-white/5 border border-[#F5DEB3]/20 px-3 text-sm text-[#F5DEB3] placeholder:text-[#F5DEB3]/30 focus:outline-none focus:border-[#F5DEB3]/50"
+                className="w-full h-11 rounded-xl bg-white/5 border border-paper/20 px-3 text-sm text-paper placeholder:text-paper/30 focus:outline-none focus:border-paper/50"
               />
             </div>
             <div>
-              <label className="block text-[10px] uppercase tracking-widest text-[#F5DEB3]/60 mb-1.5">
+              <label className="block text-[10px] uppercase tracking-widest text-paper/60 mb-1.5">
                 Mobile number
               </label>
               <input
@@ -136,14 +136,14 @@ const NotifyMeModal = ({ productName, productId, onClose }) => {
                 value={mobile}
                 onChange={(e) => setMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
                 placeholder="10-digit number"
-                className="w-full h-11 rounded-xl bg-white/5 border border-[#F5DEB3]/20 px-3 text-sm text-[#F5DEB3] placeholder:text-[#F5DEB3]/30 focus:outline-none focus:border-[#F5DEB3]/50"
+                className="w-full h-11 rounded-xl bg-white/5 border border-paper/20 px-3 text-sm text-paper placeholder:text-paper/30 focus:outline-none focus:border-paper/50"
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-12 bg-[#F5DEB3] text-[#1c3026] rounded-full font-bold uppercase tracking-widest text-xs disabled:opacity-50"
+              className="w-full h-12 bg-paper text-ink rounded-full font-bold uppercase tracking-widest text-xs disabled:opacity-50"
             >
               {loading ? "Submitting..." : "Notify me"}
             </button>

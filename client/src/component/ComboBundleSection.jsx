@@ -123,7 +123,7 @@ const BundleTile = ({
                     title={v.variantName}
                     onClick={() => onSelectVariant(v.variantName)}
                     className={`w-3.5 h-3.5 sm:w-5 sm:h-5 rounded-full overflow-hidden border shadow flex items-center justify-center bg-white shrink-0 transition-transform hover:scale-110 ${
-                      isSelected ? "border-[#e22525]" : "border-[#F5DEB3]"
+                      isSelected ? "border-brand" : "border-paper"
                     }`}
                   >
                     {type === "color" && value ? (
@@ -151,7 +151,7 @@ const BundleTile = ({
                   type="button"
                   onClick={() => (menuOpen ? setMenuOpen(false) : openMenu())}
                   title="More variants"
-                  className="w-3.5 h-3.5 sm:w-5 sm:h-5 rounded-full bg-[#1c3026] border border-white/70 shadow flex items-center justify-center text-[6px] sm:text-[8px] font-bold text-[#F5DEB3] shrink-0 hover:scale-110 transition-transform"
+                  className="w-3.5 h-3.5 sm:w-5 sm:h-5 rounded-full bg-ink border border-white/70 shadow flex items-center justify-center text-[6px] sm:text-[8px] font-bold text-paper shrink-0 hover:scale-110 transition-transform"
                 >
                   +{overflowCount}
                 </button>
@@ -167,8 +167,8 @@ const BundleTile = ({
             aria-label={removed ? `Add ${product?.productName} back` : `Remove ${product?.productName}`}
             className={`absolute -top-1.5 -right-1.5 sm:-top-2 sm:-right-2 w-5 h-5 sm:w-7 sm:h-7 rounded-full border flex items-center justify-center text-[11px] sm:text-[14px] font-bold transition-colors ${
               removed
-                ? "bg-[#F5DEB3] text-[#1c3026] border-[#F5DEB3]"
-                : "bg-[#1c3026] text-white/70 border-white/25 hover:border-white/50 hover:text-white"
+                ? "bg-paper text-ink border-paper"
+                : "bg-ink text-white/70 border-white/25 hover:border-white/50 hover:text-white"
             }`}
           >
             {removed ? "+" : "−"}
@@ -181,7 +181,7 @@ const BundleTile = ({
           createPortal(
             <div
               ref={portalRef}
-              className="fixed z-[10050] rounded-lg border border-[#F5DEB3]/25 bg-[#1c3026] shadow-2xl overflow-y-auto max-h-56"
+              className="fixed z-[10050] rounded-lg border border-paper/25 bg-ink shadow-2xl overflow-y-auto max-h-56"
               style={{ top: menuPos.top, left: menuPos.left, width: menuPos.width }}
             >
               {variants.map((v) => {
@@ -197,7 +197,7 @@ const BundleTile = ({
                     }}
                     className={`w-full flex items-center gap-2 text-left px-3 py-2 text-xs font-medium transition-colors ${
                       isSelected
-                        ? "bg-[#F5DEB3]/15 text-[#F5DEB3]"
+                        ? "bg-paper/15 text-paper"
                         : "text-white/80 hover:bg-white/5"
                     }`}
                   >
@@ -353,10 +353,10 @@ const ComboBundleSection = ({
     ]);
 
   return (
-    <section className="mt-5 border-t border-[#F5DEB3]/15  sm:mt-12 px-4 lg:px-12">
+    <section className="mt-5 border-t border-paper/15  sm:mt-12 px-4 lg:px-12">
       <div className="max-w-xl mx-auto rounded-xl sm:rounded-2xl overflow-hidden">
         <div className="px-3 sm:px-5 pt-8 pb-1 text-center  border-white/[0.07]">
-          <span className="text-[#F5DEB3]/70 font-bold tracking-[0.1em] uppercase text-[12px] sm:text-[12px]">
+          <span className="text-paper/70 font-bold tracking-[0.1em] uppercase text-[12px] sm:text-[12px]">
             {eyebrow}
           </span>
         </div>
@@ -382,7 +382,7 @@ const ComboBundleSection = ({
                 // max-w-[140px] sm:max-w-[190px] and render the same size.
                 <Fragment key={id}>
                   <div className="self-center shrink-0 flex justify-center">
-                    <span className="text-[#F5DEB3] text-[26px] sm:text-[30px]">
+                    <span className="text-paper text-[26px] sm:text-[30px]">
                       +
                     </span>
                   </div>
@@ -405,7 +405,7 @@ const ComboBundleSection = ({
             <button
               type="button"
               onClick={onNotifyMe}
-              className="w-full h-9 sm:h-10 rounded-full bg-[#F5DEB3] text-[#1c3026] text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.12em] sm:tracking-[0.15em] hover:bg-white transition-colors flex items-center justify-center gap-2"
+              className="w-full h-9 sm:h-10 rounded-full bg-paper text-ink text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.12em] sm:tracking-[0.15em] hover:bg-white transition-colors flex items-center justify-center gap-2"
             >
               <i className="fa-regular fa-bell text-[10px]" />
               Notify Me
@@ -417,8 +417,8 @@ const ComboBundleSection = ({
               disabled={isAdding || bundleAdded}
               className={`w-fit h-12 sm:h-12 rounded-full text-[11px] sm:text-[11px] font-bold uppercase tracking-[0.12em] sm:tracking-[0.15em] transition-colors disabled:opacity-100 px-5 flex items-center justify-center gap-1.5 ${
                 bundleAdded
-                  ? "bg-[#1c3026] text-[#F5DEB3] border border-[#F5DEB3]/40"
-                  : "bg-[#F5DEB3] text-[#1c3026] hover:bg-white disabled:opacity-50"
+                  ? "bg-ink text-paper border border-paper/40"
+                  : "bg-paper text-ink hover:bg-white disabled:opacity-50"
               }`}
             >
               {isAdding ? (

@@ -33,22 +33,20 @@ const OtherVariants = ({ productId, productName, variants = [], currentVariantNa
     <section className="mt-8 sm:mt-12 md:mt-16 px-4 lg:px-12 pt-4 sm:pt-6">
       <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 sm:gap-6">
         <div className="flex-1">
-          <span className="text-[#F5DEB3] font-bold tracking-[0.2em] uppercase text-[16px]">
+          <p className="gl-lbl text-brand mb-2">Same product, other looks</p>
+          <h2 className="font-archivo text-2xl sm:text-3xl font-extrabold tracking-tight text-ink">
             Explore Other Variants
-          </span>
-          {/* <h2 className="text-2xl sm:text-3xl lg:text-4xl font-serif text-white mt-2">
-            Explore Other Variants
-          </h2> */}
+          </h2>
         </div>
-        {/* {hasMore && (
+        {hasMore && (
           <button
             type="button"
             onClick={() => navigate(`/products/${productId}`)}
-            className="text-[#F5DEB3]/80 hover:text-[#F5DEB3] text-xs font-bold uppercase tracking-widest border-b border-[#F5DEB3]/30 hover:border-[#F5DEB3] pb-1 transition-colors shrink-0 self-start sm:self-auto"
+            className="gl-lbl text-[11px] shrink-0 self-start sm:self-auto inline-flex items-center gap-1.5 border-b-2 border-current pb-0.5 hover:text-brand hover:border-brand transition-colors"
           >
-            View all {others.length} <i className="fa-solid fa-arrow-right ml-1 text-[10px]" />
+            View all {others.length} →
           </button>
-        )} */}
+        )}
       </div>
 
       <div
@@ -64,7 +62,7 @@ const OtherVariants = ({ productId, productName, variants = [], currentVariantNa
             (variant?.variantQuantity != null &&
               Number(variant.variantQuantity) <= 0);
           const badge = oos
-            ? { label: "Out of Stock", className: "bg-red-500 text-white" }
+            ? { label: "Out of Stock", className: "bg-ink text-white" }
             : null;
 
           return (

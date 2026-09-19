@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Urban Nook — Editorial Redesign (Real Catalog)</title>
+  <meta name="description" content="Editorial redesign concept for Urban Nook — 3D-printed desk lamps, pen stands & desk décor." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,300;1,9..144,400;1,9..144,500&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: {
+      colors: { canvas:'#F7F5F2', ink:'#171311', muted:'#6E655F', faint:'#A79E97', red:'#E23A45', redDeep:'#B4121F', rose:'#F6D9D4', gold:'#C79A5B', sage:'#7E8C7A' },
+      fontFamily: { display:['Fraunces','Georgia','serif'], sans:['"Space Grotesk"','ui-sans-serif','system-ui','sans-serif'] },
+      borderRadius: { '4xl':'2rem','5xl':'2.75rem' },
+    }}};
+  </script>
+
+  <style>
+    :root { color-scheme: light; }
+    body { background:#F7F5F2; font-family:'Space Grotesk',sans-serif; color:#171311; -webkit-font-smoothing:antialiased; overflow-x:hidden; }
+    .font-display { font-family:'Fraunces',Georgia,serif; }
+    #bg { position:fixed; inset:0; z-index:-2; pointer-events:none; }
+    .aurora { position:fixed; inset:0; z-index:-3; overflow:hidden; pointer-events:none; }
+    .blob { position:absolute; border-radius:9999px; filter:blur(110px); will-change:transform; }
+    .b1{width:46vw;height:46vw;left:-12vw;top:-10vw;background:radial-gradient(circle,#FAD4CE 0%,transparent 70%);opacity:.7;animation:f1 24s ease-in-out infinite}
+    .b2{width:42vw;height:42vw;right:-10vw;top:6vh;background:radial-gradient(circle,#FCE6CC 0%,transparent 70%);opacity:.65;animation:f2 28s ease-in-out infinite}
+    .b3{width:52vw;height:52vw;left:18vw;bottom:-24vw;background:radial-gradient(circle,#E9E7F3 0%,transparent 70%);opacity:.65;animation:f3 32s ease-in-out infinite}
+    @keyframes f1{0%,100%{transform:translate(0,0)}50%{transform:translate(6vw,5vh)}}
+    @keyframes f2{0%,100%{transform:translate(0,0)}50%{transform:translate(-5vw,7vh)}}
+    @keyframes f3{0%,100%{transform:translate(0,0)}50%{transform:translate(4vw,-6vh)}}
+    .grain{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.03;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+    .glass{background:rgba(255,255,255,.58);backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%);border:1px solid rgba(23,19,17,.07);box-shadow:0 14px 40px -18px rgba(120,60,50,.28),inset 0 1px 0 rgba(255,255,255,.75)}
+    .glass-strong{background:rgba(255,255,255,.86);backdrop-filter:blur(22px) saturate(150%);-webkit-backdrop-filter:blur(22px) saturate(150%);border:1px solid rgba(23,19,17,.06);box-shadow:0 18px 50px -20px rgba(120,60,50,.3)}
+    .ring-hover{transition:border-color .35s,box-shadow .35s,transform .35s}
+    .ring-hover:hover{border-color:rgba(226,58,69,.4);box-shadow:0 26px 60px -24px rgba(226,58,69,.32);transform:translateY(-3px)}
+    .btn-primary{background:#E23A45;color:#fff;box-shadow:0 12px 28px -10px rgba(226,58,69,.6);transition:transform .25s,box-shadow .25s,background .25s}
+    .btn-primary:hover{transform:translateY(-2px);background:#C42A38;box-shadow:0 16px 36px -10px rgba(226,58,69,.7)}
+    .btn-ghost{transition:background .25s,border-color .25s,transform .25s}.btn-ghost:hover{background:rgba(255,255,255,.85);transform:translateY(-2px)}
+    .label{font-size:10px;font-weight:700;letter-spacing:.28em;text-transform:uppercase}
+    .grad-text{background:linear-gradient(100deg,#E23A45,#F0735A);-webkit-background-clip:text;background-clip:text;color:transparent}
+    [data-reveal]{opacity:0;transform:translateY(30px);transition:opacity 1s cubic-bezier(.16,1,.3,1),transform 1s cubic-bezier(.16,1,.3,1)}
+    [data-reveal].in{opacity:1;transform:none}
+    @media (prefers-reduced-motion:reduce){[data-reveal]{opacity:1!important;transform:none!important}.blob{animation:none!important}}
+    .marquee{display:flex;width:max-content;animation:scrollx 38s linear infinite}.marquee:hover{animation-play-state:paused}
+    @keyframes scrollx{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+    .tickerline{display:flex;width:max-content;animation:scrollx 28s linear infinite}
+    [data-page]{display:none}[data-page].active{display:block;animation:pageIn .55s cubic-bezier(.16,1,.3,1)}
+    @keyframes pageIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+    .hscroll{display:flex;gap:1.25rem;overflow-x:auto;scroll-snap-type:x mandatory;cursor:grab;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+    .hscroll::-webkit-scrollbar{display:none}.hscroll.dragging{cursor:grabbing;scroll-snap-type:none}
+    .hscroll>*{scroll-snap-align:start;flex:0 0 auto}
+    .masonry{column-gap:1.25rem}@media(min-width:640px){.masonry{columns:2}}@media(min-width:1024px){.masonry{columns:3}}
+    .masonry>*{break-inside:avoid;margin-bottom:1.25rem}
+    #idxPreview{position:fixed;top:0;left:0;width:240px;height:300px;border-radius:1.25rem;overflow:hidden;pointer-events:none;opacity:0;transform:translate(-50%,-50%) scale(.9);transition:opacity .3s,transform .3s;z-index:45;box-shadow:0 30px 60px -20px rgba(0,0,0,.35);object-fit:cover;background:#fff}
+    #idxPreview.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+    .idx-row{transition:padding-left .35s,color .35s}.idx-row:hover{padding-left:1rem;color:#E23A45}
+    #cur,#curDot{position:fixed;top:0;left:0;border-radius:9999px;pointer-events:none;z-index:60;mix-blend-mode:multiply}
+    #cur{width:34px;height:34px;border:1.5px solid rgba(226,58,69,.5);transition:transform .15s ease-out,width .25s,height .25s}
+    #curDot{width:5px;height:5px;background:#E23A45}
+    .cur-lg{width:74px!important;height:74px!important;background:rgba(226,58,69,.06)}
+    @media(hover:none),(pointer:coarse){#cur,#curDot{display:none}}
+    ::selection{background:#E23A45;color:#fff}
+    ::-webkit-scrollbar{width:10px}::-webkit-scrollbar-track{background:#F7F5F2}::-webkit-scrollbar-thumb{background:#E4DDD6;border-radius:10px;border:2px solid #F7F5F2}
+    details>summary{list-style:none;cursor:pointer}details>summary::-webkit-details-marker{display:none}details[open] .chev{transform:rotate(180deg)}
+    input[type=range]{accent-color:#E23A45}.chk{accent-color:#E23A45;width:16px;height:16px}
+    .safe-bottom{padding-bottom:calc(.75rem + env(safe-area-inset-bottom))}
+    .no-scrollbar{scrollbar-width:none}.no-scrollbar::-webkit-scrollbar{display:none}
+  </style>
+</head>
+
+<body class="font-sans">
+  <div class="aurora"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
+  <canvas id="bg"></canvas>
+  <div class="grain"></div>
+  <div id="cur"></div><div id="curDot"></div>
+  <img id="idxPreview" alt="" />
+
+  <!-- NAV -->
+  <header class="fixed top-4 left-3 right-3 md:top-5 md:left-6 md:right-6 z-50">
+    <nav class="glass-strong rounded-full px-3 md:px-4 h-14 md:h-16 flex items-center justify-between max-w-7xl mx-auto">
+      <a data-go="home" data-cursor class="flex items-center gap-2.5 pl-2 cursor-pointer group"><span class="w-8 h-8 rounded-full bg-red grid place-items-center text-white font-display font-semibold text-lg group-hover:rotate-12 transition-transform">u</span><span class="font-display text-lg tracking-tight">Urban&nbsp;Nook</span></a>
+      <div class="hidden lg:flex items-center gap-1 glass rounded-full p-1">
+        <a data-go="home" data-cursor class="nav-link px-4 py-2 rounded-full text-sm font-medium text-muted hover:text-ink transition cursor-pointer">Home</a>
+        <a data-go="shop" data-cursor class="nav-link px-4 py-2 rounded-full text-sm font-medium text-muted hover:text-ink transition cursor-pointer">Shop</a>
+        <a data-go="product" data-cursor class="nav-link px-4 py-2 rounded-full text-sm font-medium text-muted hover:text-ink transition cursor-pointer">Product</a>
+        <a data-cursor class="px-4 py-2 rounded-full text-sm font-medium text-muted hover:text-ink transition cursor-pointer">Gifting</a>
+      </div>
+      <div class="flex items-center gap-2">
+        <button data-cursor class="hidden md:grid w-10 h-10 rounded-full glass place-items-center text-muted hover:text-ink ring-hover"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></button>
+        <button data-cursor class="relative w-10 h-10 rounded-full btn-primary grid place-items-center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg><span class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-ink text-white text-[10px] font-bold grid place-items-center border-2 border-white">2</span></button>
+        <button id="menuBtn" class="lg:hidden w-10 h-10 rounded-full glass grid place-items-center text-ink"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg></button>
+      </div>
+    </nav>
+    <div id="mobileMenu" class="lg:hidden hidden mt-2 glass-strong rounded-4xl p-3 max-w-7xl mx-auto">
+      <a data-go="home" class="flex items-center justify-between p-4 rounded-2xl hover:bg-black/5 cursor-pointer"><span class="font-medium">Home</span><span class="text-faint">→</span></a>
+      <a data-go="shop" class="flex items-center justify-between p-4 rounded-2xl hover:bg-black/5 cursor-pointer"><span class="font-medium">Shop</span><span class="text-faint">→</span></a>
+      <a data-go="product" class="flex items-center justify-between p-4 rounded-2xl hover:bg-black/5 cursor-pointer"><span class="font-medium">Product</span><span class="text-faint">→</span></a>
+    </div>
+  </header>
+
+  <main>
+  <!-- =============================== HOME =============================== -->
+  <section data-page="home" class="active">
+    <!-- HERO: latest product ghost + showcase card -->
+    <div id="hero" class="relative min-h-screen flex items-center pt-28 pb-24 px-5 md:px-10 overflow-hidden">
+      <div class="absolute inset-0 -z-[1] pointer-events-none overflow-hidden">
+        <span id="heroGhostName" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 font-display italic font-light text-ink/[0.045] whitespace-nowrap leading-none text-[42vw] select-none"></span>
+        <img id="heroGhost" alt="" class="absolute right-[-8%] lg:right-[2%] top-1/2 h-[58vh] lg:h-[80vh] w-auto object-contain opacity-[0.16]" style="transform:translateY(-50%);-webkit-mask-image:radial-gradient(circle at center,#000 50%,transparent 82%);mask-image:radial-gradient(circle at center,#000 50%,transparent 82%)"/>
+      </div>
+      <div class="max-w-7xl mx-auto w-full grid lg:grid-cols-12 gap-10 lg:gap-8 items-center">
+        <div class="lg:col-span-7">
+          <div class="flex items-center gap-3 mb-6" data-reveal><span class="inline-flex items-center gap-2 glass rounded-full pl-2 pr-4 py-1.5"><span class="relative flex h-2 w-2"><span class="animate-ping absolute h-full w-full rounded-full bg-red opacity-60"></span><span class="relative rounded-full h-2 w-2 bg-red"></span></span><span class="label text-red">Latest drop · <span id="heroBadgeName">Brake Caliper Lamp</span></span></span></div>
+          <h1 class="font-display font-light leading-[0.84] tracking-tight" data-reveal>
+            <span class="block text-[16vw] lg:text-[8.5rem]">Make every</span>
+            <span class="block text-[16vw] lg:text-[8.5rem]">corner <span class="italic grad-text">count.</span></span>
+          </h1>
+          <p class="mt-7 text-lg md:text-xl text-muted max-w-md font-light" data-reveal>3D-printed <span class="text-red font-display italic">desk lamps, pen stands & décor</span> — made to order in India for the corners you actually live in.</p>
+          <div class="mt-8 flex gap-3" data-reveal>
+            <button data-go="shop" data-cursor class="btn-primary px-8 py-4 rounded-full font-semibold tracking-wide">Explore Collection</button>
+            <button data-go="product" data-cursor class="btn-ghost glass px-7 py-4 rounded-full font-medium flex items-center gap-2 text-ink">Featured <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+          </div>
+        </div>
+        <div class="lg:col-span-5 flex justify-center lg:justify-end" data-reveal>
+          <div id="heroCard" data-go="product" data-cursor class="group glass rounded-[2rem] p-3 w-full max-w-sm ring-hover cursor-pointer transition-transform duration-300 will-change-transform">
+            <div class="relative rounded-[1.6rem] overflow-hidden aspect-[4/5] bg-white">
+              <img id="hcImg" alt="" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-[1.4s]" draggable="false"/>
+              <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent"></div>
+              <span class="absolute top-4 left-4 label text-white bg-red px-3 py-1.5 rounded-full">★ Just launched</span>
+              <button onclick="event.stopPropagation()" class="absolute top-4 right-4 w-10 h-10 rounded-full glass-strong grid place-items-center text-ink hover:text-red"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg></button>
+              <div class="absolute bottom-4 left-4 right-4 glass-strong rounded-2xl p-4 flex items-center justify-between"><div class="min-w-0"><p class="label text-red">New arrival</p><p id="hcName" class="font-display text-xl mt-0.5 truncate">Brake Caliper Lamp</p></div><p id="hcPrice" class="font-display text-2xl shrink-0 ml-2">₹1,599</p></div>
+            </div>
+            <div class="flex items-center justify-between px-3 py-3"><div class="flex items-center gap-1.5" id="hcDots"></div><span class="flex items-center gap-1.5 text-sm font-semibold text-red">View product <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+          </div>
+        </div>
+      </div>
+      <div class="absolute bottom-5 left-0 right-0 overflow-hidden border-y border-ink/10 py-3 glass">
+        <div class="tickerline gap-10 text-faint font-display text-2xl italic items-center">
+          <span>Desk Lamps</span><span class="text-red not-italic">✦</span><span>Pen Stands</span><span class="text-red not-italic">✦</span><span>Wall Posters</span><span class="text-red not-italic">✦</span><span>Desk Décor</span><span class="text-red not-italic">✦</span><span>Gifting</span><span class="text-red not-italic">✦</span>
+          <span>Desk Lamps</span><span class="text-red not-italic">✦</span><span>Pen Stands</span><span class="text-red not-italic">✦</span><span>Wall Posters</span><span class="text-red not-italic">✦</span><span>Desk Décor</span><span class="text-red not-italic">✦</span><span>Gifting</span><span class="text-red not-italic">✦</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- THE DROP: horizontal drag -->
+    <div class="py-20 px-5 md:px-10 max-w-[1600px] mx-auto" data-reveal>
+      <div class="flex items-end justify-between mb-8 max-w-7xl mx-auto w-full"><div><p class="label text-red mb-2">◇ In stock now</p><h2 class="font-display text-4xl md:text-6xl">The drop.</h2></div><p class="hidden md:flex items-center gap-2 text-sm text-faint"><span class="w-8 h-px bg-faint"></span>Drag to explore</p></div>
+      <div id="dropScroller" class="hscroll px-1" data-cursor-drag></div>
+    </div>
+
+    <!-- CATALOGUE INDEX -->
+    <div class="py-20 px-5 md:px-10 max-w-7xl mx-auto" data-reveal>
+      <p class="label text-red mb-2">◇ The catalogue</p>
+      <h2 class="font-display text-4xl md:text-6xl mb-10">Browse by piece.</h2>
+      <div id="homeIndex" class="border-t border-ink/12"></div>
+    </div>
+
+    <!-- YOUR DESK: editorial split -->
+    <div class="py-20 px-5 md:px-10 max-w-7xl mx-auto">
+      <div class="grid lg:grid-cols-12 gap-6 items-stretch">
+        <div class="lg:col-span-7 relative rounded-5xl overflow-hidden glass ring-hover min-h-[420px] group cursor-pointer" data-go="shop" data-cursor>
+          <img src="https://images.unsplash.com/photo-1593062096033-9a26b09da705?auto=format&fit=crop&w=1200&q=80" onerror="this.src='https://picsum.photos/seed/desk1/1200/800'" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-[1.4s]"/>
+          <div class="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
+          <div class="absolute bottom-0 p-8 text-white"><p class="label text-rose mb-1">Your setup</p><h3 class="font-display text-4xl">Your desk, dialled in</h3></div>
+        </div>
+        <div class="lg:col-span-5 flex flex-col gap-6">
+          <div class="glass rounded-5xl p-8 flex-1 flex flex-col justify-between ring-hover" data-reveal><p class="label text-red">The philosophy</p><p class="font-display text-2xl md:text-3xl leading-snug mt-4">Every piece is 3D-printed to order in India — built for late-night grinds, gifting, and desks that deserve better.</p><button data-go="shop" data-cursor class="btn-ghost glass self-start mt-6 px-6 py-3 rounded-full text-sm font-medium">Our story →</button></div>
+          <div class="grid grid-cols-3 gap-3">
+            <div class="glass rounded-3xl p-4 text-center ring-hover" data-reveal><p class="font-display text-3xl text-red">3D</p><p class="label text-faint mt-1">Printed</p></div>
+            <div class="glass rounded-3xl p-4 text-center ring-hover" data-reveal><p class="font-display text-3xl">COD</p><p class="label text-faint mt-1">Available</p></div>
+            <div class="glass rounded-3xl p-4 text-center ring-hover" data-reveal><p class="font-display text-3xl">7-Day</p><p class="label text-faint mt-1">Returns</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- EARLY REVIEWS marquee -->
+    <div class="py-16 overflow-hidden" data-reveal>
+      <p class="label text-red text-center mb-8">◇ What early customers say</p>
+      <div class="marquee gap-4"><div class="flex gap-4" id="revSet"></div><div class="flex gap-4" id="revSet2" aria-hidden="true"></div></div>
+    </div>
+
+    <!-- CTA -->
+    <div class="px-5 md:px-10 pb-20 max-w-7xl mx-auto" data-reveal>
+      <div class="glass rounded-5xl p-10 md:p-16 text-center relative overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-br from-rose/40 via-transparent to-rose/30"></div>
+        <div class="relative"><h2 class="font-display text-4xl md:text-6xl">Light up your <span class="italic grad-text">corner.</span></h2><p class="text-muted mt-4 max-w-md mx-auto">Be one of the first — get 10% off your first order.</p>
+          <div class="mt-8 flex flex-col sm:flex-row gap-3 justify-center max-w-md mx-auto"><input type="email" placeholder="you@email.com" class="flex-1 glass rounded-full px-6 py-4 outline-none focus:border-red/50 placeholder:text-faint text-ink"/><button data-cursor class="btn-primary px-8 py-4 rounded-full font-semibold">Get 10% off</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================== SHOP =============================== -->
+  <section data-page="shop">
+    <div class="pt-32 md:pt-40 px-5 md:px-10 max-w-7xl mx-auto pb-24">
+      <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8" data-reveal>
+        <div><p class="label text-red mb-2">◇ The collection</p><h1 class="font-display text-5xl md:text-7xl leading-[0.9]">Curated <span class="italic grad-text">corners.</span></h1></div>
+        <div class="glass rounded-full p-1 flex items-center self-start">
+          <button data-view="gallery" class="viewbtn px-5 py-2.5 rounded-full text-sm font-medium bg-ink text-white flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Gallery</button>
+          <button data-view="index" class="viewbtn px-5 py-2.5 rounded-full text-sm font-medium text-muted hover:text-ink flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>Index</button>
+        </div>
+      </div>
+      <div class="sticky top-24 z-30 glass-strong rounded-full px-2.5 py-2.5 flex items-center gap-2 mb-6 overflow-x-auto no-scrollbar" data-reveal>
+        <button id="filterToggle" data-cursor class="shrink-0 flex items-center gap-2 bg-ink text-white rounded-full px-4 py-2 text-sm font-medium"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M7 12h10M10 18h4"/></svg>Filters <span id="filterCount" class="hidden bg-red text-white text-[10px] rounded-full w-5 h-5 grid place-items-center"></span></button>
+        <span class="w-px h-6 bg-ink/10 shrink-0"></span>
+        <div id="quickCats" class="flex items-center gap-2"></div>
+        <span class="flex-1"></span>
+        <div class="shrink-0 flex items-center gap-1 pl-2"><button data-sort="featured" class="sort-btn px-3 py-2 rounded-full text-xs font-medium bg-red text-white whitespace-nowrap">Featured</button><button data-sort="low" class="sort-btn px-3 py-2 rounded-full text-xs font-medium text-muted hover:text-ink whitespace-nowrap">₹ Low</button><button data-sort="high" class="sort-btn px-3 py-2 rounded-full text-xs font-medium text-muted hover:text-ink whitespace-nowrap">₹ High</button></div>
+      </div>
+      <div id="filterPanel" class="hidden glass rounded-4xl p-6 md:p-8 mb-6 grid md:grid-cols-3 gap-8" data-reveal>
+        <div><p class="label text-faint mb-3">Category</p><div id="catList" class="space-y-2.5"></div></div>
+        <div><p class="label text-faint mb-3">Max price · <span id="priceLbl" class="text-ink">₹2,000</span></p><input id="priceRange" type="range" min="199" max="2000" step="100" value="2000" class="w-full"/><div class="flex justify-between text-[11px] text-faint mt-1"><span>₹199</span><span>₹2,000</span></div></div>
+        <div><p class="label text-faint mb-3">Tags</p><div id="tagList" class="flex flex-wrap gap-2"></div><button id="clearAll" class="mt-8 text-sm text-red font-semibold hover:underline">Clear all filters</button></div>
+      </div>
+      <div id="activeChips" class="flex flex-wrap gap-2 mb-6"></div>
+      <p class="text-sm text-muted mb-6"><span id="count" class="text-ink font-semibold">6</span> pieces</p>
+      <div id="galleryView" class="masonry"></div>
+      <div id="indexView" class="hidden border-t border-ink/12"></div>
+      <div id="emptyState" class="hidden text-center py-24 glass rounded-4xl"><p class="font-display text-2xl">No pieces match your filters</p><button id="resetEmpty" class="btn-primary mt-5 px-6 py-3 rounded-full text-sm font-semibold">Reset filters</button></div>
+    </div>
+  </section>
+
+  <!-- =============================== PRODUCT (Brake Caliper Lamp) =============================== -->
+  <section data-page="product">
+    <div id="buyBar" class="fixed top-3 md:top-5 left-3 right-3 md:left-6 md:right-6 z-40 max-w-7xl mx-auto opacity-0 -translate-y-4 pointer-events-none transition-all duration-300">
+      <div class="glass-strong rounded-full pl-5 pr-2 py-2 flex items-center justify-between"><div class="flex items-center gap-3 min-w-0"><span class="font-display text-lg truncate">Brake Caliper Lamp</span><span id="barPrice" class="text-red font-display text-lg shrink-0">₹1,599</span></div><button data-cursor class="btn-primary rounded-full px-6 py-2.5 text-sm font-semibold shrink-0">Add to Cart</button></div>
+    </div>
+
+    <div class="pt-24 md:pt-28 px-5 md:px-10 max-w-7xl mx-auto pb-32 md:pb-24">
+      <div class="flex items-center gap-2 text-sm text-faint mb-6" data-reveal><a data-go="home" class="hover:text-ink cursor-pointer">Home</a><span>/</span><a data-go="shop" class="hover:text-ink cursor-pointer">Desk Lamps</a><span>/</span><span class="text-muted">Brake Caliper Lamp</span></div>
+
+      <!-- COVER HERO -->
+      <div class="relative rounded-[2rem] overflow-hidden min-h-[68vh] md:min-h-[80vh] flex items-end glass" data-reveal>
+        <img id="coverImg" src="https://d1dhs7xre1cv0d.cloudfront.net/product-images/019cb457-16df-70af-be27-204839148bc3.webp" onerror="this.src='https://picsum.photos/seed/caliper/1600/1100'" class="absolute inset-0 w-full h-full object-cover"/>
+        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/10"></div>
+        <span class="absolute top-6 left-6 label text-white bg-red px-3 py-1.5 rounded-full">New arrival · Featured</span>
+        <span class="absolute top-6 right-6 glass-strong rounded-full px-4 py-2 text-sm font-medium flex items-center gap-1.5">3D printed · COD</span>
+        <div class="relative w-full p-6 md:p-12">
+          <p class="label text-rose mb-3">Desktop Lamp</p>
+          <h1 class="font-display font-light text-white text-[13vw] md:text-[7.5rem] leading-[0.85]">Brake Caliper<br/><span class="italic">Lamp</span></h1>
+          <p class="text-white/80 mt-3 max-w-md font-light">Warm red, fiery ambient light — perfect for late-night grinds.</p>
+          <div class="mt-7 inline-flex flex-wrap items-center gap-4 glass-strong rounded-[1.4rem] md:rounded-full p-2 pl-6">
+            <div><span id="coverPrice" class="font-display text-3xl text-ink">₹1,599</span></div>
+            <div class="flex items-center gap-2" id="coverFinish"></div>
+            <button data-cursor class="btn-primary rounded-full px-8 py-3.5 font-semibold">Add to Cart</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- gift add-on -->
+      <label class="mt-4 flex items-center gap-3 glass rounded-2xl p-4 cursor-pointer ring-hover max-w-md" data-reveal>
+        <input type="checkbox" class="chk"/>
+        <span class="w-12 h-12 rounded-xl overflow-hidden shrink-0 bg-white"><img src="https://d1dhs7xre1cv0d.cloudfront.net/product-images/019cf377-5b40-7335-91ed-0d629aae750b.jpeg" onerror="this.src='https://picsum.photos/seed/penstand/100'" class="w-full h-full object-cover"/></span>
+        <span class="flex-1"><span class="font-medium">Add a matching pen stand</span><span class="block text-sm text-faint">Complete the desk set</span></span>
+        <span class="font-display text-lg text-red">+₹99</span>
+      </label>
+
+      <!-- lifestyle gallery -->
+      <div class="mt-6" data-reveal><div class="flex items-center justify-between mb-3"><p class="label text-faint">Gallery</p><p class="hidden md:flex items-center gap-2 text-xs text-faint"><span class="w-6 h-px bg-faint"></span>Drag</p></div><div id="pdpGallery" class="hscroll" data-cursor-drag></div></div>
+
+      <!-- storytelling -->
+      <div class="mt-24 space-y-24">
+        <div class="grid lg:grid-cols-2 gap-10 items-center" data-reveal>
+          <div class="rounded-4xl overflow-hidden aspect-[4/3] glass"><img src="https://d1dhs7xre1cv0d.cloudfront.net/product-images/019cfd3c-e8ec-7e89-9093-1a588b7a5233.webp" onerror="this.src='https://picsum.photos/seed/glow/900/700'" class="w-full h-full object-cover"/></div>
+          <div><span class="font-display text-7xl text-red/15">01</span><h3 class="font-display text-3xl md:text-4xl -mt-6">The glow.</h3><p class="text-muted mt-4 text-lg font-light leading-relaxed">A neon tube behind a translucent-red shade throws a warm, rotor-hot ambient glow across your desk — aggressive, modern and oddly cozy for late-night sessions.</p></div>
+        </div>
+        <div class="grid lg:grid-cols-2 gap-10 items-center" data-reveal>
+          <div class="lg:order-2 rounded-4xl overflow-hidden aspect-[4/3] glass"><img src="https://d1dhs7xre1cv0d.cloudfront.net/product-images/lambo-1.webp" onerror="this.src='https://picsum.photos/seed/build/900/700'" class="w-full h-full object-cover"/></div>
+          <div class="lg:order-1"><span class="font-display text-7xl text-red/15">02</span><h3 class="font-display text-3xl md:text-4xl -mt-6">The build.</h3><p class="text-muted mt-4 text-lg font-light leading-relaxed">3D-printed in PLA + PETG with a layer-texture finish and a glossy resin badge. Choose your marque — BMW, Porsche or Lamborghini — each with a 2m wire and adapter included.</p></div>
+        </div>
+      </div>
+
+      <!-- SPEC DATASHEET -->
+      <div class="mt-24 glass rounded-5xl p-8 md:p-12" data-reveal>
+        <div class="flex items-end justify-between mb-8"><h2 class="font-display text-3xl md:text-4xl">Specification.</h2><span class="label text-faint">UN-PROD-16</span></div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-y-8 gap-x-6">
+          <div class="border-t border-ink/12 pt-4"><p class="label text-faint">Dimensions</p><p class="font-display text-2xl mt-1">27 × 6 × 27 cm</p></div>
+          <div class="border-t border-ink/12 pt-4"><p class="label text-faint">Weight</p><p class="font-display text-2xl mt-1">1,770 g</p></div>
+          <div class="border-t border-ink/12 pt-4"><p class="label text-faint">Light source</p><p class="font-display text-2xl mt-1">Neon tube</p></div>
+          <div class="border-t border-ink/12 pt-4"><p class="label text-faint">Power</p><p class="font-display text-2xl mt-1">Adapter incl.</p></div>
+          <div class="border-t border-ink/12 pt-4"><p class="label text-faint">Base material</p><p class="font-display text-2xl mt-1">PLA + PETG</p></div>
+          <div class="border-t border-ink/12 pt-4"><p class="label text-faint">Shade</p><p class="font-display text-2xl mt-1">Translucent red</p></div>
+          <div class="border-t border-ink/12 pt-4"><p class="label text-faint">Wire length</p><p class="font-display text-2xl mt-1">2 m</p></div>
+          <div class="border-t border-ink/12 pt-4"><p class="label text-faint">Payment</p><p class="font-display text-2xl mt-1">COD ✓</p></div>
+        </div>
+        <div class="mt-10 divide-y divide-ink/10 border-t border-ink/10">
+          <details open class="py-5"><summary class="flex items-center justify-between"><span class="font-display text-lg">Shipping & Returns</span><span class="chev text-faint transition-transform">⌄</span></summary><p class="text-muted mt-3 font-light">Made to order & shipped pan-India. 7-day easy returns. Cash on delivery available.</p></details>
+          <details class="py-5"><summary class="flex items-center justify-between"><span class="font-display text-lg">Care</span><span class="chev text-faint transition-transform">⌄</span></summary><p class="text-muted mt-3 font-light">Crafted with premium materials. Wipe clean with a soft, dry cloth.</p></details>
+        </div>
+      </div>
+
+      <!-- EARLY REVIEWS -->
+      <div class="mt-24" data-reveal>
+        <div class="grid lg:grid-cols-[320px_1fr] gap-10 items-start">
+          <div class="lg:sticky lg:top-28"><h2 class="font-display text-3xl md:text-4xl mb-4">Early reviews.</h2><div class="flex items-center gap-3"><span class="text-gold text-2xl">★★★★★</span><p class="text-muted text-sm">from our first customers</p></div></div>
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div class="glass rounded-3xl p-6"><div class="text-gold mb-2">★★★★★</div><p class="text-muted">"The red glow is unreal on a late-night setup. Way cooler in person."</p><p class="mt-4 text-sm font-medium">Aryan · Verified</p></div>
+            <div class="glass rounded-3xl p-6"><div class="text-gold mb-2">★★★★★</div><p class="text-muted">"Gifted the Porsche one to my brother — he hasn't turned it off since."</p><p class="mt-4 text-sm font-medium">Simran · Verified</p></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- complete the look -->
+      <div class="mt-24" data-reveal><div class="flex items-end justify-between mb-6"><h2 class="font-display text-3xl md:text-4xl">Complete the <span class="italic text-red">desk.</span></h2><button data-go="shop" data-cursor class="text-sm text-red font-semibold hover:underline">View all →</button></div><div id="relatedScroller" class="hscroll" data-cursor-drag></div></div>
+    </div>
+
+    <div class="md:hidden fixed bottom-0 left-0 right-0 z-40 glass-strong border-t border-ink/10 p-3 flex items-center gap-3 safe-bottom"><div class="pl-2"><p class="font-display text-xl leading-none text-red">₹1,599</p><p class="text-xs text-faint mt-1">Brake Caliper Lamp</p></div><button class="btn-primary flex-1 h-12 rounded-full font-semibold">Add to Cart</button></div>
+  </section>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="border-t border-ink/10 mt-10">
+    <div class="max-w-7xl mx-auto px-5 md:px-10 py-16 grid md:grid-cols-4 gap-10">
+      <div><div class="flex items-center gap-2.5 mb-4"><span class="w-8 h-8 rounded-full bg-red grid place-items-center text-white font-display font-semibold text-lg">u</span><span class="font-display text-lg">Urban Nook</span></div><p class="text-muted text-sm max-w-xs">3D-printed desk lamps, pen stands & décor. Make every corner count.</p></div>
+      <div><p class="label text-faint mb-4">Shop</p><ul class="space-y-2.5 text-sm text-muted"><li><a class="hover:text-red cursor-pointer">Desk Lamps</a></li><li><a class="hover:text-red cursor-pointer">Pen Stands</a></li><li><a class="hover:text-red cursor-pointer">Wall Posters (soon)</a></li><li><a class="hover:text-red cursor-pointer">Desk Décor</a></li></ul></div>
+      <div><p class="label text-faint mb-4">Company</p><ul class="space-y-2.5 text-sm text-muted"><li><a class="hover:text-red cursor-pointer">About</a></li><li><a class="hover:text-red cursor-pointer">Contact</a></li><li><a class="hover:text-red cursor-pointer">Gifting</a></li><li><a class="hover:text-red cursor-pointer">FAQs</a></li></ul></div>
+      <div><p class="label text-faint mb-4">Support</p><ul class="space-y-2.5 text-sm text-muted"><li><a class="hover:text-red cursor-pointer">Track Order</a></li><li><a class="hover:text-red cursor-pointer">Returns</a></li><li><a class="hover:text-red cursor-pointer">Shipping</a></li><li><a class="hover:text-red cursor-pointer">Privacy</a></li></ul></div>
+    </div>
+    <div class="border-t border-ink/10 py-6 text-center text-xs text-faint">Concept prototype · real catalog · Crimson Studio light theme — Fraunces / Space Grotesk</div>
+  </footer>
+
+  <script>
+    /* ---------------- REAL catalog ---------------- */
+    const CF='https://d1dhs7xre1cv0d.cloudfront.net/product-images/';
+    const PRODUCTS=[
+      { name:'Brake Caliper Lamp', cat:'Desk Lamps', price:1599, tall:1, seed:'caliper', tags:['Featured','New'],
+        desc:'Warm red, fiery ambient light — perfect for late-night grinds.',
+        img:CF+'019cb457-16df-70af-be27-204839148bc3.webp',
+        variants:[{name:'BMW',price:1599,img:CF+'019cb457-16df-70af-be27-204839148bc3.webp'},{name:'Porsche',price:1599,img:CF+'1.webp'},{name:'Lambo',price:1799,img:CF+'lambo-1.webp'}] },
+      { name:'Stationery Suit Pen Stand', cat:'Pen Stands', price:299, tall:0, seed:'penstand', tags:['New','Best seller','Trending'],
+        desc:'Keep your pens cozy and your desk effortlessly cool.',
+        img:CF+'019cf390-1037-7593-9173-96d0a8392e86.jpeg',
+        variants:[{name:'White',price:299,img:CF+'019cf390-1037-7593-9173-96d0a8392e86.jpeg'},{name:'Red',price:299,img:CF+'019cf377-5b40-7335-91ed-0d629aae750b.jpeg'},{name:'Black',price:299,img:CF+'019cf39b-1014-73a8-81c2-19cdd1210b6a.jpeg'},{name:'Blue',price:299,img:CF+'019cf39b-5c64-77d7-b8c5-56a732dc3929.jpeg'},{name:'Rainbow',price:299,img:CF+'019cf39e-2f25-7989-a4b3-10fff0db8860.jpeg'},{name:'Yellow',price:299,img:CF+'019cf39e-6fcd-737f-85df-5858bac8e64a.jpeg'}] },
+      // --- Coming soon (expansion zones · demo imagery) ---
+      { name:'Motorsport Wall Poster', cat:'Wall Posters', price:null, soon:1, tall:1, seed:'poster', tags:['Coming soon'], desc:'Framed prints for the wall above your setup.', img:'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=800&q=80', variants:[] },
+      { name:'Halo Ambient Lamp', cat:'Desk Lamps', price:null, soon:1, tall:0, seed:'halolamp', tags:['Coming soon'], desc:'Soft, warm glow for calmer corners.', img:'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=800&q=80', variants:[] },
+      { name:'Cable & Desk Organiser', cat:'Desk Décor', price:null, soon:1, tall:0, seed:'organiser', tags:['Coming soon'], desc:'Tidy cables, tidier mind.', img:'https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=800&q=80', variants:[] },
+      { name:'Grid Desk Mat', cat:'Desk Décor', price:null, soon:1, tall:1, seed:'deskmat', tags:['Coming soon'], desc:'Anchor your whole setup.', img:'https://images.unsplash.com/photo-1616627561950-9f746e330187?auto=format&fit=crop&w=800&q=80', variants:[] },
+    ];
+    const fb=(p)=>`https://picsum.photos/seed/${p.seed}/800/800`;
+    const CATS=[...new Set(PRODUCTS.map(p=>p.cat))];
+    const TAGS=['Featured','New','Best seller','Trending'];
+    const state={cats:new Set(),maxPrice:2000,tags:new Set(),sort:'featured',view:'gallery'};
+    const money=(n)=>'₹'+n.toLocaleString('en-IN');
+    const swatches=(p)=>{ if(!p.variants||!p.variants.length) return ''; const s=p.variants.slice(0,5).map(v=>`<span class="w-5 h-5 rounded-full bg-cover bg-center border border-ink/15" style="background-image:url('${v.img}')" title="${v.name}"></span>`).join(''); return `<div class="flex items-center gap-1.5">${s}${p.variants.length>5?`<span class="text-[10px] text-faint ml-1">+${p.variants.length-5}</span>`:''}</div>`; };
+    const priceHTML=(p)=> p.soon ? '<span class="label text-faint">Coming soon</span>' : `<span class="font-display text-xl text-red">${money(p.price)}</span>`;
+    const tagBadge=(p)=> p.soon ? '<span class="label text-white bg-ink/70 px-2.5 py-1 rounded-full">Soon</span>' : (p.tags[0]?`<span class="label text-white bg-red px-2.5 py-1 rounded-full">${p.tags[0]}</span>`:'');
+
+    /* ---------------- Home renders ---------------- */
+    document.getElementById('dropScroller').innerHTML = PRODUCTS.filter(p=>!p.soon).concat(PRODUCTS.filter(p=>p.soon)).slice(0,6).map((p,i)=>`
+      <div ${p.soon?'':'data-go="product"'} data-cursor class="group relative w-[78vw] sm:w-[60vw] md:w-[440px] aspect-[4/5] rounded-4xl overflow-hidden glass ring-hover ${p.soon?'':'cursor-pointer'}">
+        <img src="${p.img}" onerror="this.src='${fb(p)}'" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-[1.4s]" draggable="false"/>
+        <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent"></div>
+        <span class="absolute top-5 left-5 font-display text-white/70 text-xl">0${i+1}</span>
+        <span class="absolute top-5 right-5">${tagBadge(p)}</span>
+        <div class="absolute bottom-0 p-6 text-white w-full flex items-end justify-between"><div><p class="label text-rose">${p.cat}</p><h3 class="font-display text-3xl mt-1">${p.name}</h3><p class="font-display text-xl mt-1">${p.soon?'Coming soon':money(p.price)}</p></div>${p.soon?'':'<span class="w-11 h-11 rounded-full glass-strong grid place-items-center text-ink shrink-0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>'}</div>
+      </div>`).join('');
+
+    document.getElementById('homeIndex').innerHTML = PRODUCTS.map((p,i)=>`
+      <div class="idx-row group flex items-center justify-between py-5 md:py-6 border-b border-ink/12 ${p.soon?'':'cursor-pointer'}" ${p.soon?'':'data-go="product"'} data-cursor data-prev="${p.img}" data-fb="${fb(p)}">
+        <div class="flex items-baseline gap-4 md:gap-8 min-w-0"><span class="font-mono text-xs text-faint w-8 shrink-0">0${i+1}</span><h3 class="font-display text-2xl md:text-5xl font-light truncate">${p.name}</h3></div>
+        <div class="flex items-center gap-4 md:gap-10 shrink-0"><span class="hidden sm:block label text-faint">${p.cat}</span><span class="font-display text-lg md:text-2xl ${p.soon?'text-faint':''}">${p.soon?'Soon':money(p.price)}</span><span class="w-9 h-9 md:w-11 md:h-11 rounded-full border border-ink/15 grid place-items-center group-hover:bg-red group-hover:text-white group-hover:border-red transition"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></div>
+      </div>`).join('');
+
+    const revHTML=[['Aryan','The red glow is unreal on a late-night setup. Way cooler in person.'],['Simran','Gifted the Porsche one to my brother — he hasn\'t turned it off since.'],['Kabir','Pen stand is tiny but adorable. My desk finally looks intentional.']].map(([n,t])=>`<div class="glass rounded-3xl p-6 w-80 shrink-0"><div class="text-gold mb-2">★★★★★</div><p class="text-muted">"${t}"</p><p class="mt-4 font-medium text-sm">— ${n}</p></div>`).join('');
+    document.getElementById('revSet').innerHTML=revHTML; document.getElementById('revSet2').innerHTML=revHTML;
+
+    /* index hover preview */
+    const prev=document.getElementById('idxPreview');
+    function bindIndexPreview(scope){ scope.querySelectorAll('[data-prev]').forEach(row=>{ row.addEventListener('mouseenter',()=>{prev.src=row.dataset.prev;prev.onerror=()=>{prev.src=row.dataset.fb;};prev.classList.add('show');}); row.addEventListener('mouseleave',()=>prev.classList.remove('show')); }); }
+    window.addEventListener('mousemove',e=>{ if(prev.classList.contains('show')){prev.style.left=e.clientX+'px';prev.style.top=e.clientY+'px';}},{passive:true});
+
+    /* ---------------- Shop renders ---------------- */
+    function galleryCard(p,i){
+      const ar=p.tall?'aspect-[3/4]':'aspect-square';
+      return `<div class="group glass rounded-4xl overflow-hidden ring-hover ${p.soon?'':'cursor-pointer'}" ${p.soon?'':'data-go="product"'} data-cursor style="animation:pageIn .5s ${i*40}ms backwards">
+        <div class="relative ${ar} overflow-hidden bg-white">
+          <img src="${p.img}" onerror="this.src='${fb(p)}'" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-[1.3s]"/>
+          <span class="absolute top-3 left-3">${tagBadge(p)}</span>
+          ${p.soon?'<div class="absolute inset-0 bg-white/30 grid place-items-center"><span class="glass-strong rounded-full px-4 py-2 text-sm font-semibold">Coming soon</span></div>':`
+          <button onclick="event.stopPropagation()" class="absolute top-3 right-3 w-9 h-9 rounded-full glass-strong grid place-items-center text-ink hover:text-red opacity-0 group-hover:opacity-100 transition"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg></button>
+          <div class="absolute inset-x-3 bottom-3 flex gap-2 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all"><button onclick="event.stopPropagation()" class="glass-strong text-ink flex-1 py-2.5 rounded-full text-xs font-semibold">Quick Look</button><button onclick="event.stopPropagation()" class="btn-primary px-4 py-2.5 rounded-full text-xs font-semibold">Add +</button></div>`}
+        </div>
+        <div class="p-4 md:p-5"><p class="label text-faint">${p.cat}</p><h3 class="font-display text-lg md:text-xl mt-1 leading-snug">${p.name}</h3>
+          <div class="mt-3">${swatches(p)}</div>
+          <div class="mt-4 flex items-end justify-between">${priceHTML(p)}</div>
+        </div></div>`;
+    }
+    function indexRow(p,i){
+      return `<div class="idx-row group flex items-center justify-between py-5 md:py-6 border-b border-ink/12 ${p.soon?'':'cursor-pointer'}" ${p.soon?'':'data-go="product"'} data-cursor data-prev="${p.img}" data-fb="${fb(p)}">
+        <div class="flex items-baseline gap-4 md:gap-8 min-w-0"><span class="font-mono text-xs text-faint w-8 shrink-0">0${i+1}</span><h3 class="font-display text-2xl md:text-4xl font-light truncate">${p.name}</h3></div>
+        <div class="flex items-center gap-4 md:gap-10 shrink-0"><span class="hidden sm:block">${swatches(p)}</span><span class="hidden md:block label text-faint">${p.cat}</span><span class="font-display text-lg md:text-2xl ${p.soon?'text-faint':'text-red'}">${p.soon?'Soon':money(p.price)}</span></div></div>`;
+    }
+    function applyFilters(){
+      let list=PRODUCTS.filter(p=>(state.cats.size===0||state.cats.has(p.cat))&&((p.price??0)<=state.maxPrice)&&(state.tags.size===0||(p.tags||[]).some(t=>state.tags.has(t))));
+      if(state.sort==='low')list.sort((a,b)=>(a.price??Infinity)-(b.price??Infinity));
+      if(state.sort==='high')list.sort((a,b)=>(b.price??-1)-(a.price??-1));
+      const g=document.getElementById('galleryView'),x=document.getElementById('indexView'),em=document.getElementById('emptyState');
+      g.innerHTML=list.map(galleryCard).join(''); x.innerHTML=list.map(indexRow).join(''); bindIndexPreview(x);
+      const none=list.length===0; em.classList.toggle('hidden',!none);
+      g.classList.toggle('hidden',none||state.view!=='gallery'); x.classList.toggle('hidden',none||state.view!=='index');
+      document.getElementById('count').textContent=list.length;
+      const n=state.cats.size+state.tags.size+(state.maxPrice<2000?1:0); const fc=document.getElementById('filterCount'); fc.textContent=n; fc.classList.toggle('hidden',n===0);
+      renderChips();
+    }
+    function renderChips(){ const chips=[]; state.cats.forEach(c=>chips.push(['cat',c,c])); state.tags.forEach(t=>chips.push(['tag',t,t])); if(state.maxPrice<2000)chips.push(['price','','≤ '+money(state.maxPrice)]); document.getElementById('activeChips').innerHTML=chips.map(([t,v,l])=>`<button class="rmchip glass rounded-full pl-3 pr-2 py-1.5 text-xs font-medium flex items-center gap-1.5" data-t="${t}" data-v="${v}">${l} <span class="text-red">✕</span></button>`).join(''); }
+    document.getElementById('catList').innerHTML=CATS.map(c=>{const n=PRODUCTS.filter(p=>p.cat===c).length;return `<label class="flex items-center justify-between gap-2 text-sm text-muted hover:text-ink cursor-pointer"><span class="flex items-center gap-2.5"><input type="checkbox" class="chk catbox" value="${c}"> ${c}</span><span class="text-faint text-xs">${n}</span></label>`;}).join('');
+    document.getElementById('quickCats').innerHTML=CATS.map(c=>`<button class="qcat shrink-0 px-3.5 py-2 rounded-full text-sm text-muted hover:text-ink whitespace-nowrap" data-c="${c}">${c}</button>`).join('');
+    document.getElementById('tagList').innerHTML=TAGS.map(t=>`<button class="tagchip px-3.5 py-2 rounded-full glass text-sm text-muted hover:text-ink" data-t="${t}">${t}</button>`).join('');
+    document.getElementById('filterToggle').addEventListener('click',()=>document.getElementById('filterPanel').classList.toggle('hidden'));
+    document.addEventListener('change',e=>{ if(e.target.classList.contains('catbox')){const v=e.target.value; e.target.checked?state.cats.add(v):state.cats.delete(v); syncCat(v); applyFilters();}});
+    function syncCat(v){ const on=state.cats.has(v); document.querySelectorAll('.catbox[value="'+v+'"]').forEach(b=>b.checked=on); document.querySelectorAll('.qcat[data-c="'+v+'"]').forEach(b=>{b.classList.toggle('bg-ink',on);b.classList.toggle('text-white',on);b.classList.toggle('text-muted',!on);}); }
+    function syncTag(t){ const on=state.tags.has(t); document.querySelectorAll('.tagchip[data-t="'+t+'"]').forEach(b=>{b.classList.toggle('bg-ink',on);b.classList.toggle('text-white',on);b.classList.toggle('text-muted',!on);}); }
+    document.addEventListener('click',e=>{
+      const q=e.target.closest('.qcat'); if(q){const v=q.dataset.c; state.cats.has(v)?state.cats.delete(v):state.cats.add(v); syncCat(v); applyFilters(); return;}
+      const tg=e.target.closest('.tagchip'); if(tg){const t=tg.dataset.t; state.tags.has(t)?state.tags.delete(t):state.tags.add(t); syncTag(t); applyFilters(); return;}
+      const rm=e.target.closest('.rmchip'); if(rm){const {t,v}=rm.dataset;
+        if(t==='cat'){state.cats.delete(v);syncCat(v);} if(t==='tag'){state.tags.delete(v);syncTag(v);}
+        if(t==='price'){state.maxPrice=2000;document.getElementById('priceRange').value=2000;document.getElementById('priceLbl').textContent='₹2,000';}
+        applyFilters();}
+    });
+    document.getElementById('priceRange').addEventListener('input',e=>{state.maxPrice=+e.target.value;document.getElementById('priceLbl').textContent=money(+e.target.value);applyFilters();});
+    document.querySelectorAll('.sort-btn').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.sort-btn').forEach(x=>{x.classList.remove('bg-red','text-white');x.classList.add('text-muted','hover:text-ink');});b.classList.add('bg-red','text-white');b.classList.remove('text-muted','hover:text-ink');state.sort=b.dataset.sort;applyFilters();}));
+    document.querySelectorAll('.viewbtn').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.viewbtn').forEach(x=>{x.classList.remove('bg-ink','text-white');x.classList.add('text-muted','hover:text-ink');});b.classList.add('bg-ink','text-white');b.classList.remove('text-muted','hover:text-ink');state.view=b.dataset.view;applyFilters();}));
+    function clearAll(){state.cats.clear();state.tags.clear();state.maxPrice=2000;state.sort='featured';document.querySelectorAll('.catbox').forEach(b=>b.checked=false);document.querySelectorAll('.qcat,.tagchip').forEach(b=>{b.classList.remove('bg-ink','text-white');b.classList.add('text-muted');});document.getElementById('priceRange').value=2000;document.getElementById('priceLbl').textContent='₹2,000';applyFilters();}
+    document.getElementById('clearAll').addEventListener('click',clearAll); document.getElementById('resetEmpty').addEventListener('click',clearAll);
+
+    /* ---------------- PDP renders ---------------- */
+    const LAMP=PRODUCTS[0];
+    document.getElementById('pdpGallery').innerHTML=LAMP.variants.concat(LAMP.variants).slice(0,4).map((v,n)=>`<div class="w-[80vw] md:w-[520px] aspect-[4/3] rounded-4xl overflow-hidden glass"><img src="${v.img}" onerror="this.src='https://picsum.photos/seed/g${n}/900/700'" class="w-full h-full object-cover" draggable="false"/></div>`).join('');
+    document.getElementById('coverFinish').innerHTML=LAMP.variants.map((v,i)=>`<button class="cfin w-9 h-9 rounded-full bg-cover bg-center ring-2 ${i===0?'ring-red':'ring-transparent'} ring-offset-2 ring-offset-white" style="background-image:url('${v.img}')" data-img="${v.img}" data-price="${v.price}" title="${v.name}"></button>`).join('');
+    document.getElementById('coverFinish').addEventListener('click',e=>{const b=e.target.closest('.cfin'); if(!b)return; document.querySelectorAll('.cfin').forEach(x=>x.classList.replace('ring-red','ring-transparent')); b.classList.replace('ring-transparent','ring-red'); document.getElementById('coverImg').src=b.dataset.img; const pr=money(+b.dataset.price); document.getElementById('coverPrice').textContent=pr; document.getElementById('barPrice').textContent=pr;});
+    document.getElementById('relatedScroller').innerHTML=[PRODUCTS[1],PRODUCTS[3],PRODUCTS[4]].map(p=>`<div class="w-[60vw] sm:w-[40vw] md:w-[300px]">${galleryCard(p,0)}</div>`).join('');
+
+    /* drag scroll */
+    document.querySelectorAll('.hscroll').forEach(el=>{let down=false,sx,sl;el.addEventListener('pointerdown',e=>{down=true;el.classList.add('dragging');sx=e.pageX;sl=el.scrollLeft;el.setPointerCapture(e.pointerId);});el.addEventListener('pointermove',e=>{if(!down)return;el.scrollLeft=sl-(e.pageX-sx);});const up=()=>{down=false;el.classList.remove('dragging');};el.addEventListener('pointerup',up);el.addEventListener('pointercancel',up);el.addEventListener('pointerleave',up);});
+
+    /* page switching */
+    const pages=document.querySelectorAll('[data-page]'),navLinks=document.querySelectorAll('.nav-link');
+    function go(view){pages.forEach(p=>p.classList.toggle('active',p.dataset.page===view));navLinks.forEach(l=>{const on=l.dataset.go===view;l.classList.toggle('text-ink',on);l.classList.toggle('bg-black/5',on);l.classList.toggle('text-muted',!on);});document.getElementById('mobileMenu').classList.add('hidden');window.scrollTo({top:0});requestAnimationFrame(setupReveals);}
+    document.body.addEventListener('click',e=>{const t=e.target.closest('[data-go]');if(t&&!e.target.closest('[onclick]')){e.preventDefault();go(t.dataset.go);}});
+    document.getElementById('menuBtn').addEventListener('click',()=>document.getElementById('mobileMenu').classList.toggle('hidden'));
+
+    /* PDP buy bar */
+    const buyBar=document.getElementById('buyBar');
+    window.addEventListener('scroll',()=>{const onPdp=document.querySelector('[data-page="product"]').classList.contains('active');const show=onPdp&&window.scrollY>window.innerHeight*0.7;buyBar.style.opacity=show?'1':'0';buyBar.style.transform=show?'translateY(0)':'translateY(-1rem)';buyBar.style.pointerEvents=show?'auto':'none';},{passive:true});
+
+    /* reveals */
+    let io;
+    function setupReveals(){if(!io)io=new IntersectionObserver(es=>es.forEach(en=>{if(en.isIntersecting){en.target.classList.add('in');io.unobserve(en.target);}}),{threshold:.1});document.querySelectorAll('[data-page].active [data-reveal]:not(.in)').forEach(el=>io.observe(el));}
+
+    /* Hero: latest product spotlight */
+    (function(){
+      const ghost=document.getElementById('heroGhost'),hcImg=document.getElementById('hcImg');
+      ghost.src=LAMP.img; ghost.onerror=function(){this.src=fb(LAMP);};
+      hcImg.src=LAMP.img; hcImg.onerror=function(){this.src=fb(LAMP);};
+      document.getElementById('heroGhostName').textContent=LAMP.name.split(' ')[0];
+      document.getElementById('heroBadgeName').textContent=LAMP.name;
+      document.getElementById('hcName').textContent=LAMP.name;
+      document.getElementById('hcPrice').textContent=money(LAMP.price);
+      document.getElementById('hcDots').innerHTML=swatches(LAMP);
+      if(matchMedia('(prefers-reduced-motion: reduce)').matches||matchMedia('(hover:none)').matches)return;
+      const hero=document.getElementById('hero'),card=document.getElementById('heroCard'),gname=document.getElementById('heroGhostName');
+      hero.addEventListener('mousemove',e=>{const r=hero.getBoundingClientRect(),x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;ghost.style.transform=`translateY(-50%) translate(${-x*36}px,${-y*36}px)`;gname.style.transform=`translate(-50%,-50%) translate(${-x*16}px,${-y*16}px)`;card.style.transform=`translate(${x*16}px,${y*16}px)`;},{passive:true});
+      hero.addEventListener('mouseleave',()=>{ghost.style.transform='translateY(-50%)';gname.style.transform='translate(-50%,-50%)';card.style.transform='';});
+    })();
+
+    /* animated bg canvas */
+    (function(){const c=document.getElementById('bg'),ctx=c.getContext('2d');const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;let w,h,orbs,mx=-999,my=-999;const COL=[[226,58,69],[240,115,90],[201,154,91],[233,231,243]];
+      function resize(){w=c.width=innerWidth;h=c.height=innerHeight;}
+      function init(){orbs=Array.from({length:reduce?0:14},(_,i)=>({x:Math.random()*innerWidth,y:Math.random()*innerHeight,r:120+((i*53)%180),col:COL[i%COL.length],vx:(((i%5)-2)/12),vy:(((i%3)-1)/12),a:.05+((i%4)*.012)}));}
+      function draw(){ctx.clearRect(0,0,w,h);for(const o of orbs){o.x+=o.vx;o.y+=o.vy;if(o.x<-o.r)o.x=w+o.r;if(o.x>w+o.r)o.x=-o.r;if(o.y<-o.r)o.y=h+o.r;if(o.y>h+o.r)o.y=-o.r;const g=ctx.createRadialGradient(o.x,o.y,0,o.x,o.y,o.r);g.addColorStop(0,`rgba(${o.col[0]},${o.col[1]},${o.col[2]},${o.a})`);g.addColorStop(1,`rgba(${o.col[0]},${o.col[1]},${o.col[2]},0)`);ctx.fillStyle=g;ctx.beginPath();ctx.arc(o.x,o.y,o.r,0,7);ctx.fill();}if(mx>-900){const g=ctx.createRadialGradient(mx,my,0,mx,my,260);g.addColorStop(0,'rgba(226,58,69,.07)');g.addColorStop(1,'rgba(226,58,69,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(mx,my,260,0,7);ctx.fill();}requestAnimationFrame(draw);}
+      resize();init();if(!reduce)draw();addEventListener('resize',()=>{resize();init();},{passive:true});addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;},{passive:true});
+    })();
+
+    /* custom cursor */
+    (function(){if(matchMedia('(hover:none)').matches)return;const cur=document.getElementById('cur'),dot=document.getElementById('curDot');let cx=0,cy=0,tx=0,ty=0;addEventListener('mousemove',e=>{tx=e.clientX;ty=e.clientY;dot.style.transform=`translate(${tx-2.5}px,${ty-2.5}px)`;},{passive:true});(function loop(){cx+=(tx-cx)*.18;cy+=(ty-cy)*.18;cur.style.transform=`translate(${cx-17}px,${cy-17}px)`;requestAnimationFrame(loop);})();document.addEventListener('mouseover',e=>{cur.classList.toggle('cur-lg',!!e.target.closest('a,button,[data-go],[data-cursor],.idx-row,[data-cursor-drag]'));});})();
+
+    /* motion.dev */
+    (async()=>{if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;try{const {animate,press}=await import('https://cdn.jsdelivr.net/npm/motion@11/+esm');if(press)document.body.addEventListener('pointerdown',e=>{const b=e.target.closest('.btn-primary');if(b)animate(b,{scale:.96},{duration:.1}).finished.then(()=>animate(b,{scale:1},{type:'spring',stiffness:500,damping:18}));});}catch(_){}})();
+
+    /* init */
+    bindIndexPreview(document.getElementById('homeIndex'));
+    applyFilters(); setupReveals();
+  </script>
+</body>
+</html>

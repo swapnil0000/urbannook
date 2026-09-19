@@ -81,7 +81,7 @@
   <!-- PWA / App -->
   <!-- build: v2.1 -->
   <link rel="manifest" href="/manifest.json" />
-  <meta name="theme-color" content="#a89068" />
+  <meta name="theme-color" content="#141414" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -93,7 +93,10 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" />
   <link rel="dns-prefetch" href="https://accounts.google.com" />
 
-  <!-- AireHeroBanner renders /assets/hero2.webp at every breakpoint, so preload it
+  <!-- Editorial "2040" typography: Anton (display) · Archivo (headings) · Inter (body) · JetBrains Mono (labels) -->
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+
+  <!-- The home hero renders /assets/hero2.webp at every breakpoint, so preload it
        unconditionally. The previous media-split preload fetched hero21.webp on mobile —
        an image the hero never uses — and left the real LCP image undiscovered until
        React had rendered, costing ~2.2s of LCP load delay.

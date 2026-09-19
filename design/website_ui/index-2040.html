@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Urban Nook 2040 — Upgrade Your Space</title>
+<meta name="description" content="One store. Every fandom. The 2040 concept build.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Anton&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   URBAN NOOK — 2040 CONCEPT
+   Same three colours. Same four faces. New physics.
+   ============================================================ */
+:root{
+  --black:#141414; --black-2:#1F1E1C;
+  --cream:#EFEAE0; --cream-2:#E5DFD3;
+  --red:#E63329; --red-2:#C9281F;
+  --grey:#8C8779; --grey-d:#615C50;
+  --line:#D8D2C5; --line-dk:#33312D;
+  --maxw:1280px;
+  --ease:cubic-bezier(.2,.7,.2,1);
+  --ease-out:cubic-bezier(.16,1,.3,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+html,body{overflow-x:clip}
+body{
+  background:var(--cream);color:var(--black);
+  font-family:'Inter',sans-serif;line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:inherit;text-decoration:none}
+img{display:block;max-width:100%}
+button{font:inherit;background:none;border:none;cursor:pointer;color:inherit}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px}
+.mono{font-family:'JetBrains Mono',monospace}
+.red{color:var(--red)}
+
+/* ---------- film grain ---------- */
+.grain{position:fixed;inset:-100%;z-index:1000;pointer-events:none;opacity:.05;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation:grain 8s steps(10) infinite}
+@keyframes grain{
+  0%,100%{transform:translate(0,0)}10%{transform:translate(-5%,-8%)}20%{transform:translate(-12%,4%)}
+  30%{transform:translate(6%,-14%)}40%{transform:translate(-4%,12%)}50%{transform:translate(-12%,6%)}
+  60%{transform:translate(10%,0)}70%{transform:translate(0,10%)}80%{transform:translate(-8%,-2%)}90%{transform:translate(4%,6%)}
+}
+
+/* ---------- custom cursor ---------- */
+.cursor,.cursor-ring{position:fixed;top:0;left:0;z-index:2000;pointer-events:none;border-radius:50%;
+  transform:translate(-50%,-50%);will-change:transform}
+.cursor{width:8px;height:8px;background:var(--red)}
+.cursor-ring{width:38px;height:38px;border:1.5px solid var(--red);opacity:.55;
+  display:flex;align-items:center;justify-content:center;
+  transition:width .35s var(--ease),height .35s var(--ease),opacity .3s,background-color .3s}
+.cursor-ring .c-label{font-family:'JetBrains Mono';font-size:9px;letter-spacing:.18em;color:#fff;opacity:0;text-transform:uppercase;transition:opacity .2s}
+.cursor-ring.is-hover{width:64px;height:64px;background:rgba(230,51,41,.92);border-color:transparent;opacity:1}
+.cursor-ring.is-hover .c-label{opacity:1}
+@media(hover:none),(pointer:coarse){.cursor,.cursor-ring{display:none}}
+
+/* ---------- preloader ---------- */
+.loader{position:fixed;inset:0;z-index:3000;background:var(--black);color:var(--cream);
+  display:flex;align-items:center;justify-content:center;flex-direction:column;gap:26px;
+  transition:clip-path .9s var(--ease-out);clip-path:inset(0 0 0 0)}
+.loader.done{clip-path:inset(0 0 100% 0)}
+.loader .l-mark{display:flex;align-items:center;gap:14px;font-family:'Anton';font-size:34px;text-transform:uppercase;letter-spacing:.02em}
+.loader .l-dot{width:13px;height:13px;border-radius:50%;background:var(--red);animation:pulse 1s var(--ease) infinite}
+@keyframes pulse{50%{transform:scale(1.7);opacity:.6}}
+.loader .l-count{font-family:'JetBrains Mono';font-size:12px;letter-spacing:.3em;color:var(--grey)}
+.loader .l-bar{width:210px;height:2px;background:var(--line-dk);overflow:hidden}
+.loader .l-bar i{display:block;height:100%;width:0;background:var(--red)}
+
+/* ---------- progress hairline ---------- */
+.progress{position:fixed;top:0;left:0;height:2px;width:100%;z-index:1500;background:transparent}
+.progress i{display:block;height:100%;width:0;background:var(--red)}
+
+/* ---------- header ---------- */
+.site-header{position:sticky;top:0;z-index:900;background:color-mix(in srgb,var(--black) 92%,transparent);
+  backdrop-filter:blur(14px);color:var(--cream);border-bottom:1px solid var(--line-dk)}
+.nav{display:flex;align-items:center;justify-content:space-between;height:64px}
+.brand{font-family:'Anton';text-transform:uppercase;font-size:22px;display:flex;align-items:center;gap:10px}
+.brand .b-dot{width:9px;height:9px;border-radius:50%;background:var(--red);animation:pulse 2.4s var(--ease) infinite}
+.nav-links{display:flex;gap:26px;font-family:'JetBrains Mono';font-size:11px;letter-spacing:.16em;text-transform:uppercase}
+.nav-links a{color:#bdb6a6;padding:4px 0;position:relative;transition:color .2s}
+.nav-links a:hover{color:var(--cream)}
+.nav-links a::after{content:"";position:absolute;left:0;bottom:-2px;height:2px;width:0;background:var(--red);transition:width .3s var(--ease)}
+.nav-links a:hover::after{width:100%}
+.nav-utils{display:flex;align-items:center;gap:20px;font-family:'JetBrains Mono';font-size:11px;letter-spacing:.14em;text-transform:uppercase}
+.clock{color:var(--grey);display:flex;align-items:center;gap:8px}
+.clock i{width:6px;height:6px;border-radius:50%;background:var(--red);display:inline-block;animation:pulse 1.6s infinite}
+.cart-btn{position:relative;color:var(--cream);display:flex;gap:8px;align-items:center}
+.cart-count{background:var(--red);color:#fff;min-width:19px;height:19px;border-radius:50%;
+  display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:600}
+
+/* ---------- ticker (velocity-reactive) ---------- */
+.ticker{background:var(--red);color:#fff;overflow:hidden;white-space:nowrap;border-bottom:2px solid var(--black)}
+.ticker-track{display:inline-flex;padding:10px 0;font-family:'JetBrains Mono';font-size:12px;letter-spacing:.2em;text-transform:uppercase;will-change:transform}
+.ticker-track span{padding:0 28px;display:inline-flex;align-items:center;gap:28px}
+.ticker-track span::after{content:"●";font-size:8px}
+
+/* ---------- hero ---------- */
+.hero{position:relative;border-bottom:2px solid var(--black);overflow:clip;min-height:calc(100svh - 110px);display:flex;align-items:center}
+.hero .wrap{width:100%;position:relative;padding-top:64px;padding-bottom:140px}
+.hero-meta{display:flex;gap:26px;font-family:'JetBrains Mono';font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--grey-d);margin-bottom:30px}
+.hero-meta .hm{opacity:0;transform:translateY(14px);animation:fadeUp .7s var(--ease-out) forwards}
+.hero-meta .hm:nth-child(2){animation-delay:.08s}
+.hero-meta .hm:nth-child(3){animation-delay:.16s}
+@keyframes fadeUp{to{opacity:1;transform:none}}
+.hero-title{font-family:'Anton';text-transform:uppercase;line-height:.84;letter-spacing:.004em;
+  font-size:clamp(64px,12.5vw,190px);position:relative;z-index:2}
+.hero-title .ln{display:block;overflow:hidden}
+.hero-title .ch{display:inline-block;transform:translateY(115%) rotate(4deg);animation:chRise .9s var(--ease-out) forwards}
+@keyframes chRise{to{transform:none}}
+.hero-title .outline{color:transparent;-webkit-text-stroke:2px var(--black)}
+.hero-sub{max-width:430px;color:var(--grey-d);font-size:17px;margin:34px 0 30px;
+  opacity:0;transform:translateY(16px);animation:fadeUp .8s .55s var(--ease-out) forwards}
+.hero-cta{display:flex;gap:14px;flex-wrap:wrap;opacity:0;transform:translateY(16px);animation:fadeUp .8s .68s var(--ease-out) forwards}
+
+.hero-visual{position:absolute;right:0;top:50%;transform:translateY(-50%);width:min(38vw,520px);aspect-ratio:3/4;z-index:1}
+.hero-visual .hv-img{position:absolute;inset:0;overflow:hidden;background:var(--black)}
+.hero-visual .hv-img img{width:100%;height:100%;object-fit:cover;filter:grayscale(1) contrast(1.12);transform:scale(1.12);will-change:transform}
+.hero-visual .hv-img::after{content:"";position:absolute;inset:0;background:var(--red);mix-blend-mode:multiply;opacity:.4}
+.hero-visual .hv-frame{position:absolute;inset:0;border:2px solid var(--black);transform:translate(18px,18px);z-index:-1}
+.hero-visual .tagchip{position:absolute;bottom:20px;left:-26px;background:var(--black);color:var(--cream);
+  font-family:'JetBrains Mono';font-size:10px;letter-spacing:.18em;text-transform:uppercase;padding:10px 16px;display:flex;gap:10px;align-items:center}
+.hero-visual .tagchip i{width:6px;height:6px;border-radius:50%;background:var(--red)}
+
+.orbit{position:absolute;left:-70px;bottom:-70px;width:230px;height:230px;z-index:3;pointer-events:none;animation:spin 26s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.orbit svg{width:100%;height:100%}
+.orbit text{font-family:'JetBrains Mono';font-size:11.5px;letter-spacing:.34em;text-transform:uppercase;fill:var(--black)}
+.orbit circle{fill:var(--red)}
+
+.hero-scroll{position:absolute;bottom:26px;left:28px;font-family:'JetBrains Mono';font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:var(--grey);display:flex;align-items:center;gap:12px}
+.hero-scroll .line{width:52px;height:1px;background:var(--grey);position:relative;overflow:hidden}
+.hero-scroll .line::after{content:"";position:absolute;inset:0;background:var(--red);transform:translateX(-100%);animation:sweep 1.8s var(--ease) infinite}
+@keyframes sweep{60%{transform:translateX(0)}100%{transform:translateX(100%)}}
+
+/* ---------- buttons ---------- */
+.btn{display:inline-flex;align-items:center;gap:10px;font-family:'Archivo';font-weight:800;
+  text-transform:uppercase;letter-spacing:.04em;font-size:14px;padding:16px 30px;
+  border:2px solid transparent;position:relative;overflow:hidden;transition:color .3s var(--ease)}
+.btn .btn-fill{position:absolute;inset:0;transform:translateY(101%);transition:transform .4s var(--ease-out);z-index:0}
+.btn > span{position:relative;z-index:1}
+.btn-primary{background:var(--red);color:#fff}
+.btn-primary .btn-fill{background:var(--black)}
+.btn-primary:hover .btn-fill{transform:translateY(0)}
+.btn-ghost{border-color:var(--black);color:var(--black)}
+.btn-ghost .btn-fill{background:var(--black)}
+.btn-ghost:hover{color:var(--cream)}
+.btn-ghost:hover .btn-fill{transform:translateY(0)}
+[data-magnet]{will-change:transform}
+
+/* ---------- section scaffolding ---------- */
+.section{padding:100px 0}
+.sec-head{display:flex;align-items:flex-end;justify-content:space-between;gap:22px;flex-wrap:wrap;margin-bottom:44px}
+.sec-kicker{font-family:'JetBrains Mono';font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--red);display:block;margin-bottom:12px}
+.sec-title{font-family:'Archivo';font-weight:900;text-transform:uppercase;font-size:clamp(34px,5.4vw,60px);letter-spacing:-.02em;line-height:.95}
+.sec-link{font-family:'JetBrains Mono';font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  border-bottom:2px solid var(--red);padding-bottom:4px;display:inline-flex;gap:8px;transition:gap .25s var(--ease)}
+.sec-link:hover{gap:14px}
+
+/* reveal on scroll */
+.reveal{opacity:0;transform:translateY(38px);transition:opacity .8s var(--ease-out),transform .8s var(--ease-out)}
+.reveal.in{opacity:1;transform:none}
+
+/* ---------- collections rail ---------- */
+.rail-outer{overflow:hidden}
+.rail{display:flex;gap:18px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:22px;
+  scrollbar-width:none;-ms-overflow-style:none;cursor:grab}
+.rail::-webkit-scrollbar{display:none}
+.rail.dragging{cursor:grabbing;scroll-snap-type:none}
+.rail .cat{position:relative;flex:0 0 min(320px,72vw);aspect-ratio:3/4.1;scroll-snap-align:start;
+  overflow:hidden;background:var(--black);display:flex;align-items:flex-end}
+.rail .cat img{position:absolute;inset:0;width:100%;height:112%;object-fit:cover;top:-6%;
+  filter:grayscale(1) contrast(1.1);transition:filter .5s var(--ease);will-change:transform}
+.rail .cat::before{content:"";position:absolute;inset:0;background:var(--red);mix-blend-mode:multiply;opacity:.42;z-index:1;transition:opacity .5s}
+.rail .cat::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgba(20,20,20,.88));z-index:2}
+.rail .cat:hover img{filter:grayscale(0) contrast(1.05)}
+.rail .cat:hover::before{opacity:.12}
+.rail .cat .c-idx{position:absolute;top:16px;left:18px;z-index:3;font-family:'JetBrains Mono';font-size:11px;letter-spacing:.2em;color:var(--cream);opacity:.75}
+.rail .cat .c-name{position:relative;z-index:3;color:var(--cream);font-family:'Archivo';font-weight:900;text-transform:uppercase;font-size:24px;padding:22px;width:100%}
+.rail .cat .c-name small{display:block;font-family:'JetBrains Mono';font-weight:400;font-size:10px;letter-spacing:.18em;color:var(--red);margin-top:6px;text-transform:uppercase}
+.rail-progress{height:2px;background:var(--line);position:relative;margin-top:4px}
+.rail-progress i{position:absolute;left:0;top:0;height:100%;width:20%;background:var(--red);transition:transform .15s linear}
+
+/* ---------- product grid (3D tilt) ---------- */
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:22px;perspective:1200px}
+.card{background:#fff;border:1px solid var(--line);display:flex;flex-direction:column;position:relative;
+  transform-style:preserve-3d;will-change:transform;transition:box-shadow .35s var(--ease)}
+.card:hover{box-shadow:0 24px 60px rgba(20,20,20,.16)}
+.card .ph{position:relative;aspect-ratio:1;overflow:hidden;background:var(--black)}
+.card .ph img{width:100%;height:100%;object-fit:cover;filter:grayscale(.4) contrast(1.06);transition:transform .7s var(--ease),filter .5s}
+.card:hover .ph img{transform:scale(1.08);filter:grayscale(0)}
+.card .glare{position:absolute;inset:0;z-index:2;pointer-events:none;opacity:0;transition:opacity .3s;
+  background:radial-gradient(420px circle at var(--gx,50%) var(--gy,50%),rgba(239,234,224,.35),transparent 45%)}
+.card:hover .glare{opacity:1}
+.card .badge{position:absolute;top:12px;left:12px;z-index:3;background:var(--red);color:#fff;
+  font-family:'JetBrains Mono';font-size:10px;letter-spacing:.14em;text-transform:uppercase;padding:5px 10px;font-weight:600}
+.card .info{padding:18px;display:flex;flex-direction:column;gap:8px;flex:1;transform:translateZ(28px)}
+.card .ptag{font-family:'JetBrains Mono';font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--grey)}
+.card .pname{font-family:'Archivo';font-weight:800;font-size:16px;text-transform:uppercase;line-height:1.15}
+.card .prow{display:flex;justify-content:space-between;align-items:center;margin-top:auto}
+.card .price{font-family:'JetBrains Mono';font-weight:600;color:var(--red);font-size:15px}
+.card .price .strike{color:var(--grey);text-decoration:line-through;font-size:12px;margin-right:8px}
+.card .quick{font-family:'Archivo';font-weight:800;font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+  border:2px solid var(--black);padding:8px 14px;position:relative;overflow:hidden;transition:color .3s}
+.card .quick::before{content:"";position:absolute;inset:0;background:var(--red);transform:translateY(101%);transition:transform .35s var(--ease-out)}
+.card .quick span{position:relative;z-index:1}
+.card .quick:hover{color:#fff;border-color:var(--red)}
+.card .quick:hover::before{transform:none}
+
+/* ---------- manifesto (scroll ink-fill) ---------- */
+.manifesto{background:var(--black);color:var(--cream);border-top:2px solid var(--black);border-bottom:2px solid var(--black);padding:130px 0}
+.manifesto .m-kicker{color:var(--red)}
+.m-text{font-family:'Archivo';font-weight:900;text-transform:uppercase;letter-spacing:-.02em;
+  font-size:clamp(30px,5.4vw,64px);line-height:1.06;max-width:1050px}
+.m-text .w{color:var(--line-dk);transition:color .35s var(--ease)}
+.m-text .w.lit{color:var(--cream)}
+.m-text .w.accent.lit{color:var(--red)}
+.m-foot{margin-top:56px;display:flex;gap:40px;flex-wrap:wrap}
+.stat{min-width:150px}
+.stat .n{font-family:'Anton';font-size:clamp(38px,5vw,58px);color:var(--red);line-height:1}
+.stat .l{font-family:'JetBrains Mono';font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--grey);margin-top:8px}
+
+/* ---------- split feature ---------- */
+.feature{border-bottom:2px solid var(--black)}
+.feature .f-grid{display:grid;grid-template-columns:1fr 1fr;min-height:560px}
+.feature .f-media{position:relative;overflow:hidden;background:var(--black);border-right:2px solid var(--black)}
+.feature .f-media img{position:absolute;inset:0;width:100%;height:116%;object-fit:cover;top:-8%;
+  filter:grayscale(1) contrast(1.15);will-change:transform}
+.feature .f-media::after{content:"";position:absolute;inset:0;background:var(--red);mix-blend-mode:multiply;opacity:.34}
+.feature .f-body{padding:90px 64px;display:flex;flex-direction:column;justify-content:center;gap:22px}
+.feature .f-body h3{font-family:'Archivo';font-weight:900;text-transform:uppercase;font-size:clamp(30px,4vw,48px);line-height:.98}
+.feature .f-body p{color:var(--grey-d);max-width:420px}
+.f-list{display:flex;flex-direction:column;gap:0;margin-top:10px}
+.f-item{display:grid;grid-template-columns:56px 1fr;gap:16px;padding:20px 0;border-top:1px solid var(--line);align-items:baseline}
+.f-item:last-child{border-bottom:1px solid var(--line)}
+.f-item .fn{font-family:'Anton';font-size:26px;color:var(--red)}
+.f-item h4{font-family:'Archivo';font-weight:800;text-transform:uppercase;font-size:16px}
+.f-item p{font-size:14px;color:var(--grey-d);max-width:none}
+
+/* ---------- newsletter ---------- */
+.news{padding:110px 0;text-align:center;position:relative;overflow:clip}
+.news h2{font-family:'Anton';text-transform:uppercase;font-size:clamp(40px,7vw,84px);line-height:.9}
+.news h2 em{font-style:normal;color:var(--red)}
+.news p{color:var(--grey-d);margin:20px auto 34px;max-width:420px}
+.news form{display:flex;max-width:460px;margin:0 auto;border:2px solid var(--black);background:#fff}
+.news input{flex:1;border:0;outline:0;padding:16px 18px;font-family:'JetBrains Mono';font-size:13px;background:transparent}
+.news .btn{border-radius:0}
+
+/* ---------- footer ---------- */
+footer{background:var(--black);color:var(--cream);padding:80px 0 40px;overflow:clip}
+.f-top{display:flex;justify-content:space-between;gap:40px;flex-wrap:wrap;padding-bottom:60px;border-bottom:1px solid var(--line-dk)}
+.f-col h5{font-family:'JetBrains Mono';font-size:10px;letter-spacing:.26em;text-transform:uppercase;color:var(--grey);margin-bottom:18px}
+.f-col a{display:block;font-family:'Archivo';font-weight:600;font-size:15px;color:#cfc8b8;padding:5px 0;transition:color .2s,transform .25s var(--ease)}
+.f-col a:hover{color:var(--red);transform:translateX(6px)}
+.f-word{font-family:'Anton';text-transform:uppercase;line-height:.82;font-size:clamp(70px,14vw,220px);text-align:center;margin:70px 0 30px;
+  color:transparent;-webkit-text-stroke:1.5px var(--line-dk);transition:color .6s var(--ease),-webkit-text-stroke-color .6s}
+.f-word:hover{color:var(--red);-webkit-text-stroke-color:var(--red)}
+.f-bottom{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;font-family:'JetBrains Mono';font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--grey)}
+
+/* ---------- responsive ---------- */
+@media(max-width:980px){
+  .grid{grid-template-columns:repeat(2,1fr)}
+  .hero-visual{display:none}
+  .feature .f-grid{grid-template-columns:1fr}
+  .feature .f-media{min-height:340px;border-right:0;border-bottom:2px solid var(--black)}
+  .feature .f-body{padding:60px 28px}
+  .nav-links{display:none}
+}
+@media(max-width:560px){
+  .grid{grid-template-columns:1fr}
+  .section{padding:70px 0}
+}
+
+/* ---------- reduced motion ---------- */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001s!important;transition-duration:.001s!important;scroll-behavior:auto!important}
+  .cursor,.cursor-ring,.grain{display:none}
+  .reveal{opacity:1;transform:none}
+  .hero-title .ch{transform:none}
+  .hero-meta .hm,.hero-sub,.hero-cta{opacity:1;transform:none}
+}
+</style>
+</head>
+<body data-page="home-2040">
+
+<div class="grain" aria-hidden="true"></div>
+<div class="cursor" aria-hidden="true"></div>
+<div class="cursor-ring" aria-hidden="true"><span class="c-label">View</span></div>
+
+<!-- PRELOADER -->
+<div class="loader" id="loader" aria-hidden="true">
+  <div class="l-mark"><span class="l-dot"></span>Urban Nook</div>
+  <div class="l-bar"><i id="loadBar"></i></div>
+  <div class="l-count" id="loadCount">000</div>
+</div>
+
+<div class="progress" aria-hidden="true"><i id="pageBar"></i></div>
+
+<!-- HEADER -->
+<header class="site-header">
+  <div class="wrap nav">
+    <a class="brand" href="index.html"><span class="b-dot"></span>Urban Nook</a>
+    <nav class="nav-links">
+      <a href="shop.html?cat=Anime">Anime</a>
+      <a href="shop.html?cat=Auto">Auto</a>
+      <a href="shop.html?cat=Tech">Tech</a>
+      <a href="shop.html?cat=Gaming">Gaming</a>
+      <a href="shop.html" class="red" style="color:var(--red)">New</a>
+    </nav>
+    <div class="nav-utils">
+      <span class="clock"><i></i><span id="clock">--:--:--</span></span>
+      <button class="cart-btn" data-hover>Cart <span class="cart-count">0</span></button>
+    </div>
+  </div>
+</header>
+
+<!-- TICKER -->
+<div class="ticker" aria-hidden="true">
+  <div class="ticker-track" id="ticker">
+    <span>New drop every Friday</span><span>Free shipping over ₹999</span><span>One store · Every fandom</span>
+    <span>Upgrade your space</span><span>Limited stock · Don't sleep</span>
+    <span>New drop every Friday</span><span>Free shipping over ₹999</span><span>One store · Every fandom</span>
+    <span>Upgrade your space</span><span>Limited stock · Don't sleep</span>
+  </div>
+</div>
+
+<!-- HERO -->
+<section class="hero" id="hero">
+  <div class="wrap">
+    <div class="hero-meta mono">
+      <span class="hm">EST. 2024 → 2040</span>
+      <span class="hm">CURATED / NOT CLUTTERED</span>
+      <span class="hm red" style="color:var(--red)">DROP 047 LIVE</span>
+    </div>
+    <h1 class="hero-title" id="heroTitle">
+      <span class="ln" data-text="Upgrade"></span>
+      <span class="ln outline" data-text="Your"></span>
+      <span class="ln" data-text="Space" data-accent></span>
+    </h1>
+    <p class="hero-sub">Aesthetic, fandom-driven gear for the desk that says something about you. Anime, auto, tech, gaming &amp; more — curated in one place.</p>
+    <div class="hero-cta">
+      <a href="shop.html" class="btn btn-primary" data-magnet data-hover><span>Shop The Drop</span><i class="btn-fill"></i></a>
+      <a href="about.html" class="btn btn-ghost" data-magnet data-hover><span>Our Story</span><i class="btn-fill"></i></a>
+    </div>
+
+    <div class="hero-visual" aria-hidden="true">
+      <div class="hv-frame"></div>
+      <div class="hv-img"><img src="https://d1dhs7xre1cv0d.cloudfront.net/product-images/019cb457-16df-70af-be27-204839148bc3.webp" alt="Brake Caliper Lamp" data-parallax="0.12"></div>
+      <span class="tagchip"><i></i>Drop 047 · Limited</span>
+      <div class="orbit">
+        <svg viewBox="0 0 200 200">
+          <defs><path id="circ" d="M100,100 m-78,0 a78,78 0 1,1 156,0 a78,78 0 1,1 -156,0"/></defs>
+          <circle cx="100" cy="100" r="7"/>
+          <text><textPath href="#circ">UPGRADE YOUR SPACE · ONE STORE · EVERY FANDOM ·</textPath></text>
+        </svg>
+      </div>
+    </div>
+  </div>
+  <div class="hero-scroll mono">Scroll<span class="line"></span>001 / 006</div>
+</section>
+
+<!-- COLLECTIONS RAIL -->
+<section class="section">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div>
+        <span class="sec-kicker">002 — Collections</span>
+        <h2 class="sec-title">Pick Your World</h2>
+      </div>
+      <a class="sec-link" href="shop.html" data-hover>View All <span>→</span></a>
+    </div>
+  </div>
+  <div class="wrap rail-outer reveal">
+    <div class="rail" id="rail">
+      <a class="cat" href="shop.html?cat=Anime" data-hover-view>
+        <span class="c-idx mono">01</span>
+        <img src="https://picsum.photos/seed/un-anime-2040/600/900" alt="Anime" data-rail-parallax>
+        <span class="c-name">Anime<small>Posters · Katanas · Tapestry</small></span>
+      </a>
+      <a class="cat" href="shop.html?cat=Auto" data-hover-view>
+        <span class="c-idx mono">02</span>
+        <img src="https://d1dhs7xre1cv0d.cloudfront.net/product-images/019cfd3c-e8ec-7e89-9093-1a588b7a5233.webp" alt="Auto" data-rail-parallax>
+        <span class="c-name">Auto<small>Caliper Lamps · Keychains</small></span>
+      </a>
+      <a class="cat" href="shop.html?cat=Tech" data-hover-view>
+        <span class="c-idx mono">03</span>
+        <img src="https://picsum.photos/seed/un-tech-2040/600/900" alt="Tech" data-rail-parallax>
+        <span class="c-name">Tech<small>Desk Gear · Cable Mgmt</small></span>
+      </a>
+      <a class="cat" href="shop.html?cat=Gaming" data-hover-view>
+        <span class="c-idx mono">04</span>
+        <img src="https://picsum.photos/seed/un-gaming-2040/600/900" alt="Gaming" data-rail-parallax>
+        <span class="c-name">Gaming<small>Stands · RGB · Decor</small></span>
+      </a>
+      <a class="cat" href="shop.html?cat=Plants" data-hover-view>
+        <span class="c-idx mono">05</span>
+        <img src="https://picsum.photos/seed/un-plants-2040/600/900" alt="Plants" data-rail-parallax>
+        <span class="c-name">Plants<small>Planters · Desk Greenery</small></span>
+      </a>
+    </div>
+    <div class="rail-progress"><i id="railBar"></i></div>
+  </div>
+</section>
+
+<!-- BEST SELLERS -->
+<section class="section" style="padding-top:20px">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div>
+        <span class="sec-kicker">003 — Best Sellers</span>
+        <h2 class="sec-title">The Heavy Rotation</h2>
+      </div>
+      <a class="sec-link" href="shop.html" data-hover>Shop All <span>→</span></a>
+    </div>
+    <div class="grid" id="featured"></div>
+  </div>
+</section>
+
+<!-- MANIFESTO -->
+<section class="manifesto" id="manifesto">
+  <div class="wrap">
+    <span class="sec-kicker m-kicker reveal">004 — Manifesto</span>
+    <p class="m-text" id="mText">Your desk is not furniture. It is the six square feet where your world happens. We build the gear that makes it yours — one drop at a time.</p>
+    <div class="m-foot">
+      <div class="stat reveal"><div class="n" data-count="12000">0</div><div class="l">Desks Upgraded</div></div>
+      <div class="stat reveal"><div class="n" data-count="47">0</div><div class="l">Drops Shipped</div></div>
+      <div class="stat reveal"><div class="n" data-count="5">0</div><div class="l">Worlds &amp; Counting</div></div>
+      <div class="stat reveal"><div class="n" data-count="99">0</div><div class="l">% Would Reorder</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURE SPLIT -->
+<section class="feature">
+  <div class="f-grid">
+    <div class="f-media"><img src="https://picsum.photos/seed/un-feature-2040/1000/1200" alt="" data-parallax="0.1"></div>
+    <div class="f-body">
+      <span class="sec-kicker reveal">005 — How It Works</span>
+      <h3 class="reveal">Built For The Desk That Flexes</h3>
+      <p class="reveal">However you rep your world, your setup should show it. We curate the gear so you don't have to hunt across ten sites.</p>
+      <div class="f-list">
+        <div class="f-item reveal"><div class="fn">01</div><div><h4>Pick Your World</h4><p>Browse by genre — or mix them. Every shelf is curated, never cluttered.</p></div></div>
+        <div class="f-item reveal"><div class="fn">02</div><div><h4>Add The Pieces</h4><p>Lamps, stands, posters, planters — the upgrades that make a desk yours.</p></div></div>
+        <div class="f-item reveal"><div class="fn">03</div><div><h4>Upgrade Your Space</h4><p>Fast dispatch, easy returns, free shipping over ₹999. Done.</p></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- NEWSLETTER -->
+<section class="news">
+  <div class="wrap reveal">
+    <span class="sec-kicker">006 — The List</span>
+    <h2>Don't Sleep<br>On <em>Drops</em></h2>
+    <p>New pieces land every Friday. Get early access and member-only deals.</p>
+    <form data-demo>
+      <input type="email" placeholder="your@email.com" required aria-label="Email">
+      <button class="btn btn-primary" type="submit" data-hover><span>Join</span><i class="btn-fill"></i></button>
+    </form>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="wrap">
+    <div class="f-top">
+      <div class="f-col">
+        <h5>Shop</h5>
+        <a href="shop.html?cat=Anime" data-hover>Anime</a>
+        <a href="shop.html?cat=Auto" data-hover>Auto</a>
+        <a href="shop.html?cat=Tech" data-hover>Tech</a>
+        <a href="shop.html?cat=Gaming" data-hover>Gaming</a>
+      </div>
+      <div class="f-col">
+        <h5>Company</h5>
+        <a href="about.html" data-hover>Our Story</a>
+        <a href="contact.html" data-hover>Contact</a>
+        <a href="#" data-hover>Shipping &amp; Returns</a>
+      </div>
+      <div class="f-col">
+        <h5>Social</h5>
+        <a href="#" data-hover>Instagram</a>
+        <a href="#" data-hover>YouTube</a>
+        <a href="#" data-hover>WhatsApp</a>
+      </div>
+    </div>
+    <div class="f-word" aria-hidden="true">Urban Nook</div>
+    <div class="f-bottom">
+      <span>© 2040 Urban Nook · Upgrade Your Space</span>
+      <span>Red #E63329 · Paper #EFEAE0 · Ink #141414</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* ============================================================
+   URBAN NOOK 2040 — interaction engine (vanilla, no deps)
+   ============================================================ */
+(() => {
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const lerp = (a, b, t) => a + (b - a) * t;
+
+  /* ---------- preloader ---------- */
+  const loader = document.getElementById('loader');
+  const loadBar = document.getElementById('loadBar');
+  const loadCount = document.getElementById('loadCount');
+  let lp = 0;
+  const loadTick = setInterval(() => {
+    lp = Math.min(100, lp + Math.random() * 17);
+    loadBar.style.width = lp + '%';
+    loadCount.textContent = String(Math.floor(lp)).padStart(3, '0');
+    if (lp >= 100) {
+      clearInterval(loadTick);
+      setTimeout(() => loader.classList.add('done'), 220);
+      setTimeout(() => loader.remove(), 1300);
+    }
+  }, reduced ? 1 : 90);
+
+  /* ---------- hero: split chars ---------- */
+  document.querySelectorAll('.hero-title .ln').forEach((ln, li) => {
+    const text = ln.dataset.text || '';
+    ln.innerHTML = [...text].map((c, ci) =>
+      `<span class="ch" style="animation-delay:${0.35 + li * 0.1 + ci * 0.028}s">${c}</span>`).join('');
+  });
+
+  /* ---------- custom cursor ---------- */
+  const cur = document.querySelector('.cursor');
+  const ring = document.querySelector('.cursor-ring');
+  let mx = innerWidth / 2, my = innerHeight / 2, rx = mx, ry = my;
+  addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+  (function cursorLoop() {
+    rx = lerp(rx, mx, 0.16); ry = lerp(ry, my, 0.16);
+    cur.style.transform = `translate(${mx}px,${my}px) translate(-50%,-50%)`;
+    ring.style.transform = `translate(${rx}px,${ry}px) translate(-50%,-50%)`;
+    requestAnimationFrame(cursorLoop);
+  })();
+  document.querySelectorAll('a,button,[data-hover]').forEach(el => {
+    el.addEventListener('mouseenter', () => ring.classList.add('is-hover'));
+    el.addEventListener('mouseleave', () => ring.classList.remove('is-hover'));
+  });
+
+  /* ---------- magnetic buttons ---------- */
+  document.querySelectorAll('[data-magnet]').forEach(el => {
+    el.addEventListener('mousemove', e => {
+      const r = el.getBoundingClientRect();
+      el.style.transform = `translate(${(e.clientX - r.left - r.width / 2) * 0.22}px,${(e.clientY - r.top - r.height / 2) * 0.28}px)`;
+    });
+    el.addEventListener('mouseleave', () => { el.style.transform = ''; });
+  });
+
+  /* ---------- clock ---------- */
+  const clock = document.getElementById('clock');
+  setInterval(() => {
+    clock.textContent = new Date().toLocaleTimeString('en-IN', { hour12: false, timeZone: 'Asia/Kolkata' }) + ' IST';
+  }, 1000);
+
+  /* ---------- scroll state: progress + velocity ticker + parallax ---------- */
+  const pageBar = document.getElementById('pageBar');
+  const ticker = document.getElementById('ticker');
+  let lastY = scrollY, vel = 0, tickX = 0;
+  (function scrollLoop() {
+    const y = scrollY;
+    vel = lerp(vel, y - lastY, 0.12);
+    lastY = y;
+    // progress
+    const max = document.documentElement.scrollHeight - innerHeight;
+    pageBar.style.width = (max > 0 ? (y / max) * 100 : 0) + '%';
+    // velocity marquee
+    tickX -= (0.6 + Math.min(Math.abs(vel) * 0.28, 9));
+    const half = ticker.scrollWidth / 2;
+    if (-tickX >= half) tickX += half;
+    ticker.style.transform = `translateX(${tickX}px)`;
+    // parallax media
+    document.querySelectorAll('[data-parallax]').forEach(img => {
+      const sp = parseFloat(img.dataset.parallax) || 0.1;
+      const r = img.parentElement.getBoundingClientRect();
+      if (r.bottom > 0 && r.top < innerHeight) {
+        img.style.transform = `translateY(${(r.top + r.height / 2 - innerHeight / 2) * -sp}px) scale(1.12)`;
+      }
+    });
+    requestAnimationFrame(scrollLoop);
+  })();
+
+  /* ---------- reveals ---------- */
+  const io = new IntersectionObserver(es => es.forEach(e => {
+    if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+  }), { threshold: 0.14 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+  /* ---------- collections rail: drag + progress ---------- */
+  const rail = document.getElementById('rail');
+  const railBar = document.getElementById('railBar');
+  let down = false, startX = 0, startScroll = 0;
+  rail.addEventListener('pointerdown', e => { down = true; startX = e.clientX; startScroll = rail.scrollLeft; rail.classList.add('dragging'); });
+  addEventListener('pointerup', () => { down = false; rail.classList.remove('dragging'); });
+  addEventListener('pointermove', e => { if (down) rail.scrollLeft = startScroll - (e.clientX - startX); });
+  const updRail = () => {
+    const max = rail.scrollWidth - rail.clientWidth;
+    const p = max > 0 ? rail.scrollLeft / max : 0;
+    railBar.style.transform = `translateX(${p * (rail.clientWidth / (railBar.offsetWidth || 1) - 1) * (railBar.offsetWidth || 1)}px)`;
+    railBar.style.width = Math.max(12, (rail.clientWidth / rail.scrollWidth) * 100) + '%';
+    railBar.style.left = (p * (100 - parseFloat(railBar.style.width))) + '%';
+    railBar.style.transform = '';
+  };
+  rail.addEventListener('scroll', updRail); updRail();
+
+  /* ---------- product cards: build + 3D tilt + glare ---------- */
+  const CF = 'https://d1dhs7xre1cv0d.cloudfront.net/product-images/';
+  const PRODUCTS = [
+    { name: 'Brake Caliper Lamp', tag: 'Auto', price: 1599, old: null, seed: 'p-caliper', img: CF+'019cb457-16df-70af-be27-204839148bc3.webp' },
+    { name: 'Stationery Suit Pen Stand', tag: 'Tech', price: 299, old: null, seed: 'p-pen', img: CF+'019cf390-1037-7593-9173-96d0a8392e86.jpeg' },
+  ];
+  const grid = document.getElementById('featured');
+  grid.innerHTML = PRODUCTS.map((p, i) => `
+    <article class="card reveal" style="transition-delay:${i * 70}ms" data-tilt>
+      <div class="ph">
+        <span class="badge">${p.tag}</span>
+        <img src="${p.img || ('https://picsum.photos/seed/'+p.seed+'/640/640')}" alt="${p.name}" loading="lazy">
+        <span class="glare"></span>
+      </div>
+      <div class="info">
+        <span class="ptag mono">Drop 047 · ${p.tag}</span>
+        <h3 class="pname">${p.name}</h3>
+        <div class="prow">
+          <span class="price">${p.old ? `<span class="strike">₹${p.old.toLocaleString('en-IN')}</span>` : ''}₹${p.price.toLocaleString('en-IN')}</span>
+          <button class="quick" data-hover><span>Add</span></button>
+        </div>
+      </div>
+    </article>`).join('');
+  document.querySelectorAll('.reveal:not(.in)').forEach(el => io.observe(el));
+
+  if (!reduced) document.querySelectorAll('[data-tilt]').forEach(card => {
+    card.addEventListener('mousemove', e => {
+      const r = card.getBoundingClientRect();
+      const px = (e.clientX - r.left) / r.width, py = (e.clientY - r.top) / r.height;
+      card.style.transform = `rotateY(${(px - 0.5) * 10}deg) rotateX(${(0.5 - py) * 8}deg) translateZ(0)`;
+      card.style.setProperty('--gx', px * 100 + '%');
+      card.style.setProperty('--gy', py * 100 + '%');
+    });
+    card.addEventListener('mouseleave', () => { card.style.transform = ''; });
+  });
+
+  /* cart demo */
+  let cart = 0;
+  const cartCount = document.querySelector('.cart-count');
+  grid.addEventListener('click', e => {
+    const b = e.target.closest('.quick');
+    if (!b) return;
+    cartCount.textContent = ++cart;
+    b.querySelector('span').textContent = 'Added ✓';
+    setTimeout(() => b.querySelector('span').textContent = 'Add', 1300);
+  });
+
+  /* ---------- manifesto: word-by-word ink fill on scroll ---------- */
+  const mText = document.getElementById('mText');
+  const ACCENTS = new Set(['world', 'yours', 'drop']);
+  mText.innerHTML = mText.textContent.trim().split(/\s+/).map(w =>
+    `<span class="w${ACCENTS.has(w.replace(/[^a-z]/gi, '').toLowerCase()) ? ' accent' : ''}">${w}</span>`).join(' ');
+  const words = [...mText.querySelectorAll('.w')];
+  const manifesto = document.getElementById('manifesto');
+  addEventListener('scroll', () => {
+    const r = manifesto.getBoundingClientRect();
+    const p = Math.min(1, Math.max(0, (innerHeight * 0.75 - r.top) / (r.height * 0.9)));
+    const lit = Math.floor(p * words.length);
+    words.forEach((w, i) => w.classList.toggle('lit', i < lit));
+  }, { passive: true });
+
+  /* ---------- stat count-up ---------- */
+  const statIO = new IntersectionObserver(es => es.forEach(en => {
+    if (!en.isIntersecting) return;
+    statIO.unobserve(en.target);
+    const el = en.target, target = +el.dataset.count, t0 = performance.now();
+    (function tick(t) {
+      const p = Math.min(1, (t - t0) / 1400), eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.floor(target * eased).toLocaleString('en-IN') + (p === 1 && target >= 1000 ? '+' : '');
+      if (p < 1) requestAnimationFrame(tick);
+    })(t0);
+  }), { threshold: 0.6 });
+  document.querySelectorAll('[data-count]').forEach(el => statIO.observe(el));
+
+  /* ---------- rail cards get VIEW cursor label ---------- */
+  document.querySelectorAll('[data-hover-view]').forEach(el => {
+    el.addEventListener('mouseenter', () => { ring.classList.add('is-hover'); ring.querySelector('.c-label').textContent = 'View'; });
+    el.addEventListener('mouseleave', () => ring.classList.remove('is-hover'));
+  });
+
+  /* demo form */
+  document.querySelectorAll('form[data-demo]').forEach(f => f.addEventListener('submit', e => {
+    e.preventDefault();
+    const b = f.querySelector('button span');
+    b.textContent = 'Joined ✓';
+    setTimeout(() => b.textContent = 'Join', 1600);
+    f.reset();
+  }));
+})();
+</script>
+</body>
+</html>

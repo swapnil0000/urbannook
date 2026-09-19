@@ -18,10 +18,10 @@ const ForgotPassword = ({ onClose, onBackToLogin }) => {
   const { showNotification } = useUI();
 
   // Use validation hook for password reset
-  const { 
-    errors, 
+  const {
+    errors,
     validateField,
-    clearFieldError 
+    clearFieldError
   } = useFormValidation();
 
   const handleRequestOTP = async (e) => {
@@ -96,23 +96,33 @@ const ForgotPassword = ({ onClose, onBackToLogin }) => {
     }
   };
 
+  // Shared chrome classes — bottom-sheet on mobile, centered dialog on desktop
+  const overlayCls = 'fixed inset-0 bg-ink/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-[100] sm:p-4 font-inter text-ink';
+  const cardCls = 'bg-paper p-8 sm:p-12 w-full sm:max-w-[460px] shadow-2xl relative overflow-hidden auth-sheet max-h-[94dvh]';
+  const Handle = () => (
+    <div className="sm:hidden absolute top-2.5 inset-x-0 z-30 flex justify-center pointer-events-none">
+      <span className="h-1.5 w-11 rounded-full bg-hair"></span>
+    </div>
+  );
+
   if (step === 'success') {
     return (
-      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[100] p-4">
-        <div className="bg-white rounded-[2.5rem] p-8 md:p-12 w-full max-w-[480px] shadow-2xl relative animate-in fade-in zoom-in duration-300">
+      <div className={overlayCls}>
+        <div className={cardCls}>
+          <Handle />
           <div className="text-center">
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <i className="fa-solid fa-check text-green-600 text-2xl"></i>
             </div>
-            
-            <h2 className="text-3xl font-serif text-slate-900 mb-4">Password Reset Successful!</h2>
-            <p className="text-slate-600 mb-8">
+
+            <h2 className="text-3xl font-archivo font-bold text-ink mb-4">Password Reset Successful!</h2>
+            <p className="text-muted mb-8">
               Your password has been reset successfully. You can now login with your new password.
             </p>
-            
+
             <button
               onClick={onBackToLogin}
-              className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-xl"
+              className="w-full py-4 bg-brand text-white rounded-2xl font-bold uppercase tracking-widest hover:bg-brandHi transition-all shadow-xl"
             >
               Back to Login
             </button>
@@ -124,50 +134,49 @@ const ForgotPassword = ({ onClose, onBackToLogin }) => {
 
   if (step === 'otp') {
     return (
-      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[100] p-4" onClick={onClose}>
-        <div 
-          className="bg-white rounded-[2.5rem] p-8 md:p-12 w-full max-w-[480px] shadow-2xl relative animate-in fade-in zoom-in duration-300"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button 
-            className="absolute top-8 right-8 w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:text-slate-900 transition-colors"
+      <div className={overlayCls} onClick={onClose}>
+        <div className={cardCls} onClick={(e) => e.stopPropagation()}>
+          <Handle />
+          <button
+            className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center rounded-full bg-surface text-faint hover:text-ink transition-colors"
             onClick={onClose}
           >
             <i className="fa-solid fa-xmark"></i>
           </button>
 
-          <button 
-            className="absolute top-8 left-8 w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:text-slate-900 transition-colors"
+          <button
+            className="absolute top-6 left-6 w-10 h-10 flex items-center justify-center rounded-full bg-surface text-faint hover:text-ink transition-colors"
             onClick={() => setStep('email')}
           >
             <i className="fa-solid fa-arrow-left"></i>
           </button>
 
           <div className="text-center mb-8">
-            <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <i className="fa-solid fa-shield-halved text-blue-600 text-2xl"></i>
+            <div className="w-20 h-20 bg-brand/10 rounded-full flex items-center justify-center mx-auto mb-6">
+              <i className="fa-solid fa-shield-halved text-brand text-2xl"></i>
             </div>
-            
-            <h2 className="text-3xl font-serif text-slate-900 mb-2">Enter OTP & New Password</h2>
-            <p className="text-slate-500 text-sm">
-              We've sent a 6-digit code to <span className="font-bold text-slate-700">{email}</span>
+
+            <h2 className="text-3xl font-archivo font-bold text-ink mb-2">Enter OTP &amp; New Password</h2>
+            <p className="text-muted text-sm">
+              We&apos;ve sent a 6-digit code to <span className="font-bold text-ink">{email}</span>
             </p>
           </div>
 
           <form onSubmit={handleResetPassword} className="space-y-6">
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">
+              <label className="text-[10px] font-black uppercase tracking-widest text-faint ml-1">
                 OTP Code
               </label>
               <input
                 type="text"
+                inputMode="numeric"
                 value={otp}
                 onChange={(e) => {
                   setOtp(e.target.value.replace(/\D/g, '').slice(0, 6));
                   setError('');
                 }}
-                className={`w-full p-4 bg-slate-50 border rounded-2xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all outline-none text-slate-900 text-center text-2xl tracking-widest font-mono ${
-                  error ? 'border-red-500' : 'border-slate-300'
+                className={`w-full p-4 bg-white border rounded-2xl focus:border-brand focus:ring-4 focus:ring-brand/10 transition-all outline-none text-ink text-center text-2xl tracking-widest font-mono ${
+                  error ? 'border-red-500' : 'border-hair'
                 }`}
                 placeholder="000000"
                 maxLength="6"
@@ -176,7 +185,7 @@ const ForgotPassword = ({ onClose, onBackToLogin }) => {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">
+              <label className="text-[10px] font-black uppercase tracking-widest text-faint ml-1">
                 New Password
               </label>
               <div className="relative">
@@ -188,8 +197,8 @@ const ForgotPassword = ({ onClose, onBackToLogin }) => {
                     setError('');
                     clearFieldError('password');
                   }}
-                  className={`w-full p-4 bg-slate-50 border rounded-2xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all outline-none text-slate-900 text-sm pr-12 ${
-                    errors.password ? 'border-red-500' : 'border-slate-300'
+                  className={`w-full p-4 bg-white border rounded-2xl focus:border-brand focus:ring-4 focus:ring-brand/10 transition-all outline-none text-ink text-sm pr-12 ${
+                    errors.password ? 'border-red-500' : 'border-hair'
                   }`}
                   placeholder="At least 8 characters"
                   required
@@ -197,7 +206,7 @@ const ForgotPassword = ({ onClose, onBackToLogin }) => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-emerald-700 transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-faint hover:text-brand transition-colors"
                 >
                   <i className={`fa-solid ${showPassword ? 'fa-eye-slash' : 'fa-eye'} text-xs`}></i>
                 </button>
@@ -206,7 +215,7 @@ const ForgotPassword = ({ onClose, onBackToLogin }) => {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">
+              <label className="text-[10px] font-black uppercase tracking-widest text-faint ml-1">
                 Confirm Password
               </label>
               <div className="relative">
@@ -218,8 +227,8 @@ const ForgotPassword = ({ onClose, onBackToLogin }) => {
                     setError('');
                     clearFieldError('confirmPassword');
                   }}
-                  className={`w-full p-4 bg-slate-50 border rounded-2xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all outline-none text-slate-900 text-sm pr-12 ${
-                    errors.confirmPassword ? 'border-red-500' : 'border-slate-300'
+                  className={`w-full p-4 bg-white border rounded-2xl focus:border-brand focus:ring-4 focus:ring-brand/10 transition-all outline-none text-ink text-sm pr-12 ${
+                    errors.confirmPassword ? 'border-red-500' : 'border-hair'
                   }`}
                   placeholder="Re-enter password"
                   required
@@ -227,7 +236,7 @@ const ForgotPassword = ({ onClose, onBackToLogin }) => {
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-emerald-700 transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-faint hover:text-brand transition-colors"
                 >
                   <i className={`fa-solid ${showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'} text-xs`}></i>
                 </button>
@@ -237,10 +246,10 @@ const ForgotPassword = ({ onClose, onBackToLogin }) => {
 
             {error && <p className="text-red-500 text-xs ml-1">{error}</p>}
 
-            <button 
+            <button
               type="submit"
               disabled={isResetting}
-              className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-xl active:scale-[0.98] disabled:opacity-50"
+              className="w-full py-4 bg-brand text-white rounded-2xl font-bold uppercase tracking-widest hover:bg-brandHi transition-all shadow-xl active:scale-[0.98] disabled:opacity-50"
             >
               {isResetting ? (
                 <div className="flex items-center justify-center gap-2">
@@ -254,12 +263,12 @@ const ForgotPassword = ({ onClose, onBackToLogin }) => {
           </form>
 
           <div className="text-center mt-6">
-            <button 
+            <button
               onClick={handleResendOTP}
               disabled={isRequestingOTP}
-              className="text-sm text-emerald-700 font-bold hover:underline transition-all disabled:opacity-50"
+              className="text-sm text-brand font-bold hover:underline transition-all disabled:opacity-50"
             >
-              Didn't receive code? Resend OTP
+              Didn&apos;t receive code? Resend OTP
             </button>
           </div>
         </div>
@@ -268,39 +277,37 @@ const ForgotPassword = ({ onClose, onBackToLogin }) => {
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[100] p-4" onClick={onClose}>
-      <div 
-        className="bg-white rounded-[2.5rem] p-8 md:p-12 w-full max-w-[480px] shadow-2xl relative animate-in fade-in zoom-in duration-300"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button 
-          className="absolute top-8 right-8 w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:text-slate-900 transition-colors"
+    <div className={overlayCls} onClick={onClose}>
+      <div className={cardCls} onClick={(e) => e.stopPropagation()}>
+        <Handle />
+        <button
+          className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center rounded-full bg-surface text-faint hover:text-ink transition-colors"
           onClick={onClose}
         >
           <i className="fa-solid fa-xmark"></i>
         </button>
 
-        <button 
-          className="absolute top-8 left-8 w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:text-slate-900 transition-colors"
+        <button
+          className="absolute top-6 left-6 w-10 h-10 flex items-center justify-center rounded-full bg-surface text-faint hover:text-ink transition-colors"
           onClick={onBackToLogin}
         >
           <i className="fa-solid fa-arrow-left"></i>
         </button>
 
         <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <i className="fa-solid fa-key text-blue-600 text-2xl"></i>
+          <div className="w-20 h-20 bg-brand/10 rounded-full flex items-center justify-center mx-auto mb-6">
+            <i className="fa-solid fa-key text-brand text-2xl"></i>
           </div>
-          
-          <h2 className="text-3xl font-serif text-slate-900 mb-2">Forgot Password?</h2>
-          <p className="text-slate-500 text-sm">
-            No worries! Enter your email and we'll send you an OTP to reset your password.
+
+          <h2 className="text-3xl font-archivo font-bold text-ink mb-2">Forgot Password?</h2>
+          <p className="text-muted text-sm">
+            No worries! Enter your email and we&apos;ll send you an OTP to reset your password.
           </p>
         </div>
 
         <form onSubmit={handleRequestOTP} className="space-y-6">
           <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">
+            <label className="text-[10px] font-black uppercase tracking-widest text-faint ml-1">
               Email Address
             </label>
             <input
@@ -310,8 +317,8 @@ const ForgotPassword = ({ onClose, onBackToLogin }) => {
                 setEmail(e.target.value);
                 setError('');
               }}
-              className={`w-full p-4 bg-slate-50 border rounded-2xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all outline-none text-slate-900 text-sm ${
-                error ? 'border-red-500' : 'border-slate-300'
+              className={`w-full p-4 bg-white border rounded-2xl focus:border-brand focus:ring-4 focus:ring-brand/10 transition-all outline-none text-ink text-sm ${
+                error ? 'border-red-500' : 'border-hair'
               }`}
               placeholder="name@example.com"
               required
@@ -319,10 +326,10 @@ const ForgotPassword = ({ onClose, onBackToLogin }) => {
             {error && <p className="text-red-500 text-xs ml-1">{error}</p>}
           </div>
 
-          <button 
+          <button
             type="submit"
             disabled={isRequestingOTP}
-            className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-xl active:scale-[0.98] disabled:opacity-50"
+            className="w-full py-4 bg-brand text-white rounded-2xl font-bold uppercase tracking-widest hover:bg-brandHi transition-all shadow-xl active:scale-[0.98] disabled:opacity-50"
           >
             {isRequestingOTP ? (
               <div className="flex items-center justify-center gap-2">
@@ -335,9 +342,9 @@ const ForgotPassword = ({ onClose, onBackToLogin }) => {
           </button>
         </form>
 
-        <p className="text-sm text-center mt-6 text-slate-500">
+        <p className="text-sm text-center mt-6 text-muted">
           Remember your password?{' '}
-          <span onClick={onBackToLogin} className="text-emerald-700 cursor-pointer font-bold hover:underline transition-all">
+          <span onClick={onBackToLogin} className="text-brand cursor-pointer font-bold hover:underline transition-all">
             Back to Login
           </span>
         </p>

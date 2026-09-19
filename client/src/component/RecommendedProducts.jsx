@@ -31,10 +31,8 @@ const RecommendedProducts = ({ products = [], title = "You May Also Like" }) => 
     <section className="mt-8 sm:mt-12 md:mt-16 px-4 lg:px-12 pt-4 sm:pt-6">
       <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 sm:gap-6">
         <div className="flex-1">
-          <span className="text-[#F5DEB3] font-bold tracking-[0.2em] uppercase text-[16px]">
-            Handpicked for you
-          </span>
-          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-serif text-white mt-2">{title}</h2>
+          <p className="gl-lbl text-brand mb-2">Handpicked for you</p>
+          <h2 className="font-archivo text-2xl sm:text-3xl font-extrabold tracking-tight text-ink">{title}</h2>
         </div>
         {/* Arrow controls — shown on both web and mobile */}
         {/* <div className="flex items-center gap-2 shrink-0">
@@ -42,7 +40,7 @@ const RecommendedProducts = ({ products = [], title = "You May Also Like" }) => 
             type="button"
             onClick={() => scrollBy(-1)}
             aria-label="Scroll left"
-            className="w-10 h-10 rounded-full flex items-center justify-center bg-[#F5DEB3]/10 text-[#F5DEB3] border border-[#F5DEB3]/25 hover:bg-[#F5DEB3] hover:text-[#1c3026] active:scale-95 transition-all"
+            className="gl-press w-10 h-10 rounded-full flex items-center justify-center border border-hair text-ink hover:bg-ink hover:text-paper hover:border-ink transition-colors"
           >
             <i className="fa-solid fa-arrow-left text-sm" />
           </button>
@@ -50,7 +48,7 @@ const RecommendedProducts = ({ products = [], title = "You May Also Like" }) => 
             type="button"
             onClick={() => scrollBy(1)}
             aria-label="Scroll right"
-            className="w-10 h-10 rounded-full flex items-center justify-center bg-[#F5DEB3]/10 text-[#F5DEB3] border border-[#F5DEB3]/25 hover:bg-[#F5DEB3] hover:text-[#1c3026] active:scale-95 transition-all"
+            className="gl-press w-10 h-10 rounded-full flex items-center justify-center border border-hair text-ink hover:bg-ink hover:text-paper hover:border-ink transition-colors"
           >
             <i className="fa-solid fa-arrow-right text-sm" />
           </button>
@@ -76,7 +74,7 @@ const RecommendedProducts = ({ products = [], title = "You May Also Like" }) => 
                   (v.variantQuantity != null && Number(v.variantQuantity) <= 0),
               ));
           const badge = oos
-            ? { label: "Out of Stock", className: "bg-red-500 text-white" }
+            ? { label: "Out of Stock", className: "bg-ink text-white" }
             : null;
 
           return (

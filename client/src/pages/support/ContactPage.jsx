@@ -1,374 +1,135 @@
 import { useState, useEffect } from 'react';
-
 import { useSubmitContactMutation } from '../../store/api/userApi';
 import { useUI } from '../../hooks/useRedux';
 import useFormValidation from '../../hooks/useFormValidation';
 import SEOHead from '../../component/SEOHead';
 import { contactInfo, contactPageFaqs } from '../../data/constant';
 
-// --- Reusable Accordion Component for FAQs (Updated for Light Theme) ---
 const AccordionItem = ({ question, answer, isOpen, onClick }) => (
-  <div className="border-b border-gray-200">
-    <button 
-      onClick={onClick} 
-      className="w-full py-5 flex justify-between items-center text-left hover:text-[#a89068] transition-colors group"
-      type="button"
-    >
-      <span className={`text-sm md:text-base font-serif transition-colors ${isOpen ? 'text-[#a89068]' : 'text-[#2e443c]'}`}>
-        {question}
-      </span>
-      <span className={`flex items-center justify-center w-6 h-6 rounded-full border transition-all duration-300 ${isOpen ? 'rotate-180 border-[#a89068] bg-[#a89068] text-white' : 'border-gray-300 text-gray-400 group-hover:border-[#a89068] group-hover:text-[#a89068]'}`}>
-        <i className="fa-solid fa-chevron-down text-[10px]"></i>
-      </span>
+  <div className="border-b border-hair">
+    <button onClick={onClick} type="button" className="w-full py-4 flex justify-between items-center text-left gap-4">
+      <span className={`text-sm font-semibold ${isOpen ? 'text-brand' : 'text-ink'}`}>{question}</span>
+      <span className={`shrink-0 w-6 h-6 rounded-full grid place-items-center text-[10px] transition-all ${isOpen ? 'bg-brand text-white rotate-180' : 'border border-hair text-muted'}`}>▾</span>
     </button>
-    {isOpen && (
-      <div className="overflow-hidden">
-        <div className="pb-6 text-gray-500 text-sm leading-relaxed font-light pl-2 border-l-2 border-[#a89068]/20 ml-2 mt-2">
-          {answer}
-        </div>
-      </div>
-    )}
+    {isOpen && <div className="pb-5 text-muted text-sm leading-relaxed">{answer}</div>}
   </div>
 );
 
 const ContactPage = () => {
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, []);
+  useEffect(() => { window.scrollTo(0, 0); }, []);
 
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    mobile: '',
-    subject: 'Product Inquiry',
-    message: ''
-  });
-
-  const [activeInput, setActiveInput] = useState(null);
+  const [formData, setFormData] = useState({ name: '', email: '', mobile: '', subject: 'Product Inquiry', message: '' });
   const [openFaq, setOpenFaq] = useState(0);
 
   const [submitContact, { isLoading }] = useSubmitContactMutation();
   const { showNotification } = useUI();
-
-  // Use validation hook
-  const { 
-    errors, 
-    validateAllFields, 
-    clearFieldError, 
-    clearAllErrors 
-  } = useFormValidation();
+  const { errors, validateAllFields, clearFieldError, clearAllErrors } = useFormValidation();
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value
-    });
-    if (errors[name]) {
-      clearFieldError(name);
-    }
-  };
-
-  const handleBlur = () => {
-    setActiveInput(null);
+    setFormData({ ...formData, [name]: value });
+    if (errors[name]) clearFieldError(name);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    const isValid = validateAllFields(formData);
-    if (!isValid) {
-      showNotification('Please fix the errors in the form', 'error');
-      return;
-    }
-
+    if (!validateAllFields(formData)) { showNotification('Please fix the errors in the form', 'error'); return; }
     try {
       await submitContact(formData).unwrap();
       showNotification('Thank you for contacting us! We will get back to you soon.', 'success');
-      setFormData({
-        name: '',
-        email: '',
-        mobile: '',
-        subject: 'Product Inquiry',
-        message: ''
-      });
+      setFormData({ name: '', email: '', mobile: '', subject: 'Product Inquiry', message: '' });
       clearAllErrors();
     } catch (error) {
-      console.error('Failed to submit contact form:', error);
-      const errorMessage = error?.data?.message || 'Failed to submit contact form. Please try again.';
-      showNotification(errorMessage, 'error');
+      showNotification(error?.data?.message || 'Failed to submit contact form. Please try again.', 'error');
     }
   };
 
   const isMobileValid = !formData?.mobile || /^[6-9]\d{9}$/.test(formData?.mobile?.trim());
   const isFormValid = formData?.name && formData?.email && formData?.message && isMobileValid && Object.keys(errors).length === 0;
+  const field = (bad) => `w-full bg-white border rounded-xl px-4 py-3.5 text-sm outline-none transition-colors ${bad ? 'border-sale' : 'border-hair focus:border-brand'}`;
 
   return (
-    <div className="bg-[#2e443c] min-h-screen text-gray-200 font-sans relative selection:bg-[#a89068] selection:text-white overflow-x-hidden">
-      <SEOHead
-        title="Contact Us"
-        description="Get in touch with UrbanNook. Reach us via WhatsApp, email or phone for product inquiries, order support, and custom design requests."
-        url="/contact-us"
-      />
-      
-      {/* 1. BACKGROUND ATMOSPHERE */}
-      <div className="fixed inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-[#3a554a] via-[#2e443c] to-[#1a2822] pointer-events-none z-0 opacity-50"></div>
-      
-      {/* Noise Texture */}
-      <div className="fixed inset-0 opacity-[0.04] pointer-events-none z-0 mix-blend-overlay" 
-           style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}>
-      </div>
+    <div className="font-inter bg-paper text-ink min-h-screen">
+      <SEOHead title="Contact Us" url="/contact-us" description="Get in touch with UrbanNook via WhatsApp, email or phone for product inquiries, order support and custom design requests." />
 
-      {/* --- HERO SECTION --- */}
-      <section className="relative lg:pt-32 pt-24 px-6 lg:px-12 overflow-hidden flex items-center border-b border-[#a89068]/20 ">
-        <div className="max-w-4xl mx-auto text-center">
-             <div className="flex flex-col items-start">
-                <div className="flex items-center gap-4 mb-8">
-                    <span className="h-[1px] w-12 md:w-16 bg-[#F5DEB3]"></span>
-                    <span className="text-[10px] font-bold tracking-[0.3em] text-[#F5DEB3] uppercase">
-                        Support & Inquiries
-                    </span>
-                    <span className="h-[1px] w-12 md:w-16 bg-[#F5DEB3]"></span>
-                </div>
-             </div>
+      <section className="max-w-[1280px] mx-auto px-5 pt-14 md:pt-20 pb-8">
+        <p className="gl-lbl text-brand mb-3">Support & Inquiries</p>
+        <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight">Get in touch.</h1>
+        <p className="text-lg text-muted mt-4 max-w-xl">Questions, custom requests or order help — we reply within 2–4 business hours.</p>
+      </section>
+
+      {/* contact info */}
+      <section className="max-w-[1280px] mx-auto px-5 pb-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {contactInfo.map((item) => (
+            <div key={item.id} className="border border-hair rounded-2xl p-6 hover:border-brand transition-colors">
+              <div className="w-11 h-11 rounded-full bg-brand/10 text-brand grid place-items-center mb-4"><i className={item.icon}></i></div>
+              <p className="gl-lbl text-[10px] text-muted mb-1">{item.title}</p>
+              <p className="text-lg font-bold">{item.info}</p>
+              <p className="text-xs text-faint mt-1">{item.subInfo}</p>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* --- CONTACT INFO GRID (LIGHT BOXES) --- */}
-      <section className="py-4 px-6 relative z-10">
-        <div className="max-w-7xl mx-auto">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {contactInfo.map((item) => (
-                    <div 
-                        key={item.id}
-                        className="group bg-[#f5f7f8] p-8 lg:p-10 rounded-[2rem] border border-transparent hover:border-[#a89068]/30 hover:shadow-xl hover:-translate-y-1 transition-all duration-500 shadow-lg"
-                    >
-                        <div className="flex justify-between items-start mb-8">
-                            <div className="w-12 h-12 rounded-full border border-gray-200 flex items-center justify-center text-[#a89068] group-hover:bg-[#a89068] group-hover:text-white transition-colors duration-500">
-                                <i className={item.icon}></i>
-                            </div>
-                            <span className="text-4xl font-serif text-[#2e443c]/10 group-hover:text-[#a89068]/20 transition-colors">
-                                0{item.id}
-                            </span>
-                        </div>
-                        <h3 className="text-[10px] font-bold uppercase tracking-widest text-[#a89068] mb-2">{item.title}</h3>
-                        <p className="text-xl font-serif text-[#2e443c]">{item.info}</p>
-                        <p className="text-xs text-gray-400 mt-1">{item.subInfo}</p>
-                    </div>
+      {/* form + faq */}
+      <section className="max-w-[1280px] mx-auto px-5 py-12 grid lg:grid-cols-12 gap-10 lg:gap-16 items-start">
+        <div className="lg:col-span-7">
+          <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight mb-2">Send a message</h2>
+          <p className="text-muted text-sm mb-6">Fill out the form and our team will get back to you promptly.</p>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="gl-lbl text-[10px] text-muted mb-1.5 block">Your name</label>
+                <input type="text" name="name" value={formData.name} onChange={handleInputChange} required placeholder="John Doe" className={field(errors.name)} />
+                {errors.name && <p className="text-sale text-xs mt-1.5">{errors.name}</p>}
+              </div>
+              <div>
+                <label className="gl-lbl text-[10px] text-muted mb-1.5 block">Email address</label>
+                <input type="email" name="email" value={formData.email} onChange={handleInputChange} required placeholder="john@example.com" className={field(errors.email)} />
+                {errors.email && <p className="text-sale text-xs mt-1.5">{errors.email}</p>}
+              </div>
+            </div>
+            <div>
+              <label className="gl-lbl text-[10px] text-muted mb-1.5 block">Mobile <span className="normal-case tracking-normal text-faint">(optional)</span></label>
+              <input type="tel" name="mobile" value={formData.mobile} maxLength={10}
+                onChange={(e) => { const val = e.target.value.replace(/\D/g, '').slice(0, 10); setFormData({ ...formData, mobile: val }); if (errors.mobile) clearFieldError('mobile'); }}
+                placeholder="10-digit mobile number" className={field(formData.mobile && !/^[6-9]\d{9}$/.test(formData.mobile))} />
+              {formData?.mobile && !/^[6-9]\d{9}$/.test(formData?.mobile) && <p className="text-sale text-xs mt-1.5">Please enter a valid 10-digit mobile number</p>}
+            </div>
+            <div>
+              <p className="gl-lbl text-[10px] text-muted mb-2">Inquiry type</p>
+              <div className="flex flex-wrap gap-2.5">
+                {['Product Inquiry', 'Support'].map((option) => (
+                  <button key={option} type="button" onClick={() => setFormData({ ...formData, subject: option })}
+                    className={`gl-press px-5 py-2.5 rounded-full text-sm font-semibold border transition-colors ${formData.subject === option ? 'bg-brand text-white border-brand' : 'bg-white border-hair hover:border-ink'}`}>{option}</button>
                 ))}
+              </div>
             </div>
+            <div>
+              <label className="gl-lbl text-[10px] text-muted mb-1.5 block">Message</label>
+              <textarea name="message" value={formData.message} onChange={handleInputChange} required rows="4" placeholder="How can we help?" className={`${field(errors.message)} resize-none`}></textarea>
+              {errors.message && <p className="text-sale text-xs mt-1.5">{errors.message}</p>}
+            </div>
+            <button type="submit" disabled={isLoading || !isFormValid} className="gl-press bg-brand text-white font-bold text-sm px-8 py-3.5 rounded-xl hover:bg-brandHi disabled:opacity-50 disabled:cursor-not-allowed">
+              {isLoading ? 'Sending…' : 'Send message'}
+            </button>
+          </form>
+        </div>
+
+        <div className="lg:col-span-5">
+          <div className="border border-hair rounded-2xl p-6 mb-8 bg-surface">
+            <div className="flex items-center gap-3 mb-2"><span className="w-10 h-10 rounded-full bg-brand/10 text-brand grid place-items-center">⏱</span><div><p className="font-bold">Fast response guarantee</p><p className="gl-lbl text-[10px] text-brand">Standard SLA</p></div></div>
+            <p className="text-sm text-muted">We aim to respond within <b className="text-ink">2–4 business hours</b> on working days.</p>
+          </div>
+          <h3 className="gl-lbl text-muted mb-3">Frequently asked</h3>
+          <div className="border-t border-hair">
+            {contactPageFaqs.map((faq, index) => (
+              <AccordionItem key={index} question={faq.question} answer={faq.answer} isOpen={openFaq === index} onClick={() => setOpenFaq(openFaq === index ? null : index)} />
+            ))}
+          </div>
         </div>
       </section>
-
-      {/* --- FORM & FAQ SECTION (LIGHT BOX) --- */}
-      <section className="m-5 px-6 py-16 lg:py-24 relative z-10 bg-[#f5f7f8] rounded-[3rem] border-t border-white/5 mt-8 shadow-2xl">
-        <div className="max-w-7xl mx-auto">
-            
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 lg:gap-24 items-start">
-                
-                {/* LEFT: THE FORM (Takes up 7 columns on Desktop) */}
-                <div className="lg:col-span-7">
-                    <div className="mb-10">
-                        <h2 className="text-3xl md:text-4xl font-serif text-[#2e443c] mb-4">Send a Message</h2>
-                        <p className="text-gray-500 font-light text-sm md:text-base leading-relaxed">
-                            Have a specific question or custom request? Fill out the form below and our studio team will get back to you promptly.
-                        </p>
-                    </div>
-
-                    <form onSubmit={handleSubmit} className="space-y-8">
-                        
-                        {/* Row 1: Name & Email */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="relative group">
-                                <label className="text-[10px] font-bold uppercase tracking-widest text-[#a89068] mb-1.5 block ml-1">Your Name</label>
-                                <input
-                                    type="text"
-                                    name="name"
-                                    value={formData.name}
-                                    onChange={handleInputChange}
-                                    onFocus={() => setActiveInput('name')}
-                                    onBlur={handleBlur}
-                                    required
-                                    className={`w-full bg-white border rounded-xl px-5 py-4 text-[#2e443c] focus:outline-none transition-all duration-300 placeholder-gray-300 shadow-sm ${
-                                      errors.name ? 'border-red-500' : 'border-gray-200 focus:border-[#a89068]'
-                                    }`}
-                                    placeholder="John Doe"
-                                    id="name"
-                                />
-                                {errors.name && (
-                                  <p className="text-red-500 text-xs mt-2 ml-1">{errors.name}</p>
-                                )}
-                            </div>
-
-                            <div className="relative group">
-                                <label className="text-[10px] font-bold uppercase tracking-widest text-[#a89068] mb-1.5 block ml-1">Email Address</label>
-                                <input
-                                    type="email"
-                                    name="email"
-                                    value={formData.email}
-                                    onChange={handleInputChange}
-                                    onFocus={() => setActiveInput('email')}
-                                    onBlur={handleBlur}
-                                    required
-                                    className={`w-full bg-white border rounded-xl px-5 py-4 text-[#2e443c] focus:outline-none transition-all duration-300 placeholder-gray-300 shadow-sm ${
-                                      errors.email ? 'border-red-500' : 'border-gray-200 focus:border-[#a89068]'
-                                    }`}
-                                    placeholder="john@example.com"
-                                    id="email"
-                                />
-                                {errors.email && (
-                                  <p className="text-red-500 text-xs mt-2 ml-1">{errors.email}</p>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Mobile Number */}
-                        <div className="relative group">
-                            <label className="text-[10px] font-bold uppercase tracking-widest text-[#a89068] mb-1.5 block ml-1">
-                                Mobile Number <span className="text-gray-400 normal-case tracking-normal font-normal">(optional)</span>
-                            </label>
-                            <input
-                                type="tel"
-                                name="mobile"
-                                value={formData.mobile}
-                                onChange={(e) => {
-                                    const val = e.target.value.replace(/\D/g, '').slice(0, 10);
-                                    setFormData({ ...formData, mobile: val });
-                                    if (errors.mobile) clearFieldError('mobile');
-                                }}
-                                onFocus={() => setActiveInput('mobile')}
-                                onBlur={handleBlur}
-                                className={`w-full bg-white border rounded-xl px-5 py-4 text-[#2e443c] focus:outline-none transition-all duration-300 placeholder-gray-300 shadow-sm ${
-                                    formData.mobile && !/^[6-9]\d{9}$/.test(formData.mobile) ? 'border-red-500' : 'border-gray-200 focus:border-[#a89068]'
-                                }`}
-                                placeholder="10-digit mobile number"
-                                id="mobile"
-                                maxLength={10}
-                            />
-                            {formData?.mobile && !/^[6-9]\d{9}$/.test(formData?.mobile) ? (
-                                <p className="text-red-500 text-xs mt-2 ml-1">Please enter a valid 10-digit mobile number</p>
-                            ) : (
-                                <p className="text-gray-400 text-xs mt-2 ml-1 flex items-center gap-1">
-                                    <i className="fa-solid fa-bolt text-[#a89068] text-[9px]"></i>
-                                    Add your mobile number for a quicker response
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Subject Pills */}
-                        <div>
-                            <p className="block uppercase tracking-widest text-[10px] font-bold text-[#a89068] mb-3 ml-1">Inquiry Type</p>
-                            <div className="flex flex-wrap gap-3">
-                                {['Product Inquiry', 'Support'].map((option) => (
-                                    <button
-                                        key={option}
-                                        type="button"
-                                        onClick={() => setFormData({...formData, subject: option})}
-                                        className={`px-6 py-3 rounded-full text-xs font-bold transition-all duration-300 border shadow-sm ${
-                                            formData.subject === option 
-                                            ? 'bg-[#a89068] text-white border-[#a89068]' 
-                                            : 'bg-white text-gray-500 border-gray-200 hover:border-[#a89068] hover:text-[#a89068]'
-                                        }`}
-                                    >
-                                        {option}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Message */}
-                        <div className="relative group">
-                            <label className="text-[10px] font-bold uppercase tracking-widest text-[#a89068] mb-1.5 block ml-1">Message</label>
-                            <textarea
-                                name="message"
-                                value={formData.message}
-                                onChange={handleInputChange}
-                                onFocus={() => setActiveInput('message')}
-                                onBlur={handleBlur}
-                                required
-                                rows="4"
-                                className={`w-full bg-white border rounded-xl px-5 py-4 text-[#2e443c] focus:outline-none transition-all duration-300 placeholder-gray-300 resize-none shadow-sm ${
-                                  errors.message ? 'border-red-500' : 'border-gray-200 focus:border-[#a89068]'
-                                }`}
-                                placeholder="How can we help?"
-                                id="message"
-                            ></textarea>
-                            {errors.message && (
-                              <p className="text-red-500 text-xs mt-2 ml-1">{errors.message}</p>
-                            )}
-                        </div>
-
-                        {/* Submit Button */}
-                        <div className="flex justify-start pt-2">
-                            <button
-                                type="submit"
-                                disabled={isLoading || !isFormValid}
-                                className={`group relative w-full sm:w-auto px-10 py-4 overflow-hidden rounded-full font-bold uppercase tracking-widest text-[10px] transition-all duration-300 shadow-lg ${
-                                  isLoading || !isFormValid
-                                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed border border-gray-200'
-                                    : 'bg-[#a89068] text-white hover:bg-[#2e443c] hover:shadow-[0_0_30px_rgba(46,68,60,0.4)] active:scale-95'
-                                }`}
-                            >
-                                <span className="relative z-10 flex items-center justify-center gap-3">
-                                    {isLoading ? (
-                                      <>
-                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                        Sending...
-                                      </>
-                                    ) : (
-                                      <>
-                                        Send Request
-                                        <i className="fa-solid fa-arrow-right group-hover:translate-x-1 transition-transform"></i>
-                                      </>
-                                    )}
-                                </span>
-                            </button>
-                        </div>
-                    </form>
-                </div>
-
-                {/* RIGHT: FAQs & SERVICE PROMISE (Takes up 5 columns on Desktop) */}
-                <div className="lg:col-span-5 lg:pl-8 border-t lg:border-t-0 lg:border-l border-gray-200 pt-16 lg:pt-0">
-                    
-                    {/* Premium Service Badge */}
-                    <div className="bg-white border border-gray-100 p-6 rounded-2xl mb-10 shadow-lg relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-[#a89068]/5 rounded-full blur-2xl transition-all group-hover:bg-[#a89068]/10"></div>
-                        <div className="flex items-center gap-4 mb-3">
-                            <div className="w-10 h-10 rounded-full bg-[#a89068]/10 flex items-center justify-center text-[#a89068]">
-                                <i className="fa-solid fa-clock-rotate-left"></i>
-                            </div>
-                            <div>
-                                <h4 className="text-[#2e443c] font-serif text-lg">Fast Response Guarantee</h4>
-                                <p className="text-[10px] text-[#a89068] uppercase tracking-widest font-bold">Standard SLA</p>
-                            </div>
-                        </div>
-                        <p className="text-sm text-gray-500 font-light leading-relaxed">
-                            We aim to respond to all inquiries within <span className="text-[#2e443c] font-medium">2-4 business hours</span> during standard working days. Your space matters to us.
-                        </p>
-                    </div>
-
-                    {/* FAQ Accordion */}
-                    <div>
-                        <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#2e443c] mb-6">Frequently Asked</h3>
-                        <div className="border-t border-gray-200">
-                            {contactPageFaqs.map((faq, index) => (
-                                <AccordionItem 
-                                    key={index}
-                                    question={faq.question}
-                                    answer={faq.answer}
-                                    isOpen={openFaq === index}
-                                    onClick={() => setOpenFaq(openFaq === index ? null : index)}
-                                />
-                            ))}
-                        </div>
-                    </div>
-
-                </div>
-
-            </div>
-        </div>
-      </section>
-
     </div>
   );
 };
