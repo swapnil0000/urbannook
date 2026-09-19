@@ -13,6 +13,7 @@ import { fetchCsrfToken } from './store/api/apiSlice';
 import AppRoutes from './store/AppRoutes';
 import NewsTicker from './pages/home/NewsTicker';
 import WhatsAppLoginWatcher from './component/layout/auth/WhatsAppLoginWatcher';
+import WhatsAppOneTap from './component/layout/auth/WhatsAppOneTap';
 import SEOHead from './component/SEOHead';
 import { trackPageView, setUserId, captureAttribution, setMetaAdvancedMatching } from './utils/analytics';
 // check
@@ -191,6 +192,11 @@ function App() {
                 {/* Global Google One Tap for logged-out visitors (boosts Meta EMQ) */}
                 <ErrorBoundary>
                   <GoogleOneTap />
+                </ErrorBoundary>
+                {/* WhatsApp's equivalent of One Tap — one short prompt per
+                    session for logged-out visitors */}
+                <ErrorBoundary>
+                  <WhatsAppOneTap />
                 </ErrorBoundary>
                 {/* Independence Day 10%-off lead capture — shows once, everywhere */}
                 <ErrorBoundary>
