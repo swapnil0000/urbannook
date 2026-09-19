@@ -1053,6 +1053,25 @@ const CheckoutPage = () => {
       document.body.appendChild(s);
     });
 
+  /* ── Razorpay Magic Checkout (1CC) ──────────────────────────────────────
+     Magic collects the address, applies coupons and rates shipping inside its
+     own modal, so on this path our address step is skipped and the address
+     comes back on the order via the webhook.
+
+     PREPAID only — COD keeps the existing flow with its 2x-shipping advance,
+     which Magic's dashboard-configured COD advance cannot reproduce.
+
+     The server must agree: it only treats an order as Magic when
+     MAGIC_CHECKOUT_ENABLED is on AND the request carries `magic: true`. */
+  const magicEnabled =
+    import.meta.env.VITE_MAGIC_CHECKOUT_ENABLED === "true" && paymentMethod !== "COD";
+
+  // Extra checkout.js options that switch the modal into Magic. Note this is a
+  // CHECKOUT option — the order itself is made a Magic order by its line_items.
+  const magicCheckoutOptions = magicEnabled
+    ? { one_click_checkout: true, show_coupons: true }
+    : {};
+
   const handleAddressConfirm = (suggestion, addressId, deliveryAddressFull) => {
     addressManuallyResetRef.current = false;
     setAddress(deliveryAddressFull || suggestion.formattedAddress);
@@ -1352,6 +1371,7 @@ const CheckoutPage = () => {
             navigate(`/payment-processing/${response.razorpay_order_id}`);
           },
           prefill: { name: guestName.trim(), email: guestEmail.trim(), contact: guestMobile.trim() },
+          ...magicCheckoutOptions,
           notes: { address, pinCode }, theme: { color: "#E63329" },
           modal: { ondismiss: () => { trackPaymentModalDismissed({ orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId, value: totalToPay }); setPaymentError("Payment cancelled. Your cart is safe."); setShowRetry(true); }, escape: false, confirm_close: true },
         });
@@ -1395,6 +1415,7 @@ const CheckoutPage = () => {
           long: selectedFullAddr?.location?.coordinates?.[0] || selectedFullAddr?.long || 0,
         },
         paymentMethod,
+        magic: magicEnabled, // server skips address/shipping and sends line_items
         ...getFbCookies(), // _fbp / _fbc → stored on order for CAPI match quality
       }).unwrap();
 
@@ -1430,6 +1451,7 @@ const CheckoutPage = () => {
           } catch (_) { setPaymentError("Payment verification failed. Contact support if amount was debited."); }
         },
         prefill: { name: userProfile?.userName || userProfile?.name || "", email: userProfile?.email || "", contact: senderMobileStr },
+        ...magicCheckoutOptions,
         notes: { address, pinCode }, theme: { color: "#E63329" },
         modal: { ondismiss: () => { trackPaymentModalDismissed({ orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId || orderResult.id, value: totalToPay }); setPaymentError("Payment cancelled. Your cart is safe."); setShowRetry(true); }, escape: false, confirm_close: true },
       });

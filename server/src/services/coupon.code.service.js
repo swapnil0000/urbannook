@@ -325,4 +325,7 @@ const getAllCouponCodeService = async ({ userId, code }) => {
   return { statusCode: 200, message: "activeCouponCodeList", data: results, success: true };
 };
 
-export { applyCouponCodeService, getAllCouponCodeService };
+// validateNewCoupon is exported so the Magic Checkout apply-coupon callback can reuse
+// the exact same eligibility rules (per-user caps, TARGETED assignment, MEMBERS_ONLY,
+// validity window, min-cart) without going through the cart-mutating apply service.
+export { applyCouponCodeService, getAllCouponCodeService, validateNewCoupon };

@@ -152,6 +152,10 @@ const orderSchema = new mongoose.Schema(
 
     isGuestOrder: { type: Boolean, default: false },
     isNewGuestAccount: { type: Boolean, default: false },
+    // Razorpay Magic Checkout (1CC) order: the address and the final shipping
+    // fee arrive from Razorpay after payment, so the webhook fills
+    // deliveryAddress instead of order-create. Always PREPAID.
+    isMagicOrder: { type: Boolean, default: false },
     guestInfo: {
       name: { type: String, default: null },
       email: { type: String, default: null },
