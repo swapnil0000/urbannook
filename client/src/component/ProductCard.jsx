@@ -122,7 +122,7 @@ const ProductCard = ({ product, index = 0, listId = "all_products", listName = "
   };
 
   return (
-    <div className="group relative rounded-[1.2rem] overflow-hidden bg-black/20 border border-white/5 shadow-lg hover:shadow-2xl hover:border-[#F5DEB3]/30 transition-all duration-500 flex flex-col h-full">
+    <div className="gl-pcard group relative rounded-none overflow-hidden bg-white border border-hair flex flex-col h-full">
       {/* Wishlist Button (Floating Top Right) */}
       {/* <div className="absolute top-4 right-4 z-20">
         <Suspense
@@ -139,7 +139,7 @@ const ProductCard = ({ product, index = 0, listId = "all_products", listName = "
         className="flex flex-col flex-grow cursor-pointer"
         onClick={goToProduct}
       >
-        <div className="relative w-full aspect-square bg-[#f8f8f5] overflow-hidden">
+        <div className="relative w-full aspect-square bg-surface overflow-hidden">
           {variantImages.length > 1 ? (
             <VariantSlider images={variantImages} alt={product.productName} />
           ) : (
@@ -228,7 +228,7 @@ const ProductCard = ({ product, index = 0, listId = "all_products", listName = "
               );
             if (product?.productStatus === "out_of_stock" || allVariantsOOS) {
               return (
-                <span className="absolute top-3 left-3 z-10 text-[7px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-red-500 text-white shadow">
+                <span className="absolute top-3 left-3 z-10 gl-lbl text-[8px] px-2 py-0.5 rounded-none bg-ink text-white">
                   Out of Stock
                 </span>
               );
@@ -247,7 +247,7 @@ const ProductCard = ({ product, index = 0, listId = "all_products", listName = "
             if (totalLeft > LOW_STOCK_THRESHOLD) return null;
             if (totalLeft === 1) return null;
             return (
-              <span className="absolute top-3 left-3 z-10 flex items-center gap-1 text-[7px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#2e443c] text-[#F5DEB3] border border-[#F5DEB3]/30 shadow">
+              <span className="absolute top-3 left-3 z-10 flex items-center gap-1 gl-lbl text-[8px] px-2 py-0.5 rounded-none bg-brand text-white">
                 <i className="fa-solid fa-hourglass-half text-[6px]" /> Few left
               </span>
             );
@@ -258,7 +258,7 @@ const ProductCard = ({ product, index = 0, listId = "all_products", listName = "
             title (FitTitle: always exactly one line, whatever the name's
             length) keeps every card in a row the same height, so a row
             never looks uneven. */}
-        <div className="p-4 flex flex-col items-center gap-1 bg-white/90 backdrop-blur-md">
+        <div className="p-3.5 flex flex-col items-center gap-1 bg-white border-t border-hair">
           {/* Fixed-height wrapper, sized to the CAP font size regardless of
               how much this particular title had to shrink — otherwise a
               long name (smaller font) leaves a shorter title block than a
@@ -268,16 +268,16 @@ const ProductCard = ({ product, index = 0, listId = "all_products", listName = "
               text={product.productName || ""}
               capPx={15}
               floorPx={9}
-              className="font-serif text-[#2e443c] leading-snug text-center block md:hidden w-full"
+              className="font-archivo font-bold text-ink leading-snug text-center block md:hidden w-full"
             />
             <FitTitle
               text={product.productName || ""}
               capPx={18}
               floorPx={12}
-              className="font-serif text-[#2e443c] leading-snug text-center hidden md:block w-full"
+              className="font-archivo font-bold text-ink leading-snug text-center hidden md:block w-full"
             />
           </div>
-          <span className="text-xs md:text-sm font-medium text-[#157a44]">
+          <span className="text-xs md:text-sm font-semibold text-ink">
             Starting at ₹{price?.toLocaleString()}
           </span>
         </div>

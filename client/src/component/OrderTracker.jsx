@@ -26,8 +26,8 @@ const OrderTracker = ({ status, trackingNumber }) => {
     const isShipped = !!trackingNumber;
     return (
       <div className="flex items-center justify-center py-4">
-        <div className={`flex flex-col items-center ${isShipped ? 'text-blue-500' : 'text-[#a89068]'}`}>
-          <i className={`${isShipped ? 'fas fa-truck text-blue-500' : 'fas fa-box text-[#a89068] animate-pulse'} text-5xl mb-2`}></i>
+        <div className={`flex flex-col items-center ${isShipped ? 'text-blue-500' : 'text-brand'}`}>
+          <i className={`${isShipped ? 'fas fa-truck text-blue-500' : 'fas fa-box text-brand animate-pulse'} text-5xl mb-2`}></i>
           <span className="text-sm font-medium">
             {isShipped ? 'Your Order is Shipped' : (status === 'CREATED' ? 'Order Created' : 'Order Placed Successfully')}
           </span>

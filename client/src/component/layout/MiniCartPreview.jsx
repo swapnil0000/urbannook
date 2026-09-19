@@ -188,7 +188,7 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
                       onClick={() => handleRemoveItem(item)}
                       title={`Remove ${displayName}`}
                       aria-label={`Remove ${displayName}`}
-                      className="absolute -top-1.5 -left-1.5 z-10 w-5 h-5 flex items-center justify-center rounded-full bg-[#f5deb3] border border-[#e0c896] shadow-sm text-[#1c3026] hover:bg-[#E63329] hover:text-white hover:border-[#E63329] transition-colors"
+                      className="absolute -top-1.5 -left-1.5 z-10 w-5 h-5 flex items-center justify-center rounded-full bg-paper border border-hair shadow-sm text-ink hover:bg-brand hover:text-white hover:border-brand transition-colors"
                     >
                       <i className="fa-solid fa-xmark text-[9px]" />
                     </button>
@@ -196,7 +196,7 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-bold text-black truncate">{displayName}</p>
                     {item.selectedVariant && item.selectedVariant !== "N/A" && (
-                      <span className="inline-block mt-0.5 mb-0.5 px-2 py-0.5 rounded-full bg-[#1c3026] text-white text-[10px] font-semibold">
+                      <span className="inline-block mt-0.5 mb-0.5 px-2 py-0.5 rounded-full bg-ink text-white text-[10px] font-semibold">
                         {item.selectedVariant}
                       </span>
                     )}
@@ -211,10 +211,10 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
                       : 0;
                     return hasDiscount ? (
                       <div className="text-right shrink-0">
-                        <p className="text-xs font-bold text-[#157a44]">₹{Math.round(discountedPrice * itemQty(item.quantity)).toLocaleString()}</p>
+                        <p className="text-xs font-bold text-save">₹{Math.round(discountedPrice * itemQty(item.quantity)).toLocaleString()}</p>
                         <div className="flex items-center justify-end gap-1">
                           <span className="text-[9px] text-black/40 line-through">₹{(rawPrice * itemQty(item.quantity)).toLocaleString()}</span>
-                          <span className="text-[9px] font-bold uppercase rounded-full bg-[#157a44] text-white px-1.5 py-px">
+                          <span className="text-[9px] font-bold uppercase rounded-full bg-save text-white px-1.5 py-px">
                             {percentOff}% OFF
                           </span>
                         </div>
@@ -271,7 +271,7 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
           <button
             onClick={onViewCart}
             disabled={cartItems.length === 0}
-            className="w-full py-3.5 rounded-xl text-[11px] font-extrabold uppercase tracking-[0.1em] text-white bg-[#1c3026] disabled:opacity-40"
+            className="w-full py-3.5 rounded-xl text-[11px] font-extrabold uppercase tracking-[0.1em] text-white bg-ink disabled:opacity-40"
           >
             View Cart
           </button>

@@ -1,127 +1,95 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useGetProductsQuery } from '../../store/api/productsApi';
 import SEOHead from '../../component/SEOHead';
+import UnProductCard, { firstVariant } from '../../component/UnProductCard';
 import { trackViewItemList } from '../../utils/analytics';
-import ProductCard from '../../component/ProductCard';
 import RevealCard from '../../component/RevealCard';
-import ScrollHint from '../../component/ScrollHint';
+
+const productList = (res) => res?.data?.products || res?.data?.listofPublishedProducts || [];
 
 const AllProductsPage = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeCat, setActiveCat] = useState(searchParams.get('category') || 'All');
   const [sortBy, setSortBy] = useState('featured');
-  const [showSortModal, setShowSortModal] = useState(false);
-  
-  const { data: productsResponse, isLoading, error } = useGetProductsQuery({
-    page: 1,
-    limit: 12,
-    sortBy: sortBy === 'featured' ? undefined : sortBy
-  });
 
+  const { data: productsResponse, isLoading, error } = useGetProductsQuery({ page: 1, limit: 24 });
 
-  // Extract products from response
-  const products = productsResponse?.data?.products || productsResponse?.data?.listofPublishedProducts || [];
+  useEffect(() => { window.scrollTo(0, 0); }, []);
+  useEffect(() => { setActiveCat(searchParams.get('category') || 'All'); }, [searchParams]);
+
+  const products = useMemo(() => productList(productsResponse), [productsResponse]);
+  const categories = useMemo(() => {
+    const set = [];
+    products.forEach((p) => { if (p.productCategory && !set.includes(p.productCategory)) set.push(p.productCategory); });
+    return set;
+  }, [products]);
 
   const displayProducts = useMemo(() => {
-    let sorted = products.map(p => {
-      const firstVariantPrice = p.variantDetails?.[0]?.variantPrice || 0;
-      const firstVariantMrp = p.variantDetails?.[0]?.variantMrp || 0;
-      return {
-        ...p,
-        effectivePrice: firstVariantPrice,
-        effectiveMrp: firstVariantMrp,
-      };
-    });
-
-    if (sortBy === 'price-low') sorted.sort((a, b) => a.effectivePrice - b.effectivePrice);
-    if (sortBy === 'price-high') sorted.sort((a, b) => b.effectivePrice - a.effectivePrice);
-    return sorted;
-  }, [products, sortBy]);
+    let list = products.filter((p) => activeCat === 'All' || p.productCategory === activeCat);
+    const price = (p) => firstVariant(p)?.variantPrice || 0;
+    if (sortBy === 'price-low') list = [...list].sort((a, b) => price(a) - price(b));
+    if (sortBy === 'price-high') list = [...list].sort((a, b) => price(b) - price(a));
+    return list;
+  }, [products, activeCat, sortBy]);
 
   useEffect(() => {
-    if (displayProducts.length > 0) {
-      trackViewItemList({
-        listName: 'All Products',
-        listId: 'all_products',
-        items: displayProducts.map((product, index) => ({
-          itemId: product.productId,
-          itemName: product.productName,
-          price: product.variantDetails?.[0]?.variantPrice || 0,
-          itemVariant: product.variantDetails?.[0]?.variantName || '',
-          index,
-        })),
-      });
-    }
+    if (displayProducts.length) trackViewItemList?.({ listName: 'All Products', listId: 'all_products', items: displayProducts.map((p, i) => ({ itemId: p.productId, itemName: p.productName, price: firstVariant(p)?.variantPrice || 0, index: i })) });
   }, [displayProducts]);
 
-  if (error) {
-    console.error("API Error:", error);
-  }
+  const selectCat = (c) => {
+    setActiveCat(c);
+    if (c === 'All') { searchParams.delete('category'); setSearchParams(searchParams, { replace: true }); }
+    else setSearchParams({ category: c }, { replace: true });
+  };
+
+  const chip = (c) => `gl-press px-4 py-2 rounded-full text-sm font-semibold transition-colors ${activeCat === c ? 'bg-brand text-white' : 'bg-white border border-hair hover:border-ink'}`;
 
   return (
-    <div className="min-h-screen bg-[#2e443c] relative font-sans selection:bg-[#F5DEB3] selection:text-[#2e443c] pb-10">
-      <SEOHead
-        title="Shop All Products"
-        description="Browse UrbanNook's full collection of premium 3D printed home decor, lighting & lifestyle products. Modern designs, fast pan-India delivery."
-        url="/products"
-      />
+    <div className="font-inter bg-surface text-ink min-h-screen">
+      <SEOHead title="Shop All Products" url="/products" description="Browse UrbanNook's full collection of 3D-printed desk lamps, pen stands & décor. Made in India, fast pan-India delivery." />
 
-      {/* --- Ambient Background Glow --- */}
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#F5DEB3]/5 rounded-full blur-[120px] pointer-events-none"></div>
+      <div className="max-w-[1280px] mx-auto px-5 pt-10">
+        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">Shop All</h1>
+        <p className="text-muted mt-2">3D-printed desk lamps, pen stands &amp; décor.</p>
 
-      {/* Hero Section */}
-      <section className="pt-[5rem] pb-8 md:pt-[7rem] md:pb-5 px-6 relative z-10">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-end gap-10">
-          
-          {/* LEFT SIDE: Heading & Description */}
-          <div >
-            <h1 className="text-4xl sm:text-6xl md:text-7xl font-serif text-white leading-[0.9] mt-6 mb-2 ">
-              Curated{' '}
-              <span className="italic font-light text-[#F5DEB3]">Atmospheres.</span>
-            </h1>
-            <p className="text-sm md:text-base text-green-50/70 font-light leading-relaxed max-w-md">
-              Explore our exclusive collection designed for modern indoor environments.
-            </p>
+        <div className="flex flex-wrap items-center justify-between gap-4 mt-6">
+          <div className="flex flex-wrap gap-2.5">
+            <button onClick={() => selectCat('All')} className={chip('All')}>All</button>
+            {categories.map((c) => <button key={c} onClick={() => selectCat(c)} className={chip(c)}>{c}</button>)}
+          </div>
+          <div className="flex items-center border border-hair rounded-full overflow-hidden bg-white">
+            {[['featured', 'Featured'], ['price-low', '₹ Low'], ['price-high', '₹ High']].map(([v, l]) => (
+              <button key={v} onClick={() => setSortBy(v)} className={`px-3.5 py-2 text-xs font-semibold transition-colors ${sortBy === v ? 'bg-ink text-white' : 'text-muted hover:text-ink'}`}>{l}</button>
+            ))}
           </div>
         </div>
-      </section>
+      </div>
 
-      {/* Product Grid */}
-      <section className="pb-24 px-4 md:px-6 relative z-10">
-        <div className="max-w-7xl mx-auto">
-          {isLoading ? (
-            <div className="flex justify-center py-32">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#F5DEB3]"></div>
-            </div>
-          ) : error ? (
-            <div className="flex flex-col items-center justify-center py-32 bg-black/10 rounded-[2rem] border border-white/5 backdrop-blur-sm">
-              <i className="fa-solid fa-triangle-exclamation text-4xl text-[#F5DEB3]/50 mb-4"></i>
-              <h2 className="text-2xl font-serif text-white mb-2">Unable to load products</h2>
-              <p className="text-green-50/60 mb-6 font-light">Please check your connection and try again</p>
-              <button 
-                onClick={() => window.location.reload()} 
-                className="bg-[#F5DEB3] text-[#2e443c] px-8 py-3 rounded-full font-bold uppercase tracking-widest text-xs hover:bg-white transition-colors"
-              >
-                Retry Connection
-              </button>
-            </div>
-          ) : displayProducts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-32 bg-black/10 rounded-[2rem] border border-white/5 backdrop-blur-sm">
-              <i className="fa-solid fa-box-open text-4xl text-[#F5DEB3]/50 mb-4"></i>
-              <h2 className="text-2xl font-serif text-white mb-2">The collection is updating</h2>
-              <p className="text-green-50/60 font-light">Check back later for new arrivals.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-              {displayProducts?.map((product, index) => (
-                <RevealCard key={product.productId} index={index}>
-                  <ProductCard product={product} index={index} />
-                </RevealCard>
-              ))}
-            </div>
-          )}
-        </div>
+      <section className="max-w-[1280px] mx-auto px-5 py-8 pb-28">
+        {isLoading ? (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">{[...Array(8)].map((_, i) => <div key={i} className="aspect-[4/5] bg-hair animate-pulse rounded-2xl border border-hair" />)}</div>
+        ) : error ? (
+          <div className="text-center py-28 border border-hair rounded-2xl bg-white">
+            <h2 className="text-2xl font-extrabold">Unable to load products</h2>
+            <p className="text-muted mt-2">Please check your connection and try again.</p>
+            <button onClick={() => window.location.reload()} className="gl-press bg-brand text-white font-bold text-sm px-7 py-3.5 rounded-xl mt-6 hover:bg-brandHi">Retry</button>
+          </div>
+        ) : displayProducts.length === 0 ? (
+          <div className="text-center py-28 border border-hair rounded-2xl bg-white">
+            <h2 className="text-2xl font-extrabold">Dropping soon</h2>
+            <p className="text-muted mt-2">New pieces land here — check back Friday.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            {displayProducts.map((p, i) => (
+              <RevealCard key={p.productId || i} index={i}>
+                <UnProductCard p={p} index={i} listId="all_products" listName="All Products" />
+              </RevealCard>
+            ))}
+          </div>
+        )}
       </section>
-
-      <ScrollHint />
     </div>
   );
 };

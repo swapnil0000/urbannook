@@ -56,12 +56,12 @@ export const GiftWrapLineItem = ({ image }) => {
         <img src={image || DEFAULT_GIFT_IMAGE} alt={offer.title} className="w-full h-full object-contain" />
       </div>
       <div className="flex-1 flex flex-col justify-center min-w-0">
-        <h4 className="text-sm sm:text-base font-bold text-[#0a110e] leading-snug uppercase tracking-tight">
+        <h4 className="text-sm sm:text-base font-bold text-ink leading-snug uppercase tracking-tight">
           {offer.title || "Gift Wrap"}
         </h4>
         <div className="flex items-center justify-between mt-1 sm:mt-2">
           <span className="text-xs text-gray-400">x{quantity}</span>
-          <p className="text-sm font-bold text-[#0a110e]">
+          <p className="text-sm font-bold text-ink">
             ₹{(Number(offer.price) * quantity).toLocaleString()}
           </p>
         </div>
@@ -145,8 +145,8 @@ const GiftWrapOffer = ({ image }) => {
       {/* Trigger row */}
       <div className="flex items-center justify-between gap-3 py-3 px-1 select-none">
         <div className="flex items-center gap-2 min-w-0">
-          <i className="fa-solid fa-gift text-sm text-[#157a44]" />
-          <span className="text-sm font-semibold text-[#1c3026] truncate">
+          <i className="fa-solid fa-gift text-sm text-save" />
+          <span className="text-sm font-semibold text-ink truncate">
             {offer.title || "Make it a gift"}
           </span>
 
@@ -158,7 +158,7 @@ const GiftWrapOffer = ({ image }) => {
             onClick={openPopup}
             aria-label="Gift wrap info"
             className={
-              selected ? "text-[#157a44] shrink-0" : "text-gray-400 shrink-0"
+              selected ? "text-save shrink-0" : "text-gray-400 shrink-0"
             }
           >
             <i
@@ -179,7 +179,7 @@ const GiftWrapOffer = ({ image }) => {
           <button
             type="button"
             onClick={openPopup}
-            className="shrink-0 px-4 py-1.5 rounded-lg border border-gray-300 text-xs font-bold uppercase tracking-widest text-[#1c3026] hover:bg-gray-50 transition-colors"
+            className="shrink-0 px-4 py-1.5 rounded-lg border border-gray-300 text-xs font-bold uppercase tracking-widest text-ink hover:bg-gray-50 transition-colors"
           >
             Add
           </button>
@@ -287,7 +287,7 @@ const GiftWrapOffer = ({ image }) => {
                 type="button"
                 onClick={handleAdd}
                 disabled={isToggling}
-                className="w-full h-11 rounded-lg border border-gray-300 text-xs font-bold uppercase tracking-widest text-[#1c3026] hover:bg-gray-50 transition-colors disabled:opacity-50"
+                className="w-full h-11 rounded-lg border border-gray-300 text-xs font-bold uppercase tracking-widest text-ink hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
                 {isToggling ? "…" : offer.ctaLabel || "Make It A Gift"}
               </button>

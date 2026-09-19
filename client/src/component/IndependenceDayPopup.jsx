@@ -88,13 +88,13 @@ const OfferCountdown = memo(() => {
 
   return (
     <div className="flex items-center justify-center gap-1.5">
-      <span className="text-[9px] uppercase tracking-[0.18em] text-[#F5DEB3]/50 mr-1">Ends in</span>
+      <span className="text-[9px] uppercase tracking-[0.18em] text-paper/50 mr-1">Ends in</span>
       {units.map((unit) => (
         <div key={unit.label} className="flex flex-col items-center">
-          <span className="min-w-[30px] rounded-md border border-[#F5DEB3]/15 bg-white/5 px-1.5 py-1 font-mono text-sm font-bold tabular-nums text-[#F5DEB3]">
+          <span className="min-w-[30px] rounded-md border border-paper/15 bg-white/5 px-1.5 py-1 font-mono text-sm font-bold tabular-nums text-paper">
             {unit.value}
           </span>
-          <span className="mt-1 text-[7px] uppercase tracking-[0.15em] text-[#F5DEB3]/40">
+          <span className="mt-1 text-[7px] uppercase tracking-[0.15em] text-paper/40">
             {unit.label}
           </span>
         </div>
@@ -105,7 +105,7 @@ const OfferCountdown = memo(() => {
 OfferCountdown.displayName = 'OfferCountdown';
 
 const FIELD_BASE =
-  'un-offer-input w-full h-12 rounded-xl bg-white/5 border px-3.5 text-[15px] text-[#F5DEB3] caret-[#F5DEB3] placeholder:text-[#F5DEB3]/25 outline-none transition-colors focus:border-[#F5DEB3]/60 focus:bg-white/[0.07]';
+  'un-offer-input w-full h-12 rounded-xl bg-white/5 border px-3.5 text-[15px] text-paper caret-paper placeholder:text-paper/25 outline-none transition-colors focus:border-paper/60 focus:bg-white/[0.07]';
 
 // Kept as a plain <style> tag rather than styled-jsx: this project is Vite, and
 // the `<style jsx>` syntax used elsewhere in the codebase is a Next.js feature
@@ -468,7 +468,7 @@ const IndependenceDayPopup = memo(() => {
         <button
           type="button"
           onClick={handleReopen}
-          className="un-offer-pill fixed bottom-24 left-4 z-[9998] flex items-center gap-2 rounded-full border border-[#F5DEB3]/25 bg-[#1c3026]/95 py-2.5 pl-2.5 pr-4 shadow-[0_8px_30px_rgba(0,0,0,0.35)] backdrop-blur-md transition-transform hover:scale-105 active:scale-95 sm:bottom-6"
+          className="un-offer-pill fixed bottom-24 left-4 z-[9998] flex items-center gap-2 rounded-full border border-paper/25 bg-ink/95 py-2.5 pl-2.5 pr-4 shadow-[0_8px_30px_rgba(0,0,0,0.35)] backdrop-blur-md transition-transform hover:scale-105 active:scale-95 sm:bottom-6"
           aria-label={
             hasClaimed
               ? `Your Independence Day code is ${claimedCode}. Reopen offer.`
@@ -479,10 +479,10 @@ const IndependenceDayPopup = memo(() => {
             <AshokaChakra className="h-4 w-4 text-white" />
           </span>
           <span className="text-left leading-tight">
-            <span className="block text-[7px] font-bold uppercase tracking-[0.18em] text-[#F5DEB3]/50">
+            <span className="block text-[7px] font-bold uppercase tracking-[0.18em] text-paper/50">
               {hasClaimed ? 'Your code' : 'Freedom Sale'}
             </span>
-            <span className="block text-[11px] font-bold tracking-wide text-[#F5DEB3]">
+            <span className="block text-[11px] font-bold tracking-wide text-paper">
               {hasClaimed ? claimedCode : `Get ${amount} OFF`}
             </span>
           </span>
@@ -508,14 +508,14 @@ const IndependenceDayPopup = memo(() => {
           aria-labelledby="un-offer-title"
           aria-describedby="un-offer-subtitle"
           tabIndex={-1}
-          className="un-offer-sheet relative flex w-full max-w-[420px] flex-col overflow-hidden rounded-[1.75rem] border border-[#F5DEB3]/15 bg-[#1c3026] shadow-[0_24px_70px_rgba(0,0,0,0.55)] outline-none"
+          className="un-offer-sheet relative flex w-full max-w-[420px] flex-col overflow-hidden rounded-[1.75rem] border border-paper/15 bg-ink shadow-[0_24px_70px_rgba(0,0,0,0.55)] outline-none"
         >
           <TricolourBar />
 
           <button
             type="button"
             onClick={() => closePopup('close_button')}
-            className="absolute right-3 top-5 z-20 flex h-9 w-9 items-center justify-center rounded-full text-[#F5DEB3]/60 transition-colors hover:bg-white/10 hover:text-[#F5DEB3]"
+            className="absolute right-3 top-5 z-20 flex h-9 w-9 items-center justify-center rounded-full text-paper/60 transition-colors hover:bg-white/10 hover:text-paper"
             aria-label="Close offer"
           >
             <i className="fa-solid fa-xmark text-base" />
@@ -529,12 +529,12 @@ const IndependenceDayPopup = memo(() => {
                   {/* Capped width so this row can never run under the close
                       button on narrow phones — it wraps instead of colliding. */}
                   <div className="mx-auto mb-3 flex max-w-[78%] flex-wrap items-center justify-center gap-2">
-                    <span className="h-px w-5 bg-[#F5DEB3]/30" />
-                    <AshokaChakra className="un-offer-chakra h-4 w-4 text-[#F5DEB3]/70" />
-                    <span className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#F5DEB3]/70">
+                    <span className="h-px w-5 bg-paper/30" />
+                    <AshokaChakra className="un-offer-chakra h-4 w-4 text-paper/70" />
+                    <span className="text-[9px] font-bold uppercase tracking-[0.22em] text-paper/70">
                       Independence Day Special
                     </span>
-                    <span className="h-px w-5 bg-[#F5DEB3]/30" />
+                    <span className="h-px w-5 bg-paper/30" />
                   </div>
 
                   <h2 id="un-offer-title" className="font-serif text-[22px] leading-tight text-white">
@@ -546,7 +546,7 @@ const IndependenceDayPopup = memo(() => {
                   {/* The qualifying condition sits with the headline, not buried
                       in fine print — someone gives up their number on the
                       strength of this claim. */}
-                  <p className="mt-1.5 text-[11px] font-medium tracking-wide text-[#F5DEB3]/70">
+                  <p className="mt-1.5 text-[11px] font-medium tracking-wide text-paper/70">
                     {condition}
                   </p>
                   <p id="un-offer-subtitle" className="mt-1.5 text-[13px] text-white/60">
@@ -572,12 +572,12 @@ const IndependenceDayPopup = memo(() => {
                   <div>
                     <label
                       htmlFor="un-offer-mobile"
-                      className="mb-1.5 block text-[10px] uppercase tracking-[0.15em] text-[#F5DEB3]/60"
+                      className="mb-1.5 block text-[10px] uppercase tracking-[0.15em] text-paper/60"
                     >
                       Mobile number
                     </label>
                     <div className="relative">
-                      <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 border-r border-[#F5DEB3]/20 pr-2.5 text-[15px] text-[#F5DEB3]/55">
+                      <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 border-r border-paper/20 pr-2.5 text-[15px] text-paper/55">
                         +91
                       </span>
                       <input
@@ -595,7 +595,7 @@ const IndependenceDayPopup = memo(() => {
                         aria-invalid={!!errors.mobile}
                         aria-describedby={errors.mobile ? 'un-offer-mobile-error' : undefined}
                         className={`${FIELD_BASE} pl-[4.25rem] ${
-                          errors.mobile ? 'border-red-500/60' : 'border-[#F5DEB3]/20'
+                          errors.mobile ? 'border-red-500/60' : 'border-paper/20'
                         }`}
                       />
                     </div>
@@ -609,11 +609,11 @@ const IndependenceDayPopup = memo(() => {
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="mt-1 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#F5DEB3] text-xs font-bold uppercase tracking-[0.15em] text-[#1c3026] transition-all hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                    className="mt-1 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-paper text-xs font-bold uppercase tracking-[0.15em] text-ink transition-all hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isSubmitting ? (
                       <>
-                        <span className="un-offer-spinner h-3.5 w-3.5 rounded-full border-2 border-[#1c3026]/25 border-t-[#1c3026]" />
+                        <span className="un-offer-spinner h-3.5 w-3.5 rounded-full border-2 border-ink/25 border-t-ink" />
                         Unlocking…
                       </>
                     ) : (
@@ -634,8 +634,8 @@ const IndependenceDayPopup = memo(() => {
               /* ---- Success ---- */
               <div className="py-1 text-center">
                 <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[#FF9933] via-white to-[#138808]">
-                  <span className="flex h-[52px] w-[52px] items-center justify-center rounded-full bg-[#1c3026]">
-                    <i className="fa-solid fa-check text-lg text-[#F5DEB3]" />
+                  <span className="flex h-[52px] w-[52px] items-center justify-center rounded-full bg-ink">
+                    <i className="fa-solid fa-check text-lg text-paper" />
                   </span>
                 </div>
 
@@ -649,10 +649,10 @@ const IndependenceDayPopup = memo(() => {
                 {/* Presented as display type, not a field — this is something to
                     read and keep, and a bordered box reads as "type here". */}
                 <div className="mt-4">
-                  <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#F5DEB3]/40">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-paper/40">
                     Your code
                   </p>
-                  <p className="mt-1.5 select-all font-mono text-[30px] font-bold leading-none tracking-[0.16em] text-[#F5DEB3]">
+                  <p className="mt-1.5 select-all font-mono text-[30px] font-bold leading-none tracking-[0.16em] text-paper">
                     {claimedCode}
                   </p>
                 </div>
@@ -664,7 +664,7 @@ const IndependenceDayPopup = memo(() => {
                 <button
                   type="button"
                   onClick={handleCopyAndClose}
-                  className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#F5DEB3] text-xs font-bold uppercase tracking-[0.15em] text-[#1c3026] transition-all hover:bg-white"
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-paper text-xs font-bold uppercase tracking-[0.15em] text-ink transition-all hover:bg-white"
                 >
                   <i className={`fa-solid ${copied ? 'fa-check' : 'fa-copy'} text-sm`} />
                   {copied ? 'Copied' : 'Copy code'}

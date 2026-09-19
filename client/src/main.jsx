@@ -8,8 +8,13 @@ import config from './config/env.js';
 import { initializeFonts } from './utils/initFontLoading.js';
 import { initPerformanceMetrics, onMetricsUpdate } from './utils/performanceMetrics.js';
 import { monitorPerformance } from './utils/performanceValidation.js';
+import { escapeToExternalBrowser } from './utils/browserEnv.js';
 // test
 if (typeof window !== 'undefined') {
+  // Instagram/Facebook in-app browsers break Google login, passkeys & autofill.
+  // On Android, hand the page straight to Chrome BEFORE React mounts (no-op elsewhere).
+  escapeToExternalBrowser();
+
   initPerformanceMetrics();
   
   if (import.meta.env.DEV) {

@@ -4,6 +4,7 @@ import {
   HomePage,
   ContactPage,
   AllProductsPage,
+  CustomizePage,
   ProductDetailPage,
   ProductVariantsPage,
   CheckoutPage,
@@ -28,7 +29,7 @@ import ProtectedRoute from "../component/ProtectedRoute.jsx";
 // Minimal loader for individual route transitions only
 const MinimalLoader = () => (
   <div className="fixed top-0 left-0 w-full h-1 bg-gray-200 z-50">
-    <div className="h-full bg-[#a89068] animate-pulse"></div>
+    <div className="h-full bg-brand animate-pulse"></div>
   </div>
 );
 
@@ -50,6 +51,14 @@ const AppRoutes = () => {
         element={
           <Suspense fallback={<MinimalLoader />}>
             <ContactPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/customize"
+        element={
+          <Suspense fallback={<MinimalLoader />}>
+            <CustomizePage />
           </Suspense>
         }
       />

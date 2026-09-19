@@ -41,8 +41,8 @@ const AddressTypeChips = ({ value, onChange }) => (
         onClick={() => onChange(label)}
         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
           value === label
-            ? "bg-[#2e443c] text-white border-[#2e443c]"
-            : "bg-white text-gray-600 border-gray-200 hover:border-[#a89068] hover:text-[#a89068]"
+            ? "bg-ink text-white border-ink"
+            : "bg-white text-gray-600 border-gray-200 hover:border-brand hover:text-brand"
         }`}
       >
         <i className={`fa-solid ${icon} text-[10px]`}></i>
@@ -75,7 +75,7 @@ const FormField = ({ label, required, placeholder, value, onChange, readOnly, ic
         } ${
           readOnly
             ? "bg-gray-50 border-gray-200 text-gray-500 cursor-not-allowed"
-            : "bg-white border-gray-200 text-[#2e443c] focus:border-[#a89068] placeholder:text-gray-300"
+            : "bg-white border-gray-200 text-ink focus:border-brand placeholder:text-gray-300"
         }`}
       />
     </div>
@@ -88,17 +88,17 @@ const FormField = ({ label, required, placeholder, value, onChange, readOnly, ic
 const LocationSummaryCard = ({ locationSummary, deliveryAddressFull, onChangePinClick }) => {
   if (!locationSummary) return null;
   return (
-    <div className="m-3 bg-white rounded-xl border border-[#a89068]/30 p-3 shadow-sm">
+    <div className="m-3 bg-white rounded-xl border border-brand/30 p-3 shadow-sm">
       {/* <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-2 min-w-0">
-          <div className="w-7 h-7 rounded-full bg-[#a89068]/10 flex items-center justify-center shrink-0 mt-0.5">
-            <i className="fa-solid fa-location-dot text-[#a89068] text-xs"></i>
+          <div className="w-7 h-7 rounded-full bg-brand/10 flex items-center justify-center shrink-0 mt-0.5">
+            <i className="fa-solid fa-location-dot text-brand text-xs"></i>
           </div>
           <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-[#a89068] mb-0.5">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-brand mb-0.5">
               Delivering your order to
             </p>
-            <p className="text-sm font-semibold text-[#2e443c] leading-tight truncate">
+            <p className="text-sm font-semibold text-ink leading-tight truncate">
               {locationSummary.name || locationSummary.locality || locationSummary.formattedAddress?.split(",")[0] || locationSummary.city}
             </p>
             <p className="text-xs text-gray-500 mt-0.5 truncate">
@@ -111,7 +111,7 @@ const LocationSummaryCard = ({ locationSummary, deliveryAddressFull, onChangePin
         <button
           type="button"
           onClick={onChangePinClick}
-          className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-[#a89068] border border-[#a89068]/30 px-2 py-1 rounded-lg hover:bg-[#a89068]/10 transition-colors"
+          className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-brand border border-brand/30 px-2 py-1 rounded-lg hover:bg-brand/10 transition-colors"
         >
           Change
         </button>
@@ -120,14 +120,14 @@ const LocationSummaryCard = ({ locationSummary, deliveryAddressFull, onChangePin
       {/* Full delivery address preview — shows what will be saved */}
       {deliveryAddressFull && (
         <div className="flex items-start gap-2">
-          <div className="w-7 h-7 rounded-full bg-[#a89068]/10 flex items-center justify-center shrink-0 mt-0.5">
-            <i className="fa-solid fa-location-dot text-[#a89068] text-xs"></i>
+          <div className="w-7 h-7 rounded-full bg-brand/10 flex items-center justify-center shrink-0 mt-0.5">
+            <i className="fa-solid fa-location-dot text-brand text-xs"></i>
           </div>
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-[#a89068] mb-0.5">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-brand mb-0.5">
               Delivering your order to
             </p>
-            <p className="text-xs text-[#2e443c] leading-snug break-words">
+            <p className="text-xs text-ink leading-snug break-words">
               {deliveryAddressFull}
             </p>
           </div>
@@ -516,7 +516,7 @@ const AddressFormModal = ({
             value={searchQuery}
             onChange={e => handleSearch(e.target.value)}
             placeholder="Search area, street, landmark..."
-            className="w-full h-10 bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-9 text-sm text-[#2e443c] focus:border-[#a89068] focus:bg-white outline-none placeholder:text-gray-300 transition-all"
+            className="w-full h-10 bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-9 text-sm text-ink focus:border-brand focus:bg-white outline-none placeholder:text-gray-300 transition-all"
           />
           {searchQuery && (
             <button
@@ -534,7 +534,7 @@ const AddressFormModal = ({
           <div className="absolute left-3 right-3 top-[105%] bg-white border border-gray-200 rounded-xl shadow-xl z-30 max-h-[220px] overflow-y-auto">
             {isSearching ? (
               <div className="p-5 flex items-center justify-center gap-2 text-gray-400">
-                <div className="w-4 h-4 border-2 border-[#a89068] border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin"></div>
                 <span className="text-xs">Searching...</span>
               </div>
             ) : searchResults.length > 0 ? (
@@ -545,9 +545,9 @@ const AddressFormModal = ({
                   onClick={() => handleSelectResult(item)}
                   className="w-full text-left p-3 hover:bg-gray-50 border-b border-gray-100 last:border-0 flex items-start gap-3 group"
                 >
-                  <i className="fa-solid fa-location-dot text-gray-300 group-hover:text-[#a89068] text-xs mt-1 shrink-0 transition-colors"></i>
+                  <i className="fa-solid fa-location-dot text-gray-300 group-hover:text-brand text-xs mt-1 shrink-0 transition-colors"></i>
                   <div className="min-w-0">
-                    <p className="text-sm text-[#2e443c] font-medium truncate group-hover:text-[#a89068] transition-colors">
+                    <p className="text-sm text-ink font-medium truncate group-hover:text-brand transition-colors">
                       {item.structured_formatting?.main_text}
                     </p>
                     <p className="text-[11px] text-gray-400 truncate mt-0.5">
@@ -575,7 +575,7 @@ const AddressFormModal = ({
 
         {/* Center pin */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full pointer-events-none z-10">
-          <i className="fa-solid fa-location-dot text-4xl text-[#a89068] drop-shadow-[0_6px_8px_rgba(0,0,0,0.4)]"></i>
+          <i className="fa-solid fa-location-dot text-4xl text-brand drop-shadow-[0_6px_8px_rgba(0,0,0,0.4)]"></i>
           <div className="w-2 h-1 bg-black/40 rounded-full absolute -bottom-0.5 left-1/2 -translate-x-1/2 blur-[2px]"></div>
         </div>
 
@@ -585,7 +585,7 @@ const AddressFormModal = ({
           onClick={handleLocate}
           disabled={isLocating}
           title="Go to current location"
-          className="absolute bottom-4 right-4 z-10 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center text-[#a89068] hover:bg-[#a89068] hover:text-white transition-all disabled:opacity-60 border border-gray-200"
+          className="absolute bottom-4 right-4 z-10 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center text-brand hover:bg-brand hover:text-white transition-all disabled:opacity-60 border border-gray-200"
         >
           <i className={`fa-solid ${isLocating ? "fa-spinner animate-spin" : "fa-location-crosshairs"} text-sm`}></i>
         </button>
@@ -594,8 +594,8 @@ const AddressFormModal = ({
         {!locationSummary && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[5] px-8">
             <div className="bg-white/90 backdrop-blur-sm p-4 rounded-2xl border border-white/30 text-center shadow-lg">
-              <i className="fa-solid fa-hand-pointer text-xl text-[#a89068] mb-2 animate-bounce"></i>
-              <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-[#a89068] mb-1">Drag to pinpoint</p>
+              <i className="fa-solid fa-hand-pointer text-xl text-brand mb-2 animate-bounce"></i>
+              <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-brand mb-1">Drag to pinpoint</p>
               <p className="text-xs text-gray-500">Move the map to set your exact delivery location</p>
             </div>
           </div>
@@ -632,15 +632,15 @@ const AddressFormModal = ({
         {/* Auto-filled area fields — editable by user */}
         <div className="space-y-3">
           {/* <div className="flex items-center gap-2 mb-1">
-            <i className="fa-solid fa-map-pin text-[#a89068] text-xs"></i>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-[#a89068]">
+            <i className="fa-solid fa-map-pin text-brand text-xs"></i>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-brand">
               Area — auto-filled from map pin, editable
             </p>
             {locationSummary && (
               <button
                 type="button"
                 onClick={() => { setLocationSummary(null); setForm(f => ({ ...f, city: "", state: "", pinCode: "" })); }}
-                className="ml-auto text-[10px] text-[#a89068] underline underline-offset-2"
+                className="ml-auto text-[10px] text-brand underline underline-offset-2"
               >
                 Reset pin
               </button>
@@ -789,11 +789,11 @@ const AddressFormModal = ({
           type="button"
           onClick={handleSubmit}
           disabled={isSubmitting}
-          className="w-full py-4 bg-[#2e443c] text-[#F5DEB3] rounded-xl font-bold text-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-[#1c3026] transition-colors disabled:opacity-60"
+          className="w-full py-4 bg-ink text-white rounded-xl font-bold text-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-ink/90 transition-colors disabled:opacity-60"
         >
           {isSubmitting ? (
             <>
-              <div className="w-4 h-4 border-2 border-[#F5DEB3] border-t-transparent rounded-full animate-spin"></div>
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
               Saving...
             </>
           ) : (
@@ -816,8 +816,8 @@ const AddressFormModal = ({
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
           <div className="flex items-center gap-3">
             <div>
-              <h3 className="font-serif text-[#2e443c] text-lg leading-tight">Set Delivery Address</h3>
-              <p className="text-[10px] text-[#a89068] uppercase tracking-widest font-bold mt-0.5">
+              <h3 className="font-serif text-ink text-lg leading-tight">Set Delivery Address</h3>
+              <p className="text-[10px] text-brand uppercase tracking-widest font-bold mt-0.5">
                 Pin your location, then fill in the details
               </p>
             </div>

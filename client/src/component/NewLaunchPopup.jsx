@@ -35,7 +35,7 @@ const NewLaunchPopup = memo(() => {
         onClick={handleClose}
       ></div>
 
-      <div className="relative w-[85%] max-w-[340px] md:max-w-lg md:w-full bg-[#2e443c] rounded-[1.5rem] md:rounded-[2rem] overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)] group animate-popup border border-white/10">
+      <div className="relative w-[85%] max-w-[340px] md:max-w-lg md:w-full bg-ink rounded-[1.5rem] md:rounded-[2rem] overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)] group animate-popup border border-white/10">
         <button 
           onClick={handleClose}
           className="absolute top-3 right-3 md:top-4 md:right-4 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-all z-20"
@@ -48,9 +48,9 @@ const NewLaunchPopup = memo(() => {
 
           {/* Badge */}
           <div className="flex items-center gap-2 md:gap-3 mb-3 md:mb-4">
-            <span className="h-[1px] w-4 md:w-6 bg-[#F5DEB3]"></span>
+            <span className="h-[1px] w-4 md:w-6 bg-brand"></span>
             <span className="text-[#fafaf9] font-bold tracking-[0.2em] md:tracking-[0.3em] uppercase text-[8px] md:text-[10px]">Launch Offer</span>
-            <span className="h-[1px] w-4 md:w-6 bg-[#F5DEB3]"></span>
+            <span className="h-[1px] w-4 md:w-6 bg-brand"></span>
           </div>
 
           {/* Urgency Timer */}
@@ -65,9 +65,9 @@ const NewLaunchPopup = memo(() => {
                 <div key={item.label} className="flex items-center gap-2 md:gap-3">
                   <div className="flex flex-col items-center">
                     <div className="bg-white/5 backdrop-blur-md rounded-xl p-2 md:p-3 min-w-[50px] md:min-w-[65px] border border-white/10 shadow-inner">
-                      <span className="text-xl md:text-3xl font-bold text-[#F5DEB3] font-mono tracking-tighter">{item.value}</span>
+                      <span className="text-xl md:text-3xl font-bold text-brand font-mono tracking-tighter">{item.value}</span>
                     </div>
-                    <span className="text-[7px] md:text-[9px] uppercase tracking-[0.2em] text-[#F5DEB3]/60 mt-1.5 font-bold">{item.label}</span>
+                    <span className="text-[7px] md:text-[9px] uppercase tracking-[0.2em] text-brand/60 mt-1.5 font-bold">{item.label}</span>
                   </div>
                   {idx < 3 && (
                     <span className="text-xl md:text-3xl font-light text-white/20 self-start mt-1.5 md:mt-2">:</span>
@@ -82,27 +82,27 @@ const NewLaunchPopup = memo(() => {
           </div>
 
           <h2 className="text-3xl md:text-5xl font-serif text-white leading-tight mb-3 md:mb-4">
-            Welcome to <span className="italic text-[#F5DEB3]">UrbanNook</span>
+            Welcome to <span className="italic text-brand">UrbanNook</span>
           </h2>
 
 
           <div className="flex flex-col gap-3 md:gap-4 mb-5 md:mb-8 w-full max-w-sm">
             <p className="text-white/80 text-[10px] md:text-sm font-light leading-relaxed">
               <span className="mr-1.5 md:mr-2 text-sm md:text-base">🚚</span> 
-              <span className="font-medium text-white">FLAT ₹149 SHIPPING</span> ACROSS INDIA
+              <span className="font-medium text-white">DOORSTEP DELIVERY</span> ACROSS INDIA
             </p>
           </div>
 
           <div className="relative overflow-hidden rounded-xl bg-white/5 p-1 mb-4 md:mb-6 w-full">
              <button 
                 onClick={handleNavigate}
-                className="px-5 py-2.5 md:px-6 md:py-3 bg-[#a89068] text-white rounded-lg font-bold uppercase tracking-widest text-[9px] md:text-[10px] transition-all hover:scale-105 hover:bg-[#bfa884] w-full"
+                className="px-5 py-2.5 md:px-6 md:py-3 bg-brand text-white rounded-lg font-bold uppercase tracking-widest text-[9px] md:text-[10px] transition-all hover:scale-105 hover:bg-brandHi w-full"
              >
                Shop Now — Offer Ending Soon
              </button>
           </div>
           
-          <p className="text-[#F5DEB3]/50 text-[7px] md:text-[8px] uppercase tracking-[0.15em] md:tracking-[0.2em]">
+          <p className="text-brand/50 text-[7px] md:text-[8px] uppercase tracking-[0.15em] md:tracking-[0.2em]">
             First order exclusive • UrbanNook Signature
           </p>
         </div>

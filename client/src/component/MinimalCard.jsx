@@ -25,17 +25,17 @@ const MinimalCard = ({ image, alt, title, price, mrp, pricePrefix, badge, onClic
   return (
     <div
       onClick={onClick}
-      className="group relative rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md border border-black/5 transition-shadow duration-300 flex flex-col h-full cursor-pointer"
+      className="gl-pcard group relative rounded-none overflow-hidden bg-white border border-hair flex flex-col h-full cursor-pointer"
     >
-      <div className="relative w-full aspect-square bg-[#f8f8f5] overflow-hidden">
+      <div className="relative w-full aspect-square bg-surface overflow-hidden">
         <img
           src={image || "/placeholder.jpg"}
           alt={alt}
-          className="w-full h-full object-cover mix-blend-multiply transition-transform duration-[1.5s] group-hover:scale-110"
+          className="gl-img w-full h-full object-cover mix-blend-multiply"
         />
         {badge && (
           <span
-            className={`absolute top-2 left-2 z-10 text-[6px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${badge.className}`}
+            className={`absolute top-2 left-2 z-10 gl-lbl text-[8px] px-2 py-0.5 rounded-none ${badge.className}`}
           >
             {badge.label}
           </span>
@@ -53,7 +53,7 @@ const MinimalCard = ({ image, alt, title, price, mrp, pricePrefix, badge, onClic
             text={title || ""}
             capPx={13}
             floorPx={9}
-            className="font-serif text-gray-800 leading-snug text-left w-full"
+            className="font-archivo font-bold text-ink leading-snug text-left w-full"
           />
         </div>
 
@@ -63,14 +63,14 @@ const MinimalCard = ({ image, alt, title, price, mrp, pricePrefix, badge, onClic
         <div className="flex items-start gap-3">
           <span className="whitespace-nowrap">
             {pricePrefix && (
-              <span className="text-[10px] text-gray-500 mr-1">{pricePrefix}</span>
+              <span className="gl-lbl text-[9px] text-faint mr-1">{pricePrefix}</span>
             )}
-            <span className="text-[15px] font-bold text-gray-900">₹{price?.toLocaleString()}</span>
+            <span className="text-[15px] font-extrabold text-ink">₹{price?.toLocaleString()}</span>
           </span>
           {mrp > price && (
             <span className="flex flex-col items-start leading-none whitespace-nowrap">
-              <span className="text-[10px] font-semibold text-[#157a44]">{discountPct}% off</span>
-              <span className="text-[11px] text-gray-400 line-through mt-0.5">₹{mrp?.toLocaleString()}</span>
+              <span className="gl-lbl text-[9px] text-sale">{discountPct}% off</span>
+              <span className="text-[11px] text-faint line-through mt-0.5">₹{mrp?.toLocaleString()}</span>
             </span>
           )}
         </div>

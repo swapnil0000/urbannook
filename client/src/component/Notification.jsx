@@ -36,9 +36,9 @@ const Notification = () => {
       case 'warning':
         return { 
             icon: 'fa-triangle-exclamation', 
-            color: 'text-[#F5DEB3]', 
-            border: 'border-[#F5DEB3]', 
-            glow: 'shadow-[#F5DEB3]/20' 
+            color: 'text-surface',
+            border: 'border-surface',
+            glow: 'shadow-surface/20'
         };
       default:
         return { 
@@ -61,7 +61,7 @@ const Notification = () => {
                 pointer-events-auto
                 relative overflow-hidden
                 min-w-[300px] max-w-sm w-full
-                bg-[#1c3026] text-white
+                bg-ink text-white
                 rounded-xl shadow-2xl ${style.glow}
                 border-l-4 ${style.border}
                 flex flex-col

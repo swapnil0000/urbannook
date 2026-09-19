@@ -87,6 +87,11 @@ import {
   razorpayWebHookController,
   guestCreateOrderController,
 } from "../controller/rp.payment.controller.js";
+import {
+  magicShippingInfoController,
+  magicGetPromotionsController,
+  magicApplyPromotionController,
+} from "../controller/magic.checkout.controller.js";
 
 const userRouter = Router();
 const authLimiter = rateLimit({
@@ -282,6 +287,40 @@ userRouter.post(
   "/rp/webhook",
   bodyParser.raw({ type: "application/json" }),
   razorpayWebHookController,
+);
+
+/* ===============================================================
+   RAZORPAY MAGIC CHECKOUT (1CC) CALLBACKS (PUBLIC – SERVER TO SERVER)
+   ---------------------------------------------------------------
+   Razorpay calls these mid-checkout. Register the URLs in
+   Dashboard → Magic Checkout → Setup & Settings:
+     Checkout Setup → URL for get promotions
+       https://api.urbannook.in/api/v1/magic/promotions
+     Checkout Setup → URL for apply promotions
+       https://api.urbannook.in/api/v1/magic/promotions/apply
+     Shipping Setup → serviceability URL
+       https://api.urbannook.in/api/v1/magic/shipping-info
+
+   ⚠️ RAW body (NOT express.json) — the secret is checked against raw bytes.
+   No authGuardService: authenticated by the per-channel secret instead.
+   Inert until the URLs are configured in the dashboard.
+================================================================ */
+userRouter.post(
+  "/magic/shipping-info",
+  bodyParser.raw({ type: "application/json" }),
+  magicShippingInfoController,
+);
+
+userRouter.post(
+  "/magic/promotions",
+  bodyParser.raw({ type: "application/json" }),
+  magicGetPromotionsController,
+);
+
+userRouter.post(
+  "/magic/promotions/apply",
+  bodyParser.raw({ type: "application/json" }),
+  magicApplyPromotionController,
 );
 
 export default userRouter;

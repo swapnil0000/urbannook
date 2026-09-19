@@ -1031,7 +1031,7 @@ const FreeShippingBanner = ({
               type="button"
               onClick={goToPrevBanner}
               aria-label="Previous suggestion"
-              className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full flex items-center justify-center border border-[#D8D2C5] bg-white/95 text-[#1c3026] shadow hover:bg-white transition-colors"
+              className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full flex items-center justify-center border border-hair bg-white/95 text-ink shadow hover:bg-white transition-colors"
             >
               <i className="fa-solid fa-chevron-left text-[10px]" />
             </button>
@@ -1039,7 +1039,7 @@ const FreeShippingBanner = ({
               type="button"
               onClick={goToNextBanner}
               aria-label="Next suggestion"
-              className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full flex items-center justify-center border border-[#D8D2C5] bg-white/95 text-[#1c3026] shadow hover:bg-white transition-colors"
+              className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full flex items-center justify-center border border-hair bg-white/95 text-ink shadow hover:bg-white transition-colors"
             >
               <i className="fa-solid fa-chevron-right text-[10px]" />
             </button>
@@ -1063,9 +1063,9 @@ const FreeShippingBanner = ({
           before anything else on the card is even read. Separate from the
           green progress panel below so it stays legible/unmissable
           regardless of combo state. bg-[#FAF7F2] */}
-        <div className="relative z-10 overflow-hidden bg-[#E63329] px-4 py-3 flex items-center justify-center gap-2">
+        <div className="relative z-10 overflow-hidden bg-brand px-4 py-3 flex items-center justify-center gap-2">
           <style>{`@keyframes fsbRibbonShine { 0% { transform: translateX(-120%); } 100% { transform: translateX(320%); } }`}</style>
-          <i className="fa-solid fa-bolt text-[10px] text-[#F5DEB3]" />
+          <i className="fa-solid fa-bolt text-[10px] text-paper" />
           <span className="text-[12px] font-extrabold uppercase tracking-[0.16em] text-white">
             {quantityNudge ? "Exclusive Combo Offer" : "Exclusive Combo Offer"}
           </span>
@@ -1079,10 +1079,10 @@ const FreeShippingBanner = ({
           />
         </div>
         {/* Ribbon header */}
-        {/* <div className="flex items-center justify-between gap-3 bg-[#2e443c] px-4 py-3">
+        {/* <div className="flex items-center justify-between gap-3 bg-ink px-4 py-3">
         <div className="flex items-center gap-2.5 min-w-0">
-          <i className="fa-solid fa-truck-fast text-sm text-[#E63329] shrink-0" />
-          <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#EFEAE0] truncate">
+          <i className="fa-solid fa-truck-fast text-sm text-brand shrink-0" />
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-paper truncate">
             {banner.text}
           </p>
         </div>
@@ -1099,17 +1099,17 @@ const FreeShippingBanner = ({
         <div className="px-4 pt-3 text-center">
           {quantityNudge ? (
             <p
-              className="font-semibold tracking-[0.01em] text-[#1c3026] whitespace-nowrap"
+              className="font-semibold tracking-[0.01em] text-ink whitespace-nowrap"
               style={{ fontSize: "clamp(8px, 3vw, 11px)" }}
             >
               Add {quantityNudge.remaining} more &amp; get all{" "}
               {quantityNudge.needed} at{" "}
-              <span className="font-bold uppercase text-[#E63329]">
+              <span className="font-bold uppercase text-brand">
                 ₹{quantityNudgeTotal.toLocaleString()}
               </span>
             </p>
           ) : freeShippingUnlocked ? (
-            <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#1c3026]">
+            <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-ink">
               Free shipping unlocked on this order
             </span>
           ) : added && !sourceInCart ? (
@@ -1118,30 +1118,30 @@ const FreeShippingBanner = ({
             // isn't real yet. Tell them exactly what's missing instead of
             // implying it's already done.
             <>
-              {/* <p className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#1c3026]">
+              {/* <p className="text-[11px] font-bold uppercase tracking-[0.05em] text-ink">
                   One more step!
                 </p> */}
-              <p className="text-[10px] font-semibold text-[#1c3026]/80">
+              <p className="text-[10px] font-semibold text-ink/80">
                 Add {sourceProduct?.productName || "this product"} to your cart
                 to unlock{" "}
-                <span className="font-bold text-[#E63329]">free shipping</span>
+                <span className="font-bold text-brand">free shipping</span>
               </p>
             </>
           ) : genericIsCloser && closestRuleProduct ? (
             // A generic cart rule (e.g. "2+ Lamps") is currently closer to
             // completing than the admin-configured combo above — nudge
             // toward THAT instead, since it's genuinely nearer.
-            <p className="text-[10px] font-semibold text-[#1c3026]/80">
+            <p className="text-[10px] font-semibold text-ink/80">
               Add{" "}
               {ruleEval.closestUnmatchedRule.conditions.find(
                 (c) => c.remaining > 0,
               )?.remaining || 1}{" "}
               more {closestRuleProduct.productName} to unlock{" "}
-              <span className="font-bold text-[#E63329]">free shipping</span>
+              <span className="font-bold text-brand">free shipping</span>
             </p>
           ) : (
             <>
-              {/* <p className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#1c3026]">
+              {/* <p className="text-[11px] font-bold uppercase tracking-[0.05em] text-ink">
                 You're almost there!
               </p> */}
               {/* One level lighter than the other headline states
@@ -1153,16 +1153,16 @@ const FreeShippingBanner = ({
                     (e.g. iPhone SE) so it fits without wrapping, and caps at
                     11px on normal widths. */}
               <p
-                className="font-semibold tracking-[0.01em] text-[#1c3026] whitespace-nowrap"
+                className="font-semibold tracking-[0.01em] text-ink whitespace-nowrap"
                 style={{ fontSize: "clamp(8px, 3vw, 11px)" }}
               >
                 Add {recommendedProduct.productName} &amp; unlock{" "}
-                <span className="font-bold uppercase text-[#E63329]">
+                <span className="font-bold uppercase text-brand">
                   free shipping
                 </span>
               </p>
 
-              {/* <p className="text-[11px] font-semibold text-[#1c3026]/80">
+              {/* <p className="text-[11px] font-semibold text-ink/80">
                   Add {recommendedProduct.productName} & unlock free shipping
                 </p> */}
             </>
@@ -1174,10 +1174,10 @@ const FreeShippingBanner = ({
           <button
             onClick={goToProduct}
             title={`View ${recommendedProduct.productName}`}
-            className="relative shrink-0 w-24 h-24 rounded-xl overflow-hidden border border-[#D8D2C5] bg-white"
+            className="relative shrink-0 w-24 h-24 rounded-xl overflow-hidden border border-hair bg-white"
           >
             {discountPercent > 0 && (
-              <span className="absolute top-1.5 left-1.5 z-10 bg-[#E63329] text-white text-[10px] font-bold uppercase px-1.5 py-0.5">
+              <span className="absolute top-1.5 left-1.5 z-10 bg-brand text-white text-[10px] font-bold uppercase px-1.5 py-0.5">
                 −{discountPercent}%
               </span>
             )}
@@ -1226,7 +1226,7 @@ const FreeShippingBanner = ({
                       setVariantMenuOpen((v) => !v)
                     }
                     disabled={(added || !!banner?.recommendedVariantName) && !quantityNudge}
-                    className="w-full flex items-center justify-between gap-1 rounded-lg border border-black/15 bg-white px-2.5 py-1 text-xs font-bold text-black disabled:opacity-60 disabled:cursor-default focus:outline-none focus:ring-1 focus:ring-[#157a44] focus:border-[#157a44]"
+                    className="w-full flex items-center justify-between gap-1 rounded-lg border border-black/15 bg-white px-2.5 py-1 text-xs font-bold text-black disabled:opacity-60 disabled:cursor-default focus:outline-none focus:ring-1 focus:ring-save focus:border-save"
                   >
                     <span className="flex items-center gap-1.5 min-w-0">
                       <span
@@ -1260,7 +1260,7 @@ const FreeShippingBanner = ({
                         `}</style>
                         <div
                           ref={variantMenuPortalRef}
-                          className="fsb-variant-scroll fixed z-[10050] rounded-lg border border-[#157a44]/30 bg-[#FAF7F0] shadow-lg overflow-y-scroll max-h-48"
+                          className="fsb-variant-scroll fixed z-[10050] rounded-lg border border-save/30 bg-[#FAF7F0] shadow-lg overflow-y-scroll max-h-48"
                           style={{
                             top: variantMenuPos.top,
                             left: variantMenuPos.left,
@@ -1280,8 +1280,8 @@ const FreeShippingBanner = ({
                                 }}
                                 className={`w-full flex items-center gap-1.5 text-left px-2.5 py-1.5 text-xs font-bold transition-colors ${
                                   isSelected
-                                    ? "bg-[#d6f2dd] text-[#157a44]"
-                                    : "text-[#1c3026] hover:bg-[#d6f2dd] hover:text-[#157a44]"
+                                    ? "bg-[#d6f2dd] text-save"
+                                    : "text-ink hover:bg-[#d6f2dd] hover:text-save"
                                 }`}
                               >
                                 <span
@@ -1328,13 +1328,13 @@ const FreeShippingBanner = ({
                   );
                   return (
                     <>
-                      <span className="text-lg font-bold tabular-nums text-[#E63329]">
+                      <span className="text-lg font-bold tabular-nums text-brand">
                         ₹{lineDiscounted.toLocaleString()}
                       </span>
                       <span className="text-xs text-gray-400 line-through tabular-nums">
                         ₹{lineDisplayPrice.toLocaleString()}
                       </span>
-                      <span className="text-[10px] font-bold uppercase rounded-full bg-[#157a44] text-white px-1.5 py-0.5">
+                      <span className="text-[10px] font-bold uppercase rounded-full bg-save text-white px-1.5 py-0.5">
                         {rulePercent}% OFF
                       </span>
                     </>
@@ -1349,7 +1349,7 @@ const FreeShippingBanner = ({
                   const lineMax = maxVariantPrice * lineQty;
                   return (
                     <>
-                      <span className="text-lg font-bold tabular-nums text-[#E63329]">
+                      <span className="text-lg font-bold tabular-nums text-brand">
                         ₹{lineDisplayPrice.toLocaleString()}
                       </span>
                       <span className="text-xs text-gray-400 line-through tabular-nums">
@@ -1374,7 +1374,7 @@ const FreeShippingBanner = ({
                 const fakeMrpLine = Math.round(displayPrice / 0.75) * lineQty;
                 return (
                   <>
-                    <span className="text-lg font-bold tabular-nums text-[#E63329]">
+                    <span className="text-lg font-bold tabular-nums text-brand">
                       ₹{lineDisplayPrice.toLocaleString()}
                     </span>
                     <span className="text-xs text-gray-400 line-through tabular-nums">
@@ -1722,7 +1722,7 @@ const FreeShippingBanner = ({
             // their own fixed ~900ms timeline from the click.
             <button
               disabled
-              className="relative w-full py-3.5 rounded-full overflow-hidden flex items-center justify-center gap-2.5 text-sm font-extrabold uppercase tracking-wide bg-[#f5deb3] text-[#1c3026] cursor-wait"
+              className="relative w-full py-3.5 rounded-full overflow-hidden flex items-center justify-center gap-2.5 text-sm font-extrabold uppercase tracking-wide bg-paper text-ink cursor-wait"
             >
               <style>{`@keyframes fsbLoadSweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }`}</style>
               <span
@@ -1741,32 +1741,32 @@ const FreeShippingBanner = ({
             </button>
           ) : added ? (
             <div className="flex items-center gap-2">
-              <div className="flex-1 h-[50px] flex items-center justify-center rounded-full text-[11px] font-extrabold uppercase tracking-[0.1em] text-center bg-[#f5deb3] text-[#1c3026] border border-[#ffce64]">
+              <div className="flex-1 h-[50px] flex items-center justify-center rounded-full text-[11px] font-extrabold uppercase tracking-[0.1em] text-center bg-paper text-ink border border-[#ffce64]">
                 {quantityNudge ? (
                   <>
-                    <i className="fa-solid fa-circle-check mr-1.5 text-[#E63329]" />{" "}
+                    <i className="fa-solid fa-circle-check mr-1.5 text-brand" />{" "}
                     Added to Cart
                   </>
                 ) : freeShippingUnlocked ? (
                   <>
-                    <i className="fa-solid fa-circle-check mr-1.5 text-[#E63329]" />{" "}
+                    <i className="fa-solid fa-circle-check mr-1.5 text-brand" />{" "}
                     Free Shipping Unlocked!
                   </>
                 ) : (
                   <>
-                    <i className="fa-solid fa-circle-check mr-1.5 text-[#E63329]" />{" "}
+                    <i className="fa-solid fa-circle-check mr-1.5 text-brand" />{" "}
                     Added to Cart
                   </>
                 )}
               </div>
 
               {showQuantityStepper ? (
-                <div className="shrink-0 flex items-center gap-3 rounded-xl border border-[#D8D2C5] px-3 h-[52px] bg-white">
+                <div className="shrink-0 flex items-center gap-3 rounded-xl border border-hair px-3 h-[52px] bg-white">
                   <button
                     onClick={handleDecrement}
                     disabled={isUpdatingQty}
                     title="Decrease quantity"
-                    className="disabled:opacity-50 text-gray-500 hover:text-[#E63329]"
+                    className="disabled:opacity-50 text-gray-500 hover:text-brand"
                   >
                     <i className="fa-solid fa-minus text-[10px]" />
                   </button>
@@ -1786,23 +1786,23 @@ const FreeShippingBanner = ({
                 // Quantity stepper here too (was a remove-only X) — decrementing
                 // to 1 and pressing minus again still removes the line, via the
                 // existing handleDecrement → handleRemove fallback below.
-                <div className="shrink-0 flex items-center gap-3 rounded-full border border-[#ffce64] px-3 h-[50px] bg-[#f5deb3]">
+                <div className="shrink-0 flex items-center gap-3 rounded-full border border-[#ffce64] px-3 h-[50px] bg-paper">
                   <button
                     onClick={handleDecrement}
                     disabled={isUpdatingQty}
                     title="Decrease quantity"
-                    className="disabled:opacity-50 text-[#1c3026]/60 hover:text-[#E63329]"
+                    className="disabled:opacity-50 text-ink/60 hover:text-brand"
                   >
                     <i className="fa-solid fa-minus text-[10px]" />
                   </button>
-                  <span className="text-xs font-bold w-3 text-center text-[#1c3026]">
+                  <span className="text-xs font-bold w-3 text-center text-ink">
                     {itemQty(cartMatch?.quantity) || 1}
                   </span>
                   <button
                     onClick={handleIncrement}
                     disabled={isUpdatingQty}
                     title="Increase quantity"
-                    className="disabled:opacity-50 text-[#1c3026]/60 hover:text-[#1c3026]"
+                    className="disabled:opacity-50 text-ink/60 hover:text-ink"
                   >
                     <i className="fa-solid fa-plus text-[10px]" />
                   </button>
@@ -1818,7 +1818,7 @@ const FreeShippingBanner = ({
               // appeared and the tap had no visual feedback at all. `active:`
               // fires on touch AND on mouse-down, so the press reads the same
               // everywhere — instant dark-brown fill, no transition delay.
-              className="w-full py-3.5 rounded-full flex items-center justify-center gap-2.5 text-sm font-medium uppercase tracking-wide disabled:opacity-50 bg-[#f5deb3] text-[#1c3026] active:bg-[#4a2f1b] active:text-[#f5deb3] active:scale-[0.98] transition-[background-color,color,transform] duration-100"
+              className="w-full py-3.5 rounded-full flex items-center justify-center gap-2.5 text-sm font-medium uppercase tracking-wide disabled:opacity-50 bg-paper text-ink active:bg-[#4a2f1b] active:text-paper active:scale-[0.98] transition-[background-color,color,transform] duration-100"
             >
               <span className="flex items-center justify-center gap-2.5">
                 {isActiveVariantOOS ? (
@@ -1879,8 +1879,8 @@ const FreeShippingBanner = ({
               <div className="mx-auto w-10 h-1 rounded-full bg-black/15 mb-4" />
 
               <div className="flex items-start gap-3">
-                <div className="shrink-0 w-11 h-11 rounded-full bg-[#E63329]/10 flex items-center justify-center">
-                  <i className="fa-solid fa-truck-fast text-[#E63329] text-sm" />
+                <div className="shrink-0 w-11 h-11 rounded-full bg-brand/10 flex items-center justify-center">
+                  <i className="fa-solid fa-truck-fast text-brand text-sm" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-extrabold uppercase tracking-wide text-black">
@@ -1908,7 +1908,7 @@ const FreeShippingBanner = ({
                 <button
                   onClick={handleAddSourceToCart}
                   disabled={sourceAdding}
-                  className="flex-1 py-3 rounded-xl text-[11px] font-extrabold uppercase tracking-[0.1em] text-white bg-[#1c3026] active:bg-[#4a2f1b] disabled:opacity-70 transition-colors duration-100"
+                  className="flex-1 py-3 rounded-xl text-[11px] font-extrabold uppercase tracking-[0.1em] text-white bg-ink active:bg-[#4a2f1b] disabled:opacity-70 transition-colors duration-100"
                 >
                   {sourceAdding ? (
                     <>

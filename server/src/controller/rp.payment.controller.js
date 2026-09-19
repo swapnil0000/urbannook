@@ -1,4 +1,7 @@
-import { razorpayCreateOrderService } from "../services/rp.payement.service.js";
+import {
+  razorpayCreateOrderService,
+  razorpayFetchOrderService,
+} from "../services/rp.payement.service.js";
 import { ApiRes } from "../utils/index.js";
 import User from "../model/user.model.js";
 import Order from "../model/order.model.js";
@@ -10,6 +13,12 @@ import env from "../config/envConfigSetup.js";
 import Coupon from "../model/coupon.model.js";
 import CouponUsage from "../model/couponUsage.model.js";
 import { backfillUserProfileFromCheckout } from "../services/user.profile.service.js";
+import {
+  isMagicCheckoutEnabled,
+  buildMagicLineItems,
+  lineItemsTotalPaise,
+  toOrderDeliveryAddress,
+} from "../services/magic.checkout.service.js";
 import { sendOrderConfirmationWhatsApp } from "../services/whatsapp.send.service.js";
 import {
   sendOrderConfirmation,
@@ -181,7 +190,17 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   if (!items || !Array.isArray(items) || items.length === 0) {
     throw new ValidationError("Items are required");
   }
-  if (!addressId && !clientAddress?.formattedAddress?.trim()) throw new ValidationError("Delivery address is required");
+
+  // Magic Checkout (1CC): Razorpay collects the address inside its own modal,
+  // so there is none to validate here and no pincode to rate shipping against.
+  // Shipping comes from the /magic/shipping-info callback and the address lands
+  // on the order via the webhook. Magic is PREPAID-only — COD keeps the
+  // existing flow with its 2x-shipping advance.
+  const isMagic = isMagicCheckoutEnabled() && req.body?.magic === true;
+
+  if (!isMagic && !addressId && !clientAddress?.formattedAddress?.trim()) {
+    throw new ValidationError("Delivery address is required");
+  }
 
   const user = await User.findOne({ userId }).lean();
   const stripCountryCode = (mobile) => {
@@ -195,9 +214,9 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     }
     return trimmed;
   };
-  const selectedAddr = await Address.findOne({ addressId }).lean();
+  const selectedAddr = isMagic ? null : await Address.findOne({ addressId }).lean();
 
-  if (!selectedAddr && !clientAddress) {
+  if (!isMagic && !selectedAddr && !clientAddress) {
     throw new ValidationError("Selected address not found");
   }
 
@@ -209,8 +228,10 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     receiverMobile || finalSenderMobile,
   );
 
-  // Validate sender mobile (required)
-  if (!finalSenderMobile || !/^[0-9]{10}$/.test(finalSenderMobile)) {
+  // Validate sender mobile (required). Magic collects the number in its own
+  // modal, so a logged-in user without one on file is still allowed through —
+  // the webhook writes the verified number onto the order.
+  if (!isMagic && (!finalSenderMobile || !/^[0-9]{10}$/.test(finalSenderMobile))) {
     throw new ValidationError("Valid sender mobile number is required");
   }
 
@@ -418,23 +439,30 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       0,
   };
 
-  // Re-calculate shipping to get enriched data (type, weight, boxes)
-  const shippingResult = await getShippingRateOrFallback({
-    pincode: deliveryAddressSnapshot.pinCode,
-    paymentType: reqPaymentMethod === "COD" ? "COD" : "PREPAID",
-    cartItems: items.map(i => ({
-      productId: i.productId,
-      quantity: i.quantity,
-      price: orderItems.find(oi => oi.productId === i.productId)?.productSnapshot.priceAtPurchase
-    }))
-  });
+  // Re-calculate shipping to get enriched data (type, weight, boxes).
+  // Magic has no pincode at this point — Razorpay rates the address through the
+  // /magic/shipping-info callback and adds shipping_fee to the order itself, so
+  // shipping must stay OUT of the amount we create the order with.
+  const shippingResult = isMagic
+    ? null
+    : await getShippingRateOrFallback({
+        pincode: deliveryAddressSnapshot.pinCode,
+        paymentType: reqPaymentMethod === "COD" ? "COD" : "PREPAID",
+        cartItems: items.map(i => ({
+          productId: i.productId,
+          quantity: i.quantity,
+          price: orderItems.find(oi => oi.productId === i.productId)?.productSnapshot.priceAtPurchase
+        }))
+      });
 
   // realShippingAmount = actual carrier rate — always used as the basis for
   // the COD upfront advance (a fraud/RTO-risk deposit, not a shipping fee).
   // chargedShippingAmount = what the customer's order total reflects — 0 when
   // the free-shipping offer applies. These must NOT be the same variable:
   // zeroing shipping for the customer should not also zero the COD advance.
-  const realShippingAmount = shippingResult?.total_charges || summary?.shipping || 179;
+  const realShippingAmount = isMagic
+    ? 0 // added by Razorpay from the serviceability callback, not by us
+    : (shippingResult?.total_charges || summary?.shipping || 179);
 
   // Recompute subtotal from actual order items — authoritative, not from cart snapshot.
   // Computed AFTER the cart-rule discount loop above has already reduced any
@@ -633,7 +661,12 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     console.log(`[Coupon:PaymentRecheck] ✅ PASSED — couponCodeId=${couponCodeId} discountAmount=₹${discountAmount} isInternalTestOrder=${isInternalTestOrder}`);
   }
 
-  finalAmount = isInternalTestOrder ? 1 : Math.max(subtotal + giftWrapAmount + chargedShippingAmount - discountAmount, 0);
+  // Magic applies coupons inside its own modal via /magic/promotions/apply, so
+  // a cart-applied discount must NOT also be baked into the order amount here —
+  // that would discount the order twice.
+  const orderDiscountAmount = isMagic ? 0 : discountAmount;
+
+  finalAmount = isInternalTestOrder ? 1 : Math.max(subtotal + giftWrapAmount + chargedShippingAmount - orderDiscountAmount, 0);
 
   // Sync shipping in snapshots — customer-facing amount (0 when free-shipping offer applies)
   orderItems.forEach(i => { i.productSnapshot.shipping = String(chargedShippingAmount); });
@@ -642,7 +675,9 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   // deposit — this must stay based on realShippingAmount even when the order
   // itself has free shipping, otherwise a free-shipping COD order collects
   // zero advance and loses its anti-fraud protection entirely.
-  const isCOD = reqPaymentMethod === "COD";
+  // Magic is prepaid-only — its serviceability callback always reports cod:false,
+  // so a COD request can never reach this path as a Magic order.
+  const isCOD = !isMagic && reqPaymentMethod === "COD";
   const codPartialAmount = isCOD ? Math.min(Math.ceil(realShippingAmount) * 2, Math.ceil(finalAmount)) : 0;
   const codRemainingAmount = isCOD ? Math.max(0, Math.ceil(finalAmount) - codPartialAmount) : 0;
   const razorpayChargeAmount = isCOD ? codPartialAmount : finalAmount;
@@ -650,9 +685,42 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   // returned to the client/stored below, or Razorpay Checkout rejects it as a mismatch.
   const razorpayChargeAmountPaise = Math.ceil(razorpayChargeAmount) * 100;
 
+  // An order only counts as a Magic order if it carries line_items — that is
+  // what switches Razorpay into the 1CC flow, not a boolean flag.
+  let magicOrderOptions = {};
+  if (isMagic) {
+    const lineItems = buildMagicLineItems(orderItems);
+
+    // Gift wrap is part of the order amount, so it has to appear as a line item
+    // too — Razorpay reconciles amount against line_items_total and would
+    // otherwise reject the order for the gift-wrap difference.
+    if (giftWrapSelected && giftWrapAmount > 0) {
+      const giftWrapPaise = Math.round(giftWrapAmount * 100);
+      lineItems.push({
+        type: "e-commerce",
+        sku: "gift-wrap",
+        price: giftWrapPaise,
+        offer_price: giftWrapPaise,
+        tax_amount: 0,
+        quantity: 1,
+        name: giftWrapConfig.title || "Gift Wrap",
+        description: "Gift wrapping",
+      });
+    }
+
+    magicOrderOptions = {
+      line_items: lineItems,
+      line_items_total: lineItemsTotalPaise(lineItems),
+    };
+    console.log(
+      `[MAGIC][order-create] ${lineItems.length} line item(s), total ₹${magicOrderOptions.line_items_total / 100}, amount ₹${razorpayChargeAmount}`,
+    );
+  }
+
   const razorpayOrder = await razorpayCreateOrderService(
     razorpayChargeAmountPaise,
     "INR",
+    magicOrderOptions,
   );
 
   // Checkout is where a WhatsApp-login user first tells us their real name and
@@ -693,6 +761,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     deliveryAddress: deliveryAddressSnapshot,
     payment: { razorpayOrderId: razorpayOrder?.data?.id },
     status: "CREATED",
+    isMagicOrder: isMagic,
     paymentMethod: isCOD ? "COD" : "PREPAID",
     codDetails: isCOD ? { partialAmountPaid: codPartialAmount, remainingAmount: codRemainingAmount } : undefined,
     coupon: {
@@ -760,6 +829,46 @@ const razorpayWebHookController = async (req, res) => {
           "payment.razorpayOrderId": razorpayOrderId,
         });
         if (!order) break;
+
+        // ── Magic Checkout: the address only exists now ────────────────────
+        // Razorpay collected it in its own modal, so pull it onto the order
+        // BEFORE anything downstream (emails, ShipMozo, order confirmation)
+        // reads deliveryAddress. Also picks up the shipping fee Razorpay added
+        // from our serviceability callback.
+        if (order.isMagicOrder && !order.deliveryAddress?.pinCode) {
+          const rpOrder = await razorpayFetchOrderService(razorpayOrderId);
+          const magicAddress = toOrderDeliveryAddress(rpOrder?.customer_details);
+
+          if (magicAddress) {
+            order.deliveryAddress = magicAddress;
+            order.userName = magicAddress.fullName || order.userName;
+            order.userMobile = magicAddress.mobileNumber || order.userMobile;
+            order.senderMobile = magicAddress.mobileNumber || order.senderMobile;
+            order.receiverMobile = magicAddress.mobileNumber || order.receiverMobile;
+
+            const email = rpOrder?.customer_details?.email;
+            if (email && !order.userEmail) order.userEmail = email;
+
+            // Razorpay adds shipping_fee (from /magic/shipping-info) and
+            // subtracts any promotion, then re-states the order amount. Trust
+            // its numbers — they are what the customer actually paid.
+            const shippingFeeRupees = Number(rpOrder?.shipping_fee || 0) / 100;
+            if (shippingFeeRupees > 0) {
+              order.shippingInfo = { ...(order.shippingInfo?.toObject?.() || order.shippingInfo || {}), amount: shippingFeeRupees };
+            }
+            const paidRupees = Number(payment.amount || 0) / 100;
+            if (paidRupees > 0) order.amount = Math.ceil(paidRupees);
+
+            await order.save();
+            console.log(
+              `[MAGIC][webhook] address captured for ${razorpayOrderId} — pin ${magicAddress.pinCode}, shipping ₹${shippingFeeRupees}, paid ₹${paidRupees}`,
+            );
+          } else {
+            console.error(
+              `[MAGIC][webhook] no customer_details on ${razorpayOrderId} — order has NO address, fulfilment will fail`,
+            );
+          }
+        }
 
         // idempotent update
         if (order.status !== "PAID") {
@@ -1183,8 +1292,18 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   if (!/^[0-9]{10}$/.test(cleanMobile)) throw new ValidationError("Valid 10-digit mobile number is required");
 
   if (!items || !Array.isArray(items) || items.length === 0) throw new ValidationError("Items are required");
-  if (!deliveryAddress?.formattedAddress?.trim()) throw new ValidationError("Delivery address is required");
-  if (!deliveryAddress?.pinCode) throw new ValidationError("Pincode is required");
+
+  // Magic Checkout (1CC): Razorpay collects the address in its own modal, so
+  // there is none to validate and no pincode to rate shipping against. Shipping
+  // comes from the /magic/shipping-info callback and the address lands on the
+  // order via the webhook. Guests are the biggest win here — they have no saved
+  // address, so Magic's address network does the most work for them.
+  const isMagic = isMagicCheckoutEnabled() && req.body?.magic === true;
+
+  if (!isMagic) {
+    if (!deliveryAddress?.formattedAddress?.trim()) throw new ValidationError("Delivery address is required");
+    if (!deliveryAddress?.pinCode) throw new ValidationError("Pincode is required");
+  }
 
   const productIds = [...new Set(items.map((i) => i.productId))];
   const products = await Product.find({ productId: { $in: productIds }, productStatus: "in_stock" });
@@ -1258,12 +1377,17 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   // inline during the map above — mirrors the authenticated-user path.
   const subtotal = orderItems.reduce((s, i) => s + i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity, 0);
 
-  const shippingResult = await getShippingRateOrFallback({
-    pincode: deliveryAddress.pinCode,
-    paymentType: reqPaymentMethod === "COD" ? "COD" : "PREPAID",
-    cartItems: rawItemsForShipping
-  });
-  const realShippingAmount = shippingResult?.total_charges || 179;
+  // Magic has no pincode yet — Razorpay rates the address through
+  // /magic/shipping-info and adds shipping_fee to the order itself, so shipping
+  // must stay OUT of the amount we create the order with.
+  const shippingResult = isMagic
+    ? null
+    : await getShippingRateOrFallback({
+        pincode: deliveryAddress.pinCode,
+        paymentType: reqPaymentMethod === "COD" ? "COD" : "PREPAID",
+        cartItems: rawItemsForShipping
+      });
+  const realShippingAmount = isMagic ? 0 : (shippingResult?.total_charges || 179);
   // Free shipping unlocks via ANY of: the combo-banner offer (source +
   // recommended product both present), any active generic cart rule whose
   // effects include free_shipping (e.g. "2+ Lamps"), OR the cart subtotal
@@ -1390,14 +1514,19 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     console.log(`[Coupon:Guest] Applied "${cleanCode}" — discount ₹${discountAmount} on subtotal ₹${subtotal}`);
   }
 
-  const finalAmount = isInternalTestOrder ? 1 : Math.max(subtotal + giftWrapAmount + chargedShippingAmount - discountAmount, 0);
+  // Magic applies coupons inside its own modal via /magic/promotions/apply, so a
+  // pre-applied discount must not also be baked into the order amount here.
+  const orderDiscountAmount = isMagic ? 0 : discountAmount;
+
+  const finalAmount = isInternalTestOrder ? 1 : Math.max(subtotal + giftWrapAmount + chargedShippingAmount - orderDiscountAmount, 0);
 
   // Update orderItems with shipping value now that it's calculated — customer-facing amount
   orderItems.forEach(i => { i.productSnapshot.shipping = String(chargedShippingAmount); });
 
   // COD: charge 2x the REAL shipping cost upfront via Razorpay as an RTO/fraud
   // deposit — stays based on realShippingAmount even on free-shipping orders.
-  const isCOD = reqPaymentMethod === "COD";
+  // Magic is prepaid-only — its serviceability callback always reports cod:false.
+  const isCOD = !isMagic && reqPaymentMethod === "COD";
   const codPartialAmount = isCOD ? Math.min(Math.ceil(realShippingAmount) * 2, Math.ceil(finalAmount)) : 0;
   const codRemainingAmount = isCOD ? Math.max(0, Math.ceil(finalAmount) - codPartialAmount) : 0;
   const razorpayChargeAmount = isCOD ? codPartialAmount : finalAmount;
@@ -1405,7 +1534,37 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   // returned to the client/stored below, or Razorpay Checkout rejects it as a mismatch.
   const razorpayChargeAmountPaise = Math.ceil(razorpayChargeAmount) * 100;
 
-  const razorpayOrder = await razorpayCreateOrderService(razorpayChargeAmountPaise, "INR");
+  // line_items is what makes Razorpay treat this as a 1CC order.
+  let magicOrderOptions = {};
+  if (isMagic) {
+    const lineItems = buildMagicLineItems(orderItems);
+    if (giftWrapSelected && giftWrapAmount > 0) {
+      const giftWrapPaise = Math.round(giftWrapAmount * 100);
+      lineItems.push({
+        type: "e-commerce",
+        sku: "gift-wrap",
+        price: giftWrapPaise,
+        offer_price: giftWrapPaise,
+        tax_amount: 0,
+        quantity: 1,
+        name: giftWrapConfig.title || "Gift Wrap",
+        description: "Gift wrapping",
+      });
+    }
+    magicOrderOptions = {
+      line_items: lineItems,
+      line_items_total: lineItemsTotalPaise(lineItems),
+    };
+    console.log(
+      `[MAGIC][order-create][guest] ${lineItems.length} line item(s), total ₹${magicOrderOptions.line_items_total / 100}, amount ₹${razorpayChargeAmount}`,
+    );
+  }
+
+  const razorpayOrder = await razorpayCreateOrderService(
+    razorpayChargeAmountPaise,
+    "INR",
+    magicOrderOptions,
+  );
 
   const order = await Order.create({
     orderId: uuidv7(),
@@ -1435,19 +1594,22 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     },
     senderMobile: cleanMobile,
     receiverMobile: cleanMobile,
+    // On the Magic path deliveryAddress is absent — the webhook fills this in
+    // from Razorpay's customer_details once payment succeeds.
     deliveryAddress: {
       fullName: guestInfo.name.trim(),
       mobileNumber: cleanMobile,
-      formattedAddress: deliveryAddress.formattedAddress || "",
-      deliveryAddressFull: deliveryAddress.deliveryAddressFull || deliveryAddress.formattedAddress || "",
-      pinCode: deliveryAddress.pinCode ? parseInt(String(deliveryAddress.pinCode), 10) : null,
-      landmark: deliveryAddress.landmark || "",
-      flatOrFloorNumber: deliveryAddress.flatOrFloorNumber || "",
-      lat: deliveryAddress.lat || 0,
-      long: deliveryAddress.long || 0,
+      formattedAddress: deliveryAddress?.formattedAddress || "",
+      deliveryAddressFull: deliveryAddress?.deliveryAddressFull || deliveryAddress?.formattedAddress || "",
+      pinCode: deliveryAddress?.pinCode ? parseInt(String(deliveryAddress.pinCode), 10) : null,
+      landmark: deliveryAddress?.landmark || "",
+      flatOrFloorNumber: deliveryAddress?.flatOrFloorNumber || "",
+      lat: deliveryAddress?.lat || 0,
+      long: deliveryAddress?.long || 0,
     },
     payment: { razorpayOrderId: razorpayOrder?.data?.id },
     status: "CREATED",
+    isMagicOrder: isMagic,
     paymentMethod: isCOD ? "COD" : "PREPAID",
     codDetails: isCOD ? { partialAmountPaid: codPartialAmount, remainingAmount: codRemainingAmount } : undefined,
     isGuestOrder: true,

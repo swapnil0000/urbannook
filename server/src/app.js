@@ -20,6 +20,7 @@ import {
   metaCapiRouter,
   adminAnalyticsRouter,
   freeShippingOfferRouter,
+  passkeyRouter,
   cartRuleRouter,
   offerLeadRouter,
   offerRouter,
@@ -174,9 +175,18 @@ app.use(
 /* Health Route */
 app.use("/health", healthRouter);
 
-/*Explicity for webhook because it requires rp webhook requires raw not json */
+/* Explicity for webhook because it requires rp webhook requires raw not json.
+   The Magic Checkout (1CC) callbacks need the same treatment — their secret is
+   verified against the raw bytes, which express.json() would consume. */
+const RAW_BODY_PATHS = new Set([
+  "/api/v1/rp/webhook",
+  "/api/v1/magic/shipping-info",
+  "/api/v1/magic/promotions",
+  "/api/v1/magic/promotions/apply",
+]);
+
 app.use("/api/v1", (req, res, next) => {
-  if (req.originalUrl === "/api/v1/rp/webhook") {
+  if (RAW_BODY_PATHS.has(req.originalUrl.split("?")[0])) {
     next();
   } else {
     express.json()(req, res, next);
@@ -220,6 +230,7 @@ app.use(
   metaCapiRouter,
   adminAnalyticsRouter,
   freeShippingOfferRouter,
+  passkeyRouter,
   cartRuleRouter,
   offerLeadRouter,
   offerRouter,
