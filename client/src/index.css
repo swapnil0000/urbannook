@@ -593,14 +593,12 @@
 .gl-pcard:hover .gl-img{transform:scale(1.04)}
 .gl-img2{opacity:0;transition:opacity .5s}
 .gl-pcard:hover .gl-img2{opacity:1}
-.gl-qa{transform:translateY(105%);opacity:0;transition:transform .32s cubic-bezier(.2,.7,.2,1),opacity .3s}
-.gl-pcard:hover .gl-qa{transform:none;opacity:1}
 .gl-hscroll{scrollbar-width:none}.gl-hscroll::-webkit-scrollbar{display:none}
 .gl-swatch.on{outline:2px solid rgb(var(--gl-brand));outline-offset:2px}
 .gl-press{transition:transform .18s ease}.gl-press:active{transform:scale(.97)}
 @media(max-width:767px){ body{ padding-bottom:4rem } }
 @media(prefers-reduced-motion:reduce){
-  .gl-pcard,.gl-img,.gl-img2,.gl-qa{transition:none!important;transform:none!important}
+  .gl-pcard,.gl-img,.gl-img2{transition:none!important;transform:none!important}
 }
 
 /* ============================================================
@@ -717,7 +715,13 @@
     right: 0;
     bottom: 0;
     z-index: 30;
-    max-height: 85vh;
+    /* Stop short of the sticky 4rem header instead of sliding up behind it.
+       `vh` counts the area hidden behind mobile browser chrome, so a plain 85vh
+       reaches past the header on short screens and the header (z-50) then paints
+       over the top of the sheet — the grab handle and first card disappear.
+       `dvh` tracks the visible viewport; the vh line above is the fallback. */
+    max-height: calc(100vh - 5rem);
+    max-height: calc(100dvh - 5rem);
     overflow-y: auto;
     background: #ffffff;
     border-top-left-radius: 1.5rem !important;

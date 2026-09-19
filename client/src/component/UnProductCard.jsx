@@ -1,8 +1,6 @@
-import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import WishlistButton from './WishlistButton';
-import { addItem } from '../store/slices/cartSlice';
-import { trackSelectItem, trackAddToCart } from '../utils/analytics';
+import { trackSelectItem } from '../utils/analytics';
 
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
 const firstVariant = (p) => p?.variantDetails?.[0] || {};
@@ -23,8 +21,13 @@ const badgeOf = (p) => {
 };
 
 /**
- * GullyLabs-style product card — real data, hover 2nd image, quick-add
- * variants, wishlist.
+ * GullyLabs-style product card — real data, hover 2nd image, wishlist.
+ *
+ * The whole card is one tap target. It deliberately carries no quick-add
+ * variant strip: that overlay sat over the bottom of the image and stopped
+ * propagation, so on touch the first tap only triggered :hover, slid the strip
+ * in and was swallowed — the card looked unclickable. Adding to cart happens on
+ * the variant page the card links to.
  *
  * `href`, `badge` and `showWishlist` exist so a caller can reuse this exact
  * card for something that is not a whole product — the PDP's "Explore other
@@ -43,11 +46,9 @@ const UnProductCard = ({
   showWishlist = true,
 }) => {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
   const v = firstVariant(p);
   const badge = badgeOverride !== undefined ? badgeOverride : badgeOf(p);
   const img2 = secondImg(p);
-  const variants = (p?.variantDetails || []).slice(0, 5);
   // Struck MRP + % off, same source of truth as ProductCard: the first
   // variant's own variantMrp (never a synthesised markup).
   const price = Number(p?.effectivePrice ?? v.variantPrice ?? 0);
@@ -56,14 +57,6 @@ const UnProductCard = ({
   const go = () => {
     trackSelectItem?.({ itemId: p.productId, itemName: p.productName, itemVariant: v.variantName || '', price: v.variantPrice || 0, listId, listName, index });
     navigate(href || productHref(p));
-  };
-  const addVariant = (variant, e) => {
-    e?.stopPropagation();
-    dispatch(addItem({
-      id: p.productId, mongoId: p.productId, name: p.productName,
-      price: variant.variantPrice, image: variant.variantImage?.[0], quantity: 1, selectedVariant: variant.variantName,
-    }));
-    trackAddToCart?.({ itemId: p.productId, itemName: p.productName, itemVariant: variant.variantName || '', price: variant.variantPrice || 0, quantity: 1 });
   };
 
   return (
@@ -77,20 +70,6 @@ const UnProductCard = ({
         )}
         <img src={productImg(p)} alt={p.productName} loading="lazy" className="gl-img w-full h-full object-cover" onError={(e) => { e.currentTarget.src = '/assets/logo.webp'; }} />
         {img2 && <img src={img2} alt="" className="gl-img2 absolute inset-0 w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
-        {variants.length > 0 && (
-          <div className="gl-qa absolute inset-x-0 bottom-0 z-20 p-2.5 bg-white/95 backdrop-blur border-t border-hair flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-            <div className="flex gap-1.5 flex-1 flex-wrap">
-              {variants.map((vr, i) => (
-                <button key={i} title={vr.variantName} onClick={(e) => addVariant(vr, e)}
-                  className="w-6 h-6 rounded-full overflow-hidden border border-hair bg-cover bg-center gl-press"
-                  style={{ backgroundImage: vr.variantImage?.[0] ? `url('${vr.variantImage[0]}')` : undefined }} />
-              ))}
-            </div>
-            <button title="Quick add" onClick={(e) => addVariant(v, e)} className="w-9 h-9 rounded-none bg-brand text-white grid place-items-center shrink-0 gl-press hover:bg-brandHi">
-              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>
-            </button>
-          </div>
-        )}
       </div>
       <div className="p-3.5 flex flex-col flex-1">
         <span className="gl-lbl text-[10px] text-faint">{p.productCategory || 'Urban Nook'}</span>

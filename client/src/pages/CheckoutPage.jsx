@@ -68,7 +68,7 @@ const AUTH_STEPS = [
 const CHECKOUT_STATE_KEY = "checkoutState_v2";
 
 const Field = ({ label, required, error, children }) => (
-  <div className="space-y-1.5">
+  <div className="space-y-1">
     <label className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-widest text-gray-400">
       {label} {required && <span className="text-red-400 normal-case font-normal text-xs">*</span>}
     </label>
@@ -81,8 +81,10 @@ const Field = ({ label, required, error, children }) => (
   </div>
 );
 
+// h-11 is 44px — the smallest comfortable touch target, so this stays tappable
+// on a phone while taking a row less vertical space than the old h-12.
 const inputCls = (err) =>
-  `w-full h-12 bg-white border rounded-xl px-4 text-sm text-gray-800 placeholder:text-gray-300 outline-none transition-all ${
+  `w-full h-11 bg-white border rounded-xl px-3.5 text-sm text-gray-800 placeholder:text-gray-300 outline-none transition-all ${
     err
       ? "border-red-300 focus:border-red-400 focus:ring-2 focus:ring-red-100"
       : "border-gray-200 focus:border-ink focus:ring-2 focus:ring-brand/8"
@@ -1679,12 +1681,9 @@ const CheckoutPage = () => {
         <div className="min-w-0">
           {/* ══════════ STEP — CONTACT ════════════════════════════════ */}
           {currentStep === contactStep && (
-            <div className="space-y-5 step-fade checkout-sheet">
+            <div className="space-y-4 step-fade checkout-sheet">
               {/* mobile sheet grab handle */}
               <div className="lg:hidden flex justify-center pt-2 pb-1"><span className="h-1.5 w-11 rounded-full bg-gray-200" /></div>
-              {/* Sign-in nudge for guests. This used to be a screen of its own
-                  before the contact form; as a strip it offers the same choice
-                  without spending a whole step on it. */}
               {isGuest && (
                 <button
                   type="button"
@@ -1713,8 +1712,8 @@ const CheckoutPage = () => {
 
               {/* Contact form card */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-50">
-                  <div className="w-8 h-8 rounded-xl bg-brand/8 flex items-center justify-center">
+                <div className="flex items-center gap-2.5 px-4 py-3 border-b border-gray-50">
+                  <div className="w-8 h-8 rounded-xl bg-brand/8 flex items-center justify-center shrink-0">
                     <i className="fa-solid fa-address-card text-ink text-sm" />
                   </div>
                   <div>
@@ -1727,7 +1726,7 @@ const CheckoutPage = () => {
                   </div>
                 </div>
 
-                <div className="p-6 space-y-5">
+                <div className="p-4 space-y-3.5">
                   {/* Full Name */}
                   <Field
                     label="Full Name"
@@ -1916,16 +1915,6 @@ const CheckoutPage = () => {
                 Continue to Address
                 <i className="fa-solid fa-arrow-right text-xs" />
               </button>
-
-              <div className="flex items-center justify-center gap-5 text-gray-300">
-                <i className="fa-brands fa-cc-visa text-xl" />
-                <i className="fa-brands fa-cc-mastercard text-xl" />
-                <i className="fa-brands fa-google-pay text-xl" />
-                <i className="fa-solid fa-shield-halved text-base" />
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-300">
-                  100% Secure
-                </span>
-              </div>
             </div>
           )}
 
@@ -2615,9 +2604,11 @@ const CheckoutPage = () => {
         </div>
       </div>
 
-      {/* ── Mobile app-style sticky action bar (Contact / Address / Review) ── */}
-      {!(isGuest && currentStep === 1) && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 lg:hidden">
+      {/* ── Mobile app-style sticky action bar (Contact / Address / Review) ──
+          Shown on every step. It used to be suppressed for guests on the
+          Contact step, which left them stranded: the inline "Continue to
+          Address" button is lg-only, so on a phone there was no way forward. */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 lg:hidden">
           {/* "more content below" hint on the review step — floats just above the bar */}
           {currentStep === reviewStep && !mobileSummaryOpen && (
             <div className="pointer-events-none absolute -top-9 inset-x-0 flex justify-center">
@@ -2708,8 +2699,7 @@ const CheckoutPage = () => {
               .savings-tip{ animation: savingsFloat 1.8s ease-in-out infinite; }
             `}</style>
           </div>
-        </div>
-      )}
+      </div>
 
       {/* ── COD advance breakdown popup ──────────────────────────────────── */}
       {showCodSheet && (
