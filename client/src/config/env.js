@@ -61,6 +61,7 @@ const config = {
     // has its own MAGIC_CHECKOUT_ENABLED flag and both must be on.
     enableMagicCheckout: env.VITE_MAGIC_CHECKOUT_ENABLED === 'true'
   }
+  
 };
 
 // Log configuration in development
