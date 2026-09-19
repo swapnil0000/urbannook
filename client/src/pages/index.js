@@ -15,6 +15,7 @@ export const PrivacyPolicy = lazy(() => import("./legal/PrivacyPolicy.jsx"));
 export const Faq = lazy(() => import("./support/Faqs.jsx"));
 export const Return = lazy(() => import("./legal/Return.jsx"));
 export const ContactPage = lazy(() => import("./support/ContactPage.jsx"));
+export const CustomizePage = lazy(() => import("./support/CustomizePage.jsx"));
 export const AllProductsPage = lazy(() => import("./shop/AllProductsPage.jsx"));
 export const ProductDetailPage = lazy(() => import("./shop/ProductDetailPage.jsx"));
 export const ProductVariantsPage = lazy(() => import("./shop/ProductVariantsPage.jsx"));

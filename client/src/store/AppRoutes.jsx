@@ -4,6 +4,7 @@ import {
   HomePage,
   ContactPage,
   AllProductsPage,
+  CustomizePage,
   ProductDetailPage,
   ProductVariantsPage,
   CheckoutPage,
@@ -50,6 +51,14 @@ const AppRoutes = () => {
         element={
           <Suspense fallback={<MinimalLoader />}>
             <ContactPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/customize"
+        element={
+          <Suspense fallback={<MinimalLoader />}>
+            <CustomizePage />
           </Suspense>
         }
       />

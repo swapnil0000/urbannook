@@ -53,8 +53,6 @@ const Footer = () => {
         <p className="text-sm mt-3 max-w-xs">3D-printed desk lamps, pen stands & décor. Made to order in India — make every corner count.</p>
         <div className="flex gap-4 mt-4 text-sm text-white/60">
           <a href="https://www.instagram.com/urbannook.store" target="_blank" rel="noreferrer" className="hover:text-white">Instagram</a>
-          <a href="#" className="hover:text-white">YouTube</a>
-          <a href="#" className="hover:text-white">X</a>
         </div>
       </div>
       <div>
@@ -102,7 +100,7 @@ const Footer = () => {
       </div>
     </div>
     <div className="border-t border-white/10">
-      <div className="max-w-[1280px] mx-auto px-5 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white/40">
+      <div className="max-w-[1280px] mx-auto px-5 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white/60">
         <span>© {new Date().getFullYear()} Urban Nook · Made in India 🇮🇳</span>
         <div className="flex gap-4">
           <Link to="/privacy-policy" className="hover:text-white">Privacy</Link>

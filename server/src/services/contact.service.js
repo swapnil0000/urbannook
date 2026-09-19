@@ -4,7 +4,7 @@ import { ValidationError, NotFoundError, InternalServerError } from '../utils/er
 import env from '../config/envConfigSetup.js';
 import { sendEmail } from './email.service.js';
 class ContactService {
-  async createSubmission({ name, email, subject, message, mobile, productId, productName }) {
+  async createSubmission({ name, email, subject, message, mobile, productId, productName, variantName, referenceImages }) {
     // Create and save contact submission
     const contact = new Contact({
       name,
@@ -14,6 +14,8 @@ class ContactService {
       mobile: mobile || null,
       productId: productId || null,
       productName: productName || null,
+      variantName: variantName || null,
+      referenceImages: referenceImages || [],
       status: 'pending'
     });
 

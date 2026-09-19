@@ -1,27 +1,24 @@
-import { useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import MinimalCard from "./MinimalCard";
-import { trackSelectItem } from "../utils/analytics";
+import UnProductCard from "./UnProductCard";
 
 /**
- * PDP section — "Explore Other Variants": the OTHER variants of the SAME
- * product currently open (excludes whichever one the visitor is looking
- * at), shown with the shared MinimalCard — its own look, deliberately kept
- * separate from the /products/:id variant-list page's VariantCard, per how
- * this section was asked to be redesigned. Capped to a handful so it stays
- * a teaser, not the full list — "View all" routes to the full
- * /products/:id variant page for the rest.
+ * PDP section — "Explore other variants": the OTHER variants of the SAME
+ * product currently open (excludes whichever one the visitor is looking at).
  *
- * Placed after Reviews and before RecommendedProducts on the PDP: reviews
- * build trust in this product first, this offers the other looks of the
- * SAME product next, and only then does the page branch into unrelated
- * cross-sell (RecommendedProducts).
+ * Uses the very same card and grid as the "You may also like" row directly
+ * below it, so the two read as one system — identical card size, spacing and
+ * heading treatment, with only the contents differing. Each variant is handed
+ * to the card shaped like a one-variant product, with an explicit href so the
+ * card opens that variant's own page rather than the product's variant list.
+ *
+ * Placed after Reviews and before the cross-sell: reviews build trust in this
+ * product first, this offers the other looks of the SAME product next, and
+ * only then does the page branch into unrelated products.
  */
-const MAX_SHOWN = 6;
+const MAX_SHOWN = 8;
 
 const OtherVariants = ({ productId, productName, variants = [], currentVariantName }) => {
   const navigate = useNavigate();
-  const scrollRef = useRef(null);
 
   const others = variants.filter((v) => v.variantName !== currentVariantName);
   if (others.length === 0) return null;
@@ -30,73 +27,50 @@ const OtherVariants = ({ productId, productName, variants = [], currentVariantNa
   const hasMore = others.length > shown.length;
 
   return (
-    <section className="mt-8 sm:mt-12 md:mt-16 px-4 lg:px-12 pt-4 sm:pt-6">
-      <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 sm:gap-6">
-        <div className="flex-1">
-          <p className="gl-lbl text-brand mb-2">Same product, other looks</p>
-          <h2 className="font-archivo text-2xl sm:text-3xl font-extrabold tracking-tight text-ink">
-            Explore Other Variants
-          </h2>
-        </div>
+    <div className="mt-16">
+      <div className="flex items-end justify-between mb-6">
+        <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">Explore other variants</h2>
         {hasMore && (
           <button
-            type="button"
             onClick={() => navigate(`/products/${productId}`)}
-            className="gl-lbl text-[11px] shrink-0 self-start sm:self-auto inline-flex items-center gap-1.5 border-b-2 border-current pb-0.5 hover:text-brand hover:border-brand transition-colors"
+            className="text-sm font-bold underline underline-offset-4 decoration-2 hover:text-brand"
           >
             View all {others.length} →
           </button>
         )}
       </div>
 
-      <div
-        ref={scrollRef}
-        className="flex gap-5 overflow-x-auto scroll-smooth snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        style={{ touchAction: "pan-x" }}
-      >
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {shown.map((variant, index) => {
-          const price = Number(variant?.variantPrice || 0);
-          const mrp = Number(variant?.variantMrp || 0);
           const oos =
             variant?.variantOutOfStock === true ||
-            (variant?.variantQuantity != null &&
-              Number(variant.variantQuantity) <= 0);
-          const badge = oos
-            ? { label: "Out of Stock", className: "bg-ink text-white" }
-            : null;
+            (variant?.variantQuantity != null && Number(variant.variantQuantity) <= 0);
+
+          /* Shaped like a product so the shared card can read it unchanged:
+             one variant in variantDetails is all it needs for image, price
+             and struck MRP. */
+          const asProduct = {
+            productId,
+            productName: variant?.variantName || productName,
+            productCategory: "Variant",
+            variantDetails: [variant],
+          };
 
           return (
-            <div
-              key={variant._id || variant.sku || variant.variantName}
-              className="snap-start shrink-0 w-[150px] sm:w-[170px] md:w-[185px]"
-            >
-              <MinimalCard
-                image={variant?.variantImage?.[0]}
-                alt={variant?.variantName || productName}
-                title={variant?.variantName}
-                price={price}
-                mrp={mrp}
-                badge={badge}
-                onClick={() => {
-                  trackSelectItem({
-                    itemId: productId,
-                    itemName: productName,
-                    itemVariant: variant?.variantName,
-                    price,
-                    listId: "other_variants",
-                    listName: `${productName} — Other Variants`,
-                    index,
-                  });
-                  navigate(
-                    `/product/${productId}/${variant?.sku || variant?.variantName}`,
-                  );
-                }}
-              />
-            </div>
+            <UnProductCard
+              key={variant._id || variant.sku || variant.variantName || index}
+              p={asProduct}
+              index={index}
+              listId="other_variants"
+              listName={`${productName} — Other Variants`}
+              href={`/product/${productId}/${variant?.sku || variant?.variantName}`}
+              badge={oos ? "Out of stock" : null}
+              showWishlist={false}
+            />
           );
         })}
       </div>
-    </section>
+    </div>
   );
 };
 

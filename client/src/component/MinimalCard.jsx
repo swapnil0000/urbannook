@@ -69,7 +69,7 @@ const MinimalCard = ({ image, alt, title, price, mrp, pricePrefix, badge, onClic
           </span>
           {mrp > price && (
             <span className="flex flex-col items-start leading-none whitespace-nowrap">
-              <span className="gl-lbl text-[9px] text-save">{discountPct}% off</span>
+              <span className="gl-lbl text-[9px] text-sale">{discountPct}% off</span>
               <span className="text-[11px] text-faint line-through mt-0.5">₹{mrp?.toLocaleString()}</span>
             </span>
           )}

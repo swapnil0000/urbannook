@@ -22,12 +22,30 @@ const badgeOf = (p) => {
   return null;
 };
 
-/** GullyLabs-style product card — real data, hover 2nd image, quick-add variants, wishlist. */
-const UnProductCard = ({ p, index = 0, listId = 'grid', listName = 'Grid' }) => {
+/**
+ * GullyLabs-style product card — real data, hover 2nd image, quick-add
+ * variants, wishlist.
+ *
+ * `href`, `badge` and `showWishlist` exist so a caller can reuse this exact
+ * card for something that is not a whole product — the PDP's "Explore other
+ * variants" row feeds it one variant at a time, and needs to link to that
+ * variant's own page, mark it out of stock, and drop the wishlist heart
+ * (wishlist is keyed by product, so every variant card would toggle the
+ * same heart). Everything defaults to the product behaviour.
+ */
+const UnProductCard = ({
+  p,
+  index = 0,
+  listId = 'grid',
+  listName = 'Grid',
+  href,
+  badge: badgeOverride,
+  showWishlist = true,
+}) => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const v = firstVariant(p);
-  const badge = badgeOf(p);
+  const badge = badgeOverride !== undefined ? badgeOverride : badgeOf(p);
   const img2 = secondImg(p);
   const variants = (p?.variantDetails || []).slice(0, 5);
   // Struck MRP + % off, same source of truth as ProductCard: the first
@@ -37,7 +55,7 @@ const UnProductCard = ({ p, index = 0, listId = 'grid', listName = 'Grid' }) => 
 
   const go = () => {
     trackSelectItem?.({ itemId: p.productId, itemName: p.productName, itemVariant: v.variantName || '', price: v.variantPrice || 0, listId, listName, index });
-    navigate(productHref(p));
+    navigate(href || productHref(p));
   };
   const addVariant = (variant, e) => {
     e?.stopPropagation();
@@ -52,9 +70,11 @@ const UnProductCard = ({ p, index = 0, listId = 'grid', listName = 'Grid' }) => 
     <div onClick={go} className="gl-pcard group bg-white rounded-none border border-hair overflow-hidden flex flex-col h-full cursor-pointer">
       <div className="relative aspect-square overflow-hidden bg-surface">
         {badge && <span className="absolute top-3 left-3 z-10 bg-sale text-white gl-lbl text-[9px] px-2 py-1 rounded-none shadow-sm">{badge}</span>}
-        <div className="absolute top-2.5 right-2.5 z-10" onClick={(e) => e.stopPropagation()}>
-          <WishlistButton productId={p.productId} />
-        </div>
+        {showWishlist && (
+          <div className="absolute top-2.5 right-2.5 z-10" onClick={(e) => e.stopPropagation()}>
+            <WishlistButton productId={p.productId} />
+          </div>
+        )}
         <img src={productImg(p)} alt={p.productName} loading="lazy" className="gl-img w-full h-full object-cover" onError={(e) => { e.currentTarget.src = '/assets/logo.webp'; }} />
         {img2 && <img src={img2} alt="" className="gl-img2 absolute inset-0 w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
         {variants.length > 0 && (
@@ -80,7 +100,7 @@ const UnProductCard = ({ p, index = 0, listId = 'grid', listName = 'Grid' }) => 
           {mrp > price && (
             <>
               <span className="text-xs text-faint line-through">{inr(mrp)}</span>
-              <span className="gl-lbl text-[9px] text-save">{Math.round(((mrp - price) / mrp) * 100)}% off</span>
+              <span className="gl-lbl text-[9px] text-sale">{Math.round(((mrp - price) / mrp) * 100)}% off</span>
             </>
           )}
         </div>

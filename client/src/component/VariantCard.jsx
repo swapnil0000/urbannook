@@ -74,7 +74,7 @@ const VariantCard = ({ productId, productName, variant, index, listId = "product
             </span>
             {mrp > price && (
               <span className="flex flex-col items-start leading-none whitespace-nowrap">
-                <span className="gl-lbl text-[8px] md:text-[9px] text-save">
+                <span className="gl-lbl text-[8px] md:text-[9px] text-sale">
                   {Math.round(((mrp - price) / mrp) * 100)}% OFF
                 </span>
                 <span className="text-[9px] md:text-xs text-faint line-through mt-0.5">

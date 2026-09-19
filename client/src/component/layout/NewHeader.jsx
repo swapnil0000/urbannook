@@ -73,14 +73,14 @@ const NewHeader = () => {
   const navLinks = useMemo(() => [
     { name: 'Shop All', path: '/products', key: 'products' },
     ...categoryLinks.slice(0, MAX_NAV_CATEGORIES),
-    { name: 'Story', path: '/about-us', key: 'about-us' },
+    { name: 'Customize', path: '/customize', key: 'customize' },
   ], [categoryLinks]);
 
   /* The drawer has room to list every category, so it never hides one. */
   const mobileNavLinks = useMemo(() => [
     { name: 'Shop All', path: '/products', key: 'products' },
     ...categoryLinks,
-    { name: 'Story', path: '/about-us', key: 'about-us' },
+    { name: 'Customize', path: '/customize', key: 'customize' },
   ], [categoryLinks]);
 
   const activeRoute = useMemo(() => {
@@ -89,6 +89,7 @@ const NewHeader = () => {
     if (path.startsWith('/products') || path.startsWith('/product/')) return 'products';
     if (path === '/contact-us') return 'support';
     if (path === '/about-us') return 'about-us';
+    if (path.startsWith('/customize')) return 'customize';
     return '';
   }, [location.pathname]);
 

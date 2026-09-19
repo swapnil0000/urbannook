@@ -73,3 +73,32 @@ export const getInvoicePresignedUrl = async (fileKey) => {
     throw error;
   }
 };
+
+/**
+ * Reference picture attached to a customization request.
+ *
+ * Kept apart from uploadReviewImageToS3 because that one keys the file by
+ * userId, and a customization request can come from a logged-out visitor —
+ * there is no user to key it by, so these land under the request's own
+ * random id instead.
+ */
+export const uploadCustomizationImageToS3 = async (imageBuffer, mimeType, ref) => {
+  const envFolder = env.NODE_ENV === "production" ? "prod" : "dev";
+  const ext = (mimeType.split("/")[1] || "jpg").replace(/[^a-z0-9]/gi, "");
+  const fileKey = `${envFolder}/customization/${ref}-${Date.now()}.${ext}`;
+
+  const params = {
+    Bucket: env.AWS_BUCKET_NAME,
+    Key: fileKey,
+    Body: imageBuffer,
+    ContentType: mimeType,
+  };
+
+  try {
+    await s3Client.send(new PutObjectCommand(params));
+    return `${env.ASSET_BASE_URL}/${fileKey}`;
+  } catch (error) {
+    console.error("❌ Error uploading customization image to S3:", error);
+    throw error;
+  }
+};

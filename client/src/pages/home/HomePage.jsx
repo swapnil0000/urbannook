@@ -336,7 +336,6 @@ const ReferSave = () => {
 
 const HERO_ROTATE_MS = 6000;
 const BUNDLE_MS = 6000;   // how long one free-shipping offer holds the panel
-const PRINT_MS = 1100;
 
 const REDUCE_MOTION =
   typeof window !== 'undefined' &&
@@ -432,22 +431,16 @@ const HeroCarousel = ({ products = [], onProduct, onVariant, onShop }) => {
   return (
     <section className="relative bg-ink text-paper overflow-hidden">
       <style>{`
-        @keyframes un-print { from { clip-path: inset(100% 0 0 0); } to { clip-path: inset(0 0 0 0); } }
-        @keyframes un-scan  { 0% { top: 100%; opacity: 0; } 8% { opacity: 1; } 90% { opacity: 1; } 100% { top: -2%; opacity: 0; } }
-        @keyframes un-in    { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
-        .un-print { animation: un-print ${PRINT_MS}ms cubic-bezier(.4,0,.1,1) both; }
-        .un-scan  { animation: un-scan  ${PRINT_MS}ms cubic-bezier(.4,0,.1,1) both; }
-        .un-in    { animation: un-in 520ms cubic-bezier(.16,1,.3,1) both; }
+        @keyframes un-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+        .un-in { animation: un-in 520ms cubic-bezier(.16,1,.3,1) both; }
         @media (prefers-reduced-motion: reduce) {
-          .un-print, .un-scan, .un-in { animation: none; }
-          .un-print { clip-path: none; }
-          .un-scan { display: none; }
+          .un-in { animation: none; }
         }
       `}</style>
 
       {/* ambient: one red wash + a faint rule grid, nothing that eats space */}
       <div className="pointer-events-none absolute inset-0"
-        style={{ background: 'radial-gradient(55% 45% at 68% 38%, rgba(230,51,41,.20), transparent 70%)' }} />
+        style={{ background: 'radial-gradient(55% 45% at 68% 38%, rgb(var(--gl-brand) / 0.20), transparent 70%)' }} />
       <div className="pointer-events-none absolute inset-0 opacity-[0.07]"
         style={{
           backgroundImage: 'linear-gradient(to right, rgba(255,255,255,.6) 1px, transparent 1px)',
@@ -527,13 +520,7 @@ const HeroCarousel = ({ products = [], onProduct, onVariant, onShop }) => {
             )}
           </div>
 
-          {/* the lit tile */}
-          {/* The carousel: one tile per variant, filling everything the copy
-              column leaves. The shots are portrait-to-square (0.75–1.0) with
-              non-uniform studio backdrops, so every fixed aspect crops
-              something and every fixed tile colour mismatches something —
-              each tile therefore shrink-wraps its own photo at its own ratio.
-              Nothing is cropped, stretched, letterboxed or padded. */}
+
           <div className="order-1 md:order-2 flex-1 min-w-0 w-full">
             <div key={`r-${f.id}`} className="un-in relative">
               <div
@@ -542,39 +529,44 @@ const HeroCarousel = ({ products = [], onProduct, onVariant, onShop }) => {
                 style={{ touchAction: 'pan-x' }}
               >
                 {f.tiles.map((t) => (
+                  /* Fixed width AND fixed aspect, so every tile is the same size
+                     whatever the photo's ratio is — the shots run 0.75 to 1.0,
+                     and sizing each tile to its own photo made the rail change
+                     size every time the banner rotated. */
                   <button
                     key={t.key}
                     onClick={() => onVariant(f.id, t.sku)}
                     aria-label={`Shop ${t.label}`}
-                    className="group relative shrink-0 snap-start text-left border border-white/10 overflow-hidden"
+                    className="group relative shrink-0 snap-start text-left border border-white/10 overflow-hidden w-[62vw] max-w-[240px] sm:w-[clamp(190px,20vw,260px)] sm:max-w-none"
                   >
-                    <div className="relative overflow-hidden">
+                    <div className="relative w-full aspect-[4/5] overflow-hidden bg-surface">
+                      {/* A blurred copy fills the box behind the real photo, so
+                          the tile can be a fixed shape without cropping the
+                          product or leaving a hard letterbox edge. The shots
+                          sit on soft studio gradients, so the blurred backdrop
+                          reads as a continuation of that backdrop. */}
+                      <img
+                        src={t.img}
+                        alt=""
+                        aria-hidden="true"
+                        onError={onImgErr}
+                        className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl"
+                      />
                       <img
                         src={t.img}
                         alt={t.label}
                         loading="eager"
                         onError={onImgErr}
-                        className="block w-[62vw] max-w-[260px] h-auto sm:w-auto sm:max-w-none sm:h-[clamp(230px,38vh,400px)] transition-transform duration-[900ms] group-hover:scale-[1.04]"
+                        className="relative w-full h-full object-contain transition-transform duration-[900ms] group-hover:scale-[1.04]"
                       />
                     </div>
-                    {/* w-0 + min-w-full: the label contributes nothing to the
-                        card's intrinsic width, then stretches to whatever the
-                        photo above decided it should be. Without this a long
-                        variant name ("Lamborghini Brake Caliper Lamp") widened
-                        the card past the photo, so the photo looked inset and
-                        the strip hung outside it — and truncate never fired,
-                        because it has no definite width to truncate against. */}
-                    <div className="w-0 min-w-full flex items-center justify-between gap-3 px-3.5 py-2.5 bg-white border-t border-hair">
+                    <div className="w-full flex items-center justify-between gap-3 px-3.5 py-2.5 bg-white border-t border-hair">
                       <span className="gl-lbl text-[10px] text-ink truncate min-w-0">{t.label}</span>
                       <span className="gl-lbl text-[10px] text-brand shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">Shop →</span>
                     </div>
                   </button>
                 ))}
               </div>
-
-              {/* the print head sweeps the whole row as it loads in */}
-              <div className="un-scan absolute left-0 right-0 h-[2px] bg-brand pointer-events-none"
-                style={{ boxShadow: '0 0 16px 3px rgba(230,51,41,.7)' }} />
 
               {/* desktop scrub — mobile just swipes */}
               {f.tiles.length > 1 && (
@@ -604,9 +596,9 @@ const HeroCarousel = ({ products = [], onProduct, onVariant, onShop }) => {
              the row instead of leaving a gap, a long one just scrolls. */}
         <div className="shrink-0 px-5 md:px-10 pt-7 pb-7">
           <div className="flex items-baseline justify-between gap-4 mb-3">
-            <span className="gl-lbl text-[10px] text-paper/50">
+            {/* <span className="gl-lbl text-[10px] text-paper/50">
               {strip.isRest ? 'More from the drop' : 'The drop'} · {String(strip.items.length).padStart(2, '0')} pieces
-            </span>
+            </span> */}
             <button onClick={onShop}
               className="gl-lbl text-[10px] text-paper/70 hover:text-brand border-b border-white/25 hover:border-brand pb-0.5 transition-colors">
               Shop all →
@@ -924,36 +916,42 @@ const HomePage = () => {
                   products in that offer, so it is visible at a glance that
                   there is more than one — and the bar under the active chip
                   shows it is cycling on its own. */}
-              {bundles.length > 1 && (
-                <div className="mb-5 flex items-center gap-2.5 flex-wrap">
-                  {bundles.map((b, k) => {
-                    const on = k === bi;
-                    return (
-                      <button
-                        key={b.key}
-                        onClick={() => setPickedBundle(k)}
-                        aria-label={`Offer ${k + 1} of ${bundles.length}: ${b.src.productName} + ${b.rec.productName}`}
-                        aria-current={on}
-                        className={`relative flex items-center p-1 pr-2 gap-1 border transition-colors ${on ? 'border-brand bg-brand/5' : 'border-hair hover:border-ink/40'}`}
-                      >
-                        <img src={productImg(b.src)} alt="" onError={onImgErr}
-                          className={`w-7 h-7 object-cover bg-white ${on ? '' : 'opacity-60'}`} />
-                        <img src={productImg(b.rec)} alt="" onError={onImgErr}
-                          className={`w-7 h-7 object-cover bg-white -ml-3 border-l-2 border-white ${on ? '' : 'opacity-60'}`} />
-                        <span className={`gl-lbl text-[9px] ml-0.5 ${on ? 'text-brand' : 'text-faint'}`}>
-                          {String(k + 1).padStart(2, '0')}
-                        </span>
-                        {on && pickedBundle == null && !bundlePaused && !REDUCE_MOTION && (
-                          <span key={`p-${bi}`} className="un-bprog absolute left-0 bottom-0 h-[2px] bg-brand" />
-                        )}
-                      </button>
-                    );
-                  })}
-                  <span className="gl-lbl text-[9px] text-faint ml-1">
-                    {pickedBundle == null ? 'auto' : `${String(bi + 1).padStart(2, '0')}/${String(bundles.length).padStart(2, '0')}`}
-                  </span>
-                </div>
-              )}
+              {bundles.length > 1 && (() => {
+                /* Segmented bar, the way stories mark progress: one thin
+                   segment per offer, the current one filling with the rotation
+                   timer. It says "there are three of these and they are
+                   cycling" without a row of 28px thumbnails, which at that size
+                   were unreadable mush. Each segment is a full-height tap
+                   target even though the bar itself is 3px. */
+                const autoRunning = pickedBundle == null && !bundlePaused && !REDUCE_MOTION;
+                return (
+                  <div className="mb-5 flex items-center gap-3">
+                    <div className="flex items-center gap-1.5 w-full max-w-[190px]">
+                      {bundles.map((b, k) => (
+                        <button
+                          key={b.key}
+                          onClick={() => setPickedBundle(k)}
+                          aria-label={`Offer ${k + 1} of ${bundles.length}: ${b.src.productName} + ${b.rec.productName}`}
+                          aria-current={k === bi}
+                          className="flex-1 py-2 group"
+                        >
+                          <span className="block h-[3px] bg-ink/15 overflow-hidden">
+                            {k < bi && <span className="block h-full w-full bg-ink/35" />}
+                            {k === bi && (
+                              autoRunning
+                                ? <span key={`p-${bi}`} className="un-bprog block h-full bg-brand" />
+                                : <span className="block h-full w-full bg-brand" />
+                            )}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                    <span className="gl-lbl text-[10px] text-faint tabular-nums shrink-0">
+                      {String(bi + 1).padStart(2, '0')}/{String(bundles.length).padStart(2, '0')}
+                    </span>
+                  </div>
+                );
+              })()}
               <h3 className="font-archivo text-3xl md:text-5xl font-extrabold tracking-tight leading-[0.92]">
                 {bundleUnlocked ? <>Free shipping<br />unlocked 🎉</> : inCartCount === 1 ? <>You're one<br />away</> : <>Buy the pair,<br />ship free</>}
               </h3>
@@ -1158,22 +1156,28 @@ const HomePage = () => {
       </section>
 
       {/* ══ ABOUT — compact brand intro, kept at the bottom above the footer ══ */}
+      {/* ══ CUSTOMIZE — every piece is printed to order, so this is a normal
+             ask rather than an exception. Replaces the old "About" panel:
+             that told people who we are, this gives them something to do. ══ */}
       <section className="max-w-[1280px] mx-auto px-5 py-5 md:py-16">
         <Reveal className="relative overflow-hidden bg-surface border border-hair p-8 md:p-14">
-          <span aria-hidden="true" className="pointer-events-none select-none absolute -right-3 -bottom-10 md:-bottom-16 font-archivo text-[6rem] md:text-[13rem] font-extrabold text-ink/[0.04] leading-none tracking-tight">NOOK</span>
+          <span aria-hidden="true" className="pointer-events-none select-none absolute -right-3 -bottom-10 md:-bottom-16 font-archivo text-[6rem] md:text-[13rem] font-extrabold text-ink/[0.04] leading-none tracking-tight">YOURS</span>
           <div className="relative max-w-2xl">
-            <p className="gl-lbl text-brand mb-4">About · Est. 2025 · India</p>
-            <TextReveal as="h2" text="We print desk icons." className="font-archivo text-4xl md:text-6xl font-extrabold tracking-tight leading-[0.95]" />
+            <p className="gl-lbl text-brand mb-4">Customization · Made to order</p>
+            <TextReveal as="h2" text="Make it yours." className="font-archivo text-4xl md:text-6xl font-extrabold tracking-tight leading-[0.95]" />
             <p className="mt-5 text-muted text-base md:text-lg max-w-xl">
-              UrbanNook is a small Indian studio 3D-printing bold desk pieces — like the caliper lamp that lights up your late-night grind. No warehouses. No mass production. Just made-to-order gear built for <span className="text-ink font-semibold">your</span> setup.
+              Nothing here sits in a warehouse — every piece is 3D-printed once you order it.
+              So a different colour, your name on the side, or a livery we don&apos;t stock is a
+              normal ask. Tell us what you want and we&apos;ll come back with what&apos;s
+              possible and <span className="text-ink font-semibold">what it costs</span>.
             </p>
             <Stagger className="mt-6 flex flex-wrap gap-2" stagger={0.05}>
-              {['3D-Printed', 'Made in India 🇮🇳', 'Small-Batch', 'Car Culture', 'Made to Order'].map((t) => (
+              {['Custom colours', 'Name / text on it', 'Your own livery', 'Gifting', 'Bulk orders'].map((t) => (
                 <StaggerItem key={t} as="span" className="gl-lbl text-[10px] border border-hair bg-white px-3 py-1.5">{t}</StaggerItem>
               ))}
             </Stagger>
-            <button onClick={() => navigate('/about-us')} className="un-btn gl-press mt-7 bg-ink text-paper font-bold text-sm px-7 py-3.5">
-              <span className="un-fill bg-brand"></span>Our Story
+            <button onClick={() => navigate('/customize')} className="un-btn gl-press mt-7 bg-ink text-paper font-bold text-sm px-7 py-3.5">
+              <span className="un-fill bg-brand"></span>Customize a piece
             </button>
           </div>
         </Reveal>

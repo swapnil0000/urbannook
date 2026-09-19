@@ -41,6 +41,22 @@ const isVariantOutOfStock = (v) =>
 // badge to nudge the buyer. Tweak freely.
 const LOW_STOCK_THRESHOLD = 5;
 
+/* Every variant name repeats the product name in full — "Zoro Enma Wooden
+   Katana (Black & Red)" sitting under a product called "Anime Wooden Katana".
+   Dropping the words the product already says leaves "Zoro Enma (Black &
+   Red)": the part that actually tells one variant from the next, and short
+   enough that the pills stop wrapping into a column. Falls back to the full
+   name when nothing would be left (single-variant products). */
+const shortVariantName = (variantName = '', productName = '') => {
+  const norm = (w) => w.toLowerCase().replace(/[^a-z0-9]/gi, '');
+  const drop = new Set(String(productName).split(/\s+/).map(norm).filter(Boolean));
+  const kept = String(variantName).split(/\s+/).filter((w) => !drop.has(norm(w)));
+  return kept.join(' ').trim() || variantName;
+};
+
+/* What the variant row is called, per category. */
+const VARIANT_NOUN = { Lamp: 'Marque', Anime: 'Design' };
+
 const ProductDetailPage = () => {
   const itemQty = (q) => (typeof q === 'object' && q !== null ? q.quantity || 0 : q || 0);
 
@@ -563,7 +579,7 @@ const ProductDetailPage = () => {
                 {discountPercent > 0 && (
                   <>
                     <span className="text-base text-faint line-through tabular-nums">{inr(maxVariantPrice)}</span>
-                    <span className="gl-lbl text-[11px] text-save bg-save/10 px-2 py-0.5 rounded-md">{discountPercent}% OFF</span>
+                    <span className="gl-lbl text-[11px] text-sale bg-sale/10 px-2 py-0.5 rounded-md">{discountPercent}% OFF</span>
                   </>
                 )}
               </div>
@@ -573,18 +589,18 @@ const ProductDetailPage = () => {
               {availableVariants.length > 0 && (
                 <>
                   <div className="border-t border-hair my-4" />
-                  <p className="gl-lbl text-ink mb-2">{product.productCategory === 'Lamp' ? 'Marque' : 'Variant'} · <span className="normal-case tracking-normal font-semibold text-muted">{selectedVariant}</span></p>
-                  <div className="flex gap-2 flex-wrap">
-                    {product.variantDetails.map((v, i) => (
-                      <button
-                        key={i}
-                        onClick={() => onSelectVariant(v)}
-                        className={`gl-press px-4 h-10 rounded-xl border text-sm font-semibold transition-colors ${v.variantName === selectedVariant ? 'border-brand bg-brand/5 text-brand' : 'border-hair bg-white text-ink hover:border-ink'}`}
-                      >
-                        {v.variantName}
-                      </button>
-                    ))}
-                  </div>
+
+                  {/* Picture swatches. Deliberately large: at thumbnail size a
+                      katana is a thin diagonal nobody can identify, so these are
+                      ~100px and carry a short name underneath — picture AND
+                      label, rather than asking either to work alone. Where the
+                      variant genuinely IS a colour (the pen stand) the tile
+                      shows that colour instead of a photo of it. The row scrolls
+                      rather than wraps, so eleven variants stay one line instead
+                      of stacking into a column. */}
+                  
+
+                 
                 </>
               )}
 
@@ -628,8 +644,31 @@ const ProductDetailPage = () => {
                 )}
               </div>
 
+              {/* Customization — offered on every product, since all of them are
+                  printed to order. Carries the product (and the variant they
+                  are looking at) through so the request form arrives prefilled. */}
+              <button
+                type="button"
+                onClick={() =>
+                  navigate(
+                    `/customize?product=${encodeURIComponent(product.productId)}${
+                      selectedVariant ? `&variant=${encodeURIComponent(selectedVariant)}` : ''
+                    }`,
+                  )
+                }
+                className="mt-4 w-full flex items-center justify-between gap-3 border border-hair bg-white px-4 py-3 rounded-xl hover:border-ink transition-colors text-left"
+              >
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold text-ink">Want it customised?</span>
+                  <span className="block text-xs text-muted mt-0.5">
+                    Different colour, your name on it, or your own livery.
+                  </span>
+                </span>
+                <span className="gl-lbl text-[10px] text-brand shrink-0">Ask us →</span>
+              </button>
+
               {/* pincode delivery check */}
-              <div className="mt-4 pt-4 border-t border-hair">
+              {/* <div className="mt-4 pt-4 border-t border-hair">
                 <p className="gl-lbl text-ink mb-2">Check delivery</p>
                 <div className="flex gap-2">
                   <input
@@ -662,7 +701,7 @@ const ProductDetailPage = () => {
                     <p className="mt-2 text-sm font-semibold text-brand">✕ {pinStatus.msg}</p>
                   )
                 )}
-              </div>
+              </div> */}
 
               {/* trust strip inside the card */}
               <div className="mt-4 pt-4 border-t border-hair grid grid-cols-3 divide-x divide-hair text-center text-[11px] text-muted">
@@ -673,7 +712,7 @@ const ProductDetailPage = () => {
             </div>
 
             {/* OFFERS — UPI / EMI / card offers, applied via Razorpay at checkout */}
-            <div className="mt-4 rounded-2xl border border-hair bg-white p-4 md:max-w-md">
+            {/* <div className="mt-4 rounded-2xl border border-hair bg-white p-4 md:max-w-md">
               <div className="flex items-center justify-between mb-3">
                 <p className="gl-lbl text-brand">Available offers</p>
                 <span className="text-[10px] font-bold text-muted uppercase tracking-wider">Powered by Razorpay</span>
@@ -698,7 +737,7 @@ const ProductDetailPage = () => {
                   </li>
                 )}
               </ul>
-            </div>
+            </div> */}
 
             {/* ZONE C — complete the set (secondary card) */}
             {crossSell && (
@@ -726,6 +765,25 @@ const ProductDetailPage = () => {
             )}
 
           </div>
+        </div>
+
+        {/* PRODUCT DETAILS — full-bleed LIGHT-GREY (surface) band: description / specs / shipping */}
+        <div className="w-screen ml-[calc(50%-50vw)] bg-paper mt-16">
+        <section className="max-w-3xl mx-auto px-5 ">
+          <p className="gl-lbl text-brand mb-2 text-center">The full rundown</p>
+          <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight mb-6 text-center">Product details</h2>
+          <div className="divide-y divide-hair border-y border-hair">
+            {(product.productSubDes || product.productDes) && (
+              <details open className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Description<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary><p className="text-muted mt-3 text-sm leading-relaxed">{product.productSubDes || product.productDes}</p></details>
+            )}
+            {specs.length > 0 && (
+              <details className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Specifications<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary>
+                <div className="mt-3 text-sm">{specs.map((s, i) => <div key={i} className="flex justify-between py-1.5 border-b border-hair last:border-0"><span className="text-muted">{s.key}</span><span className="font-medium text-right">{s.value}</span></div>)}</div>
+              </details>
+            )}
+            <details className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Shipping &amp; Returns<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary><p className="text-muted mt-3 text-sm">Made to order, ships pan-India in 2–4 business days. 7-day easy returns.{product.isCodAvailable ? ' COD available.' : ''}</p></details>
+          </div>
+        </section>
         </div>
 
         {/* LOOK CLOSER — full-bleed LIGHT-GREY (surface) band, auto-playing carousel (tap to zoom) */}
@@ -810,45 +868,7 @@ const ProductDetailPage = () => {
               </div>
             ))}
           </div>
-        </section>
-
-        {/* PRODUCT DETAILS — full-bleed LIGHT-GREY (surface) band: description / specs / shipping */}
-        <div className="w-screen ml-[calc(50%-50vw)] bg-paper mt-16">
-        <section className="max-w-3xl mx-auto px-5 ">
-          <p className="gl-lbl text-brand mb-2 text-center">The full rundown</p>
-          <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight mb-6 text-center">Product details</h2>
-          <div className="divide-y divide-hair border-y border-hair">
-            {(product.productSubDes || product.productDes) && (
-              <details open className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Description<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary><p className="text-muted mt-3 text-sm leading-relaxed">{product.productSubDes || product.productDes}</p></details>
-            )}
-            {specs.length > 0 && (
-              <details className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Specifications<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary>
-                <div className="mt-3 text-sm">{specs.map((s, i) => <div key={i} className="flex justify-between py-1.5 border-b border-hair last:border-0"><span className="text-muted">{s.key}</span><span className="font-medium text-right">{s.value}</span></div>)}</div>
-              </details>
-            )}
-            <details className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Shipping &amp; Returns<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary><p className="text-muted mt-3 text-sm">Made to order, ships pan-India in 2–4 business days. 7-day easy returns.{product.isCodAvailable ? ' COD available.' : ''}</p></details>
-          </div>
-        </section>
-        </div>
-
-        {/* FAQ — helps buyers understand the product before purchase */}
-        {productFaqs.length > 0 && (
-          <section className="mt-16">
-            <p className="gl-lbl text-brand mb-2 text-center">Good to know</p>
-            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-8 text-center">Questions, answered</h2>
-            <div className="max-w-3xl mx-auto divide-y divide-hair border-y border-hair">
-              {productFaqs.map((f, i) => (
-                <details key={i} className="group py-4">
-                  <summary className="flex items-center justify-between gap-4 cursor-pointer font-bold list-none">
-                    <span>{f.q}</span>
-                    <span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span>
-                  </summary>
-                  <p className="text-muted text-sm mt-3 leading-relaxed">{f.a}</p>
-                </details>
-              ))}
-            </div>
-          </section>
-        )}
+        </section>       
 
         {/* REVIEWS — full-bleed LIGHT-GREY (surface) band */}
         <div className="w-screen ml-[calc(50%-50vw)] bg-paper mt-16">
@@ -961,15 +981,32 @@ const ProductDetailPage = () => {
         />
 
         {/* Admin-curated recommendations (distinct from the generic grid below) */}
-        {recommendedProducts.length > 0 && (
+        {/* {recommendedProducts.length > 0 && (
           <RecommendedProducts products={recommendedProducts} />
-        )}
+        )} */}
 
         {related.length > 0 && (
           <div className="mt-16">
             <div className="flex items-end justify-between mb-6"><h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">You may also like</h2><button onClick={() => navigate('/products')} className="text-sm font-bold underline underline-offset-4 decoration-2 hover:text-brand">View all →</button></div>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">{related.map((p, i) => <UnProductCard key={p.productId || i} p={p} index={i} listId="pdp_related" listName="Related" />)}</div>
           </div>
+        )}
+          {productFaqs.length > 0 && (
+          <section className="mt-16">
+            <p className="gl-lbl text-brand mb-2 text-center">Good to know</p>
+            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-8 text-center">Questions, answered</h2>
+            <div className="max-w-3xl mx-auto divide-y divide-hair border-y border-hair">
+              {productFaqs.map((f, i) => (
+                <details key={i} className="group py-4">
+                  <summary className="flex items-center justify-between gap-4 cursor-pointer font-bold list-none">
+                    <span>{f.q}</span>
+                    <span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span>
+                  </summary>
+                  <p className="text-muted text-sm mt-3 leading-relaxed">{f.a}</p>
+                </details>
+              ))}
+            </div>
+          </section>
         )}
       </div>
 
@@ -984,7 +1021,11 @@ const ProductDetailPage = () => {
             className="md:hidden fixed inset-x-0 z-30 bg-paper/95 backdrop-blur border-t border-hair px-4 py-3 flex items-center gap-3"
             style={{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom))' }}
           >
-            <img src={variantImage(selectedVariant)} alt="" className="w-11 h-11 rounded-lg object-cover border border-hair shrink-0" onError={onImgErr} />
+            {/* the thumbnail is the first thing to go once the bar also has to
+                hold a stepper — at 390px there is not room for both */}
+            {!isInCart && (
+              <img src={variantImage(selectedVariant)} alt="" className="w-11 h-11 rounded-lg object-cover border border-hair shrink-0" onError={onImgErr} />
+            )}
             <div className="min-w-0 flex-1">
               <p className="text-xs font-bold truncate leading-tight">{product.productName}</p>
               <p className="text-sm font-extrabold">{inr(currentPrice)}</p>
@@ -992,7 +1033,29 @@ const ProductDetailPage = () => {
             {isOutOfStock ? (
               <button onClick={() => setShowNotifyModal(true)} className="gl-press border border-ink text-ink font-bold text-sm px-5 h-11 rounded-xl shrink-0 hover:bg-ink hover:text-paper transition-colors">Notify me</button>
             ) : isInCart ? (
-              <button onClick={handleCheckoutClick} className="gl-press bg-brand text-white font-bold text-sm px-6 h-11 rounded-xl shrink-0 hover:bg-brandHi">Checkout</button>
+              <>
+                {/* Same handleUpdateQty the main buy box uses, so the cart API
+                    call (and the guest-cart dispatch) stays in one place —
+                    this bar only adds a second way to reach it. */}
+                <div className="flex items-center border border-ink rounded-xl h-11 shrink-0">
+                  <button
+                    onClick={() => handleUpdateQty(currentCartQty - 1)}
+                    aria-label={currentCartQty > 1 ? 'Decrease quantity' : 'Remove from cart'}
+                    className="w-8 h-full text-lg leading-none grid place-items-center"
+                  >
+                    −
+                  </button>
+                  <span className="w-6 text-center font-bold text-sm tabular-nums">{currentCartQty}</span>
+                  <button
+                    onClick={() => handleUpdateQty(currentCartQty + 1)}
+                    aria-label="Increase quantity"
+                    className="w-8 h-full text-lg leading-none grid place-items-center"
+                  >
+                    +
+                  </button>
+                </div>
+                <button onClick={handleCheckoutClick} className="gl-press bg-brand text-white font-bold text-sm px-4 h-11 rounded-xl shrink-0 hover:bg-brandHi">Checkout</button>
+              </>
             ) : (
               <button onClick={handleInitialAddToCart} disabled={isAdding} className="gl-press bg-brand text-white font-bold text-sm px-6 h-11 rounded-xl shrink-0 hover:bg-brandHi disabled:opacity-60">{isAdding ? 'Adding…' : 'Add to Cart'}</button>
             )}
