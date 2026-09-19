@@ -619,7 +619,6 @@ const CheckoutPage = () => {
   }, [isGuest]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    window.scrollTo(0, 0);
     if (!isGuest) {
       fetchCsrfToken().catch((e) => console.warn("[Checkout] CSRF fetch failed:", e));
     }

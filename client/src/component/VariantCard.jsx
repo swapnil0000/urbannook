@@ -42,7 +42,7 @@ const VariantCard = ({ productId, productName, variant, index, listId = "product
           className="w-full h-full object-cover mix-blend-multiply transition-transform duration-[1.5s] group-hover:scale-110"
         />
         {oos && (
-          <span className="absolute top-3 left-3 z-10 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md bg-red-500 text-white shadow">
+          <span className="absolute top-3 left-3 z-10 text-[7px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-red-500 text-white shadow">
             Out of Stock
           </span>
         )}
