@@ -2,11 +2,17 @@ import { useState, useEffect, useRef, Suspense, useMemo, lazy } from 'react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { useGetWishlistQuery } from '../../store/api/userApi';
+import { useGetProductsQuery } from '../../store/api/productsApi';
 import { logout as logoutAction } from '../../store/slices/authSlice';
 import { setShowLoginModal, clearLoginCallback } from '../../store/slices/uiSlice';
 import { useLogoutMutation } from '../../store/api/authApi';
 import { useAuth, useUI } from '../../hooks/useRedux';
 import { clearCsrfToken } from '../../store/api/apiSlice';
+
+/* Labels the team already uses. Anything new falls back to the admin's own
+   category name — better a plain "Decor" than an invented "Decors". */
+const CATEGORY_LABEL = { Lamp: 'Lamps', 'Pen Stand': 'Pen Stands' };
+const MAX_NAV_CATEGORIES = 4; // beyond this the bar wraps; "Shop All" covers the rest
 
 const SignupForm = lazy(() => import('./auth/SignupForm'));
 const LoginForm = lazy(() => import('./auth/LoginForm'));
@@ -37,12 +43,45 @@ const NewHeader = () => {
   useGetWishlistQuery(undefined, { skip: !isAuthenticated, refetchOnMountOrArgChange: false });
   const [logoutAPI, { isLoading: isLoggingOut }] = useLogoutMutation();
 
+  /* The nav used to hard-code Lamps + Pen Stands, which between them cover one
+     product each — while Anime, the largest part of the catalogue, had no way
+     in at all. There is no categories endpoint (products/categories 404s), so
+     the categories are read off the catalogue itself, the same way the shop
+     page derives its filter chips. Same query args as the home page, so on
+     that page this is a cache hit rather than a second request. */
+  const { data: prodRes } = useGetProductsQuery({ page: 1, limit: 24 });
+
+  const categories = useMemo(() => {
+    const list = prodRes?.data?.products || prodRes?.data?.listofPublishedProducts || [];
+    const seen = [];
+    list.forEach((p) => {
+      const c = p?.productCategory;
+      if (c && !seen.includes(c)) seen.push(c);
+    });
+    return seen;
+  }, [prodRes]);
+
+  const categoryLinks = useMemo(
+    () => categories.map((c) => ({
+      name: CATEGORY_LABEL[c] || c,
+      path: `/products?category=${encodeURIComponent(c)}`,
+      key: `cat-${c}`,
+    })),
+    [categories],
+  );
+
   const navLinks = useMemo(() => [
     { name: 'Shop All', path: '/products', key: 'products' },
-    { name: 'Lamps', path: '/products?category=Lamp', key: 'lamp' },
-    { name: 'Pen Stands', path: '/products?category=Pen%20Stand', key: 'pen' },
+    ...categoryLinks.slice(0, MAX_NAV_CATEGORIES),
     { name: 'Story', path: '/about-us', key: 'about-us' },
-  ], []);
+  ], [categoryLinks]);
+
+  /* The drawer has room to list every category, so it never hides one. */
+  const mobileNavLinks = useMemo(() => [
+    { name: 'Shop All', path: '/products', key: 'products' },
+    ...categoryLinks,
+    { name: 'Story', path: '/about-us', key: 'about-us' },
+  ], [categoryLinks]);
 
   const activeRoute = useMemo(() => {
     const path = location.pathname;
@@ -163,7 +202,7 @@ const NewHeader = () => {
         {isMenuOpen && (
           <div className="md:hidden border-t border-white/10 bg-ink text-paper px-5 py-3">
             <nav className="flex flex-col">
-              {navLinks.map((item) => (
+              {mobileNavLinks.map((item) => (
                 <button key={item.key} onClick={() => handleMobileNav(item.path)} className={`text-left py-3 border-b border-white/10 font-semibold ${activeRoute === item.key ? 'text-brand' : 'text-paper'}`}>{item.name}</button>
               ))}
             </nav>
