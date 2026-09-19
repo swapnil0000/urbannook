@@ -6,6 +6,7 @@ import { HelmetProvider } from 'react-helmet-async';
 import { store } from './store/store';
 import { useCartSync } from './hooks/useCartSync';
 import { useWishlistSync } from './hooks/useWishlistSync';
+import { useScrollRestoration } from './hooks/useScrollRestoration';
 import ErrorBoundary from './component/ErrorBoundary';
 import { setCredentials, logout } from './store/slices/authSlice';
 import { fetchCsrfToken } from './store/api/apiSlice';
@@ -122,9 +123,13 @@ const SessionManager = ({ children }) => {
 
 // Fires a GA4 page_view on every SPA route change and locks first-touch
 // attribution (utm/gclid/fbclid) before the landing query string is lost.
+// Scroll-position restoration on back/forward navigation is a separate
+// concern, owned entirely by useScrollRestoration (hooks/useScrollRestoration.js).
 const RouteTracker = () => {
   const location = useLocation();
   const firstLoad = useRef(true);
+
+  useScrollRestoration();
 
   // Capture first-touch UTMs immediately, before any client-side navigation wipes them.
   useEffect(() => {

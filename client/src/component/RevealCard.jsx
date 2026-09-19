@@ -6,6 +6,21 @@ import { useEffect, useRef, useState } from "react";
 // them. Each card just registers/unregisters its own callback on mount.
 let sharedObserver = null;
 const callbacks = new WeakMap();
+// Tracks each element's last committed visible/hidden state, separately from
+// React state, so the callback below can apply hysteresis.
+const shownState = new WeakMap();
+
+// A single threshold + `entry.isIntersecting` flips at exactly one crossing
+// point — on mobile, momentum/elastic scroll causes tiny sub-pixel jitter
+// right at that boundary (most obvious at the very top/bottom "edge" of the
+// scrollable area), which flips isIntersecting true/false repeatedly in a
+// few frames: a visible flicker. Fixing it needs a gap between the ratio
+// that SHOWS a card and the ratio that HIDES it again, so jitter inside
+// that gap does nothing — sampled at multiple ratios via the threshold
+// array below so the callback actually receives intermediate values
+// instead of just a single crossing event.
+const SHOW_AT = 0.15;
+const HIDE_AT = 0.02;
 
 function getSharedObserver() {
   if (sharedObserver) return sharedObserver;
@@ -13,10 +28,21 @@ function getSharedObserver() {
     (entries) => {
       for (const entry of entries) {
         const setVisible = callbacks.get(entry.target);
-        if (setVisible) setVisible(entry.isIntersecting);
+        if (!setVisible) continue;
+        const wasShown = shownState.get(entry.target) || false;
+        const ratio = entry.intersectionRatio;
+        if (!wasShown && ratio >= SHOW_AT) {
+          shownState.set(entry.target, true);
+          setVisible(true);
+        } else if (wasShown && ratio <= HIDE_AT) {
+          shownState.set(entry.target, false);
+          setVisible(false);
+        }
+        // Anything between HIDE_AT and SHOW_AT while state hasn't flipped is
+        // exactly the jitter band — deliberately ignored.
       }
     },
-    { threshold: 0.1, rootMargin: "-5% 0px -5% 0px" },
+    { threshold: [0, HIDE_AT, SHOW_AT, 0.3, 0.5], rootMargin: "-5% 0px -5% 0px" },
   );
   return sharedObserver;
 }
@@ -50,6 +76,7 @@ const RevealCard = ({ index = 0, children, className = "" }) => {
     return () => {
       observer.unobserve(el);
       callbacks.delete(el);
+      shownState.delete(el);
     };
   }, []);
 

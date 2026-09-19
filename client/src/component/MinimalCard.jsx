@@ -35,7 +35,7 @@ const MinimalCard = ({ image, alt, title, price, mrp, pricePrefix, badge, onClic
         />
         {badge && (
           <span
-            className={`absolute top-2 left-2 z-10 text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded ${badge.className}`}
+            className={`absolute top-2 left-2 z-10 text-[6px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${badge.className}`}
           >
             {badge.label}
           </span>
