@@ -132,6 +132,7 @@ export const magicShippingInfoController = asyncHandler(async (req, res) => {
           addr,
           freeShipping ? 0 : (rate?.total_charges ?? FALLBACK_SHIPPING_CHARGE),
           true,
+          { estimatedDays: rate?.estimatedDays },
         );
       } catch (err) {
         // A genuinely unserviceable pincode must block the order — we cannot
