@@ -21,9 +21,6 @@ const ProductVariantsPage = () => {
   const product = productResponse?.data;
   const variants = product?.variantDetails || [];
 
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [productId]);
 
   useEffect(() => {
     if (product && variants.length > 0) {

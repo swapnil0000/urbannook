@@ -348,6 +348,12 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
         // was worded at purchase time, even if the product's template is
         // edited later. Blank when the product never set one.
         variantTitleTemplate: product.variantTitleTemplate || "",
+        // Stable variant identifier, frozen at purchase time — unlike
+        // selectedVariant (a display name), this never goes stale if an
+        // admin renames the variant afterward. Admin dispatch/analytics
+        // views should key off this first, falling back to name-matching
+        // only for orders placed before this field existed.
+        variantSku: matchedVariant?.sku || "",
       },
     };
   });
@@ -1200,6 +1206,9 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
         priceAtPurchase,
         selectedVariant: itemVariant,
         variantTitleTemplate: product.variantTitleTemplate || "",
+        // Stable variant identifier — see the matching comment in
+        // razorpayCreateOrderController above.
+        variantSku: matchedVariant?.sku || "",
       },
     };
   });

@@ -28,6 +28,10 @@ const orderSchema = new mongoose.Schema(
           // product's template can't retroactively change how a past order
           // reads. Blank = order predates this field, or product never set one.
           variantTitleTemplate: { type: String, default: "" },
+          // Stable identifier for the exact variant purchased — set at order
+          // time and never changed afterward, unlike selectedVariant (a display
+          // name an admin can rename later). Blank = order predates this field.
+          variantSku: { type: String, default: "" },
         },
       },
     ],

@@ -16,9 +16,6 @@ const AllProductsPage = () => {
     sortBy: sortBy === 'featured' ? undefined : sortBy
   });
 
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, []);
 
   // Extract products from response
   const products = productsResponse?.data?.products || productsResponse?.data?.listofPublishedProducts || [];

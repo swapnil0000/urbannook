@@ -228,7 +228,7 @@ const ProductCard = ({ product, index = 0, listId = "all_products", listName = "
               );
             if (product?.productStatus === "out_of_stock" || allVariantsOOS) {
               return (
-                <span className="absolute top-3 left-3 z-10 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md bg-red-500 text-white shadow">
+                <span className="absolute top-3 left-3 z-10 text-[7px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-red-500 text-white shadow">
                   Out of Stock
                 </span>
               );
@@ -247,8 +247,8 @@ const ProductCard = ({ product, index = 0, listId = "all_products", listName = "
             if (totalLeft > LOW_STOCK_THRESHOLD) return null;
             if (totalLeft === 1) return null;
             return (
-              <span className="absolute top-3 left-3 z-10 flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md bg-[#2e443c] text-[#F5DEB3] border border-[#F5DEB3]/30 shadow">
-                <i className="fa-solid fa-hourglass-half text-[9px]" /> Few left
+              <span className="absolute top-3 left-3 z-10 flex items-center gap-1 text-[7px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#2e443c] text-[#F5DEB3] border border-[#F5DEB3]/30 shadow">
+                <i className="fa-solid fa-hourglass-half text-[6px]" /> Few left
               </span>
             );
           })()}

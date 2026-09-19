@@ -546,9 +546,6 @@ const ProductDetailPage = () => {
     );
   }, [wishlistItems, product]);
 
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, []);
 
   // Shared drag core — driven by pointer events (mouse) AND native touch
   // events (iOS Safari delivers custom-drag pointermove unreliably, so touch
