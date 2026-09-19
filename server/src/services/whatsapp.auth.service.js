@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { v7 as uuid7 } from "uuid";
 import WhatsAppLoginToken from "../model/whatsappLoginToken.model.js";
+import WhatsAppMessage from "../model/whatsappMessage.model.js";
 import User from "../model/user.model.js";
 import env from "../config/envConfigSetup.js";
 import { buildPlaceholderEmail } from "../utils/placeholderEmail.js";
@@ -63,6 +64,20 @@ const normalizeIndianMobile = (raw) => {
   if (!/^[6-9]\d{9}$/.test(local)) return null;
 
   return Number(local);
+};
+
+/**
+ * Files an inbound message away so a human can read it later.
+ *
+ * Never throws and is never awaited on the webhook path — the login must not
+ * depend on the archive succeeding.
+ */
+const recordInboundMessage = ({ mobileNumber, rawFrom, text, kind }) => {
+  if (!mobileNumber) return;
+
+  WhatsAppMessage.create({ mobileNumber, rawFrom, text, kind }).catch((error) =>
+    console.error("[WHATSAPP AUTH] Could not record message:", error.message),
+  );
 };
 
 /** Keeps full numbers out of the logs — 98XXXXXX10 */
@@ -320,11 +335,17 @@ const handleInboundMessage = async (body) => {
 
   const match = inbound.text.toUpperCase().match(TOKEN_REGEX);
   if (!match) {
-    // Text arrived but held no code. The length tells us whether the message
-    // was empty or the user wrote something of their own.
+    // No code at all, so this is almost certainly a customer asking something.
+    // Nothing here answers it, but at least it is no longer thrown away.
     console.warn(
       `[WHATSAPP AUTH] No login code in message (text length=${inbound.text.length})`,
     );
+    recordInboundMessage({
+      mobileNumber: normalizeIndianMobile(inbound.phone),
+      rawFrom: inbound.phone,
+      text: inbound.text,
+      kind: "CUSTOMER",
+    });
     return { handled: false, reason: "NO_TOKEN_IN_TEXT" };
   }
 
@@ -346,6 +367,12 @@ const handleInboundMessage = async (body) => {
     console.warn(
       `[WHATSAPP AUTH] Unknown or expired code ${token} from ${maskMobile(mobileNumber)}`,
     );
+    recordInboundMessage({
+      mobileNumber,
+      rawFrom: inbound.phone,
+      text: inbound.text,
+      kind: "LOGIN_FAILED",
+    });
     return { handled: false, reason: "TOKEN_NOT_FOUND" };
   }
 
@@ -363,17 +390,35 @@ const handleInboundMessage = async (body) => {
     `[WHATSAPP AUTH] Verified ${token} from ${maskMobile(mobileNumber)} -> userId ${user.userId}`,
   );
 
-  // WhatsApp cannot hand the user back to us on its own, so the customer is
-  // left sitting in the chat wondering what happens next. A reply with a link
-  // closes the loop in one tap. The customer just messaged us, so this is a
-  // free-form session message and needs no approved template.
+  recordInboundMessage({
+    mobileNumber,
+    rawFrom: inbound.phone,
+    text: inbound.text,
+    kind: "LOGIN_VERIFIED",
+  });
+
+  // Deliberately no link here.
   //
-  // Not awaited: the webhook has to answer fast, and a failed courtesy
-  // message must never hold up a verified login.
+  // WhatsApp opens links in the phone's default browser, which is almost
+  // never the browser the login started in — most of our traffic arrives in
+  // Instagram's in-app browser. Tapping a link lands the customer in Chrome
+  // or Safari with no session and no cart, looking logged out, while the tab
+  // that actually signed them in sits waiting behind Instagram. That reads as
+  // a failed login even though it worked.
+  //
+  // Sending them back to where they started is the only thing that works,
+  // and no link can do that.
+  //
+  // Not awaited: the webhook has to answer fast, and a courtesy message must
+  // never hold up a verified login.
+  // The link carries the code so it signs them in wherever it opens — which
+  // is usually not where they started.
   const siteUrl = env.CLIENT_BASE_URL || "https://www.urbannook.in";
+  const resumeUrl = `${siteUrl}/?wa=${token}`;
+
   const reply = isNewUser
-    ? `Welcome to UrbanNook 🌿\n\nYou're signed in. From now on your order updates will reach you right here.\n\nStart exploring: ${siteUrl}`
-    : `You're signed in to UrbanNook ✅\n\nTap to continue: ${siteUrl}`;
+    ? `Welcome to UrbanNook 🌿\n\nYou're signed in. Your order updates will arrive right here from now on.\n\nOpen your account: ${resumeUrl}`
+    : `You're signed in to UrbanNook ✅\n\nOpen your account: ${resumeUrl}`;
 
   sendWhatsAppSessionMessage(mobileNumber, reply).catch(() => {});
 
@@ -434,13 +479,30 @@ const checkWhatsAppLoginStatus = async (token) => {
 
   const normalized = token.trim().toUpperCase();
 
-  // Take a VERIFIED code atomically so two parallel polls cannot both be
-  // handed a session
-  const verified = await WhatsAppLoginToken.findOneAndDelete({
-    token: normalized,
-    status: "VERIFIED",
-    expiresAt: { $gt: new Date() },
-  });
+  /**
+   * A verified code stays usable until it expires, rather than being consumed
+   * by whoever reads it first.
+   *
+   * The customer does not reliably come back to the browser they started in.
+   * Most arrive from Instagram's in-app browser, and returning from WhatsApp
+   * often lands them in Chrome or Safari instead — a different browser, with
+   * no session. Deleting on first read meant the polling tab and the link in
+   * the WhatsApp reply were fighting over one code, and whichever lost showed
+   * a logged-out page.
+   *
+   * The code is random, lives five minutes, and only ever exists on the
+   * customer's phone and in this database, so letting it sign the same person
+   * in on two devices inside that window is the better trade.
+   */
+  const verified = await WhatsAppLoginToken.findOneAndUpdate(
+    {
+      token: normalized,
+      status: "VERIFIED",
+      expiresAt: { $gt: new Date() },
+    },
+    { $set: { consumedAt: new Date() } },
+    { new: true },
+  );
 
   if (verified) {
     const user = await User.findOne({ userId: verified.userId });
