@@ -196,6 +196,88 @@ export const lineItemsTotalPaise = (lineItems = []) =>
   );
 
 /* ===============================================================
+   DISCOUNTING THE LINE ITEMS
+================================================================ */
+
+/**
+ * Bring `line_items` down so they add up to exactly what we intend to charge.
+ *
+ * WHY NOT `promotions`: Razorpay's order API accepts a `promotions` array and
+ * its own SDK types it, so a cart coupon was first sent that way — amount
+ * discounted, line items at full price, promotion explaining the gap. Razorpay
+ * ACCEPTED the order, kept our amount, and silently dropped the promotion:
+ *
+ *   sent  → amount ₹1,  line_items_total ₹3697, promotion ₹3696
+ *   kept  → amount ₹1,  line_items_total ₹3697, promotions []
+ *
+ * The Magic modal builds its cart from the line items, so it billed ₹3697 and
+ * the discount vanished. The only number Razorpay reliably respects is the one
+ * on the items themselves — so the discount goes there.
+ *
+ * `price` stays at the full amount and only `offer_price` moves, which is what
+ * makes the modal show the original struck through.
+ *
+ * Money is in PAISE and every price must be a whole number of them, so the
+ * proportional split leaves a few paise unallocated; those are handed out one
+ * at a time to the items that can absorb them (an item of quantity n costs n
+ * paise to raise by one). Whatever cannot be placed — only possible when every
+ * quantity is above 1 — stays as a sub-rupee shortfall, and the caller charges
+ * the total that came back rather than the one it asked for, so the two can
+ * never disagree.
+ *
+ * @param {object[]} lineItems  as built by buildMagicLineItems
+ * @param {number} targetPaise  what the customer should pay for the items
+ * @returns {{lineItems: object[], total: number}} `total` is authoritative
+ */
+export const discountMagicLineItems = (lineItems = [], targetPaise = 0) => {
+  const currentTotal = lineItemsTotalPaise(lineItems);
+  const target = Math.round(Number(targetPaise) || 0);
+
+  // Nothing to do: no discount, or a target at/above full price (never scale up
+  // — that would charge more than the items are worth).
+  if (!lineItems.length || currentTotal <= 0 || target >= currentTotal) {
+    return { lineItems, total: currentTotal };
+  }
+
+  if (target <= 0) {
+    // A free order cannot be paid for; the caller should not have got here.
+    return { lineItems, total: currentTotal };
+  }
+
+  const qtyOf = (li) => Math.max(1, Number(li.quantity) || 1);
+
+  const scaled = lineItems.map((li) => {
+    const unit = Math.floor(((Number(li.offer_price) || 0) * target) / currentTotal);
+    return { ...li, offer_price: Math.max(0, unit) };
+  });
+
+  // Hand out the rounding remainder. Cheapest-to-raise first (an item of
+  // quantity 1 absorbs a single paisa), so the shortfall closes completely
+  // whenever any item has quantity 1 — which is the ordinary case.
+  const order = scaled
+    .map((li, i) => ({ i, qty: qtyOf(li) }))
+    .sort((a, b) => a.qty - b.qty);
+
+  let short = target - scaled.reduce((sum, li) => sum + li.offer_price * qtyOf(li), 0);
+  let placed = true;
+  while (short > 0 && placed) {
+    placed = false;
+    for (const { i, qty } of order) {
+      if (qty > short) continue;
+      // Never price an item above its own strike-through price.
+      if (scaled[i].offer_price + 1 > (Number(scaled[i].price) || Infinity)) continue;
+      scaled[i].offer_price += 1;
+      short -= qty;
+      placed = true;
+      if (short <= 0) break;
+    }
+  }
+
+  const total = scaled.reduce((sum, li) => sum + li.offer_price * qtyOf(li), 0);
+  return { lineItems: scaled, total };
+};
+
+/* ===============================================================
    SERVICEABILITY RESPONSE
 ================================================================ */
 
