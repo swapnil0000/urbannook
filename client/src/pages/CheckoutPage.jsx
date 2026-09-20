@@ -409,7 +409,7 @@ const PriceRows = ({ subtotal, shipping, discount, giftWrapAmount = 0, appliedCo
 
       {totalSavings > 0 && <SavingsBanner amount={totalSavings} freeShipping={isShippingFree} />}
 
-      {isCOD && realShippingAmount > 0 && (
+      {/* {isCOD && realShippingAmount > 0 && (
         <div className="border-t border-dashed border-amber-200 pt-3 space-y-0 rounded-xl bg-amber-50/60 -mx-1 px-3 pb-3 mt-1">
           <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-amber-600 mb-2.5 flex items-center gap-1.5">
             <i className="fa-solid fa-receipt text-[8px]" /> COD Breakdown
@@ -439,8 +439,7 @@ const PriceRows = ({ subtotal, shipping, discount, giftWrapAmount = 0, appliedCo
             </div>
           </div>
         </div>
-      )}
-
+      )} */}
     </div>
   );
 };
@@ -505,6 +504,21 @@ const CheckoutPage = () => {
   });
   const [shippingError, setShippingError] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("PREPAID"); // "PREPAID" | "COD"
+  // A guest picks HOW to pay before filling anything in. Paying online hands
+  // the whole job to Razorpay Magic — it collects contact and address in its
+  // own modal — so the Contact and Address steps are skipped outright; asking
+  // for the same details first and then again inside the modal is the worst of
+  // both. COD has no such shortcut: its advance is 2x the live carrier rate,
+  // which Magic cannot express, so it drops into the usual three steps.
+  //   null    → not chosen yet
+  //   EXPRESS → paying online, Magic owns the rest
+  //   FORM    → the ordinary stepped flow
+  // Deliberately NOT persisted. The choice belongs to one visit to checkout:
+  // moving between steps keeps it (this component stays mounted), while
+  // leaving for a product page and coming back asks again — that is a fresh
+  // attempt, and someone who picked COD once must not be stuck with it for the
+  // rest of the session with no way back to paying online.
+  const [payChoice, setPayChoice] = useState(null);
   const [showCodSheet, setShowCodSheet] = useState(false); // COD breakdown popup
   // When the user taps "Pay Online" while still on COD, we must first flip to
   // PREPAID and let shipping re-calc settle BEFORE charging — otherwise the
@@ -1135,14 +1149,31 @@ const CheckoutPage = () => {
      which Magic's dashboard-configured COD advance cannot reproduce.
 
      The server must agree: it only treats an order as Magic when
-     MAGIC_CHECKOUT_ENABLED is on AND the request carries `magic: true`. */
-  const magicEnabled = config.features.enableMagicCheckout && paymentMethod !== "COD";
+     MAGIC_CHECKOUT_ENABLED is on AND the request carries `magic: true`.
+
+     Magic runs on the EXPRESS path only — the one where the customer chose to
+     pay online before any form, so nothing has been collected yet. Anyone who
+     has already given us contact and address goes through the ordinary flow:
+     Magic's whole value is collecting those itself, and opening it on top of a
+     filled form only asks the same questions twice and discards what they
+     typed. That applies to signed-in customers as much as to guests. */
+  const magicEnabled =
+    config.features.enableMagicCheckout &&
+    paymentMethod !== "COD" &&
+    payChoice === "EXPRESS";
 
   // Extra checkout.js options that switch the modal into Magic. Note this is a
   // CHECKOUT option — the order itself is made a Magic order by its line_items.
-  const magicCheckoutOptions = magicEnabled
-    ? { one_click_checkout: true, show_coupons: true }
-    : {};
+  //
+  // Driven by what the SERVER says it built, not by our own flag: the server
+  // has its own MAGIC_CHECKOUT_ENABLED and a guests-only rollout switch, so it
+  // can decline Magic for an order we asked to be Magic. Opening the 1CC modal
+  // on an order that carries no line_items strands the customer in a checkout
+  // that cannot complete.
+  const magicCheckoutOptions = (orderResult) =>
+    (orderResult?.data?.magic ?? orderResult?.magic ?? false)
+      ? { one_click_checkout: true, show_coupons: true }
+      : {};
 
   const handleAddressConfirm = (suggestion, addressId, deliveryAddressFull) => {
     addressManuallyResetRef.current = false;
@@ -1367,7 +1398,17 @@ const CheckoutPage = () => {
     goToStep(reviewStep);
   };
 
-  const handlePayment = async () => {
+  /**
+   * @param {{forceMagic?: boolean}} opts
+   *   `forceMagic` exists because the express button sets payChoice and pays in
+   *   the same tick: React has not re-rendered yet, so `magicEnabled` below is
+   *   still computed from the OLD payChoice and the order goes out as a plain
+   *   one. The server then demands the name and address the express path never
+   *   collected, and the first tap fails while the second — after the state has
+   *   landed — succeeds. The caller knows what it chose, so it says so.
+   */
+  const handlePayment = async (opts = {}) => {
+    const useMagic = opts.forceMagic ?? magicEnabled;
     setPaymentError(null);
     {
       const buyerName = (isGuest ? guestName : (userProfile?.userName || userProfile?.name || "")).trim();
@@ -1399,7 +1440,7 @@ const CheckoutPage = () => {
             long: addressForm?.long || 0,
           },
           paymentMethod,
-          magic: magicEnabled, // server skips address/shipping and sends line_items
+          magic: useMagic, // server skips address/shipping and sends line_items
           ...(appliedCoupon ? { couponCode: appliedCoupon } : {}),
           // Guests have no server-side cart to read this from — the boolean
           // intent has to come from the request. Price is still never
@@ -1444,7 +1485,7 @@ const CheckoutPage = () => {
             navigate(`/payment-processing/${response.razorpay_order_id}`);
           },
           prefill: { name: guestName.trim(), email: guestEmail.trim(), contact: guestMobile.trim() },
-          ...magicCheckoutOptions,
+          ...magicCheckoutOptions(orderResult),
           notes: { address, pinCode }, theme: { color: "#E63329" },
           modal: { ondismiss: () => { trackPaymentModalDismissed({ orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId, value: totalToPay }); setPaymentError("Payment cancelled. Your cart is safe."); setShowRetry(true); }, escape: false, confirm_close: true },
         });
@@ -1457,17 +1498,26 @@ const CheckoutPage = () => {
       } catch (e) {
         const msg = e?.data?.message || e?.message || "Failed to initialize payment.";
         showNotification(msg, "error"); setPaymentError(msg); setShowRetry(true);
+        // Express skipped our forms on the promise that Magic would collect
+        // everything. If the server declined it, the order has no address and
+        // this rejection is the only signal we get — put the steps back rather
+        // than leaving the customer on a screen that cannot succeed.
+        if (payChoice === "EXPRESS") { setPayChoice("FORM"); goToStep(1); }
       }
       return;
     }
 
     const senderMobileStr = stripCC(String(senderMobile || ""));
-    if (!senderMobileStr || !validateMobile(senderMobileStr)) { showNotification("Please enter a valid mobile number", "error"); goToStep(contactStep); return; }
+    // Express skipped these screens on purpose — Magic collects the number and
+    // the address in its own modal, and the server skips the same checks for a
+    // Magic order. Demanding them here would block the very path that exists
+    // to avoid asking.
+    if (!useMagic && (!senderMobileStr || !validateMobile(senderMobileStr))) { showNotification("Please enter a valid mobile number", "error"); goToStep(contactStep); return; }
     const deliveryMobileStr = stripCC(String(deliveryMobile || ""));
     if (useDifferentDeliveryContact && deliveryMobileStr && !validateMobile(deliveryMobileStr)) {
       showNotification("Please enter a valid delivery contact", "error"); return;
     }
-    if (!address.trim()) { showNotification("Please select a delivery address", "error"); return; }
+    if (!useMagic && !address.trim()) { showNotification("Please select a delivery address", "error"); return; }
     try {
       const selectedFullAddr = savedAddress.find((a) => a.addressId === currentAddressId);
       const orderResult = await createOrder({
@@ -1488,7 +1538,7 @@ const CheckoutPage = () => {
           long: selectedFullAddr?.location?.coordinates?.[0] || selectedFullAddr?.long || 0,
         },
         paymentMethod,
-        magic: magicEnabled, // server skips address/shipping and sends line_items
+        magic: useMagic, // server skips address/shipping and sends line_items
         ...getFbCookies(), // _fbp / _fbc → stored on order for CAPI match quality
       }).unwrap();
 
@@ -1524,7 +1574,7 @@ const CheckoutPage = () => {
           } catch (_) { setPaymentError("Payment verification failed. Contact support if amount was debited."); }
         },
         prefill: { name: userProfile?.userName || userProfile?.name || "", email: userProfile?.email || "", contact: senderMobileStr },
-        ...magicCheckoutOptions,
+        ...magicCheckoutOptions(orderResult),
         notes: { address, pinCode }, theme: { color: "#E63329" },
         modal: { ondismiss: () => { trackPaymentModalDismissed({ orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId || orderResult.id, value: totalToPay }); setPaymentError("Payment cancelled. Your cart is safe."); setShowRetry(true); }, escape: false, confirm_close: true },
       });
@@ -1537,6 +1587,10 @@ const CheckoutPage = () => {
     } catch (e) {
       const msg = e?.data?.message || e?.message || "Failed to initialize payment.";
       showNotification(msg, "error"); setPaymentError(msg); setShowRetry(true);
+      // Express skipped the forms expecting Magic to collect everything. If the
+      // server declined it, the order has no address and this is the only
+      // signal we get — put the steps back.
+      if (payChoice === "EXPRESS") { setPayChoice("FORM"); goToStep(1); }
     }
   };
 
@@ -1620,6 +1674,47 @@ const CheckoutPage = () => {
     handlePayment();
   };
 
+  // ── Express (guest + Magic): no forms at all ───────────────────────────────
+  // Offered only when the build flag is on. The SERVER has the final say and
+  // may still decline Magic (its own flag, or a guests-only rollout), in which
+  // case the order it builds needs an address we never collected — that lands
+  // in the guest error path above, which puts the steps back.
+  const expressAvailable = config.features.enableMagicCheckout;
+  const showPayChoice =
+    expressAvailable && (!payChoice || payChoice === "EXPRESS") && cartItems.length > 0;
+
+  const handleExpressPay = () => {
+    if (payBusy) return;
+    setPayChoice("EXPRESS");
+    trackSelectPaymentMethod({ paymentMethod: "PREPAID" });
+    // paymentMethod is still PREPAID here: this screen is the first thing the
+    // customer sees, so nothing has had the chance to switch it to COD. No
+    // need to wait for shipping either — a Magic order's amount never includes
+    // it. forceMagic: the payChoice set above has not rendered yet.
+    handlePayment({ forceMagic: true });
+  };
+
+  const handleChooseCodPath = () => {
+    setPayChoice("COD");
+    setPaymentMethod("COD");
+    trackSelectPaymentMethod({ paymentMethod: "COD" });
+    // No goToStep here: a fresh session is already on step 1, and a returning
+    // one keeps the step it was restored to, address and all.
+  };
+
+  // Having already chosen COD on the way in, the Review step shows one action,
+  // not two — offering "Pay Online" again just re-asks a settled question.
+  const codOnly = payChoice === "COD";
+
+  // No second "pay online instead" control is needed here: tapping the COD
+  // button opens the advance breakdown, and that sheet already carries a
+  // "Save ₹X — pay online" action. Two ways back would just crowd the footer.
+
+  const handleLeaveExpress = () => {
+    setPayChoice("FORM");
+    setPaymentError(null);
+  };
+
   // The two footer/sidebar buttons double as the payment-method selector, but
   // ONE tap always completes the action.
   //
@@ -1647,6 +1742,146 @@ const CheckoutPage = () => {
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin" />
           <p className="text-xs text-gray-400 font-medium tracking-wide uppercase">Loading checkout</p>
+        </div>
+      </div>
+    );
+  }
+
+  /* ── How would you like to pay? ─────────────────────────────────────────
+     The whole point of this screen is that it comes BEFORE any field. Paying
+     online needs nothing from us — Magic collects it. COD needs the address
+     first, because the advance is priced off the live carrier rate for that
+     pincode. Shipping is deliberately not shown as a number here: on the
+     online path Razorpay rates it against the address it is about to collect,
+     and quoting a figure we cannot stand behind would be worse than saying so. */
+  if (showPayChoice) {
+    const unitCount = cartItems.reduce((n, i) => n + (Number(i.quantity) || 0), 0);
+    const itemsTotal = pricingDetails.subtotal + giftWrapAmount - pricingDetails.discount;
+    // Locked while the order is being built and the modal opened. A dismissal
+    // or a failed payment records an error, and that unlocks it again —
+    // otherwise the customer is left staring at a dead "Opening…" button.
+    const busy = isOrdering || (payChoice === "EXPRESS" && !paymentError);
+
+    return (
+      <div className="bg-[#f5f7f5] min-h-[80vh] pt-8 lg:pt-10">
+        <div className="max-w-xl mx-auto px-4 sm:px-6 pb-16">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-1.5 text-xs text-gray-400 font-medium hover:text-ink transition-colors mb-7"
+          >
+            <i className="fa-solid fa-chevron-left text-[10px]" /> Cart
+          </button>
+
+          <h1 className="text-[26px] sm:text-[32px] font-bold text-ink leading-tight tracking-tight">
+            How would you like to pay?
+          </h1>
+          <p className="text-sm text-gray-500 mt-2">
+            {unitCount} {unitCount === 1 ? "item" : "items"} ready to go.
+          </p>
+
+          {/* ── What it costs so far ───────────────────────────────────── */}
+          <div className="mt-6 bg-white rounded-2xl border border-gray-100 p-5">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-500">Subtotal</span>
+              <span className="font-semibold text-ink tabular-nums">₹{Math.round(pricingDetails.subtotal).toLocaleString("en-IN")}</span>
+            </div>
+            {giftWrapAmount > 0 && (
+              <div className="flex items-center justify-between text-sm mt-2.5">
+                <span className="text-gray-500">Gift wrap</span>
+                <span className="font-semibold text-ink tabular-nums">₹{Math.round(giftWrapAmount).toLocaleString("en-IN")}</span>
+              </div>
+            )}
+            {pricingDetails.discount > 0 && (
+              <div className="flex items-center justify-between text-sm mt-2.5">
+                <span className="flex items-center gap-1.5 text-emerald-600 font-medium">
+                  <i className="fa-solid fa-tag text-[10px]" />
+                  {appliedCoupon || "Discount"}
+                </span>
+                <span className="font-semibold text-emerald-600 tabular-nums">
+                  −₹{Math.round(pricingDetails.discount).toLocaleString("en-IN")}
+                </span>
+              </div>
+            )}
+            <div className="flex items-center justify-between pt-3.5 mt-3.5 border-t border-gray-100">
+              <span className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Items total</span>
+              <span className="text-xl font-bold text-ink tabular-nums">₹{Math.round(itemsTotal).toLocaleString("en-IN")}</span>
+            </div>
+            <p className="text-[11px] text-gray-400 mt-2 leading-relaxed">
+              Delivery is priced once we have your pincode — free on eligible orders.
+            </p>
+          </div>
+
+          {/* ── Something went wrong on the last attempt ───────────────── */}
+          {paymentError && (
+            <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-red-100 bg-red-50 px-4 py-3">
+              <i className="fa-solid fa-circle-exclamation text-red-500 text-xs mt-0.5" />
+              <p className="text-xs text-red-600 leading-relaxed">{paymentError}</p>
+            </div>
+          )}
+
+          {/* ── The choice ─────────────────────────────────────────────────
+              Two rows in one card, not two pitches. The only thing that
+              actually differs for the customer is WHEN the money leaves, so
+              that is the only thing each row says. Nothing here advertises the
+              checkout to someone who has already decided to buy. */}
+          <div className="mt-6 space-y-3">
+            <button
+              onClick={handleExpressPay}
+              disabled={busy}
+              className="w-full text-left rounded-2xl bg-white border-2 border-ink px-5 py-4 flex items-center gap-4 transition-colors hover:bg-gray-50 disabled:cursor-wait disabled:hover:bg-white group"
+            >
+              <span className="w-2 h-2 rounded-full bg-ink shrink-0" />
+              <span className="min-w-0 flex-1">
+                {/* No sub-line: paying online holds no surprise worth warning
+                    about. Only the option that takes money earlier than the
+                    customer expects has something to say. */}
+                <span className="block font-bold text-[15px] text-ink">Pay online</span>
+                {busy && (
+                  <span className="block text-[13px] text-gray-500 mt-0.5">Opening payment…</span>
+                )}
+              </span>
+              {busy ? (
+                <span className="w-4 h-4 border-2 border-gray-300 border-t-ink rounded-full animate-spin shrink-0" />
+              ) : (
+                <i className="fa-solid fa-chevron-right text-[11px] text-gray-300 shrink-0 transition-transform group-hover:translate-x-0.5" />
+              )}
+            </button>
+
+            <button
+              onClick={handleChooseCodPath}
+              disabled={busy}
+              className="w-full text-left rounded-2xl bg-white border border-gray-300 px-5 py-4 flex items-center gap-4 transition-colors hover:border-gray-400 disabled:opacity-50 group"
+            >
+              <span className="w-2 h-2 rounded-full bg-gray-300 shrink-0" />
+              <span className="min-w-0 flex-1">
+                <span className="block font-bold text-[15px] text-ink">Cash on delivery</span>
+                {/* The advance is 2x the live carrier rate, which needs a
+                    pincode we do not have yet — so this names the charge
+                    without quoting a figure that could change. The exact split
+                    is shown on the review step, before anything is charged. */}
+                <span className="block text-[13px] text-gray-500 mt-0.5">
+                  Advance online now, rest in cash
+                </span>
+              </span>
+              <i className="fa-solid fa-chevron-right text-[11px] text-gray-300 shrink-0 transition-transform group-hover:translate-x-0.5" />
+            </button>
+          </div>
+
+          {/* Only offered to someone who HAS a saved address — for a guest
+              there is nothing on file to go back to. */}
+          {!isGuest && (
+            <button
+              onClick={handleLeaveExpress}
+              disabled={busy}
+              className="mt-4 text-xs text-gray-400 hover:text-ink transition-colors disabled:opacity-40"
+            >
+              Use a saved address instead
+            </button>
+          )}
+
+          <p className="flex items-center justify-center gap-1.5 text-[11px] text-gray-400 mt-8">
+            <i className="fa-solid fa-lock text-[9px]" /> Secured by Razorpay
+          </p>
         </div>
       </div>
     );
@@ -2624,8 +2859,9 @@ const CheckoutPage = () => {
             {/* Pay buttons (review step only) */}
             {currentStep === reviewStep && (
               <div className="px-5 pb-5 space-y-3">
-                {/* Pay Online → primary CTA with fancy Save tooltip */}
-                <div className="relative">
+                {/* Pay Online → primary CTA with fancy Save tooltip.
+                    Hidden when COD was already chosen on the way in. */}
+                <div className={`relative ${codOnly ? "hidden" : ""}`}>
                   {!payBusy && amountsSettled && codSaving > 0 && (
                     <div className="pointer-events-none absolute -top-2.5 right-3 z-10">
                       <span className="savings-tip inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-[10px] font-extrabold shadow-md shadow-emerald-600/40">
@@ -2671,8 +2907,9 @@ const CheckoutPage = () => {
                   }`}
                 >
                   <i className="fa-solid fa-hand-holding-dollar text-xs opacity-80" />{" "}
-                  Pay on Delivery
+                  {codOnly && amountsSettled ? `Pay ₹${codAdvance.toLocaleString()} now` : "Pay on Delivery"}
                 </button>
+
                 <div className="flex items-center justify-center gap-3">
                   <i className="fa-brands fa-cc-visa text-gray-300 text-lg" />
                   <i className="fa-brands fa-cc-mastercard text-gray-300 text-lg" />
@@ -2731,7 +2968,26 @@ const CheckoutPage = () => {
                   Continue <i className="fa-solid fa-arrow-right text-xs" />
                 </button>
               )}
-              {currentStep === reviewStep && (
+              {/* COD chosen on the way in → one action, full width, plus a
+                  quiet way back for a last-minute change of mind. */}
+              {currentStep === reviewStep && codOnly && (
+                <button
+                  onClick={handleCodButton}
+                  disabled={payBusy || !amountsSettled}
+                  className="flex-1 min-w-0 h-12 rounded-xl font-bold text-[13px] active:scale-[0.99] transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 border-2 bg-brand text-white border-brand shadow-lg"
+                >
+                  {isOrdering || pendingPay || isCalculatingShipping ? (
+                    <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <i className="fa-solid fa-hand-holding-dollar text-[11px] opacity-80" />{" "}
+                      {amountsSettled ? `Pay ₹${codAdvance.toLocaleString()} now` : "Pay on Delivery"}
+                    </>
+                  )}
+                </button>
+              )}
+
+              {currentStep === reviewStep && !codOnly && (
                 <>
                   {/* Pay on Delivery — outline until selected */}
                   <button
