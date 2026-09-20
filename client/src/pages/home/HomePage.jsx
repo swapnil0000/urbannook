@@ -63,9 +63,14 @@ const SecHead = ({ index, kicker, title, onView }) => (
 //   </div>
 // );
 
+/* The middle figure is maintained by hand — bump it when the milestone moves.
+   It used to read "0 — Mass produced", which was meant as a boast about not
+   mass producing but rendered as a large animated zero and simply looked like
+   a number that had failed to load. A "+" is deliberate: the claim stays true
+   as the count grows, so a stale value is never a false one. */
 const STATS = [
   { to: 100, suffix: '%', label: 'Made in India' },
-  { to: 0, suffix: '', label: 'Mass produced' },
+  { to: 900, suffix: '+', label: 'Orders delivered' },
   { to: 48, suffix: 'h', label: 'To ship' },
 ];
 

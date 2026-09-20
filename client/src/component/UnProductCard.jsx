@@ -71,14 +71,19 @@ const UnProductCard = ({
         <img src={productImg(p)} alt={p.productName} loading="lazy" className="gl-img w-full h-full object-cover" onError={(e) => { e.currentTarget.src = '/assets/logo.webp'; }} />
         {img2 && <img src={img2} alt="" className="gl-img2 absolute inset-0 w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
       </div>
-      <div className="p-3.5 flex flex-col flex-1">
-        <span className="gl-lbl text-[10px] text-faint">{p.productCategory || 'Urban Nook'}</span>
-        <p className="font-bold text-sm leading-snug line-clamp-2 min-h-[2.75em] mt-1">{p.productName}</p>
+      <div className="p-3.5 flex flex-col flex-1 min-w-0">
+        {/* Truncated: a long category in uppercase mono with .14em tracking
+            wraps to two lines and shoves the name and price out of alignment
+            across the grid. */}
+        <span className="gl-lbl text-[10px] text-sale block truncate">{p.productCategory || 'Urban Nook'}</span>
+        {/* Explicit colour: the card forces a white background, so leaving the
+            name to inherit means it follows whatever the page sets. */}
+        <p className="font-bold text-sm leading-snug line-clamp-2 min-h-[2.75em] mt-1 text-ink">{p.productName}</p>
         <div className="mt-auto pt-2 flex items-baseline flex-wrap gap-x-2 gap-y-0.5">
-          <span className="font-extrabold">{inr(price)}</span>
+          <span className="text-[15px] text-ink font-extrabold">{inr(price)}</span>
           {mrp > price && (
             <>
-              <span className="text-xs text-faint line-through">{inr(mrp)}</span>
+              <span className="text-xs text-sale line-through">{inr(mrp)}</span>
               <span className="gl-lbl text-[9px] text-sale">{Math.round(((mrp - price) / mrp) * 100)}% off</span>
             </>
           )}

@@ -11,7 +11,6 @@ const productList = (res) => res?.data?.products || res?.data?.listofPublishedPr
 const AllProductsPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeCat, setActiveCat] = useState(searchParams.get('category') || 'All');
-  const [sortBy, setSortBy] = useState('featured');
 
   const { data: productsResponse, isLoading, error } = useGetProductsQuery({ page: 1, limit: 24 });
 
@@ -25,13 +24,13 @@ const AllProductsPage = () => {
     return set;
   }, [products]);
 
-  const displayProducts = useMemo(() => {
-    let list = products.filter((p) => activeCat === 'All' || p.productCategory === activeCat);
-    const price = (p) => firstVariant(p)?.variantPrice || 0;
-    if (sortBy === 'price-low') list = [...list].sort((a, b) => price(a) - price(b));
-    if (sortBy === 'price-high') list = [...list].sort((a, b) => price(b) - price(a));
-    return list;
-  }, [products, activeCat, sortBy]);
+  // Price sorting is gone with its control: with a catalogue this size the
+  // whole category fits on one screen, so sorting solved a problem nobody had
+  // while taking the room the categories actually needed.
+  const displayProducts = useMemo(
+    () => products.filter((p) => activeCat === 'All' || p.productCategory === activeCat),
+    [products, activeCat],
+  );
 
   useEffect(() => {
     if (displayProducts.length) trackViewItemList?.({ listName: 'All Products', listId: 'all_products', items: displayProducts.map((p, i) => ({ itemId: p.productId, itemName: p.productName, price: firstVariant(p)?.variantPrice || 0, index: i })) });
@@ -53,15 +52,15 @@ const AllProductsPage = () => {
         <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">Shop All</h1>
         <p className="text-muted mt-2">3D-printed desk lamps, pen stands &amp; décor.</p>
 
-        <div className="flex flex-wrap items-center justify-between gap-4 mt-6">
-          <div className="flex flex-wrap gap-2.5">
+        {/* One line, scrolled sideways — wrapping pushed the grid down a whole
+            row on phones, and a category list is read across, not down.
+            gl-hscroll hides the scrollbar; the negative margin lets the row
+            bleed to the screen edge so the last chip is visibly cut off,
+            which is what tells you there is more to swipe. */}
+        <div className="mt-6 -mx-4 sm:-mx-6 px-4 sm:px-6 overflow-x-auto gl-hscroll">
+          <div className="flex items-center gap-2.5 w-max">
             <button onClick={() => selectCat('All')} className={chip('All')}>All</button>
             {categories.map((c) => <button key={c} onClick={() => selectCat(c)} className={chip(c)}>{c}</button>)}
-          </div>
-          <div className="flex items-center border border-hair rounded-full overflow-hidden bg-white">
-            {[['featured', 'Featured'], ['price-low', '₹ Low'], ['price-high', '₹ High']].map(([v, l]) => (
-              <button key={v} onClick={() => setSortBy(v)} className={`px-3.5 py-2 text-xs font-semibold transition-colors ${sortBy === v ? 'bg-ink text-white' : 'text-muted hover:text-ink'}`}>{l}</button>
-            ))}
           </div>
         </div>
       </div>

@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
 import { useGoogleLoginMutation } from '../../../store/api/authApi';
 import { useDispatch, useSelector } from 'react-redux';
@@ -15,6 +16,33 @@ export default function GoogleLoginButton({
   text = "continue_with",
   shape = "rectangular"
 }) {
+  /* Google renders this button inside an iframe it lays out itself, at the
+     width IT is told. Stretching that iframe with CSS does not widen the
+     button — it widens the box around a button that is still laid out for the
+     old width, which is what tore the logo away from the label. The supported
+     way is to hand Google a pixel width, so the wrapper is measured and the
+     number passed down; 400 is the widest Google accepts. */
+  const holderRef = useRef(null);
+  const [width, setWidth] = useState(0);
+
+  useEffect(() => {
+    const el = holderRef.current;
+    if (!el) return;
+
+    const measure = () => {
+      const w = Math.floor(el.getBoundingClientRect().width);
+      if (w > 0) setWidth(Math.min(w, 400));
+    };
+
+    measure();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", measure);
+      return () => window.removeEventListener("resize", measure);
+    }
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const [googleLogin, { isLoading }] = useGoogleLoginMutation();
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -78,14 +106,21 @@ export default function GoogleLoginButton({
   };
 
   return (
-    <GoogleLogin
-      onSuccess={handleSuccess}
-      onError={handleError}
-      useOneTap={useOneTap}
-      theme={theme}
-      size={size}
-      text={text}
-      shape={shape}
-    />
+    // Full width so there is something to measure; the button itself is drawn
+    // at the measured width and centred, never stretched.
+    <div ref={holderRef} className="w-full flex justify-center">
+      {width > 0 && (
+        <GoogleLogin
+          onSuccess={handleSuccess}
+          onError={handleError}
+          useOneTap={useOneTap}
+          theme={theme}
+          size={size}
+          text={text}
+          shape={shape}
+          width={width}
+        />
+      )}
+    </div>
   );
 }

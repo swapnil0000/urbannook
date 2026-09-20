@@ -29,42 +29,7 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
 
   const [passkeyLoginOptions] = usePasskeyLoginOptionsMutation();
   const [passkeyLoginVerify] = usePasskeyLoginVerifyMutation();
-  const [passkeyBusy, setPasskeyBusy] = useState(false);
-  const passkeySupported = typeof window !== 'undefined' && browserSupportsWebAuthn() && isGoogleAuthSupported();
 
-  const handlePasskeyLogin = async () => {
-    const email = formData.identifier?.trim();
-    if (!email) {
-      setFieldError('identifier', 'Enter your email to use a passkey');
-      showNotification('Enter your email first', 'error');
-      return;
-    }
-    setPasskeyBusy(true);
-    try {
-      const optsRes = await passkeyLoginOptions({ email }).unwrap();
-      const assertion = await startAuthentication({ optionsJSON: optsRes.data });
-      const res = await passkeyLoginVerify({ email, assertion }).unwrap();
-      // passkeyLoginVerify.onQueryStarted already did setCredentials + CSRF
-      showNotification('Signed in with passkey!', 'success');
-      trackLogin({ method: 'passkey', userId: res.data?.userId, email: res.data?.email || email, name: res.data?.name });
-      const userData = { name: res.data?.name || 'User', email: res.data?.email || email, userId: res.data?.userId || '' };
-      if (onLoginSuccess) onLoginSuccess(userData);
-      dispatch(setShowLoginModal(false));
-      if (onClose) onClose();
-      if (loginCallback && loginCallback.startsWith('navigate:')) {
-        const path = loginCallback.replace('navigate:', '');
-        dispatch(clearLoginCallback());
-        navigate(path);
-      }
-    } catch (err) {
-      // User dismissed the OS passkey prompt — stay silent
-      if (err?.name === 'NotAllowedError' || err?.name === 'AbortError') return;
-      const msg = err?.data?.message || err?.message || 'Passkey sign-in failed';
-      showNotification(msg, 'error');
-    } finally {
-      setPasskeyBusy(false);
-    }
-  };
 
   // Use validation hook with custom rules for login (password without pattern validation)
   const { 
@@ -208,7 +173,7 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
   const googleWorksHere = isGoogleAuthSupported();
 
   const googleOption = (
-    <div className="flex justify-center [&>div]:w-full [&_iframe]:!w-full">
+    <div className="flex justify-center">
       <GoogleLoginButton
         useOneTap={false}
         onSuccess={(userData) => {
@@ -403,17 +368,7 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
             </form>
 
             {/* Passkey (Face ID / fingerprint) — one-tap sign-in for returning users */}
-            {passkeySupported && (
-              <button
-                type="button"
-                onClick={handlePasskeyLogin}
-                disabled={passkeyBusy}
-                className="w-full py-3.5 mt-4 border-2 border-ink text-ink rounded-2xl font-bold uppercase tracking-widest text-xs hover:bg-ink hover:text-white transition-all flex items-center justify-center gap-2 disabled:opacity-50 gl-press"
-              >
-                <i className="fa-solid fa-fingerprint text-sm"></i>
-                {passkeyBusy ? 'Waiting for passkey...' : 'Use a passkey'}
-              </button>
-            )}
+            
 
             <p className="text-sm text-center mt-8 text-gray-500">
               New here?{' '}

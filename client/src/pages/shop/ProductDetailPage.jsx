@@ -9,6 +9,7 @@ import RecommendedProducts from '../../component/RecommendedProducts';
 import OtherVariants from '../../component/OtherVariants';
 import NotifyMeModal from '../../component/NotifyMeModal';
 import ComboBundleSection from '../../component/ComboBundleSection';
+import FreeShippingBanner from '../../component/FreeShippingBanner';
 import ImageCarousel from '../../component/ImageCarousel';
 import { motion, AnimatePresence } from 'motion/react';
 import { ScrollColorBand } from '../../component/motion';
@@ -124,24 +125,9 @@ const ProductDetailPage = () => {
     return list;
   }, [product]);
 
-  // Cross-sell: pair a lamp with a pen stand (and vice-versa) — "complete the set".
-  const crossSell = useMemo(() => {
-    const all = productList(relRes).filter((p) => p.productId !== productId);
-    const viewingPen = /pen/i.test(product?.productCategory || '') || /pen/i.test(product?.productName || '');
-    const match = all.find((p) =>
-      viewingPen
-        ? /lamp/i.test(p.productCategory || '')
-        : (/pen/i.test(p.productCategory || '') || /pen/i.test(p.productName || ''))
-    );
-    return match || null;
-  }, [relRes, product, productId]);
-  const crossSellVariant = crossSell?.variantDetails?.[0];
-  const crossSellPrice = crossSellVariant?.variantPrice || 0;
-  const crossSellImg = crossSellVariant?.variantImage?.[0] || crossSell?.productImg || 'https://urbannook.in/assets/logo.webp';
-  const crossSellInCart = useMemo(
-    () => !!crossSell && cartItems.some((i) => [i.id, i.mongoId, i.productId].map(String).includes(String(crossSell.productId))),
-    [cartItems, crossSell]
-  );
+  // (The "complete the set" pairing that used to live here was a guess in
+  // code — pen stand ⇒ lamp, anything else ⇒ pen stand. The offers an admin
+  // actually configured are read by FreeShippingBanner further down.)
 
   const currentPrice = useMemo(() => {
     if (!product?.variantDetails?.length) return 0;
@@ -283,24 +269,6 @@ const ProductDetailPage = () => {
       trackAddToCart({ itemId: product.productId, itemName: product.productName, itemVariant: effectiveVariant, price: currentPrice, quantity: 1, placement: 'pdp_main' });
     }
 
-  };
-
-  const addCrossSell = async () => {
-    if (!crossSell) return;
-    const vName = crossSellVariant?.variantName || 'Standard Variant';
-    const isLoggedIn = isAuthenticated || !!localStorage.getItem('authToken');
-    try {
-      if (isLoggedIn) {
-        await addToCartAPI({ productId: crossSell.productId, quantity: 1, variant: vName, image: crossSellImg }).unwrap();
-        await refetchCart().unwrap();
-      } else {
-        dispatch(addItem({ id: crossSell.productId, mongoId: crossSell.productId, name: crossSell.productName, price: crossSellPrice, image: crossSellImg, quantity: 1, selectedVariant: vName }));
-      }
-      confetti({ particleCount: 90, spread: 70, origin: { y: 0.7 }, colors: ['#E63329', '#F3C33B', '#ffffff'] });
-      trackAddToCart({ itemId: crossSell.productId, itemName: crossSell.productName, itemVariant: vName, price: crossSellPrice, quantity: 1, placement: 'pdp_buy_together' });
-    } catch (err) {
-      showNotification(err?.data?.message || 'Something went wrong', 'error');
-    }
   };
 
   // Adds every item the customer kept in the static "buy together" section
@@ -739,30 +707,18 @@ const ProductDetailPage = () => {
               </ul>
             </div> */}
 
-            {/* ZONE C — complete the set (secondary card) */}
-            {crossSell && (
-              <div className="mt-4 rounded-2xl border border-hair bg-white p-4 md:max-w-md">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="gl-lbl text-brand">Complete the set</p>
-                  <span className="text-[11px] font-bold text-muted flex items-center gap-1">🔗 Frequently bought together</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <img src={crossSellImg} alt={crossSell.productName} onClick={() => navigate(`/product/${crossSell.productId}`)} className="w-16 h-16 rounded-xl object-cover border border-hair cursor-pointer shrink-0" onError={onImgErr} />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-sm truncate">{crossSell.productName}</p>
-                    <p className="text-xs text-muted">Pairs with your {(product.productCategory || 'lamp').toLowerCase()}</p>
-                    <p className="text-sm font-extrabold mt-0.5">{inr(crossSellPrice)}</p>
-                  </div>
-                  {crossSellInCart ? (
-                    <span className="shrink-0 flex items-center gap-1.5 text-sm font-bold text-save">
-                      <span className="w-5 h-5 rounded-full bg-save text-paper grid place-items-center text-xs">✓</span>Added
-                    </span>
-                  ) : (
-                    <button onClick={addCrossSell} className="un-btn gl-press shrink-0 bg-ink text-paper text-sm font-bold px-5 h-10 rounded-xl hover:bg-brandHi transition-colors">Add</button>
-                  )}
-                </div>
-              </div>
-            )}
+            {/* ZONE C — the real free-shipping offer.
+                This slot used to hold a hand-rolled "Complete the set" card
+                whose pairing was a guess in code — if you were looking at a pen
+                stand it showed a lamp, otherwise a pen stand — and whose copy
+                ("Frequently bought together") claimed data we do not have.
+                FreeShippingBanner was written for exactly this spot (see its
+                docstring) and was simply never wired in: it reads the offers an
+                admin actually configured, pages through them when a product has
+                several, takes its wording and CTA from the admin, and reports
+                impressions and clicks under this surface. It renders nothing
+                when no offer applies to this product. */}
+            <FreeShippingBanner productId={productId} surface="pdp" className="mt-4 md:max-w-md" />
 
           </div>
         </div>

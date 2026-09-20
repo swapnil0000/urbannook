@@ -156,6 +156,16 @@ const orderSchema = new mongoose.Schema(
     // fee arrive from Razorpay after payment, so the webhook fills
     // deliveryAddress instead of order-create. Always PREPAID.
     isMagicOrder: { type: Boolean, default: false },
+    // An INTERNAL_TEST coupon pins the order at ₹1. Kept on the order so the
+    // Magic serviceability callback can answer ₹0 shipping — otherwise
+    // Razorpay adds a real shipping fee on top and the test order is no
+    // longer ₹1.
+    isInternalTestOrder: { type: Boolean, default: false },
+    // Whether free shipping was unlocked when the order was created (offer,
+    // cart rule, or subtotal threshold). Magic rates shipping in a later
+    // callback, which cannot see the cart rules — without this the customer
+    // is charged shipping the cart told them they would not pay.
+    freeShippingUnlocked: { type: Boolean, default: false },
     guestInfo: {
       name: { type: String, default: null },
       email: { type: String, default: null },

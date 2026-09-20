@@ -88,7 +88,12 @@ export const magicShippingInfoController = asyncHandler(async (req, res) => {
 
   const { addresses = [] } = payload;
   const razorpayOrderId = resolveRazorpayOrderId(payload);
-  const order = await orderForRazorpayId(razorpayOrderId, { items: 1, amount: 1 });
+  const order = await orderForRazorpayId(razorpayOrderId, {
+    items: 1,
+    amount: 1,
+    isInternalTestOrder: 1,
+    freeShippingUnlocked: 1,
+  });
   const cartItems = cartItemsForOrder(order);
 
   if (!order) {
@@ -102,7 +107,21 @@ export const magicShippingInfoController = asyncHandler(async (req, res) => {
   // So the offer has to be evaluated here, or it silently stops applying to
   // every Magic order. Mirrors the standard checkout's rules: per-product
   // eligibility, or cart subtotal at/above the configured threshold.
-  let freeShipping = false;
+  // An INTERNAL_TEST order is pinned at ₹1 by the coupon. Razorpay adds
+  // whatever this callback returns ON TOP of the order amount, so charging
+  // normal shipping here means the test order is not ₹1 any more.
+  let freeShipping = !!order?.isInternalTestOrder;
+  if (freeShipping) {
+    console.log(`${TAG}[shipping] internal test order — shipping ₹0`);
+  }
+
+  // Free shipping decided at order-create — including the cart rules ("2+ lamps"
+  // and friends), which the re-derivation below knows nothing about. Honouring
+  // it here is what stops Magic charging for delivery the cart said was free.
+  if (!freeShipping && order?.freeShippingUnlocked) {
+    freeShipping = true;
+    console.log(`${TAG}[shipping] free shipping carried over from order-create`);
+  }
   try {
     const subtotal = cartItems.reduce(
       (s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1),
@@ -113,7 +132,7 @@ export const magicShippingInfoController = asyncHandler(async (req, res) => {
     const productEligible = cartItems.length
       ? await isFreeShippingEligible(cartItems.map((i) => i.productId))
       : false;
-    freeShipping = thresholdEligible || productEligible;
+    freeShipping = freeShipping || thresholdEligible || productEligible;
     if (freeShipping) {
       console.log(`${TAG}[shipping] free shipping applies (subtotal ₹${subtotal})`);
     }
@@ -178,6 +197,15 @@ export const magicGetPromotionsController = asyncHandler(async (req, res) => {
   if (!payload) return;
 
   try {
+    // A coupon applied in our cart is already discounted into the order's line
+    // items, so the reduction is in the amount Razorpay will charge. Offering
+    // the coupon sheet on top of that invites a second discount on one order.
+    const existing = await orderForRazorpayId(resolveRazorpayOrderId(payload), { coupon: 1 });
+    if (existing?.coupon?.isApplied) {
+      console.log(`${TAG}[getPromotions] coupon "${existing.coupon.couponCodeName}" already applied — no list`);
+      return res.status(200).json({ promotions: [] });
+    }
+
     const now = new Date();
     const coupons = await Coupon.find({
       isActive: true,
@@ -257,7 +285,20 @@ export const magicApplyPromotionController = asyncHandler(async (req, res) => {
   // Product subtotal the discount applies to. The DB order's amount is the
   // source of truth; Razorpay's order_amount is a fallback.
   // VERIFY: confirm the field name and whether it already includes shipping.
-  const order = await orderForRazorpayId(razorpayOrderId, { amount: 1 });
+  const order = await orderForRazorpayId(razorpayOrderId, {
+    amount: 1,
+    coupon: 1,
+    userId: 1,
+    isGuestOrder: 1,
+  });
+
+  if (order?.coupon?.isApplied) {
+    return fail(
+      `"${order.coupon.couponCodeName}" is already applied to this order.`,
+      "REQUIREMENT_NOT_MET",
+    );
+  }
+
   const subtotalRupees =
     Number(order?.amount) || Number(payload.order_amount) / 100 || 0;
 
@@ -277,10 +318,12 @@ export const magicApplyPromotionController = asyncHandler(async (req, res) => {
       cartProductTotal: subtotalRupees,
       email,
       mobile: stripCountryCode(contact),
-      // Magic collects a phone number but no session — treat every Magic
-      // customer as a guest. MEMBERS_ONLY and INTERNAL_TEST coupons are
-      // correctly refused as a result.
-      isLoggedIn: false,
+      // Magic carries no session of ours, but the order does: it was created
+      // by either the logged-in or the guest checkout. Hardcoding false here
+      // refused every MEMBERS_ONLY coupon to signed-in customers, who are
+      // exactly the people those coupons are for. INTERNAL_TEST stays refused
+      // on its own terms (scope/targeting), not on this flag.
+      isLoggedIn: !!order?.userId && !order?.isGuestOrder,
     });
   } catch (err) {
     return fail(err.message || "This coupon cannot be applied.");
