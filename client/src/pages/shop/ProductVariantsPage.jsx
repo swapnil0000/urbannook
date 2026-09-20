@@ -48,7 +48,7 @@ const ProductVariantsPage = () => {
 
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-brand/5 rounded-full blur-[120px] pointer-events-none"></div>
 
-      <section className="pt-[6rem] pb-6 md:pt-[7rem] md:pb-5 px-6 relative z-10">
+      <section className="pt-[1rem] pb-6 md:pt-[1rem] md:pb-5 px-6 relative z-10">
         <div className="max-w-7xl mx-auto">
           <button
             onClick={() => navigate("/products")}
