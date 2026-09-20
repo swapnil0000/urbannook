@@ -218,8 +218,8 @@ return (
           {/* 1. Header */}
           <div className="p-4 sm:p-5 border-b border-gray-100 flex justify-between items-center bg-white shrink-0 z-30">
             <div>
-              <h3 className="font-serif text-[#2e443c] text-lg sm:text-xl">Set Delivery Location</h3>
-              <p className="text-[10px] text-[#a89068] uppercase tracking-widest mt-0.5 font-bold">
+              <h3 className="font-serif text-ink text-lg sm:text-xl">Set Delivery Location</h3>
+              <p className="text-[10px] text-brand uppercase tracking-widest mt-0.5 font-bold">
                 Move pin to exact location
               </p>
             </div>
@@ -243,7 +243,7 @@ return (
                   value={searchQuery}
                   onChange={(e) => handleSearchPlaces(e.target.value)}
                   placeholder="Search area, street..."
-                  className="w-full h-[46px] bg-white border border-gray-300 rounded-lg p-3 pl-10 text-sm text-[#2e443c] focus:border-[#a89068] outline-none placeholder:text-gray-400 shadow-sm transition-colors"
+                  className="w-full h-[46px] bg-white border border-gray-300 rounded-lg p-3 pl-10 text-sm text-ink focus:border-brand outline-none placeholder:text-gray-400 shadow-sm transition-colors"
                 />
                 <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
               </div>
@@ -253,7 +253,7 @@ return (
                 onClick={getUserCurrentLocation}
                 disabled={isLocating}
                 title={isLocating ? "Locating device..." : "Use Current Location"}
-                className="h-[46px] px-3 sm:px-4 rounded-lg bg-[#a89068]/10 border border-[#a89068]/30 text-[#a89068] font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-[#a89068]/20 transition-all disabled:opacity-50 shrink-0"
+                className="h-[46px] px-3 sm:px-4 rounded-lg bg-brand/10 border border-brand/30 text-brand font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-brand/20 transition-all disabled:opacity-50 shrink-0"
               >
                 <i className={`fa-solid ${isLocating ? "fa-spinner animate-spin" : "fa-location-crosshairs"} text-sm`}></i>
                 {/* Full text for Web, Short text for Mobile */}
@@ -267,7 +267,7 @@ return (
               <div className="absolute left-3 right-3 sm:left-4 sm:right-4 top-[105%] bg-white border border-gray-200 rounded-xl shadow-xl z-[120] max-h-[250px] overflow-y-auto">
                 {isSearching ? (
                   <div className="w-full p-6 flex flex-col items-center justify-center gap-2">
-                    <div className="w-5 h-5 border-2 border-[#a89068] border-t-transparent rounded-full animate-spin"></div>
+                    <div className="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin"></div>
                     <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Searching...</p>
                   </div>
                 ) : searchResults.length > 0 ? (
@@ -277,11 +277,11 @@ return (
                       onClick={() => handleSelectSearchResult(item)}
                       className="w-full text-left p-3 hover:bg-gray-50 border-b border-gray-100 last:border-0 flex items-start gap-3 transition-colors group"
                     >
-                      <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-[#a89068]/10">
-                        <i className="fa-solid fa-location-dot text-xs text-gray-400 group-hover:text-[#a89068] transition-colors"></i>
+                      <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-brand/10">
+                        <i className="fa-solid fa-location-dot text-xs text-gray-400 group-hover:text-brand transition-colors"></i>
                       </div>
                       <div>
-                        <p className="text-sm text-[#2e443c] font-medium group-hover:text-[#a89068] transition-colors">
+                        <p className="text-sm text-ink font-medium group-hover:text-brand transition-colors">
                           {item.structured_formatting.main_text}
                         </p>
                         <p className="text-[11px] text-gray-400 line-clamp-1 mt-0.5">
@@ -306,7 +306,7 @@ return (
 
             {/* Center Pin */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full pointer-events-none z-10">
-              <i className="fa-solid fa-location-dot text-4xl text-[#a89068] drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)]"></i>
+              <i className="fa-solid fa-location-dot text-4xl text-brand drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)]"></i>
               <div className="w-2 h-1 bg-black/50 rounded-full absolute -bottom-1 left-1/2 -translate-x-1/2 blur-[2px]"></div>
             </div>
 
@@ -314,8 +314,8 @@ return (
             {mapSuggestions.length === 0 && !isSearching && !isLocating && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 px-8">
                 <div className="bg-white/90 backdrop-blur-md p-4 sm:p-6 rounded-2xl border border-white/20 text-center shadow-xl">
-                  <i className="fa-solid fa-hand-pointer text-xl sm:text-2xl text-[#a89068] mb-2 sm:mb-3 animate-bounce"></i>
-                  <p className="text-[10px] sm:text-[11px] text-[#a89068] uppercase tracking-[0.2em] font-bold mb-1">Navigation Required</p>
+                  <i className="fa-solid fa-hand-pointer text-xl sm:text-2xl text-brand mb-2 sm:mb-3 animate-bounce"></i>
+                  <p className="text-[10px] sm:text-[11px] text-brand uppercase tracking-[0.2em] font-bold mb-1">Navigation Required</p>
                   <p className="text-xs sm:text-sm text-gray-600 leading-relaxed font-light">
                     Drag the map to pinpoint<br/>your exact location
                   </p>
@@ -330,7 +330,7 @@ return (
             
             {/* Address Type Selector */}
             <div className="mb-3 shrink-0">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-[#a89068] mb-2 flex items-center gap-2">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-brand mb-2 flex items-center gap-2">
                 <i className="fa-solid fa-tag"></i> Address Type
               </p>
               <div className="flex gap-2">
@@ -340,7 +340,7 @@ return (
                     onClick={() => setSelectedAddressType(type)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
                       selectedAddressType === type
-                        ? "bg-[#a89068] text-white"
+                        ? "bg-brand text-white"
                         : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                     }`}
                   >
@@ -350,16 +350,16 @@ return (
               </div>
             </div>
             
-            <p className="text-[10px] font-bold uppercase tracking-widest text-[#a89068] mb-2 flex items-center gap-2 shrink-0">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-brand mb-2 flex items-center gap-2 shrink-0">
               <i className="fa-solid fa-list-ul"></i> Select Nearest Match
             </p>
             
             {/* Smooth Scrollable List Container */}
             <div 
-              className="space-y-3 overflow-y-auto pr-2 flex-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-[#a89068]/30 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-[#a89068]/50"
+              className="space-y-3 overflow-y-auto pr-2 flex-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-brand/30 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-brand/50"
               style={{
                 scrollbarWidth: 'thin',
-                scrollbarColor: 'rgba(168, 144, 104, 0.3) transparent'
+                scrollbarColor: 'rgba(223, 0, 36, 0.3) transparent'
               }}
             >
               {mapSuggestions.length > 0 ? (
@@ -367,17 +367,17 @@ return (
                   <button
                     key={idx}
                     onClick={() => handleConfirmAddress(s)}
-                    className="w-full text-left p-3.5 sm:p-4 rounded-xl bg-gray-50 border border-gray-100 hover:border-[#a89068]/50 hover:bg-[#a89068]/5 transition-all group flex items-center justify-between"
+                    className="w-full text-left p-3.5 sm:p-4 rounded-xl bg-gray-50 border border-gray-100 hover:border-brand/50 hover:bg-brand/5 transition-all group flex items-center justify-between"
                   >
                     <div className="pr-4">
-                      <p className="text-sm text-[#2e443c] group-hover:text-[#a89068] line-clamp-1 transition-colors font-medium">
+                      <p className="text-sm text-ink group-hover:text-brand line-clamp-1 transition-colors font-medium">
                         {s.formattedAddress}
                       </p>
                       <p className="text-[10px] sm:text-xs text-gray-500 mt-1 uppercase tracking-wider">
                         {s.city}, {s.state} - <span className="text-gray-800 font-mono">{s.pinCode}</span>
                       </p>
                     </div>
-                    <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-white flex items-center justify-center group-hover:bg-[#a89068] group-hover:text-white text-gray-300 border border-gray-200 transition-colors shrink-0">
+                    <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-white flex items-center justify-center group-hover:bg-brand group-hover:text-white text-gray-300 border border-gray-200 transition-colors shrink-0">
                       <i className="fa-solid fa-check text-[10px] sm:text-xs"></i>
                     </div>
                   </button>

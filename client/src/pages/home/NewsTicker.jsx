@@ -2,70 +2,65 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useShippingDelayNotice } from '../../hooks/useShippingDelayNotice';
 
+/**
+ * Site-wide announcement bar — editorial "2040" styling (ink band, mono
+ * labels, red asterisk separators) carrying the operational headlines from
+ * main: the conditional shipping-delay notice plus the evergreen ones.
+ */
 const NewsTicker = () => {
   const [isPaused, setIsPaused] = useState(false);
   const shippingDelayMessage = useShippingDelayNotice();
 
   const headlines = [
-    // "Free Shipping on orders above ₹1700",
     ...(shippingDelayMessage ? [shippingDelayMessage] : []),
-    "Ready to ship within 48 hrs",
-    "Cash on Delivery available",
+    'Ready to ship within 48 hrs',
+    'Cash on Delivery available',
+    'Pan-India delivery',
+    'Made in India 🇮🇳',
   ];
 
   return (
-    <Link to="/products" className="block relative overflow-hidden group">
-      {/* News Ticker Scroll - Matching Header Style */}
-      <div className="bg-emerald-50/50 border-b border-emerald-200/40 overflow-hidden relative py-2.5 sm:py-3 transition-colors hover:bg-emerald-100/50">
-        {/* Custom Marquee Keyframes */}
+    <Link to="/products" className="block relative overflow-hidden group" aria-label="Shop all products">
+      <div className="bg-ink text-paper overflow-hidden relative py-2 sm:py-2.5 transition-colors hover:bg-black">
         <style>{`
           @keyframes marquee {
             0% { transform: translateX(0); }
             100% { transform: translateX(-50%); }
           }
-          .animate-ticker {
-            animation: marquee 20s linear infinite;
+          .animate-ticker { animation: marquee 26s linear infinite; }
+          @media (prefers-reduced-motion: reduce) {
+            .animate-ticker { animation: none; }
           }
         `}</style>
 
-        <div 
+        <div
           className="relative flex items-center"
           onMouseEnter={() => setIsPaused(true)}
           onMouseLeave={() => setIsPaused(false)}
         >
-          {/* The Ticker Content */}
-          <div 
+          <div
             className={`flex whitespace-nowrap animate-ticker ${
               isPaused ? '[animation-play-state:paused]' : ''
             }`}
           >
-            {/* Duplicating array for seamless loop */}
+            {/* Duplicated so the loop is seamless */}
             {[...headlines, ...headlines].map((headline, index) => (
-              <div 
-                key={index}
-                className="flex items-center px-6 sm:px-8"
-              >
-                <span className={`text-[9px] sm:text-xs font-bold tracking-[0.15em] uppercase text-emerald-700 font-extrabold`}>
+              <div key={index} className="flex items-center px-6 sm:px-8">
+                <span className="gl-lbl text-[9px] sm:text-[10px] tracking-[0.18em] text-paper">
                   {headline}
                 </span>
-                {/* Separator Icon */}
-                <span className="ml-6 sm:ml-8 text-emerald-300/50">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z" />
-                  </svg>
-                </span>
+                <span className="ml-6 sm:ml-8 text-brand text-xs leading-none">✳</span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Gradient Overlays for smooth entry/exit */}
-        <div className="absolute inset-y-0 left-0 w-16 sm:w-20 bg-gradient-to-r from-emerald-50/50 to-transparent z-10 pointer-events-none"></div>
-        <div className="absolute inset-y-0 right-0 w-16 sm:w-20 bg-gradient-to-l from-emerald-50/50 to-transparent z-10 pointer-events-none"></div>
+        {/* Gradient overlays for a smooth entry/exit against the ink band */}
+        <div className="absolute inset-y-0 left-0 w-12 sm:w-16 bg-gradient-to-r from-ink to-transparent z-10 pointer-events-none" />
+        <div className="absolute inset-y-0 right-0 w-12 sm:w-16 bg-gradient-to-l from-ink to-transparent z-10 pointer-events-none" />
       </div>
     </Link>
   );
 };
 
 export default NewsTicker;
-

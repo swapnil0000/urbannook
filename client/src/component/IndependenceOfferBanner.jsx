@@ -64,7 +64,7 @@ const IndependenceOfferBanner = ({
   const eligible = shortfall === 0 && !isApplied && !otherCouponApplied;
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-[#a89068]/30 bg-gradient-to-br from-[#FF9933]/[0.08] via-white to-[#138808]/[0.08]">
+    <div className="relative overflow-hidden rounded-xl border border-brand/30 bg-gradient-to-br from-[#FF9933]/[0.08] via-white to-[#138808]/[0.08]">
       <div className="flex h-1 w-full" aria-hidden="true">
         <span className="flex-1 bg-[#FF9933]" />
         <span className="flex-1 bg-white" />
@@ -73,21 +73,21 @@ const IndependenceOfferBanner = ({
 
       <div className="p-4">
         <div className="flex items-center gap-1.5">
-          <Chakra className="h-4 w-4 shrink-0 text-[#2e443c]/70" />
-          <span className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#2e443c]/70">
+          <Chakra className="h-4 w-4 shrink-0 text-ink/70" />
+          <span className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-ink/70">
             Independence Day Special
           </span>
         </div>
 
         {/* The saving is the headline. At 15px it was competing with body copy
             and shoppers were scrolling straight past the offer. */}
-        <p className="mt-2 text-[26px] font-extrabold leading-none text-[#2e443c]">
+        <p className="mt-2 text-[26px] font-extrabold leading-none text-ink">
           {amount} OFF
         </p>
         <p className="mt-1 text-[12px] font-semibold text-gray-500">{condition}</p>
 
         <div className="mt-3 flex items-stretch gap-2">
-          <span className="flex flex-1 items-center truncate rounded-lg border border-dashed border-[#a89068]/60 bg-white/80 px-3 py-2.5 font-mono text-[15px] font-bold tracking-[0.12em] text-[#2e443c]">
+          <span className="flex flex-1 items-center truncate rounded-lg border border-dashed border-brand/60 bg-white/80 px-3 py-2.5 font-mono text-[15px] font-bold tracking-[0.12em] text-ink">
             {code}
           </span>
           <button
@@ -97,7 +97,7 @@ const IndependenceOfferBanner = ({
             className={`shrink-0 rounded-lg px-5 text-[12px] font-bold uppercase tracking-wider transition-all disabled:cursor-not-allowed ${
               isApplied
                 ? 'bg-emerald-600 text-white disabled:opacity-100'
-                : 'bg-[#2e443c] text-white hover:bg-[#1c3026] disabled:opacity-40'
+                : 'bg-ink text-white hover:bg-ink disabled:opacity-40'
             }`}
           >
             {isApplying ? (
@@ -118,12 +118,12 @@ const IndependenceOfferBanner = ({
             Discount applied to your order
           </p>
         ) : otherCouponApplied ? (
-          <p className="mt-2.5 text-[12px] font-semibold text-[#a89068]">
+          <p className="mt-2.5 text-[12px] font-semibold text-brand">
             {appliedCoupon} is already applied — remove it to use this offer
           </p>
         ) : (
           shortfall > 0 && (
-            <p className="mt-2.5 text-[12px] font-semibold text-[#a89068]">
+            <p className="mt-2.5 text-[12px] font-semibold text-brand">
               Add ₹{shortfall.toLocaleString('en-IN')} more to use this offer
             </p>
           )

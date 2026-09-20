@@ -43,7 +43,7 @@ const CustomSelect = ({
     return (
         <div className={`space-y-2 ${className}`}>
             {label && (
-                <label className="text-[10px] uppercase tracking-widest text-[#a89068] font-bold ml-2">
+                <label className="text-[10px] uppercase tracking-widest text-brand font-bold ml-2">
                     {label}
                 </label>
             )}
@@ -59,17 +59,17 @@ const CustomSelect = ({
                             : 'cursor-pointer'
                     } ${
                         error 
-                            ? 'border-red-500 focus:border-red-500' 
-                            : 'border-gray-200 focus:border-[#a89068] hover:border-[#a89068]/50'
-                    } ${isOpen ? 'border-[#a89068] shadow-md' : ''}`}
+                            ? 'border-red-500 focus:border-red-500'
+                            : 'border-gray-200 focus:border-brand hover:border-brand/50'
+                    } ${isOpen ? 'border-brand shadow-md' : ''}`}
                 >
                     <div className="flex items-center gap-3">
                         {selectedOption && selectedOption.value ? (
                             <>
                                 {selectedOption.icon && (
-                                    <i className={`${selectedOption.icon} text-[#a89068] text-sm`}></i>
+                                    <i className={`${selectedOption.icon} text-brand text-sm`}></i>
                                 )}
-                                <span className="text-[#2e443c] font-medium">{selectedOption.label}</span>
+                                <span className="text-ink font-medium">{selectedOption.label}</span>
                             </>
                         ) : (
                             <>
@@ -78,7 +78,7 @@ const CustomSelect = ({
                             </>
                         )}
                     </div>
-                    <i className={`fa-solid fa-chevron-down text-[#a89068] text-xs transition-transform duration-200 ${
+                    <i className={`fa-solid fa-chevron-down text-brand text-xs transition-transform duration-200 ${
                         isOpen ? 'rotate-180' : ''
                     }`}></i>
                 </button>
@@ -96,14 +96,14 @@ const CustomSelect = ({
                                 disabled={option.disabled}
                                 className={`w-full px-5 py-4 text-left hover:bg-gray-50 transition-colors flex items-center gap-3 group ${
                                     option.disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
-                                } ${value === option.value ? 'bg-[#a89068]/5 border-r-2 border-[#a89068]' : ''}`}
+                                } ${value === option.value ? 'bg-brand/5 border-r-2 border-brand' : ''}`}
                             >
                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
-                                    value === option.value 
-                                        ? 'bg-[#a89068] text-white' 
-                                        : option.disabled 
-                                            ? 'bg-gray-100 text-gray-400' 
-                                            : 'bg-gray-100 text-[#a89068] group-hover:bg-[#a89068] group-hover:text-white'
+                                    value === option.value
+                                        ? 'bg-brand text-white'
+                                        : option.disabled
+                                            ? 'bg-gray-100 text-gray-400'
+                                            : 'bg-gray-100 text-brand group-hover:bg-brand group-hover:text-white'
                                 }`}>
                                     {option.icon && (
                                         <i className={`${option.icon} text-xs`}></i>
@@ -111,7 +111,7 @@ const CustomSelect = ({
                                 </div>
                                 <div className="flex-1">
                                     <div className={`font-medium ${
-                                        option.disabled ? 'text-gray-400' : 'text-[#2e443c]'
+                                        option.disabled ? 'text-gray-400' : 'text-ink'
                                     }`}>
                                         {option.label}
                                     </div>
@@ -122,7 +122,7 @@ const CustomSelect = ({
                                     )}
                                 </div>
                                 {value === option.value && (
-                                    <i className="fa-solid fa-check text-[#a89068] text-sm"></i>
+                                    <i className="fa-solid fa-check text-brand text-sm"></i>
                                 )}
                             </button>
                         ))}

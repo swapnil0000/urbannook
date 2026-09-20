@@ -1,8 +1,89 @@
-import { lazy, Suspense } from "react";
+import { lazy, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { trackSelectItem } from "../utils/analytics";
+import FitTitle from "./FitTitle";
 
 const WishlistButton = lazy(() => import("./WishlistButton"));
+
+// Auto-cycles through a product's own variant photos as a hold-then-crossfade
+// slideshow — each photo sits still, then slowly dissolves into the next
+// (never slides/scrolls). Cycles forward through the list and wraps from the
+// last image back to the first via the same fade, so there's never a
+// direction to "reverse". Paused via IntersectionObserver whenever the card
+// is off-screen, and skipped entirely under prefers-reduced-motion, so idle
+// or motion-sensitive viewers cost nothing.
+const HOLD_MS = 2600; // fully-visible pause on each image
+const FADE_MS = 1500; // crossfade duration into the next image
+
+// Read once at module load, not on every render — this can't change
+// mid-session in any way that matters for a decorative auto-cycle.
+const REDUCE_MOTION =
+  typeof window !== "undefined" &&
+  !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+const VariantSlider = ({ images, alt }) => {
+  const containerRef = useRef(null);
+  const [inView, setInView] = useState(false);
+  const [index, setIndex] = useState(0);
+  // Which slide indices are allowed to actually mount an <img> (and so
+  // request their file). A grid can show a dozen-plus of these cards at
+  // once, each with several variant photos — loading every photo of every
+  // card the moment it scrolls into view would multiply into a genuinely
+  // large burst of requests. Only the currently-shown photo plus the next
+  // one (so the crossfade never has to wait) are ever mounted; the rest
+  // stay unmounted until the auto-cycle actually reaches them.
+  const [loadedIndices, setLoadedIndices] = useState(() => new Set([0, 1 % images.length]));
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([entry]) => setInView(entry.isIntersecting), {
+      threshold: 0.15,
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!inView || REDUCE_MOTION || images.length < 2) return;
+    const id = setInterval(() => {
+      setIndex((i) => {
+        const next = (i + 1) % images.length;
+        setLoadedIndices((prev) => {
+          const after = (next + 1) % images.length;
+          if (prev.has(next) && prev.has(after)) return prev;
+          const merged = new Set(prev);
+          merged.add(next);
+          merged.add(after);
+          return merged;
+        });
+        return next;
+      });
+    }, HOLD_MS + FADE_MS);
+    return () => clearInterval(id);
+  }, [inView, images.length]);
+
+  return (
+    <div ref={containerRef} className="relative w-full h-full">
+      {images.map((src, i) =>
+        loadedIndices.has(i) ? (
+          <img
+            key={src}
+            src={src}
+            alt={alt}
+            loading="lazy"
+            className="absolute inset-0 w-full h-full object-cover mix-blend-multiply ease-in-out"
+            style={{
+              opacity: i === index ? 1 : 0,
+              transitionProperty: "opacity",
+              transitionDuration: `${FADE_MS}ms`,
+            }}
+          />
+        ) : null,
+      )}
+    </div>
+  );
+};
 
 /**
  * Shared storefront product card — used by the All Products grid AND the PDP
@@ -16,8 +97,16 @@ const ProductCard = ({ product, index = 0, listId = "all_products", listName = "
 
   const firstVariant = product?.variantDetails?.[0];
   const price = Number(product?.effectivePrice ?? firstVariant?.variantPrice ?? 0);
-  const mrp = Number(product?.effectiveMrp ?? firstVariant?.variantMrp ?? 0);
   const thumbnail = firstVariant?.variantImage?.[0] || "/placeholder.jpg";
+  // Distinct variant photos, deduped — a size/color variant that reuses the
+  // same image as another shouldn't create a pointless jump-cut in the loop.
+  // Memoized on the underlying variant data so this isn't rebuilt (a fresh
+  // array + a fresh Set) on every render of a card sitting in a grid.
+  const productVariantDetails = product?.variantDetails;
+  const variantImages = useMemo(
+    () => [...new Set((productVariantDetails || []).map((v) => v.variantImage?.[0]).filter(Boolean))],
+    [productVariantDetails],
+  );
 
   const goToProduct = () => {
     trackSelectItem({
@@ -29,11 +118,11 @@ const ProductCard = ({ product, index = 0, listId = "all_products", listName = "
       listName,
       index,
     });
-    navigate(firstVariant?.sku ? `/product/${product.productId}/${firstVariant.sku}` : `/product/${product.productId}`);
+    navigate(`/products/${product.productId}`);
   };
 
   return (
-    <div className="group relative rounded-[1.6rem] overflow-hidden bg-black/20 border border-white/5 shadow-lg hover:shadow-2xl hover:border-[#F5DEB3]/30 transition-all duration-500 flex flex-col h-full">
+    <div className="gl-pcard group relative rounded-none overflow-hidden bg-white border border-hair flex flex-col h-full">
       {/* Wishlist Button (Floating Top Right) */}
       {/* <div className="absolute top-4 right-4 z-20">
         <Suspense
@@ -50,12 +139,16 @@ const ProductCard = ({ product, index = 0, listId = "all_products", listName = "
         className="flex flex-col flex-grow cursor-pointer"
         onClick={goToProduct}
       >
-        <div className="relative w-full aspect-square bg-[#f8f8f5] overflow-hidden">
-          <img
-            src={thumbnail}
-            alt={product.productName}
-            className="w-full h-full object-cover mix-blend-multiply transition-transform duration-[1.5s] group-hover:scale-110"
-          />
+        <div className="relative w-full aspect-square bg-surface overflow-hidden">
+          {variantImages.length > 1 ? (
+            <VariantSlider images={variantImages} alt={product.productName} />
+          ) : (
+            <img
+              src={thumbnail}
+              alt={product.productName}
+              className="w-full h-full object-cover mix-blend-multiply transition-transform duration-[1.5s] group-hover:scale-110"
+            />
+          )}
 
           {/* Nook's Special: Fixed Ribbon + Positioned Text */}
           {product?.featured === true && (
@@ -135,7 +228,7 @@ const ProductCard = ({ product, index = 0, listId = "all_products", listName = "
               );
             if (product?.productStatus === "out_of_stock" || allVariantsOOS) {
               return (
-                <span className="absolute top-3 left-3 z-10 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md bg-red-500 text-white shadow">
+                <span className="absolute top-3 left-3 z-10 gl-lbl text-[8px] px-2 py-0.5 rounded-none bg-ink text-white">
                   Out of Stock
                 </span>
               );
@@ -154,127 +247,39 @@ const ProductCard = ({ product, index = 0, listId = "all_products", listName = "
             if (totalLeft > LOW_STOCK_THRESHOLD) return null;
             if (totalLeft === 1) return null;
             return (
-              <span className="absolute top-3 left-3 z-10 flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md bg-[#2e443c] text-[#F5DEB3] border border-[#F5DEB3]/30 shadow">
-                <i className="fa-solid fa-hourglass-half text-[9px]" /> Few left
+              <span className="absolute top-3 left-3 z-10 flex items-center gap-1 gl-lbl text-[8px] px-2 py-0.5 rounded-none bg-brand text-white">
+                <i className="fa-solid fa-hourglass-half text-[6px]" /> Few left
               </span>
             );
           })()}
         </div>
 
-        {/* Text & CTA */}
-        <div className="p-4 md:p-4 flex flex-col flex-grow bg-[#f5f7f8] to-transparent backdrop-blur-md">
-          {/* Titles likely to wrap to 2 lines use a smaller font so the block
-              stays compact; short titles reserve only ~1 line of height —
-              previously EVERY card reserved 2-line height even when the name
-              fit on one line, leaving an empty gap above the divider. */}
-          {(() => {
-            const isLongTitle = (product.productName || "").length > 18;
-            return (
-              <div className="mb-2">
-                <h3
-                  className={`font-serif text-gray-500 leading-snug line-clamp-2 ${
-                    isLongTitle
-                      ? "text-sm md:text-lg min-h-[2.4em] md:min-h-[2.6em]"
-                      : "text-base md:text-xl min-h-[1.3em] md:min-h-[1.4em]"
-                  }`}
-                >
-                  {product.productName}
-                </h3>
-              </div>
-            );
-          })()}
-
-          <div className="flex justify-between items-end pt-2 border-t border-[#F5DEB3]/10] gap-2">
-            {/* Price + MRP on left — flex-nowrap keeps this on ONE line */}
-            <div className="flex items-center flex-nowrap gap-1 md:gap-1.5 min-w-0">
-              <span className="text-base md:text-xl font-bold text-[#a89068] whitespace-nowrap">
-                ₹{price?.toLocaleString()}
-              </span>
-              {mrp > price && (
-                // % OFF stacked directly above the struck MRP
-                <span className="flex flex-col items-start leading-none whitespace-nowrap">
-                  <span className="text-[7px] md:text-[9px] font-bold text-[#157a44]">
-                    {Math.round(((mrp - price) / mrp) * 100)}% OFF
-                  </span>
-                  <span className="text-[9px] md:text-xs text-gray-400 line-through mt-0.5">
-                    ₹{mrp?.toLocaleString()}
-                  </span>
-                </span>
-              )}
-            </div>
-
-            {/* Variants on far right — max 2 then +X */}
-            <div className="flex items-center gap-1 shrink-0 ml-auto">
-              {(() => {
-                const variantDetails = product?.variantDetails || [];
-                if (variantDetails.length === 0) return null;
-                return (
-                  <>
-                    {variantDetails.slice(0, 2).map((detail, idx) => {
-                      const variantName = detail.variantName;
-                      const swatchType =
-                        detail.variantSwatchType === "color"
-                          ? "color"
-                          : "image";
-                      const swatchValue =
-                        (detail.variantSwatchValue &&
-                          detail.variantSwatchValue.trim()) ||
-                        (swatchType === "image"
-                          ? detail.variantImage?.[0]
-                          : "");
-                      const goToVariant = (e) => {
-                        e.stopPropagation();
-                        navigate(
-                          `/product/${product.productId}/${detail.sku || variantName}`,
-                        );
-                      };
-                      const oos =
-                        detail.variantOutOfStock === true ||
-                        (detail.variantQuantity != null &&
-                          Number(detail.variantQuantity) <= 0);
-                      return (
-                        <span
-                          key={detail._id || idx}
-                          title={
-                            oos ? `${variantName} — out of stock` : variantName
-                          }
-                          onClick={goToVariant}
-                          className={`w-3 h-3 rounded-full overflow-hidden border border-[#d1d5db] shadow-sm transition-transform hover:scale-110 cursor-pointer flex items-center justify-center bg-white shrink-0 ${oos ? "opacity-40 grayscale" : ""}`}
-                        >
-                          {swatchType === "color" && swatchValue ? (
-                            <span
-                              className="w-full h-full block"
-                              style={{ background: swatchValue }}
-                            />
-                          ) : swatchValue ? (
-                            <img
-                              src={swatchValue}
-                              alt={variantName}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <span className="text-[6px] font-bold uppercase text-gray-400">
-                              {variantName?.charAt(0)}
-                            </span>
-                          )}
-                        </span>
-                      );
-                    })}
-                    {variantDetails.length > 2 && (
-                      <span className="text-[9px] md:text-[10px] font-medium text-gray-500 whitespace-nowrap">
-                        +{variantDetails.length - 2}
-                      </span>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
-
-            {/* Arrow CTA — desktop only */}
-            <div className="hidden md:flex w-12 h-12 rounded-full bg-[#F5DEB3]/10 text-gray-500 items-center justify-center group-hover:bg-[#F5DEB3] group-hover:text-[#2e443c] transition-all duration-300">
-              <i className="fa-solid fa-arrow-right -rotate-45 group-hover:rotate-0 transition-transform duration-500"></i>
-            </div>
+        {/* Minimal footer — name, then price, nothing else. A fixed-height
+            title (FitTitle: always exactly one line, whatever the name's
+            length) keeps every card in a row the same height, so a row
+            never looks uneven. */}
+        <div className="p-3.5 flex flex-col items-center gap-1 bg-white border-t border-hair">
+          {/* Fixed-height wrapper, sized to the CAP font size regardless of
+              how much this particular title had to shrink — otherwise a
+              long name (smaller font) leaves a shorter title block than a
+              short name (full font), and the row/card ends up uneven. */}
+          <div className="h-5 md:h-6 flex items-center justify-center w-full">
+            <FitTitle
+              text={product.productName || ""}
+              capPx={15}
+              floorPx={9}
+              className="font-archivo font-bold text-ink leading-snug text-center block md:hidden w-full"
+            />
+            <FitTitle
+              text={product.productName || ""}
+              capPx={18}
+              floorPx={12}
+              className="font-archivo font-bold text-ink leading-snug text-center hidden md:block w-full"
+            />
           </div>
+          <span className="text-xs md:text-sm font-semibold text-ink">
+            Starting at ₹{price?.toLocaleString()}
+          </span>
         </div>
       </div>
     </div>

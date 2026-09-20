@@ -52,7 +52,7 @@ const CouponList = ({ onCouponApplied, userId, isGuest, cartTotal }) => {
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3">
-        <div className="w-10 h-10 border-2 border-[#2e443c] border-t-transparent rounded-full animate-spin" />
+        <div className="w-10 h-10 border-2 border-ink border-t-transparent rounded-full animate-spin" />
         <p className="text-xs text-gray-400 font-medium">Finding your coupons…</p>
       </div>
     );
@@ -74,8 +74,8 @@ const CouponList = ({ onCouponApplied, userId, isGuest, cartTotal }) => {
   if (coupons.length === 0) {
     return (
       <div className="flex flex-col items-center gap-4 py-12 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-[#2e443c]/8 flex items-center justify-center">
-          <i className="fa-solid fa-ticket text-[#2e443c]/40 text-2xl" />
+        <div className="w-16 h-16 rounded-2xl bg-ink/8 flex items-center justify-center">
+          <i className="fa-solid fa-ticket text-ink/40 text-2xl" />
         </div>
         <div>
           <p className="text-sm font-bold text-gray-600">No offers right now</p>
@@ -179,7 +179,7 @@ const CouponList = ({ onCouponApplied, userId, isGuest, cartTotal }) => {
                 className="flex items-center justify-between px-4 py-2.5 rounded-xl"
                 style={{ background: '#fdf8f3', border: '2px dashed rgba(168,144,104,0.4)' }}
               >
-                <code className="font-mono font-black text-[#2e443c] text-base tracking-widest">
+                <code className="font-mono font-black text-ink text-base tracking-widest">
                   {coupon.code}
                 </code>
                 <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#a89068' }}>

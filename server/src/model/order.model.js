@@ -28,6 +28,10 @@ const orderSchema = new mongoose.Schema(
           // product's template can't retroactively change how a past order
           // reads. Blank = order predates this field, or product never set one.
           variantTitleTemplate: { type: String, default: "" },
+          // Stable identifier for the exact variant purchased — set at order
+          // time and never changed afterward, unlike selectedVariant (a display
+          // name an admin can rename later). Blank = order predates this field.
+          variantSku: { type: String, default: "" },
         },
       },
     ],
@@ -173,6 +177,10 @@ const orderSchema = new mongoose.Schema(
 
     isGuestOrder: { type: Boolean, default: false },
     isNewGuestAccount: { type: Boolean, default: false },
+    // Razorpay Magic Checkout (1CC) order: the address and the final shipping
+    // fee arrive from Razorpay after payment, so the webhook fills
+    // deliveryAddress instead of order-create. Always PREPAID.
+    isMagicOrder: { type: Boolean, default: false },
     guestInfo: {
       name: { type: String, default: null },
       email: { type: String, default: null },
@@ -181,6 +189,12 @@ const orderSchema = new mongoose.Schema(
     metaTracking: {
       fbp: { type: String, default: null },
       fbc: { type: String, default: null },
+      // Persistent per-browser device id. Declared explicitly because Mongoose
+      // strict mode silently drops undeclared nested paths — collectMetaTracking
+      // in rp.payment.controller.js has always sent this, but without this line
+      // it never reached the DB, so the guest CAPI externalId fallback and
+      // channel attribution on the server-side purchase both had nothing to use.
+      anonymousId: { type: String, default: null },
       clientIp: { type: String, default: null },
       clientUserAgent: { type: String, default: null },
       eventSourceUrl: { type: String, default: null },

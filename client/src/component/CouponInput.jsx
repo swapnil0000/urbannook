@@ -155,12 +155,12 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
               onKeyDown={handleKeyPress}
               placeholder="Enter coupon code..."
               disabled={isLoading || isLookingUp}
-              className="flex-1 bg-white border border-[#F5DEB3] rounded-xl px-4 py-3 text-[#2e443c]  focus:outline-none focus:border-[#F5DEB3] focus:ring-1 focus:ring-[#F5DEB3] transition-all uppercase tracking-wider text-sm disabled:opacity-50"
+              className="flex-1 bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-800 placeholder:text-gray-300 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand/30 transition-all uppercase tracking-wider text-sm disabled:opacity-50"
             />
             <button
               onClick={handleApplyCoupon}
               disabled={isLoading || isLookingUp || !couponCode.trim()}
-              className="px-6 py-3 bg-[#a89068] text-[#fff] rounded-xl font-bold uppercase tracking-wider text-xs hover:bg-[#a89068] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-3 bg-brand text-white rounded-xl font-bold uppercase tracking-wider text-xs hover:bg-brandHi active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {(isLoading || isLookingUp) ? (
                 <i className="fa-solid fa-spinner fa-spin"></i>
@@ -171,14 +171,14 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
           </div>
 
           {error && (
-            <div className="flex items-center gap-2 text-red-400 text-sm bg-red-400/10 px-4 py-2 rounded-lg border border-red-400/20">
+            <div className="flex items-center gap-2 text-rose-600 text-sm bg-rose-50 px-4 py-2 rounded-lg border border-rose-200">
               <i className="fa-solid fa-circle-exclamation"></i>
               <span>{error}</span>
             </div>
           )}
 
           {success && (
-            <div className="flex items-center gap-2 text-gray-500 text-sm bg-white px-4 py-2 rounded-lg border border-green-400/20">
+            <div className="flex items-center gap-2 text-emerald-600 text-sm bg-emerald-50 px-4 py-2 rounded-lg border border-emerald-200">
               <i className="fa-solid fa-circle-check"></i>
               <span>{success}</span>
             </div>
@@ -218,14 +218,14 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
           </div>
 
           {error && (
-            <div className="flex items-center gap-2 text-red-400 text-sm bg-red-400/10 px-4 py-2 rounded-lg border border-red-400/20">
+            <div className="flex items-center gap-2 text-rose-600 text-sm bg-rose-50 px-4 py-2 rounded-lg border border-rose-200">
               <i className="fa-solid fa-circle-exclamation"></i>
               <span>{error}</span>
             </div>
           )}
 
           {success && (
-            <div className="flex items-center gap-2 text-green-400 text-sm bg-green-400/10 px-4 py-2 rounded-lg border border-green-400/20">
+            <div className="flex items-center gap-2 text-emerald-600 text-sm bg-emerald-50 px-4 py-2 rounded-lg border border-emerald-200">
               <i className="fa-solid fa-circle-check"></i>
               <span>{success}</span>
             </div>

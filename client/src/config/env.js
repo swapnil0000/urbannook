@@ -55,8 +55,13 @@ const config = {
     enableGoogleOAuth: !!env.VITE_GOOGLE_CLIENT_ID,
     enableAnalytics: env.VITE_ENABLE_ANALYTICS === 'true',
     analyticsDebug: env.VITE_ANALYTICS_DEBUG === 'true',
-    enableServiceWorker: env.PROD && env.VITE_ENABLE_SW !== 'false'
+    enableServiceWorker: env.PROD && env.VITE_ENABLE_SW !== 'false',
+    // Razorpay Magic Checkout (1CC). Must be set at BUILD time — Vite inlines
+    // it into the bundle, so setting it on the server has no effect. The server
+    // has its own MAGIC_CHECKOUT_ENABLED flag and both must be on.
+    enableMagicCheckout: env.VITE_MAGIC_CHECKOUT_ENABLED === 'true'
   }
+  
 };
 
 // Log configuration in development

@@ -57,7 +57,7 @@ class ErrorBoundary extends React.Component {
         return (
           <div className="min-h-screen flex items-center justify-center bg-gray-50">
             <div className="text-center">
-              <div className="w-8 h-8 border-2 border-[#2e443c] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+              <div className="w-8 h-8 border-2 border-ink border-t-transparent rounded-full animate-spin mx-auto mb-3" />
               <p className="text-sm text-gray-500">Updating, please wait…</p>
             </div>
           </div>

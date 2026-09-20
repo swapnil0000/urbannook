@@ -20,7 +20,7 @@ const contactSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Subject is required'],
       enum: {
-        values: ['Product Inquiry',  'Support', 'Order Support', 'Technical Support', 'Returns & Refunds','General Inquiry'],
+        values: ['Product Inquiry',  'Support', 'Order Support', 'Technical Support', 'Returns & Refunds','General Inquiry', 'Customization'],
         message: '{VALUE} is not a valid inquiry type'
       }
     },
@@ -51,6 +51,19 @@ const contactSchema = new mongoose.Schema(
       trim: true,
       maxlength: [200, 'Product name cannot exceed 200 characters'],
       default: null
+    },
+    // Customization requests only: which variant they want changed, and any
+    // reference pictures they attached. Both optional — a request can be a
+    // plain description with no variant and no image.
+    variantName: {
+      type: String,
+      trim: true,
+      maxlength: [200, 'Variant name cannot exceed 200 characters'],
+      default: null
+    },
+    referenceImages: {
+      type: [String],
+      default: []
     },
     status: {
       type: String,

@@ -2,3 +2,6 @@ node_modules
 
 
 # merged main with pr
+# Design reference only — HTML mockups, style guide and brand guidelines.
+# Nothing in client/ or server/ imports these; they are not part of any build.
+design/

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { socialLinks } from '../../data/constant';
 
@@ -7,58 +7,43 @@ const SocialMediaFAB = () => {
   const location = useLocation();
 
   // Only show on home page
-  if (location.pathname !== '/') {
-    return null;
-  }
+  if (location.pathname !== '/') return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-[9999] flex flex-col-reverse items-end gap-4 pointer-events-none">
-      <button 
-        onClick={() => setIsOpen(!isOpen)}
-        className={`w-10 h-10 rounded-full flex items-center justify-center text-white shadow-2xl transition-all duration-500 relative pointer-events-auto ${
-            isOpen ? 'bg-slate-900 rotate-45' : 'bg-emerald-600 hover:scale-110'
+    <div className="fixed right-0 top-1/2 -translate-y-1/2 z-[9998] flex items-center pointer-events-none">
+      {/* Social icons — slide out from the right edge when opened */}
+      <div
+        className={`flex flex-col justify-center gap-2 p-2 bg-ink/95 backdrop-blur border-y border-l border-white/10 shadow-2xl transition-all duration-500 ease-out ${
+          isOpen ? 'translate-x-0 opacity-100 pointer-events-auto' : 'translate-x-full opacity-0'
         }`}
       >
-        <i className="fa-solid fa-plus text-1xl"></i>
-        
-        {!isOpen && (
-            <span className="absolute -inset-1 rounded-full bg-emerald-500/50 animate-ping pointer-events-none"></span>
-        )}
-      </button>
-
-      <div className="flex flex-col-reverse items-end gap-3 pb-2">
-        {socialLinks.map((social, index) => (
+        {socialLinks.map((social) => (
           <a
             key={social.id}
             href={social.link}
             target="_blank"
             rel="noopener noreferrer"
-            // pointer-events-auto ensures these links are clickable when visible
-            className={`group flex items-center gap-3 transition-all duration-300 transform origin-bottom pointer-events-auto ${
-              isOpen 
-                ? 'opacity-100 translate-y-0 scale-100' 
-                : 'opacity-0 translate-y-10 scale-0 pointer-events-none'
-            }`}
-            style={{ 
-                // Staggered animation delay based on index
-                transitionDelay: isOpen ? `${index * 50}ms` : '0ms' 
-            }}
+            aria-label={social.name}
+            className={`group relative w-10 h-10 rounded-full grid place-items-center text-white shadow-md border border-white/20 hover:scale-110 active:scale-95 transition-transform ${social.color}`}
           >
-            
-            {/* Tooltip Label (Appears on Left) */}
-            <span className="bg-white text-slate-900 text-xs font-bold px-3 py-1.5 rounded-lg shadow-lg opacity-0 -translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 whitespace-nowrap hidden md:block border border-slate-100">
+            <i className={`${social.icon} text-base`} />
+            {/* hover label (desktop) */}
+            <span className="absolute right-full mr-2 gl-lbl text-[9px] bg-ink text-paper px-2 py-1 whitespace-nowrap opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 hidden md:block">
               {social.name}
             </span>
-
-            {/* Icon Circle */}
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white shadow-lg hover:scale-110 transition-transform ${social.color}`}>
-              <i className={`${social.icon} text-lg`}></i>
-            </div>
-
           </a>
         ))}
       </div>
 
+      {/* Right-edge trigger tab — icon only */}
+      <button
+        onClick={() => setIsOpen((o) => !o)}
+        aria-label={isOpen ? 'Close menu' : 'Chat & follow us'}
+        aria-expanded={isOpen}
+        className="pointer-events-auto bg-brand hover:bg-brandHi text-white w-11 h-12 grid place-items-center shadow-lg border-l-2 border-white/30 transition-colors"
+      >
+        <i className={`fa-solid ${isOpen ? 'fa-xmark' : 'fa-share-nodes'} text-lg transition-transform duration-300`} />
+      </button>
     </div>
   );
 };

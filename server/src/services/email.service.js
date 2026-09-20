@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import env from "../config/envConfigSetup.js";
+import { isPlaceholderEmail } from "../utils/placeholderEmail.js";
 let singleTransporter = null;
 
 // Standard transporter for single emails
@@ -20,6 +21,19 @@ const getNodeMailerTransporter = () => {
 
 // Basic email sending function
 const sendEmail = (to, subject, html) => {
+  // WhatsApp-only accounts carry a placeholder address on a domain with no
+  // mail server. Sending there guarantees a bounce, and bounces cost us the
+  // deliverability of real order mail.
+  if (isPlaceholderEmail(to)) {
+    console.log(`[INFO] Skipped email to placeholder address (${to})`);
+    return {
+      statusCode: 200,
+      message: "Skipped: placeholder address",
+      data: to,
+      success: true,
+    };
+  }
+
   const transporter = getNodeMailerTransporter();
   try {
     transporter.sendMail({
@@ -68,6 +82,18 @@ const sendEmailCommunityService = (to, subject, html) => {
 
 // Enhanced email sending with retry logic
 const sendEmailWithRetry = async (to, subject, html, retries = 3) => {
+  // Same guard as sendEmail — retrying a guaranteed bounce three times is
+  // three times the damage
+  if (isPlaceholderEmail(to)) {
+    console.log(`[INFO] Skipped email to placeholder address (${to})`);
+    return {
+      statusCode: 200,
+      message: "Skipped: placeholder address",
+      data: { messageId: null },
+      success: true,
+    };
+  }
+
   const transporter = getNodeMailerTransporter();
   
   for (let attempt = 1; attempt <= retries; attempt++) {

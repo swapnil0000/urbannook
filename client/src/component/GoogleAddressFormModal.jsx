@@ -65,7 +65,7 @@ const FormField = ({ label, required, placeholder, value, onChange, icon, maxLen
         maxLength={maxLength}
         className={`w-full border rounded-xl px-3 py-3 text-sm transition-all outline-none ${
           icon ? "pl-9" : ""
-        } bg-white border-gray-200 text-[#2e443c] focus:border-[#a89068] placeholder:text-gray-300`}
+        } bg-white border-gray-200 text-ink focus:border-brand placeholder:text-gray-300`}
       />
     </div>
   </div>
@@ -74,16 +74,16 @@ const FormField = ({ label, required, placeholder, value, onChange, icon, maxLen
 const LocationSummaryCard = ({ deliveryAddressFull }) => {
   if (!deliveryAddressFull) return null;
   return (
-    <div className="m-3 bg-white rounded-xl border border-[#a89068]/30 p-3 shadow-sm">
+    <div className="m-3 bg-white rounded-xl border border-brand/30 p-3 shadow-sm">
       <div className="flex items-start gap-2">
-        <div className="w-7 h-7 rounded-full bg-[#a89068]/10 flex items-center justify-center shrink-0 mt-0.5">
-          <i className="fa-solid fa-location-dot text-[#a89068] text-xs" />
+        <div className="w-7 h-7 rounded-full bg-brand/10 flex items-center justify-center shrink-0 mt-0.5">
+          <i className="fa-solid fa-location-dot text-brand text-xs" />
         </div>
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-[#a89068] mb-0.5">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-brand mb-0.5">
             Delivering your order to
           </p>
-          <p className="text-xs text-[#2e443c] leading-snug break-words">{deliveryAddressFull}</p>
+          <p className="text-xs text-ink leading-snug break-words">{deliveryAddressFull}</p>
         </div>
       </div>
     </div>
@@ -754,9 +754,9 @@ const GoogleAddressFormModal = ({
             {/* Center loading card */}
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
               <div className="bg-white/95 backdrop-blur-sm rounded-2xl px-5 py-3 shadow-lg flex items-center gap-3 border border-white/40">
-                <div className="w-6 h-6 border-[3px] border-[#a89068]/30 border-t-[#a89068] rounded-full animate-spin shrink-0" />
+                <div className="w-6 h-6 border-[3px] border-brand/30 border-t-brand rounded-full animate-spin shrink-0" />
                 <div>
-                  <p className="text-xs font-semibold text-[#2e443c] leading-tight">
+                  <p className="text-xs font-semibold text-ink leading-tight">
                     Loading map…
                   </p>
                   <p className="text-[10px] text-gray-400 leading-tight">
@@ -786,7 +786,7 @@ const GoogleAddressFormModal = ({
         {/* Floating center pin — shown over map and skeleton */}
         {isLoaded && (
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full pointer-events-none z-10">
-            <i className="fa-solid fa-location-dot text-4xl text-[#a89068] drop-shadow-[0_6px_8px_rgba(0,0,0,0.4)]" />
+            <i className="fa-solid fa-location-dot text-4xl text-brand drop-shadow-[0_6px_8px_rgba(0,0,0,0.4)]" />
             <div className="w-2 h-1 bg-black/40 rounded-full absolute -bottom-0.5 left-1/2 -translate-x-1/2 blur-[2px]" />
           </div>
         )}
@@ -794,8 +794,8 @@ const GoogleAddressFormModal = ({
         {/* Hint card — shown after map loads, before user sets a location */}
         {isLoaded && !locationSummary && (
           <div className="absolute bottom-4 left-0 right-0 flex justify-center pointer-events-none z-[5] px-4">
-            <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-md border border-[#a89068]/15 px-3.5 py-2 flex items-center gap-2 max-w-xs">
-              <i className="fa-solid fa-hand-pointer text-[#a89068] text-xs shrink-0" />
+            <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-md border border-brand/15 px-3.5 py-2 flex items-center gap-2 max-w-xs">
+              <i className="fa-solid fa-hand-pointer text-brand text-xs shrink-0" />
               <p className="text-[11px] text-gray-500 leading-snug">
                 Drag the pin or search above to set location
               </p>
@@ -830,7 +830,7 @@ const GoogleAddressFormModal = ({
               <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">
                 Pincode <span className="text-red-400">*</span>
                 {isFetchingPincode && (
-                  <span className="w-3 h-3 border border-[#a89068] border-t-transparent rounded-full animate-spin inline-block shrink-0" />
+                  <span className="w-3 h-3 border border-brand border-t-transparent rounded-full animate-spin inline-block shrink-0" />
                 )}
               </label>
               <input
@@ -845,7 +845,7 @@ const GoogleAddressFormModal = ({
                   setField("pinCode")(cleaned);
                   if (cleaned.length === 6) fetchPincodeData(cleaned);
                 }}
-                className={`w-full border rounded-xl px-3 py-3 text-sm transition-all outline-none bg-white text-[#2e443c] focus:border-[#a89068] placeholder:text-gray-300 ${
+                className={`w-full border rounded-xl px-3 py-3 text-sm transition-all outline-none bg-white text-ink focus:border-brand placeholder:text-gray-300 ${
                   errors.pinCode ? "border-red-300 focus:border-red-400" : "border-gray-200"
                 }`}
               />
@@ -957,25 +957,6 @@ const GoogleAddressFormModal = ({
           />
         </div>
 
-        {/* Save CTA */}
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={isSubmitting}
-          className="w-full py-4 bg-[#2e443c] text-[#F5DEB3] rounded-xl font-bold text-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-[#1c3026] transition-colors disabled:opacity-60"
-        >
-          {isSubmitting ? (
-            <>
-              <div className="w-4 h-4 border-2 border-[#F5DEB3] border-t-transparent rounded-full animate-spin" />
-              Saving...
-            </>
-          ) : (
-            <>
-              <i className="fa-solid fa-floppy-disk text-sm" />
-              Save Address
-            </>
-          )}
-        </button>
       </div>
     </div>
   );
@@ -983,12 +964,12 @@ const GoogleAddressFormModal = ({
   // ─── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-white w-full max-w-4xl h-[93dvh] sm:h-[88vh] rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl flex flex-col">
+      <div className="bg-white w-full max-w-4xl h-[93dvh] sm:h-[88vh] rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl flex flex-col auth-sheet">
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 shrink-0">
           <div>
-            <h3 className="font-serif text-[#2e443c] text-base leading-tight">
+            <h3 className="font-serif text-ink text-base leading-tight">
               Set Delivery Address
             </h3>
           </div>
@@ -1010,15 +991,15 @@ const GoogleAddressFormModal = ({
           </div>
 
           {/* Form column — fills all remaining height, scrolls independently */}
-          <div className="flex-1 min-h-0 flex flex-col overflow-hidden md:flex-1">
+          <div className="relative flex-1 min-h-0 flex flex-col overflow-hidden md:flex-1">
 
             {/* Search bar — sits below map on mobile, top of right panel on desktop */}
             <div ref={searchBarRef} className="shrink-0 px-3 py-2.5 bg-white border-b border-gray-100">
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none z-10">
                   {isSearching
-                    ? <div className="w-3.5 h-3.5 border-2 border-[#a89068] border-t-transparent rounded-full animate-spin" />
-                    : <i className="fa-solid fa-magnifying-glass text-[#a89068] text-sm" />
+                    ? <div className="w-3.5 h-3.5 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+                    : <i className="fa-solid fa-magnifying-glass text-brand text-sm" />
                   }
                 </div>
                 <input
@@ -1027,7 +1008,7 @@ const GoogleAddressFormModal = ({
                   onChange={(e) => handleSearch(e.target.value)}
                   placeholder="Search street, area or landmark…"
                   autoComplete="off"
-                  className="w-full h-11 bg-[#fdf9f6] border-2 border-[#a89068]/35 rounded-xl pl-10 pr-11 text-sm text-[#2e443c] font-medium focus:border-[#a89068] focus:bg-white focus:shadow-[0_0_0_3px_rgba(168,144,104,0.12)] outline-none placeholder:text-gray-400 placeholder:font-normal transition-all"
+                  className="w-full h-11 bg-surface border-2 border-brand/35 rounded-xl pl-10 pr-11 text-sm text-ink font-medium focus:border-brand focus:bg-white focus:shadow-[0_0_0_3px_rgba(223,0,36,0.12)] outline-none placeholder:text-gray-400 placeholder:font-normal transition-all"
                 />
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
                   {searchQuery ? (
@@ -1044,7 +1025,7 @@ const GoogleAddressFormModal = ({
                       onClick={handleLocate}
                       disabled={isLocating || !isLoaded}
                       title="Use my current location"
-                      className="w-7 h-7 rounded-lg bg-[#a89068]/10 hover:bg-[#a89068]/20 flex items-center justify-center text-[#a89068] transition-colors disabled:opacity-40"
+                      className="w-7 h-7 rounded-lg bg-brand/10 hover:bg-brand/20 flex items-center justify-center text-brand transition-colors disabled:opacity-40"
                     >
                       <i className={`fa-solid ${isLocating ? "fa-spinner animate-spin" : "fa-location-crosshairs"} text-xs`} />
                     </button>
@@ -1057,7 +1038,7 @@ const GoogleAddressFormModal = ({
                 <div className="bg-white border border-gray-200 rounded-xl shadow-2xl max-h-[260px] overflow-y-auto" style={dropdownStyle}>
                   {isSearching ? (
                     <div className="p-4 flex items-center justify-center gap-2.5 text-gray-400">
-                      <div className="w-4 h-4 border-2 border-[#a89068] border-t-transparent rounded-full animate-spin shrink-0" />
+                      <div className="w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin shrink-0" />
                       <span className="text-xs font-medium">Searching…</span>
                     </div>
                   ) : searchResults.length > 0 ? (
@@ -1071,16 +1052,16 @@ const GoogleAddressFormModal = ({
                           key={key}
                           type="button"
                           onClick={() => handleSelectResult(item)}
-                          className="w-full text-left px-4 py-3 active:bg-[#fdf9f6] hover:bg-gray-50 border-b border-gray-100 last:border-0 flex items-center gap-3 group"
+                          className="w-full text-left px-4 py-3 active:bg-surface hover:bg-gray-50 border-b border-gray-100 last:border-0 flex items-center gap-3 group"
                         >
-                          <div className="w-8 h-8 rounded-full bg-gray-100 group-hover:bg-[#a89068]/10 flex items-center justify-center shrink-0 transition-colors">
-                            <i className="fa-solid fa-location-dot text-gray-400 group-hover:text-[#a89068] text-xs transition-colors" />
+                          <div className="w-8 h-8 rounded-full bg-gray-100 group-hover:bg-brand/10 flex items-center justify-center shrink-0 transition-colors">
+                            <i className="fa-solid fa-location-dot text-gray-400 group-hover:text-brand text-xs transition-colors" />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-sm text-[#2e443c] font-medium leading-snug group-hover:text-[#a89068] transition-colors">{mainText}</p>
+                            <p className="text-sm text-ink font-medium leading-snug group-hover:text-brand transition-colors">{mainText}</p>
                             {subText && <p className="text-[11px] text-gray-400 mt-0.5 leading-snug line-clamp-1">{subText}</p>}
                           </div>
-                          <i className="fa-solid fa-chevron-right text-gray-200 text-[10px] shrink-0 group-hover:text-[#a89068] transition-colors" />
+                          <i className="fa-solid fa-chevron-right text-gray-200 text-[10px] shrink-0 group-hover:text-brand transition-colors" />
                         </button>
                       );
                     })
@@ -1099,15 +1080,15 @@ const GoogleAddressFormModal = ({
             <button
               type="button"
               onClick={() => setMapCollapsed(false)}
-              className={`md:hidden shrink-0 w-full flex items-center gap-2.5 px-4 py-2.5 border-b border-[#ede9e3] transition-all ${mapCollapsed ? "bg-[#fdf9f5]" : "pointer-events-none opacity-0 h-0 py-0 border-0 overflow-hidden"}`}
+              className={`md:hidden shrink-0 w-full flex items-center gap-2.5 px-4 py-2.5 border-b border-hair transition-all ${mapCollapsed ? "bg-surface" : "pointer-events-none opacity-0 h-0 py-0 border-0 overflow-hidden"}`}
             >
-              <div className="w-6 h-6 rounded-full bg-[#a89068]/15 flex items-center justify-center shrink-0">
-                <i className="fa-solid fa-map-location-dot text-[#a89068] text-[10px]" />
+              <div className="w-6 h-6 rounded-full bg-brand/15 flex items-center justify-center shrink-0">
+                <i className="fa-solid fa-map-location-dot text-brand text-[10px]" />
               </div>
-              <p className="text-xs text-[#2e443c] font-medium truncate flex-1">
+              <p className="text-xs text-ink font-medium truncate flex-1">
                 {locationSummary?.formattedAddress || deliveryPreview || "Tap to expand map"}
               </p>
-              <span className="text-[10px] text-[#a89068] font-bold shrink-0 flex items-center gap-1 pl-2">
+              <span className="text-[10px] text-brand font-bold shrink-0 flex items-center gap-1 pl-2">
                 Map <i className="fa-solid fa-chevron-up text-[9px]" />
               </span>
             </button>
@@ -1115,8 +1096,34 @@ const GoogleAddressFormModal = ({
             <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
               {FormSection}
             </div>
+            {/* "more content below" hint — subtle fade + bouncing chevron */}
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-9 bg-gradient-to-t from-white via-white/80 to-transparent flex items-end justify-center pb-1.5">
+              <i className="fa-solid fa-chevron-down text-gray-300 text-[11px] animate-bounce" />
+            </div>
           </div>
 
+        </div>
+
+        {/* Sticky footer — Save button ALWAYS visible (never hidden below the fold) */}
+        <div className="shrink-0 border-t border-gray-100 bg-white px-4 py-3" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="w-full py-4 bg-ink text-white rounded-xl font-bold text-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-black transition-colors disabled:opacity-60"
+          >
+            {isSubmitting ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <i className="fa-solid fa-floppy-disk text-sm" />
+                Save Address
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>

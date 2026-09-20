@@ -42,6 +42,12 @@ async function validateNewCoupon({ coupon, cartProductTotal, email, mobile, isLo
   const tag = "[Coupon:Storefront]";
   const now = new Date();
 
+  console.log(
+    `${tag} ELIGIBILITY CHECK "${coupon.code}" — scope=${coupon.scope} audience=${coupon.audience} ` +
+    `isLoggedIn=${isLoggedIn} email=${email || "-"} mobile=${mobile || "-"} assignedToCount=${coupon.assignedTo?.length ?? 0} ` +
+    `cartProductTotal=₹${cartProductTotal}`
+  );
+
   if (!coupon.isActive) {
     console.log(`${tag} REJECT "${coupon.code}" — not active`);
     throw new ValidationError("This coupon is not currently active.");
@@ -147,6 +153,7 @@ async function validateNewCoupon({ coupon, cartProductTotal, email, mobile, isLo
 
 const applyCouponCodeService = async ({ userId, couponCodeName, email, mobile }) => {
   const tag = "[Coupon:Storefront]";
+  console.log(`${tag} applyCouponCodeService called: userId=${userId} code="${couponCodeName || "-"}" email=${email || "-"} mobile=${mobile || "-"}`);
 
   const cartRes = await getCartService({ userId });
 
@@ -237,6 +244,9 @@ const applyCouponCodeService = async ({ userId, couponCodeName, email, mobile })
 // render without knowing which model a coupon came from.
 
 const getAllCouponCodeService = async ({ userId, code }) => {
+  const tag = "[Coupon:List]";
+  console.log(`${tag} getAllCouponCodeService called: userId=${userId || "-"} code="${code || "-"}"`);
+
   // ── Single-coupon lookup by exact code (used by guests typing a code manually) ──
   // Lets the storefront show the correct discount for HIDDEN coupons without listing them.
   // Only returns a coupon if the exact code is known — hidden coupons never appear in the
@@ -254,6 +264,20 @@ const getAllCouponCodeService = async ({ userId, code }) => {
       },
       { couponId: 1, code: 1, title: 1, notes: 1, discountType: 1, discountValue: 1, maxDiscountCap: 1, minCartValue: 1, validUntil: 1 },
     ).lean();
+
+    if (!one) {
+      // Debug-only lookup to explain WHY it didn't match (this query result is never returned to the client).
+      const raw = await Coupon.findOne({ code: cleanCode }, { scope: 1, audience: 1, isActive: 1, isArchived: 1, isTest: 1 }).lean();
+      console.log(
+        `${tag} Code "${cleanCode}" NOT returned by public lookup. ` +
+        (raw
+          ? `Found in DB but filtered out: scope=${raw.scope} audience=${raw.audience} isActive=${raw.isActive} isArchived=${raw.isArchived} isTest=${raw.isTest} ` +
+            `(scope must be PUBLIC, audience must not be MEMBERS_ONLY, isActive=true, isArchived=false, isTest=false — this is by design for TARGETED/MEMBERS_ONLY coupons, they're never returned by this code-lookup endpoint either)`
+          : `No coupon with this code exists at all.`)
+      );
+    } else {
+      console.log(`${tag} Code "${cleanCode}" matched and returned.`);
+    }
 
     const data = one
       ? [{
@@ -301,4 +325,7 @@ const getAllCouponCodeService = async ({ userId, code }) => {
   return { statusCode: 200, message: "activeCouponCodeList", data: results, success: true };
 };
 
-export { applyCouponCodeService, getAllCouponCodeService };
+// validateNewCoupon is exported so the Magic Checkout apply-coupon callback can reuse
+// the exact same eligibility rules (per-user caps, TARGETED assignment, MEMBERS_ONLY,
+// validity window, min-cart) without going through the cart-mutating apply service.
+export { applyCouponCodeService, getAllCouponCodeService, validateNewCoupon };

@@ -43,6 +43,9 @@ function normalizeEvent(e, ctx) {
     ip: ctx.ip,
     userAgent: ctx.userAgent,
     eventTime: e.timestamp ? new Date(e.timestamp) : new Date(),
+    // Only honoured for events the server also writes (purchase) — see
+    // services/event.service.js. Clamped like every other client-supplied string.
+    ...(e.dedupeKey ? { dedupeKey: clamp(e.dedupeKey, 128) } : {}),
   };
 }
 

@@ -183,6 +183,18 @@ export const userApi = apiSlice.injectEndpoints({
       }),
     }),
 
+    /* Customization request. Sent as FormData because the reference picture is
+       optional — prepareHeaders deliberately sets no Content-Type, so the
+       browser adds the multipart boundary itself. Lands in the same admin
+       inbox as contact messages, under the "Customization" subject. */
+    submitCustomization: builder.mutation({
+      query: (form) => ({
+        url: "contact/customization",
+        method: "POST",
+        body: form,
+      }),
+    }),
+
     // Invoice APIs
     generateInvoice: builder.mutation({
       queryFn: async (data, api, _extraOptions, baseQuery) => {
@@ -352,6 +364,7 @@ export const {
   useCreateGuestOrderMutation,
   useJoinCommunityMutation,
   useSubmitContactMutation,
+  useSubmitCustomizationMutation,
   useGenerateInvoiceMutation,
   useSearchAddressMutation,
   useGetAddressSuggestionsMutation,

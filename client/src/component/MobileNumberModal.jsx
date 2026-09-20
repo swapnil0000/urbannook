@@ -82,10 +82,10 @@ const MobileNumberModal = ({
         {/* Header */}
         <div className="p-4 sm:p-6 border-b border-gray-100 flex justify-between items-center bg-white shrink-0">
           <div>
-            <h3 className="font-serif text-[#2e443c] text-lg sm:text-xl">
+            <h3 className="font-serif text-ink text-lg sm:text-xl">
               Add Mobile Number
             </h3>
-            <p className="text-[10px] text-[#a89068] uppercase tracking-widest mt-0.5 font-bold">
+            <p className="text-[10px] text-brand uppercase tracking-widest mt-0.5 font-bold">
               Required for delivery coordination
             </p>
           </div>
@@ -102,27 +102,27 @@ const MobileNumberModal = ({
           
           {/* Name Display */}
           <div className="space-y-2">
-            <label className="text-[9px] uppercase tracking-widest text-[#a89068] font-bold">
+            <label className="text-[9px] uppercase tracking-widest text-brand font-bold">
               Full Name
             </label>
-            <div className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-[#2e443c] text-sm font-medium">
+            <div className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-ink text-sm font-medium">
               {userProfile?.userName || userProfile?.name || "N/A"}
             </div>
           </div>
 
           {/* Email Display */}
           <div className="space-y-2">
-            <label className="text-[9px] uppercase tracking-widest text-[#a89068] font-bold">
+            <label className="text-[9px] uppercase tracking-widest text-brand font-bold">
               Email Address
             </label>
-            <div className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-[#2e443c] text-sm font-medium">
+            <div className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-ink text-sm font-medium">
               {userProfile?.userEmail || userProfile?.email || "N/A"}
             </div>
           </div>
 
           {/* Mobile Number Input */}
           <div className="space-y-2">
-            <label className="text-[9px] uppercase tracking-widest text-[#a89068] font-bold">
+            <label className="text-[9px] uppercase tracking-widest text-brand font-bold">
               Mobile Number *
             </label>
             <input
@@ -131,9 +131,9 @@ const MobileNumberModal = ({
               onChange={handleMobileChange}
               placeholder="Enter 10-digit mobile number"
               maxLength="10"
-              className={`w-full bg-white border rounded-xl p-4 text-sm text-[#2e443c] 
+              className={`w-full bg-white border rounded-xl p-4 text-sm text-ink
                 focus:outline-none transition-all placeholder:text-gray-400
-                ${errors ? "border-red-500 focus:border-red-500" : "border-gray-200 focus:border-[#a89068]"}`}
+                ${errors ? "border-red-500 focus:border-red-500" : "border-gray-200 focus:border-brand"}`}
               disabled={isSaving}
             />
             {errors && (
@@ -152,7 +152,7 @@ const MobileNumberModal = ({
           <button
             onClick={handleSave}
             disabled={isSaving || !mobileNumber}
-            className="w-full py-3 px-4 bg-[#a89068] text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-[#2e443c] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2"
+            className="w-full py-3 px-4 bg-brand text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-brandHi transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2"
           >
             {isSaving ? (
               <>
