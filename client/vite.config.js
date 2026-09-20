@@ -105,6 +105,19 @@ export default defineConfig(({ mode }) => {
   // Vite does NOT auto-populate process.env from .env files, so load them here
   // and hand the GTM container id to the index.html replace plugin.
   const env = loadEnv(mode, '.', '');
+
+  // Trace where each required VITE_ var is actually coming from, since a var can be
+  // "present" but from the wrong source (e.g. a stale local .env shadowing Infisical).
+  const tracedVars = ['VITE_GOOGLE_CLIENT_ID', 'VITE_API_BASE_URL', 'VITE_DOMAIN_BASE_URL'];
+  console.log(`\n[env] mode=${mode}`);
+  tracedVars.forEach((key) => {
+    const fromProcess = Object.prototype.hasOwnProperty.call(process.env, key);
+    const value = env[key];
+    const source = !value ? 'MISSING' : fromProcess ? 'process.env (infisical run)' : '.env file';
+    console.log(`[env]   ${key}: ${source}${value ? '' : ' — run via `infisical run` or add to .env'}`);
+  });
+  console.log('');
+
   return {
   plugins: [react(), bundleSizeMonitor(), htmlEnvReplace(env.VITE_GTM_ID, env.VITE_META_PIXEL_ID)],
   resolve: {

@@ -4,12 +4,12 @@
   "type": "module",
   "main": "src/server.js",
   "scripts": {
-    "dev": "cross-env NODE_ENV=development nodemon src/server.js",
-    "dev:staging": "cross-env NODE_ENV=staging nodemon src/server.js",
-    "dev:prod": "cross-env NODE_ENV=production nodemon src/server.js",
-    "start": "node src/server.js",
-    "start:staging": "cross-env NODE_ENV=staging node src/server.js",
-    "start:prod": "cross-env NODE_ENV=production node src/server.js",
+    "dev": "infisical run --env=dev --path=/user/server -- cross-env NODE_ENV=development nodemon src/server.js",
+    "dev:staging": "infisical run --env=staging --path=/user/server -- cross-env NODE_ENV=staging nodemon src/server.js",
+    "dev:prod": "infisical run --env=prod --path=/user/server -- cross-env NODE_ENV=production nodemon src/server.js",
+    "start": "infisical run --env=dev --path=/user/server -- node src/server.js",
+    "start:staging": "infisical run --env=staging --path=/user/server -- cross-env NODE_ENV=staging node src/server.js",
+    "start:prod": "infisical run --env=prod --path=/user/server -- cross-env NODE_ENV=production node src/server.js",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
   },
   "dependencies": {

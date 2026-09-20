@@ -16,8 +16,10 @@ import mongoose from "mongoose";
 //     server-side at checkout, never trusted from the client — see
 //     rp.payment.controller.js.
 // This replaces the legacy freeShippingOffer.model.js / cartRule.model.js
-// collections, which are left untouched as a fallback until every environment
-// is confirmed migrated (see the dual-read fallback in the utils above).
+// collections. Those legacy collections still exist as historical/backfill
+// source data (see UN-ADMIN-panel's server/scripts/seedOffersFromLegacy.js),
+// but the storefront has no fallback read path to them — see the utils above,
+// which read this collection exclusively.
 
 const conditionSchema = new mongoose.Schema(
   {
@@ -72,9 +74,23 @@ const offerSchema = new mongoose.Schema(
     price: { type: Number, min: 0 },
     title: { type: String, trim: true },
     note: { type: String, trim: true },
-    ctaLabel: { type: String, default: "Add Gift Wrap", trim: true },
+    // No schema-level default here on purpose — shared across all three
+    // `type`s at the Mongoose path level, so a default would leak onto
+    // free_shipping/cart_rule docs too. Mirrors UN-ADMIN-panel's fix; kept in
+    // sync even though this repo never writes Offer docs, so the two schemas
+    // don't drift back into the same trap. See the pre-validate hook below.
+    ctaLabel: { type: String, trim: true },
   },
   { timestamps: true },
 );
+
+// Scope ctaLabel's default to gift_wrap only — mirrors UN-ADMIN-panel's
+// offer.model.js (the actual write owner for this collection).
+offerSchema.pre("validate", function setGiftWrapCtaLabelDefault(next) {
+  if (this.type === "gift_wrap" && !this.ctaLabel) {
+    this.ctaLabel = "Add Gift Wrap";
+  }
+  next();
+});
 
 export default mongoose.model("Offer", offerSchema, "offers");
