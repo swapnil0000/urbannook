@@ -312,23 +312,26 @@ userRouter.post(
    ⚠️ RAW body (NOT express.json) — the secret is checked against raw bytes.
    No authGuardService: authenticated by the per-channel secret instead.
    Inert until the URLs are configured in the dashboard.
+
+   GET **and** POST are both mounted on purpose. Razorpay's docs describe all
+   three callbacks as `GET /your-server-url/...` yet show a JSON request body,
+   which only makes sense over POST — and it does not send the same method to
+   every one of them. While only POST was mounted, a GET from Razorpay hit the
+   404 handler instead of the controller, so nothing was logged and Razorpay
+   fell back to its own coupon validation ("INVALID_COUPON — coupon not
+   applicable for this order"). Accepting both removes the guesswork;
+   authedPayload reads the body when there is one and the query string
+   otherwise.
 ================================================================ */
-userRouter.post(
-  "/magic/shipping-info",
-  bodyParser.raw({ type: "application/json" }),
-  magicShippingInfoController,
-);
+const magicCallbackBody = bodyParser.raw({ type: "application/json" });
 
-userRouter.post(
-  "/magic/promotions",
-  bodyParser.raw({ type: "application/json" }),
-  magicGetPromotionsController,
-);
+userRouter.post("/magic/shipping-info", magicCallbackBody, magicShippingInfoController);
+userRouter.get("/magic/shipping-info", magicCallbackBody, magicShippingInfoController);
 
-userRouter.post(
-  "/magic/promotions/apply",
-  bodyParser.raw({ type: "application/json" }),
-  magicApplyPromotionController,
-);
+userRouter.post("/magic/promotions", magicCallbackBody, magicGetPromotionsController);
+userRouter.get("/magic/promotions", magicCallbackBody, magicGetPromotionsController);
+
+userRouter.post("/magic/promotions/apply", magicCallbackBody, magicApplyPromotionController);
+userRouter.get("/magic/promotions/apply", magicCallbackBody, magicApplyPromotionController);
 
 export default userRouter;
