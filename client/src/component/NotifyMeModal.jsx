@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { getApiUrl } from "../config/appUrls";
 
-const NotifyMeModal = ({ productName, productId, onClose }) => {
+const NotifyMeModal = ({ productName, productId, variantName, onClose }) => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [mobile, setMobile] = useState("");
@@ -36,9 +36,12 @@ const NotifyMeModal = ({ productName, productId, onClose }) => {
           email,
           mobile,
           subject: "Product Inquiry",
-          message: `Please notify me when "${productName}" (Product ID: ${productId}) is back in stock.`,
+          message: variantName
+            ? `Please notify me when "${productName}" (${variantName}) (Product ID: ${productId}) is back in stock.`
+            : `Please notify me when "${productName}" (Product ID: ${productId}) is back in stock.`,
           productId,
           productName,
+          variantName: variantName || null,
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -143,7 +146,7 @@ const NotifyMeModal = ({ productName, productId, onClose }) => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-12 bg-paper text-ink rounded-full font-bold uppercase tracking-widest text-xs disabled:opacity-50"
+              className="w-full h-12 bg-green-600 text-white rounded-full font-bold uppercase tracking-widest text-xs disabled:opacity-50"
             >
               {loading ? "Submitting..." : "Notify me"}
             </button>

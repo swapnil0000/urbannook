@@ -37,9 +37,32 @@ import {
 
 const TAG = "[MAGIC]";
 
+// These callbacks carry the customer's email and phone, and everything logged
+// here lands in a log aggregator nobody has scrubbed. Enough is kept to match
+// a request to a customer while debugging; the rest is masked.
+const redact = (payload = {}) => {
+  const masked = { ...payload };
+  if (masked.email) {
+    const [user, domain] = String(masked.email).split("@");
+    masked.email = domain ? `${user.slice(0, 2)}***@${domain}` : "***";
+  }
+  if (masked.contact) {
+    const digits = String(masked.contact).replace(/\D/g, "");
+    masked.contact = digits ? `***${digits.slice(-4)}` : "***";
+  }
+  return masked;
+};
+
 // Authenticate + parse a raw callback body. Returns the payload, or null after
 // the response has already been sent (caller must return immediately).
 const authedPayload = (channel, req, res) => {
+  // Logged before the auth check so a rejected call still shows up while
+  // debugging which method/shape Razorpay actually uses for this callback.
+  const rawBody = Buffer.isBuffer(req.body) ? req.body.toString("utf8") : "";
+  console.log(
+    `${TAG}[${channel}] ${req.method} hit — body ${rawBody.length}b, query keys [${Object.keys(req.query || {}).join(", ")}]`,
+  );
+
   const auth = verifyMagicCallback(channel, req.body, req.headers, req.query);
   if (!auth.ok) {
     console.error(`${TAG}[${channel}] rejected: ${auth.reason}`);
@@ -47,12 +70,22 @@ const authedPayload = (channel, req, res) => {
     return null;
   }
 
+  // A GET carries its parameters on the query string instead of a body, and
+  // Razorpay documents these callbacks as GET while showing a JSON body — so
+  // whichever it actually sends, the parameters are found.
+  if (!rawBody.trim()) {
+    const { k, ...params } = req.query || {};
+    console.log(`${TAG}[${channel}] auth=${auth.reason} query-payload=${JSON.stringify(redact(params))}`);
+    return params;
+  }
+
   try {
-    const parsed = JSON.parse(req.body.toString("utf8"));
-    console.log(`${TAG}[${channel}] auth=${auth.reason} payload=${JSON.stringify(parsed)}`);
+    const parsed = JSON.parse(rawBody);
+    console.log(`${TAG}[${channel}] auth=${auth.reason} payload=${JSON.stringify(redact(parsed))}`);
     return parsed;
   } catch {
-    console.error(`${TAG}[${channel}] invalid JSON body`);
+    // Shape only — the body itself may carry the customer's details.
+    console.error(`${TAG}[${channel}] invalid JSON body (${rawBody.length} bytes)`);
     res.status(400).json({ success: false, message: "Invalid JSON" });
     return null;
   }
@@ -60,9 +93,25 @@ const authedPayload = (channel, req, res) => {
 
 // Hydrate weight-accurate shipping inputs from the DB order created at
 // order-create time (payment.razorpayOrderId === the Magic order_id).
+//
+// Only valid for the shipping-info callback: per Razorpay's own docs, THAT
+// payload carries both `order_id` (the receipt) and `razorpay_order_id` (the
+// real Razorpay id, no `order_` prefix) — resolveRazorpayOrderId prefers the
+// latter, which is what this looks up by.
 const orderForRazorpayId = async (razorpayOrderId, projection) => {
   if (!razorpayOrderId) return null;
   return Order.findOne({ "payment.razorpayOrderId": razorpayOrderId }, projection).lean();
+};
+
+// Get/Apply Promotions carry ONLY `order_id`, and per Razorpay's docs that
+// value IS the receipt we set at order-create — never the Razorpay order id.
+// Looking that up against payment.razorpayOrderId (as this file used to)
+// never matches anything, since we never even set a receipt: order-create
+// silently sent no `receipt` at all. Order.orderId is what we now put in
+// `receipt`, so that is what this must match against.
+const orderByReceipt = async (receipt, projection) => {
+  if (!receipt) return null;
+  return Order.findOne({ orderId: receipt }, projection).lean();
 };
 
 const cartItemsForOrder = (order) =>
@@ -200,7 +249,7 @@ export const magicGetPromotionsController = asyncHandler(async (req, res) => {
     // A coupon applied in our cart is already discounted into the order's line
     // items, so the reduction is in the amount Razorpay will charge. Offering
     // the coupon sheet on top of that invites a second discount on one order.
-    const existing = await orderForRazorpayId(resolveRazorpayOrderId(payload), { coupon: 1 });
+    const existing = await orderByReceipt(payload.order_id, { coupon: 1 });
     if (existing?.coupon?.isApplied) {
       console.log(`${TAG}[getPromotions] coupon "${existing.coupon.couponCodeName}" already applied — no list`);
       return res.status(200).json({ promotions: [] });
@@ -267,7 +316,9 @@ export const magicApplyPromotionController = asyncHandler(async (req, res) => {
   if (!payload) return;
 
   const { code, contact, email } = payload;
-  const razorpayOrderId = resolveRazorpayOrderId(payload);
+  // Not resolveRazorpayOrderId — Apply Promotions only ever sends `order_id`,
+  // and per Razorpay's docs that's the receipt, not a Razorpay order id.
+  const receipt = payload.order_id;
 
   // Razorpay treats a 200 with failure_code as "coupon rejected, show this
   // reason" — which is what we want for every business rejection.
@@ -285,7 +336,7 @@ export const magicApplyPromotionController = asyncHandler(async (req, res) => {
   // Product subtotal the discount applies to. The DB order's amount is the
   // source of truth; Razorpay's order_amount is a fallback.
   // VERIFY: confirm the field name and whether it already includes shipping.
-  const order = await orderForRazorpayId(razorpayOrderId, {
+  const order = await orderByReceipt(receipt, {
     amount: 1,
     coupon: 1,
     userId: 1,

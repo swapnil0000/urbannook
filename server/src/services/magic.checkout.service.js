@@ -97,9 +97,16 @@ export const verifyMagicCallback = (channel, rawBody, headers = {}, query = {}) 
   }
 
   // (a) HMAC-SHA256 of the raw body — same trust model as the Razorpay webhook.
+  // A GET callback has no body at all, and body-parser then leaves req.body as
+  // {} rather than a Buffer, which createHmac().update() would throw on.
+  const bodyBytes = Buffer.isBuffer(rawBody)
+    ? rawBody
+    : typeof rawBody === "string"
+      ? Buffer.from(rawBody)
+      : Buffer.alloc(0);
   const expected = crypto
     .createHmac("sha256", secret)
-    .update(rawBody || Buffer.alloc(0))
+    .update(bodyBytes)
     .digest("hex");
 
   for (const h of SIGNATURE_HEADERS) {

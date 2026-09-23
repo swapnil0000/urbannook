@@ -1024,6 +1024,7 @@ const ProductDetailPage = () => {
         <NotifyMeModal
           productName={product?.productName}
           productId={product?.productId}
+          variantName={selectedVariant || null}
           onClose={() => setShowNotifyModal(false)}
         />
       )}
