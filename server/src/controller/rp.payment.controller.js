@@ -141,6 +141,54 @@ const collectMetaTracking = (req) => ({
   eventSourceUrl: req.headers["referer"] || req.headers["origin"] || null,
 });
 
+// Pull the address Razorpay collected inside the Magic modal onto our order,
+// whether the payment that followed succeeded or failed. Razorpay saves
+// customer_details on the Razorpay order as soon as the customer fills the
+// modal — before payment even runs — so this is available on a failed
+// attempt too, not just a captured one. Mutates `order` in place; the caller
+// is responsible for `order.save()`. Returns true if an address was written.
+const captureMagicAddressIfMissing = async (order, razorpayOrderId) => {
+  if (!order?.isMagicOrder) {
+    console.log(`[MAGIC][address-capture] skip ${razorpayOrderId} — not a Magic order`);
+    return false;
+  }
+  if (order.deliveryAddress?.pinCode) {
+    console.log(`[MAGIC][address-capture] skip ${razorpayOrderId} — address already on order`);
+    return false;
+  }
+
+  console.log(`[MAGIC][address-capture] fetching Razorpay order ${razorpayOrderId} for customer_details`);
+  const rpOrder = await razorpayFetchOrderService(razorpayOrderId);
+  const magicAddress = toOrderDeliveryAddress(rpOrder?.customer_details);
+  if (!magicAddress) {
+    console.error(`[MAGIC][address-capture] no customer_details on ${razorpayOrderId} — order still has NO address`);
+    return false;
+  }
+
+  // Pin code only — the customer's name and number stay out of the logs.
+  console.log(`[MAGIC][address-capture] captured for ${razorpayOrderId} — pin ${magicAddress.pinCode}`);
+  order.deliveryAddress = magicAddress;
+  order.userName = magicAddress.fullName || order.userName;
+  order.userMobile = magicAddress.mobileNumber || order.userMobile;
+  order.senderMobile = magicAddress.mobileNumber || order.senderMobile;
+  order.receiverMobile = magicAddress.mobileNumber || order.receiverMobile;
+
+  const email = rpOrder?.customer_details?.email;
+  if (email && (!order.userEmail || isPlaceholderEmail(order.userEmail))) {
+    order.userEmail = email;
+  }
+
+  if (order.isGuestOrder) {
+    order.guestInfo = {
+      name: order.guestInfo?.name || magicAddress.fullName || "",
+      email: order.guestInfo?.email || email || "",
+      mobile: order.guestInfo?.mobile || magicAddress.mobileNumber || "",
+    };
+  }
+
+  return true;
+};
+
 const PAYMENT_ERROR_MESSAGES = {
   BAD_REQUEST_ERROR: "Payment failed due to invalid request. Please try again.",
   GATEWAY_ERROR:
@@ -695,6 +743,13 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   // What Razorpay is actually asked to charge. Identical to
   // razorpayChargeAmountPaise off the Magic path; on it, the line items decide.
   let magicChargePaise = razorpayChargeAmountPaise;
+  // Generated here (before the Razorpay order exists) so it can be sent as
+  // `receipt` below — Razorpay's own docs mark `receipt` mandatory for a
+  // Magic order, and its Get/Apply Promotions callbacks echo it straight
+  // back as `order_id` (with NO `razorpay_order_id` alongside it, unlike the
+  // shipping-info callback). Without setting a receipt here, that echoed
+  // `order_id` matched nothing in our DB and coupon lookups silently failed.
+  const preGeneratedOrderId = uuidv7();
   if (isMagic) {
     const lineItems = buildMagicLineItems(orderItems);
 
@@ -722,9 +777,23 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     const discounted = discountMagicLineItems(lineItems, razorpayChargeAmountPaise);
 
     magicOrderOptions = {
+      receipt: preGeneratedOrderId,
       line_items: discounted.lineItems,
       line_items_total: discounted.total,
+      // Points this order at a Razorpay Dashboard payment-methods config that
+      // has Cash on Delivery turned off, so Magic's own "Cash on Delivery —
+      // Not available for this order" tile never renders at all. Without
+      // this, Razorpay falls back to the account's default config, which
+      // still lists COD (greyed out) because it's enabled account-wide. We
+      // never want Razorpay's own COD here — the site's real COD button is
+      // a separate, non-Magic flow (see payChoice === "COD" on the client).
+      ...(env.MAGIC_CHECKOUT_CONFIG_ID ? { checkout_config_id: env.MAGIC_CHECKOUT_CONFIG_ID } : {}),
     };
+    console.log(
+      env.MAGIC_CHECKOUT_CONFIG_ID
+        ? `[MAGIC][order-create] using checkout_config_id=${env.MAGIC_CHECKOUT_CONFIG_ID}`
+        : `[MAGIC][order-create] MAGIC_CHECKOUT_CONFIG_ID not set — using Razorpay account default config (COD tile may still show)`,
+    );
     // Charge exactly what the items add up to. Splitting a discount across
     // whole paise can leave a few unplaced, and an amount that disagrees with
     // the line items is precisely what makes Razorpay bill its own number.
@@ -767,7 +836,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   });
 
   const order = await Order.create({
-    orderId: uuidv7(),
+    orderId: preGeneratedOrderId,
     userEmail,
     userId,
     userName: deliveryAddressSnapshot.fullName,
@@ -1338,27 +1407,38 @@ const razorpayWebHookController = async (req, res) => {
         const errorCode = payment.error_code || "payment_failed";
         const errorDescription =
           payment.error_description || "Payment attempt failed.";
+        const razorpayOrderId = payment.order_id;
 
-        await Order.updateOne(
-          {
-            "payment.razorpayOrderId": payment.order_id,
-            status: { $nin: ["PAID", "DELIVERED", "SHIPPED"] },
-          },
-          {
-            $set: {
-              status: "FAILED",
-              "payment.errorCode": errorCode,
-              "payment.errorDescription": errorDescription,
-            },
-            $push: {
-              statusHistory: {
-                status: "FAILED",
-                timestamp: new Date(),
-                note: `Payment failed: ${errorDescription}`,
-              },
-            },
-          },
-        );
+        // Fetch first (not updateOne) so a Magic order can still have the
+        // address the customer typed into the modal captured — otherwise a
+        // failed Magic attempt leaves the order with no name/address/mobile
+        // at all, even though Razorpay already collected them.
+        const order = await Order.findOne({
+          "payment.razorpayOrderId": razorpayOrderId,
+          status: { $nin: ["PAID", "DELIVERED", "SHIPPED"] },
+        });
+
+        if (order) {
+          console.log(`[WEBHOOK] payment.failed for order ${order.orderId} (rp order ${razorpayOrderId}), isMagicOrder=${order.isMagicOrder}`);
+          try {
+            await captureMagicAddressIfMissing(order, razorpayOrderId);
+          } catch (err) {
+            console.error(`[MAGIC][address-capture] payment.failed capture threw: ${err.message}`);
+          }
+
+          order.status = "FAILED";
+          order.payment.errorCode = errorCode;
+          order.payment.errorDescription = errorDescription;
+          order.statusHistory.push({
+            status: "FAILED",
+            timestamp: new Date(),
+            note: `Payment failed: ${errorDescription}`,
+          });
+          await order.save();
+          console.log(`[WEBHOOK] order ${order.orderId} marked FAILED, deliveryAddress.pinCode=${order.deliveryAddress?.pinCode || "none"}`);
+        } else {
+          console.warn(`[WEBHOOK] payment.failed — no order found for rp order ${razorpayOrderId}`);
+        }
 
         console.log("❌ Payment Failed:", payment.id, errorCode);
         break;
@@ -1663,6 +1743,9 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   // What Razorpay is actually asked to charge. Identical to
   // razorpayChargeAmountPaise off the Magic path; on it, the line items decide.
   let magicChargePaise = razorpayChargeAmountPaise;
+  // See the logged-in path's comment on this same line — receipt is what
+  // Get/Apply Promotions echo back as `order_id`.
+  const preGeneratedOrderId = uuidv7();
   if (isMagic) {
     const lineItems = buildMagicLineItems(orderItems);
     if (giftWrapSelected && giftWrapAmount > 0) {
@@ -1684,10 +1767,19 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     const discounted = discountMagicLineItems(lineItems, razorpayChargeAmountPaise);
 
     magicOrderOptions = {
+      receipt: preGeneratedOrderId,
       line_items: discounted.lineItems,
       line_items_total: discounted.total,
+      // See the logged-in path above — keeps Razorpay's own greyed-out COD
+      // tile out of the Magic sheet entirely.
+      ...(env.MAGIC_CHECKOUT_CONFIG_ID ? { checkout_config_id: env.MAGIC_CHECKOUT_CONFIG_ID } : {}),
     };
     magicChargePaise = discounted.total;
+    console.log(
+      env.MAGIC_CHECKOUT_CONFIG_ID
+        ? `[MAGIC][order-create][guest] using checkout_config_id=${env.MAGIC_CHECKOUT_CONFIG_ID}`
+        : `[MAGIC][order-create][guest] MAGIC_CHECKOUT_CONFIG_ID not set — using Razorpay account default config (COD tile may still show)`,
+    );
     console.log(
       `[MAGIC][order-create][guest] ${lineItems.length} line item(s), full ₹${fullTotal / 100}, ` +
         `after discount ₹${discounted.total / 100} (asked ₹${razorpayChargeAmount})`,
@@ -1701,7 +1793,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   );
 
   const order = await Order.create({
-    orderId: uuidv7(),
+    orderId: preGeneratedOrderId,
     userEmail: guestEmail || buildPlaceholderEmail(`magic-${razorpayOrder?.data?.id || uuidv7()}`),
     // Reuse the SAME per-browser anonymousId the pre-payment guest-cart-sync
     // wrote as userId (see guestCart.route.js / syncGuestCartService) — this
