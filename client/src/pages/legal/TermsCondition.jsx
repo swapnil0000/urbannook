@@ -100,10 +100,10 @@ const TermsConditions = () => {
           {/* Section 5 */}
           <section>
             <h2 className="font-archivo text-xl md:text-2xl font-bold text-ink mb-4 flex items-center gap-3">
-              <span className="gl-lbl text-brand text-sm">05.</span> Shipping, Returns & Cancellations
+              <span className="gl-lbl text-brand text-sm">05.</span> Shipping, Exchange & Cancellations
             </h2>
             <p className="leading-relaxed text-muted">
-              Our shipping, return, and cancellation policies are an integral part of these Terms. Please review our specific policies for detailed information:
+              Our shipping, exchange, and cancellation policies are an integral part of these Terms. Please review our specific policies for detailed information:
             </p>
             <div className="flex flex-wrap gap-4 mt-6">
               <Link to="/shipping-policy" className="text-sm border border-hair px-4 py-2 rounded bg-white text-faint">Shipping Policy</Link>

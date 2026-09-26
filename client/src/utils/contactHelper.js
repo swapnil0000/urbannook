@@ -1,6 +1,6 @@
 // src/utils/contactHelper.js
 
-export const SUPPORT_EMAIL = "support@urbannook.in";
+export const SUPPORT_EMAIL = "urbanadmin@urbannook.in";
 
 /**
  * Generates a properly formatted mailto URL.

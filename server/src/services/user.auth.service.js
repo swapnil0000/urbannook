@@ -39,7 +39,7 @@ const loginService = async (email, password) => {
   // CRITICAL: Check if user is suspended
   if (res.isSuspended) {
     throw new AuthorizationError(
-      "Your account has been suspended. Please contact support at support@urbannook.in",
+      "Your account has been suspended. Please contact support at urbanadmin@urbannook.in",
     );
   }
 

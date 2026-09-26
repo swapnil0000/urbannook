@@ -117,7 +117,7 @@ const getShippingRateOrFallback = async (params) => {
       expectedNoOfBoxes: params.cartItems?.length || 0,
       serviceName: null,
       courierName: null,
-      estimatedDays: "3-4 Days",
+      estimatedDays: "24-48 hours",
       paymentType: params.paymentType || "PREPAID",
     };
   }

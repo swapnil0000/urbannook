@@ -118,7 +118,7 @@ export  const socialLinks = [
       name: 'Email Support',
       icon: 'fa-solid fa-envelope',
       color: 'bg-blue-600',
-      link: 'mailto:support@urbannook.in',
+      link: 'mailto:urbanadmin@urbannook.in',
     },
     {
       id: 'call',
@@ -135,7 +135,7 @@ export  const socialLinks = [
         { value: 'Product Inquiry', label: 'Product Inquiry', icon: 'fa-solid fa-box', description: 'Questions about our products' },
         { value: 'Order Support', label: 'Order Support', icon: 'fa-solid fa-truck', description: 'Track orders & delivery' },
         { value: 'Technical Support', label: 'Technical Support', icon: 'fa-solid fa-tools', description: 'Assembly & setup help' },
-        { value: 'Returns & Refunds', label: 'Returns & Refunds', icon: 'fa-solid fa-undo', description: 'Return policy & refunds' },
+        { value: 'Exchange & Refunds', label: 'Exchange & Refunds', icon: 'fa-solid fa-undo', description: 'Exchange policy & refunds' },
         { value: 'General Inquiry', label: 'General Inquiry', icon: 'fa-solid fa-comment', description: 'Other questions' }
     ];
 
@@ -151,7 +151,7 @@ export const contactInfo = [
         id: 2,
         icon: "fa-solid fa-envelope",
         title: "Any Type Of Enquires",
-        info: "support@urbannook.in",
+        info: "urbanadmin@urbannook.in",
         subInfo: "Response within 24h",
     },
     {
@@ -170,11 +170,11 @@ export const contactPageFaqs = [
     },
     {
         question: "How long does standard shipping take?",
-        answer: "All our pieces are made to order to ensure the highest quality. Please allow 3-5 business days for production, and an additional 3-4 days for pan-India delivery."
+        answer: "All our pieces are made to order to ensure the highest quality. We ship within 24-48 hours of ordering, pan-India."
     },
     {
-        question: "What is your return policy?",
-        answer: "We offer a hassle-free 7-day return policy for any items damaged in transit. We just request a quick unboxing video to process replacements swiftly."
+        question: "What is your exchange policy?",
+        answer: "We don't accept returns or exchanges for change of mind, colour or preference. If your item arrives damaged, defective or wrong, report it within 3 days with an unboxing video and we'll replace it free."
     },
     {
         question: "Do you ship internationally?",
@@ -204,8 +204,8 @@ export const supportFaqs = [
         },
         {
             id: 2,
-            question: 'What is the return timeline?',
-            answer: 'We accept returns within 7 days of delivery for damaged or defective products. Please ensure the item is unused and in original packaging with tags intact.'
+            question: 'What is the exchange timeline?',
+            answer: 'We do not accept returns, but we offer exchanges within 3 days of delivery for damaged or defective products. Please ensure the item is unused and in original packaging with tags intact.'
         },
         {
             id: 3,
