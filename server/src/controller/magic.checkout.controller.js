@@ -6,6 +6,7 @@ import {
   FALLBACK_SHIPPING_CHARGE,
 } from "../services/shipping.service.js";
 import { validateNewCoupon } from "../services/coupon.code.service.js";
+import { isPlaceholderEmail } from "../utils/placeholderEmail.js";
 import {
   isFreeShippingEligible,
   getFreeShippingConfig,
@@ -37,52 +38,36 @@ import {
 
 const TAG = "[MAGIC]";
 
-// These callbacks carry the customer's email and phone, and everything logged
-// here lands in a log aggregator nobody has scrubbed. Enough is kept to match
-// a request to a customer while debugging; the rest is masked.
-const redact = (payload = {}) => {
-  const masked = { ...payload };
-  if (masked.email) {
-    const [user, domain] = String(masked.email).split("@");
-    masked.email = domain ? `${user.slice(0, 2)}***@${domain}` : "***";
-  }
-  if (masked.contact) {
-    const digits = String(masked.contact).replace(/\D/g, "");
-    masked.contact = digits ? `***${digits.slice(-4)}` : "***";
-  }
-  return masked;
-};
-
 // Authenticate + parse a raw callback body. Returns the payload, or null after
 // the response has already been sent (caller must return immediately).
 const authedPayload = (channel, req, res) => {
-  // Logged before the auth check so a rejected call still shows up while
-  // debugging which method/shape Razorpay actually uses for this callback.
   const rawBody = Buffer.isBuffer(req.body) ? req.body.toString("utf8") : "";
-  console.log(
-    `${TAG}[${channel}] ${req.method} hit — body ${rawBody.length}b, query keys [${Object.keys(req.query || {}).join(", ")}]`,
-  );
 
   const auth = verifyMagicCallback(channel, req.body, req.headers, req.query);
   if (!auth.ok) {
+    // Kept: a rejected call means Razorpay reached us but auth failed — that
+    // is a real config problem (secret/URL mismatch), worth seeing live.
     console.error(`${TAG}[${channel}] rejected: ${auth.reason}`);
     res.status(401).json({ success: false, message: "Unauthorized" });
     return null;
   }
+
+  // The payload itself is not printed here any more — every callback writes
+  // its full, unredacted body to Order.magicCallbackLog (see
+  // logMagicCallback below) once the order is resolved, which is the
+  // durable record. Console output stays limited to things worth watching
+  // live: auth failures and malformed bodies.
 
   // A GET carries its parameters on the query string instead of a body, and
   // Razorpay documents these callbacks as GET while showing a JSON body — so
   // whichever it actually sends, the parameters are found.
   if (!rawBody.trim()) {
     const { k, ...params } = req.query || {};
-    console.log(`${TAG}[${channel}] auth=${auth.reason} query-payload=${JSON.stringify(redact(params))}`);
     return params;
   }
 
   try {
-    const parsed = JSON.parse(rawBody);
-    console.log(`${TAG}[${channel}] auth=${auth.reason} payload=${JSON.stringify(redact(parsed))}`);
-    return parsed;
+    return JSON.parse(rawBody);
   } catch {
     // Shape only — the body itself may carry the customer's details.
     console.error(`${TAG}[${channel}] invalid JSON body (${rawBody.length} bytes)`);
@@ -103,15 +88,86 @@ const orderForRazorpayId = async (razorpayOrderId, projection) => {
   return Order.findOne({ "payment.razorpayOrderId": razorpayOrderId }, projection).lean();
 };
 
-// Get/Apply Promotions carry ONLY `order_id`, and per Razorpay's docs that
-// value IS the receipt we set at order-create — never the Razorpay order id.
-// Looking that up against payment.razorpayOrderId (as this file used to)
-// never matches anything, since we never even set a receipt: order-create
-// silently sent no `receipt` at all. Order.orderId is what we now put in
-// `receipt`, so that is what this must match against.
-const orderByReceipt = async (receipt, projection) => {
-  if (!receipt) return null;
-  return Order.findOne({ orderId: receipt }, projection).lean();
+// Get/Apply Promotions carry only `order_id`, and what that holds is not
+// settled: Razorpay's docs say it is the receipt we set at order-create, but
+// a captured live payload had the Razorpay order id (`order_Tf...`) in it
+// instead. Matching either is the only safe read — picking one and being
+// wrong means no order is found, the cart total falls back to whatever the
+// payload happens to carry, and coupons quietly stop applying.
+const orderByReceipt = async (orderIdFromPayload, projection) => {
+  const raw = String(orderIdFromPayload || "").trim();
+  if (!raw) return null;
+
+  // The shipping-info callback documents the Razorpay id as arriving WITHOUT
+  // the `order_` prefix, so try it both ways.
+  const prefixed = raw.startsWith("order_") ? raw : `order_${raw}`;
+
+  return Order.findOne(
+    { $or: [{ orderId: raw }, { "payment.razorpayOrderId": prefixed }] },
+    projection,
+  ).lean();
+};
+
+// Shipping-info is the EARLIEST point in the Magic flow where we hear the
+// customer's contact/email/pincode — it fires as soon as they type an
+// address to get a shipping rate, long before any payment attempt. Every
+// other capture point (the payment.captured/payment.failed webhooks) only
+// fires after an attempt, so an order the customer abandons before ever
+// tapping Pay used to reach the admin panel with nothing on it but a guest
+// avatar — no name, no number, no address. This writes whatever we have on
+// every call, so that data is there even if the order stays CREATED forever.
+// Deliberately NOT awaited by the caller — this must never slow down the
+// shipping-rate response the customer is waiting on.
+const captureContactFromShippingInfo = async (orderMongoId, payload) => {
+  if (!orderMongoId) return;
+  try {
+    const contact = payload.contact ? stripCountryCode(payload.contact) : "";
+    const email = payload.email ? String(payload.email).trim() : "";
+    const firstAddr = Array.isArray(payload.addresses) ? payload.addresses[0] : null;
+    const pinCode = firstAddr?.zipcode ? Number(String(firstAddr.zipcode).replace(/\D/g, "")) : null;
+    const state = firstAddr?.state || firstAddr?.state_code || "";
+
+    if (!contact && !email && !pinCode) return;
+
+    const existing = await Order.findById(orderMongoId, {
+      userEmail: 1,
+      isGuestOrder: 1,
+    }).lean();
+    if (!existing) return;
+
+    const set = {};
+    if (contact) {
+      set.userMobile = contact;
+      set.senderMobile = contact;
+      set.receiverMobile = contact;
+      if (existing.isGuestOrder) set["guestInfo.mobile"] = contact;
+    }
+    if (email && (!existing.userEmail || isPlaceholderEmail(existing.userEmail))) {
+      set.userEmail = email;
+      if (existing.isGuestOrder) set["guestInfo.email"] = email;
+    }
+    if (pinCode) set["deliveryAddress.pinCode"] = pinCode;
+    if (state) set["deliveryAddress.state"] = state;
+
+    if (Object.keys(set).length === 0) return;
+    await Order.updateOne({ _id: orderMongoId }, { $set: set });
+  } catch (err) {
+    console.error(`${TAG}[shipping] contact capture failed: ${err.message}`);
+  }
+};
+
+// Raw capture: every Magic callback payload, whatever it contains, appended
+// to the order it belongs to — independent of whether we currently know how
+// to interpret or display any given field. Fire-and-forget: this must never
+// slow down or fail the response Razorpay is waiting on. Capped at the last
+// 20 entries per order so a customer who reopens checkout repeatedly (each
+// pincode edit re-fires shipping-info) cannot grow this unbounded.
+const logMagicCallback = (orderMongoId, channel, payload) => {
+  if (!orderMongoId) return;
+  Order.updateOne(
+    { _id: orderMongoId },
+    { $push: { magicCallbackLog: { $each: [{ channel, payload, receivedAt: new Date() }], $slice: -20 } } },
+  ).catch((err) => console.error(`${TAG}[raw-log] ${channel} failed: ${err.message}`));
 };
 
 const cartItemsForOrder = (order) =>
@@ -144,6 +200,10 @@ export const magicShippingInfoController = asyncHandler(async (req, res) => {
     freeShippingUnlocked: 1,
   });
   const cartItems = cartItemsForOrder(order);
+
+  // Fire-and-forget: never let this block or fail the shipping-rate response.
+  captureContactFromShippingInfo(order?._id, payload);
+  logMagicCallback(order?._id, "shipping-info", payload);
 
   if (!order) {
     // Without the order we have no cart, so ShipMozo cannot weigh anything and
@@ -249,7 +309,8 @@ export const magicGetPromotionsController = asyncHandler(async (req, res) => {
     // A coupon applied in our cart is already discounted into the order's line
     // items, so the reduction is in the amount Razorpay will charge. Offering
     // the coupon sheet on top of that invites a second discount on one order.
-    const existing = await orderByReceipt(payload.order_id, { coupon: 1 });
+    const existing = await orderByReceipt(payload.order_id || payload.razorpay_order_id, { coupon: 1 });
+    logMagicCallback(existing?._id, "get-promotions", payload);
     if (existing?.coupon?.isApplied) {
       console.log(`${TAG}[getPromotions] coupon "${existing.coupon.couponCodeName}" already applied — no list`);
       return res.status(200).json({ promotions: [] });
@@ -261,8 +322,16 @@ export const magicGetPromotionsController = asyncHandler(async (req, res) => {
       isArchived: false,
       isTest: false,
       isInternal: false,
+      // Matches the storefront's own visible-coupon query (coupon.code.service.js)
+      // exactly — without this, a coupon marked hidden (manual-entry only,
+      // never meant to be listed) showed up in Magic's coupon sheet even
+      // though the storefront's own "available coupons" list correctly hid it.
+      isHidden: { $ne: true },
       scope: "PUBLIC",
-      audience: "EVERYONE",
+      // storefront excludes only MEMBERS_ONLY, not everything but EVERYONE —
+      // a legacy coupon with no audience field set is public by default and
+      // showed on the storefront but silently vanished from Magic.
+      audience: { $ne: "MEMBERS_ONLY" },
       $and: [
         { $or: [{ validFrom: null }, { validFrom: { $exists: false } }, { validFrom: { $lte: now } }] },
         { $or: [{ validUntil: null }, { validUntil: { $exists: false } }, { validUntil: { $gte: now } }] },
@@ -318,7 +387,7 @@ export const magicApplyPromotionController = asyncHandler(async (req, res) => {
   const { code, contact, email } = payload;
   // Not resolveRazorpayOrderId — Apply Promotions only ever sends `order_id`,
   // and per Razorpay's docs that's the receipt, not a Razorpay order id.
-  const receipt = payload.order_id;
+  const receipt = payload.order_id || payload.razorpay_order_id;
 
   // Razorpay treats a 200 with failure_code as "coupon rejected, show this
   // reason" — which is what we want for every business rejection.
@@ -342,6 +411,7 @@ export const magicApplyPromotionController = asyncHandler(async (req, res) => {
     userId: 1,
     isGuestOrder: 1,
   });
+  logMagicCallback(order?._id, "apply-promotion", payload);
 
   if (order?.coupon?.isApplied) {
     return fail(
@@ -385,6 +455,27 @@ export const magicApplyPromotionController = asyncHandler(async (req, res) => {
   }
 
   console.log(`${TAG}[applyPromotion] "${cleanCode}" ok — ₹${discountRupees} off ₹${subtotalRupees}`);
+
+  // Record the attempt immediately, not just on a successful payment — an
+  // order the customer abandons after applying a coupon used to show no
+  // coupon at all in the admin panel. payment.captured still reconciles this
+  // against whatever Razorpay actually honoured once/if the order is paid,
+  // so a coupon swapped or removed later inside the modal is corrected then.
+  if (order?._id) {
+    await Order.updateOne(
+      { _id: order._id },
+      {
+        $set: {
+          coupon: {
+            couponCodeId: coupon.couponId || null,
+            couponCodeName: cleanCode,
+            discountAmount: discountRupees,
+            isApplied: true,
+          },
+        },
+      },
+    ).catch((err) => console.error(`${TAG}[applyPromotion] tentative coupon save failed: ${err.message}`));
+  }
 
   return res.status(200).json({
     promotion: {

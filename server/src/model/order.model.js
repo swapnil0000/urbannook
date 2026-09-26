@@ -166,6 +166,25 @@ const orderSchema = new mongoose.Schema(
     // callback, which cannot see the cart rules — without this the customer
     // is charged shipping the cart told them they would not pay.
     freeShippingUnlocked: { type: Boolean, default: false },
+    // Raw, unmapped capture of every Magic callback Razorpay sends for this
+    // order — shipping-info, get/apply-promotions, and the webhook's own
+    // customer_details fetch — appended as they arrive, whether or not the
+    // order is ever paid. The specific fields above (deliveryAddress,
+    // userMobile, coupon, ...) are our best-effort interpretation of this;
+    // this is the source of truth underneath them, kept so nothing Razorpay
+    // ever told us is lost even if we haven't built a UI for a given field
+    // yet. Not queried on the hot path — for admin/debug use only.
+    magicCallbackLog: {
+      type: [
+        {
+          _id: false,
+          channel: { type: String, required: true }, // "shipping-info" | "get-promotions" | "apply-promotion" | "webhook-fetch-order"
+          receivedAt: { type: Date, default: Date.now },
+          payload: { type: mongoose.Schema.Types.Mixed },
+        },
+      ],
+      default: [],
+    },
     guestInfo: {
       name: { type: String, default: null },
       email: { type: String, default: null },

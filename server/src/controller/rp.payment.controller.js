@@ -159,6 +159,13 @@ const captureMagicAddressIfMissing = async (order, razorpayOrderId) => {
 
   console.log(`[MAGIC][address-capture] fetching Razorpay order ${razorpayOrderId} for customer_details`);
   const rpOrder = await razorpayFetchOrderService(razorpayOrderId);
+  // Whatever Razorpay sent, whether or not we end up finding an address in
+  // it — same "raw capture, interpret/display later" policy as the
+  // mid-checkout callbacks in magic.checkout.controller.js.
+  if (rpOrder && order.magicCallbackLog) {
+    order.magicCallbackLog.push({ channel: "webhook-fetch-order", payload: rpOrder, receivedAt: new Date() });
+    if (order.magicCallbackLog.length > 20) order.magicCallbackLog.splice(0, order.magicCallbackLog.length - 20);
+  }
   const magicAddress = toOrderDeliveryAddress(rpOrder?.customer_details);
   if (!magicAddress) {
     console.error(`[MAGIC][address-capture] no customer_details on ${razorpayOrderId} — order still has NO address`);
@@ -605,6 +612,19 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
         "This coupon is invalid. Please remove it from your cart and try again."
       );
     }
+    // Same guard as validateNewCoupon (coupon.code.service.js) — a PUBLIC-scope
+    // INTERNAL_TEST coupon would let anyone drop any order to ₹1. This
+    // controller has its own copy of the eligibility checks instead of calling
+    // validateNewCoupon (different context: re-deriving from an already-applied
+    // cart, not a fresh apply), so this guard has to be kept in sync here too —
+    // it was missing, and TARGETED-only re-check below silently skipped it for
+    // any coupon whose scope isn't "TARGETED".
+    if (isValidInternal && liveCoupon.scope !== "TARGETED") {
+      console.error(`[Coupon:Security] Coupon ${couponCodeId} is INTERNAL_TEST but scope=${liveCoupon.scope}, not TARGETED`);
+      throw new ValidationError(
+        "This coupon is invalid. Please remove it from your cart and try again."
+      );
+    }
 
     // Re-check scope/audience — the coupon's targeting rules could have changed
     // between apply-time (coupon.code.service.js) and this payment step, e.g. an
@@ -948,6 +968,11 @@ const razorpayWebHookController = async (req, res) => {
         // from our serviceability callback.
         if (order.isMagicOrder && !order.deliveryAddress?.pinCode) {
           const rpOrder = await razorpayFetchOrderService(razorpayOrderId);
+          // Raw capture — see the same log on the payment.failed path above.
+          if (rpOrder && order.magicCallbackLog) {
+            order.magicCallbackLog.push({ channel: "webhook-fetch-order", payload: rpOrder, receivedAt: new Date() });
+            if (order.magicCallbackLog.length > 20) order.magicCallbackLog.splice(0, order.magicCallbackLog.length - 20);
+          }
           const magicAddress = toOrderDeliveryAddress(rpOrder?.customer_details);
 
           if (magicAddress) {
