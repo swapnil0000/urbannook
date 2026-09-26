@@ -40,7 +40,12 @@ const OtherVariants = ({ productId, productName, variants = [], currentVariantNa
         )}
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+      {/* Single scrollable row (matches the old site's layout) instead of a
+          multi-row grid — the card design itself is unchanged. */}
+      <div
+        className="flex gap-4 md:gap-6 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        style={{ touchAction: "pan-x" }}
+      >
         {shown.map((variant, index) => {
           const oos =
             variant?.variantOutOfStock === true ||
@@ -57,16 +62,20 @@ const OtherVariants = ({ productId, productName, variants = [], currentVariantNa
           };
 
           return (
-            <UnProductCard
+            <div
               key={variant._id || variant.sku || variant.variantName || index}
-              p={asProduct}
-              index={index}
-              listId="other_variants"
-              listName={`${productName} — Other Variants`}
-              href={`/product/${productId}/${variant?.sku || variant?.variantName}`}
-              badge={oos ? "Out of stock" : null}
-              showWishlist={false}
-            />
+              className="snap-start shrink-0 w-[160px] sm:w-[190px] md:w-[220px]"
+            >
+              <UnProductCard
+                p={asProduct}
+                index={index}
+                listId="other_variants"
+                listName={`${productName} — Other Variants`}
+                href={`/product/${productId}/${variant?.sku || variant?.variantName}`}
+                badge={oos ? "Out of stock" : null}
+                showWishlist={false}
+              />
+            </div>
           );
         })}
       </div>

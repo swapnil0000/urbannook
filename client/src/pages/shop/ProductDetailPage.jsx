@@ -9,6 +9,7 @@ import RecommendedProducts from '../../component/RecommendedProducts';
 import OtherVariants from '../../component/OtherVariants';
 import NotifyMeModal from '../../component/NotifyMeModal';
 import ComboBundleSection from '../../component/ComboBundleSection';
+import ComparisonTable from '../../component/ComparisonTable';
 import FreeShippingBanner from '../../component/FreeShippingBanner';
 import ImageCarousel from '../../component/ImageCarousel';
 import { motion, AnimatePresence } from 'motion/react';
@@ -525,7 +526,13 @@ const ProductDetailPage = () => {
             </div>
             <div className="flex items-start justify-between gap-3 mt-2">
               <div className="min-w-0">
-                <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-ink leading-tight">{selectedVariant || product.productName}</h1>
+                {/* Plain h1 (not FitTitle) — capped to 2 lines with a
+                    min-height reserved for 2 lines, so a short name and a
+                    long one both settle at roughly the same block height
+                    instead of the page jumping as the title changes. */}
+                <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-ink leading-tight line-clamp-2 min-h-[66px] md:min-h-[80px]">
+                  {selectedVariant || product.productName}
+                </h1>
                 {selectedVariantSubTag && (
                   <p className="text-base md:text-lg font-normal text-muted leading-snug mt-1">{selectedVariantSubTag}</p>
                 )}
@@ -690,8 +697,11 @@ const ProductDetailPage = () => {
               <div className="mt-4 pt-4 border-t border-hair grid grid-cols-3 divide-x divide-hair text-center text-[11px] text-muted">
                 <div className="px-1 flex flex-col items-center gap-1"><span className="text-lg">🚚</span>24-48 hrs</div>
                 <div className="px-1 flex flex-col items-center gap-1"><span className="text-lg">💸</span>{product.isCodAvailable ? 'Partial COD' : 'Secure pay'}</div>
-                <div className="px-1 flex flex-col items-center gap-1"><span className="text-lg">↺</span>Free replacement if damaged</div>
+                <div className="px-1 flex flex-col items-center gap-1"><span className="text-lg">↺</span>Free replacement if damaged*</div>
               </div>
+              <p className="mt-1.5 text-[8px] text-faint text-center">
+                *Applicable only with an unboxing video showing the damaged product and its shipping label.
+              </p>
             </div>
 
             {/* OFFERS — UPI / EMI / card offers, applied via Razorpay at checkout */}
@@ -733,7 +743,7 @@ const ProductDetailPage = () => {
                 several, takes its wording and CTA from the admin, and reports
                 impressions and clicks under this surface. It renders nothing
                 when no offer applies to this product. */}
-            <FreeShippingBanner productId={productId} surface="pdp" className="mt-4 md:max-w-md" />
+            {/* <FreeShippingBanner productId={productId} surface="pdp" className="mt-4 md:max-w-md" /> */}
 
           </div>
         </div>
@@ -814,32 +824,10 @@ const ProductDetailPage = () => {
           </ScrollColorBand>
         )}
 
-        {/* WHY URBAN NOOK — comparison / trust table */}
-        <section className="mt-14">
-          <p className="gl-lbl text-brand mb-2 text-center">Why Urban Nook</p>
-          <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight mb-6 text-center">Made different.</h2>
-          <div className="max-w-lg mx-auto rounded-2xl border border-hair overflow-hidden">
-            <div className="grid grid-cols-[1fr_64px_64px] items-center px-4 py-2.5 bg-paper">
-              <span />
-              <span className="text-center text-[11px] font-extrabold uppercase tracking-wide text-brand">Us</span>
-              <span className="text-center text-[11px] font-extrabold uppercase tracking-wide text-faint">Others</span>
-            </div>
-            {[
-              '3D-printed to order',
-              'Original Indian design',
-              'Handcrafted finish',
-              'Partial COD',
-              'Free replacement if damaged',
-              'Made in India 🇮🇳',
-            ].map((label, i) => (
-              <div key={i} className="grid grid-cols-[1fr_64px_64px] items-center px-4 py-2.5 border-t border-hair">
-                <span className="text-sm font-semibold">{label}</span>
-                <span className="grid place-items-center"><span className="w-6 h-6 rounded-full bg-brand text-white grid place-items-center text-xs">✓</span></span>
-                <span className="grid place-items-center text-faint">✕</span>
-              </div>
-            ))}
-          </div>
-        </section>       
+        {/* WHY URBAN NOOK — comparison table (ComparisonTable.jsx). Same
+            layout/animations as before, recoloured to the site's red/black
+            theme using only the existing --gl-* tokens (see that file). */}
+        <ComparisonTable productName={product.productName} />
 
         {/* REVIEWS — full-bleed LIGHT-GREY (surface) band */}
         <div className="w-screen ml-[calc(50%-50vw)] bg-paper mt-16">
@@ -959,7 +947,18 @@ const ProductDetailPage = () => {
         {related.length > 0 && (
           <div className="mt-16">
             <div className="flex items-end justify-between mb-6"><h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">You may also like</h2><button onClick={() => navigate('/products')} className="text-sm font-bold underline underline-offset-4 decoration-2 hover:text-brand">View all →</button></div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">{related.map((p, i) => <UnProductCard key={p.productId || i} p={p} index={i} listId="pdp_related" listName="Related" />)}</div>
+            {/* Single scrollable row (matches the old site's layout) instead
+                of a multi-row grid — the card design itself is unchanged. */}
+            <div
+              className="flex gap-4 md:gap-6 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              style={{ touchAction: 'pan-x' }}
+            >
+              {related.map((p, i) => (
+                <div key={p.productId || i} className="snap-start shrink-0 w-[160px] sm:w-[190px] md:w-[220px]">
+                  <UnProductCard p={p} index={i} listId="pdp_related" listName="Related" />
+                </div>
+              ))}
+            </div>
           </div>
         )}
           {productFaqs.length > 0 && (
