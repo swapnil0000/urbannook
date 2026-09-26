@@ -17,7 +17,7 @@ const Return = () => {
       {/* Large Watermark */}
       <div className="absolute top-20 left-0 w-full overflow-hidden pointer-events-none opacity-[0.04]">
         <h1 className="font-archivo text-[15vw] font-extrabold text-center leading-none text-ink tracking-tighter uppercase whitespace-nowrap">
-          Returns
+          Exchange
         </h1>
       </div>
       
@@ -35,7 +35,7 @@ const Return = () => {
           </div>
           
           <h1 className="font-archivo text-4xl md:text-6xl font-extrabold text-ink mb-4 leading-[1.05] tracking-tight">
-            Cancellation, Return &amp; <span className="text-brand">Refunds</span>
+            Cancellation, Exchange &amp; <span className="text-brand">Refunds</span>
           </h1>
           <p className="text-muted text-sm md:text-base">
             Last Updated: <span className="text-ink font-semibold">{lastUpdated}</span>
@@ -44,7 +44,15 @@ const Return = () => {
 
         {/* Content Blocks */}
         <div className="space-y-12">
-          
+
+          {/* Key rule — shown first so it is read before anything else */}
+          <div className="border-2 border-brand bg-brand/5 p-5 md:p-6">
+            <p className="font-archivo text-lg md:text-xl font-bold text-ink">No returns. No change-of-mind exchanges.</p>
+            <p className="text-muted text-sm md:text-base mt-2">
+              Replacement is only for items that arrive <strong className="text-ink font-semibold">damaged, defective or wrong</strong>, reported within <strong className="text-ink font-semibold">3 days of delivery</strong> with an unboxing video.
+            </p>
+          </div>
+
           {/* Section 1 */}
           <section>
             <h2 className="font-archivo text-xl md:text-2xl font-bold text-ink mb-4 flex items-center gap-3">
@@ -63,13 +71,13 @@ const Return = () => {
           {/* Section 2 */}
           <section>
             <h2 className="font-archivo text-xl md:text-2xl font-bold text-ink mb-4 flex items-center gap-3">
-              <span className="gl-lbl text-brand text-sm">02.</span> Returns & Replacements
+              <span className="gl-lbl text-brand text-sm">02.</span> Exchange Policy
             </h2>
             <p className="leading-relaxed text-muted mb-4">
-              At Urban Nook, we take pride in the quality of our craftsmanship. We have a strict <strong className="text-ink font-semibold">3-day replacement policy</strong> applicable only for damaged, defective, or incorrect items. You may initiate a request within <strong className="text-ink font-semibold">3 days</strong> of receiving your order. Since our products are made-to-order or limited batch, we do not accept returns for <span className="font-bold text-brand">"change of mind"</span>.
+              At Urban Nook, we take pride in the quality of our craftsmanship. We do not accept returns. We offer a <strong className="text-ink font-semibold">3-day exchange policy</strong> applicable only for damaged, defective, or incorrect items. You may initiate a request within <strong className="text-ink font-semibold">3 days</strong> of receiving your order. Since our products are made-to-order or limited batch, we do not accept exchanges for <span className="font-bold text-brand">"change of mind"</span>.
             </p>
             <ul className="list-disc pl-5 space-y-2 text-muted marker:text-brand">
-              <li><strong className="text-ink font-semibold">Damaged/Defective:</strong> To claim a replacement or return for a damaged or defective item, customers must provide a clear unboxing video in which the product label is clearly visible, and share it with us within the mentioned time window.</li>
+              <li><strong className="text-ink font-semibold">Damaged/Defective:</strong> To claim an exchange for a damaged or defective item, customers must provide a clear unboxing video in which the product label is clearly visible, and share it with us within the mentioned time window.</li>
               <li><strong className="text-ink font-semibold">Wrong Item:</strong> If you receive the wrong item, please share an unboxing video clearly showing the package label within the specified time period for verification. Once confirmed, we will arrange a reverse pickup and send the correct item at no additional cost.</li>
             </ul>
           </section>
@@ -80,14 +88,22 @@ const Return = () => {
               <span className="gl-lbl text-brand text-sm">03.</span> Eligibility Criteria
             </h2>
             <p className="leading-relaxed text-muted mb-4">
-              To be eligible for a return or replacement, your item must meet the following conditions:
+              To be eligible for an exchange, your item must meet the following conditions:
             </p>
             <ul className="list-disc pl-5 space-y-2 text-muted marker:text-brand">
               <li>The item must be unused and in the same condition that you received it.</li>
               <li>It must be in the original packaging with all tags and protective covers intact.</li>
               <li>You must provide the receipt or proof of purchase.</li>
               <li>A clear unboxing video with the product label visible must be shared with us.</li>
-              <li>Items marked as "Final Sale" or "Clearance" are not eligible for return.</li>
+              <li>Items marked as "Final Sale" or "Clearance" are not eligible for exchange.</li>
+            </ul>
+            <p className="leading-relaxed text-ink font-semibold mt-6 mb-3">Claims we will reject:</p>
+            <ul className="list-disc pl-5 space-y-2 text-muted marker:text-brand">
+              <li>Change of mind, "didn't like it", or ordered by mistake.</li>
+              <li>Claims without an unboxing video, or with an edited or cut video.</li>
+              <li>Claims reported after 3 days of delivery.</li>
+              <li>Items that have been used, assembled, altered or damaged after delivery.</li>
+              <li>Minor layer lines or small texture differences, which are normal in 3D printing.</li>
             </ul>
           </section>
 
@@ -104,10 +120,10 @@ const Return = () => {
           {/* Section 5 */}
           <section>
             <h2 className="font-archivo text-xl md:text-2xl font-bold text-ink mb-4 flex items-center gap-3">
-              <span className="gl-lbl text-brand text-sm">05.</span> Non-Returnable Items
+              <span className="gl-lbl text-brand text-sm">05.</span> Non-Exchangeable Items
             </h2>
             <p className="leading-relaxed text-muted mb-4">
-              Certain types of items cannot be returned due to their nature:
+              Certain types of items cannot be exchanged due to their nature:
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                <div className="bg-white p-4 rounded-none border border-hair">
@@ -127,9 +143,9 @@ const Return = () => {
               <span className="gl-lbl text-brand text-sm">06.</span> Refund Process & Timeline
             </h2>
             <p className="leading-relaxed text-muted">
-              Once your return is received and inspected, we will send you an email to notify you that we have received your returned item. We will also notify you of the approval or rejection of your refund.
+              We do not offer refunds on delivered orders. For an approved damaged, defective or wrong-item claim, we will inspect the item and dispatch a replacement. A refund is issued only if we are unable to provide a replacement.
               <br /><br />
-              If a refund is approved (for cancelled orders, unfulfillable items, or approved returns), it will be processed to your original payment method within <strong className="text-ink font-semibold">5-7 business days</strong>. Banks may take an additional 3-5 days to reflect the amount in your account.
+              If a refund is approved (for cancelled orders, or approved claims we cannot replace), it will be processed to your original payment method within <strong className="text-ink font-semibold">5-7 business days</strong>. Banks may take an additional 3-5 days to reflect the amount in your account.
             </p>
           </section>
         </div>

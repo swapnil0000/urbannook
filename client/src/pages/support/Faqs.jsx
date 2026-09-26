@@ -27,7 +27,7 @@ const Faq = () => {
       category: "Payments",
       items: [
         { q: "What payment methods are accepted?", a: "We accept all major Credit/Debit Cards, UPI (GPay, PhonePe), Net Banking, and Wallets via Razorpay." },
-        { q: "Is Cash on Delivery (COD) available?", a: "Yes, COD is available for select products." }
+        { q: "Is Cash on Delivery (COD) available?", a: "We offer partial COD on select products — pay a small advance online to confirm the order, and the rest in cash on delivery. Full COD (no advance) is not available." }
       ]
     }
   ];
@@ -48,7 +48,7 @@ const Faq = () => {
     <div className="bg-paper min-h-screen text-ink font-inter relative selection:bg-brand selection:text-white">
       <SEOHead
         title="FAQs"
-        description="Frequently asked questions about UrbanNook — shipping, returns, custom orders, assembly, and more."
+        description="Frequently asked questions about UrbanNook — shipping, exchanges, custom orders, assembly, and more."
         url="/faqs"
         structuredData={faqStructuredData}
       />

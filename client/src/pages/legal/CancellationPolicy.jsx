@@ -52,12 +52,12 @@ const CancellationPolicy = () => {
           </section>
 
           <section>
-            <h2 className="font-archivo text-xl md:text-2xl font-bold text-ink mb-4"><span className="gl-lbl text-brand text-sm"> 02.</span> Returns &amp; Replacements</h2>
+            <h2 className="font-archivo text-xl md:text-2xl font-bold text-ink mb-4"><span className="gl-lbl text-brand text-sm"> 02.</span> Exchange Policy</h2>
             <p className="leading-relaxed text-muted mb-4">
-              We have a strict <strong className="text-ink font-semibold">3-day replacement policy</strong> applicable only for damaged, defective, or incorrect items. Since our products are made-to-order or limited batch, we do not accept returns for <span className="font-bold text-brand">&quot;change of mind&quot;</span>.
+              We do not accept returns. We offer a <strong className="text-ink font-semibold">3-day exchange policy</strong> applicable only for damaged, defective, or incorrect items. Since our products are made-to-order or limited batch, we do not accept exchanges for <span className="font-bold text-brand">&quot;change of mind&quot;</span>.
             </p>
             <ul className="list-disc pl-5 space-y-2 text-muted marker:text-brand">
-              <li><strong className="text-ink font-semibold">Damaged/Defective:</strong> To claim a replacement or return for a damaged or defective item, customers must provide a clear unboxing video in which the product label is clearly visible, and share it with us within the mentioned time window.</li>
+              <li><strong className="text-ink font-semibold">Damaged/Defective:</strong> To claim an exchange for a damaged or defective item, customers must provide a clear unboxing video in which the product label is clearly visible, and share it with us within the mentioned time window.</li>
               <li><strong className="text-ink font-semibold">Wrong Item:</strong> If you receive the wrong item, please share an unboxing video clearly showing the package label within the specified time period for verification. Once confirmed, we will arrange a reverse pickup and send the correct item at no additional cost.</li>
             </ul>
           </section>
