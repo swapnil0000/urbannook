@@ -33,7 +33,7 @@ const requiredEnvVarsLocal = [
   "AWS_SECRET",
   "AWS_BUCKET_REGION",
   "AWS_BUCKET_NAME",
-  "AWS_CDN_BASE_URL",
+  "ASSET_BASE_URL",
 
   // Shipping Configuration
   "SHIPMOZO_PRIVATE_KEY",
@@ -67,7 +67,7 @@ const requiredEnvVarsStaging = [
   "AWS_SECRET",
   "AWS_BUCKET_REGION",
   "AWS_BUCKET_NAME",
-  "AWS_CDN_BASE_URL",
+  "ASSET_BASE_URL",
 
   // Shipping Configuration
   "SHIPMOZO_PRIVATE_KEY",
@@ -101,7 +101,7 @@ const requiredEnvVarsProd = [
   "AWS_SECRET",
   "AWS_BUCKET_REGION",
   "AWS_BUCKET_NAME",
-  "AWS_CDN_BASE_URL",
+  "ASSET_BASE_URL",
 
   // Shipping Configuration
   "SHIPMOZO_PRIVATE_KEY",
