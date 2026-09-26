@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import confetti from 'canvas-confetti';
@@ -14,7 +14,7 @@ import ImageCarousel from '../../component/ImageCarousel';
 import { motion, AnimatePresence } from 'motion/react';
 import { ScrollColorBand } from '../../component/motion';
 import { trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist, trackVariantSelect, trackShare, trackDeliveryCheck } from '../../utils/analytics';
-import { useGetProductByIdQuery, useGetProductsQuery } from '../../store/api/productsApi';
+import { productsApi, useGetProductByIdQuery, useGetProductsQuery } from '../../store/api/productsApi';
 import { useAddToCartMutation, useUpdateCartMutation, useCalculateShippingMutation } from '../../store/api/userApi';
 import { useGetProductReviewsQuery, useSubmitProductReviewMutation, useUpdateProductReviewMutation } from '../../store/api/testimonialsApi';
 import { addItem, updateQuantity, removeItem, updateSelection } from '../../store/slices/cartSlice';
@@ -37,6 +37,62 @@ const isVariantOutOfStock = (v) =>
   !!v &&
   (v.variantOutOfStock === true ||
     (v.variantQuantity != null && Number(v.variantQuantity) <= 0));
+
+/* Version picker (e.g. Wooden | LED katana). The server inlines, per variant,
+   the other published variants in its variantGroup as `versions`. No type →
+   nothing shown. The open version is selected; another type opens its own PDP
+   (a separate product). A type with no linked variant is shown greyed out; an
+   out-of-stock one still opens — the existing OOS logic there blocks purchase. */
+const VERSION_TYPE_ORDER = ['Non-LED', 'LED'];
+// "Wooden" was the old name for the Non-LED edition — show it as Non-LED.
+const lc = (s) => {
+  const k = String(s || '').trim().toLowerCase();
+  return k === 'wooden' ? 'non-led' : k;
+};
+
+const VersionPicker = ({ variant, onOpen }) => {
+  if (!variant?.variantGroup && !variant?.variantType) return null;
+  const currentType = variant.variantType || '';
+  const versions = Array.isArray(variant.versions) ? variant.versions : [];
+  // Always show the known types in a fixed order, plus any other type in use.
+  const types = [...VERSION_TYPE_ORDER];
+  [currentType, ...versions.map((o) => o.type)].forEach((t) => {
+    if (t && !types.some((x) => lc(x) === lc(t))) types.push(t);
+  });
+
+  return (
+    <div className="mt-4">
+      <p className="gl-lbl text-[10px] text-muted mb-2">Type</p>
+      <div className="flex flex-wrap gap-2">
+        {types.map((t) => {
+          const isCurrent = lc(t) === lc(currentType);
+          const target = versions.find((o) => lc(o.type) === lc(t));
+          const unavailable = !isCurrent && !target;
+          return (
+            <button
+              key={t}
+              type="button"
+              aria-pressed={isCurrent}
+              disabled={unavailable}
+              onClick={() => !isCurrent && target && onOpen(target)}
+              title={unavailable ? `${t} version not available for this design` : target?.outOfStock ? `${t} version is out of stock` : undefined}
+              className={`min-w-[5.5rem] px-4 py-2 rounded-lg border text-sm font-bold transition-colors ${
+                isCurrent
+                  ? 'border-ink bg-ink text-paper'
+                  : unavailable
+                    ? 'border-hair text-faint bg-surface cursor-not-allowed line-through decoration-1'
+                    : 'border-hair text-ink bg-white hover:border-ink'
+              }`}
+            >
+              {t}
+              {target?.outOfStock && !isCurrent && <span className="block text-[10px] font-semibold text-muted">Out of stock</span>}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 // At or below this many tracked units left, show an urgency "limited stock"
 // badge to nudge the buyer. Tweak freely.
@@ -155,6 +211,13 @@ const ProductDetailPage = () => {
     [product, selectedVariant, availableVariants],
   );
   const selectedVariantOOS = useMemo(() => isVariantOutOfStock(selectedVariantObj), [selectedVariantObj]);
+
+  // Warm the cache for this variant's other versions (Wooden ↔ LED) so a
+  // switch renders instantly instead of swapping content after a fetch.
+  const prefetchProduct = productsApi.usePrefetch('getProductById');
+  useEffect(() => {
+    (selectedVariantObj?.versions || []).forEach((o) => o.productId && prefetchProduct(o.productId));
+  }, [selectedVariantObj, prefetchProduct]);
   const isOutOfStock = (product && product.productStatus !== 'in_stock') || selectedVariantOOS;
   const selectedVariantQty = selectedVariantObj?.variantQuantity;
   const selectedVariantLowStock = useMemo(() => {
@@ -170,7 +233,9 @@ const ProductDetailPage = () => {
     return ['https://urbannook.in/assets/logo.webp'];
   }, [product, selectedVariant]);
 
-  useEffect(() => {
+  // Layout effect (not a plain effect) so a product switch lands on the URL's
+  // variant before paint — no one-frame flash of the product's first variant.
+  useLayoutEffect(() => {
     if (availableVariants.length > 0 && product) {
       let initial = availableVariants[0];
       if (urlVariantSku) {
@@ -581,6 +646,11 @@ const ProductDetailPage = () => {
                  
                 </>
               )}
+
+              <VersionPicker
+                variant={selectedVariantObj}
+                onOpen={(t) => navigate(t.sku ? `/product/${t.productId}/${t.sku}` : `/products/${t.productId}`, { state: { keepScroll: true } })}
+              />
 
               {/* urgency + delivery */}
               <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs mt-4">
