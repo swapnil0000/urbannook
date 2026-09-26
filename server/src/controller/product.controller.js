@@ -134,11 +134,49 @@ const specificProductDetails = asyncHandler(async (req, res) => {
     }
     productDetails.comboProductsDetails = comboProductsDetails;
 
+    // Cross-product versions (Wooden ↔ LED): for every variant that has a
+    // variantGroup, inline the OTHER published, active variants in that group
+    // so the PDP can render its version toggle without another request.
+    // A variant with a group but no other versions gets `versions: []` — the
+    // PDP shows the toggle greyed out. No group = no `versions` key at all.
+    const groups = [
+      ...new Set((productDetails.variantDetails || []).map((v) => v.variantGroup).filter(Boolean)),
+    ];
+    if (groups.length) {
+      const peers = await Product.find(
+        { isPublished: true, "variantDetails.variantGroup": { $in: groups } },
+        { _id: 0, productId: 1, variantDetails: 1 },
+      ).lean();
+      const byGroup = new Map();
+      for (const p of peers) {
+        for (const pv of p.variantDetails || []) {
+          if (!pv.variantGroup || pv.isActive === false) continue;
+          const list = byGroup.get(pv.variantGroup) || [];
+          list.push({
+            type: pv.variantType || "",
+            productId: p.productId,
+            sku: pv.sku || "",
+            variantName: pv.variantName || "",
+            outOfStock:
+              pv.variantOutOfStock === true ||
+              (pv.variantQuantity != null && pv.variantQuantity <= 0),
+          });
+          byGroup.set(pv.variantGroup, list);
+        }
+      }
+      for (const v of productDetails.variantDetails || []) {
+        if (!v.variantGroup) continue;
+        v.versions = (byGroup.get(v.variantGroup) || []).filter(
+          (o) => !(o.productId === productDetails.productId && o.sku === v.sku),
+        );
+      }
+    }
+
     return productDetails;
   };
 
   const result = await apiCache.handle(req.params, fetcher);
-
+  // apiCache.clear()
   return res.status(200).json(new ApiRes(200, `Product Details`, result, true));
 });
 
