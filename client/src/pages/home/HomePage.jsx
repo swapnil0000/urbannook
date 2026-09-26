@@ -19,7 +19,7 @@ const HOME_STRUCTURED_DATA = {
 const productList = (res) => res?.data?.products || res?.data?.listofPublishedProducts || [];
 const stars = (n) => { const r = Math.max(1, Math.min(5, n || 5)); return '★'.repeat(r) + '☆'.repeat(5 - r); };
 
-const MARQUEE = ['3D-Printed', 'Made to Order', 'Pan-India Delivery', 'Car Culture', 'Desk Icons', 'Cash on Delivery'];
+const MARQUEE = ['3D-Printed', 'Made to Order', 'Pan-India Delivery', 'Car Culture', 'Desk Icons', 'Partial COD'];
 
 const Kicker = ({ children, className = '' }) => <p className={`gl-lbl text-brand ${className}`}>{children}</p>;
 
@@ -200,9 +200,9 @@ const CoverflowCarousel = ({ images }) => {
 
 const FAQS = [
   { q: 'Can I customise my piece?', a: "Yes! Every product is 3D-printed to order, so we can tweak the colour or finish, add your initials or a logo, or tailor it to your setup. Just message us before you order and we'll make it yours." },
-  { q: 'Do you offer Cash on Delivery (COD)?', a: 'Absolutely — COD is available everywhere across India. Pay at your doorstep when the order arrives; no prepayment needed.' },
+  { q: 'Do you offer Cash on Delivery (COD)?', a: 'We offer partial COD — pay a small advance online at checkout to confirm the order, and the rest in cash when it arrives. Full COD (no advance) is not available.' },
   { q: 'How long will my order take?', a: 'Each piece is printed after you order, so it dispatches within ~48 hours and reaches you in 2–7 days depending on your pincode. Pan-India delivery on every order.' },
-  { q: 'What if I want to return it?', a: "7-day easy returns on unused items. If anything arrives damaged or defective, we'll replace it free — just share a quick photo." },
+  { q: 'Can I return it?', a: "We don't accept returns or exchanges for change of mind, colour or preference. If your item arrives damaged, defective or wrong, report it within 3 days with an unboxing video and we'll replace it free." },
   { q: 'What are the products made of?', a: 'Premium PLA + PETG with a signature 3D-printed layer texture and glossy resin detailing — sturdy, lightweight, and built to live on your desk for years.' },
   { q: 'Do you do bulk orders or corporate gifting?', a: "Yes — we love custom bulk and corporate gifting with your branding. Reach out via Contact Us and we'll sort a quote for you." },
 ];
@@ -493,7 +493,7 @@ const HeroCarousel = ({ products = [], onProduct, onVariant, onShop }) => {
             </div>
 
             <div className="mt-6 flex flex-wrap gap-x-5 gap-y-2">
-              {['48h dispatch', 'Cash on delivery', '7-day replacement'].map((t) => (
+              {['48h dispatch', 'Partial COD', 'Free replacement if damaged'].map((t) => (
                 <span key={t} className="flex items-center gap-2 text-[11px] font-semibold text-paper/60">
                   <span className="w-1.5 h-1.5 rounded-full bg-brand" />{t}
                 </span>
@@ -887,7 +887,7 @@ const HomePage = () => {
             </span>
             <span className="hidden sm:block w-px h-3.5 bg-hair" />
             <div className="flex items-center gap-1.5 flex-wrap justify-center">
-              {['VISA', 'Mastercard', 'UPI', 'RuPay', 'COD'].map((x) => (
+              {['VISA', 'Mastercard', 'UPI', 'RuPay', 'Partial COD'].map((x) => (
                 <span key={x} className="gl-lbl text-[9px] text-muted border border-hair px-2 py-1 bg-surface">{x}</span>
               ))}
             </div>

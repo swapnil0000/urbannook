@@ -68,7 +68,7 @@ const Footer = () => {
         <p className="gl-lbl text-white/50 mb-4">Help</p>
         <ul className="space-y-2 text-sm">
           <li><a href="/orders" onClick={handleTrackOrderClick} className="hover:text-white cursor-pointer">Track Order</a></li>
-          <li><Link to="/return-policy" className="hover:text-white">Shipping & Returns</Link></li>
+          <li><Link to="/return-policy" className="hover:text-white">Shipping & Exchange</Link></li>
           <li><Link to="/faqs" className="hover:text-white">FAQs</Link></li>
           <li><Link to="/contact-us" className="hover:text-white">Contact</Link></li>
         </ul>
@@ -95,7 +95,7 @@ const Footer = () => {
         </form>
         <p className="mt-2.5 gl-lbl text-[9px] text-white/35">Monthly updates on drops. No spam, ever.</p>
         <div className="flex gap-1.5 mt-4 text-[10px] font-bold text-white/50 flex-wrap">
-          {['VISA', 'Mastercard', 'UPI', 'RuPay', 'COD'].map((x) => <span key={x} className="border border-white/20 rounded px-1.5 py-0.5">{x}</span>)}
+          {['VISA', 'Mastercard', 'UPI', 'RuPay', 'Partial COD'].map((x) => <span key={x} className="border border-white/20 rounded px-1.5 py-0.5">{x}</span>)}
         </div>
       </div>
     </div>

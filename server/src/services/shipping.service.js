@@ -237,7 +237,7 @@ const calculateShippingRate = async ({ pincode, cartItems, paymentType = "PREPAI
             expectedNoOfBoxes: totalBoxes,
             serviceName: null,
             courierName: null,
-            estimatedDays: "3-4 Days",
+            estimatedDays: "24-48 hours",
             paymentType: validPaymentType,
           };
         }
@@ -256,7 +256,7 @@ const calculateShippingRate = async ({ pincode, cartItems, paymentType = "PREPAI
           courierName: selected.courier,
           slabKg: targetSlab,
           chargeableWeightKg: Number(totalChargeableWeightInKg.toFixed(3)),
-          estimatedDays: selected.raw.estimated_delivery || "3-4 Days",
+          estimatedDays: selected.raw.estimated_delivery || "24-48 hours",
           paymentType: validPaymentType,
         };
       } catch (error) {

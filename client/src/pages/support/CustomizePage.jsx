@@ -44,8 +44,11 @@ const CustomizePage = () => {
   const [submitCustomization, { isLoading }] = useSubmitCustomizationMutation();
 
   const { data: prodRes } = useGetProductsQuery({ page: 1, limit: 24 });
+  // Only products an admin has flagged isCustomizable=true belong in this
+  // form — the rest have no customization workflow behind them to fulfil a
+  // request against.
   const products = useMemo(
-    () => prodRes?.data?.products || prodRes?.data?.listofPublishedProducts || [],
+    () => (prodRes?.data?.products || prodRes?.data?.listofPublishedProducts || []).filter((p) => p.isCustomizable),
     [prodRes],
   );
 
