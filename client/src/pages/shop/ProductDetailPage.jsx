@@ -803,7 +803,6 @@ const ProductDetailPage = () => {
                 several, takes its wording and CTA from the admin, and reports
                 impressions and clicks under this surface. It renders nothing
                 when no offer applies to this product. */}
-            <FreeShippingBanner productId={productId} surface="pdp" className="mt-4 md:max-w-md" />
 
           </div>
         </div>
