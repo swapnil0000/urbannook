@@ -113,15 +113,15 @@ const ProductDetailPage = () => {
     const cat = (product.productCategory || '').toLowerCase();
     const isLamp = cat.includes('lamp');
     const list = [
-      { q: 'How long does delivery take?', a: 'Every piece is 3D-printed to order and ships pan-India in 2–4 business days with tracking.' },
+      { q: 'How long does delivery take?', a: 'Every piece is 3D-printed to order and ships pan-India within 24-48 hours, with tracking.' },
     ];
     if (isLamp) list.push({ q: 'How is it powered?', a: 'It runs on a USB adapter (included) — just plug in and switch it on. No batteries required.' });
     list.push({ q: 'What is it made of?', a: `Precision 3D-printed with a durable build and a hand-finished ${isLamp ? 'glossy resin' : 'premium'} coat, so no two are exactly alike.` });
     list.push({
       q: product.isCodAvailable ? 'Is Cash on Delivery available?' : 'What payment methods do you accept?',
-      a: product.isCodAvailable ? 'Yes — COD is available at checkout, alongside UPI, cards, net-banking and wallets.' : 'We accept UPI, credit/debit cards, net-banking and wallets at checkout.',
+      a: product.isCodAvailable ? 'Partial COD is available — pay a small advance online and the rest in cash on delivery. You can also pay fully by UPI, cards, net-banking or wallets.' : 'We accept UPI, credit/debit cards, net-banking and wallets at checkout.',
     });
-    list.push({ q: 'Can I return or exchange it?', a: '7-day easy returns on unused items in original condition — reach out and we’ll sort it quickly.' });
+    list.push({ q: 'Can I return or exchange it?', a: "We don't accept returns or exchanges for change of mind, colour or preference. If your item arrives damaged, defective or wrong, report it within 3 days with an unboxing video and we'll replace it free." });
     return list;
   }, [product]);
 
@@ -244,8 +244,9 @@ const ProductDetailPage = () => {
     return v?.variantImage?.[0] || product?.variantDetails?.[0]?.variantImage?.[0] || 'https://urbannook.in/assets/logo.webp';
   };
 
-  const handleInitialAddToCart = async () => {
-    if (!product) return;
+  // Returns true on success so Buy Now can continue straight to checkout.
+  const handleInitialAddToCart = async ({ silent = false } = {}) => {
+    if (!product) return false;
     const effectiveVariant = selectedVariant || availableVariants[0] || 'Standard Variant';
     const selectedImage = variantImage(effectiveVariant);
     const isLoggedIn = isAuthenticated || !!localStorage.getItem('authToken');
@@ -255,20 +256,28 @@ const ProductDetailPage = () => {
         await addToCartAPI({ productId: product?.productId, quantity: 1, variant: effectiveVariant, image: selectedImage }).unwrap();
         dispatch(updateSelection({ productId: product.productId, quantity: 1, variant: effectiveVariant }));
         await refetchCart().unwrap();
-        confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 }, colors: ['#E63329', '#C9281F', '#F3C33B', '#ffffff'] });
+        if (!silent) confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 }, colors: ['#E63329', '#C9281F', '#F3C33B', '#ffffff'] });
         setSelectedVariant(effectiveVariant);
         setFeedbackMessage('Added to cart'); setTimeout(() => setFeedbackMessage(''), 2000);
-        trackAddToCart({ itemId: product.productId, itemName: product.productName, itemVariant: effectiveVariant, price: currentPrice, quantity: 1, placement: 'pdp_main' });
+        trackAddToCart({ itemId: product.productId, itemName: product.productName, itemVariant: effectiveVariant, price: currentPrice, quantity: 1, placement: silent ? 'pdp_buy_now' : 'pdp_main' });
+        return true;
       } catch (err) {
         showNotification(err.data?.message || 'Something went wrong', 'error');
+        return false;
       }
     } else {
       dispatch(addItem({ id: product?.productId, mongoId: product?.productId, name: product?.productName, price: currentPrice, image: selectedImage, quantity: 1, selectedVariant: effectiveVariant, giftWrapEligible: !!product?.giftWrapEligible }));
       setSelectedVariant(effectiveVariant);
       setFeedbackMessage('Added to cart'); setTimeout(() => setFeedbackMessage(''), 2000);
-      trackAddToCart({ itemId: product.productId, itemName: product.productName, itemVariant: effectiveVariant, price: currentPrice, quantity: 1, placement: 'pdp_main' });
+      trackAddToCart({ itemId: product.productId, itemName: product.productName, itemVariant: effectiveVariant, price: currentPrice, quantity: 1, placement: silent ? 'pdp_buy_now' : 'pdp_main' });
+      return true;
     }
+  };
 
+  // One tap to checkout: adds qty 1 (if not already in cart) and goes straight on.
+  const handleBuyNow = async () => {
+    if (!isInCart && !(await handleInitialAddToCart({ silent: true }))) return;
+    navigate('/checkout');
   };
 
   // Adds every item the customer kept in the static "buy together" section
@@ -373,8 +382,9 @@ const ProductDetailPage = () => {
         paymentType: 'PREPAID',
       }).unwrap();
       const charge = Math.ceil(parseFloat(res?.data?.total_charges));
-      // Ships in 2–4 days + courier transit — show the outer estimate as the promise date.
-      const eta = new Date(Date.now() + 7 * 86400000).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+      // Dispatched within 24-48 hours; the promise date shown here is that
+      // dispatch window plus a day for courier transit.
+      const eta = new Date(Date.now() + 3 * 86400000).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
       setPinStatus({ ok: true, msg: `Delivery available to ${pin}`, charge: Number.isFinite(charge) ? charge : null, eta });
       trackDeliveryCheck({ pincode: pin, serviceable: true, shippingAmount: charge });
     } catch (err) {
@@ -581,7 +591,7 @@ const ProductDetailPage = () => {
                 ) : (
                   <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-save" /><span className="text-ink font-semibold">In stock</span></span>
                 )}
-                <span className="text-muted">🚚 Ships in 2–4 days</span>
+                <span className="text-muted">🚚 Ships in 24-48 hrs</span>
               </div>
 
               {/* CTA */}
@@ -604,36 +614,41 @@ const ProductDetailPage = () => {
                   </>
                 ) : (
                   <>
-                    <button onClick={handleInitialAddToCart} disabled={isAdding} className="gl-press flex-1 h-12 bg-brand text-paper font-bold text-sm rounded-xl hover:bg-brandHi disabled:opacity-60 whitespace-nowrap">
-                      {isAdding ? 'Adding…' : <>Add to Cart</>}
+                    <button onClick={() => handleInitialAddToCart()} disabled={isAdding} className="gl-press flex-1 h-12 border border-ink text-ink font-bold text-sm rounded-xl hover:bg-ink hover:text-paper transition-colors disabled:opacity-60 whitespace-nowrap">
+                      Add to Cart
                     </button>
-                    {/* <button onClick={handleCheckoutClick} className="gl-press flex-1 h-12 border border-ink text-ink font-bold text-sm rounded-xl hover:bg-ink hover:text-paper transition-colors whitespace-nowrap">Buy it Now</button> */}
+                    <button onClick={handleBuyNow} disabled={isAdding} className="gl-press flex-1 h-12 bg-brand text-paper font-bold text-sm rounded-xl hover:bg-brandHi disabled:opacity-60 whitespace-nowrap">
+                      {isAdding ? 'Please wait…' : 'Buy Now'}
+                    </button>
                   </>
                 )}
               </div>
 
-              {/* Customization — offered on every product, since all of them are
-                  printed to order. Carries the product (and the variant they
-                  are looking at) through so the request form arrives prefilled. */}
-              <button
-                type="button"
-                onClick={() =>
-                  navigate(
-                    `/customize?product=${encodeURIComponent(product.productId)}${
-                      selectedVariant ? `&variant=${encodeURIComponent(selectedVariant)}` : ''
-                    }`,
-                  )
-                }
-                className="mt-4 w-full flex items-center justify-between gap-3 border border-hair bg-white px-4 py-3 rounded-xl hover:border-ink transition-colors text-left"
-              >
-                <span className="min-w-0">
-                  <span className="block text-sm font-bold text-ink">Want it customised?</span>
-                  <span className="block text-xs text-muted mt-0.5">
-                    Different colour, your name on it, or your own livery.
+              {/* Customization — admin opt-in per product (product.isCustomizable),
+                  not every product is customisable. Carries the product (and the
+                  variant they are looking at) through so the request form
+                  arrives prefilled. */}
+              {product.isCustomizable && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate(
+                      `/customize?product=${encodeURIComponent(product.productId)}${
+                        selectedVariant ? `&variant=${encodeURIComponent(selectedVariant)}` : ''
+                      }`,
+                    )
+                  }
+                  className="mt-4 w-full flex items-center justify-between gap-3 border border-hair bg-white px-4 py-3 rounded-xl hover:border-ink transition-colors text-left"
+                >
+                  <span className="min-w-0">
+                    <span className="block text-sm font-bold text-ink">Want it customised?</span>
+                    <span className="block text-xs text-muted mt-0.5">
+                      Different colour, your name on it, or your own livery.
+                    </span>
                   </span>
-                </span>
-                <span className="gl-lbl text-[10px] text-brand shrink-0">Ask us →</span>
-              </button>
+                  <span className="gl-lbl text-[10px] text-brand shrink-0">Ask us →</span>
+                </button>
+              )}
 
               {/* pincode delivery check */}
               {/* <div className="mt-4 pt-4 border-t border-hair">
@@ -673,9 +688,9 @@ const ProductDetailPage = () => {
 
               {/* trust strip inside the card */}
               <div className="mt-4 pt-4 border-t border-hair grid grid-cols-3 divide-x divide-hair text-center text-[11px] text-muted">
-                <div className="px-1 flex flex-col items-center gap-1"><span className="text-lg">🚚</span>2–4 days</div>
-                <div className="px-1 flex flex-col items-center gap-1"><span className="text-lg">💸</span>{product.isCodAvailable ? 'COD available' : 'Secure pay'}</div>
-                <div className="px-1 flex flex-col items-center gap-1"><span className="text-lg">↺</span>7-day returns</div>
+                <div className="px-1 flex flex-col items-center gap-1"><span className="text-lg">🚚</span>24-48 hrs</div>
+                <div className="px-1 flex flex-col items-center gap-1"><span className="text-lg">💸</span>{product.isCodAvailable ? 'Partial COD' : 'Secure pay'}</div>
+                <div className="px-1 flex flex-col items-center gap-1"><span className="text-lg">↺</span>Free replacement if damaged</div>
               </div>
             </div>
 
@@ -701,7 +716,7 @@ const ProductDetailPage = () => {
                 {product.isCodAvailable && (
                   <li className="flex items-start gap-2.5">
                     <i className="fa-solid fa-money-bill-wave text-brand text-xs mt-1 w-4 text-center shrink-0" />
-                    <span><b>Cash on Delivery</b> available for this product</span>
+                    <span><b>Partial COD</b> — small advance online, rest on delivery</span>
                   </li>
                 )}
               </ul>
@@ -737,7 +752,7 @@ const ProductDetailPage = () => {
                 <div className="mt-3 text-sm">{specs.map((s, i) => <div key={i} className="flex justify-between py-1.5 border-b border-hair last:border-0"><span className="text-muted">{s.key}</span><span className="font-medium text-right">{s.value}</span></div>)}</div>
               </details>
             )}
-            <details className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Shipping &amp; Returns<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary><p className="text-muted mt-3 text-sm">Made to order, ships pan-India in 2–4 business days. 7-day easy returns.{product.isCodAvailable ? ' COD available.' : ''}</p></details>
+            <details className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Shipping &amp; Exchange<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary><p className="text-muted mt-3 text-sm">Made to order, ships pan-India within 24-48 hours. Free replacement if it arrives damaged or wrong .{product.isCodAvailable ? ' Partial COD available.' : ''}</p></details>
           </div>
         </section>
         </div>
@@ -813,8 +828,8 @@ const ProductDetailPage = () => {
               '3D-printed to order',
               'Original Indian design',
               'Handcrafted finish',
-              'COD available',
-              '7-day easy returns',
+              'Partial COD',
+              'Free replacement if damaged',
               'Made in India 🇮🇳',
             ].map((label, i) => (
               <div key={i} className="grid grid-cols-[1fr_64px_64px] items-center px-4 py-2.5 border-t border-hair">
@@ -1013,7 +1028,7 @@ const ProductDetailPage = () => {
                 <button onClick={handleCheckoutClick} className="gl-press bg-brand text-white font-bold text-sm px-4 h-11 rounded-xl shrink-0 hover:bg-brandHi">Checkout</button>
               </>
             ) : (
-              <button onClick={handleInitialAddToCart} disabled={isAdding} className="gl-press bg-brand text-white font-bold text-sm px-6 h-11 rounded-xl shrink-0 hover:bg-brandHi disabled:opacity-60">{isAdding ? 'Adding…' : 'Add to Cart'}</button>
+              <button onClick={handleBuyNow} disabled={isAdding} className="gl-press bg-brand text-white font-bold text-sm px-6 h-11 rounded-xl shrink-0 hover:bg-brandHi disabled:opacity-60">{isAdding ? 'Please wait…' : 'Buy Now'}</button>
             )}
           </MotionDiv>
         )}

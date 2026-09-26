@@ -63,7 +63,7 @@ class ContactService {
     });
 
     await sendEmail(
-      'support@urbannook.in',
+      'urbanadmin@urbannook.in',
       `New Contact Form Submission: ${contact.subject}`,
       emailContent
     );

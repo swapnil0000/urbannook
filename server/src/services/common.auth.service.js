@@ -49,7 +49,7 @@ const authGuardService = (role) => {
       if (role === "USER") {
         const user = await User.findOne({ userId: decodedToken.userId }).select("isSuspended").lean();
         if (user?.isSuspended) {
-          return res.status(403).json(new ApiError(403, "Your account has been suspended. Please contact support at support@urbannook.in", null, false));
+          return res.status(403).json(new ApiError(403, "Your account has been suspended. Please contact support at urbanadmin@urbannook.in", null, false));
         }
       }
 

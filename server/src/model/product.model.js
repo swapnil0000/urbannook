@@ -90,6 +90,10 @@ const productSchema = mongoose.Schema(
     // admin sign-off (e.g. no gift wrap on a fragile/oversized item). The
     // widget only counts/charges for products where this is true.
     giftWrapEligible: { type: Boolean, default: false },
+    // Opt-in: whether the PDP's "Want it customised?" CTA is shown for this
+    // product. Default false — most products are stock designs; a handful
+    // (admin-flagged) can take a colour/name/livery request via /customize.
+    isCustomizable: { type: Boolean, default: false },
     // Manual sort weight for the listing — higher shows first (default 0).
     // Set from the admin panel; read by the products listing sort.
     priority: { type: Number, default: 0 },

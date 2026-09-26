@@ -216,14 +216,14 @@ const CustomerSupportPage = () => {
                             </a>
 
                             {/* Email Us */}
-                            <a href="mailto:support@urbannook.in" className="block p-6 rounded-2xl bg-surface border border-transparent hover:border-brand/50 hover:shadow-lg transition-all group cursor-pointer shadow-md">
+                            <a href="mailto:urbanadmin@urbannook.in" className="block p-6 rounded-2xl bg-surface border border-transparent hover:border-brand/50 hover:shadow-lg transition-all group cursor-pointer shadow-md">
                                 <div className="flex items-start gap-4">
                                     <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center text-brand group-hover:bg-brand group-hover:text-white transition-all">
                                         <i className="fa-solid fa-envelope"></i>
                                     </div>
                                     <div>
                                         <h4 className="text-ink font-archivo font-bold text-lg mb-1 group-hover:text-brand transition-colors">Email Us</h4>
-                                        <p className="text-brand font-mono text-sm mb-2 hover:underline font-bold">support@urbannook.in</p>
+                                        <p className="text-brand font-mono text-sm mb-2 hover:underline font-bold">urbanadmin@urbannook.in</p>
                                         <p className="text-xs text-gray-500">Guaranteed response in 24h</p>
                                     </div>
                                 </div>

@@ -320,7 +320,7 @@ export const toRazorpayServiceableAddress = (
     name: "Standard Delivery",
     // Real courier ETA when the rate call gave us one; the generic line is only
     // for the flat-rate fallback, where we genuinely do not know.
-    description: estimatedDays ? `Delivery in ${estimatedDays}` : "3-5 business days",
+    description: estimatedDays ? `Delivery in ${estimatedDays}` : "24-48 hours",
     serviceable: isServiceable,
     shipping_fee: isServiceable ? shippingFeePaise : 0,
     cod: false, // Magic is prepaid-only here — never let Razorpay take COD

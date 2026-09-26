@@ -479,7 +479,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
             <div className="flex items-center gap-2.5 bg-surface border border-hair rounded-xl px-4 py-3 mb-4">
               <i className="fa-solid fa-hand-holding-dollar text-brand text-base shrink-0" />
               <div>
-                <p className="text-[11px] font-bold">Cash on Delivery available</p>
+                <p className="text-[11px] font-bold">Partial Cash on Delivery</p>
                 <p className="text-[10px] text-muted mt-0.5 leading-snug">Pay a small advance online · rest at your door</p>
               </div>
             </div>

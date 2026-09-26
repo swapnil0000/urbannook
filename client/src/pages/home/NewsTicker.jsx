@@ -14,7 +14,7 @@ const NewsTicker = () => {
   const headlines = [
     ...(shippingDelayMessage ? [shippingDelayMessage] : []),
     'Ready to ship within 48 hrs',
-    'Cash on Delivery available',
+    'Partial COD available',
     'Pan-India delivery',
     'Made in India 🇮🇳',
   ];
