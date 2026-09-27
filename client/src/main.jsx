@@ -27,7 +27,7 @@ import { monitorPerformance } from './utils/performanceValidation.js';
 import { escapeToExternalBrowser } from './utils/browserEnv.js';
 // test
 if (typeof window !== 'undefined') {
-  // Instagram/Facebook in-app browsers break Google login, passkeys & autofill.
+  // Instagram/Facebook in-app browsers break Google login & autofill.
   // On Android, hand the page straight to Chrome BEFORE React mounts (no-op elsewhere).
   escapeToExternalBrowser();
 

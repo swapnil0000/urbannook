@@ -174,6 +174,19 @@ const GOOGLE_HEADER = [
   "product_type",
 ];
 
+// "Anime Wooden Katana" + "Tanjiro Wooden Katana" → "Tanjiro Wooden Katana": when the
+// variant name is already a full product name (shares a real word with the parent),
+// use it alone; otherwise append it ("Brake Caliper Lamp - BMW").
+const STOP = new Set(["anime", "premium", "collection", "the", "and", "with", "for"]);
+const stems = (str) =>
+  str.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4 && !STOP.has(w)).map((w) => w.slice(0, 5));
+const googleTitle = (productName, vName) => {
+  if (!vName || productName.includes(vName)) return productName;
+  const parent = new Set(stems(productName));
+  const standalone = stems(vName).some((w) => parent.has(w));
+  return (standalone ? vName : `${productName} - ${vName}`).slice(0, 150);
+};
+
 const variantInStock = (p, v) =>
   p.productStatus === "in_stock" &&
   !v.variantOutOfStock &&
@@ -220,7 +233,7 @@ const googleProductFeed = asyncHandler(async (req, res) => {
       rows.push(
         [
           sku || `${p.productId}_${i + 1}`,
-          vName && !productName.includes(vName) ? `${productName} - ${vName}` : productName,
+          googleTitle(productName, vName),
           description,
           sku ? `${DOMAIN}/product/${p.productId}/${sku}` : `${DOMAIN}/product/${p.productId}`,
           image,
