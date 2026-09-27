@@ -14,8 +14,6 @@ import ImageCarousel from '../../component/ImageCarousel';
 import { motion, AnimatePresence } from 'motion/react';
 import { ScrollColorBand } from '../../component/motion';
 import { variantSku, trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist, trackVariantSelect, trackShare, trackDeliveryCheck } from '../../utils/analytics';
-import { useGetProductByIdQuery, useGetProductsQuery } from '../../store/api/productsApi';
-import { trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist, trackVariantSelect, trackShare, trackDeliveryCheck } from '../../utils/analytics';
 import { productsApi, useGetProductByIdQuery, useGetProductsQuery } from '../../store/api/productsApi';
 import { useAddToCartMutation, useUpdateCartMutation, useCalculateShippingMutation } from '../../store/api/userApi';
 import { useGetProductReviewsQuery, useSubmitProductReviewMutation, useUpdateProductReviewMutation } from '../../store/api/testimonialsApi';
