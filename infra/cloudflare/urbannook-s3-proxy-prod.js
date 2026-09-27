@@ -14,7 +14,7 @@
 // Cache-Control, and error responses are never cached.
 //
 // Source of truth for this code: infra/cloudflare/ in the storefront repo.
-// Deploy by pasting into Cloudflare -> Workers & Pages -> this worker -> Edit code.
+// Deployed by Jenkins (jenkins/prod.Jenkinsfile) with wrangler — never edit in the dashboard.
 
 const encoder = new TextEncoder();
 

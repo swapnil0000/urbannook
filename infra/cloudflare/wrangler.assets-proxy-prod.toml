@@ -14,11 +14,11 @@
 
 name = "urbannook-assets-proxy-prod"
 main = "urbannook-assets-proxy-prod.js"
-compatibility_date = "2025-01-01"
+compatibility_date = "2026-07-23"
 keep_vars = true
 
 workers_dev = true
-preview_urls = true
+preview_urls = false
 
 routes = [
   { pattern = "assets-prod.urbannook.in", custom_domain = true },

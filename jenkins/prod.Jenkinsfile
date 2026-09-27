@@ -194,11 +194,17 @@ pipeline {
             fi
             echo "Server build uses Node $("$SERVER_NODE_BIN/node" -v) (prod runs $PROD_NODE)"
           '''
-          // Next release number = highest existing folder on prod + 1.
-          def last = sh(script: '''ssh $SSH_OPTS "$PROD_HOST" "ls -1 $PROD_BASE/releases 2>/dev/null" | grep -E '^[0-9]+$' | sort -n | tail -1 || true''', returnStdout: true).trim()
-          env.RELEASE = String.format('%03d', (last ? last.toInteger() : 0) + 1)
+          // Release name: <N>-<commit>-<YYYYMMDD-HHMM IST>-<developer>
+          //   e.g. 003-ffd51fe-20260928-0356-dheeraj-patnaik
+          // N (leading number) keeps releases in order for cleanup/rollback;
+          // developer = author of the latest non-merge commit (who wrote the
+          // code, not who clicked Merge).
+          def last = sh(script: '''ssh $SSH_OPTS "$PROD_HOST" "ls -1 $PROD_BASE/releases 2>/dev/null" | grep -oE '^[0-9]+' | sort -n | tail -1 || true''', returnStdout: true).trim()
+          def num   = String.format('%03d', (last ? last.toInteger() : 0) + 1)
           def stamp = sh(script: 'TZ=Asia/Kolkata date +%Y%m%d-%H%M', returnStdout: true).trim()
-          env.ARTIFACT = "server-${env.RELEASE}-${stamp}-${env.DEPLOY_COMMIT.take(7)}.tar.gz"
+          def dev   = sh(script: "git log -1 --no-merges --format=%an ${env.DEPLOY_COMMIT} | tr 'A-Z' 'a-z' | tr -cs 'a-z0-9' '-' | sed 's/^-//; s/-\$//' | cut -c1-30", returnStdout: true).trim() ?: 'unknown'
+          env.RELEASE  = "${num}-${env.DEPLOY_COMMIT.take(7)}-${stamp}-${dev}"
+          env.ARTIFACT = "server-${env.RELEASE}.tar.gz"
           echo "Building release ${env.RELEASE} → ${env.ARTIFACT}"
         }
         dir('server') {
@@ -271,7 +277,7 @@ pipeline {
 
             # Keep the last 5 releases and local artifacts (rule 5). Never the live one.
             LIVE="$(readlink -f current)"
-            ls -1 releases | grep -E '^[0-9]+$' | sort -n | head -n -5 | while read -r r; do
+            ls -1 releases | grep -E '^[0-9]+' | sort -n | head -n -5 | while read -r r; do
               [ "$BASE/releases/$r" = "$LIVE" ] || rm -rf "releases/$r"
             done || true   # cleanup must never fail a deploy that is already live
             ls -1t artifacts/*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f || true
