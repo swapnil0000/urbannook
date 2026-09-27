@@ -555,6 +555,34 @@ export function variantSku(product, variantName) {
   return (v?.sku || '').trim();
 }
 
+/**
+ * Read the GA4 client id (`_ga` cookie) and current session id (`_ga_<stream>`
+ * cookie) so the server can send the webhook fallback purchase as the SAME GA4
+ * user and session — that is what lets GA4 dedupe it against the browser hit and
+ * keeps the Google Ads click attribution on the session.
+ */
+const GA4_STREAM_SUFFIX = 'B7NGCFCRFG'; // G-B7NGCFCRFG → cookie `_ga_B7NGCFCRFG`
+export function getGaIds() {
+  if (typeof document === 'undefined') return {};
+  try {
+    const read = (name) => {
+      const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+      return m ? decodeURIComponent(m[1]) : null;
+    };
+    const out = {};
+    // `GA1.1.<random>.<timestamp>` → client_id is the last two segments
+    const ga = read('_ga')?.split('.');
+    if (ga?.length >= 4) out.gaClientId = `${ga[ga.length - 2]}.${ga[ga.length - 1]}`;
+    // Old format `GS1.1.<session_id>.…`, new format `GS2.1.s<session_id>$o…`
+    const gs = read(`_ga_${GA4_STREAM_SUFFIX}`);
+    const sessionId = gs?.match(/^GS2\.\d+\.s(\d+)/)?.[1] || gs?.match(/^GS1\.\d+\.(\d+)\./)?.[1];
+    if (sessionId) out.gaSessionId = sessionId;
+    return out;
+  } catch {
+    return {};
+  }
+}
+
 /* ---------------------------------------------------------------------------
  * Page / navigation  (React Router does NOT auto-fire pageviews in an SPA)
  * ------------------------------------------------------------------------ */
@@ -826,11 +854,58 @@ export function trackOrderCreated({ orderId, userType, paymentMethod }) {
 }
 
 /* ---------------------------------------------------------------------------
- * Purchase  (client = Meta/consent signal; canonical GA4 purchase fires server-side)
+ * Purchase
+ * The browser gtag hit below is the primary GA4 purchase (and, via the GA4 import,
+ * the Google Ads conversion). The Razorpay webhook sends the same transaction_id to
+ * GA4 through the Measurement Protocol as a fallback for hits the browser loses
+ * (ad-blockers, closed tabs, late FAILED→PAID recovery) — GA4 dedupes on
+ * transaction_id. See server/src/services/ga4.mp.service.js.
  * ------------------------------------------------------------------------ */
+
+/**
+ * Google Ads Enhanced Conversions: hand the buyer's email/phone/name to the Google
+ * tag. gtag normalises and SHA-256 hashes them before they leave the browser, and
+ * Google uses them to match the sale to an ad click when cookies are missing.
+ * Requires "Include user-provided data from your website" to be ON in the Google
+ * tag settings, otherwise gtag ignores it.
+ */
+function setGoogleUserData({ email, phone, name }) {
+  if (!enabled() || typeof window.gtag !== 'function') return;
+  const userData = {};
+  const cleanEmail = email?.trim().toLowerCase();
+  if (cleanEmail) userData.email = cleanEmail;
+  let digits = phone ? String(phone).replace(/\D/g, '') : '';
+  if (digits.length === 10) digits = `91${digits}`; // bare Indian mobile → add country code
+  if (digits.length >= 11) userData.phone_number = `+${digits}`; // E.164
+  const parts = name?.trim().split(/\s+/) || [];
+  if (parts[0]) {
+    userData.address = { first_name: parts[0] };
+    if (parts.length > 1) userData.address.last_name = parts.slice(1).join(' ');
+  }
+  if (Object.keys(userData).length) window.gtag('set', 'user_data', userData);
+}
+
+/**
+ * Fire a native Google Ads conversion through the on-page gtag (AW-18461503961 is
+ * configured in index.html). `transaction_id` lets Google Ads drop repeats of the
+ * same order, e.g. a refreshed confirmation page.
+ */
+export const trackGoogleAdsConversion = (label, value, transactionId, currency = CURRENCY) => {
+  if (!enabled()) return;
+  if (typeof window.gtag === 'function' && import.meta.env.VITE_GOOGLE_ADS_ID && label) {
+    window.gtag('event', 'conversion', {
+      send_to: `${import.meta.env.VITE_GOOGLE_ADS_ID}/${label}`,
+      value: Number(value) || 0,
+      currency,
+      transaction_id: String(transactionId || ''),
+    });
+  }
+};
 
 export function trackPurchase({ transactionId, value, shipping = 0, tax = 0, coupon, items = [], paymentMethod, eventId, email, phone, name, externalId }) {
   try {
+    // Must be set BEFORE the purchase hit so gtag attaches it to that event.
+    setGoogleUserData({ email, phone, name });
     // Feed Advanced Matching so the BROWSER Purchase pixel carries hashed email/phone/name/external_id.
     // Critical for GUESTS (most traffic): they enter contact at checkout but never logged in, so
     // setMetaAdvancedMatching was never called for them — without this the browser Purchase event
@@ -860,6 +935,8 @@ export function trackPurchase({ transactionId, value, shipping = 0, tax = 0, cou
     // arrives first creates the row and the other is a no-op. Only set when we
     // actually have the orderId — a blank key would collide across all orders.
     eventId ? `purchase:${eventId}` : undefined);
+    // Google Ads purchase conversion. Keyed on our orderId so refreshes don't double count.
+    trackGoogleAdsConversion(import.meta.env.VITE_GADS_LABEL_PURCHASE, value, eventId || transactionId);
     pushPixelEvent(
       'Purchase',
       {

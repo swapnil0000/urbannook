@@ -35,7 +35,7 @@ import IndependenceOfferBanner from "../component/IndependenceOfferBanner";
 import useOfferTerms from "../hooks/useOfferTerms";
 import { useShippingDelayNotice } from "../hooks/useShippingDelayNotice";
 import { calcLocalDiscount } from "../utils/couponDiscount";
-import { trackBeginCheckout, trackPurchase, trackAddShippingInfo, trackAddPaymentInfo, trackPaymentFailed, trackPaymentModalDismissed, trackCheckoutStep, trackOrderCreated, trackSelectPaymentMethod, trackDeliveryCheck, trackApplyCoupon, trackRemoveCoupon, getFbCookies, getAnonymousId, cacheAddressForCapi, setMetaAdvancedMatching } from "../utils/analytics";
+import { trackBeginCheckout, trackPurchase, trackAddShippingInfo, trackAddPaymentInfo, trackPaymentFailed, trackPaymentModalDismissed, trackCheckoutStep, trackOrderCreated, trackSelectPaymentMethod, trackDeliveryCheck, trackApplyCoupon, trackRemoveCoupon, getFbCookies, getGaIds, getAnonymousId, cacheAddressForCapi, setMetaAdvancedMatching } from "../utils/analytics";
 
 const CouponList = lazy(() => import("../component/CouponList"));
 const MobileNumberModal = lazy(() => import("../component/MobileNumberModal"));
@@ -1450,6 +1450,7 @@ const CheckoutPage = () => {
           giftWrapNoteOptions: giftWrapNoteOptions,
           ...getFbCookies(), // _fbp / _fbc → stored on order for CAPI match quality
           anonymousId: getAnonymousId(), // fallback externalId for guest CAPI
+          ...getGaIds(), // GA4 client/session id → webhook fallback purchase joins the same GA4 session
         }).unwrap();
 
         trackOrderCreated({
@@ -1540,6 +1541,7 @@ const CheckoutPage = () => {
         paymentMethod,
         magic: useMagic, // server skips address/shipping and sends line_items
         ...getFbCookies(), // _fbp / _fbc → stored on order for CAPI match quality
+        ...getGaIds(), // GA4 client/session id → webhook fallback purchase joins the same GA4 session
       }).unwrap();
 
       trackOrderCreated({

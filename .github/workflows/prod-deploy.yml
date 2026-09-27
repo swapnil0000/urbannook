@@ -57,6 +57,9 @@ jobs:
           echo "VITE_GTM_ID=${{ secrets.VITE_GTM_ID }}" >> .env
           echo "VITE_ENABLE_ANALYTICS=${{ secrets.VITE_ENABLE_ANALYTICS }}" >> .env
           echo "VITE_META_PIXEL_ID=${{ secrets.VITE_META_PIXEL_ID }}" >> .env
+          # Google Ads conversion tracking. Unset ⇒ empty ⇒ conversion not sent.
+          echo "VITE_GOOGLE_ADS_ID=${{ secrets.VITE_GOOGLE_ADS_ID }}" >> .env
+          echo "VITE_GADS_LABEL_PURCHASE=${{ secrets.VITE_GADS_LABEL_PURCHASE }}" >> .env
           # Razorpay Magic Checkout (1CC). Vite inlines this at build time, so it
           # can only be set here — not on the API server. Unset ⇒ empty ⇒ off.
           echo "VITE_MAGIC_CHECKOUT_ENABLED=${{ secrets.VITE_MAGIC_CHECKOUT_ENABLED }}" >> .env
