@@ -127,6 +127,7 @@ import { getActiveCartRules, evaluateCartRules, applyBestDiscount, getDiscountCa
 import { getPublicOfferConfig } from "../utils/offer.util.js";
 import { sendMetaCapiEvent } from "../services/meta.capi.service.js";
 import { recordServerPurchase } from "../services/purchaseEvent.service.js";
+import { sendGa4ServerPurchase } from "../services/ga4.mp.service.js";
 
 // Collect Meta CAPI match-quality signals from the order-creation request.
 // The webhook (Razorpay → server) has no browser context, so we persist these on
@@ -139,6 +140,8 @@ const collectMetaTracking = (req) => ({
     req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.ip || null,
   clientUserAgent: req.headers["user-agent"] || null,
   eventSourceUrl: req.headers["referer"] || req.headers["origin"] || null,
+  gaClientId: req.body?.gaClientId || null, // GA4 Measurement Protocol fallback purchase
+  gaSessionId: req.body?.gaSessionId || null,
 });
 
 // Pull the address Razorpay collected inside the Magic modal onto our order,
@@ -1396,6 +1399,11 @@ const razorpayWebHookController = async (req, res) => {
           await recordServerPurchase(order, {
             recoveredFrom: wasFailedByCron ? "FAILED" : undefined,
           });
+
+          // Same purchase to GA4 via Measurement Protocol — backfills the hits
+          // the browser loses. GA4 dedupes on transaction_id, so orders the
+          // browser already reported are not double counted.
+          await sendGa4ServerPurchase(order);
         }
 
         console.log("✅ Payment Captured:", payment.id);
