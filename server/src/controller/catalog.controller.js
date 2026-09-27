@@ -136,5 +136,115 @@ const metaProductFeed = asyncHandler(async (req, res) => {
   res.status(200).send(rows.join("\n"));
 });
 
-export { metaProductFeed };
-export default { metaProductFeed };
+/**
+ * Google Merchant Center product feed — TSV, VARIANT-LEVEL.
+ *
+ * Mirrors the columns of the hand-maintained Google Sheet this replaces, and keeps
+ * `id` = variant SKU so Merchant Center treats every row as the SAME item it already
+ * has (approval status + performance history are kept when switching sources).
+ *
+ * Differences from the Meta feed, all required/recommended by Google:
+ *  - link points at the variant URL (/product/<id>/<SKU>), so the landing page shows
+ *    that variant's price + image (avoids "price mismatch" disapprovals)
+ *  - identifier_exists = no (own-brand, no GTIN/MPN — otherwise "Missing GTIN" limits)
+ *  - additional_image_link = the variant's other images (max 10)
+ *  - availability uses Google's spelling (in_stock / out_of_stock) and per-variant stock
+ *
+ * Setup: Merchant Center → Data sources → Add product source → "Add products from a
+ * file" → "Enter a link to your file" → <API_BASE>/catalog/google-feed.tsv → Daily.
+ */
+const GOOGLE_BRAND = "Urban Nook";
+
+// TSV field: tabs/newlines would break the row, so flatten them to spaces.
+const tsv = (val) => (val == null ? "" : String(val)).replace(/[\t\r\n]+/g, " ").trim();
+
+const GOOGLE_HEADER = [
+  "id",
+  "title",
+  "description",
+  "link",
+  "image_link",
+  "additional_image_link",
+  "availability",
+  "price",
+  "condition",
+  "brand",
+  "identifier_exists",
+  "item_group_id",
+  "product_type",
+];
+
+const variantInStock = (p, v) =>
+  p.productStatus === "in_stock" &&
+  !v.variantOutOfStock &&
+  !(v.variantQuantity != null && Number(v.variantQuantity) <= 0);
+
+const googleProductFeed = asyncHandler(async (req, res) => {
+  const products = await Product.find({ isPublished: true, isAddon: { $ne: true } }).select(
+    "productId productName productDes productStatus productCategory productSubCategory variantDetails"
+  );
+
+  const rows = [GOOGLE_HEADER.join("\t")];
+  let skipped = 0;
+
+  for (const p of products) {
+    const variants = p.variantDetails || [];
+    if (!p.productId || !p.productName || !variants.length) {
+      skipped += 1;
+      continue;
+    }
+
+    const productName = plain(p.productName);
+    const description = plain(p.productDes) || productName;
+    const productType = plain(p.productSubCategory) || plain(p.productCategory);
+    const fallbackImage = productFallbackImage(p);
+    // Single-variant products are standalone items — no item_group_id.
+    const groupId = variants.length > 1 ? p.productId : "";
+
+    variants.forEach((v, i) => {
+      const price =
+        typeof v.variantPrice === "number" && v.variantPrice > 0 ? v.variantPrice : null;
+      const images = (v.variantImage || []).map(absUrl).filter(Boolean);
+      const image = images[0] || fallbackImage;
+      if (price == null || !image) {
+        skipped += 1;
+        return;
+      }
+
+      const sku = (v.sku || "").trim();
+      const vName =
+        v.variantName && !/^(n\/a|default)$/i.test(v.variantName.trim())
+          ? plain(v.variantName)
+          : "";
+
+      rows.push(
+        [
+          sku || `${p.productId}_${i + 1}`,
+          vName && !productName.includes(vName) ? `${productName} - ${vName}` : productName,
+          description,
+          sku ? `${DOMAIN}/product/${p.productId}/${sku}` : `${DOMAIN}/product/${p.productId}`,
+          image,
+          images.slice(1, 11).join(","),
+          variantInStock(p, v) ? "in_stock" : "out_of_stock",
+          `${price} ${CURRENCY}`,
+          "new",
+          GOOGLE_BRAND,
+          "no",
+          groupId,
+          productType,
+        ]
+          .map(tsv)
+          .join("\t")
+      );
+    });
+  }
+
+  console.log(`[Catalog] google feed: ${rows.length - 1} items, ${skipped} skipped`);
+
+  res.setHeader("Content-Type", "text/tab-separated-values; charset=utf-8");
+  res.setHeader("Cache-Control", "public, max-age=3600");
+  res.status(200).send(rows.join("\n"));
+});
+
+export { metaProductFeed, googleProductFeed };
+export default { metaProductFeed, googleProductFeed };
