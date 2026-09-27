@@ -46,11 +46,13 @@ async function recoverAttribution({ anonymousId, userId }) {
 }
 
 /** Map an order's line items → the same GA4 item shape the client sends. */
-function toItems(order) {
+export function toItems(order) {
   return (order.items || []).map((i) => {
     const snap = i.productSnapshot || {};
     const item = {
-      item_id: i.productId,
+      // SKU first, like the browser's toItem(), so item_id matches the
+      // Merchant Center feed; productId for orders without a variant SKU.
+      item_id: snap.variantSku || i.productId,
       item_name: snap.productName,
       price: snap.priceAtPurchase,
       quantity: snap.quantity,
