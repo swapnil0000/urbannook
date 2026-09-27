@@ -39,6 +39,11 @@ const productSchema = mongoose.Schema(
         // Manual admin override — force this variant out of stock.
         // Effective OOS = variantOutOfStock || (variantQuantity != null && variantQuantity <= 0).
         variantOutOfStock: { type: Boolean, default: false },
+        // Cross-product versions (e.g. Wooden ↔ LED katana), set from the admin
+        // panel. Variants sharing a variantGroup are versions of one design;
+        // variantType names this one. Both blank = no version toggle on the PDP.
+        variantType: { type: String, default: "" },
+        variantGroup: { type: String, default: "" },
       }
     ],
     uiProductId: {

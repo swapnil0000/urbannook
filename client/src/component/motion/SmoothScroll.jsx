@@ -15,10 +15,13 @@ import { MotionConfig } from "motion/react";
  *  - applies MotionConfig so every animation respects prefers-reduced-motion.
  */
 export default function SmoothScroll({ children }) {
-  const { pathname } = useLocation();
+  const { pathname, state } = useLocation();
 
   useEffect(() => {
+    // PDP version switch (Wooden ↔ LED) asks to keep the scroll position.
+    if (state?.keepScroll) return;
     window.scrollTo(0, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
   return <MotionConfig reducedMotion="user">{children}</MotionConfig>;
