@@ -122,7 +122,7 @@ const nfcGetUploadedDataService = async ({ userId }) => {
   }
 
   const userDoc = await nfcImage.findOne({ userId });
-  const cdnBaseUrl = process.env.AWS_CDN_BASE_URL;
+  const cdnBaseUrl = process.env.ASSET_BASE_URL;
 
   // If user doesn't exist (First time scan), then we return Empty Template
   // for preventing 404 errors on the frontend for new users.
@@ -207,7 +207,7 @@ const nfcUpsertService = async ({
     );
   }
 
-  const cdnBaseUrl = process.env.AWS_CDN_BASE_URL;
+  const cdnBaseUrl = process.env.ASSET_BASE_URL;
 
   // Initialize if new
   if (!userDoc && userDoc?.isAssigned) {

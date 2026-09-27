@@ -70,6 +70,9 @@ export function useScrollRestoration() {
       location.pathname.startsWith('/product/') &&
       prevBase === nextBase;
     if (isSameProductDifferentVariant) return;
+    // Version switch on the PDP (Wooden ↔ LED): a different product, but the
+    // shopper is mid-decision in the buy box — keep them where they are.
+    if (location.state?.keepScroll) return;
 
     const target = navigationType === 'POP' ? scrollPositions.current.get(location.key) || 0 : 0;
     window.scrollTo(0, target);
