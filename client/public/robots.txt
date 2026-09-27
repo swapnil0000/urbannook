@@ -1,21 +1,36 @@
+# UrbanNook — https://www.urbannook.in
+# Everything public is crawlable; only account, cart and payment pages are not.
+
 User-agent: *
-Disallow: /
+Allow: /
+Disallow: /checkout
+Disallow: /profile
+Disallow: /orders
+Disallow: /wishlist
+Disallow: /settings
+Disallow: /payment-processing/
+Disallow: /payment-failed
+Disallow: /order-confirm/
 
-# Noindex instruction for crawlers
-Noindex: /
+# AI search / answer engines — explicitly welcome (same rules as above)
+User-agent: GPTBot
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: PerplexityBot
+User-agent: ClaudeBot
+User-agent: Claude-SearchBot
+User-agent: Google-Extended
+User-agent: Applebot
+User-agent: Applebot-Extended
+User-agent: Bingbot
+Allow: /
+Disallow: /checkout
+Disallow: /profile
+Disallow: /orders
+Disallow: /wishlist
+Disallow: /settings
+Disallow: /payment-processing/
+Disallow: /payment-failed
+Disallow: /order-confirm/
 
-User-agent: Googlebot
-
-Disallow:
-
-User-agent: Googlebot-image
-
-Disallow:
-
-User-agent: AdsBot-Google
-
-Disallow:
-
-User-agent: AdsBot-Google-Mobile
-
-Disallow:
+Sitemap: https://www.urbannook.in/sitemap.xml

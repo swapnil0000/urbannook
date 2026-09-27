@@ -1,10 +1,14 @@
 name: Prod Deploy
 
-# This workflow triggers automatically whenever code is pushed to the 'main' branch
+# Runs on every push to 'main', and nightly so the prerendered product pages
+# (SEO HTML built from the live product feed) pick up price/stock changes.
 on:
   push:
     branches:
       - main
+  schedule:
+    - cron: '30 21 * * *' # 03:00 IST
+  workflow_dispatch:
 
 jobs:
   # JOB 1: Detect which parts of the codebase were modified
@@ -19,6 +23,7 @@ jobs:
 
       # Uses path filters to check if changes happened in the client or server folder
       - name: Path Filter
+        if: github.event_name == 'push'
         uses: dorny/paths-filter@v3
         id: filter
         with:
@@ -31,7 +36,8 @@ jobs:
   # JOB 2: Build and Deploy the Frontend (React/Vite) to AWS S3 & CloudFront
   deploy-client:
     needs: detect-changes
-    if: needs.detect-changes.outputs.client == 'true'
+    # Nightly/manual runs always rebuild the client (refreshes prerendered pages)
+    if: github.event_name != 'push' || needs.detect-changes.outputs.client == 'true'
     runs-on: ubuntu-latest
     environment: production
     env:
@@ -84,7 +90,7 @@ jobs:
         run: |
           # Step 2a: Sync all assets (JS, CSS, Images) allowing them to cache for better performance. 
           # We explicitly exclude index.html and sw.js from this bulk upload.
-          aws s3 sync client/dist/ s3://${{ secrets.AWS_S3_FRONTEND_BUCKET }} --delete --exclude "index.html" --exclude "sw.js" --only-show-errors
+          aws s3 sync client/dist/ s3://${{ secrets.AWS_S3_FRONTEND_BUCKET }} --delete --exclude "index.html" --exclude "sw.js" --exclude "product/*" --only-show-errors
           
           # Step 2b: Upload index.html with strict NO-CACHE headers. 
           # This forces browsers to always fetch the latest version, preventing "Chunk Load / Oops" errors.
@@ -95,12 +101,22 @@ jobs:
             aws s3 cp client/dist/sw.js s3://${{ secrets.AWS_S3_FRONTEND_BUCKET }}/sw.js --metadata-directive REPLACE --cache-control "no-store, no-cache, must-revalidate, max-age=0"
           fi
           
+          # Step 2d: Prerendered product pages (SEO HTML). Extensionless files uploaded to the
+          # exact keys CloudFront serves for /product/<id> and /product/<id>/<sku>. Two passes
+          # because a product key and its variant "folder" can't coexist on local disk.
+          # product/* is excluded from the --delete sync above so these aren't wiped each run.
+          for part in base variant; do
+            if [ -d "client/dist-prerender/$part" ]; then
+              aws s3 sync "client/dist-prerender/$part/" s3://${{ secrets.AWS_S3_FRONTEND_BUCKET }} --content-type "text/html; charset=utf-8" --cache-control "no-cache, max-age=0" --only-show-errors
+            fi
+          done
+
           aws cloudfront create-invalidation --distribution-id ${{ secrets.AWS_CLOUDFRONT_ID }} --paths "/*"
 
   # JOB 3: Deploy the Backend (Node.js/Express) to AWS EC2
   deploy-server:
     needs: detect-changes
-    if: needs.detect-changes.outputs.server == 'true'
+    if: github.event_name == 'push' && needs.detect-changes.outputs.server == 'true'
     runs-on: ubuntu-latest
     environment: production
     env:
