@@ -49,7 +49,6 @@ const GoogleOneTap = lazy(() => import('./component/GoogleOneTap'));
 // directly on /products or a product page and would never see a home-only popup.
 const IndependenceDayPopup = lazy(() => import('./component/IndependenceDayPopup'));
 const ScrollHint = lazy(() => import('./component/ScrollHint'));
-const PasskeyPrompt = lazy(() => import('./component/PasskeyPrompt'));
 
 // Component to handle session restoration and token removal detection
 const SessionManager = ({ children }) => {
@@ -207,10 +206,6 @@ function App() {
                     session for logged-out visitors */}
                 <ErrorBoundary>
                   <WhatsAppOneTap />
-                </ErrorBoundary>
-                {/* Post-login passkey upsell (fires once after a fresh login) */}
-                <ErrorBoundary>
-                  <PasskeyPrompt />
                 </ErrorBoundary>
                 {/* Independence Day 10%-off lead capture — shows once, everywhere */}
                 <ErrorBoundary>

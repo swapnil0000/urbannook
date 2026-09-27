@@ -11,8 +11,6 @@ import WhatsAppLoginButton from './WhatsAppLoginButton';
 import { isGoogleAuthSupported } from '../../../utils/browserEnv';
 import useFormValidation from '../../../hooks/useFormValidation';
 import { trackLogin, trackLoginFailed } from '../../../utils/analytics';
-import { startAuthentication, browserSupportsWebAuthn } from '@simplewebauthn/browser';
-import { usePasskeyLoginOptionsMutation, usePasskeyLoginVerifyMutation } from '../../../store/api/passkeyApi';
 
 const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
   const navigate = useNavigate();
@@ -27,8 +25,6 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
   const { login: setAuthUser, isAuthenticated } = useAuth();
   const { showNotification } = useUI();
 
-  const [passkeyLoginOptions] = usePasskeyLoginOptionsMutation();
-  const [passkeyLoginVerify] = usePasskeyLoginVerifyMutation();
 
 
   // Use validation hook with custom rules for login (password without pattern validation)
@@ -367,7 +363,6 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
               )}
             </form>
 
-            {/* Passkey (Face ID / fingerprint) — one-tap sign-in for returning users */}
             
 
             <p className="text-sm text-center mt-8 text-gray-500">

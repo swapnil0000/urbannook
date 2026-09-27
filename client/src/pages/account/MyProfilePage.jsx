@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useAuth, useUI } from '../../hooks/useRedux';
 import { useGetUserProfileQuery, useUpdateUserProfileMutation } from '../../store/api/userApi';
-import PasskeyEnroll from '../../component/layout/auth/PasskeyEnroll';
 
 const MyProfilePage = () => {
   const { user } = useAuth();
@@ -239,8 +238,6 @@ const MyProfilePage = () => {
         {/* --- PROFILE LAYOUT --- */}
         <div className="grid grid-cols-1 gap-6">
 
-          {/* Passkey enrollment — enable Face ID / fingerprint sign-in */}
-          <PasskeyEnroll />
 
           {/* Personal Info Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">

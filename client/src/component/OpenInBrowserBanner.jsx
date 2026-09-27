@@ -5,7 +5,7 @@ const DISMISS_KEY = 'iab_banner_dismissed';
 
 /**
  * Nudge shown ONLY inside in-app browsers (Instagram/Facebook/TikTok/etc), where
- * Google login, passkeys and autofill don't work. On Android we offer a one-tap
+ * Google login and autofill don't work. On Android we offer a one-tap
  * "Open in Chrome" (intent redirect); on iOS — which can't be force-redirected —
  * we show instructions to use the browser's menu. Dismissible for the session.
  *
