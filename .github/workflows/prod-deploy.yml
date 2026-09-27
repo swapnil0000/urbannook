@@ -10,6 +10,11 @@ on:
     - cron: '30 21 * * *' # 03:00 IST
   workflow_dispatch:
 
+# Never run two deploys at once (nightly run overlapping a push deploy)
+concurrency:
+  group: prod-deploy
+  cancel-in-progress: false
+
 jobs:
   # JOB 1: Detect which parts of the codebase were modified
   detect-changes:
@@ -101,15 +106,25 @@ jobs:
             aws s3 cp client/dist/sw.js s3://${{ secrets.AWS_S3_FRONTEND_BUCKET }}/sw.js --metadata-directive REPLACE --cache-control "no-store, no-cache, must-revalidate, max-age=0"
           fi
           
-          # Step 2d: Prerendered product pages (SEO HTML). Extensionless files uploaded to the
-          # exact keys CloudFront serves for /product/<id> and /product/<id>/<sku>. Two passes
-          # because a product key and its variant "folder" can't coexist on local disk.
-          # product/* is excluded from the --delete sync above so these aren't wiped each run.
-          for part in base variant; do
-            if [ -d "client/dist-prerender/$part" ]; then
-              aws s3 sync "client/dist-prerender/$part/" s3://${{ secrets.AWS_S3_FRONTEND_BUCKET }} --content-type "text/html; charset=utf-8" --cache-control "no-cache, max-age=0" --only-show-errors
+          # Step 2c2: Crawler files change every build — short cache instead of the default long one.
+          for f in robots.txt sitemap.xml llms.txt; do
+            if [ -f "client/dist/$f" ]; then
+              aws s3 cp "client/dist/$f" s3://${{ secrets.AWS_S3_FRONTEND_BUCKET }}/$f --metadata-directive REPLACE --cache-control "public, max-age=3600"
             fi
           done
+
+          # Step 2d: Prerendered product pages (SEO HTML) — extensionless files at the exact keys
+          # CloudFront serves for /product/<id> and /product/<id>/<sku>. S3 product/* is kept in
+          # EXACT sync with this build: every page references this build's hashed JS (the previous
+          # build's JS was just deleted above), so a stale page would load blank. Deleted products
+          # are removed, and if prerender produced nothing (feed down) all pages are removed and
+          # CloudFront falls back to index.html (the SPA) as before.
+          # Pass 1 manages product/<id> keys only; pass 2 manages product/<id>/<sku> keys only.
+          BUCKET=s3://${{ secrets.AWS_S3_FRONTEND_BUCKET }}
+          PR=client/dist-prerender
+          mkdir -p $PR/base/product $PR/variant/product
+          aws s3 sync $PR/base/product/ $BUCKET/product/ --delete --exclude "*/*" --content-type "text/html; charset=utf-8" --cache-control "no-cache, max-age=0" --only-show-errors
+          aws s3 sync $PR/variant/product/ $BUCKET/product/ --delete --exclude "*" --include "*/*" --content-type "text/html; charset=utf-8" --cache-control "no-cache, max-age=0" --only-show-errors
 
           aws cloudfront create-invalidation --distribution-id ${{ secrets.AWS_CLOUDFRONT_ID }} --paths "/*"
 

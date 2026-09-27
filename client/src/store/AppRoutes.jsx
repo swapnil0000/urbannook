@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { Suspense } from "react";
 import {
   HomePage,
@@ -202,6 +202,9 @@ const AppRoutes = () => {
           </Suspense>
         }
       />
+      {/* Legacy NFC tag links: the NFC page was removed but printed tags may still
+          point here — keep sending them to home rather than the 404 page. */}
+      <Route path="/nfc/*" element={<Navigate to="/" replace />} />
       {/* Catch-all: real not-found page (noindex) instead of a soft-404 redirect to home */}
       <Route path="*" element={<NotFound />} />
     </Routes>
