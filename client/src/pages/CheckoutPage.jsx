@@ -1112,7 +1112,7 @@ const CheckoutPage = () => {
     ) {
       beginCheckoutFiredRef.current = true;
       trackBeginCheckout({
-        items: cartItems.map((i) => ({ itemId: i.mongoId || i.id, itemName: i.name, itemVariant: i.selectedVariant || "N/A", price: i.price, quantity: i.quantity })),
+        items: cartItems.map((i) => ({ itemId: i.mongoId || i.id, sku: i.sku, itemName: i.name, itemVariant: i.selectedVariant || "N/A", price: i.price, quantity: i.quantity })),
         value: pricingDetails.subtotal,
       });
       sessionStorage.setItem("un_begin_checkout_fired", "1");
@@ -1129,7 +1129,7 @@ const CheckoutPage = () => {
   const goToStep = (n) => { setCurrentStep(n); window.scrollTo({ top: 0, behavior: "smooth" }); };
 
   const buildTrackItems = () =>
-    cartItems.map((i) => ({ itemId: i.mongoId || i.id, itemName: i.name, itemVariant: i.selectedVariant || "N/A", price: i.price, quantity: i.quantity }));
+    cartItems.map((i) => ({ itemId: i.mongoId || i.id, sku: i.sku, itemName: i.name, itemVariant: i.selectedVariant || "N/A", price: i.price, quantity: i.quantity }));
 
   const loadRazorpay = () =>
     new Promise((res) => {
@@ -1476,7 +1476,7 @@ const CheckoutPage = () => {
               paymentMethod,
               // Feed buyer PII to the browser Purchase pixel (guest = no prior login → boosts web EMQ)
               email: guestEmail.trim(), phone: guestMobile.trim(), name: guestName.trim(), externalId: getAnonymousId(),
-              items: cartItems.map((i) => ({ itemId: i.mongoId || i.id, itemName: i.name, itemVariant: i.selectedVariant || "N/A", price: i.price, quantity: i.quantity })),
+              items: cartItems.map((i) => ({ itemId: i.mongoId || i.id, sku: i.sku, itemName: i.name, itemVariant: i.selectedVariant || "N/A", price: i.price, quantity: i.quantity })),
             });
             dispatch(clearCart());
             localStorage.removeItem("guestCart"); localStorage.removeItem("guestId");
@@ -1566,7 +1566,7 @@ const CheckoutPage = () => {
               paymentMethod,
               // Feed buyer PII to the browser Purchase pixel → boosts web EMQ (phone esp.)
               email: userProfile?.email, phone: senderMobileStr, name: userProfile?.userName || userProfile?.name, externalId: userProfile?.userId || userProfile?._id || getAnonymousId(),
-              items: cartItems.map((i) => ({ itemId: i.mongoId || i.id, itemName: i.name, itemVariant: i.selectedVariant || "N/A", price: i.price, quantity: i.quantity })),
+              items: cartItems.map((i) => ({ itemId: i.mongoId || i.id, sku: i.sku, itemName: i.name, itemVariant: i.selectedVariant || "N/A", price: i.price, quantity: i.quantity })),
             });
             sessionStorage.removeItem(CHECKOUT_STATE_KEY);
             sessionStorage.removeItem("un_begin_checkout_fired"); // allow begin_checkout again for the next order

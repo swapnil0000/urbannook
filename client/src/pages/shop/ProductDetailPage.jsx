@@ -13,6 +13,8 @@ import FreeShippingBanner from '../../component/FreeShippingBanner';
 import ImageCarousel from '../../component/ImageCarousel';
 import { motion, AnimatePresence } from 'motion/react';
 import { ScrollColorBand } from '../../component/motion';
+import { variantSku, trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist, trackVariantSelect, trackShare, trackDeliveryCheck } from '../../utils/analytics';
+import { useGetProductByIdQuery, useGetProductsQuery } from '../../store/api/productsApi';
 import { trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist, trackVariantSelect, trackShare, trackDeliveryCheck } from '../../utils/analytics';
 import { productsApi, useGetProductByIdQuery, useGetProductsQuery } from '../../store/api/productsApi';
 import { useAddToCartMutation, useUpdateCartMutation, useCalculateShippingMutation } from '../../store/api/userApi';
@@ -280,7 +282,7 @@ const ProductDetailPage = () => {
   useEffect(() => {
     if (product && selectedVariant && viewedProductRef.current !== product.productId) {
       viewedProductRef.current = product.productId;
-      trackViewItem({ itemId: product.productId, itemName: product.productName, itemVariant: selectedVariant, price: currentPrice, quantity: 1 });
+      trackViewItem({ itemId: product.productId, sku: variantSku(product, selectedVariant), itemName: product.productName, itemVariant: selectedVariant, price: currentPrice, quantity: 1 });
     }
   }, [product?.productId, selectedVariant, currentPrice]);
 
@@ -324,17 +326,17 @@ const ProductDetailPage = () => {
         if (!silent) confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 }, colors: ['#E63329', '#C9281F', '#F3C33B', '#ffffff'] });
         setSelectedVariant(effectiveVariant);
         setFeedbackMessage('Added to cart'); setTimeout(() => setFeedbackMessage(''), 2000);
-        trackAddToCart({ itemId: product.productId, itemName: product.productName, itemVariant: effectiveVariant, price: currentPrice, quantity: 1, placement: silent ? 'pdp_buy_now' : 'pdp_main' });
+        trackAddToCart({ itemId: product.productId, sku: variantSku(product, effectiveVariant), itemName: product.productName, itemVariant: effectiveVariant, price: currentPrice, quantity: 1, placement: silent ? 'pdp_buy_now' : 'pdp_main' });
         return true;
       } catch (err) {
         showNotification(err.data?.message || 'Something went wrong', 'error');
         return false;
       }
     } else {
-      dispatch(addItem({ id: product?.productId, mongoId: product?.productId, name: product?.productName, price: currentPrice, image: selectedImage, quantity: 1, selectedVariant: effectiveVariant, giftWrapEligible: !!product?.giftWrapEligible }));
+      dispatch(addItem({ id: product?.productId, mongoId: product?.productId, name: product?.productName, price: currentPrice, image: selectedImage, quantity: 1, selectedVariant: effectiveVariant, giftWrapEligible: !!product?.giftWrapEligible, sku: variantSku(product, effectiveVariant) }));
       setSelectedVariant(effectiveVariant);
       setFeedbackMessage('Added to cart'); setTimeout(() => setFeedbackMessage(''), 2000);
-      trackAddToCart({ itemId: product.productId, itemName: product.productName, itemVariant: effectiveVariant, price: currentPrice, quantity: 1, placement: silent ? 'pdp_buy_now' : 'pdp_main' });
+      trackAddToCart({ itemId: product.productId, sku: variantSku(product, effectiveVariant), itemName: product.productName, itemVariant: effectiveVariant, price: currentPrice, quantity: 1, placement: silent ? 'pdp_buy_now' : 'pdp_main' });
       return true;
     }
   };
@@ -388,12 +390,14 @@ const ProductDetailPage = () => {
               quantity: 1,
               selectedVariant: variant,
               giftWrapEligible: !!combo.giftWrapEligible,
+              sku: variantDetail?.sku || '',
             }),
           );
         }
 
         trackAddToCart({
           itemId: combo.productId,
+          sku: variantDetail?.sku || '',
           itemName: combo.productName,
           itemVariant: variant,
           price,
@@ -425,7 +429,7 @@ const ProductDetailPage = () => {
         try { await updateCart({ productId: product.productId, quantity: 1, action: 'remove', variant: selectedVariant || undefined, image: selectedImage }).unwrap(); await refetchCart(); }
         catch { showNotification('Failed to update cart', 'error'); }
       } else dispatch(removeItem({ id: product?.productId, selectedVariant: selectedVariant || 'N/A' }));
-      trackRemoveFromCart({ itemId: product.productId, itemName: product.productName, itemVariant: selectedVariant, price: currentPrice, quantity: currentCartQty || 1 });
+      trackRemoveFromCart({ itemId: product.productId, sku: variantSku(product, selectedVariant), itemName: product.productName, itemVariant: selectedVariant, price: currentPrice, quantity: currentCartQty || 1 });
       return;
     }
     if (isLoggedIn) {
@@ -572,7 +576,7 @@ const ProductDetailPage = () => {
         <div className="grid lg:grid-cols-2 gap-8 lg:gap-10">
           {/* GALLERY — one big full-width framed image (swipe + dots on mobile, arrows on desktop) */}
           <div className="lg:sticky lg:top-24 self-start w-full min-w-0">
-            <ImageCarousel images={galleryImages} alt={product.productName} onImgErr={onImgErr} onItemClick={(i) => setLightbox({ list: galleryImages, idx: i })} />
+            <ImageCarousel priority images={galleryImages} alt={product.productName} onImgErr={onImgErr} onItemClick={(i) => setLightbox({ list: galleryImages, idx: i })} />
           </div>
 
           {/* INFO */}
@@ -975,7 +979,7 @@ const ProductDetailPage = () => {
                     <div className="flex items-center justify-between"><Stars n={rev.rating} className="text-sm" />{rev.userId && rev.userId === currentUserId && <button onClick={() => handleEditReview(rev)} className="text-xs text-brand font-semibold">Edit</button>}</div>
                     <p className="text-muted text-sm mt-2">{rev.desc}</p>
                     {imgs.length > 0 && (
-                      <div className="flex gap-2 mt-3">{imgs.map((u, i) => <button key={i} onClick={() => setLightbox({ list: imgs, idx: i })} className="w-14 h-14 rounded-lg overflow-hidden border border-hair"><img src={u} alt="" className="w-full h-full object-cover" /></button>)}</div>
+                      <div className="flex gap-2 mt-3">{imgs.map((u, i) => <button key={i} onClick={() => setLightbox({ list: imgs, idx: i })} className="w-14 h-14 rounded-lg overflow-hidden border border-hair"><img src={u} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" /></button>)}</div>
                     )}
                     <p className="mt-3 text-xs font-bold">{rev.userName || 'Customer'}{rev.verified !== false ? ' · Verified' : ''}</p>
                   </div>
