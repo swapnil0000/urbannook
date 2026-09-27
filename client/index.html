@@ -65,7 +65,8 @@
   <meta name="keywords" content="home decor, 3D printed decor, modern home decor India, lifestyle products, UrbanNook, indoor lighting, minimalist decor" />
   <meta name="author" content="UrbanNook" />
   <meta name="robots" content="index, follow" />
-  <link rel="canonical" href="https://www.urbannook.in/" />
+  <!-- No canonical here: this shell is served for every URL. Each page sets its own
+       (prerendered product HTML, or SEOHead at runtime). -->
 
   <!-- Google Ads -->
   <meta name="google-site-verification" content="46CQHlF4g5BYMKcIhKW_UCkjNByyMpEZE4d3j8NwaPE" />
@@ -75,7 +76,6 @@
   <meta property="og:title" content="UrbanNook — Modern Lifestyle Store" />
   <meta property="og:description" content="Premium 3D printed home decor & lifestyle products. Proudly made in India." />
   <meta property="og:image" content="https://www.urbannook.in/assets/logo_with_text.webp" />
-  <meta property="og:url" content="https://www.urbannook.in/" />
   <meta property="og:site_name" content="UrbanNook" />
   <meta property="og:locale" content="en_IN" />
 
@@ -85,6 +85,20 @@
   <meta name="twitter:description" content="Premium 3D printed home decor & lifestyle products. Proudly made in India." />
   <meta name="twitter:image" content="https://www.urbannook.in/assets/logo_with_text.webp" />
   <meta name="twitter:site" content="@urbannookstore" />
+
+  <!-- Sitewide entity data for search engines / AI answers -->
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@graph":[
+    {"@type":"Organization","@id":"https://www.urbannook.in/#org","name":"UrbanNook","url":"https://www.urbannook.in/",
+     "logo":"https://www.urbannook.in/assets/logo_with_text.webp",
+     "description":"Indian online store for 3D printed home decor, desk lamps, pen stands, anime katanas and lifestyle products. Made in India, shipped pan-India with cash on delivery.",
+     "email":"urbanadmin@urbannook.in","telephone":"+91-9124081005",
+     "address":{"@type":"PostalAddress","addressCountry":"IN"},
+     "sameAs":["https://www.instagram.com/urbannook.store"]},
+    {"@type":"WebSite","@id":"https://www.urbannook.in/#website","url":"https://www.urbannook.in/","name":"UrbanNook",
+     "publisher":{"@id":"https://www.urbannook.in/#org"},"inLanguage":"en-IN"}
+  ]}
+  </script>
 
   <!-- PWA / App -->
   <!-- build: v2.1 -->
