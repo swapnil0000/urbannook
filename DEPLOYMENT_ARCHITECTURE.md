@@ -85,13 +85,13 @@ and switch back to an older one with approval — without needing an engineer at
 
 ```
                          ┌─────────────────────────────────────────┐
-  Developer ──push──►    │ CI/CD  (GitHub Actions today → Jenkins) │
+  Developer ──push──►    │ CI/CD  (Jenkins on staging EC2)         │
                          └───────┬───────────────────────┬─────────┘
                                  │ client                │ server
                                  ▼                       ▼
-                  S3 (frontend) + CloudFront     1. build artifact  server-<rel>-<date>-<sha>.tar.gz
+                  S3 (frontend) + CF Worker      1. build artifact  server-<release>.tar.gz
                   → customers' browsers          2. upload to S3 artifacts bucket   (rule 1)
-                                                 3. tell prod EC2 to deploy <rel>   (SSM)
+                                                 3. scp to prod, extract, switch `current`
                                                                  │
   Admin panel                                                    ▼
   Vercel (UI) ──► Render (admin API) ──SSM "UrbanNook-Deploy"──► Prod EC2
@@ -110,7 +110,7 @@ Components and where they run:
 
 | Component | Runs on | Notes |
 |---|---|---|
-| Storefront frontend | S3 + CloudFront | Built by CI, static files. Not part of the release/rollback scheme yet. |
+| Storefront frontend | S3 `urbannook-prod-frontend`, served by Cloudflare Worker `urbannook-s3-proxy-prod` (no CloudFront) | Built by Jenkins, static files. Not part of the release/rollback scheme yet. |
 | Storefront API | **Prod EC2** (pm2, fork mode, 1 instance) | The thing this document protects. |
 | Admin frontend | Vercel | Independent of prod EC2. |
 | Admin API | Render | Independent of prod EC2 → can roll prod back even when prod is down. |
@@ -143,8 +143,8 @@ started with `cwd` = `/home/ubuntu/urbannook-prod/current`.
 
 ## 4. Release artifact
 
-- **Name:** `server-<release>-<YYYYMMDD-HHMM>-<git-short-sha>.tar.gz`
-  e.g. `server-007-20261003-2210-a1b2c3d.tar.gz`
+- **Name:** release folder `<N>-<git-short-sha>-<YYYYMMDD-HHMM IST>-<developer>`, artifact `server-<release folder>.tar.gz`
+  e.g. `releases/003-ffd51fe-20260928-0356-dheeraj-patnaik`, `server-003-ffd51fe-20260928-0356-dheeraj-patnaik.tar.gz`. Developer = author of the latest non-merge commit. Releases 001 and 002 use the older plain-number format.
 - **Contains:** everything under `server/` **including `node_modules`** (so an emergency
   restore needs no `npm install`), built on Linux x64 with the same Node major version as prod.
 - **Never contains:** `.env*`, SSH keys, AWS keys (rule 2). The build must verify this
@@ -264,15 +264,15 @@ admin rights for 1–2 people only.
 | Step | What | Status |
 |---|---|---|
 | 1 | Backup of live `server/` folder | ✅ Done 2026-09-26 (`server.backup-20260926-1237`) |
-| 2 | `releases/` + `shared/` + `current` layout, release `001` | ✅ Done 2026-09-26 (pm2 still runs from `server/`) |
-| 3 | Zip of release 001, copy off-server | 🚧 In progress |
-| 4 | pm2 runs from `current` (`server/ecosystem.prod.config.cjs` uses `current` when it lives inside `releases/`) | 🚧 Code ready — live with the first Jenkins server deploy |
-| 5 | CI deploys into new release folders + artifact to S3 | 🚧 `jenkins/prod.Jenkinsfile` stages *Build server release* + *Deploy server*; bucket `urbannook-release-artifacts` (versioning ON, 30-day lifecycle on `prod/`) |
+| 2 | `releases/` + `shared/` + `current` layout, release `001` | ✅ Done 2026-09-26. `shared/.env.production` refreshed from `server/.env.production` on 2026-09-27 (old copy kept as `.env.production.bak-20260919`) |
+| 3 | Zip of release 001, copy off-server | ✅ Done 2026-09-27 — `s3://urbannook-release-artifacts/prod/server-001-20260926-1259-6ea2aa3.tar.gz` |
+| 4 | pm2 runs from `current` (`server/ecosystem.prod.config.cjs` uses `current` when it lives inside `releases/`) | ✅ Live 2026-09-28 (release 002) |
+| 5 | CI deploys into new release folders + artifact to S3 | ✅ Live 2026-09-28 — Jenkins stages *Build server release* + *Deploy server*. Server `node_modules` built with prod's exact Node version (downloaded to `~/.cache/jenkins-node` on the agent). Bucket `urbannook-release-artifacts` (private, versioning ON, 30-day lifecycle on `prod/`); IAM user `Urbannook-Automation-User` has Put/Get/List only (no delete, no create) |
 | 6 | SSM on prod + `UrbanNook-Deploy` document | 📋 |
-| 7 | Jenkins (on staging EC2) replaces GitHub Actions | 🚧 2026-09-28 — job `UrbanNook-Prod-Deploy`; `prod-deploy.yml` moved unchanged to `.github/disabled/` (sync-staging, pr-check still on GitHub Actions). Nightly SEO rebuild moved 03:00 → 21:30 IST (staging EC2 is off after 22:00) |
+| 7 | Jenkins (on staging EC2) replaces GitHub Actions | ✅ Live 2026-09-28 — job `UrbanNook-Prod-Deploy` (SCM, `main`, `jenkins/prod.Jenkinsfile`). Triggers: GitHub webhook on merge to main, nightly 21:30 IST (client only, SEO refresh), manual. `prod-deploy.yml` moved unchanged to `.github/disabled/`; `sync-staging` and `pr-check` stay on GitHub Actions. Cloudflare workers deployed from `infra/cloudflare/` with wrangler, smoke-tested, auto-rolled back on failure. Staging job still uses its old inline pipeline — switch to `jenkins/staging.Jenkinsfile` 📋 |
 | 8 | Infisical for prod secrets | ✅ Live 2026-09-27 — pm2 → `server/scripts/start-prod.sh` → `infisical run` (prod, `/user/server`) via machine identity `prod-ec2-reader` (creds in `/home/ubuntu/.infisical-prod.env`, chmod 600). Falls back to `.env.production` if Infisical login fails. Retire `.env.production` + fallback after ~1 week. |
 | 9 | Admin feature A (view) → B (rollback) → C (upload) | 📋 |
-| 10 | Health-check auto-rollback | 🚧 In *Deploy server*: failed `/health` → `current` moves back to the previous release |
+| 10 | Health-check auto-rollback | ✅ Live 2026-09-28 — failed `/health` → pm2 goes back to the folder it was running before the deploy |
 | 11 | Instance resize, then cluster mode after §8 fixes | 📋 |
 
 Update this table in the same PR that changes a step's status.

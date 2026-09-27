@@ -13,13 +13,13 @@
 
 name = "urbannook-s3-proxy-prod"
 main = "urbannook-s3-proxy-prod.js"
-compatibility_date = "2025-01-01"
+compatibility_date = "2026-07-24"
 keep_vars = true
 
 # Currently enabled in the dashboard. Consider turning off later
 # (the whole site is also reachable on *.workers.dev — duplicate content for SEO).
 workers_dev = true
-preview_urls = true
+preview_urls = false
 
 routes = [
   { pattern = "www.urbannook.in/*", zone_name = "urbannook.in" },
