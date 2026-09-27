@@ -149,7 +149,9 @@ jobs:
             # Clean start for fresh code in memory
             pm2 stop urbannook-server || true
             pm2 delete urbannook-server || true
-            pm2 start ecosystem.config.cjs --env production
+            # Secrets come from Infisical via scripts/start-prod.sh (falls back
+            # to .env.production if Infisical is unreachable).
+            pm2 start ecosystem.prod.config.cjs
             pm2 save
             echo "--- DEPLOY RESTART FINISHED ---"
           EOF
