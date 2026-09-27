@@ -16,7 +16,7 @@
 //               release artifacts → s3://urbannook-release-artifacts/prod/
 //
 // FLOW (each step only runs if the previous one passed)
-//   1. Checkout the chosen branch (default main)
+//   1. Checkout main
 //   2. Detect what changed since the LAST SUCCESSFUL prod deploy
 //   3. Build the frontend           ← nothing deployed yet; a failure here
 //   4. Build the server release       leaves prod completely untouched
@@ -230,7 +230,11 @@ pipeline {
           ssh $SSH_OPTS "$PROD_HOST" "RELEASE=$RELEASE ARTIFACT=$ARTIFACT BASE=$PROD_BASE bash -s" <<'REMOTE'
             set -euo pipefail
             cd "$BASE"
-            PREV="$(readlink -f current || true)"
+            # Roll back to what pm2 is ACTUALLY running, not just where `current`
+            # points — on the first release deploy pm2 still runs from server/
+            # while `current` points at the older releases/001.
+            PM2_CWD="$(pm2 jlist 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const a=JSON.parse(s).find(p=>p.name==="urbannook-server");console.log(a?a.pm2_env.pm_cwd:"")}catch{console.log("")}})')"
+            if [ -n "$PM2_CWD" ]; then PREV="$(readlink -f "$PM2_CWD")"; else PREV="$(readlink -f current || true)"; fi
             echo "Live before deploy: ${PREV:-none}"
 
             mkdir "releases/$RELEASE"          # fails if it exists — releases are never reused
@@ -269,8 +273,8 @@ pipeline {
             LIVE="$(readlink -f current)"
             ls -1 releases | grep -E '^[0-9]+$' | sort -n | head -n -5 | while read -r r; do
               [ "$BASE/releases/$r" = "$LIVE" ] || rm -rf "releases/$r"
-            done
-            ls -1t artifacts/*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f
+            done || true   # cleanup must never fail a deploy that is already live
+            ls -1t artifacts/*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f || true
 REMOTE
         '''
       }
@@ -299,11 +303,41 @@ REMOTE
             '''
           }
         }
-        // Smoke test: website + images still answer through the new workers.
-        sh '''
-          curl -fsS -o /dev/null https://www.urbannook.in/ && echo "website OK"
-          curl -fsS -o /dev/null -w "%{http_code}\\n" https://www.urbannook.in/sitemap.xml
-        '''
+        // Smoke test through the NEW workers (?smoke= bypasses Cloudflare's
+        // cache; the workers ignore the query string). If anything is wrong,
+        // both workers go back to their previous version automatically.
+        script {
+          def ok = sh(returnStatus: true, script: '''
+            set -e
+            T=$(date +%s)
+            # Website: real HTML, and the JS bundle it references loads.
+            CT=$(curl -fsS -o /tmp/smoke-index.html -w "%{content_type}" "https://www.urbannook.in/?smoke=$T")
+            echo "$CT" | grep -q "text/html" || { echo "index: wrong content-type $CT"; exit 1; }
+            JS=$(grep -o '/assets/[^"]*\\.js' /tmp/smoke-index.html | head -1)
+            [ -n "$JS" ] || { echo "index: no JS bundle referenced"; exit 1; }
+            curl -fsS -o /dev/null "https://www.urbannook.in$JS?smoke=$T"
+            curl -fsS -o /dev/null "https://www.urbannook.in/sitemap.xml?smoke=$T"
+            # Images: any 2xx/403/404 means the worker signs and reaches S3; 5xx = broken.
+            C=$(curl -s -o /dev/null -w "%{http_code}" "https://assets-prod.urbannook.in/__smoke_$T.png")
+            [ "$C" -lt 500 ] || { echo "assets worker returned $C"; exit 1; }
+            echo "SMOKE OK"
+          ''')
+          if (ok != 0) {
+            withCredentials([
+              string(credentialsId: 'CLOUDFLARE_WORKERS_TOKEN', variable: 'CLOUDFLARE_API_TOKEN'),
+              string(credentialsId: 'CLOUDFLARE_ACCOUNT_ID', variable: 'CLOUDFLARE_ACCOUNT_ID'),
+            ]) {
+              sh '''
+                set +x
+                for w in urbannook-s3-proxy-prod urbannook-assets-proxy-prod; do
+                  npx --yes wrangler@4 rollback --name "$w" --message "Jenkins smoke test failed" --yes \
+                    || echo "ROLLBACK FAILED for $w — roll back in Cloudflare dashboard NOW"
+                done
+              '''
+            }
+            error 'Worker smoke test failed — workers rolled back to the previous version.'
+          }
+        }
       }
     }
 
