@@ -433,6 +433,18 @@ const CheckoutPage = () => {
     return saved > steps.length ? 1 : saved;
   });
   const [userProfile, setUserProfile] = useState(null);
+  // WhatsApp login gives us only a phone, so the account starts as "User 2393"
+  // with a placeholder @wa.urbannook.in email. Such a member must type a real
+  // name and email here, otherwise the placeholder lands on the courier label.
+  const [memberName, setMemberName] = useState("");
+  const [memberEmail, setMemberEmail] = useState("");
+  const [memberErrors, setMemberErrors] = useState({});
+  const rawProfileName = String(userProfile?.userName || userProfile?.name || "").trim();
+  const rawProfileEmail = String(userProfile?.email || "").trim();
+  const needsName = !isGuest && !!userProfile && (!rawProfileName || /^User \d{4}$/.test(rawProfileName));
+  const needsEmail = !isGuest && !!userProfile && (!rawProfileEmail || /@wa\.urbannook\.in$/i.test(rawProfileEmail));
+  const profileName = needsName ? memberName.trim() : rawProfileName;
+  const profileEmail = needsEmail ? memberEmail.trim().toLowerCase() : rawProfileEmail;
   const [isLoading, setIsLoading] = useState(true);
   const [address, setAddress] = useState(savedCheckout.current.address || "");
   const [pinCode, setPinCode] = useState(savedCheckout.current.pinCode || "");
@@ -1290,8 +1302,18 @@ const CheckoutPage = () => {
       if (Object.keys(errors).length) { setGuestErrors(errors); return; }
       setGuestErrors({});
     } else {
+      const errors = {};
+      if (needsName && !memberName.trim()) errors.name = "Full name is required";
+      if (needsEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(memberEmail.trim())) errors.email = "Valid email is required";
+      if (Object.keys(errors).length) { setMemberErrors(errors); return; }
+      setMemberErrors({});
       const m = stripCC(String(senderMobile || ""));
       if (!m || !validateMobile(m)) { showNotification("Please enter a valid 10-digit Indian mobile number", "error"); return; }
+      // Save the real name now; the email is copied over by the order's
+      // profile backfill, which also handles an address owned by another account
+      if (needsName) {
+        updateUserProfile({ name: memberName.trim() }).unwrap().then(() => refetchProfile()).catch(() => {});
+      }
       // Save mobile to profile if it changed
       const existingMobile = String(userProfile?.mobileNumber || userProfile?.mobile || "");
       if (m !== existingMobile) {
@@ -1342,9 +1364,9 @@ const CheckoutPage = () => {
     const useMagic = opts.forceMagic ?? magicEnabled;
     setPaymentError(null);
     {
-      const buyerName = (isGuest ? guestName : (userProfile?.userName || userProfile?.name || "")).trim();
+      const buyerName = (isGuest ? guestName : profileName).trim();
       setMetaAdvancedMatching({
-        email: isGuest ? guestEmail.trim() : userProfile?.email,
+        email: isGuest ? guestEmail.trim() : profileEmail,
         phone: isGuest ? guestMobile.trim() : stripCC(String(senderMobile || "")),
         firstName: buyerName.split(" ")[0],
         lastName: buyerName.split(" ").slice(1).join(" "),
@@ -1444,6 +1466,7 @@ const CheckoutPage = () => {
     // the address in its own modal, and the server skips the same checks for a
     // Magic order. Demanding them here would block the very path that exists
     // to avoid asking.
+    if (!useMagic && (!profileName || !profileEmail)) { showNotification("Please enter your full name and email", "error"); goToStep(contactStep); return; }
     if (!useMagic && (!senderMobileStr || !validateMobile(senderMobileStr))) { showNotification("Please enter a valid mobile number", "error"); goToStep(contactStep); return; }
     const deliveryMobileStr = stripCC(String(deliveryMobile || ""));
     if (useDifferentDeliveryContact && deliveryMobileStr && !validateMobile(deliveryMobileStr)) {
@@ -1457,11 +1480,11 @@ const CheckoutPage = () => {
           productId: i.mongoId || i.id.split(":")[0], quantity: i.quantity,
           variant: (i.selectedVariant && i.selectedVariant !== "N/A") ? i.selectedVariant : (cartSelections[i.id]?.variant || "N/A"),
         })),
-        senderMobile: senderMobileStr, userEmail: userProfile?.email,
+        senderMobile: senderMobileStr, userEmail: profileEmail,
         receiverMobile: useDifferentDeliveryContact && deliveryMobileStr ? deliveryMobileStr : senderMobileStr,
         addressId: currentAddressId,
         deliveryAddress: {
-          addressId: currentAddressId, fullName: userProfile?.userName || userProfile?.name || "",
+          addressId: currentAddressId, fullName: profileName,
           mobileNumber: useDifferentDeliveryContact && deliveryMobileStr ? deliveryMobileStr : senderMobileStr,
           formattedAddress: address, deliveryAddressFull: address,
           pinCode: pinCode ? parseInt(pinCode, 10) : null,
@@ -1491,6 +1514,7 @@ const CheckoutPage = () => {
         image: "/assets/logo.webp",
         order_id: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId || orderResult.id,
         handler: async (response) => {
+          paymentCompletedRef.current = true;
           try {
             trackPurchase({
               transactionId: response.razorpay_order_id,
@@ -1498,7 +1522,7 @@ const CheckoutPage = () => {
               value: totalToPay, shipping: pricingDetails.shipping, tax: 0,
               paymentMethod,
               // Feed buyer PII to the browser Purchase pixel → boosts web EMQ (phone esp.)
-              email: userProfile?.email, phone: senderMobileStr, name: userProfile?.userName || userProfile?.name, externalId: userProfile?.userId || userProfile?._id || getAnonymousId(),
+              email: profileEmail, phone: senderMobileStr, name: profileName, externalId: userProfile?.userId || userProfile?._id || getAnonymousId(),
               items: cartItems.map((i) => ({ itemId: i.mongoId || i.id, sku: i.sku, itemName: i.name, itemVariant: i.selectedVariant || "N/A", price: i.price, quantity: i.quantity })),
             });
             sessionStorage.removeItem(CHECKOUT_STATE_KEY);
@@ -1506,7 +1530,7 @@ const CheckoutPage = () => {
             navigate(`/payment-processing/${response.razorpay_order_id}`);
           } catch (_) { setPaymentError("Payment verification failed. Contact support if amount was debited."); }
         },
-        prefill: { name: userProfile?.userName || userProfile?.name || "", email: userProfile?.email || "", contact: senderMobileStr },
+        prefill: { name: profileName, email: profileEmail, contact: senderMobileStr },
         ...magicCheckoutOptions(orderResult),
         notes: { address, pinCode }, theme: { color: "#E63329" },
         modal: { ondismiss: () => { trackPaymentModalDismissed({ orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId || orderResult.id, value: totalToPay }); setPaymentError("Payment cancelled. Your cart is safe."); setShowRetry(true); }, escape: false, confirm_close: true },
@@ -1549,7 +1573,7 @@ const CheckoutPage = () => {
       ? (Number(giftWrapOffer.price) || 0) * giftWrapEligibleCount
       : 0;
   const totalToPay = pricingDetails.subtotal + giftWrapAmount + shippingAmount - pricingDetails.discount;
-  const userName = isGuest ? guestName : (userProfile?.userName || userProfile?.name || "");
+  const userName = isGuest ? guestName : profileName;
   const userInitials = userName ? userName.split(" ").filter(Boolean).map((w) => w[0]).join("").toUpperCase().slice(0, 2) : "?";
 
   // ── Payment-action helpers (money-critical: never charge a stale amount) ──
@@ -1968,10 +1992,24 @@ const CheckoutPage = () => {
                   {/* Full Name */}
                   <Field
                     label="Full Name"
-                    required={isGuest}
-                    error={guestErrors.name}
+                    required={isGuest || needsName}
+                    error={isGuest ? guestErrors.name : memberErrors.name}
                   >
-                    {isGuest
+                    {!isGuest && needsName
+                      ? iconInput(
+                          "fa-user",
+                          <input
+                            type="text"
+                            value={memberName}
+                            onChange={(e) => {
+                              setMemberName(e.target.value);
+                              setMemberErrors((p) => ({ ...p, name: "" }));
+                            }}
+                            placeholder="e.g. Priya Sharma"
+                            className={`${inputCls(memberErrors.name)} pl-10`}
+                          />,
+                        )
+                      : isGuest
                       ? iconInput(
                           "fa-user",
                           <input
@@ -1998,10 +2036,24 @@ const CheckoutPage = () => {
                   {/* Email */}
                   <Field
                     label="Email Address"
-                    required={isGuest}
-                    error={guestErrors.email}
+                    required={isGuest || needsEmail}
+                    error={isGuest ? guestErrors.email : memberErrors.email}
                   >
-                    {isGuest
+                    {!isGuest && needsEmail
+                      ? iconInput(
+                          "fa-envelope",
+                          <input
+                            type="email"
+                            value={memberEmail}
+                            onChange={(e) => {
+                              setMemberEmail(e.target.value);
+                              setMemberErrors((p) => ({ ...p, email: "" }));
+                            }}
+                            placeholder="you@example.com"
+                            className={`${inputCls(memberErrors.email)} pl-10`}
+                          />,
+                        )
+                      : isGuest
                       ? iconInput(
                           "fa-envelope",
                           <input
@@ -2566,10 +2618,10 @@ const CheckoutPage = () => {
                     <p className="text-sm font-bold text-gray-800">
                       {isGuest
                         ? guestName
-                        : userProfile?.userName || userProfile?.name}
+                        : profileName}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5 truncate">
-                      {isGuest ? guestEmail : userProfile?.email}
+                      {isGuest ? guestEmail : profileEmail}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5 font-medium">
                       {isGuest ? guestMobile : senderMobile}
@@ -3104,7 +3156,7 @@ const CheckoutPage = () => {
           prefillName={
             isGuest
               ? guestName
-              : userProfile?.userName || userProfile?.name || ""
+              : profileName
           }
           prefillPhone={
             isGuest

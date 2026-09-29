@@ -1,3 +1,5 @@
+import { fulfilCapturedPayment, UNPAID_STATUSES } from "./rp.payment.controller.js";
+import { razorpayFetchOrderPaymentsService } from "../services/rp.payement.service.js";
 import {
   addToCartService,
   getCartService,
@@ -154,7 +156,7 @@ const getOrderStatus = asyncHandler(async (req, res) => {
   }
 
   // Find the order
-  const order = await Order.findOne({ "payment.razorpayOrderId": orderId });
+  let order = await Order.findOne({ "payment.razorpayOrderId": orderId });
 
   if (!order) {
     console.log(
@@ -163,15 +165,33 @@ const getOrderStatus = asyncHandler(async (req, res) => {
     throw new NotFoundError("Order not found");
   }
 
+  // Our status only moves when a webhook lands. A retry that paid after a
+  // failed first attempt, a late webhook or a lost one would otherwise show a
+  // paying customer "failed" — so for anything unpaid, ask Razorpay directly.
+  let status = order.status;
+  if (UNPAID_STATUSES.includes(order.status)) {
+    const payments = await razorpayFetchOrderPaymentsService(orderId);
+    if (payments) {
+      const captured = payments.find((p) => p.status === "captured");
+      if (captured) {
+        order = await fulfilCapturedPayment(order, captured);
+        status = "PAID";
+      } else if (payments.some((p) => p.status === "authorized" || p.status === "created")) {
+        // Money is on its way (authorized, capture pending) — keep polling
+        status = "PROCESSING";
+      }
+    }
+  }
+
   return res.status(200).json(
     new ApiRes(
       200,
       "Order status",
       {
         orderId: order.orderId,
-        status: order.status,
+        status,
         isGuestOrder: order.isGuestOrder ?? false,
-        ...(order.isGuestOrder && order.status === "PAID" && order.guestInfo?.email
+        ...(order.isGuestOrder && status === "PAID" && order.guestInfo?.email
           ? { guestEmail: order.guestInfo.email, isNewGuestAccount: order.isNewGuestAccount ?? true }
           : {}),
       },
