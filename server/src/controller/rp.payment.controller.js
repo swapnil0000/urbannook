@@ -12,7 +12,7 @@ import Cart from "../model/user.cart.model.js";
 import env from "../config/envConfigSetup.js";
 import Coupon from "../model/coupon.model.js";
 import CouponUsage from "../model/couponUsage.model.js";
-import { backfillUserProfileFromCheckout } from "../services/user.profile.service.js";
+import { backfillUserProfileFromCheckout, PLACEHOLDER_NAME } from "../services/user.profile.service.js";
 import {
   isMagicCheckoutEnabled,
   isMagicGuestsOnly,
@@ -459,14 +459,26 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     }
   }
 
+  // A WhatsApp-login account starts as "User 2393"; that placeholder must never
+  // reach the order or the courier label, so it is skipped at every step.
+  const realName = (n) => {
+    const clean = String(n ?? "").trim();
+    return clean && !PLACEHOLDER_NAME.test(clean) ? clean : "";
+  };
+  const resolvedFullName =
+    realName(clientAddress?.fullName) ||
+    realName(selectedAddr?.fullName) ||
+    realName(user?.userName) ||
+    realName(user?.name);
+
+  // Magic collects the name in its own modal and the webhook writes it later
+  if (!isMagic && !resolvedFullName) {
+    throw new ValidationError("Please enter your full name to place the order");
+  }
+
   const deliveryAddressSnapshot = {
     addressId: addressId,
-    fullName:
-      clientAddress?.fullName ||
-      selectedAddr?.fullName ||
-      user?.userName ||
-      user?.name ||
-      "Customer",
+    fullName: resolvedFullName || "Customer",
     mobileNumber:
       clientAddress?.mobileNumber ||
       selectedAddr?.mobileNumber ||

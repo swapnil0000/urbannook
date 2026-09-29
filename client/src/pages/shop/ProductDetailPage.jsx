@@ -1110,7 +1110,8 @@ const ProductDetailPage = () => {
         <NotifyMeModal
           productName={product?.productName}
           productId={product?.productId}
-          variantName={selectedVariant || null}
+          variantName={selectedVariant || availableVariants[0] || null}
+          variants={(product?.variantDetails || []).map((v) => ({ name: v.variantName, outOfStock: isVariantOutOfStock(v) }))}
           onClose={() => setShowNotifyModal(false)}
         />
       )}
