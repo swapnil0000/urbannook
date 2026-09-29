@@ -1514,6 +1514,7 @@ const CheckoutPage = () => {
         image: "/assets/logo.webp",
         order_id: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId || orderResult.id,
         handler: async (response) => {
+          paymentCompletedRef.current = true;
           try {
             trackPurchase({
               transactionId: response.razorpay_order_id,
