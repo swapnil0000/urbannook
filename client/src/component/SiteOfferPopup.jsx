@@ -5,7 +5,7 @@ import useOfferTerms from '../hooks/useOfferTerms';
 import { useAuth } from '../hooks/useRedux';
 import { getApiUrl } from '../config/appUrls';
 import {
-  INDEPENDENCE_OFFER,
+  SITE_OFFER,
   offerAmountLabel,
   offerConditionLabel,
   isOfferLive,
@@ -16,7 +16,7 @@ import {
   detectVisitorSource,
   isInAppBrowser,
   getAttributionPayload,
-} from '../config/independenceOffer';
+} from '../config/siteOffer';
 import {
   track,
   trackViewPromotion,
@@ -26,7 +26,7 @@ import {
 } from '../utils/analytics';
 
 /**
- * Site-wide Independence Day lead-capture popup.
+ * Site-wide offer popup ("₹100 off above ₹1,500") with lead capture.
  *
  * Mounted globally rather than on the home page, because a large share of this
  * traffic lands straight on /products or a product page from an Instagram ad or
@@ -37,36 +37,25 @@ import {
  * again) can reopen it on their own terms.
  */
 
-const PROMO_NAME = 'Independence Day 10% Off Popup';
+const PROMO_NAME = 'Site Offer Popup';
 const CREATIVE_SLOT = 'site_wide_popup';
 
 const MOBILE_RE = /^[6-9]\d{9}$/;
 
-const AshokaChakra = ({ className = '' }) => (
-  <svg viewBox="0 0 48 48" className={className} aria-hidden="true" focusable="false">
-    <circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" strokeWidth="2" />
-    <circle cx="24" cy="24" r="3.5" fill="currentColor" />
-    {Array.from({ length: 24 }, (_, i) => (
-      <line
-        key={i}
-        x1="24"
-        y1="6"
-        x2="24"
-        y2="24"
-        stroke="currentColor"
-        strokeWidth="1"
-        transform={`rotate(${i * 15} 24 24)`}
-      />
-    ))}
-  </svg>
+/** Brand accent rule across the top of the sheet. Purely decorative. */
+const AccentBar = () => (
+  <div
+    className="h-1 w-full bg-gradient-to-r from-brand via-[#F5DEB3] to-brand"
+    aria-hidden="true"
+  />
 );
 
-/** Three-band tricolour rule. Purely decorative. */
-const TricolourBar = ({ className = '' }) => (
-  <div className={`flex h-1.5 w-full ${className}`} aria-hidden="true">
-    <span className="flex-1 bg-[#FF9933]" />
-    <span className="flex-1 bg-white" />
-    <span className="flex-1 bg-[#138808]" />
+/** Ticket-style dashed divider between the offer and the form. */
+const TicketDivider = () => (
+  <div className="my-5 flex items-center gap-2" aria-hidden="true">
+    <span className="h-1.5 w-1.5 rounded-full bg-paper/30" />
+    <div className="flex-1 border-t border-dashed border-paper/20" />
+    <span className="h-1.5 w-1.5 rounded-full bg-paper/30" />
   </div>
 );
 
@@ -76,8 +65,8 @@ const TricolourBar = ({ className = '' }) => (
  * tree (open or not) is a cost with nothing to show for it.
  */
 const OfferCountdown = memo(() => {
-  const timeLeft = useTimer(INDEPENDENCE_OFFER.endsAt);
-  if (timeLeft.isExpired) return null;
+  const timeLeft = useTimer(SITE_OFFER.endsAt || new Date(0).toISOString());
+  if (!SITE_OFFER.endsAt || timeLeft.isExpired) return null;
 
   const units = [
     { label: 'Days', value: timeLeft.days },
@@ -134,7 +123,6 @@ const POPUP_STYLES = `
   }
   .un-offer-pill     { animation: unOfferPillIn .4s cubic-bezier(.16,1,.3,1) both }
   .un-offer-spinner  { animation: unOfferSpin .7s linear infinite }
-  .un-offer-chakra   { animation: unOfferFade .6s ease-out both }
 
   /* Chrome and Safari repaint an autofilled field with their own near-white
      background and near-black text through a UA style that ordinary CSS rules
@@ -180,18 +168,17 @@ const POPUP_STYLES = `
   @media (prefers-reduced-motion: reduce) {
     .un-offer-backdrop,
     .un-offer-sheet,
-    .un-offer-pill,
-    .un-offer-chakra { animation: unOfferFade .01s linear both }
+    .un-offer-pill { animation: unOfferFade .01s linear both }
     .un-offer-spinner { animation-duration: 1.4s }
   }
 `;
 
-const IndependenceDayPopup = memo(() => {
+const SiteOfferPopup = memo(() => {
   const location = useLocation();
   const { user } = useAuth();
   // Live coupon terms from the server, so an admin rename or re-price reaches
   // the popup without a rebuild.
-  const { terms: campaign } = useOfferTerms();
+  const { terms: campaign, loaded: termsLoaded } = useOfferTerms();
 
   const [offerState, setOfferState] = useState(readOfferState);
   const [isOpen, setIsOpen] = useState(false);
@@ -227,13 +214,22 @@ const IndependenceDayPopup = memo(() => {
   // server re-validates the window on claim anyway.
   const offerLive = isOfferLive();
   const suppressed = isSuppressedPath(location.pathname);
+  // Only once the server has confirmed the coupon is usable. Opening earlier
+  // (or when it is not) locked page scroll behind a popup that renders nothing.
+  const canShow = offerLive && !suppressed && termsLoaded && campaign.available !== false;
 
   /* -- open once, after the page has had a moment to settle ---------------- */
   useEffect(() => {
-    if (!offerLive || suppressed || offerState) return;
-    const timer = setTimeout(() => setIsOpen(true), INDEPENDENCE_OFFER.openDelayMs);
+    if (!canShow || offerState) return;
+    const timer = setTimeout(() => setIsOpen(true), SITE_OFFER.openDelayMs);
     return () => clearTimeout(timer);
-  }, [offerLive, suppressed, offerState]);
+  }, [canShow, offerState]);
+
+  // Navigating to checkout (or the offer going away) while open must close it,
+  // or the scroll lock below would outlive the visible popup.
+  useEffect(() => {
+    if (!canShow && isOpen) setIsOpen(false);
+  }, [canShow, isOpen]);
 
   /* -- prefill for signed-in visitors: nothing left to type ---------------- */
   useEffect(() => {
@@ -245,7 +241,7 @@ const IndependenceDayPopup = memo(() => {
     if (!isOpen || hasTrackedView.current) return;
     hasTrackedView.current = true;
     trackViewPromotion({
-      promotionId: INDEPENDENCE_OFFER.campaignId,
+      promotionId: SITE_OFFER.campaignId,
       promotionName: PROMO_NAME,
       creativeSlot: CREATIVE_SLOT,
     });
@@ -258,15 +254,16 @@ const IndependenceDayPopup = memo(() => {
     if (viewRef.current === 'success') return;
     setOfferState(markDismissed());
     track('promo_popup_dismissed', {
-      promotion_id: INDEPENDENCE_OFFER.campaignId,
+      promotion_id: SITE_OFFER.campaignId,
       promotion_name: PROMO_NAME,
       dismiss_method: reason,
     });
   }, []);
 
   /* -- modal plumbing: scroll lock, Escape, focus trap, focus restore ------ */
+  const isVisible = isOpen && canShow;
   useEffect(() => {
-    if (!isOpen) return undefined;
+    if (!isVisible) return undefined;
 
     lastFocusedRef.current = document.activeElement;
     const previousOverflow = document.body.style.overflow;
@@ -309,7 +306,7 @@ const IndependenceDayPopup = memo(() => {
       document.body.style.overflow = previousOverflow;
       lastFocusedRef.current?.focus?.();
     };
-  }, [isOpen, closePopup]);
+  }, [isVisible, closePopup]);
 
   const validate = () => {
     const next = {};
@@ -334,7 +331,7 @@ const IndependenceDayPopup = memo(() => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mobile,
-          campaign: INDEPENDENCE_OFFER.campaignId,
+          campaign: SITE_OFFER.campaignId,
           source,
           pagePath: location.pathname,
           isInAppBrowser: isInAppBrowser(),
@@ -414,10 +411,10 @@ const IndependenceDayPopup = memo(() => {
 
     setCopied(true);
     trackSelectPromotion({
-      promotionId: INDEPENDENCE_OFFER.campaignId,
+      promotionId: SITE_OFFER.campaignId,
       promotionName: PROMO_NAME,
       creativeSlot: CREATIVE_SLOT,
-      ctaText: 'Copy code',
+      ctaText: 'Copy code & continue shopping',
     });
 
     // Let the confirmation land before the sheet goes — closing on the same
@@ -435,7 +432,7 @@ const IndependenceDayPopup = memo(() => {
     setView(offerState?.status === 'claimed' ? 'success' : 'form');
     setIsOpen(true);
     track('promo_popup_reopened', {
-      promotion_id: INDEPENDENCE_OFFER.campaignId,
+      promotion_id: SITE_OFFER.campaignId,
       promotion_name: PROMO_NAME,
       state: offerState?.status || 'new',
     });
@@ -444,7 +441,7 @@ const IndependenceDayPopup = memo(() => {
   // `available` is false when the coupon is switched off, expired or has used
   // up its global cap — better to show nothing than to hand out a code that
   // checkout will refuse.
-  if (!offerLive || suppressed || campaign.available === false) return null;
+  if (!canShow) return null;
 
   const hasClaimed = offerState?.status === 'claimed';
 
@@ -471,16 +468,16 @@ const IndependenceDayPopup = memo(() => {
           className="un-offer-pill fixed bottom-24 left-4 z-[9998] flex items-center gap-2 rounded-full border border-paper/25 bg-ink/95 py-2.5 pl-2.5 pr-4 shadow-[0_8px_30px_rgba(0,0,0,0.35)] backdrop-blur-md transition-transform hover:scale-105 active:scale-95 sm:bottom-6"
           aria-label={
             hasClaimed
-              ? `Your Independence Day code is ${claimedCode}. Reopen offer.`
-              : `Claim ${amount} off for Independence Day`
+              ? `Your discount code is ${claimedCode}. Reopen offer.`
+              : `Claim ${amount} off your order`
           }
         >
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-[#FF9933] to-[#138808]">
-            <AshokaChakra className="h-4 w-4 text-white" />
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand text-white">
+            <i className="fa-solid fa-ticket text-[11px]" />
           </span>
           <span className="text-left leading-tight">
             <span className="block text-[7px] font-bold uppercase tracking-[0.18em] text-paper/50">
-              {hasClaimed ? 'Your code' : 'Freedom Sale'}
+              {hasClaimed ? 'Your code' : 'Special offer'}
             </span>
             <span className="block text-[11px] font-bold tracking-wide text-paper">
               {hasClaimed ? claimedCode : `Get ${amount} OFF`}
@@ -510,7 +507,7 @@ const IndependenceDayPopup = memo(() => {
           tabIndex={-1}
           className="un-offer-sheet relative flex w-full max-w-[420px] flex-col overflow-hidden rounded-[1.75rem] border border-paper/15 bg-ink shadow-[0_24px_70px_rgba(0,0,0,0.55)] outline-none"
         >
-          <TricolourBar />
+          <AccentBar />
 
           <button
             type="button"
@@ -528,33 +525,36 @@ const IndependenceDayPopup = memo(() => {
                 <div className="text-center">
                   {/* Capped width so this row can never run under the close
                       button on narrow phones — it wraps instead of colliding. */}
-                  <div className="mx-auto mb-3 flex max-w-[78%] flex-wrap items-center justify-center gap-2">
-                    <span className="h-px w-5 bg-paper/30" />
-                    <AshokaChakra className="un-offer-chakra h-4 w-4 text-paper/70" />
-                    <span className="text-[9px] font-bold uppercase tracking-[0.22em] text-paper/70">
-                      Independence Day Special
+                  <div className="mx-auto mb-4 flex max-w-[78%] items-center justify-center gap-2.5">
+                    <span className="h-px w-6 bg-paper/25" />
+                    <span className="text-[9px] font-bold uppercase tracking-[0.24em] text-paper/60">
+                      Welcome to Urban Nook
                     </span>
-                    <span className="h-px w-5 bg-paper/30" />
+                    <span className="h-px w-6 bg-paper/25" />
                   </div>
 
-                  <h2 id="un-offer-title" className="font-serif text-[22px] leading-tight text-white">
-                    Celebrate freedom with
+                  <h2 id="un-offer-title" className="font-serif text-[20px] leading-tight text-white/90">
+                    Your welcome gift is here
                   </h2>
-                  <p className="un-offer-gradient font-serif text-[46px] font-bold leading-none">
+                  <p className="un-offer-gradient mt-2 font-serif text-[56px] font-bold leading-none tracking-tight">
                     {amount} OFF
                   </p>
                   {/* The qualifying condition sits with the headline, not buried
                       in fine print — someone gives up their number on the
                       strength of this claim. */}
-                  <p className="mt-1.5 text-[11px] font-medium tracking-wide text-paper/70">
+                  <p className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-paper/15 bg-white/5 px-3 py-1 text-[11px] font-medium tracking-wide text-paper/80">
+                    <i className="fa-solid fa-bag-shopping text-[9px] text-paper/50" />
                     {condition}
-                  </p>
-                  <p id="un-offer-subtitle" className="mt-1.5 text-[13px] text-white/60">
-                    Enter your number to unlock it instantly.
                   </p>
                 </div>
 
-                <div className="my-4">
+                <TicketDivider />
+
+                <p id="un-offer-subtitle" className="-mt-1 mb-4 text-center text-[13px] text-white/55">
+                  Enter your number and we&apos;ll unlock it instantly.
+                </p>
+
+                <div className="mb-4 empty:hidden">
                   <OfferCountdown />
                 </div>
 
@@ -609,11 +609,11 @@ const IndependenceDayPopup = memo(() => {
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="mt-1 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-paper text-xs font-bold uppercase tracking-[0.15em] text-ink transition-all hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                    className="mt-1 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-brand text-xs font-bold uppercase tracking-[0.15em] text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)] transition-all hover:bg-brandHi active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isSubmitting ? (
                       <>
-                        <span className="un-offer-spinner h-3.5 w-3.5 rounded-full border-2 border-ink/25 border-t-ink" />
+                        <span className="un-offer-spinner h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white" />
                         Unlocking…
                       </>
                     ) : (
@@ -626,29 +626,27 @@ const IndependenceDayPopup = memo(() => {
                     onClick={() => closePopup('maybe_later')}
                     className="w-full py-1 text-[11px] text-white/40 underline-offset-4 transition-colors hover:text-white/70 hover:underline"
                   >
-                    No thanks, I&apos;ll pay full price
+                    Maybe later
                   </button>
                 </form>
               </>
             ) : (
               /* ---- Success ---- */
               <div className="py-1 text-center">
-                <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[#FF9933] via-white to-[#138808]">
-                  <span className="flex h-[52px] w-[52px] items-center justify-center rounded-full bg-ink">
-                    <i className="fa-solid fa-check text-lg text-paper" />
-                  </span>
+                <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-brand/15 ring-1 ring-brand/40">
+                  <i className="fa-solid fa-check text-lg text-paper" />
                 </div>
 
                 <h2 id="un-offer-title" className="font-serif text-[22px] leading-tight text-white">
                   Your {amount} off is ready
                 </h2>
                 <p id="un-offer-subtitle" className="mt-2 text-[13px] text-white/55">
-                  Apply it at checkout {condition}.
+                  Saved to this device. We&apos;ll apply it for you at checkout {condition}.
                 </p>
 
-                {/* Presented as display type, not a field — this is something to
-                    read and keep, and a bordered box reads as "type here". */}
-                <div className="mt-4">
+                {/* Presented as a ticket stub, not a field — this is something to
+                    read and keep, and a plain bordered box reads as "type here". */}
+                <div className="mt-5 rounded-2xl border border-dashed border-paper/25 bg-white/[0.04] px-4 py-4">
                   <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-paper/40">
                     Your code
                   </p>
@@ -657,17 +655,17 @@ const IndependenceDayPopup = memo(() => {
                   </p>
                 </div>
 
-                <div className="my-4">
+                <div className="my-4 empty:hidden">
                   <OfferCountdown />
                 </div>
 
                 <button
                   type="button"
                   onClick={handleCopyAndClose}
-                  className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-paper text-xs font-bold uppercase tracking-[0.15em] text-ink transition-all hover:bg-white"
+                  className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-brand text-xs font-bold uppercase tracking-[0.15em] text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)] transition-all hover:bg-brandHi active:scale-[0.99]"
                 >
                   <i className={`fa-solid ${copied ? 'fa-check' : 'fa-copy'} text-sm`} />
-                  {copied ? 'Copied' : 'Copy code'}
+                  {copied ? 'Saved · Happy shopping' : 'Copy code & continue shopping'}
                 </button>
 
                 {/* Announced politely so the confirmation reaches a screen reader
@@ -696,6 +694,6 @@ const IndependenceDayPopup = memo(() => {
   );
 });
 
-IndependenceDayPopup.displayName = 'IndependenceDayPopup';
+SiteOfferPopup.displayName = 'SiteOfferPopup';
 
-export default IndependenceDayPopup;
+export default SiteOfferPopup;

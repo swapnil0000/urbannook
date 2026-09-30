@@ -1,36 +1,33 @@
 /**
- * Independence Day offer — campaign config + the small amount of state the
- * popup has to remember between visits.
+ * Site-wide offer popup ("₹100 off above ₹1,500") — campaign config plus the
+ * small amount of state the popup remembers between visits.
  *
- * Mirrors server/src/config/independenceOffer.config.js. The server is the
- * authority on the actual coupon terms (it reads the live coupon document and
- * returns them on claim); the values here are what we render *before* the
- * visitor submits, so keep the code and percentage in sync with the server.
+ * Mirrors server/src/config/siteOffer.config.js. The server is the authority on
+ * the actual coupon terms (GET /offer/campaign reads the live coupon document);
+ * the values here only render until that answers, or if it fails.
  */
 import { captureAttribution } from '../utils/analytics';
 import { getApiUrl } from './appUrls';
 
 const env = import.meta.env;
 
-export const INDEPENDENCE_OFFER = {
-  campaignId: 'INDEPENDENCE_DAY_2026',
+export const SITE_OFFER = {
+  campaignId: (env.VITE_OFFER_CAMPAIGN_ID || 'SITE_OFFER_100').toUpperCase(),
 
-  // LAST-RESORT FALLBACKS ONLY. The live terms come from GET /offer/campaign,
-  // which reads the coupon document, so renaming or re-pricing the coupon in
-  // the admin panel reflects here without a rebuild. These values are used only
-  // if that request fails. Do not treat them as the source of truth.
-  code: (env.VITE_INDEPENDENCE_COUPON_CODE || 'UNFREEDOM80').toUpperCase(),
+  // LAST-RESORT FALLBACKS ONLY — the live terms come from GET /offer/campaign.
+  code: (env.VITE_OFFER_COUPON_CODE || 'UNSAVE100').toUpperCase(),
   discountType: 'FLAT',
-  discountValue: 80,
+  discountValue: 100,
   maxDiscount: null,
-  minCartValue: 499,
-  startsAt: env.VITE_INDEPENDENCE_STARTS_AT || '2026-08-14T00:00:00+05:30',
+  minCartValue: 1500,
 
-  endsAt: env.VITE_INDEPENDENCE_ENDS_AT || '2026-08-15T23:59:59+05:30',
+  // Both optional. Unset = always on; the coupon's own validity (and
+  // `available` from the server) still decides whether it is shown.
+  startsAt: env.VITE_OFFER_STARTS_AT || null,
+  endsAt: env.VITE_OFFER_ENDS_AT || null,
 
   openDelayMs: 2500,
 };
-
 
 const SUPPRESSED_PREFIXES = [
   '/checkout',
@@ -53,11 +50,11 @@ export function isSuppressedPath(pathname = '') {
  * ------------------------------------------------------------------------ */
 
 const CONFIG_FALLBACK = {
-  couponCode: INDEPENDENCE_OFFER.code,
-  discountType: INDEPENDENCE_OFFER.discountType,
-  discountValue: INDEPENDENCE_OFFER.discountValue,
-  maxDiscount: INDEPENDENCE_OFFER.maxDiscount,
-  minCartValue: INDEPENDENCE_OFFER.minCartValue,
+  couponCode: SITE_OFFER.code,
+  discountType: SITE_OFFER.discountType,
+  discountValue: SITE_OFFER.discountValue,
+  maxDiscount: SITE_OFFER.maxDiscount,
+  minCartValue: SITE_OFFER.minCartValue,
   // Unknown rather than false: a failed request must not silently hide a live
   // offer, so we let the campaign dates decide instead.
   available: true,
@@ -99,14 +96,14 @@ export { CONFIG_FALLBACK };
  * ------------------------------------------------------------------------ */
 
 /** "₹100" or "10" + "%" — the bare amount, for sentences. */
-export function offerAmountLabel(offer = INDEPENDENCE_OFFER) {
+export function offerAmountLabel(offer = SITE_OFFER) {
   return offer.discountType === 'FLAT'
     ? `₹${offer.discountValue}`
     : `${offer.discountValue}%`;
 }
 
 /** The material condition attached to the offer, or the absence of one. */
-export function offerConditionLabel(offer = INDEPENDENCE_OFFER) {
+export function offerConditionLabel(offer = SITE_OFFER) {
   if (offer.minCartValue > 0) {
     return `on orders above ₹${Number(offer.minCartValue).toLocaleString('en-IN')}`;
   }
@@ -117,7 +114,8 @@ export function offerConditionLabel(offer = INDEPENDENCE_OFFER) {
  * Persisted state
  * ------------------------------------------------------------------------ */
 
-const STORAGE_KEY = 'un_independence_offer_v1';
+// New key on purpose: an Independence Day dismissal must not hide this offer.
+const STORAGE_KEY = 'un_site_offer_v1';
 
 // In-app browsers and private mode can throw on localStorage access. Falling
 // back to module memory keeps behaviour sane for the rest of the session
@@ -159,6 +157,12 @@ export const markClaimed = (code, mobile) =>
     at: new Date().toISOString(),
   });
 
+/** The code this visitor claimed from the popup, or '' if none. */
+export function getClaimedCode() {
+  const state = readOfferState();
+  return state?.status === 'claimed' && state.code ? String(state.code).toUpperCase() : '';
+}
+
 /**
  * The mobile number the visitor gave the popup, for prefilling checkout.
  * Re-validated on read: storage is user-editable and this feeds an order.
@@ -175,9 +179,9 @@ export function getClaimedMobile() {
  * ------------------------------------------------------------------------ */
 
 export function isOfferLive(now = new Date()) {
-  const start = new Date(INDEPENDENCE_OFFER.startsAt);
-  const end = new Date(INDEPENDENCE_OFFER.endsAt);
-  return now >= start && now <= end;
+  if (SITE_OFFER.startsAt && now < new Date(SITE_OFFER.startsAt)) return false;
+  if (SITE_OFFER.endsAt && now > new Date(SITE_OFFER.endsAt)) return false;
+  return true;
 }
 
 /* ---------------------------------------------------------------------------

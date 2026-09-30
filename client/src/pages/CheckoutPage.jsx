@@ -29,8 +29,8 @@ import config from "../config/env";
 import CouponInput from "../component/CouponInput";
 import FreeShippingBanner from "../component/FreeShippingBanner";
 import { ComponentLoader } from "../component/layout/LoadingSpinner";
-import { getClaimedMobile, isOfferLive } from "../config/independenceOffer";
-import IndependenceOfferBanner from "../component/IndependenceOfferBanner";
+import { getClaimedMobile, getClaimedCode, isOfferLive } from "../config/siteOffer";
+import SiteOfferBanner from "../component/SiteOfferBanner";
 import useOfferTerms from "../hooks/useOfferTerms";
 import { useShippingDelayNotice } from "../hooks/useShippingDelayNotice";
 import { calcLocalDiscount } from "../utils/couponDiscount";
@@ -498,7 +498,7 @@ const CheckoutPage = () => {
   const [isApplyingOffer, setIsApplyingOffer] = useState(false);
   // Live campaign terms, so the block's own numbers and this page's discount
   // maths come from the same source as the coupon the server will validate.
-  const { terms: offerTerms } = useOfferTerms();
+  const { terms: offerTerms, loaded: offerTermsLoaded } = useOfferTerms();
   const [showMobileModal, setShowMobileModal] = useState(false);
 
   const [guestName, setGuestName] = useState(savedCheckout.current.guestName || "");
@@ -1274,6 +1274,48 @@ const CheckoutPage = () => {
     }
   };
 
+  // ── Popup offer: apply the claimed code for them ─────────────────────────
+  // Someone who claimed the code in the popup should not have to find and type
+  // it again. Runs on every step (not just Review) so the express/Magic order,
+  // which is built before Review, carries the discount too. Once per session:
+  // if they remove it, it stays removed.
+  const OFFER_AUTO_KEY = "un_offer_autoapplied";
+  useEffect(() => {
+    if (!offerTermsLoaded || appliedCoupon || isApplyingOffer || paymentCompletedRef.current) return;
+    if (!cartItems.length || !isOfferLive() || offerTerms.available === false) return;
+    if (!getClaimedCode()) return;
+    if (!isGuest && profileLoading) return;
+    try { if (sessionStorage.getItem(OFFER_AUTO_KEY)) return; } catch { /* ignore */ }
+    // Below the minimum there is nothing to apply yet; try again when the cart grows
+    if (cartTotalAmount < (offerTerms.minCartValue || 0)) return;
+    try { sessionStorage.setItem(OFFER_AUTO_KEY, "1"); } catch { /* ignore */ }
+    // The live code, not the stored one: the admin may have renamed it since
+    handleApplyOfferCode(offerTerms.couponCode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offerTermsLoaded, appliedCoupon, cartTotalAmount, cartItems.length, isGuest, profileLoading, offerTerms]);
+
+  // Guests' discounts are worked out on this page, so a cart that shrinks below
+  // the minimum would keep showing a discount the server then refuses — and the
+  // order would fail at "Pay". Keep the offer code honest as the cart changes.
+  useEffect(() => {
+    if (!isGuest || !appliedCoupon || appliedCoupon !== offerTerms.couponCode) return;
+    const minCart = offerTerms.minCartValue || 0;
+    const discount = cartTotalAmount >= minCart ? calcLocalDiscount(offerTerms, cartTotalAmount) : 0;
+    if (discount > 0) {
+      setPricingDetails((prev) => (prev.discount === discount ? prev : { ...prev, discount }));
+      return;
+    }
+    setAppliedCoupon(null);
+    setPricingDetails((prev) => ({ ...prev, discount: 0 }));
+    // Let it re-apply automatically once they are back over the minimum
+    try { sessionStorage.removeItem(OFFER_AUTO_KEY); } catch { /* ignore */ }
+    showNotification(
+      `${appliedCoupon} removed — add ₹${Math.max(0, minCart - cartTotalAmount).toLocaleString()} more to use it (min order ₹${minCart.toLocaleString()})`,
+      "error",
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGuest, appliedCoupon, cartTotalAmount, offerTerms]);
+
   const handleCouponRemoved = async () => {
     try {
       const r = await applyCouponMutation({ couponCode: null, email: userEmail }).unwrap();
@@ -1922,14 +1964,14 @@ const CheckoutPage = () => {
         </div>
       )}
 
-      {/* ── Independence Day offer ─────────────────────────────────────────
+      {/* ── Site offer ──────────────────────────────────────────────────────
           Review & Pay only. Account, Contact and Address are all the same
           /checkout route, so without the step check this rode along on every
           one of them — and a coupon is noise until there is a total to apply it
           to. Also takes itself away when the campaign window closes. */}
       {isOfferLive() && currentStep === reviewStep && (
         <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-6">
-          <IndependenceOfferBanner
+          <SiteOfferBanner
             cartTotal={cartTotalAmount}
             appliedCoupon={appliedCoupon}
             isApplying={isApplyingOffer}
