@@ -167,6 +167,7 @@ const GOOGLE_HEADER = [
   "additional_image_link",
   "availability",
   "price",
+  "sale_price",
   "condition",
   "brand",
   "identifier_exists",
@@ -174,15 +175,30 @@ const GOOGLE_HEADER = [
   "product_type",
 ];
 
+// "Anime Wooden Katana" + "Tanjiro Wooden Katana" → "Tanjiro Wooden Katana": when the
+// variant name is already a full product name (shares a real word with the parent),
+// use it alone; otherwise append it ("Brake Caliper Lamp - BMW").
+const STOP = new Set(["anime", "premium", "collection", "the", "and", "with", "for"]);
+const stems = (str) =>
+  str.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4 && !STOP.has(w)).map((w) => w.slice(0, 5));
+const googleTitle = (productName, vName) => {
+  if (!vName || productName.includes(vName)) return productName;
+  const parent = new Set(stems(productName));
+  const standalone = stems(vName).some((w) => parent.has(w));
+  return (standalone ? vName : `${productName} - ${vName}`).slice(0, 150);
+};
+
 const variantInStock = (p, v) =>
   p.productStatus === "in_stock" &&
   !v.variantOutOfStock &&
   !(v.variantQuantity != null && Number(v.variantQuantity) <= 0);
 
 const googleProductFeed = asyncHandler(async (req, res) => {
-  const products = await Product.find({ isPublished: true, isAddon: { $ne: true } }).select(
-    "productId productName productDes productStatus productCategory productSubCategory variantDetails"
-  );
+  // .lean(): variantMrp / variantDes are written by the admin panel but not declared
+  // in this repo's schema, so a hydrated document would silently drop them.
+  const products = await Product.find({ isPublished: true, isAddon: { $ne: true } })
+    .select("productId productName productDes productStatus productCategory productSubCategory variantDetails")
+    .lean();
 
   const rows = [GOOGLE_HEADER.join("\t")];
   let skipped = 0;
@@ -212,6 +228,12 @@ const googleProductFeed = asyncHandler(async (req, res) => {
       }
 
       const sku = (v.sku || "").trim();
+      // Admin MRP → Google shows the strike-through price + "Sale" badge. Only when it's
+      // a real markdown (MRP above the selling price); otherwise send the plain price.
+      const mrp = Number(v.variantMrp) > price ? Number(v.variantMrp) : null;
+      // Variant copy first (admin variantDes), then the shared product description.
+      const variantDes = plain(v.variantDes);
+      const itemDescription = variantDes && variantDes !== description ? `${variantDes} ${description}` : description;
       const vName =
         v.variantName && !/^(n\/a|default)$/i.test(v.variantName.trim())
           ? plain(v.variantName)
@@ -220,13 +242,14 @@ const googleProductFeed = asyncHandler(async (req, res) => {
       rows.push(
         [
           sku || `${p.productId}_${i + 1}`,
-          vName && !productName.includes(vName) ? `${productName} - ${vName}` : productName,
-          description,
+          googleTitle(productName, vName),
+          itemDescription.slice(0, 5000),
           sku ? `${DOMAIN}/product/${p.productId}/${sku}` : `${DOMAIN}/product/${p.productId}`,
           image,
           images.slice(1, 11).join(","),
           variantInStock(p, v) ? "in_stock" : "out_of_stock",
-          `${price} ${CURRENCY}`,
+          `${mrp || price} ${CURRENCY}`,
+          mrp ? `${price} ${CURRENCY}` : "",
           "new",
           GOOGLE_BRAND,
           "no",

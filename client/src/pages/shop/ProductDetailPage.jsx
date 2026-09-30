@@ -171,7 +171,10 @@ const ProductDetailPage = () => {
     const list = [
       { q: 'How long does delivery take?', a: 'Every piece is 3D-printed to order and ships pan-India within 24-48 hours, with tracking.' },
     ];
-    if (isLamp) list.push({ q: 'How is it powered?', a: 'It runs on a USB adapter (included) — just plug in and switch it on. No batteries required.' });
+    // Answer from the admin "Power Source" spec when set — never guess (not every lamp is USB).
+    const powerSpec = [...(product.specifications || []), ...((product.variantDetails || []).flatMap((v) => v.specifications || []))]
+      .find((sp) => /power/i.test(sp?.key || '') && sp?.value);
+    if (powerSpec) list.push({ q: 'How is it powered?', a: `${powerSpec.value}. Just plug in and switch it on.` });
     list.push({ q: 'What is it made of?', a: `Precision 3D-printed with a durable build and a hand-finished ${isLamp ? 'glossy resin' : 'premium'} coat, so no two are exactly alike.` });
     list.push({
       q: product.isCodAvailable ? 'Is Cash on Delivery available?' : 'What payment methods do you accept?',
@@ -191,12 +194,19 @@ const ProductDetailPage = () => {
     return (sel && sel.variantPrice) || product.variantDetails[0].variantPrice || 0;
   }, [product, selectedVariant]);
 
+  // Strike-through price = the selected variant's MRP set in the admin panel
+  // (variantMrp). Products without an MRP keep the old behaviour (highest variant
+  // price) so nothing changes for them until an MRP is entered.
   const { maxVariantPrice, discountPercent } = useMemo(() => {
     if (!product?.variantDetails?.length) return { maxVariantPrice: 0, discountPercent: 0 };
-    const maxPrice = Math.max(...product.variantDetails.map((v) => v.variantPrice || 0));
-    const discount = maxPrice > currentPrice ? Math.round(((maxPrice - currentPrice) / maxPrice) * 100) : 0;
-    return { maxVariantPrice: maxPrice, discountPercent: discount };
-  }, [product, currentPrice]);
+    const sel = product.variantDetails.find((v) => v.variantName === selectedVariant);
+    const hasAnyMrp = product.variantDetails.some((v) => Number(v.variantMrp) > 0);
+    const compareAt = hasAnyMrp
+      ? Number(sel?.variantMrp) || 0
+      : Math.max(...product.variantDetails.map((v) => v.variantPrice || 0));
+    const discount = compareAt > currentPrice ? Math.round(((compareAt - currentPrice) / compareAt) * 100) : 0;
+    return { maxVariantPrice: compareAt, discountPercent: discount };
+  }, [product, currentPrice, selectedVariant]);
 
   const availableVariants = useMemo(() => (product?.variantDetails ? product.variantDetails.map((v) => v.variantName) : []), [product]);
 
@@ -255,6 +265,12 @@ const ProductDetailPage = () => {
   // Admin-set, per-variant sub tag (e.g. "BMW Inspired, 104cm") shown as a
   // small line under the main product title — blank when the selected
   // variant has none set.
+  // Admin-set, per-variant description (variantDes) — falls back to the product copy.
+  const selectedVariantDes = useMemo(() => {
+    const d = product?.variantDetails?.find((v) => v.variantName === selectedVariant)?.variantDes;
+    return (d && d.trim()) || '';
+  }, [product, selectedVariant]);
+
   const selectedVariantSubTag = useMemo(() => {
     if (!product) return '';
     const selectedDetail = product.variantDetails?.find((v) => v.variantName === selectedVariant);
@@ -554,16 +570,66 @@ const ProductDetailPage = () => {
     </div>
   );
 
-  const specs = product.specifications || [];
+  // Specifications: selected variant's specs first (they override product specs with
+  // the same key), then product specs, then dimensions/weight when not already listed.
+  const selDetail = product.variantDetails?.find((v) => v.variantName === selectedVariant);
+  const specs = (() => {
+    const out = [];
+    const seen = new Set();
+    const add = (key, value) => {
+      const k = String(key || '').trim();
+      const val = String(value ?? '').trim();
+      if (!k || !val || seen.has(k.toLowerCase())) return;
+      seen.add(k.toLowerCase());
+      out.push({ key: k, value: val });
+    };
+    (selDetail?.specifications || []).forEach((sp) => add(sp.key, sp.value));
+    (product.specifications || []).forEach((sp) => add(sp.key, sp.value));
+    const d = selDetail?.dimensions?.length ? selDetail.dimensions : product.dimensions;
+    if (d && (d.length || d.breadth || d.height)) add('Dimensions', `${[d.length, d.breadth, d.height].map((n) => n || '–').join(' × ')} cm (L × W × H)`);
+    if (product.weight) add('Weight', /[a-z]/i.test(product.weight) ? product.weight : `${product.weight} g`);
+    return out;
+  })();
+  const pageDescription = selectedVariantDes || product.productSubDes || product.productDes;
+  // One ProductGroup, same shape and @id as the prerendered JSON-LD
+  // (client/scripts/prerender.mjs), so crawlers don't see two conflicting products.
+  const productUrl = `https://www.urbannook.in/product/${product.productId}`;
   const structuredData = {
-    '@context': 'https://schema.org', '@type': 'Product', name: product.productName, image: galleryImages, description: product.productSubDes || product.productDes, sku: product.productId,
+    '@context': 'https://schema.org',
+    '@type': 'ProductGroup',
+    '@id': `${productUrl}#product`,
+    name: product.productName,
+    url: productUrl,
+    description: product.productSubDes || product.productDes,
     brand: { '@type': 'Brand', name: 'UrbanNook' },
-    offers: { '@type': 'Offer', url: `https://www.urbannook.in/product/${product.productId}`, priceCurrency: 'INR', price: currentPrice, availability: product.productStatus === 'in_stock' ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock' },
+    productGroupID: product.productId,
+    ...(product.materialAndCare ? { material: product.materialAndCare } : {}),
+    ...(totalReviews > 0 && avgRating > 0
+      ? { aggregateRating: { '@type': 'AggregateRating', ratingValue: Number(avgRating).toFixed(1), reviewCount: totalReviews, bestRating: 5, worstRating: 1 } }
+      : {}),
+    hasVariant: (product.variantDetails || []).filter((v) => v.isActive !== false).map((v) => {
+      const price = Number(v.variantPrice) || 0;
+      return {
+        '@type': 'Product',
+        name: v.variantName || product.productName,
+        ...(v.sku ? { sku: v.sku } : {}),
+        ...(v.variantDes ? { description: v.variantDes } : {}),
+        image: v.variantImage?.length ? v.variantImage : galleryImages,
+        offers: {
+          '@type': 'Offer',
+          url: v.sku ? `${productUrl}/${v.sku}` : productUrl,
+          priceCurrency: 'INR',
+          price,
+          availability: product.productStatus === 'in_stock' && !isVariantOutOfStock(v) ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+          itemCondition: 'https://schema.org/NewCondition',
+        },
+      };
+    }),
   };
 
   return (
     <div className="font-inter bg-paper text-ink min-h-screen overflow-x-clip">
-      <SEOHead title={product.productName} description={product.productSubDes || product.productDes} url={`/product/${product.productId}`} image={galleryImages[0]} structuredData={structuredData} />
+      <SEOHead title={selectedVariant && selectedVariant !== 'N/A' ? selectedVariant : product.productName} description={pageDescription} url={`/product/${product.productId}`} image={galleryImages[0]} structuredData={structuredData} />
 
       <div className="max-w-[1280px] mx-auto px-5 py-6 md:py-8">
         {/* breadcrumb */}
@@ -614,7 +680,7 @@ const ProductDetailPage = () => {
                 <button onClick={copyShareLink} aria-label="Copy link" className="w-9 h-9 grid place-items-center rounded-full border border-hair text-ink hover:border-ink hover:bg-surface transition-colors"><i className="fa-solid fa-link text-xs" /></button>
               </div>
             )}
-            {(product.productDes || product.productSubDes) && <p className="text-sm text-muted leading-relaxed mt-2 line-clamp-2">{product.productDes || product.productSubDes}</p>}
+            {(selectedVariantDes || product.productDes || product.productSubDes) && <p className="text-sm text-muted leading-relaxed mt-2 line-clamp-2">{selectedVariantDes || product.productDes || product.productSubDes}</p>}
 
             {/* ZONE B — BUY CARD: price → savings → variants → urgency → CTA → trust, one unit */}
             <div className="mt-5  bg-paper p-4 md:p-5 md:max-w-md">
@@ -815,16 +881,28 @@ const ProductDetailPage = () => {
           <p className="gl-lbl text-brand mb-2 text-center">The full rundown</p>
           <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight mb-6 text-center">Product details</h2>
           <div className="divide-y divide-hair border-y border-hair">
-            {(product.productSubDes || product.productDes) && (
-              <details open className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Description<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary><p className="text-muted mt-3 text-sm leading-relaxed">{product.productSubDes || product.productDes}</p></details>
+            {pageDescription && (
+              <details open className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Description<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary>
+                <p className="text-muted mt-3 text-sm leading-relaxed">{pageDescription}</p>
+                {selectedVariantDes && (product.productSubDes || product.productDes) && selectedVariantDes !== (product.productSubDes || product.productDes) && (
+                  <p className="text-muted mt-3 text-sm leading-relaxed">{product.productSubDes || product.productDes}</p>
+                )}
+              </details>
             )}
             {specs.length > 0 && (
               <details className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Specifications<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary>
                 <div className="mt-3 text-sm">{specs.map((s, i) => <div key={i} className="flex justify-between py-1.5 border-b border-hair last:border-0"><span className="text-muted">{s.key}</span><span className="font-medium text-right">{s.value}</span></div>)}</div>
               </details>
             )}
+            {(product.materialAndCare || product.warranty) && (
+              <details className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Material &amp; Care<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary>
+                {product.materialAndCare && <p className="text-muted mt-3 text-sm leading-relaxed">{product.materialAndCare}</p>}
+                {product.warranty && <p className="text-muted mt-2 text-sm leading-relaxed"><span className="font-semibold text-ink">Warranty:</span> {product.warranty}</p>}
+              </details>
+            )}
             <details className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Shipping &amp; Exchange<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary><p className="text-muted mt-3 text-sm">Made to order, ships pan-India within 24-48 hours. Free replacement if it arrives damaged or wrong .{product.isCodAvailable ? ' Partial COD available.' : ''}</p></details>
           </div>
+          {product.disclaimer && <p className="text-xs text-faint mt-4 text-center leading-relaxed">{product.disclaimer}</p>}
         </section>
         </div>
 

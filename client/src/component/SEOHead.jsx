@@ -16,14 +16,17 @@ const SEOHead = ({
   noIndex = false,
 }) => {
   const fullTitle = title ? `${title} | ${SITE_NAME}` : `${SITE_NAME} — Modern Lifestyle Store`;
-  const canonicalUrl = url ? `${SITE_URL}${url}` : SITE_URL;
+  // Only pages that pass `url` get a canonical. The app-wide <SEOHead> in App.jsx has
+  // no url; emitting SITE_URL there added a second, conflicting canonical ("/") to
+  // every page, telling Google each product was a duplicate of the homepage.
+  const canonicalUrl = url ? `${SITE_URL}${url}` : null;
 
   return (
     <Helmet>
       {/* Primary */}
       <title>{fullTitle}</title>
       <meta name="description" content={description} />
-      <link rel="canonical" href={canonicalUrl} />
+      {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
       {noIndex && <meta name="robots" content="noindex, nofollow" />}
 
       {/* Open Graph */}
@@ -31,7 +34,7 @@ const SEOHead = ({
       <meta property="og:title" content={fullTitle} />
       <meta property="og:description" content={description} />
       <meta property="og:image" content={image} />
-      <meta property="og:url" content={canonicalUrl} />
+      {canonicalUrl && <meta property="og:url" content={canonicalUrl} />}
       <meta property="og:site_name" content={SITE_NAME} />
       <meta property="og:locale" content="en_IN" />
 

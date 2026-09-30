@@ -60,7 +60,8 @@ function groupProducts(rows) {
     byId.get(id).variants.push({
       sku: sku || null,
       title: r.title,
-      price: parseFloat(r.price) || null,
+      // Selling price: sale_price when the feed sends an MRP markdown, else price.
+      price: parseFloat(r.sale_price || r.price) || null,
       inStock: r.availability === 'in_stock',
       images: [r.image_link, ...(r.additional_image_link ? r.additional_image_link.split(',') : [])].filter(Boolean),
     });
@@ -119,13 +120,16 @@ function renderProductHtml(shell, p, variant) {
   const v = variant || p.variants.find((x) => x.inStock) || p.variants[0];
   const heading = variant ? v.title : p.name;
   const prices = p.variants.map((x) => x.price).filter(Boolean);
-  const from = Math.min(...prices);
+  const from = prices.length ? Math.min(...prices) : null; // never "from ₹Infinity"
   // Keep the "Buy Online in India" hook only when it fits in ~60 chars; otherwise
   // the product name alone (long variant names would otherwise end in "–…").
   const room = 60 - ` | ${BRAND}`.length;
   const withHook = `${heading} – Buy Online in India`;
   const title = `${withHook.length <= room ? withHook : clip(heading, room)} | ${BRAND}`;
-  const desc = clip(`${heading} from ₹${v.price || from}. ${p.description} Cash on delivery available, shipped pan-India.`, 155);
+  const priceText = v.price || from ? ` from ₹${v.price || from}` : '';
+  // Variant pages lead with that variant's own admin copy (variantDes).
+  const blurb = (variant && v.ownDescription) || p.description;
+  const desc = clip(`${heading}${priceText}. ${blurb} Cash on delivery available, shipped pan-India.`, 155);
   const image = v.images[0] || `${SITE}/assets/logo_with_text.webp`;
 
   const head = [
@@ -156,8 +160,8 @@ function renderProductHtml(shell, p, variant) {
       <h1>${esc(heading)}</h1>
       ${p.category ? `<p>Category: ${esc(p.category)}</p>` : ''}
       <img src="${esc(image)}" alt="${esc(heading)}" width="600" height="600" />
-      <p>Price: ₹${v.price || from} · ${v.inStock ? 'In stock' : 'Out of stock'} · Cash on delivery · Pan-India delivery</p>
-      <p>${esc(p.description)}</p>
+      <p>Price: ₹${v.price || from || ''} · ${v.inStock ? 'In stock' : 'Out of stock'} · Cash on delivery · Pan-India delivery</p>
+      <p>${esc((variant && v.ownDescription) || p.description)}</p>
       ${variantLinks}
     </main>`;
 
@@ -194,7 +198,7 @@ function llmsTxt(products) {
   }
   const sections = [...byCat].map(([c, ps]) => `## ${c}\n${ps.map((p) => {
     const prices = p.variants.map((v) => v.price).filter(Boolean);
-    return `- [${p.name}](${SITE}/product/${p.id}): from ₹${Math.min(...prices)}`;
+    return `- [${p.name}](${SITE}/product/${p.id})${prices.length ? `: from ₹${Math.min(...prices)}` : ''}`;
   }).join('\n')}`);
   return `# ${BRAND}
 
@@ -212,6 +216,34 @@ ${sections.join('\n\n')}
 `;
 }
 
+/**
+ * Real product name + copy from the product API. Feed titles can't be relied on for the
+ * name (variant titles may be standalone, e.g. "Tanjiro Wooden Katana"), and the feed's
+ * description is "<variant copy> <product copy>". Best effort: on any failure the
+ * feed-derived values stay.
+ */
+async function enrichFromApi(api, products) {
+  const plain = (t) => String(t || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  await Promise.all(products.map(async (p) => {
+    try {
+      const r = await fetch(`${api}/product/${encodeURIComponent(p.id)}`, { signal: AbortSignal.timeout(10000) });
+      if (!r.ok) return;
+      const d = (await r.json())?.data;
+      if (!d) return;
+      if (d.productName) p.name = plain(d.productName);
+      const copy = plain(d.productSubDes) || plain(d.productDes);
+      if (copy) p.description = copy;
+      for (const v of p.variants) {
+        const src = (d.variantDetails || []).find((x) => x.sku && x.sku === v.sku);
+        // Admin variant names are already full names ("BMW Brake Caliper Lamp").
+        if (src?.variantName && !/^(n\/a|default)$/i.test(src.variantName.trim())) v.title = plain(src.variantName);
+        const own = plain(src?.variantDes);
+        if (own) v.ownDescription = own;
+      }
+    } catch { /* keep feed-derived values */ }
+  }));
+}
+
 async function main() {
   const env = loadEnv(process.env.MODE || 'production', ROOT, 'VITE_');
   const api = (process.env.VITE_API_BASE_URL || env.VITE_API_BASE_URL || '').replace(/\/$/, '');
@@ -224,6 +256,7 @@ async function main() {
     const res = await fetch(`${api}/catalog/google-feed.tsv`, { signal: AbortSignal.timeout(20000) });
     if (!res.ok) throw new Error(`feed HTTP ${res.status}`);
     products = groupProducts(parseTsv(await res.text()));
+    await enrichFromApi(api, products);
   } catch (err) {
     console.warn(`[prerender] product feed unavailable (${err.message}) — writing sitemap/llms.txt without products`);
   }
