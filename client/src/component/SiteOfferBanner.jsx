@@ -1,35 +1,13 @@
-import { isOfferLive, offerAmountLabel, offerConditionLabel } from '../config/independenceOffer';
+import { isOfferLive, offerAmountLabel, offerConditionLabel } from '../config/siteOffer';
 import useOfferTerms from '../hooks/useOfferTerms';
 
 /**
- * Independence Day offer strip for the checkout promo area — the thing that
- * tells a shopper at checkout that a sale is on and which code to use.
- *
- * Checkout is a light surface, so this deliberately does not reuse the popup's
- * dark palette, only its tricolour language, so the two still read as one
- * campaign. It disappears on its own when the campaign window closes.
+ * Site offer strip for checkout — tells a shopper which code to use and applies
+ * it in one tap. Checkout is a light surface, so this uses the light palette
+ * with the popup's brand accent, so the two still read as one offer.
  */
 
-const Chakra = ({ className = '' }) => (
-  <svg viewBox="0 0 48 48" className={className} aria-hidden="true" focusable="false">
-    <circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" strokeWidth="2.5" />
-    <circle cx="24" cy="24" r="4" fill="currentColor" />
-    {Array.from({ length: 12 }, (_, i) => (
-      <line
-        key={i}
-        x1="24"
-        y1="6"
-        x2="24"
-        y2="24"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        transform={`rotate(${i * 30} 24 24)`}
-      />
-    ))}
-  </svg>
-);
-
-const IndependenceOfferBanner = ({
+const SiteOfferBanner = ({
   cartTotal = 0,
   onApply,
   isApplying = false,
@@ -64,18 +42,14 @@ const IndependenceOfferBanner = ({
   const eligible = shortfall === 0 && !isApplied && !otherCouponApplied;
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-brand/30 bg-gradient-to-br from-[#FF9933]/[0.08] via-white to-[#138808]/[0.08]">
-      <div className="flex h-1 w-full" aria-hidden="true">
-        <span className="flex-1 bg-[#FF9933]" />
-        <span className="flex-1 bg-white" />
-        <span className="flex-1 bg-[#138808]" />
-      </div>
+    <div className="relative overflow-hidden rounded-xl border border-brand/25 bg-gradient-to-br from-brand/[0.06] via-white to-white">
+      <div className="h-1 w-full bg-gradient-to-r from-brand via-[#F5DEB3] to-brand" aria-hidden="true" />
 
       <div className="p-4">
         <div className="flex items-center gap-1.5">
-          <Chakra className="h-4 w-4 shrink-0 text-ink/70" />
+          <i className="fa-solid fa-ticket text-[11px] text-brand" />
           <span className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-ink/70">
-            Independence Day Special
+            Your special offer
           </span>
         </div>
 
@@ -133,4 +107,4 @@ const IndependenceOfferBanner = ({
   );
 };
 
-export default IndependenceOfferBanner;
+export default SiteOfferBanner;

@@ -11,12 +11,12 @@
  * Checks the coupon exists, is redeemable, has redemptions left, and that its
  * real terms match what the popup renders before the visitor submits.
  *
- * Run: node scripts/verify-independence-coupon.js   (from the server/ directory)
+ * Run: node scripts/verify-offer-coupon.js   (from the server/ directory)
  */
 import mongoose from "mongoose";
 import env from "../src/config/envConfigSetup.js";
 import Coupon from "../src/model/coupon.model.js";
-import independenceOffer from "../src/config/independenceOffer.config.js";
+import independenceOffer from "../src/config/siteOffer.config.js";
 
 const IST = { timeZone: "Asia/Kolkata" };
 let problems = 0;

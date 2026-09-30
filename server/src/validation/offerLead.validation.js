@@ -31,7 +31,7 @@ const offerClaimSchema = Joi.object({
     }),
 
   // Optional so a second campaign can reuse this endpoint; defaults to the
-  // Independence Day campaign server-side when omitted.
+  // site offer campaign server-side when omitted.
   campaign: Joi.string().trim().uppercase().max(60).optional().allow("", null),
 
   source: Joi.string().trim().max(40).optional().allow("", null),

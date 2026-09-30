@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { CONFIG_FALLBACK, fetchCampaignTerms } from '../config/independenceOffer';
+import { CONFIG_FALLBACK, fetchCampaignTerms } from '../config/siteOffer';
 
 /**
- * The Independence Day offer's live terms, read from the server.
+ * The site offer's live terms, read from the server.
  *
  * Every consumer gets the coupon's current code, amount and minimum straight
  * from the coupon document, so an admin rename or re-price shows up on the next
