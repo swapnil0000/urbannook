@@ -1,6 +1,8 @@
 import { useNavigate } from 'react-router-dom';
 import WishlistButton from './WishlistButton';
+import FitTitle from './FitTitle';
 import { trackSelectItem } from '../utils/analytics';
+import tailwindConfig from '../../tailwind.config.js';
 
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
 const firstVariant = (p) => p?.variantDetails?.[0] || {};
@@ -62,7 +64,7 @@ const UnProductCard = ({
   return (
     <div onClick={go} className="gl-pcard group bg-white rounded-none border border-hair overflow-hidden flex flex-col h-full cursor-pointer">
       <div className="relative aspect-square overflow-hidden bg-surface">
-        {badge && <span className="absolute top-3 left-3 z-10 bg-sale text-white gl-lbl text-[9px] px-2 py-1 rounded-none shadow-sm">{badge}</span>}
+        {badge && <span className="absolute top-2 left-2 z-10 bg-sale text-white gl-lbl text-[7px] px-1.5 py-0.5 rounded-none shadow-sm">{badge}</span>}
         {showWishlist && (
           <div className="absolute top-2.5 right-2.5 z-10" onClick={(e) => e.stopPropagation()}>
             <WishlistButton productId={p.productId} />
@@ -72,20 +74,24 @@ const UnProductCard = ({
         {img2 && <img src={img2} alt="" className="gl-img2 absolute inset-0 w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
       </div>
       <div className="p-3.5 flex flex-col flex-1 min-w-0">
-        {/* Truncated: a long category in uppercase mono with .14em tracking
-            wraps to two lines and shoves the name and price out of alignment
-            across the grid. */}
-        <span className="gl-lbl text-[10px] text-sale block truncate">{p.productCategory || 'Urban Nook'}</span>
-        {/* Explicit colour: the card forces a white background, so leaving the
-            name to inherit means it follows whatever the page sets. */}
-        <p className="font-bold text-sm leading-snug line-clamp-2 min-h-[2.75em] mt-1 text-ink">{p.productName}</p>
-        <div className="mt-auto pt-2 flex items-baseline flex-wrap gap-x-2 gap-y-0.5">
+        <div className="h-5 flex items-center">
+          <FitTitle
+            text={p.productName}
+            capPx={14}
+            floorPx={9}
+            fontFamily={tailwindConfig.theme.extend.fontFamily.inter.join(', ')}
+            className="font-bold text-ink"
+          />
+        </div>
+        {/* Price, then the % off / struck-MRP stack sitting right next to it
+            (gap-1.5, no space-between spread) — smaller text on the stack. */}
+        <div className="mt-auto pt-2 flex items-center gap-1.5">
           <span className="text-[15px] text-ink font-extrabold">{inr(price)}</span>
           {mrp > price && (
-            <>
-              <span className="text-xs text-sale line-through">{inr(mrp)}</span>
-              <span className="gl-lbl text-[9px] text-sale">{Math.round(((mrp - price) / mrp) * 100)}% off</span>
-            </>
+            <div className="flex flex-col leading-tight">
+              <span className="gl-lbl text-[8px] text-sale">{Math.round(((mrp - price) / mrp) * 100)}% off</span>
+              <span className="text-[10px] text-sale line-through">{inr(mrp)}</span>
+            </div>
           )}
         </div>
       </div>

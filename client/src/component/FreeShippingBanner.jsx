@@ -1813,14 +1813,43 @@ const FreeShippingBanner = ({
             <button
               onClick={handleAddToCart}
               disabled={isAdding || isActiveVariantOOS}
-              // Press state instead of the old hover-fill sweep: touch devices
-              // have no hover, so on mobile that green fill simply never
-              // appeared and the tap had no visual feedback at all. `active:`
-              // fires on touch AND on mouse-down, so the press reads the same
-              // everywhere — instant dark-brown fill, no transition delay.
-              className="w-full py-3.5 rounded-full flex items-center justify-center gap-2.5 text-sm font-medium uppercase tracking-wide disabled:opacity-50 bg-paper text-ink active:bg-[#4a2f1b] active:text-paper active:scale-[0.98] transition-[background-color,color,transform] duration-100"
+              // Solid red button (the old bg-paper/border pairing blended
+              // straight into the card's own cream background — the button
+              // was effectively invisible). `group` scopes the wave overlay
+              // below to just this button's own hover. The `active:` state
+              // is kept alongside the hover wave (not replaced by it) —
+              // touch devices have no hover, so mobile still needs its own
+              // instant-feedback fill on tap, per the fix this button
+              // already had.
+              className="group relative w-full py-3.5 rounded-full overflow-hidden flex items-center justify-center gap-2.5 text-sm font-bold uppercase tracking-wide disabled:opacity-50 bg-brand text-white active:bg-brandHi active:scale-[0.98] transition-[transform] duration-100"
             >
-              <span className="flex items-center justify-center gap-2.5">
+              {/* Wavy fill — sits hidden below the button and rises to fill
+                  it on hover (group-hover, Tailwind's translate utilities),
+                  while a separate inner animation drifts the wave shape
+                  sideways in a loop for a "liquid" feel. Two elements
+                  because the rise (Tailwind's transform) and the drift (its
+                  own keyframe, also a transform) would otherwise fight over
+                  the same CSS property on one element. */}
+              <span
+                aria-hidden="true"
+                className="absolute inset-0 overflow-hidden rounded-full pointer-events-none"
+              >
+                <style>{`@keyframes fsbWaveDrift { 0% { transform: translateX(0); } 100% { transform: translateX(-200px); } }`}</style>
+                <span className="absolute inset-x-0 bottom-0 h-full translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out">
+                  <svg
+                    className="absolute bottom-0 left-0 w-[200%] h-full"
+                    viewBox="0 0 400 60"
+                    preserveAspectRatio="none"
+                    style={{ animation: "fsbWaveDrift 2.4s linear infinite" }}
+                  >
+                    <path
+                      d="M0 30 Q50 10 100 30 T200 30 T300 30 T400 30 V60 H0 Z"
+                      fill="rgb(var(--gl-brand-hi))"
+                    />
+                  </svg>
+                </span>
+              </span>
+              <span className="relative z-10 flex items-center justify-center gap-2.5">
                 {isActiveVariantOOS ? (
                   "Out of Stock"
                 ) : isAdding ? (

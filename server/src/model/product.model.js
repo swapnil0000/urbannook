@@ -39,8 +39,36 @@ const productSchema = mongoose.Schema(
         // Manual admin override — force this variant out of stock.
         // Effective OOS = variantOutOfStock || (variantQuantity != null && variantQuantity <= 0).
         variantOutOfStock: { type: Boolean, default: false },
+        // Optional per-variant overrides of the product-level dimensions/
+        // specifications. Blank/absent means "use the product-level value".
+        // Kept in sync with server/models/product.model.js in the admin repo —
+        // both must declare the same variantDetails fields or non-.lean()
+        // reads here will silently strip whatever this schema omits.
+        dimensions: {
+          length: Number,
+          breadth: Number,
+          height: Number,
+        },
+        specifications: [
+          {
+            key: String,
+            value: String,
+          },
+        ],
       }
     ],
+    // Category linkage — auto-populated by the admin repo from its Category
+    // collection when productCategory is saved (admin's product.model.js has
+    // the full comment). Declared here too so the Promotion Engine V2's
+    // category_promotion type can target by stable ID instead of a free-text
+    // string, and so a future non-.lean() read here doesn't silently strip
+    // them (today's reads are all .lean(), which already pass these through
+    // regardless of this declaration — this is a documentation/safety
+    // addition, not a fix for an active bug).
+    categoryId:      { type: String, default: "" },
+    categorySlug:    { type: String, default: "" },
+    subCategoryId:   { type: String, default: "" },
+    subCategorySlug: { type: String, default: "" },
     uiProductId: {
       type: String,
       required: [true, "uiProductId is required"],

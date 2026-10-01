@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { trackSelectItem } from "../utils/analytics";
+import { isVariantOutOfStock } from "../utils/variantStock";
 import FitTitle from "./FitTitle";
 
 /**
@@ -13,9 +14,7 @@ const VariantCard = ({ productId, productName, variant, index, listId = "product
   const price = Number(variant?.variantPrice || 0);
   const mrp = Number(variant?.variantMrp || 0);
   const thumbnail = variant?.variantImage?.[0] || "/placeholder.jpg";
-  const oos =
-    variant?.variantOutOfStock === true ||
-    (variant?.variantQuantity != null && Number(variant.variantQuantity) <= 0);
+  const oos = isVariantOutOfStock(variant);
 
   const goToVariant = () => {
     trackSelectItem({

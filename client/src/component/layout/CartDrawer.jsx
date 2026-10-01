@@ -249,6 +249,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
     (b) => hasProductVariant(b.sourceProductId, b.sourceVariantName) && !hasProductVariant(b.recommendedProductId, b.recommendedVariantName),
   );
 
+
   // Combo cross-sell nudges AND same-product quantity-discount nudges are
   // paged through in ONE shared carousel card (not two stacked cards) — a
   // quantity nudge is tagged with __quantityNudge so FreeShippingBanner can

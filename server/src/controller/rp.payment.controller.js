@@ -12,6 +12,8 @@ import Cart from "../model/user.cart.model.js";
 import env from "../config/envConfigSetup.js";
 import Coupon from "../model/coupon.model.js";
 import CouponUsage from "../model/couponUsage.model.js";
+import PromotionUsage from "../model/promotionUsage.model.js";
+import Promotion from "../model/promotion.model.js";
 import { backfillUserProfileFromCheckout } from "../services/user.profile.service.js";
 import {
   isMagicCheckoutEnabled,
@@ -37,15 +39,22 @@ import html_to_pdf from "html-pdf-node";
 import { generateInvoiceHtmlTemplate } from "../template/invoiceTemplate.template.js";
 import { calculateShippingRate, FALLBACK_SHIPPING_CHARGE } from "../services/shipping.service.js";
 import { apiCache } from "../module/cache.manager.module.js";
+import { sortVariantsOOSLast, deriveProductStatus, syncVariantOutOfStock } from "../utils/variantSort.js";
 
 // ── Per-variant stock decrement ───────────────────────────────────────────────
 // Runs once, atomically, the moment an order is confirmed PAID. For each ordered
 // item we decrement THAT variant's tracked quantity (variantQuantity) by the
 // purchased quantity. Variants with no tracked quantity (null) are skipped —
 // they aren't stock-managed. The update is atomic ($inc on the positionally
-// matched variant) so concurrent orders don't clobber each other. When a
-// quantity crosses 0 the variant auto-derives out-of-stock everywhere (the OOS
-// rule is computed, not stored). Best-effort: never throws into the payment flow.
+// matched variant), GUARDED by variantQuantity >= qty so two concurrent
+// last-unit payment confirmations can't both succeed and push stock negative
+// (the earlier assertVariantAvailable check at order-creation time is a
+// courtesy UX check only — a plain read, not a lock — so this guard at the
+// actual write is what actually prevents overselling). When a quantity
+// crosses 0 the variant auto-derives out-of-stock everywhere (the OOS rule is
+// computed, not stored) — and its position in the array is pushed to the end
+// (see sortVariantsOOSLast) so it doesn't keep sitting among in-stock ones.
+// Best-effort: never throws into the payment flow.
 const decrementStockForOrder = async (order) => {
   let anyChanged = false;
   for (const item of order.items || []) {
@@ -54,16 +63,34 @@ const decrementStockForOrder = async (order) => {
     if (!item.productId || !qty || qty < 1) continue;
     if (!variantName || variantName === "N/A") continue; // single-design / no variant
     try {
+      // Read first to tell "untracked" (variantQuantity null — correctly a
+      // no-op) apart from "tracked but not enough left" (the case the write
+      // guard below exists for) so only the latter gets logged as a problem.
+      const productDoc = await Product.findOne(
+        { productId: item.productId, "variantDetails.variantName": variantName },
+        { "variantDetails.$": 1 },
+      ).lean();
+      const trackedVariant = productDoc?.variantDetails?.[0];
+      if (!trackedVariant || trackedVariant.variantQuantity == null) continue; // not stock-tracked
+
       const res = await Product.updateOne(
         {
           productId: item.productId,
-          variantDetails: { $elemMatch: { variantName, variantQuantity: { $ne: null } } },
+          variantDetails: { $elemMatch: { variantName, variantQuantity: { $ne: null, $gte: qty } } },
         },
         // Decrement the variant AND the product-level total (kept = sum of
         // tracked variant quantities) so both stay consistent between admin saves.
         { $inc: { "variantDetails.$.variantQuantity": -qty, productQuantity: -qty } },
       );
-      if (res.modifiedCount > 0) anyChanged = true;
+      if (res.modifiedCount > 0) {
+        anyChanged = true;
+        await resortVariantsIfNeeded(item.productId);
+      } else {
+        // Tracked, but not enough stock left at decrement time (the race this
+        // guard exists for). Order is already PAID; no refund/cancellation is
+        // triggered here (out of scope), just surfaced for manual follow-up.
+        console.error(`[Stock] insufficient stock at decrement time order=${order.orderId} product=${item.productId} variant=${variantName} qty=${qty}`);
+      }
     } catch (err) {
       console.error(`[Stock] decrement failed order=${order.orderId} product=${item.productId} variant=${variantName}:`, err.message);
     }
@@ -72,6 +99,34 @@ const decrementStockForOrder = async (order) => {
   // the new stock (and any freshly out-of-stock variant) right away.
   if (anyChanged) {
     try { apiCache.clear(); } catch { /* best-effort */ }
+  }
+};
+
+// After a successful decrement: auto-flip variantOutOfStock for the variant
+// that just hit 0 (quantity is the source of truth for any TRACKED variant —
+// this is the ONE write path where quantity changes with zero admin anywhere
+// near the edit form, so it's the one place that actually needs to sync the
+// stored flag itself rather than relying on the admin server's own
+// save-time sync). Then re-sort so any newly-OOS variant sinks to the end —
+// mirrors the admin server's on-save sort (product.controller.js). Also
+// re-derives productStatus from the fresh stock, same reasoning.
+const resortVariantsIfNeeded = async (productId) => {
+  try {
+    const doc = await Product.findOne({ productId }, { variantDetails: 1, productQuantity: 1, productStatus: 1 }).lean();
+    if (!doc?.variantDetails?.length) return;
+    const synced = syncVariantOutOfStock(doc.variantDetails);
+    const flagsChanged = synced.some((v, i) => v.variantOutOfStock !== doc.variantDetails[i]?.variantOutOfStock);
+    const sorted = sortVariantsOOSLast(synced);
+    const reordered = sorted.some((v, i) => v.variantName !== doc.variantDetails[i]?.variantName);
+    const update = {};
+    if (flagsChanged || reordered) update.variantDetails = sorted;
+    const derivedStatus = deriveProductStatus(synced, doc.productQuantity, doc.productStatus);
+    if (derivedStatus !== doc.productStatus) update.productStatus = derivedStatus;
+    if (Object.keys(update).length) {
+      await Product.updateOne({ productId }, { $set: update });
+    }
+  } catch (err) {
+    console.error(`[Stock] OOS resort/status update failed product=${productId}:`, err.message);
   }
 };
 
@@ -124,6 +179,15 @@ const getShippingRateOrFallback = async (params) => {
 };
 import { isFreeShippingEligible, getFreeShippingConfig } from "../utils/freeShippingOffer.util.js";
 import { getActiveCartRules, evaluateCartRules, applyBestDiscount, getDiscountCandidatesForItem } from "../utils/cartRule.util.js";
+// Promotion Engine V2 — separate collection/evaluator, additive only. See
+// promotionEngine.util.js's file header and the wiring comment below.
+import {
+  getActivePromotions,
+  evaluatePromotions,
+  buildCartContext,
+  applyBestPromotionDiscount,
+  getDiscountCandidatesForItem as getPromotionDiscountCandidatesForItem,
+} from "../utils/promotionEngine.util.js";
 import { getPublicOfferConfig } from "../utils/offer.util.js";
 import { sendMetaCapiEvent } from "../services/meta.capi.service.js";
 import { recordServerPurchase } from "../services/purchaseEvent.service.js";
@@ -453,6 +517,79 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     const candidates = getDiscountCandidatesForItem(cartRuleResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
     if (candidates?.length) {
       oi.productSnapshot.priceAtPurchase = applyBestDiscount(oi.productSnapshot.priceAtPurchase, candidates);
+      // A cart_rule discount that zeroes an item's price out (e.g. a
+      // percent_off 100 "get this free" offer) marks it as a promotional
+      // gift for admin/order views — same field the Promotion V2
+      // free_product reward uses (see below), so both paths to a genuinely
+      // free line item are marked identically regardless of which system
+      // granted it.
+      if (oi.productSnapshot.priceAtPurchase === 0) oi.productSnapshot.isPromotionalGift = true;
+    }
+  }
+
+  // ── Promotion Engine V2 — separate collection, evaluated ADDITIONALLY to
+  // the cart_rule block above, never replacing it. See promotionEngine
+  // .util.js's file header. Only applies a product-level discount to a
+  // product the legacy cart_rule engine did NOT already discount (checked via
+  // cartRuleResult.discountCandidatesByProduct below) — avoids any
+  // double-discount risk without needing a cross-system priority model.
+  // Customer/geo/date-time targeting conditions are evaluated with partial
+  // context here (orderCount/deliveryAddress not resolved at this point in
+  // the flow yet) — a promotion using those simply won't match until that
+  // context is wired through (planned follow-up), same as any other
+  // targeting condition the caller doesn't supply context for.
+  const activePromotions = await getActivePromotions();
+  const promoProductMeta = new Map(
+    products.map((p) => [p.productId, { category: p.productCategory, subcategory: p.productSubCategory, tags: p.tags || [] }]),
+  );
+  const promoCartItems = orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity, variantSku: oi.variantSku }));
+  const promoSubtotalSoFar = orderItems.reduce((s, i) => s + i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity, 0);
+  const promoCtx = buildCartContext(promoCartItems, { subtotal: promoSubtotalSoFar, productMeta: promoProductMeta, customerType: "registered" });
+  const promotionResult = evaluatePromotions(promoCartItems, promoCtx, activePromotions);
+
+  for (const oi of orderItems) {
+    if (getDiscountCandidatesForItem(cartRuleResult.discountCandidatesByProduct, oi.productId, oi.variantSku)?.length) continue; // legacy cart_rule already discounted this line
+    const candidates = getPromotionDiscountCandidatesForItem(promotionResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
+    if (candidates?.length) {
+      oi.productSnapshot.priceAtPurchase = applyBestPromotionDiscount(oi.productSnapshot.priceAtPurchase, candidates);
+    }
+  }
+
+  // free_product reward: append a synthetic ₹0 line, flagged
+  // isPromotionalGift so admin/order views can tell it apart from a paid
+  // item. Runs through the EXACT SAME assertVariantAvailable-guarded stock
+  // check as a real line (reused, not reimplemented) — if the gift target is
+  // OOS/deleted, it's silently skipped (order still proceeds), matching the
+  // existing "[Stock] insufficient stock" precedent for real items.
+  for (const gift of promotionResult.freeGifts) {
+    if (!gift.targetProductId) continue; // gift_choice (pick-1-of-N) needs a cart-side choice step — not wired here yet
+    try {
+      const giftProduct = products.find((p) => p.productId === gift.targetProductId) || (await Product.findOne({ productId: gift.targetProductId, productStatus: "in_stock" }));
+      if (!giftProduct) { console.error(`[PromotionV2] free_product target not found/inactive: ${gift.targetProductId} (promotion ${gift.promotionId})`); continue; }
+      const giftVariant = gift.targetVariantSku
+        ? giftProduct.variantDetails?.find((v) => v.sku === gift.targetVariantSku)
+        : giftProduct.variantDetails?.[0];
+      const giftVariantName = giftVariant?.variantName || "N/A";
+      assertVariantAvailable(giftProduct, giftVariantName, 1);
+      orderItems.push({
+        productId: giftProduct.productId,
+        variantSku: giftVariant?.sku || "",
+        productSnapshot: {
+          quantity: 1,
+          productImg: giftVariant?.variantImage?.[0] || giftProduct.productImg || "https://urbannook.in/assets/logo.webp",
+          productName: giftProduct.productName,
+          productCategory: giftProduct.productCategory,
+          productSubCategory: giftProduct.productSubCategory,
+          priceAtPurchase: 0,
+          shipping: "0",
+          selectedVariant: giftVariantName,
+          variantTitleTemplate: giftProduct.variantTitleTemplate || "",
+          variantSku: giftVariant?.sku || "",
+          isPromotionalGift: true,
+        },
+      });
+    } catch (err) {
+      console.error(`[PromotionV2] free_product gift skipped (${gift.targetProductId}, promotion ${gift.promotionId}):`, err.message);
     }
   }
 
@@ -533,7 +670,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   const freeShippingConfig = await getFreeShippingConfig();
   const thresholdEligible = freeShippingConfig.isActive && subtotal >= freeShippingConfig.thresholdAmount;
   const freeShippingUnlocked =
-    (await isFreeShippingEligible(items.map((i) => i.productId))) || cartRuleResult.freeShipping || thresholdEligible;
+    (await isFreeShippingEligible(items.map((i) => i.productId))) || cartRuleResult.freeShipping || thresholdEligible || promotionResult.freeShipping;
   const chargedShippingAmount = freeShippingUnlocked ? 0 : realShippingAmount;
   // console.log(
   //   `[FreeShipping][Order:auth] realShipping=₹${realShippingAmount} chargedShipping=₹${chargedShippingAmount} items=${items.map(i => `${i.productId}x${i.quantity}`).join(",")}`,
@@ -842,6 +979,11 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     userName: deliveryAddressSnapshot.fullName,
     userMobile: deliveryAddressSnapshot.mobileNumber,
     items: orderItems,
+    // Promotion Engine V2 — snapshot of which promotions matched at order-
+    // creation time (see the wiring comment above). Empty when none matched.
+    appliedPromotions: promotionResult.matchedPromotions.map((p) => ({
+      promotionId: String(p._id), name: p.name, rewardTypes: [...new Set((p.rewards || []).map((r) => r.type))],
+    })),
     // Whole-rupee, matching exactly what razorpayChargeAmountPaise actually
     // charges — finalAmount itself can be fractional (realShippingAmount is
     // a live carrier rate, not guaranteed integer), so storing it unrounded
@@ -1107,6 +1249,40 @@ const razorpayWebHookController = async (req, res) => {
           // Decrement per-variant stock now that the order is confirmed PAID.
           // Guarded by the `order.status !== "PAID"` block above → runs once.
           await decrementStockForOrder(order);
+
+          // Promotion Engine V2 — permanent usage audit trail, same
+          // never-deleted invariant as CouponUsage, recorded here (once,
+          // guarded by the same order.status !== "PAID" block) rather than
+          // at order-creation time, since a CREATED-but-never-PAID order
+          // should never count against a promotion's usage limits.
+          if (order.appliedPromotions?.length) {
+            const productSubtotalForUsage = order.items.reduce(
+              (s, i) => s + ((i.productSnapshot?.priceAtPurchase || 0) * (i.productSnapshot?.quantity || 0)),
+              0,
+            );
+            try {
+              await PromotionUsage.insertMany(
+                order.appliedPromotions.map((ap) => ({
+                  promotionId: ap.promotionId,
+                  promotionName: ap.name,
+                  orderId: order.orderId,
+                  orderType: "WEBSITE",
+                  userId: order.userId || null,
+                  email: order.userEmail || "",
+                  mobile: order.userMobile || "",
+                  rewardsSnapshot: { rewardTypes: ap.rewardTypes },
+                  cartValueBeforeDiscount: productSubtotalForUsage,
+                  usedAt: new Date(),
+                })),
+              );
+              await Promotion.updateMany(
+                { _id: { $in: order.appliedPromotions.map((ap) => ap.promotionId) } },
+                { $inc: { usageCount: 1 } },
+              );
+            } catch (err) {
+              console.error(`[PromotionV2] usage recording failed order=${order.orderId}:`, err.message);
+            }
+          }
 
           // ── STEP 3: Send credentials email now that order is confirmed ────
           if (guestCredentials) {
@@ -1576,6 +1752,60 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     const candidates = getDiscountCandidatesForItem(cartRuleResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
     if (candidates?.length) {
       oi.productSnapshot.priceAtPurchase = applyBestDiscount(oi.productSnapshot.priceAtPurchase, candidates);
+      // See the matching comment in razorpayCreateOrderController above.
+      if (oi.productSnapshot.priceAtPurchase === 0) oi.productSnapshot.isPromotionalGift = true;
+    }
+  }
+
+  // ── Promotion Engine V2 — see the matching comment in
+  // razorpayCreateOrderController above for the full rationale. Identical
+  // wiring, guest path.
+  const activePromotions = await getActivePromotions();
+  const promoProductMeta = new Map(
+    products.map((p) => [p.productId, { category: p.productCategory, subcategory: p.productSubCategory, tags: p.tags || [] }]),
+  );
+  const promoCartItems = orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity, variantSku: oi.variantSku }));
+  const promoSubtotalSoFar = orderItems.reduce((s, i) => s + i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity, 0);
+  const promoCtx = buildCartContext(promoCartItems, { subtotal: promoSubtotalSoFar, productMeta: promoProductMeta, customerType: "guest" });
+  const promotionResult = evaluatePromotions(promoCartItems, promoCtx, activePromotions);
+
+  for (const oi of orderItems) {
+    if (getDiscountCandidatesForItem(cartRuleResult.discountCandidatesByProduct, oi.productId, oi.variantSku)?.length) continue;
+    const candidates = getPromotionDiscountCandidatesForItem(promotionResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
+    if (candidates?.length) {
+      oi.productSnapshot.priceAtPurchase = applyBestPromotionDiscount(oi.productSnapshot.priceAtPurchase, candidates);
+    }
+  }
+
+  for (const gift of promotionResult.freeGifts) {
+    if (!gift.targetProductId) continue;
+    try {
+      const giftProduct = products.find((p) => p.productId === gift.targetProductId) || (await Product.findOne({ productId: gift.targetProductId, productStatus: "in_stock" }));
+      if (!giftProduct) { console.error(`[PromotionV2] free_product target not found/inactive: ${gift.targetProductId} (promotion ${gift.promotionId})`); continue; }
+      const giftVariant = gift.targetVariantSku
+        ? giftProduct.variantDetails?.find((v) => v.sku === gift.targetVariantSku)
+        : giftProduct.variantDetails?.[0];
+      const giftVariantName = giftVariant?.variantName || "N/A";
+      assertVariantAvailable(giftProduct, giftVariantName, 1);
+      orderItems.push({
+        productId: giftProduct.productId,
+        variantSku: giftVariant?.sku || "",
+        productSnapshot: {
+          quantity: 1,
+          productImg: giftVariant?.variantImage?.[0] || giftProduct.productImg || "https://urbannook.in/assets/logo.webp",
+          productName: giftProduct.productName,
+          productCategory: giftProduct.productCategory,
+          productSubCategory: giftProduct.productSubCategory,
+          priceAtPurchase: 0,
+          shipping: "0",
+          selectedVariant: giftVariantName,
+          variantTitleTemplate: giftProduct.variantTitleTemplate || "",
+          variantSku: giftVariant?.sku || "",
+          isPromotionalGift: true,
+        },
+      });
+    } catch (err) {
+      console.error(`[PromotionV2] free_product gift skipped (${gift.targetProductId}, promotion ${gift.promotionId}):`, err.message);
     }
   }
 
@@ -1602,7 +1832,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   const freeShippingConfig = await getFreeShippingConfig();
   const thresholdEligible = freeShippingConfig.isActive && subtotal >= freeShippingConfig.thresholdAmount;
   const freeShippingUnlocked =
-    (await isFreeShippingEligible(items.map((i) => i.productId))) || cartRuleResult.freeShipping || thresholdEligible;
+    (await isFreeShippingEligible(items.map((i) => i.productId))) || cartRuleResult.freeShipping || thresholdEligible || promotionResult.freeShipping;
   const chargedShippingAmount = freeShippingUnlocked ? 0 : realShippingAmount;
   // console.log(
   //   `[FreeShipping][Order:guest] realShipping=₹${realShippingAmount} chargedShipping=₹${chargedShippingAmount} items=${items.map(i => `${i.productId}x${i.quantity}`).join(",")}`,
@@ -1809,6 +2039,11 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     userName: guestInfo?.name?.trim() || "",
     userMobile: cleanMobile,
     items: orderItems,
+    // Promotion Engine V2 — snapshot of which promotions matched at order-
+    // creation time (see the wiring comment above). Empty when none matched.
+    appliedPromotions: promotionResult.matchedPromotions.map((p) => ({
+      promotionId: String(p._id), name: p.name, rewardTypes: [...new Set((p.rewards || []).map((r) => r.type))],
+    })),
     // Whole-rupee, matching exactly what razorpayChargeAmountPaise actually
     // charges — finalAmount itself can be fractional (realShippingAmount is
     // a live carrier rate, not guaranteed integer), so storing it unrounded

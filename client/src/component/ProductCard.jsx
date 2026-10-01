@@ -1,6 +1,7 @@
 import { lazy, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { trackSelectItem } from "../utils/analytics";
+import { isVariantOutOfStock, allActiveVariantsOOS } from "../utils/variantStock";
 import FitTitle from "./FitTitle";
 
 const WishlistButton = lazy(() => import("./WishlistButton"));
@@ -219,14 +220,7 @@ const ProductCard = ({ product, index = 0, listId = "all_products", listName = "
             const active = (product?.variantDetails || []).filter(
               (v) => v.isActive !== false,
             );
-            const allVariantsOOS =
-              active.length > 0 &&
-              active.every(
-                (v) =>
-                  v.variantOutOfStock === true ||
-                  (v.variantQuantity != null && Number(v.variantQuantity) <= 0),
-              );
-            if (product?.productStatus === "out_of_stock" || allVariantsOOS) {
+            if (product?.productStatus === "out_of_stock" || allActiveVariantsOOS(product)) {
               return (
                 <span className="absolute top-3 left-3 z-10 gl-lbl text-[8px] px-2 py-0.5 rounded-none bg-ink text-white">
                   Out of Stock
@@ -234,10 +228,7 @@ const ProductCard = ({ product, index = 0, listId = "all_products", listName = "
               );
             }
             const tracked = active.filter(
-              (v) =>
-                v.variantQuantity != null &&
-                !v.variantOutOfStock &&
-                Number(v.variantQuantity) > 0,
+              (v) => v.variantQuantity != null && !isVariantOutOfStock(v),
             );
             if (tracked.length === 0) return null;
             const totalLeft = tracked.reduce(

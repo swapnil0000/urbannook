@@ -138,7 +138,6 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
   const nudgeBanners = banners.filter(
     (b) => hasProductVariant(b.sourceProductId, b.sourceVariantName) && !hasProductVariant(b.recommendedProductId, b.recommendedVariantName),
   );
-
   useEffect(() => {
     const id = requestAnimationFrame(() => setMounted(true));
     return () => cancelAnimationFrame(id);

@@ -175,6 +175,16 @@ const getCartService = async ({ userId }) => {
         // list honest without duplicating the hard order-creation guard in
         // rp.payment.controller.js (assertVariantAvailable), which remains
         // the real enforcement point.
+        // NOTE: this is a raw Mongo aggregation expression, not JS, so it
+        // can't import the canonical isVariantOutOfStock (utils/variantSort.js
+        // in this repo; utils/variantStock.js on the client) the way every
+        // other OOS check in the codebase does — this $or below must be kept
+        // hand-in-sync with those if the rule ever changes. variantOutOfStock
+        // is now auto-synced to quantity at write time for tracked variants
+        // (see variantSort.js's syncVariantOutOfStock), so mOOS alone would
+        // actually be sufficient going forward — the $lte 0 branch is kept
+        // as a defensive fallback for untracked variants and any stale data
+        // written before that sync existed.
         isEligibleForCalc: {
           $cond: [
             {

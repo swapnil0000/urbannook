@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from "rea
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
+import { useEvaluateCartRulesQuery } from "../store/api/userApi";
 
 // Copy shown when the admin leaves the corresponding combo text field blank.
 const DEFAULT_EYEBROW = "People also buy along with this";
@@ -321,19 +322,54 @@ const ComboBundleSection = ({
       return next;
     });
 
-  if (!mainVariants.length || !offerable.length) return null;
-
   const activeMainVariant =
     mainVariants.find((v) => v.variantName === mainVariantName) || mainVariants[0];
   const mainPrice = Number(activeMainVariant?.variantPrice ?? 0);
 
+  const kept = offerable.filter((e) => !removedIds.has(e.product.productId));
+
+  // A cart_rule offer (admin Offers page) can make one of these companions
+  // free/discounted when bought together with the main product (e.g. "Buy
+  // Katana Get Stand FREE") — this bundle row previously always showed full
+  // price, misleadingly, since it had no idea such a rule existed. Evaluated
+  // against a HYPOTHETICAL cart — current cart contents PLUS this exact
+  // bundle selection — so the shown total matches what checkout will
+  // actually charge if the customer confirms this. Display-only: the real
+  // enforcement still happens server-side at order-creation time regardless
+  // of which widget added the items.
+  const cartItemsForEval = useSelector((state) => state.cart.items);
+  const itemQtyForEval = (q) => (typeof q === "object" && q !== null ? q.quantity || 0 : q || 0);
+  const hypotheticalItems = useMemo(() => {
+    const fromCart = cartItemsForEval
+      .map((item) => ({ productId: item.id || item.mongoId, quantity: itemQtyForEval(item.quantity), selectedVariant: item.selectedVariant }))
+      .filter((i) => i.productId && i.quantity > 0);
+    const bundleItems = [
+      { productId: mainProduct?.productId, quantity: 1, selectedVariant: activeMainVariant?.variantName },
+      ...kept.map((entry) => ({
+        productId: entry.product.productId,
+        quantity: 1,
+        selectedVariant: (entry.variants.find((x) => x.variantName === chosenVariants[entry.product.productId]) || entry.variants[0])?.variantName,
+      })),
+    ].filter((i) => i.productId);
+    return [...fromCart, ...bundleItems];
+  }, [cartItemsForEval, mainProduct?.productId, activeMainVariant?.variantName, kept, chosenVariants]);
+  const { data: bundleRuleEval } = useEvaluateCartRulesQuery(hypotheticalItems, { skip: hypotheticalItems.length === 0 });
+
   const priceOf = (entry) => {
     const name = chosenVariants[entry.product.productId];
     const v = entry.variants.find((x) => x.variantName === name) || entry.variants[0];
-    return { variant: v, price: Number(v?.variantPrice ?? 0) };
+    const basePrice = Number(v?.variantPrice ?? 0);
+    const candidates = (bundleRuleEval?.discounts?.[entry.product.productId] || []).filter(
+      (c) => !c.variantName || c.variantName === v?.variantName,
+    );
+    const price = candidates.length
+      ? Math.round(Math.max(Math.min(...candidates.map((c) => (c.type === "percent_off" ? basePrice * (1 - c.value / 100) : basePrice - c.value))), 0))
+      : basePrice;
+    return { variant: v, price, basePrice, discounted: price < basePrice };
   };
 
-  const kept = offerable.filter((e) => !removedIds.has(e.product.productId));
+  if (!mainVariants.length || !offerable.length) return null;
+
   const total = mainPrice + kept.reduce((sum, entry) => sum + priceOf(entry).price, 0);
 
   const bundleAdded =
