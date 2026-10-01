@@ -6,6 +6,12 @@
 >
 > **This is the canonical copy.** The admin repo (`urbannook-admin`) points here.
 > Any change to how code reaches production must update this file in the same PR.
+>
+> **New to the system or debugging an incident?** Start with the **System Guide** — the plain-
+> language map of every part, how admin and storefront connect, how long each kind of change takes
+> to show up (caches), and first steps per symptom. It is shown in the admin panel
+> (Admin → **System Guide**) and lives in the admin repo at `client/src/content/system-guide.md`.
+> This document is the deploy spec and rules; keep both in step when either changes.
 
 ---
 
@@ -149,8 +155,44 @@ started with `cwd` = `/home/ubuntu/urbannook-prod/current`.
   restore needs no `npm install`), built on Linux x64 with the same Node major version as prod.
 - **Never contains:** `.env*`, SSH keys, AWS keys (rule 2). The build must verify this
   (`tar -tzf … | grep -i '\.env'` must return nothing).
-- **Stored:** `s3://<artifacts-bucket>/prod/` (versioning ON, 30-day lifecycle) **and**
-  `artifacts/` on the server.
+- **Stored:** `s3://<artifacts-bucket>/prod/server/` (versioning ON, 30-day lifecycle on `prod/`) **and**
+  `artifacts/` on the server. Artifacts made before 2026-09-30 are in `prod/` directly; Jenkins
+  copies them into `prod/server/` and every reader checks both.
+
+### 4.1 S3 layout (`urbannook-release-artifacts`)
+
+```
+prod/
+  server/server-<release>.tar.gz     server builds (incl. node_modules)
+  client/client-<release>.tar.gz     website builds (dist + prerendered pages)
+  db/<YYYYMMDD-HHMM>-<reason>/       DB snapshots: manifest.json + <collection>.jsonl.gz
+                                     (nightly, manual, and "predeploy-<N>" before each server deploy)
+  bundles/<id>/                      one per prod deploy / rollback (see 4.2)
+  state.json                         what is live right now (read by the admin panel)
+staging/db/                          staging DB snapshots (never mixed with prod)
+```
+
+### 4.2 Release bundles — "what was live after this run"
+
+Written by Jenkins at the end of every prod deploy and rollback, **success or failure**
+(`jenkins/scripts/release-bundle.mjs`), id `<YYYYMMDD-HHMM>-<commit>-<developer>-b<build>`:
+
+- `manifest.json` — status (+ failed stage), action (deploy / nightly / rollback), commit,
+  developer, who triggered, Jenkins build, the **server and client release live after the run**
+  (with artifact keys), the **pre-deploy DB snapshot** folder + status, workers deployed,
+  restored bundle (rollbacks).
+- `env-keys.json` — Infisical key **names** for prod `/user/server` and `/user/client` (never
+  values) and what was added/removed since the previous successful bundle.
+
+Artifacts are referenced, not copied. The DB snapshot is taken by the admin API (only Render
+can reach the prod DB) via `POST /api/v1/admin/releases/hooks/db-snapshot` (secret
+`TIME_MACHINE_SECRET`), before the server switches; a failed snapshot is logged as a warning and
+does not block the deploy.
+
+Admin → Time Machine → **Deploy history** lists bundles; **Restore** runs
+`UrbanNook-Prod-Rollback` with `COMPONENT=both` (server then client). Data is never changed by a
+restore — the bundle's DB snapshot is restored by hand with `server/scripts/restore-db-backup.js`
+in the admin repo (`--patch` / `--undelete` / `--into`, dry-run by default, env-guarded).
 
 ---
 
