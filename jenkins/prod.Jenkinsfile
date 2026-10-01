@@ -14,6 +14,7 @@
 //               backend  → prod EC2 172.31.13.243 (private IP, same VPC) as a
 //                          numbered release: releases/<N> + `current` symlink
 //               release artifacts → s3://urbannook-release-artifacts/prod/
+//                   server/  client/  db/ (snapshots)  bundles/ (one per run)
 //
 // FLOW (each step only runs if the previous one passed)
 //   1. Checkout main
@@ -21,10 +22,20 @@
 //   3. Build the frontend           ← nothing deployed yet; a failure here
 //   4. Build the server release       leaves prod completely untouched
 //      (tar.gz incl. node_modules → S3)
+//   4b. DB snapshot (server deploys only): started right after 'Detect changes'
+//      so it runs WHILE the builds run (no extra deploy time); 'Wait for DB
+//      snapshot' just confirms it finished before the server switches. The
+//      admin API (the only service allowed into the prod DB) writes it to
+//      prod/db/. A failed snapshot warns but does not block the deploy.
 //   5. Deploy the release: extract to releases/<N>, move `current`, restart,
 //      health check — on failure `current` goes back to the previous release
 //   6. Cloudflare workers (only if infra/cloudflare/ changed)
 //   7. Upload the frontend + purge Cloudflare cache
+//   8. Release bundle (post, success AND failure): prod/bundles/<id>/ —
+//      manifest (server + client live after the run, commit, who, DB snapshot,
+//      failed stage) and env-keys.json (Infisical key NAMES + diff, never
+//      values). Admin → Time Machine → Deploy history lists them and can
+//      restore a successful one (server + client together).
 //
 // TRIGGERS (GitHub Actions' prod workflow must be DISABLED — both would deploy)
 //   - Merge to main: GitHub webhook starts the job automatically.
@@ -47,6 +58,46 @@
 //
 // See DEPLOYMENT_ARCHITECTURE.md before changing this file.
 // ============================================================================
+
+// Release bundle for this run (see step 8). Never fails the build — a missing
+// bundle only means Deploy history lacks this entry.
+def writeBundle(String status) {
+  if (!env.STAMP) { echo 'No bundle: the run stopped before Detect changes'; return }
+  if (status == 'success' && env.CLIENT_CHANGED != 'true' && env.SERVER_CHANGED != 'true' && env.WORKERS_CHANGED != 'true') {
+    echo 'No bundle: nothing was deployed'
+    return
+  }
+  try {
+    withCredentials([
+      string(credentialsId: 'INFISICAL_CLIENT_ID', variable: 'INFISICAL_CLIENT_ID'),
+      string(credentialsId: 'INFISICAL_CLIENT_SECRET', variable: 'INFISICAL_CLIENT_SECRET'),
+    ]) {
+      // Key NAMES only — values are never written to a file or the log.
+      sh '''
+        set +x
+        rm -f env-keys-input.json
+        export INFISICAL_TOKEN="$(infisical login --method=universal-auth \
+          --client-id="$INFISICAL_CLIENT_ID" --client-secret="$INFISICAL_CLIENT_SECRET" --silent --plain)"
+        if [ -n "$INFISICAL_TOKEN" ]; then
+          infisical export --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/user/server --format=dotenv | cut -d= -f1 > keys-server.txt
+          infisical export --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/user/client --format=dotenv | cut -d= -f1 > keys-client.txt
+          node jenkins/scripts/env-keys-json.mjs keys-server.txt keys-client.txt env-keys-input.json
+          rm -f keys-server.txt keys-client.txt
+        else
+          echo "WARNING: Infisical login failed — bundle written without env keys"
+        fi
+        unset INFISICAL_TOKEN
+      '''
+    }
+    withEnv(["BUNDLE_STATUS=${status}", "BUNDLE_STAMP=${env.STAMP}", "FAILED_STAGE=${env.LAST_STAGE ?: ''}",
+             "ENV_KEYS_FILE=env-keys-input.json"]) {
+      sh 'node jenkins/scripts/release-bundle.mjs'
+    }
+  } catch (e) {
+    echo "WARNING: release bundle not written: ${e.message}"
+  }
+}
+
 pipeline {
   // Label of the Jenkins node that RUNS the build (the staging EC2).
   // Not the deploy target — see PROD_HOST / S3_BUCKET below.
@@ -85,6 +136,9 @@ pipeline {
     ARTIFACTS_BUCKET     = 'urbannook-release-artifacts'
     PROD_SSH_KEY         = '/home/ubuntu/.ssh/prod_deploy'
     SSH_OPTS             = '-i /home/ubuntu/.ssh/prod_deploy -o StrictHostKeyChecking=yes -o BatchMode=yes'
+    // Admin API (Render) — takes the pre-deploy DB snapshot (prod DB access is
+    // limited to it). Auth: TIME_MACHINE_SECRET from Infisical prod /admin/server.
+    ADMIN_API            = 'https://urbannook-store.onrender.com/api/v1/admin'
   }
 
   stages {
@@ -111,6 +165,7 @@ pipeline {
           // product pages / sitemap pick up price & stock changes from the
           // live feed. The server is not touched on a nightly run.
           def byTimer = !currentBuild.getBuildCauses('hudson.triggers.TimerTrigger$TimerTriggerCause').isEmpty()
+          env.BUNDLE_ACTION = byTimer ? 'nightly' : 'deploy'
           if (byTimer) {
             env.CLIENT_CHANGED  = 'true'
             env.SERVER_CHANGED  = 'false'
@@ -137,7 +192,45 @@ pipeline {
           // Who/what started this build — shown in the admin panel history.
           def causes = 'unknown'
           try { causes = currentBuild.getBuildCauses().collect { it.shortDescription }.join('; ') ?: 'unknown' } catch (e) { echo "Could not read build causes: ${e.message}" }
-          env.TRIGGERED_BY = params.TRIGGERED_BY ?: causes
+          env.TRIGGERED_BY = params.TRIGGERED_BY ?: (byTimer ? 'Nightly SEO rebuild (21:30 IST, automatic)' : causes)
+        }
+      }
+    }
+
+    // DB snapshot, part 1: start it now so it runs in parallel with the builds
+    // (a snapshot takes 1–2 min; the builds take longer). Only when the backend
+    // changes — only backend code changes data. Never blocks the deploy.
+    stage('Start DB snapshot') {
+      when { environment name: 'SERVER_CHANGED', value: 'true' }
+      steps {
+        script {
+          env.LAST_STAGE = 'Start DB snapshot'
+          env.DB_SNAPSHOT = ''
+          env.DB_SNAPSHOT_STATUS = 'failed'
+          withCredentials([
+            string(credentialsId: 'INFISICAL_CLIENT_ID', variable: 'INFISICAL_CLIENT_ID'),
+            string(credentialsId: 'INFISICAL_CLIENT_SECRET', variable: 'INFISICAL_CLIENT_SECRET'),
+          ]) {
+            def rc = sh(returnStatus: true, script: '''
+              set +x
+              rm -f .db_snapshot_folder
+              export INFISICAL_TOKEN="$(infisical login --method=universal-auth \
+                --client-id="$INFISICAL_CLIENT_ID" --client-secret="$INFISICAL_CLIENT_SECRET" --silent --plain)"
+              [ -n "$INFISICAL_TOKEN" ] || { echo "Infisical login failed"; exit 1; }
+              SECRET="$(infisical secrets get TIME_MACHINE_SECRET --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/admin/server --plain --silent)"
+              unset INFISICAL_TOKEN
+              [ -n "$SECRET" ] || { echo "TIME_MACHINE_SECRET not readable from Infisical"; exit 1; }
+              RESP="$(curl -fsS -m 90 --retry 2 -X POST "$ADMIN_API/releases/hooks/db-snapshot" \
+                -H "x-deploy-secret: $SECRET" -H "Content-Type: application/json" \
+                --data "{\\"reason\\":\\"predeploy-$COMMIT7\\"}")" || { echo "Snapshot request to admin API failed"; exit 1; }
+              FOLDER="$(echo "$RESP" | node jenkins/scripts/json-field.mjs folder)"
+              [ -n "$FOLDER" ] || { echo "Admin API did not return a snapshot folder"; exit 1; }
+              echo "$FOLDER" > .db_snapshot_folder
+              echo "DB snapshot started (runs while we build): $FOLDER"
+            ''')
+            if (rc != 0) echo "WARNING: could not start the pre-deploy DB snapshot — deploying anyway; the last nightly snapshot is the fallback."
+          }
+          env.DB_SNAPSHOT = fileExists('.db_snapshot_folder') ? readFile('.db_snapshot_folder').trim() : ''
         }
       }
     }
@@ -146,6 +239,7 @@ pipeline {
     stage('Build client') {
       when { environment name: 'CLIENT_CHANGED', value: 'true' }
       steps {
+        script { env.LAST_STAGE = 'Build client' }
         dir('client') {
           sh 'npm ci --legacy-peer-deps'
           withCredentials([
@@ -207,6 +301,7 @@ pipeline {
     stage('Build server release') {
       when { environment name: 'SERVER_CHANGED', value: 'true' }
       steps {
+        script { env.LAST_STAGE = 'Build server release' }
         script {
           // node_modules (bcrypt is native) must be built with prod's exact
           // Node version. The agent's own Node (used for the client build) is
@@ -241,9 +336,57 @@ pipeline {
           if tar -tzf "$ARTIFACT" | grep -iE '(^|/)\\.env($|\\.)|\\.pem$|id_rsa'; then
             echo "SECRET-LIKE FILE IN ARTIFACT — aborting"; exit 1
           fi
-          aws s3 cp "$ARTIFACT" "s3://$ARTIFACTS_BUCKET/prod/$ARTIFACT" --only-show-errors
-          echo "Artifact stored: s3://$ARTIFACTS_BUCKET/prod/$ARTIFACT"
+          aws s3 cp "$ARTIFACT" "s3://$ARTIFACTS_BUCKET/prod/server/$ARTIFACT" --only-show-errors
+          echo "Artifact stored: s3://$ARTIFACTS_BUCKET/prod/server/$ARTIFACT"
+
+          # One-time layout move: server artifacts made before prod/server/
+          # existed sit in prod/. Copy any missing ones across (copy, not move —
+          # Jenkins' AWS user can't delete; the 30-day lifecycle clears prod/).
+          aws s3 ls "s3://$ARTIFACTS_BUCKET/prod/" | awk '{print $4}' | grep -E '^server-.*[.]tar[.]gz$' | while read -r f; do
+            aws s3 ls "s3://$ARTIFACTS_BUCKET/prod/server/$f" >/dev/null 2>&1 \
+              || aws s3 cp "s3://$ARTIFACTS_BUCKET/prod/$f" "s3://$ARTIFACTS_BUCKET/prod/server/$f" --only-show-errors
+          done || true
         '''
+      }
+    }
+
+    // DB snapshot, part 2: make sure the snapshot started before the builds has
+    // finished before the server switches. Usually already done by now.
+    stage('Wait for DB snapshot') {
+      when { expression { env.SERVER_CHANGED == 'true' && env.DB_SNAPSHOT } }
+      steps {
+        script {
+          env.LAST_STAGE = 'Wait for DB snapshot'
+          def rc = 1
+          withCredentials([
+            string(credentialsId: 'INFISICAL_CLIENT_ID', variable: 'INFISICAL_CLIENT_ID'),
+            string(credentialsId: 'INFISICAL_CLIENT_SECRET', variable: 'INFISICAL_CLIENT_SECRET'),
+          ]) {
+            rc = sh(returnStatus: true, script: '''
+              set +x
+              export INFISICAL_TOKEN="$(infisical login --method=universal-auth \
+                --client-id="$INFISICAL_CLIENT_ID" --client-secret="$INFISICAL_CLIENT_SECRET" --silent --plain)"
+              SECRET="$(infisical secrets get TIME_MACHINE_SECRET --projectId="$INFISICAL_PROJECT_ID" --env=prod --path=/admin/server --plain --silent)"
+              unset INFISICAL_TOKEN
+              [ -n "$SECRET" ] || { echo "TIME_MACHINE_SECRET not readable from Infisical"; exit 1; }
+              for i in $(seq 1 36); do   # up to ~6 minutes (normally 0–1 checks)
+                ST="$(curl -fsS -m 30 -G "$ADMIN_API/releases/hooks/db-snapshot" --data-urlencode "folder=$DB_SNAPSHOT" \
+                  -H "x-deploy-secret: $SECRET" | node jenkins/scripts/json-field.mjs status)" || ST="unreachable"
+                echo "  snapshot $DB_SNAPSHOT: $ST"
+                [ "$ST" = "success" ] && exit 0
+                [ "$ST" = "failed" ] && exit 2
+                sleep 10
+              done
+              echo "Snapshot did not finish in time"; exit 3
+            ''')
+          }
+          env.DB_SNAPSHOT_STATUS = rc == 0 ? 'success' : 'failed'
+          if (rc == 0) {
+            echo "DB SNAPSHOT OK: ${env.DB_SNAPSHOT}"
+          } else {
+            echo "WARNING: pre-deploy DB snapshot FAILED (exit ${rc}) — deploying anyway; the last nightly snapshot is the fallback."
+          }
+        }
       }
     }
 
@@ -254,6 +397,7 @@ pipeline {
     stage('Deploy server') {
       when { environment name: 'SERVER_CHANGED', value: 'true' }
       steps {
+        script { env.LAST_STAGE = 'Deploy server' }
         sh '''
           scp $SSH_OPTS "$ARTIFACT" "$PROD_HOST:$PROD_BASE/artifacts/$ARTIFACT"
 
@@ -321,6 +465,7 @@ REMOTE
     stage('Deploy workers') {
       when { environment name: 'WORKERS_CHANGED', value: 'true' }
       steps {
+        script { env.LAST_STAGE = 'Deploy workers' }
         withCredentials([
           string(credentialsId: 'CLOUDFLARE_WORKERS_TOKEN', variable: 'CLOUDFLARE_API_TOKEN'),
           string(credentialsId: 'CLOUDFLARE_ACCOUNT_ID', variable: 'CLOUDFLARE_ACCOUNT_ID'),
@@ -376,6 +521,7 @@ REMOTE
     stage('Deploy client') {
       when { environment name: 'CLIENT_CHANGED', value: 'true' }
       steps {
+        script { env.LAST_STAGE = 'Deploy client' }
         // SEO phase 0 upload steps (unchanged) live in jenkins/scripts/upload-client.sh,
         // shared with the rollback job so an old client goes up exactly the same way.
         sh 'bash jenkins/scripts/upload-client.sh client/dist client/dist-prerender "$S3_BUCKET"'
@@ -399,8 +545,16 @@ REMOTE
   }
 
   post {
-    success { echo "PROD DEPLOY OK: ${env.DEPLOY_COMMIT}" }
-    failure { echo "PROD DEPLOY FAILED — site keeps running the previous version for any stage that did not run." }
-    always  { cleanWs(deleteDirs: true, notFailBuild: true) }
+    success {
+      echo "PROD DEPLOY OK: ${env.DEPLOY_COMMIT}"
+      script { writeBundle('success') }
+    }
+    failure {
+      echo "PROD DEPLOY FAILED at '${env.LAST_STAGE ?: 'start'}' — site keeps running the previous version for any stage that did not run."
+      script { writeBundle('failed') }
+    }
+    // cleanup runs LAST (after success/failure) — 'always' would run first and
+    // delete the scripts the bundle step needs.
+    cleanup { cleanWs(deleteDirs: true, notFailBuild: true) }
   }
 }
