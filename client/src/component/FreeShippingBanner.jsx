@@ -414,13 +414,30 @@ const FreeShippingBanner = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed off the serialized key so identical content (re-render without a real cart change) doesn't reset the debounce timer
   }, [cartItemsKey]);
 
-  const ruleEvalItems = useMemo(
-    () =>
-      debouncedCartItems
-        .map((item) => ({ productId: item.id || item.mongoId, quantity: itemQty(item.quantity), selectedVariant: item.selectedVariant }))
-        .filter((i) => i.productId && i.quantity > 0),
-    [debouncedCartItems],
-  );
+  // Same hypothetical-cart preview as ProductPageBanner.jsx: when the combo
+  // isn't fully in the cart yet, evaluate price AS IF the source and/or the
+  // currently-selected recommended variant were added, not just whatever's
+  // actually sitting in the cart right now. Without this, switching the
+  // variant dropdown here (Single/Double/Triple Katana stand) never re-ran
+  // the rules engine before the item was actually added, so the price shown
+  // stayed frozen — it only "just worked" for single-variant add-ons (like
+  // the Pen Stand in the Lamp combo) because there was never a second
+  // variant to switch to in the first place.
+  const ruleEvalItems = useMemo(() => {
+    const fromCart = debouncedCartItems
+      .map((item) => ({ productId: item.id || item.mongoId, quantity: itemQty(item.quantity), selectedVariant: item.selectedVariant }))
+      .filter((i) => i.productId && i.quantity > 0);
+    if (!banner) return fromCart;
+    const hypothetical = [
+      ...(sourceInCart || !banner.sourceProductId
+        ? []
+        : [{ productId: banner.sourceProductId, quantity: 1, selectedVariant: banner.sourceVariantName || sourceProduct?.variantDetails?.[0]?.variantName }]),
+      ...(added || !banner.recommendedProductId
+        ? []
+        : [{ productId: banner.recommendedProductId, quantity: 1, selectedVariant: selectedVariant || banner.recommendedVariantName }]),
+    ];
+    return [...fromCart, ...hypothetical];
+  }, [debouncedCartItems, banner, sourceInCart, added, selectedVariant, sourceProduct]);
   const { data: ruleEvalRes } = useEvaluateCartRulesQuery(ruleEvalItems, { skip: ruleEvalItems.length === 0 });
   // RTK Query keeps serving the LAST successful result once a query is
   // skipped — it doesn't clear `data` just because the cart emptied out.
