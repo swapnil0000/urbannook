@@ -10,6 +10,7 @@ import {
 // to show "Free" instead of a shipping charge and how far the customer is
 // from unlocking it.
 const getFreeShippingConfigController = asyncHandler(async (_req, res) => {
+  console.log(`[FreeShipping:HTTP] GET /free-shipping-offer`);
   const config = await getFreeShippingConfig();
   return res.status(200).json(new ApiRes(200, "OK", config, true));
 });
@@ -19,6 +20,7 @@ const getFreeShippingConfigController = asyncHandler(async (_req, res) => {
 // the schema level — first match wins.
 const getBannerForProductController = asyncHandler(async (req, res) => {
   const { productId } = req.params;
+  console.log(`[FreeShipping:HTTP] GET /free-shipping-offer/banner/${productId}`);
   const banner = await getBannerForProduct(productId);
   return res.status(200).json(new ApiRes(200, "OK", banner, true));
 });
@@ -31,6 +33,7 @@ const getBannerForProductController = asyncHandler(async (req, res) => {
 // list and lets the client decide. Revisit if/when multi-banner display on
 // checkout is actually needed — see matching TODO comment in CheckoutPage.jsx.
 const getAllActiveBannersController = asyncHandler(async (_req, res) => {
+  console.log(`[FreeShipping:HTTP] GET /free-shipping-offer/banners`);
   const banners = await getAllActiveBanners();
   return res.status(200).json(new ApiRes(200, "OK", banners, true));
 });

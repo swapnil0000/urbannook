@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import MinimalCard from "./MinimalCard";
 import { trackSelectItem } from "../utils/analytics";
+import { allActiveVariantsOOS } from "../utils/variantStock";
 
 /**
  * Horizontal, arrow-scrollable row of recommended products for the PDP.
@@ -64,15 +65,8 @@ const RecommendedProducts = ({ products = [], title = "You May Also Like" }) => 
         {products.map((product, index) => {
           const firstVariant = product?.variantDetails?.[0];
           const price = Number(product?.effectivePrice ?? firstVariant?.variantPrice ?? 0);
-          const active = (product?.variantDetails || []).filter((v) => v.isActive !== false);
           const oos =
-            product?.productStatus === "out_of_stock" ||
-            (active.length > 0 &&
-              active.every(
-                (v) =>
-                  v.variantOutOfStock === true ||
-                  (v.variantQuantity != null && Number(v.variantQuantity) <= 0),
-              ));
+            product?.productStatus === "out_of_stock" || allActiveVariantsOOS(product);
           const badge = oos
             ? { label: "Out of Stock", className: "bg-ink text-white" }
             : null;

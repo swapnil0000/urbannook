@@ -21,6 +21,7 @@ import offerLeadRouter from "./offerLead.route.js";
 import offerRouter from "./offer.route.js";
 import guestCartRouter from "./guestCart.route.js";
 import webhookRouter from "./webhook.route.js";
+import promotionRouter from "./promotion.route.js";
 export {
   userRouter,
   productRouter,
@@ -45,4 +46,5 @@ export {
   offerRouter,
   guestCartRouter,
   webhookRouter,
+  promotionRouter,
 };

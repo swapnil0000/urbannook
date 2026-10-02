@@ -12,7 +12,15 @@ jest.unstable_mockModule('../../model/order.model.js', () => ({
 }));
 
 jest.unstable_mockModule('../../services/email.service.js', () => ({
-  sendOrderStatusUpdate: mockSendOrderStatusUpdate
+  sendOrderStatusUpdate: mockSendOrderStatusUpdate,
+  // user.cart.controller.js now imports fulfilCapturedPayment from
+  // rp.payment.controller.js (added on main), which pulls in the WHOLE
+  // module graph of that file, including these — Jest's strict ESM linking
+  // needs every export the real module re-exports to exist on the mock,
+  // even though this test never exercises the payment-captured path.
+  sendOrderConfirmation: jest.fn(),
+  sendPaymentReceipt: jest.fn(),
+  sendGuestAccountCreatedEmail: jest.fn()
 }));
 
 // Import after mocking

@@ -1,4 +1,4 @@
-import Offer from "../model/offer.model.js";
+import { getActivePromotionsAsCartRules } from "./promotionToCartRule.adapter.js";
 
 /**
  * Generic cart-promotion rule evaluator. Fully data-driven — no product IDs
@@ -13,11 +13,13 @@ import Offer from "../model/offer.model.js";
  * @param {{productId: string, quantity: number}[]} cartItems
  */
 export const getActiveCartRules = async () => {
-  // Reads the unified `offers` collection (type: "cart_rule", written by the
-  // admin panel's Offers page). Legacy `cartrules` collection is retired —
-  // see UN-ADMIN-panel .../server/scripts/seedOffersFromLegacy.js for the
-  // one-time backfill that must be run on any environment before this.
-  return Offer.find({ type: "cart_rule", isActive: true }).lean();
+  // Now reads the Promotion Engine V2 `promotions` collection, via
+  // promotionToCartRule.adapter.js, instead of the legacy `offers` collection
+  // (type: "cart_rule"). The adapter represents a Promotion in this exact
+  // shape so every function below, and every caller of this one
+  // (cartRule.controller.js, user.cart.service.js, rp.payment.controller.js,
+  // every storefront client component), needed zero other changes.
+  return getActivePromotionsAsCartRules();
 };
 
 const quantityByProduct = (cartItems = []) => {
@@ -61,6 +63,24 @@ const ruleIsMatched = (rule, qtyByProduct, qtyByProductVariant) =>
     return have >= cond.minQuantity;
   });
 
+// How many times this rule's FULL condition set is satisfied at once — e.g.
+// a condition "1+ Katana" with 2 Katanas in cart satisfies it twice, so a
+// reward on that rule should benefit up to 2 units, not just 1. Admin never
+// sets this directly; it's entirely derived from the condition's own
+// `minQuantity` against the real cart quantity — the single source of truth
+// for "how many free/discounted units does this admin-configured rule
+// actually grant right now" stays here, in the evaluation engine, not
+// reimplemented per storefront display surface.
+const ruleRepeatCount = (rule, qtyByProduct, qtyByProductVariant) => {
+  if (!rule.conditions?.length) return 1;
+  return Math.max(1, Math.min(...rule.conditions.map((cond) => {
+    const have = cond.variantSku
+      ? qtyByProductVariant.get(variantKey(String(cond.productId), cond.variantSku)) || 0
+      : qtyByProduct.get(String(cond.productId)) || 0;
+    return Math.floor(have / (cond.minQuantity || 1));
+  })));
+};
+
 /**
  * Evaluates a cart against a set of active rules.
  *
@@ -68,7 +88,7 @@ const ruleIsMatched = (rule, qtyByProduct, qtyByProductVariant) =>
  * @returns {{
  *   matchedRules: object[],
  *   freeShipping: boolean,
- *   discountCandidatesByProduct: Map<string, {type: 'percent_off'|'flat_off', value: number, variantSku?: string}[]>,
+ *   discountCandidatesByProduct: Map<string, {type: 'percent_off'|'flat_off', value: number, cap: number, variantSku?: string}[]>,
  * }}
  */
 export const evaluateCartRules = (cartItems, activeRules) => {
@@ -89,6 +109,7 @@ export const evaluateCartRules = (cartItems, activeRules) => {
   // applies to every variant, unchanged from before this field existed.
   const discountCandidatesByProduct = new Map();
   for (const rule of matchedRules) {
+    const cap = ruleRepeatCount(rule, qtyByProduct, qtyByProductVariant);
     for (const effect of rule.effects) {
       if (effect.type !== "percent_off" && effect.type !== "flat_off") continue;
       const productId = String(effect.targetProductId);
@@ -96,6 +117,11 @@ export const evaluateCartRules = (cartItems, activeRules) => {
       list.push({
         type: effect.type,
         value: effect.value,
+        // How many units of the TARGET this specific rule's current cart
+        // state justifies discounting — see ruleRepeatCount above. Every
+        // consumer (checkout's real charge, every storefront display
+        // surface) reads this instead of assuming a fixed "1".
+        cap,
         ...(effect.targetVariantSku ? { variantSku: effect.targetVariantSku } : {}),
       });
       discountCandidatesByProduct.set(productId, list);

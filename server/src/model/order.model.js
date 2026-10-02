@@ -32,9 +32,30 @@ const orderSchema = new mongoose.Schema(
           // time and never changed afterward, unlike selectedVariant (a display
           // name an admin can rename later). Blank = order predates this field.
           variantSku: { type: String, default: "" },
+          // Promotion Engine V2 — true for a synthetic ₹0 line added by a
+          // free_product reward (see rp.payment.controller.js), so
+          // admin/order views can tell a granted-free item apart from a
+          // paid one at a glance. Absent/false for every pre-existing order.
+          isPromotionalGift: { type: Boolean, default: false },
         },
       },
     ],
+    // Promotion Engine V2 — which V2 promotions (if any) applied to this
+    // order, snapshotted at creation time so support/admin can see exactly
+    // what fired without recomputing the engine against since-changed
+    // promotion config. Empty array for every order that predates this or
+    // that only used the legacy offers/cart_rule system.
+    appliedPromotions: {
+      type: [
+        {
+          _id: false,
+          promotionId: String,
+          name: String,
+          rewardTypes: [String],
+        },
+      ],
+      default: [],
+    },
     invoiceData: {
       isGenerated: { type: Boolean, default: false },
       s3FileKey: { type: String, default: null },

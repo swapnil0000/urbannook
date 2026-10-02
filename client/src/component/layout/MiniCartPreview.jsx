@@ -92,9 +92,22 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
     // than rounding per-unit first then multiplying (150×2=300) would.
     return Math.round(Math.max(Math.min(...results), 0));
   };
+  // How many units of this line the matching rule(s) actually justify
+  // discounting — server-computed (cartRule.util.js's ruleRepeatCount) from
+  // the rule's own condition quantity vs. real cart quantity, e.g. 2x the
+  // trigger product unlocks up to 2 discounted units, not a flat 1.
+  const getItemDiscountCap = (item) => {
+    const productId = item.mongoId || item.id;
+    const candidates = (cartRuleEvalData?.data?.discounts?.[productId] || []).filter(
+      (c) => !c.variantName || c.variantName === item.selectedVariant,
+    );
+    return Math.max(1, ...candidates.map((c) => c.cap ?? 1));
+  };
   const ruleDiscountSavings = cartItems.reduce((sum, item) => {
     const rawPrice = Number(item.price) || 0;
-    return sum + (rawPrice - getItemDiscountedPrice(item)) * itemQty(item.quantity);
+    const discountedUnitPrice = getItemDiscountedPrice(item);
+    const discountedUnits = discountedUnitPrice < rawPrice ? Math.min(itemQty(item.quantity), getItemDiscountCap(item)) : 0;
+    return sum + (rawPrice - discountedUnitPrice) * discountedUnits;
   }, 0);
   const subtotal = (Number(totalAmount) || 0) - ruleDiscountSavings;
 
@@ -138,7 +151,6 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
   const nudgeBanners = banners.filter(
     (b) => hasProductVariant(b.sourceProductId, b.sourceVariantName) && !hasProductVariant(b.recommendedProductId, b.recommendedVariantName),
   );
-
   useEffect(() => {
     const id = requestAnimationFrame(() => setMounted(true));
     return () => cancelAnimationFrame(id);
@@ -203,17 +215,24 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
                     <p className="text-[10px] text-black/50">Qty {itemQty(item.quantity)}</p>
                   </div>
                   {(() => {
-                    const discountedPrice = getItemDiscountedPrice(item);
+                    const discountedUnitPrice = getItemDiscountedPrice(item);
                     const rawPrice = Number(item.price) || 0;
-                    const hasDiscount = discountedPrice < rawPrice;
+                    const hasDiscount = discountedUnitPrice < rawPrice;
+                    const qty = itemQty(item.quantity);
+                    // Cap scales with the rule's trigger quantity — see
+                    // getItemDiscountCap / ruleDiscountSavings above.
+                    const discountedUnits = hasDiscount ? Math.min(qty, getItemDiscountCap(item)) : 0;
+                    const fullPriceUnits = qty - discountedUnits;
+                    const lineTotal = discountedUnitPrice * discountedUnits + rawPrice * fullPriceUnits;
+                    const rawLineTotal = rawPrice * qty;
                     const percentOff = hasDiscount
-                      ? Math.round(((rawPrice - discountedPrice) / rawPrice) * 100)
+                      ? Math.round(((rawLineTotal - lineTotal) / rawLineTotal) * 100)
                       : 0;
                     return hasDiscount ? (
                       <div className="text-right shrink-0">
-                        <p className="text-xs font-bold text-save">₹{Math.round(discountedPrice * itemQty(item.quantity)).toLocaleString()}</p>
+                        <p className="text-xs font-bold text-save">₹{Math.round(lineTotal).toLocaleString()}</p>
                         <div className="flex items-center justify-end gap-1">
-                          <span className="text-[9px] text-black/40 line-through">₹{(rawPrice * itemQty(item.quantity)).toLocaleString()}</span>
+                          <span className="text-[9px] text-black/40 line-through">₹{rawLineTotal.toLocaleString()}</span>
                           <span className="text-[9px] font-bold uppercase rounded-full bg-save text-white px-1.5 py-px">
                             {percentOff}% OFF
                           </span>
@@ -221,7 +240,7 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
                       </div>
                     ) : (
                       <p className="text-xs font-bold text-black shrink-0">
-                        ₹{(rawPrice * itemQty(item.quantity)).toLocaleString()}
+                        ₹{rawLineTotal.toLocaleString()}
                       </p>
                     );
                   })()}
