@@ -1,3 +1,4 @@
+import SEOHead from "../component/SEOHead";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { Suspense } from "react";
 import {
@@ -99,6 +100,7 @@ const AppRoutes = () => {
         path="/checkout"
         element={
           <Suspense fallback={<MinimalLoader />}>
+            <SEOHead noIndex />
             <CheckoutPage />
           </Suspense>
         }
@@ -107,19 +109,21 @@ const AppRoutes = () => {
         path="/profile"
         element={
           <ProtectedRoute>
+            <SEOHead noIndex />
             <Suspense fallback={<MinimalLoader />}>
               <MyProfilePage />
             </Suspense>
           </ProtectedRoute>
         }
       />
-      <Route path="/payment-processing/:orderId" element={<PaymentProcessing />} />
-      <Route path="/order-confirm/:orderId" element={<OrderConfirm />} />
-      <Route path="/payment-failed" element={<PaymentFailed />} />
+      <Route path="/payment-processing/:orderId" element={<><SEOHead noIndex /><PaymentProcessing /></>} />
+      <Route path="/order-confirm/:orderId" element={<><SEOHead noIndex /><OrderConfirm /></>} />
+      <Route path="/payment-failed" element={<><SEOHead noIndex /><PaymentFailed /></>} />
       <Route
         path="/orders"
         element={
           <ProtectedRoute>
+            <SEOHead noIndex />
             <Suspense fallback={<MinimalLoader />}>
               <MyOrdersPage />
             </Suspense>
@@ -130,6 +134,7 @@ const AppRoutes = () => {
         path="/wishlist"
         element={
           <ProtectedRoute>
+            <SEOHead noIndex />
             <Suspense fallback={<MinimalLoader />}>
               <WishlistPage />
             </Suspense>
@@ -140,6 +145,7 @@ const AppRoutes = () => {
         path="/customer-support"
         element={
           <Suspense fallback={<MinimalLoader />}>
+            <SEOHead title="Customer Support" description="Need help with an UrbanNook order? Contact our support team for orders, shipping, returns and payments." url="/customer-support" />
             <CustomerSupportPage />
           </Suspense>
         }
@@ -148,6 +154,7 @@ const AppRoutes = () => {
         path="/rewards"
         element={
           <Suspense fallback={<MinimalLoader />}>
+            <SEOHead title="Rewards Program" description="Earn and redeem UrbanNook reward points on your orders of 3D-printed décor and desk accessories." url="/rewards" />
             <RewardsPage />
           </Suspense>
         }
@@ -156,6 +163,7 @@ const AppRoutes = () => {
         path="/settings"
         element={
           <ProtectedRoute>
+            <SEOHead noIndex />
             <Suspense fallback={<MinimalLoader />}>
               <SettingsPage />
             </Suspense>
@@ -166,6 +174,7 @@ const AppRoutes = () => {
         path="/terms-conditions"
         element={
           <Suspense fallback={<MinimalLoader />}>
+            <SEOHead title="Terms & Conditions" description="Terms and conditions for shopping at UrbanNook — orders, payments, shipping and use of the website." url="/terms-conditions" />
             <TermsConditions />
           </Suspense>
         }
@@ -182,6 +191,7 @@ const AppRoutes = () => {
         path="/privacy-policy"
         element={
           <Suspense fallback={<MinimalLoader />}>
+            <SEOHead title="Privacy Policy" description="How UrbanNook collects, uses and protects your personal data when you shop with us." url="/privacy-policy" />
             <PrivacyPolicy />
           </Suspense>
         }
@@ -198,6 +208,7 @@ const AppRoutes = () => {
         path="/return-policy"
         element={
           <Suspense fallback={<MinimalLoader />}>
+            <SEOHead title="Return & Replacement Policy" description="UrbanNook return and replacement policy — eligibility, timelines and how to raise a request." url="/return-policy" />
             <Return />
           </Suspense>
         }

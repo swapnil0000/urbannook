@@ -14,28 +14,9 @@ import AppRoutes from './store/AppRoutes';
 import NewsTicker from './pages/home/NewsTicker';
 import WhatsAppLoginWatcher from './component/layout/auth/WhatsAppLoginWatcher';
 import WhatsAppOneTap from './component/layout/auth/WhatsAppOneTap';
-import SEOHead from './component/SEOHead';
 import { trackPageView, setUserId, captureAttribution, setMetaAdvancedMatching } from './utils/analytics';
 import MotionLayer from './component/MotionLayer';
 import SmoothScroll from './component/motion/SmoothScroll';
-// check
-const ORG_STRUCTURED_DATA = {
-  '@context': 'https://schema.org',
-  '@type': 'Organization',
-  name: 'UrbanNook',
-  url: 'https://www.urbannook.in',
-  logo: 'https://www.urbannook.in/assets/logo_with_text.webp',
-  sameAs: [
-    'https://www.instagram.com/urbannook.store',
-  ],
-  contactPoint: {
-    '@type': 'ContactPoint',
-    telephone: '+91-91240-81005',
-    contactType: 'customer service',
-    areaServed: 'IN',
-    availableLanguage: ['English', 'Hindi'],
-  },
-};
 
 // Only lazy load non-critical components
 const NewHeader = lazy(() => import('./component/layout/NewHeader'));
@@ -170,7 +151,6 @@ function App() {
     <Provider store={store}>
         <Router>
           <SmoothScroll>
-          <SEOHead structuredData={ORG_STRUCTURED_DATA} />
           <RouteTracker />
           <MotionLayer />
           <SessionManager>

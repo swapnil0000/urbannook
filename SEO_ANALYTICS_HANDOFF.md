@@ -85,3 +85,20 @@ are **copied as-is**. Only the deploy mechanics around them changed:
 - Section B #4: when the feed fails, skip the two `product/` sync steps instead of syncing an empty
   folder with `--delete`. This keeps yesterday's pages.
 - Run the nightly refresh only if the feed actually changed, to save a full rebuild every night.
+
+## E. Requests from the storefront team (2026-10-02, PR "seo: quick wins")
+
+1. **Remove `/cancellation-refund` from `STATIC_PAGES`** (`client/scripts/prerender.mjs:33`) and from
+   `llms.txt` (around line 208). The route was removed on purpose in commit `95a7c20` ("remove
+   cancellation policy"), so the sitemap lists a URL that renders the noindex 404 page.
+2. **FYI, runtime head changes in this PR:**
+   - The App-level `<SEOHead>` is gone. It gave every page without its own SEOHead a
+     canonical pointing at the homepage.
+   - `SEOHead` now leaves out the canonical and `og:url` when no `url` is passed.
+   - Organization schema lives only in `index.html` (`contactPoint` was moved there).
+   - The product page now outputs `og:type=product`, a BreadcrumbList, and an
+     AggregateRating built only from real reviews. The placeholder "4.8" rating is removed.
+   - WebSite SearchAction is removed from the home page, because `/products` doesn't
+     support `?q=`.
+   - Prerendered pages should still match: please check that the Product/Breadcrumb JSON-LD
+     from `prerender.mjs` stays consistent with these.

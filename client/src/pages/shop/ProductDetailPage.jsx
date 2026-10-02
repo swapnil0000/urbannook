@@ -567,6 +567,7 @@ const ProductDetailPage = () => {
   if (isLoading) return <div className="min-h-[70vh] grid place-items-center bg-paper"><div className="w-12 h-12 border-2 border-brand border-t-transparent rounded-full animate-spin" /></div>;
   if (error || !product) return (
     <div className="min-h-[70vh] grid place-items-center bg-paper font-inter text-center px-5">
+      <SEOHead title="Product not found" noIndex />
       <div><h1 className="text-3xl font-extrabold">Product not found</h1><button onClick={() => navigate('/products')} className="gl-press mt-5 bg-brand text-white font-bold px-7 py-3 rounded-xl hover:bg-brandHi">Back to Shop</button></div>
     </div>
   );
@@ -575,12 +576,24 @@ const ProductDetailPage = () => {
   const structuredData = {
     '@context': 'https://schema.org', '@type': 'Product', name: product.productName, image: galleryImages, description: product.productSubDes || product.productDes, sku: product.productId,
     brand: { '@type': 'Brand', name: 'UrbanNook' },
-    offers: { '@type': 'Offer', url: `https://www.urbannook.in/product/${product.productId}`, priceCurrency: 'INR', price: currentPrice, availability: product.productStatus === 'in_stock' ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock' },
+    offers: { '@type': 'Offer', url: `https://www.urbannook.in/product/${product.productId}`, priceCurrency: 'INR', price: currentPrice, availability: product.productStatus === 'in_stock' ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock', itemCondition: 'https://schema.org/NewCondition' },
+    // Only real, approved reviews — never a placeholder rating.
+    ...(totalReviews > 0 && avgRating > 0 && {
+      aggregateRating: { '@type': 'AggregateRating', ratingValue: Number(avgRating).toFixed(1), reviewCount: totalReviews },
+    }),
+  };
+  const breadcrumbData = {
+    '@context': 'https://schema.org', '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://www.urbannook.in/' },
+      { '@type': 'ListItem', position: 2, name: 'Shop', item: 'https://www.urbannook.in/products' },
+      { '@type': 'ListItem', position: 3, name: product.productName, item: `https://www.urbannook.in/product/${product.productId}` },
+    ],
   };
 
   return (
     <div className="font-inter bg-paper text-ink min-h-screen overflow-x-clip">
-      <SEOHead title={product.productName} description={product.productSubDes || product.productDes} url={`/product/${product.productId}`} image={galleryImages[0]} structuredData={structuredData} />
+      <SEOHead title={product.productName} description={product.productSubDes || product.productDes} url={`/product/${product.productId}`} image={galleryImages[0]} type="product" structuredData={[structuredData, breadcrumbData]} />
 
       <div className="max-w-[1280px] mx-auto px-5 py-6 md:py-8">
         {/* breadcrumb */}
@@ -599,10 +612,10 @@ const ProductDetailPage = () => {
             {/* ZONE A — IDENTITY (on paper): kicker + rating chip, title + heart, lede */}
             <div className="flex items-center justify-between gap-3">
               <p className="gl-lbl text-brand">{product.productSubCategory || product.productCategory || '3D Printed'}</p>
-              {totalReviews > 0 && (
+              {totalReviews > 0 && avgRating > 0 && (
                 <button onClick={() => document.getElementById('reviews')?.scrollIntoView({ behavior: 'smooth' })} className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-hair px-2.5 py-1 hover:border-ink transition-colors">
-                  <Stars n={avgRating || 5} className="text-xs" />
-                  <span className="text-xs font-bold text-ink">{(avgRating || 4.8).toFixed?.(1) || avgRating}</span>
+                  <Stars n={avgRating} className="text-xs" />
+                  <span className="text-xs font-bold text-ink">{Number(avgRating).toFixed(1)}</span>
                   <span className="text-xs text-muted">({totalReviews})</span>
                 </button>
               )}
