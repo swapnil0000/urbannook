@@ -65,13 +65,21 @@ const evaluateCartRulesController = asyncHandler(async (req, res) => {
   // applyBestDiscount; this is just for the client to show "X% off").
   // Translate variantSku back to variantName here — see the file-level
   // comment above.
+  // FIXED: this used to explicitly whitelist {type, value, variantName},
+  // silently dropping `cap` (how many units the rule's trigger quantity
+  // justifies discounting — see cartRule.util.js's ruleRepeatCount) even
+  // though the engine started computing it. Every storefront consumer of
+  // this endpoint (CartDrawer, MiniCartPreview, CheckoutPage,
+  // ProductPageBanner, FreeShippingBanner) reads `c.cap ?? 1` — with it
+  // missing, they all silently fell back to a flat cap of 1, which is
+  // exactly why 3 Katanas still only freed 1 Stand instead of up to 3.
   const discounts = Object.fromEntries(
     Array.from(result.discountCandidatesByProduct.entries()).map(([productId, candidates]) => [
       productId,
       candidates.map((c) =>
         c.variantSku
-          ? { type: c.type, value: c.value, variantName: nameByProductAndSku(productId, c.variantSku) }
-          : { type: c.type, value: c.value },
+          ? { type: c.type, value: c.value, cap: c.cap, variantName: nameByProductAndSku(productId, c.variantSku) }
+          : { type: c.type, value: c.value, cap: c.cap },
       ),
     ]),
   );

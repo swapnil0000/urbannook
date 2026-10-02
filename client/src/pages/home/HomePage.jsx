@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import SEOHead from '../../component/SEOHead';
-import UnProductCard, { productImg, firstVariant, inr } from '../../component/UnProductCard';
+import { productImg, firstVariant, inr } from '../../component/UnProductCard';
+import HomeProductCard from '../../component/HomeProductCard';
 import { Reveal, Stagger, StaggerItem, Parallax, TextReveal, useInView, motion, AnimatePresence } from '../../component/motion';
 import { useGetFeaturedProductsQuery, useGetProductsQuery } from '../../store/api/productsApi';
 import { useGetTestimonialsQuery } from '../../store/api/testimonialsApi';
@@ -610,11 +611,22 @@ const HeroCarousel = ({ products = [], onProduct, onVariant, onShop }) => {
             </button>
           </div>
 
+          {/* items-stretch: a row of flush, even-height cards. HomeProductCard's
+              title reserves a fixed 2-line min-height, so a stretched card's
+              extra space lands as blank room below the %-off line, never as
+              a gap between the title and the price. */}
+          {/* shrink-0, NOT grow: every card gets the exact same fixed
+              width. grow let flex distribute leftover row space unevenly
+              across cards (down to small natural-size differences between
+              them), so the square image — sized off its own card's width —
+              came out visibly bigger on some cards than others. A short
+              catalogue just leaves blank space at the row's end now, which
+              reads fine on a horizontal scroller. */}
           <div className="flex gap-3 md:gap-4 overflow-x-auto gl-hscroll pb-1 snap-x items-stretch">
             {strip.items.map((p, k) => (
               <div key={p.productId || k}
-                className="snap-start shrink-0 grow basis-[142px] sm:basis-[158px] md:basis-[176px] max-w-[360px]">
-                <UnProductCard p={p} index={k} listId="home_drop" listName="The Drop" />
+                className="snap-start shrink-0 basis-[142px] sm:basis-[158px] md:basis-[176px]">
+                <HomeProductCard p={p} index={k} listId="home_drop" listName="The Drop" />
               </div>
             ))}
 
@@ -835,7 +847,7 @@ const HomePage = () => {
             <SecHead index="01" kicker="The Collection" title="Everything we make" onView={() => navigate('/products')} />
             {isLoading
               ? <div className={`grid ${collectionCols} mx-auto gap-3 md:gap-6`}>{[...Array(Math.max(n, 2))].map((_, i) => <div key={i} className="aspect-[4/5] bg-hair animate-pulse rounded-none border border-hair" />)}</div>
-              : <Stagger className={`grid ${collectionCols} mx-auto gap-3 md:gap-6`} stagger={0.08}>{products.map((p, i) => <StaggerItem key={p.productId || i}><UnProductCard p={p} index={i} listId="home_collection" listName="Collection" /></StaggerItem>)}</Stagger>}
+              : <Stagger className={`grid ${collectionCols} mx-auto gap-3 md:gap-6`} stagger={0.08}>{products.map((p, i) => <StaggerItem key={p.productId || i}><HomeProductCard p={p} index={i} listId="home_collection" listName="Collection" /></StaggerItem>)}</Stagger>}
             <Reveal className="text-center mt-4 md:mt-6">
               <p className="text-muted text-sm max-w-md mx-auto">A tight, made-to-order range — no filler, no warehouse leftovers. <b className="text-ink">More drops on the way.</b></p>
             </Reveal>
@@ -848,7 +860,7 @@ const HomePage = () => {
             <SecHead index="01" kicker="The Hype" title="Bestsellers" onView={() => navigate('/products')} />
             {isLoading
               ? <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">{[...Array(4)].map((_, i) => <div key={i} className="aspect-[4/5] bg-hair animate-pulse rounded-none border border-hair" />)}</div>
-              : <Stagger className={`grid ${colsFor(bestsellers.length)} mx-auto gap-4 md:gap-6`} stagger={0.06}>{bestsellers.map((p, i) => <StaggerItem key={p.productId || i}><UnProductCard p={p} index={i} listId="home_best" listName="Bestsellers" /></StaggerItem>)}</Stagger>}
+              : <Stagger className={`grid ${colsFor(bestsellers.length)} mx-auto gap-4 md:gap-6`} stagger={0.06}>{bestsellers.map((p, i) => <StaggerItem key={p.productId || i}><HomeProductCard p={p} index={i} listId="home_best" listName="Bestsellers" /></StaggerItem>)}</Stagger>}
           </div>
         </section>
       ) : null}
@@ -1036,7 +1048,7 @@ const HomePage = () => {
           <Stagger className="flex gap-4 md:gap-6 overflow-x-auto gl-hscroll snap-x snap-mandatory pb-3 -mx-5 px-5" stagger={0.06}>
             {arrivals.map((p, i) => (
               <StaggerItem key={p.productId || i} className="shrink-0 w-[68vw] sm:w-[280px] snap-start">
-                <UnProductCard p={p} index={i} listId="home_new" listName="New Arrivals" />
+                <HomeProductCard p={p} index={i} listId="home_new" listName="New Arrivals" />
               </StaggerItem>
             ))}
           </Stagger>

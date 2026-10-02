@@ -68,13 +68,15 @@ const ProductPageBanner = ({
   const [variantMenuPos, setVariantMenuPos] = useState(null);
   const [addLoading, setAddLoading] = useState(false);
 
-  // Admin-configured "Product Page Banners" — same query FreeShippingBanner
-  // uses, filtered to banners that aren't just cart_rule-derived shipping
-  // combos. Only real admin-authored banners (a real Mongo `_id`, no
-  // `ruleId`) show here — the auto-derived ones from an unrelated
-  // free_shipping cart_rule belong to FreeShippingBanner's own narrative,
-  // not this generic one, and showing both was confusing two different
-  // offers on the same page.
+  // Every active banner for this product — now entirely Promotion-derived
+  // (see freeShippingOffer.util.js's getCartRuleDerivedBanners), both
+  // free_shipping-effect combos AND percent_off/flat_off "free gift"-style
+  // ones. There is no longer a separate hand-typed admin-banner source to
+  // disambiguate from (that `offers`-backed path was removed), so the old
+  // `b._id && !b.ruleId` filter — which used to exclude auto-derived
+  // banners so they wouldn't double up with FreeShippingBanner's own
+  // narrative — now excludes EVERYTHING, since every banner is `ruleId`-
+  // tagged. Removed; every Promotion-derived banner for this product shows.
   const { data: allBannersRes } = useGetAllFreeShippingBannersQuery();
   const banners = useMemo(() => {
     const list = bannersOverride
@@ -82,7 +84,48 @@ const ProductPageBanner = ({
       : !productId
         ? []
         : (allBannersRes?.data || []).filter((b) => String(b.sourceProductId) === String(productId));
-    return list.filter((b) => b._id && !b.ruleId);
+    // Multiple rewards targeting the SAME recommended product at different
+    // variants (e.g. Single FREE / Double 50% off / Triple 50% off) each
+    // produce their own banner — rendered as separate carousel slides, each
+    // LOCKED to its own variant (the dropdown below is disabled whenever
+    // banner.recommendedVariantName is set), so a customer landing on the
+    // "Single" slide could never switch to see Double/Triple pricing, and
+    // which slide showed first was arbitrary. Deduped to ONE slide per
+    // recommended product, with the variant lock cleared — the discount
+    // price shown already resolves per-variant live from `ruleEval`
+    // (see ruleDiscountedPrice below) regardless of which specific banner
+    // object this came from, so clearing the lock is enough to make the
+    // dropdown pick any variant and see its correct price/offer.
+    // FIXED: merging used to keep only the FIRST reward's text/subtitle/
+    // image/ctaLabel as a fixed property of the merged banner — so
+    // switching the dropdown from Single to Double changed the PRICE
+    // (already variant-aware via ruleEval) but not the copy, which stayed
+    // stuck on whichever reward was first ("FREE Single-Layer Stand..."
+    // showing even once Double/Triple was selected). Now keeps a
+    // `variantOffers` map keyed by variantSku, so the copy can be looked
+    // up for whichever variant is actually selected — see
+    // activeVariantOffer below, computed once `activeVariant` is known.
+    const seen = new Map();
+    for (const b of list) {
+      const key = String(b.recommendedProductId);
+      if (!seen.has(key)) {
+        seen.set(key, { ...b, recommendedVariantSku: undefined, recommendedVariantName: undefined, variantOffers: {} });
+      }
+      // Keyed by NAME, not sku — resolveBannerVariantNames (server,
+      // freeShippingOffer.util.js) strips recommendedVariantSku and
+      // replaces it with recommendedVariantName before this ever reaches
+      // the client, so keying by sku here always collapsed to "__default__"
+      // for every variant-scoped reward — all 3 (Single/Double/Triple)
+      // silently overwrote the same slot, last-one-in-the-list wins. That
+      // was the actual bug: price was already variant-correct (separate
+      // code path, keyed by variant NAME via `selectedVariant`), only the
+      // text lookup used the wrong, now-nonexistent key.
+      const merged = seen.get(key);
+      merged.variantOffers[b.recommendedVariantName || "__default__"] = {
+        text: b.text, subtitle: b.subtitle, ctaLabel: b.ctaLabel, image: b.image,
+      };
+    }
+    return [...seen.values()];
   }, [bannersOverride, allBannersRes, productId]);
   const bannersKey = useMemo(
     () => banners.map((b) => `${b.sourceProductId}:${b.recommendedProductId}`).join(","),
@@ -133,6 +176,9 @@ const ProductPageBanner = ({
 
   const bannerRuleId = banner?.ruleId;
   const bannerDocId = banner?._id;
+  // Used only as the analytics fallback name below (offerMeta) — the actual
+  // CUSTOMER-FACING text is activeVariantOffer.text, resolved further down
+  // once activeVariant is known, so it updates when the dropdown changes.
   const bannerText = banner?.text;
   const bannerSourceId = banner?.sourceProductId;
   const bannerRecommendedId = banner?.recommendedProductId;
@@ -160,15 +206,20 @@ const ProductPageBanner = ({
     });
   }, [offerMeta, recommendedProduct, surface]);
 
+  // Matches against the DROPDOWN'S current selection (selectedVariant), not
+  // banner.recommendedVariantName — now that one banner card covers every
+  // variant (see the dedup above), the banner itself no longer pins a
+  // single variant, so "is this already in the cart" must track whichever
+  // variant the customer actually has the dropdown set to right now.
   const cartMatch = useMemo(() => {
     if (!recommendedProduct) return null;
     return cartItems.find((item) => {
       const idMatches = String(item.id) === String(recommendedProduct.productId) || String(item.mongoId) === String(recommendedProduct.productId);
       if (!idMatches) return false;
-      if (banner?.recommendedVariantName) return item.selectedVariant === banner.recommendedVariantName;
+      if (selectedVariant) return item.selectedVariant === selectedVariant;
       return true;
     });
-  }, [cartItems, recommendedProduct, banner?.recommendedVariantName]);
+  }, [cartItems, recommendedProduct, selectedVariant]);
   const added = !!cartMatch;
   const addedVariant = cartMatch?.selectedVariant || null;
 
@@ -301,11 +352,26 @@ const ProductPageBanner = ({
   // null/loading, and the actual bail-out happens right before the JSX
   // return further down.
   const activeVariant = variants.find((v) => v.variantName === selectedVariant) || variants[0];
+  // The copy (text/subtitle/ctaLabel/image) for whichever variant is
+  // CURRENTLY selected — falls back to the variant-agnostic "__default__"
+  // entry (set for banners with no variant-scoped reward, e.g. a plain
+  // free_shipping combo), then to the banner's own first-seen values as a
+  // last resort. See the `variantOffers` map built in the banners useMemo
+  // above — this is what makes the text actually change when Single ->
+  // Double is picked, instead of staying stuck on whichever reward merged
+  // first.
+  const activeVariantOffer =
+    banner?.variantOffers?.[activeVariant?.variantName] ||
+    banner?.variantOffers?.["__default__"] ||
+    { text: banner?.text, subtitle: banner?.subtitle, ctaLabel: banner?.ctaLabel, image: banner?.image };
   const goToProduct = () => {
     const sku = activeVariant?.sku;
     navigate(sku ? `/product/${recommendedProduct?.productId}/${sku}` : `/product/${recommendedProduct?.productId}`);
   };
-  const displayImage = activeVariant?.variantImage?.[0] || recommendedProduct?.productImg || "https://urbannook.in/assets/logo.webp";
+  // An admin-set custom banner image (set on the reward in the Promotions
+  // editor) takes priority over the recommended product's own photo — lets
+  // a banner show a lifestyle/combo graphic instead of a plain product shot.
+  const displayImage = activeVariantOffer.image || activeVariant?.variantImage?.[0] || recommendedProduct?.productImg || "https://urbannook.in/assets/logo.webp";
   const displayPrice = activeVariant?.variantPrice ?? 0;
   const isActiveVariantOOS = isVariantOOS(activeVariant);
   const addDisabled = isActiveVariantOOS || sourceOOS;
@@ -501,7 +567,7 @@ const ProductPageBanner = ({
 
       <div className="px-4 pt-3 text-center">
         {comboUnlocked ? (
-          <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-ink">{bannerText}</span>
+          <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-ink">{activeVariantOffer.text}</span>
         ) : added && !sourceInCart ? (
           <p className="text-[10px] font-semibold text-ink/80">
             Add {sourceProduct?.productName || "this product"} to your cart to unlock{" "}
@@ -509,8 +575,11 @@ const ProductPageBanner = ({
           </p>
         ) : (
           <p className="font-semibold tracking-[0.01em] text-ink whitespace-nowrap" style={{ fontSize: "clamp(8px, 3vw, 11px)" }}>
-            {bannerText}
+            {activeVariantOffer.text}
           </p>
+        )}
+        {activeVariantOffer.subtitle && (
+          <p className="text-[10px] text-ink/70 mt-0.5">{activeVariantOffer.subtitle}</p>
         )}
       </div>
 
@@ -581,7 +650,15 @@ const ProductPageBanner = ({
               const lineDisplayPrice = displayPrice * lineQty;
 
               if (hasRuleDiscount) {
-                const lineDiscounted = Math.round(ruleDiscountedPrice) * lineQty;
+                // Cap scales with how many times the rule's trigger
+                // condition is met — server-computed (cartRule.util.js's
+                // ruleRepeatCount), read from the candidate, never
+                // re-derived here. Matches rp.payment.controller.js exactly,
+                // so this preview never disagrees with what checkout charges.
+                const discountCap = Math.max(1, ...ruleDiscountCandidates.map((c) => c.cap ?? 1));
+                const discountedUnits = Math.min(lineQty, discountCap);
+                const fullPriceUnits = lineQty - discountedUnits;
+                const lineDiscounted = Math.round(ruleDiscountedPrice) * discountedUnits + displayPrice * fullPriceUnits;
                 const rulePercent = Math.round(((lineDisplayPrice - lineDiscounted) / lineDisplayPrice) * 100);
                 return (
                   <>
@@ -679,7 +756,7 @@ const ProductPageBanner = ({
                 </>
               ) : (
                 <>
-                  {banner.ctaLabel || "Add to Cart"}
+                  {activeVariantOffer.ctaLabel || "Add to Cart"}
                   <span className="text-base leading-none">→</span>
                 </>
               )}

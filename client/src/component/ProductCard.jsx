@@ -2,7 +2,6 @@ import { lazy, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { trackSelectItem } from "../utils/analytics";
 import { isVariantOutOfStock, allActiveVariantsOOS } from "../utils/variantStock";
-import FitTitle from "./FitTitle";
 
 const WishlistButton = lazy(() => import("./WishlistButton"));
 
@@ -245,28 +244,15 @@ const ProductCard = ({ product, index = 0, listId = "all_products", listName = "
           })()}
         </div>
 
-        {/* Minimal footer — name, then price, nothing else. A fixed-height
-            title (FitTitle: always exactly one line, whatever the name's
-            length) keeps every card in a row the same height, so a row
-            never looks uneven. */}
+        {/* Minimal footer — name, then price, nothing else. A fixed-height,
+            fixed-size title (truncated with an ellipsis if it overflows)
+            keeps every card in a row the same height, so a row never looks
+            uneven. */}
         <div className="p-3.5 flex flex-col items-center gap-1 bg-white border-t border-hair">
-          {/* Fixed-height wrapper, sized to the CAP font size regardless of
-              how much this particular title had to shrink — otherwise a
-              long name (smaller font) leaves a shorter title block than a
-              short name (full font), and the row/card ends up uneven. */}
           <div className="h-5 md:h-6 flex items-center justify-center w-full">
-            <FitTitle
-              text={product.productName || ""}
-              capPx={15}
-              floorPx={9}
-              className="font-archivo font-bold text-ink leading-snug text-center block md:hidden w-full"
-            />
-            <FitTitle
-              text={product.productName || ""}
-              capPx={18}
-              floorPx={12}
-              className="font-archivo font-bold text-ink leading-snug text-center hidden md:block w-full"
-            />
+            <h3 className="font-archivo font-bold text-ink leading-snug text-center w-full truncate text-[15px] md:text-[18px]">
+              {product.productName || ""}
+            </h3>
           </div>
           <span className="text-xs md:text-sm font-semibold text-ink">
             Starting at ₹{price?.toLocaleString()}

@@ -1,8 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import WishlistButton from './WishlistButton';
-import FitTitle from './FitTitle';
 import { trackSelectItem } from '../utils/analytics';
-import tailwindConfig from '../../tailwind.config.js';
 
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
 const firstVariant = (p) => p?.variantDetails?.[0] || {};
@@ -75,17 +73,15 @@ const UnProductCard = ({
       </div>
       <div className="p-3.5 flex flex-col flex-1 min-w-0">
         <div className="h-5 flex items-center">
-          <FitTitle
-            text={p.productName}
-            capPx={14}
-            floorPx={9}
-            fontFamily={tailwindConfig.theme.extend.fontFamily.inter.join(', ')}
-            className="font-bold text-ink"
-          />
+          <h3 className="font-bold text-ink truncate text-[13px]">{p.productName}</h3>
         </div>
         {/* Price, then the % off / struck-MRP stack sitting right next to it
-            (gap-1.5, no space-between spread) — smaller text on the stack. */}
-        <div className="mt-auto pt-2 flex items-center gap-1.5">
+            (gap-1.5, no space-between spread) — smaller text on the stack.
+            Sits right under the title (mt-1.5, not mt-auto) so it never gets
+            stretched away from it when a taller sibling card in the same
+            row forces this card to grow — that used to leave a big dead
+            gap between title and price on shorter cards. */}
+        <div className="mt-1.5 flex items-center gap-1.5">
           <span className="text-[15px] text-ink font-extrabold">{inr(price)}</span>
           {mrp > price && (
             <div className="flex flex-col leading-tight">

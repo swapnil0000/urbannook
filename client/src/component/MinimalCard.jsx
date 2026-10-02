@@ -1,5 +1,3 @@
-import FitTitle from "./FitTitle";
-
 /**
  * Product-list card for the two PDP scroller sections ("Explore Other
  * Variants" and "You May Also Like") — a standard e-commerce card layout
@@ -9,9 +7,9 @@ import FitTitle from "./FitTitle";
  * supplies the click handler, so this works equally for a product
  * (multi-variant "Starting at ₹X") or a single variant ("₹X").
  *
- * Title uses the same FitTitle every other card type uses — always exactly
- * one line, shrinking to fit rather than wrapping — so a row of these
- * cards is never uneven the way a wrapping 1-line-vs-2-line title would be.
+ * Title is a fixed-size single line, truncated with an ellipsis if it
+ * overflows — same font size on every card, so a row of these cards is
+ * never uneven the way a wrapping 1-line-vs-2-line title would be.
  *
  * Deliberately does NOT show a star rating, a "bank offer" line, or a
  * delivery estimate the way some marketplace cards do — none of that is
@@ -43,18 +41,12 @@ const MinimalCard = ({ image, alt, title, price, mrp, pricePrefix, badge, onClic
       </div>
 
       <div className="p-3 flex flex-col items-start gap-1 text-left">
-        {/* Fixed-height wrapper, sized to the CAP font size regardless of how
-            much this particular title had to shrink — otherwise a long name
-            (smaller font) leaves a shorter title block than a short name
-            (full font), and the price row below ends up at a different Y
-            per card in the same row. */}
+        {/* Fixed-height wrapper so the price row below always sits at the
+            same Y across a row of cards, regardless of title length. */}
         <div className="h-[18px] flex items-center w-full">
-          <FitTitle
-            text={title || ""}
-            capPx={13}
-            floorPx={9}
-            className="font-archivo font-bold text-ink leading-snug text-left w-full"
-          />
+          <h3 className="font-archivo font-bold text-ink leading-snug text-left w-full truncate text-[13px]">
+            {title || ""}
+          </h3>
         </div>
 
         {/* Price on the left, MRP + discount stacked to its right — left-

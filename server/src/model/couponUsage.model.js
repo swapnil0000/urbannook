@@ -14,6 +14,13 @@ const couponUsageSchema = new mongoose.Schema(
     discountAmount:          { type: Number, default: 0 },
     cartValueBeforeDiscount: { type: Number },
     usedAt:                  { type: Date, default: Date.now },
+
+    // Cancellation/refund flags this true (never deletes — same permanent
+    // audit-trail invariant promotionUsage.model.js documents) and releases
+    // the coupon's usageCount slot. Every per-user-limit check
+    // (maxUsesPerUser) below must filter `reversed: { $ne: true }`.
+    reversed:                { type: Boolean, default: false },
+    reversedAt:              { type: Date, default: null },
   },
   { timestamps: false },
 );

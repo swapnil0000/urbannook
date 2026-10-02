@@ -1335,8 +1335,16 @@ const FreeShippingBanner = ({
                   // (e.g. "2+ Lamps => 50% off Pen Stand") — always takes
                   // priority over both the variant markdown and the cosmetic
                   // badge below; a real reward is never hidden behind a fake one.
+                  // Cap scales with how many times the rule's trigger
+                  // condition is met — server-computed (cartRule.util.js's
+                  // ruleRepeatCount), read from the candidate, never
+                  // re-derived here. Matches rp.payment.controller.js, so
+                  // this never disagrees with what checkout actually charges.
+                  const discountCap = Math.max(1, ...ruleDiscountCandidates.map((c) => c.cap ?? 1));
+                  const discountedUnits = Math.min(lineQty, discountCap);
+                  const fullPriceUnits = lineQty - discountedUnits;
                   const lineDiscounted =
-                    Math.round(ruleDiscountedPrice) * lineQty;
+                    Math.round(ruleDiscountedPrice) * discountedUnits + displayPrice * fullPriceUnits;
                   // Derived from the actual prices rather than read off the
                   // rule, so a flat_off rule (₹X off) shows a correct % too.
                   const rulePercent = Math.round(

@@ -26,6 +26,27 @@ export const getActivePromotions = async () => {
   }).lean();
 };
 
+// Structural scan (not condition evaluation) — does this promotion mention
+// productId anywhere, as a condition ("product" leaf) or as a reward target
+// (targetProductId / giftOptions[].productId)? Used by the public
+// /promotions/for-product/:productId endpoint to return the PDP-relevant
+// subset without evaluating against a real cart — mirrors what
+// freeShippingOffer.util.js's getBannerForProduct does for the legacy
+// system (a structural "does this apply to this page" filter, not a
+// live cart match).
+export function promotionReferencesProduct(promotion, productId) {
+  const id = String(productId);
+  const walk = (node) => {
+    if (!node) return false;
+    if (node.op) return (node.children || []).some(walk);
+    return node.field === "product" && String(node.productId) === id;
+  };
+  if (walk(promotion.conditionTree)) return true;
+  return (promotion.rewards || []).some(
+    (r) => String(r.targetProductId) === id || (r.giftOptions || []).some((g) => String(g.productId) === id),
+  );
+}
+
 const quantityByProduct = (cartItems = []) => {
   const map = new Map();
   for (const item of cartItems) map.set(String(item.productId), (map.get(String(item.productId)) || 0) + (Number(item.quantity) || 0));
@@ -192,6 +213,31 @@ function resolveStacking(matched) {
  *   freeShipping: boolean,
  * }}
  */
+// How many times a promotion's conditionTree is satisfied at once — e.g. a
+// condition "1+ Katana" with 2 Katanas in cart satisfies it twice, so its
+// reward should benefit up to 2 units, not just 1. AND takes the minimum
+// across children (every branch must repeat together), OR takes the maximum
+// (the best-satisfied branch sets the count). A non-product leaf
+// (cartSubtotal/category/customerType/etc.) doesn't naturally repeat, so it
+// never LIMITS the count — only "product" leaves do. Entirely derived from
+// admin-configured minQuantity vs. the real cart — never guessed by a
+// storefront display surface.
+function promotionRepeatCount(node, ctx) {
+  if (!node) return Infinity;
+  if (node.op) {
+    const childCounts = (node.children || []).map((c) => promotionRepeatCount(c, ctx));
+    if (!childCounts.length) return Infinity;
+    return node.op === "OR" ? Math.max(...childCounts) : Math.min(...childCounts);
+  }
+  if (node.field === "product") {
+    const have = node.variantSku
+      ? ctx.qtyByProductVariant.get(variantKey(String(node.productId), node.variantSku)) || 0
+      : ctx.qtyByProduct.get(String(node.productId)) || 0;
+    return Math.floor(have / (node.minQuantity || 1));
+  }
+  return Infinity; // non-product condition doesn't limit the repeat count
+}
+
 export const evaluatePromotions = (cartItems, ctx, activePromotions) => {
   const matched = resolveStacking(
     activePromotions.filter((p) => evaluateConditionTree(p.conditionTree, ctx)),
@@ -206,6 +252,12 @@ export const evaluatePromotions = (cartItems, ctx, activePromotions) => {
   let freeShipping = false;
 
   for (const promo of matched) {
+    // Clamped to a large finite sentinel — Infinity survives in-process but
+    // serializes to `null` over JSON (res.json), which would silently break
+    // every client reading `cap`. Math.min(realQtyInCart, cap) downstream
+    // makes the exact clamp value irrelevant as long as it's "large enough".
+    const rawCap = promotionRepeatCount(promo.conditionTree, ctx);
+    const cap = Math.max(1, Number.isFinite(rawCap) ? rawCap : Number.MAX_SAFE_INTEGER);
     for (const reward of promo.rewards || []) {
       switch (reward.type) {
         case "percent_off_product":
@@ -213,7 +265,7 @@ export const evaluatePromotions = (cartItems, ctx, activePromotions) => {
         case "discounted_product": {
           const productId = String(reward.targetProductId);
           const list = discountCandidatesByProduct.get(productId) || [];
-          list.push({ type: reward.type, value: reward.value, ...(reward.targetVariantSku ? { variantSku: reward.targetVariantSku } : {}) });
+          list.push({ type: reward.type, value: reward.value, cap, ...(reward.targetVariantSku ? { variantSku: reward.targetVariantSku } : {}) });
           discountCandidatesByProduct.set(productId, list);
           break;
         }

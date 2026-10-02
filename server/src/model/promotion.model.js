@@ -42,6 +42,18 @@ const rewardSchema = new mongoose.Schema(
     },
     targetProductId: { type: String, trim: true },
     targetVariantSku: { type: String, trim: true, default: "" },
+    // Optional per-reward display name — a promotion with multiple rewards
+    // (e.g. one reward per stand variant: Single/Double/Triple Layer) used
+    // to show the SAME promotion-level `name` for every one of them on the
+    // storefront banner, which read as duplicated/confusing. Blank falls
+    // back to the parent Promotion's `name`, same as before this field
+    // existed — purely additive.
+    label: { type: String, trim: true, default: "" },
+    // Optional per-reward subtitle/body copy + a custom banner image.
+    // Blank description shows nothing extra; blank image falls back to the
+    // recommended product's own photo (see freeShippingOffer.util.js).
+    description: { type: String, trim: true, default: "" },
+    image: { type: String, trim: true, default: "" },
     // gift_choice: customer picks exactly one of these in-cart. Each entry
     // silently skipped at evaluation time if OOS/deleted (see engine).
     giftOptions: {
@@ -93,6 +105,19 @@ const promotionSchema = new mongoose.Schema(
 
     conditionTree: { type: conditionTreeSchema, required: true },
     rewards: { type: [rewardSchema], required: true },
+
+    // Where this promotion is allowed to surface once a display API/UI reads
+    // it (promotionPresentation.service.js). Defaults to all 8 so existing
+    // promotions created before this field existed keep behaving as
+    // "show everywhere relevant" rather than vanishing. Admin-controlled only
+    // — nothing in the frontend may hardcode which surfaces show a promotion.
+    placements: {
+      type: [{
+        type: String,
+        enum: ["pdp", "plp", "cart", "mini_cart", "checkout", "order_confirmation", "order_details", "customer_account"],
+      }],
+      default: ["pdp", "plp", "cart", "mini_cart", "checkout", "order_confirmation", "order_details", "customer_account"],
+    },
 
     // Buy-X-Get-Y repeat cap — null = unlimited (buy 6, get 3 free for a
     // "buy 2 get 1" rule with no cap; a cap of 1 means it only ever triggers

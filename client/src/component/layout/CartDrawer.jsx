@@ -83,6 +83,18 @@ const CartDrawer = ({ isOpen, onClose }) => {
     // is ₹149.5 mathematically — both round that to ₹150, consistently).
     return Math.round(Math.max(Math.min(...results), 0));
   };
+  // How many units of this line the matching rule(s) actually justify
+  // discounting — computed server-side (cartRule.util.js's ruleRepeatCount)
+  // from the rule's own condition quantity vs. real cart quantity, e.g. 2x
+  // the trigger product unlocks up to 2 discounted units, not a flat 1.
+  // Read here, never re-derived — the policy lives in exactly one place.
+  const getItemDiscountCap = (item) => {
+    const productId = item.mongoId || item.id;
+    const candidates = (cartRuleEvalData?.data?.discounts?.[productId] || []).filter(
+      (c) => !c.variantName || c.variantName === item.selectedVariant,
+    );
+    return Math.max(1, ...candidates.map((c) => c.cap ?? 1));
+  };
 
   // Map a cart line item → analytics item shape
   const toTrackItem = (item) => ({
@@ -178,11 +190,18 @@ const CartDrawer = ({ isOpen, onClose }) => {
   // totalAmount (Redux) doesn't know about cart-rule discounts — subtract
   // the same savings the line-item prices above already reflect, so the
   // drawer's own subtotal/total never disagrees with what checkout charges.
+  // FIXED: only 1 unit of a line ever gets the discount/free benefit — this
+  // used to multiply the FULL per-unit discount by the whole quantity
+  // (rawPrice - discounted) * qty, so e.g. 2x a 100%-off "free" Stand showed
+  // BOTH as free (and subtracted the full ₹399×2 from the total) instead of
+  // just the 1 unit checkout actually gives free. Matches the server's
+  // capDiscountedQuantity cap in rp.payment.controller.js exactly.
   const ruleDiscountSavings = cartItems.reduce((sum, item) => {
     const rawPrice = Number(item.price) || 0;
     const discounted = getItemDiscountedPrice(item);
     const qty = typeof item.quantity === 'object' ? Number(item.quantity?.quantity || 0) : Number(item.quantity || 0);
-    return sum + (rawPrice - discounted) * qty;
+    const discountedUnits = discounted < rawPrice ? Math.min(qty, getItemDiscountCap(item)) : 0;
+    return sum + (rawPrice - discounted) * discountedUnits;
   }, 0);
   // Gift wrap adds to what's actually charged at checkout — same price the
   // GiftWrapLineItem row above shows, so this can never disagree with it.
@@ -341,10 +360,18 @@ const CartDrawer = ({ isOpen, onClose }) => {
                   const itemId = item.mongoId || item.productId || item.id;
                   const variant = item.selectedVariant && item.selectedVariant !== 'N/A' ? item.selectedVariant : null;
                   const displayName = resolveVariantTitle(item.name, item.variantTitleTemplate, item.selectedVariant);
-                  const discountedPrice = getItemDiscountedPrice(item);
+                  const discountedUnitPrice = getItemDiscountedPrice(item);
                   const rawPrice = Number(item.price) || 0;
-                  const hasDiscount = discountedPrice < rawPrice;
-                  const percentOff = hasDiscount ? Math.round(((rawPrice - discountedPrice) / rawPrice) * 100) : 0;
+                  const hasDiscount = discountedUnitPrice < rawPrice;
+                  // The cap scales with how many times the rule's trigger
+                  // condition is met (server-computed, see getItemDiscountCap)
+                  // — a line qty of 2+ shows the correct blended total, not
+                  // the per-unit discounted price applied to every unit.
+                  const discountedUnits = hasDiscount ? Math.min(itemQty, getItemDiscountCap(item)) : 0;
+                  const fullPriceUnits = itemQty - discountedUnits;
+                  const discountedPrice = discountedUnitPrice * discountedUnits + rawPrice * fullPriceUnits;
+                  const rawLineTotal = rawPrice * itemQty;
+                  const percentOff = hasDiscount ? Math.round(((rawLineTotal - discountedPrice) / rawLineTotal) * 100) : 0;
 
                   return (
                     <div key={`${itemId}-${item.selectedVariant || 'N/A'}`} className="flex gap-4 py-4 first:pt-0">
@@ -414,7 +441,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
                             <div className="text-right">
                               <p className="text-sm font-extrabold text-save">₹{Math.round(discountedPrice).toLocaleString('en-IN')}</p>
                               <div className="flex items-center justify-end gap-1">
-                                <span className="text-[10px] text-faint line-through">₹{rawPrice.toLocaleString('en-IN')}</span>
+                                <span className="text-[10px] text-faint line-through">₹{rawLineTotal.toLocaleString('en-IN')}</span>
                                 <span className="text-[9px] font-bold uppercase rounded-full bg-save text-white px-1.5 py-px">{percentOff}% OFF</span>
                               </div>
                             </div>
@@ -515,7 +542,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
               </div>
               <button
                 onClick={handleCheckout}
-                className="gl-press relative z-0 w-full py-4 bg-brand text-white rounded-xl font-bold uppercase tracking-[0.15em] text-[10px] hover:bg-brandHi transition-colors flex items-center justify-center gap-2 px-6"
+                className="gl-press relative z-0 w-full py-4 bg-ink text-white rounded-xl font-bold uppercase tracking-[0.15em] text-[10px] hover:bg-brandHi transition-colors flex items-center justify-center gap-2 px-6"
               >
                   <span>Proceed to Checkout</span>
                   <i className="fa-solid fa-arrow-right-long"></i>

@@ -1,7 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { trackSelectItem } from "../utils/analytics";
 import { isVariantOutOfStock } from "../utils/variantStock";
-import FitTitle from "./FitTitle";
 
 /**
  * Shared variant-level card — one product's single variant (own title,
@@ -48,22 +47,13 @@ const VariantCard = ({ productId, productName, variant, index, listId = "product
       </div>
 
       <div className="p-3.5 flex flex-col flex-grow bg-white border-t border-hair">
-        {/* Always exactly one line, whatever the variant name's length —
-            shrinks to fit instead of wrapping to 2 lines, so a row of
-            these cards never ends up with mismatched heights. */}
+        {/* Always exactly one line, truncated with an ellipsis if the
+            variant name overflows, so a row of these cards never ends up
+            with mismatched heights. */}
         <div className="h-5 md:h-6 flex items-center w-full mb-1">
-          <FitTitle
-            text={variant?.variantName || ""}
-            capPx={16}
-            floorPx={10}
-            className="font-archivo font-bold text-ink leading-snug text-left w-full block md:hidden"
-          />
-          <FitTitle
-            text={variant?.variantName || ""}
-            capPx={18}
-            floorPx={12}
-            className="font-archivo font-bold text-ink leading-snug text-left w-full hidden md:block"
-          />
+          <h3 className="font-archivo font-bold text-ink leading-snug text-left w-full truncate text-[16px] md:text-[18px]">
+            {variant?.variantName || ""}
+          </h3>
         </div>
 
         <div className="flex justify-between items-end pt-2 border-t border-hair mt-auto">

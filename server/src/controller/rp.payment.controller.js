@@ -42,6 +42,46 @@ import { apiCache } from "../module/cache.manager.module.js";
 import { sortVariantsOOSLast, deriveProductStatus, syncVariantOutOfStock } from "../utils/variantSort.js";
 
 // ── Per-variant stock decrement ───────────────────────────────────────────────
+// A "buy X get Y [% off/free]" reward (cart_rule or Promotion V2) must only
+// discount up to `cap` units of Y — NOT the entire line regardless of
+// quantity. Without this, a customer adding 2+ of the discounted/free
+// product got ALL of them at the discounted price (e.g. 2 stands both free
+// off a single Katana), not just one — a real revenue leak, not a display
+// bug (priceAtPurchase is what's actually charged and invoiced).
+//
+// Mutates `oi` in place to the capped quantity + discounted price, and — if
+// the cart quantity exceeds `cap` — returns a SECOND order item for the
+// remainder at full price (same productId/variant, same pattern already
+// used for the free_product gift line below: a product can legitimately
+// appear as more than one line in `orderItems`). Returns null when no split
+// is needed (quantity already <= cap, or the discount didn't actually lower
+// the price — e.g. a reward with no matching candidate).
+// The admin-configured cap for whichever candidate(s) matched this line —
+// see cartRule.util.js's ruleRepeatCount / promotionEngine.util.js's
+// promotionRepeatCount for how `cap` itself is computed (purely from the
+// rule's own condition minQuantity vs. real cart quantity, never guessed
+// here). When more than one rule discounts the same line, the most
+// generous applicable cap wins — consistent with applyBestDiscount/
+// applyBestPromotionDiscount already picking the best PRICE among
+// candidates for the same line.
+function applicableCap(candidates) {
+  return Math.max(1, ...candidates.map((c) => c.cap ?? 1));
+}
+
+function capDiscountedQuantity(oi, fullUnitPrice, discountedUnitPrice, cap = 1) {
+  const quantity = oi.productSnapshot.quantity;
+  oi.productSnapshot.priceAtPurchase = discountedUnitPrice;
+  if (discountedUnitPrice >= fullUnitPrice || quantity <= cap) return null;
+
+  const remainder = quantity - cap;
+  oi.productSnapshot.quantity = cap;
+  return {
+    productId: oi.productId,
+    variantSku: oi.variantSku,
+    productSnapshot: { ...oi.productSnapshot, quantity: remainder, priceAtPurchase: fullUnitPrice, isPromotionalGift: false },
+  };
+}
+
 // Runs once, atomically, the moment an order is confirmed PAID. For each ordered
 // item we decrement THAT variant's tracked quantity (variantQuantity) by the
 // purchased quantity. Variants with no tracked quantity (null) are skipped —
@@ -513,10 +553,17 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity, variantSku: oi.variantSku })),
     activeCartRules,
   );
+  const extraDiscountLines = [];
   for (const oi of orderItems) {
     const candidates = getDiscountCandidatesForItem(cartRuleResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
     if (candidates?.length) {
-      oi.productSnapshot.priceAtPurchase = applyBestDiscount(oi.productSnapshot.priceAtPurchase, candidates);
+      const fullPrice = oi.productSnapshot.priceAtPurchase;
+      const discountedPrice = applyBestDiscount(fullPrice, candidates);
+      // Cap scales with how many times the rule's own condition is
+      // satisfied (e.g. 2x the trigger product → up to 2 discounted units)
+      // — never a flat 1. See applicableCap / ruleRepeatCount.
+      const remainderLine = capDiscountedQuantity(oi, fullPrice, discountedPrice, applicableCap(candidates));
+      if (remainderLine) extraDiscountLines.push(remainderLine);
       // A cart_rule discount that zeroes an item's price out (e.g. a
       // percent_off 100 "get this free" offer) marks it as a promotional
       // gift for admin/order views — same field the Promotion V2
@@ -526,6 +573,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       if (oi.productSnapshot.priceAtPurchase === 0) oi.productSnapshot.isPromotionalGift = true;
     }
   }
+  if (extraDiscountLines.length) orderItems.push(...extraDiscountLines);
 
   // ── Promotion Engine V2 — separate collection, evaluated ADDITIONALLY to
   // the cart_rule block above, never replacing it. See promotionEngine
@@ -547,13 +595,19 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   const promoCtx = buildCartContext(promoCartItems, { subtotal: promoSubtotalSoFar, productMeta: promoProductMeta, customerType: "registered" });
   const promotionResult = evaluatePromotions(promoCartItems, promoCtx, activePromotions);
 
+  const extraPromoDiscountLines = [];
   for (const oi of orderItems) {
     if (getDiscountCandidatesForItem(cartRuleResult.discountCandidatesByProduct, oi.productId, oi.variantSku)?.length) continue; // legacy cart_rule already discounted this line
     const candidates = getPromotionDiscountCandidatesForItem(promotionResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
     if (candidates?.length) {
-      oi.productSnapshot.priceAtPurchase = applyBestPromotionDiscount(oi.productSnapshot.priceAtPurchase, candidates);
+      const fullPrice = oi.productSnapshot.priceAtPurchase;
+      const discountedPrice = applyBestPromotionDiscount(fullPrice, candidates);
+      // Same dynamic cap as the cart_rule block above.
+      const remainderLine = capDiscountedQuantity(oi, fullPrice, discountedPrice, applicableCap(candidates));
+      if (remainderLine) extraPromoDiscountLines.push(remainderLine);
     }
   }
+  if (extraPromoDiscountLines.length) orderItems.push(...extraPromoDiscountLines);
 
   // free_product reward: append a synthetic ₹0 line, flagged
   // isPromotionalGift so admin/order views can tell it apart from a paid
@@ -660,7 +714,22 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   // Recompute subtotal from actual order items — authoritative, not from cart snapshot.
   // Computed AFTER the cart-rule discount loop above has already reduced any
   // discounted items' priceAtPurchase, so this naturally includes those discounts.
-  const subtotal = orderItems.reduce((s, i) => s + (i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity), 0);
+  let subtotal = orderItems.reduce((s, i) => s + (i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity), 0);
+
+  // Promotion V2 order-level discounts (percent_off_order / flat_off_order —
+  // "spend ₹2000+, get 10% off the whole order") — evaluated against the
+  // GROSS subtotal above (product-level discounts already baked in, same as
+  // any other threshold condition), applied here as a further deduction.
+  // Multiple matched order-level rewards: the one giving the BIGGEST ₹
+  // saving wins (same "best for the customer" convention as product
+  // discounts), capped so it can never exceed the subtotal itself.
+  if (promotionResult.orderLevelDiscounts?.length) {
+    const amounts = promotionResult.orderLevelDiscounts.map((d) =>
+      d.type === "percent_off_order" ? subtotal * (Number(d.value) / 100) : Number(d.value),
+    );
+    const promotionOrderDiscount = Math.round(Math.min(Math.max(...amounts, 0), subtotal));
+    subtotal -= promotionOrderDiscount;
+  }
 
   // Free shipping unlocks via ANY of: the combo-banner offer (source +
   // recommended product both present), any active generic cart rule whose
@@ -835,6 +904,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       if (identifiers.length > 0 && liveCoupon.maxUsesPerUser) {
         const priorUses = await CouponUsage.countDocuments({
           couponId: couponCodeId,
+          reversed: { $ne: true },
           $or: [
             ...(normEmailCheck  ? [{ email:  normEmailCheck  }] : []),
             ...(normMobileCheck ? [{ mobile: normMobileCheck }] : []),
@@ -1255,14 +1325,65 @@ const razorpayWebHookController = async (req, res) => {
           // guarded by the same order.status !== "PAID" block) rather than
           // at order-creation time, since a CREATED-but-never-PAID order
           // should never count against a promotion's usage limits.
+          //
+          // Usage-limit enforcement mirrors the Coupon pattern immediately
+          // below this block EXACTLY (same atomic-$inc-with-$expr-guard +
+          // per-user countDocuments + rollback-on-race shape), not a new
+          // scheme: maxUsesTotal is enforced via one atomic
+          // findOneAndUpdate per promotion (never over-increments under
+          // concurrency — same guarantee decrementStockForOrder's $gte
+          // guard gives stock). maxUsesPerUser is checked right after via
+          // countDocuments and rolled back on a genuine race, exactly like
+          // the coupon per-user safety net below. The reward/discount was
+          // already baked into the charged amount at order-creation time
+          // (courtesy-level, like assertVariantAvailable for stock) — a
+          // limit hit here, same as the coupon case, only prevents THIS
+          // order from corrupting the count for future ones; it doesn't
+          // retroactively re-charge the customer.
           if (order.appliedPromotions?.length) {
             const productSubtotalForUsage = order.items.reduce(
               (s, i) => s + ((i.productSnapshot?.priceAtPurchase || 0) * (i.productSnapshot?.quantity || 0)),
               0,
             );
-            try {
-              await PromotionUsage.insertMany(
-                order.appliedPromotions.map((ap) => ({
+            const normEmailForPromo = order.userEmail?.toLowerCase().trim() || null;
+            const normMobileForPromo = (order.userMobile || "").replace(/\D/g, "").slice(-10) || null;
+
+            for (const ap of order.appliedPromotions) {
+              try {
+                // Atomic check-and-increment — only succeeds if maxUsesTotal
+                // is unset or usageCount is still under it.
+                const updatedPromo = await Promotion.findOneAndUpdate(
+                  {
+                    _id: ap.promotionId,
+                    $or: [{ maxUsesTotal: null }, { $expr: { $lt: ["$usageCount", "$maxUsesTotal"] } }],
+                  },
+                  { $inc: { usageCount: 1 } },
+                  { new: true },
+                );
+                if (!updatedPromo) {
+                  console.warn(`[PromotionV2] order=${order.orderId} promotion=${ap.promotionId} — maxUsesTotal reached, usage not recorded`);
+                  continue;
+                }
+
+                let perUserOk = true;
+                if (updatedPromo.maxUsesPerUser && (normEmailForPromo || normMobileForPromo)) {
+                  const priorUses = await PromotionUsage.countDocuments({
+                    promotionId: ap.promotionId,
+                    reversed: { $ne: true },
+                    $or: [
+                      ...(normEmailForPromo ? [{ email: normEmailForPromo }] : []),
+                      ...(normMobileForPromo ? [{ mobile: normMobileForPromo }] : []),
+                    ],
+                  });
+                  if (priorUses >= updatedPromo.maxUsesPerUser) {
+                    perUserOk = false;
+                    await Promotion.updateOne({ _id: ap.promotionId }, { $inc: { usageCount: -1 } });
+                    console.warn(`[PromotionV2:Security] order=${order.orderId} promotion=${ap.promotionId} — maxUsesPerUser hit (race). usageCount rolled back. priorUses=${priorUses} limit=${updatedPromo.maxUsesPerUser}`);
+                  }
+                }
+                if (!perUserOk) continue;
+
+                await PromotionUsage.create({
                   promotionId: ap.promotionId,
                   promotionName: ap.name,
                   orderId: order.orderId,
@@ -1273,14 +1394,10 @@ const razorpayWebHookController = async (req, res) => {
                   rewardsSnapshot: { rewardTypes: ap.rewardTypes },
                   cartValueBeforeDiscount: productSubtotalForUsage,
                   usedAt: new Date(),
-                })),
-              );
-              await Promotion.updateMany(
-                { _id: { $in: order.appliedPromotions.map((ap) => ap.promotionId) } },
-                { $inc: { usageCount: 1 } },
-              );
-            } catch (err) {
-              console.error(`[PromotionV2] usage recording failed order=${order.orderId}:`, err.message);
+                });
+              } catch (err) {
+                console.error(`[PromotionV2] usage recording failed order=${order.orderId} promotion=${ap.promotionId}:`, err.message);
+              }
             }
           }
 
@@ -1352,6 +1469,7 @@ const razorpayWebHookController = async (req, res) => {
                 if (updatedCoupon.maxUsesPerUser && (normEmail || normMobile)) {
                   const priorUses = await CouponUsage.countDocuments({
                     couponId,
+                    reversed: { $ne: true },
                     $or: [
                       ...(normEmail  ? [{ email:  normEmail  }] : []),
                       ...(normMobile ? [{ mobile: normMobile }] : []),
@@ -1748,14 +1866,19 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity, variantSku: oi.variantSku })),
     activeCartRules,
   );
+  const extraDiscountLines = [];
   for (const oi of orderItems) {
     const candidates = getDiscountCandidatesForItem(cartRuleResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
     if (candidates?.length) {
-      oi.productSnapshot.priceAtPurchase = applyBestDiscount(oi.productSnapshot.priceAtPurchase, candidates);
+      const fullPrice = oi.productSnapshot.priceAtPurchase;
+      const discountedPrice = applyBestDiscount(fullPrice, candidates);
+      const remainderLine = capDiscountedQuantity(oi, fullPrice, discountedPrice, applicableCap(candidates));
+      if (remainderLine) extraDiscountLines.push(remainderLine);
       // See the matching comment in razorpayCreateOrderController above.
       if (oi.productSnapshot.priceAtPurchase === 0) oi.productSnapshot.isPromotionalGift = true;
     }
   }
+  if (extraDiscountLines.length) orderItems.push(...extraDiscountLines);
 
   // ── Promotion Engine V2 — see the matching comment in
   // razorpayCreateOrderController above for the full rationale. Identical
@@ -1769,13 +1892,18 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   const promoCtx = buildCartContext(promoCartItems, { subtotal: promoSubtotalSoFar, productMeta: promoProductMeta, customerType: "guest" });
   const promotionResult = evaluatePromotions(promoCartItems, promoCtx, activePromotions);
 
+  const extraPromoDiscountLines = [];
   for (const oi of orderItems) {
     if (getDiscountCandidatesForItem(cartRuleResult.discountCandidatesByProduct, oi.productId, oi.variantSku)?.length) continue;
     const candidates = getPromotionDiscountCandidatesForItem(promotionResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
     if (candidates?.length) {
-      oi.productSnapshot.priceAtPurchase = applyBestPromotionDiscount(oi.productSnapshot.priceAtPurchase, candidates);
+      const fullPrice = oi.productSnapshot.priceAtPurchase;
+      const discountedPrice = applyBestPromotionDiscount(fullPrice, candidates);
+      const remainderLine = capDiscountedQuantity(oi, fullPrice, discountedPrice, applicableCap(candidates));
+      if (remainderLine) extraPromoDiscountLines.push(remainderLine);
     }
   }
+  if (extraPromoDiscountLines.length) orderItems.push(...extraPromoDiscountLines);
 
   for (const gift of promotionResult.freeGifts) {
     if (!gift.targetProductId) continue;
@@ -1811,7 +1939,18 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
 
   // Recomputed from orderItems (post cart-rule discount), not accumulated
   // inline during the map above — mirrors the authenticated-user path.
-  const subtotal = orderItems.reduce((s, i) => s + i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity, 0);
+  let subtotal = orderItems.reduce((s, i) => s + i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity, 0);
+
+  // Promotion V2 order-level discounts — see the matching comment in
+  // razorpayCreateOrderController above for the full rationale. Identical
+  // wiring, guest path.
+  if (promotionResult.orderLevelDiscounts?.length) {
+    const amounts = promotionResult.orderLevelDiscounts.map((d) =>
+      d.type === "percent_off_order" ? subtotal * (Number(d.value) / 100) : Number(d.value),
+    );
+    const promotionOrderDiscount = Math.round(Math.min(Math.max(...amounts, 0), subtotal));
+    subtotal -= promotionOrderDiscount;
+  }
 
   // Magic has no pincode yet — Razorpay rates the address through
   // /magic/shipping-info and adds shipping_fee to the order itself, so shipping
@@ -1907,6 +2046,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     if (identifiers.length > 0 && liveCoupon.maxUsesPerUser) {
       const priorUses = await CouponUsage.countDocuments({
         couponId: liveCoupon.couponId,
+        reversed: { $ne: true },
         $or: [
           { email: guestEmail },
           { mobile: normMobileCoupon },

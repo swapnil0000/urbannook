@@ -542,7 +542,11 @@ const ProductDetailPage = () => {
             </div>
             <div className="flex items-start justify-between gap-3 mt-2">
               <div className="min-w-0">
-                <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-ink leading-tight line-clamp-2 min-h-[66px] md:min-h-[80px]">
+                {/* No line-clamp — a long name used to get cut off with an
+                    ellipsis after 2 lines on mobile. min-h is a MINIMUM, not
+                    a cap, so it still keeps short titles' height consistent
+                    without truncating a longer one. */}
+                <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-ink leading-tight min-h-[66px] md:min-h-[80px]">
                   {selectedVariant || product.productName}
                 </h1>
                 {selectedVariantSubTag && (
@@ -568,16 +572,21 @@ const ProductDetailPage = () => {
             )}
             {/* {displayDescription && <p className="text-xs text-muted leading-relaxed mt-2">{displayDescription}</p>} */}
 
-            {/* ZONE B — BUY CARD: price → savings → variants → urgency → CTA → trust, one unit */}
-            <div className="mt-5  bg-paper p-4 md:p-5 md:max-w-md">
+            {/* ZONE B — BUY CARD: price → savings → variants → urgency → CTA → trust, one unit.
+                py only, no px: the horizontal p-4/p-5 used to indent this
+                whole block (price, buttons, trust strip) further right than
+                Zone A's title/kicker above it, which sit with no padding of
+                their own — everything below looked shifted right instead of
+                lining up to the same left edge. Vertical spacing is kept. */}
+            <div className="mt-5  bg-paper py-4 md:py-5 md:max-w-md">
               {/* price hero */}
-              <div className="flex items-baseline flex-wrap gap-x-3 gap-y-1">
+              <div className="flex items-center gap-2">
                 <span className="text-4xl md:text-5xl font-extrabold text-ink tracking-tight tabular-nums leading-none">{inr(currentPrice)}</span>
                 {discountPercent > 0 && (
-                  <>
-                    <span className="text-base text-faint line-through tabular-nums">{inr(maxVariantPrice)}</span>
+                  <div className="flex flex-col items-start gap-0.5">
                     <span className="gl-lbl text-[11px] text-sale bg-sale/10 px-2 py-0.5 rounded-md">{discountPercent}% OFF</span>
-                  </>
+                    <span className="text-xs text-faint line-through tabular-nums">{inr(maxVariantPrice)}</span>
+                  </div>
                 )}
               </div>
               {discountPercent > 0 && <p className="text-sm font-semibold text-save mt-1">You save {inr(maxVariantPrice - currentPrice)}</p>}
@@ -602,7 +611,7 @@ const ProductDetailPage = () => {
               )}
 
               {/* urgency + delivery */}
-              <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs mt-4">
+              {/* <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs mt-4">
                 {isOutOfStock ? (
                   <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-faint" /><span className="text-muted font-semibold">Out of stock</span></span>
                 ) : selectedVariantLowStock && selectedVariantQty !== 1 ? (
@@ -610,8 +619,8 @@ const ProductDetailPage = () => {
                 ) : (
                   <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-save" /><span className="text-ink font-semibold">In stock</span></span>
                 )}
-                <span className="text-muted">🚚 Ships in 24-48 hrs</span>
-              </div>
+                <span className="text-muted"><i className="fa-solid fa-truck-fast mr-1" aria-hidden="true" />Ships in 24-48 hrs</span>
+              </div> */}
 
               {/* CTA */}
               <div ref={buyBoxRef} className="flex items-center gap-3 mt-4">
@@ -707,9 +716,9 @@ const ProductDetailPage = () => {
 
               {/* trust strip inside the card */}
               <div className="mt-4 pt-4 border-t border-hair grid grid-cols-3 divide-x divide-hair text-center text-[11px] text-muted">
-                <div className="px-1 flex flex-col items-center gap-1"><span className="text-lg">🚚</span>24-48 hrs</div>
-                <div className="px-1 flex flex-col items-center gap-1"><span className="text-lg">💸</span>{product.isCodAvailable ? 'Partial COD' : 'Secure pay'}</div>
-                <div className="px-1 flex flex-col items-center gap-1"><span className="text-lg">↺</span>Free replacement if damaged*</div>
+                <div className="px-1 flex flex-col items-center gap-1"><i className="fa-solid fa-truck-fast text-brand text-base" aria-hidden="true" />24-48 hrs</div>
+                <div className="px-1 flex flex-col items-center gap-1"><i className="fa-solid fa-money-bill-wave text-brand text-base" aria-hidden="true" />{product.isCodAvailable ? 'Partial COD' : 'Secure pay'}</div>
+                <div className="px-1 flex flex-col items-center gap-1"><i className="fa-solid fa-rotate-left text-brand text-base" aria-hidden="true" />Free replacement if damaged*</div>
               </div>
               <p className="mt-1.5 text-[8px] text-faint text-center">
                 *Applicable only with an unboxing video showing the damaged product and its shipping label.
