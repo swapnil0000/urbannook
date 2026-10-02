@@ -571,14 +571,29 @@ const CheckoutPage = () => {
     // is ₹149.5 mathematically — both round that to ₹150, consistently).
     return Math.round(Math.max(Math.min(...results), 0));
   };
+  // How many units of this line the matching rule(s) actually justify
+  // discounting — server-computed (cartRule.util.js's ruleRepeatCount) from
+  // the rule's own condition quantity vs. real cart quantity: 2x the
+  // trigger product in cart unlocks up to 2 discounted units, not a flat 1.
+  // Read here, never re-derived — this policy lives in exactly one place.
+  const getItemDiscountCap = (item) => {
+    const productId = item.mongoId || item.id?.split(":")[0];
+    const candidates = (cartRuleEvalData?.data?.discounts?.[productId] || []).filter(
+      (c) => !c.variantName || c.variantName === item.selectedVariant,
+    );
+    return Math.max(1, ...candidates.map((c) => c.cap ?? 1));
+  };
   // Total ₹ shaved off the cart by matched rule discounts — subtracted from
   // whatever subtotal this page would otherwise display (guest's direct
   // calc, or the coupon endpoint's summary.subtotal, which doesn't know
-  // about cart rules at all).
+  // about cart rules at all). The real charge (rp.payment.controller.js's
+  // capDiscountedQuantity) uses this exact same cap — this page must match
+  // it exactly, or it shows a different total than what Razorpay charges.
   const ruleDiscountSavings = cartItems.reduce((sum, item) => {
     const price = Number(item.price) || 0;
     const discounted = getItemDiscountedPrice(item);
-    return sum + (price - discounted) * (Number(item.quantity) || 0);
+    const discountedUnits = discounted < price ? Math.min(Number(item.quantity) || 0, getItemDiscountCap(item)) : 0;
+    return sum + (price - discounted) * discountedUnits;
   }, 0);
 
   // Checkout-only nudge: if the cart hasn't crossed the free-shipping
@@ -2554,13 +2569,22 @@ const CheckoutPage = () => {
                             </p>
                           </div>
                           {(() => {
-                            const discountedPrice =
+                            const discountedUnitPrice =
                               getItemDiscountedPrice(item);
                             const rawPrice = Number(item.price) || 0;
-                            const hasDiscount = discountedPrice < rawPrice;
+                            const hasDiscount = discountedUnitPrice < rawPrice;
+                            const qty = Number(item.quantity) || 0;
+                            // Only 1 unit ever gets the discount/free
+                            // benefit — matches the server's
+                            // capDiscountedQuantity cap in
+                            // rp.payment.controller.js exactly.
+                            const discountedUnits = hasDiscount ? Math.min(qty, getItemDiscountCap(item)) : 0;
+                            const fullPriceUnits = qty - discountedUnits;
+                            const lineTotal = discountedUnitPrice * discountedUnits + rawPrice * fullPriceUnits;
+                            const rawLineTotal = rawPrice * qty;
                             const percentOff = hasDiscount
                               ? Math.round(
-                                  ((rawPrice - discountedPrice) / rawPrice) *
+                                  ((rawLineTotal - lineTotal) / rawLineTotal) *
                                     100,
                                 )
                               : 0;
@@ -2568,16 +2592,12 @@ const CheckoutPage = () => {
                               <div className="text-right shrink-0">
                                 <p className="text-sm font-bold text-save">
                                   ₹
-                                  {(
-                                    discountedPrice * Number(item.quantity)
-                                  ).toLocaleString()}
+                                  {Math.round(lineTotal).toLocaleString()}
                                 </p>
                                 <div className="flex items-center justify-end gap-1">
                                   <span className="text-[10px] text-gray-400 line-through">
                                     ₹
-                                    {(
-                                      rawPrice * Number(item.quantity)
-                                    ).toLocaleString()}
+                                    {rawLineTotal.toLocaleString()}
                                   </span>
                                   <span className="text-[9px] font-bold uppercase rounded-full bg-save text-white px-1.5 py-px">
                                     {percentOff}% OFF
@@ -2586,10 +2606,7 @@ const CheckoutPage = () => {
                               </div>
                             ) : (
                               <p className="text-sm font-bold text-gray-800 shrink-0">
-                                ₹
-                                {(
-                                  rawPrice * Number(item.quantity)
-                                ).toLocaleString()}
+                                ₹{rawLineTotal.toLocaleString()}
                               </p>
                             );
                           })()}
@@ -2814,17 +2831,24 @@ const CheckoutPage = () => {
                     )}
                   </div>
                   {(() => {
-                    const discountedPrice = getItemDiscountedPrice(item);
+                    const discountedUnitPrice = getItemDiscountedPrice(item);
                     const rawPrice = Number(item.price) || 0;
-                    const hasDiscount = discountedPrice < rawPrice;
+                    const hasDiscount = discountedUnitPrice < rawPrice;
+                    const qty = Number(item.quantity) || 0;
+                    // Only 1 unit ever gets the discount/free benefit —
+                    // matches rp.payment.controller.js's capDiscountedQuantity.
+                    const discountedUnits = hasDiscount ? Math.min(qty, getItemDiscountCap(item)) : 0;
+                    const fullPriceUnits = qty - discountedUnits;
+                    const lineTotal = discountedUnitPrice * discountedUnits + rawPrice * fullPriceUnits;
+                    const rawLineTotal = rawPrice * qty;
                     const percentOff = hasDiscount
-                      ? Math.round(((rawPrice - discountedPrice) / rawPrice) * 100)
+                      ? Math.round(((rawLineTotal - lineTotal) / rawLineTotal) * 100)
                       : 0;
                     return hasDiscount ? (
                       <div className="text-right shrink-0">
-                        <p className="text-xs font-bold text-save">₹{(discountedPrice * Number(item.quantity)).toLocaleString()}</p>
+                        <p className="text-xs font-bold text-save">₹{Math.round(lineTotal).toLocaleString()}</p>
                         <div className="flex items-center justify-end gap-1">
-                          <span className="text-[9px] text-gray-400 line-through">₹{(rawPrice * Number(item.quantity)).toLocaleString()}</span>
+                          <span className="text-[9px] text-gray-400 line-through">₹{rawLineTotal.toLocaleString()}</span>
                           <span className="text-[9px] font-bold uppercase rounded-full bg-save text-white px-1.5 py-px">
                             {percentOff}% OFF
                           </span>
@@ -2832,7 +2856,7 @@ const CheckoutPage = () => {
                       </div>
                     ) : (
                       <p className="text-xs font-bold text-gray-800 shrink-0">
-                        ₹{(rawPrice * Number(item.quantity)).toLocaleString()}
+                        ₹{rawLineTotal.toLocaleString()}
                       </p>
                     );
                   })()}

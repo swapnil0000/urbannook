@@ -1,21 +1,6 @@
-import Offer from "../model/offer.model.js";
 import Product from "../model/product.model.js";
-
-/**
- * Fetches the free-shipping singleton doc from the unified `offers`
- * collection (type: "free_shipping", written by the admin panel's Offers
- * page). Legacy `freeshippingoffers` collection is retired — see
- * UN-ADMIN-panel .../server/scripts/seedOffersFromLegacy.js for the one-time
- * backfill that must be run on any environment before this.
- *
- * Internal — all reads of the free-shipping config/banners go through this
- * one function.
- *
- * @param {string} projection mongoose .select() string
- */
-const getFreeShippingDoc = async (projection) => {
-  return Offer.findOne({ type: "free_shipping" }).select(projection).lean();
-};
+import Promotion from "../model/promotion.model.js";
+import { getActivePromotionsAsCartRules } from "./promotionToCartRule.adapter.js";
 
 /**
  * Returns { isActive, thresholdAmount } — the raw offer config. Used both for
@@ -25,45 +10,52 @@ const getFreeShippingDoc = async (projection) => {
  * unlocks if EITHER the combo-pair rule (isFreeShippingEligible below), a
  * generic cart rule, OR the plain cart-value threshold is met.
  */
+// Now reads the Promotion Engine V2 `promotions` collection instead of the
+// legacy `offers` singleton's thresholdAmount/isActive fields — the
+// cart-value-threshold free_shipping Promotion (see
+// scripts/seedPromotionsFromOffers.js's freeShippingToPromotion mapping:
+// conditionTree { field: "cartSubtotal", operator: "gte", value }, reward
+// free_shipping). The admin's own `banners[]` on the legacy singleton
+// (isFreeShippingEligible/getCartRuleDerivedBanners below) are a DELIBERATE,
+// scoped exception that still reads `offers` — only the threshold number
+// itself moved. Picks whichever such Promotion exists (there should be
+// exactly one, same "singleton" expectation as before); if none exists,
+// defaults to off — same as an admin never having configured one.
 export const getFreeShippingConfig = async () => {
-  const offer = await getFreeShippingDoc("isActive thresholdAmount");
-  return {
-    isActive: offer?.isActive ?? false,
-    thresholdAmount: offer?.thresholdAmount ?? 0,
+  const promo = await Promotion.findOne({
+    "rewards.type": "free_shipping",
+    "conditionTree.field": "cartSubtotal",
+  }).select("isActive conditionTree").lean();
+  const result = {
+    isActive: promo?.isActive ?? false,
+    thresholdAmount: promo?.conditionTree?.value ?? 0,
   };
+  console.log(`[FreeShipping:config] promo found=${!!promo} name="${promo?.name || "none"}" → ${JSON.stringify(result)}`);
+  return result;
 };
 
 /**
- * Free shipping is unlocked ONLY when the cart contains a configured offer
- * combo — i.e. both the `sourceProductId` and its `recommendedProductId`
- * from an active banner are present in the cart. This is NOT a cart-value
- * rule: adding some unrelated product that happens to be expensive must not
- * unlock free shipping. Each active banner is one combo; the cart qualifies
- * if it satisfies ANY of them.
+ * Free shipping is unlocked when the cart satisfies any active,
+ * Promotion-backed cart_rule combo whose effects grant free_shipping (see
+ * getCartRuleDerivedBanners below for how a combo's "source"/"recommended"
+ * products are derived from a rule's conditions). This now fully reduces to
+ * the exact same evaluation cartRuleResult.freeShipping already performs in
+ * rp.payment.controller.js — kept as its own function (rather than deleted)
+ * only because rp.payment.controller.js still calls it as one of the 4 OR'd
+ * eligibility signals; it is otherwise redundant with cartRuleResult but
+ * harmless to also check (same underlying data, same answer).
  *
- * Deliberately independent of the parent offer doc's own `isActive` — that
- * flag is the cart-VALUE-threshold on/off switch only (see
- * getFreeShippingConfig above). Combo banners are a separate promo with
- * their own per-banner `isActive`, so admins can turn the threshold off
- * without silently killing an active combo (and vice versa).
- *
- * Reads ONLY the admin's own explicitly-configured banners (never the
- * cart_rule-derived ones below) — a derived banner just mirrors a cart_rule
- * that ALREADY grants free shipping via its own `effects` at checkout
- * (rp.payment.controller.js's cartRuleResult.freeShipping), so having this
- * function also count it would be redundant, not a gap.
+ * No longer reads `offers` at all — every signal here is Promotion-sourced.
  *
  * @param {string[]} cartProductIds product IDs currently in the cart/order
  */
 export const isFreeShippingEligible = async (cartProductIds = []) => {
-  const offer = await getFreeShippingDoc("banners");
-
+  const rules = await getActivePromotionsAsCartRules();
   const ids = new Set((cartProductIds || []).map((id) => String(id)));
-  const eligible = (offer?.banners || []).some(
-    (b) =>
-      b.isActive &&
-      ids.has(String(b.sourceProductId)) &&
-      ids.has(String(b.recommendedProductId)),
+  const eligible = rules.some(
+    (rule) =>
+      (rule.effects || []).some((e) => e.type === "free_shipping") &&
+      (rule.conditions || []).every((c) => ids.has(String(c.productId))),
   );
   console.log(
     `[FreeShipping] cartIds=[${[...ids].join(",")}] → eligible=${eligible}`,
@@ -72,19 +64,32 @@ export const isFreeShippingEligible = async (cartProductIds = []) => {
 };
 
 /**
- * A cart_rule created for free shipping (e.g. "Katana + Display Stand
- * Combo") already IS a combo: its `conditions` are the products that must
- * all be in the cart. Admins used to have to separately add the same combo
- * again under "Product Page Banners" just to get an on-page suggestion card
- * — easy to forget (exactly what happened with the Katana rule), and it
- * meant the same combo lived in two places that could drift apart.
+ * A cart_rule-shaped Promotion whose condition names one product and whose
+ * reward targets a DIFFERENT product (free_shipping OR a percent_off/
+ * flat_off effect that happens to be 100%-off, i.e. a "free gift" modeled
+ * the legacy way) already IS a combo: its `conditions` are the products that
+ * must be in the cart, its effect's `targetProductId` is the one to suggest.
  *
- * This derives banner-shaped entries directly from active free-shipping
- * cart_rules: for a 2-condition rule, each product becomes the "source" with
- * the other as "recommended" (so it works from either product's page). For
- * a rule with more than 2 conditions, every OTHER condition becomes its own
- * recommended entry for a given source — which is exactly what powers the
- * multi-suggestion carousel on the banner (see FreeShippingBanner.jsx).
+ * FIXED 2026-10-02: this used to only derive a banner from a `free_shipping`
+ * effect — a percent_off/flat_off effect (the ONLY way a "buy X get Y free/
+ * discounted" combo could ever be modeled before Promotion V2 existed) was
+ * silently excluded, and relied entirely on a SEPARATE hand-typed banner
+ * entry in the old "Product Page Banners" admin screen (writing to the
+ * `offers` free_shipping singleton's banners[]) to ever show as a PDP
+ * suggestion card. Now that that hand-typed path is no longer read at all
+ * (see freeShippingOffer.util.js's full Promotion cutover), a percent_off/
+ * flat_off-effect combo had NO path left to become a banner — this is that
+ * fix. Every effect type that targets a specific product (free_shipping
+ * has none to target, so it still just uses the OTHER condition product as
+ * before) now qualifies.
+ *
+ * For a 2-condition rule, each product becomes the "source" with the other
+ * as "recommended" (works from either product's page). For an effect-based
+ * rule (percent_off/flat_off), the condition's product is the "source" and
+ * the effect's `targetProductId` is the "recommended" one — these are NOT
+ * swapped (unlike the free_shipping case, which has no natural direction),
+ * since a 100%-off-the-STAND rule should suggest the Stand on the Katana's
+ * page, not the reverse.
  *
  * A condition's own `variantSku` (see utils/cartRule.util.js) carries
  * straight through as `sourceVariantSku`/`recommendedVariantSku` — so a
@@ -93,44 +98,77 @@ export const isFreeShippingEligible = async (cartProductIds = []) => {
  * `resolveBannerVariantNames` below translates these to names before the
  * banner ever reaches the client.
  */
-const getCartRuleDerivedBanners = async () => {
-  const rules = await Offer.find({
-    type: "cart_rule",
-    isActive: true,
-    "effects.type": "free_shipping",
-  })
-    .select("_id name conditions")
-    .lean();
+// `placement` (optional): when given, only promotions whose `placements[]`
+// includes it become banners — e.g. a promotion scoped to "checkout" only
+// must NOT show as a PDP suggestion card, even though it's still fully
+// active and still applies to the real charge (placements is a DISPLAY
+// concern; eligibility/checkout evaluation in cartRule.util.js intentionally
+// never filters by it — a promotion shouldn't stop actually discounting
+// just because an admin unchecked where it's advertised).
+const getCartRuleDerivedBanners = async (placement) => {
+  const everyRule = await getActivePromotionsAsCartRules();
+  const allRules = placement ? everyRule.filter((r) => (r.placements || []).includes(placement)) : everyRule;
+  // console.log(`[FreeShipping:banners] placement=${placement || "(any)"} — ${everyRule.length} active rule(s) total, ${allRules.length} placed here: [${allRules.map((r) => r.name).join(", ")}]`);
 
-  // De-duped by source+recommended+variant triple — two different rules
-  // mentioning the exact same pair (e.g. one rule for "2+ Lamps" style
-  // stacking alongside another for the plain combo) must not produce two
-  // identical carousel slides for the same suggestion. Keyed with variant so
-  // a whole-product rule and a variant-scoped rule for the same pair (a
-  // legitimate, different combo) both survive.
-  const seenPairs = new Set();
   const banners = [];
-  for (const rule of rules) {
+  const seenPairs = new Set();
+
+  // FIXED: used to run as two separate loops — every free_shipping-effect
+  // rule processed first, THEN every percent_off/flat_off-effect rule —
+  // so a lower-priority free_shipping rule always ended up BEFORE a
+  // higher-priority discount rule in the output, no matter what `priority`
+  // said. `allRules` is already priority-sorted (see
+  // promotionToCartRule.adapter.js); a SINGLE pass over it, handling
+  // whichever effect type each rule has inline, is what makes the banner
+  // order actually follow priority end-to-end instead of just within one
+  // reward-type bucket.
+  for (const rule of allRules) {
+    const fsEffect = (rule.effects || []).find((e) => e.type === "free_shipping");
+    const discountEffects = (rule.effects || []).filter((e) => (e.type === "percent_off" || e.type === "flat_off") && e.targetProductId);
     const conditions = rule.conditions || [];
-    for (const source of conditions) {
-      for (const other of conditions) {
-        if (String(other.productId) === String(source.productId)) continue;
-        const pairKey = `${source.productId}:${source.variantSku || ""}:${other.productId}:${other.variantSku || ""}`;
-        if (seenPairs.has(pairKey)) continue;
-        seenPairs.add(pairKey);
-        banners.push({
-          sourceProductId: source.productId,
-          recommendedProductId: other.productId,
-          sourceVariantSku: source.variantSku || null,
-          recommendedVariantSku: other.variantSku || null,
-          text: rule.name || "Unlock Free Shipping",
-          ctaLabel: "Add to Cart",
-          isActive: true,
-          ruleId: rule._id,
-        });
+
+    if (fsEffect) {
+      // No natural "target" for free_shipping — every condition-product
+      // pairs with every OTHER condition-product, all directions shown.
+      for (const source of conditions) {
+        for (const other of conditions) {
+          if (String(other.productId) === String(source.productId)) continue;
+          const pairKey = `${source.productId}:${source.variantSku || ""}:${other.productId}:${other.variantSku || ""}`;
+          if (seenPairs.has(pairKey)) continue;
+          seenPairs.add(pairKey);
+          banners.push({
+            sourceProductId: source.productId, recommendedProductId: other.productId,
+            sourceVariantSku: source.variantSku || null, recommendedVariantSku: other.variantSku || null,
+            text: fsEffect.label || rule.name || "Unlock Free Shipping",
+            subtitle: fsEffect.description || "", image: fsEffect.image || "",
+            ctaLabel: "Add to Cart", isActive: true, ruleId: rule._id,
+          });
+        }
+      }
+    }
+
+    if (discountEffects.length) {
+      // Directional: condition product(s) are the source, the effect's
+      // targetProductId is the recommended one.
+      for (const source of conditions) {
+        for (const effect of discountEffects) {
+          if (String(effect.targetProductId) === String(source.productId)) continue; // a rule discounting the SAME product it requires isn't a "combo" suggestion
+          const pairKey = `${source.productId}:${source.variantSku || ""}:${effect.targetProductId}:${effect.targetVariantSku || ""}`;
+          if (seenPairs.has(pairKey)) continue;
+          seenPairs.add(pairKey);
+          banners.push({
+            sourceProductId: source.productId, recommendedProductId: effect.targetProductId,
+            sourceVariantSku: source.variantSku || null, recommendedVariantSku: effect.targetVariantSku || null,
+            text: effect.label || rule.name || "Special offer",
+            subtitle: effect.description || "", image: effect.image || "",
+            ctaLabel: "Add to Cart", isActive: true, ruleId: rule._id,
+          });
+        }
       }
     }
   }
+
+  // console.log(`[FreeShipping:banners] derived ${banners.length} banner(s): ${JSON.stringify(banners.map((b) => `${b.sourceProductId}->${b.recommendedProductId}`))}`);
   return banners;
 };
 
@@ -171,42 +209,41 @@ async function resolveBannerVariantNames(banners) {
 }
 
 /**
- * Merges admin-configured "Product Page Banners" with cart_rule-derived
- * banners (see getCartRuleDerivedBanners) into one list, de-duplicated by
- * source+recommended pair (an explicit admin banner for a pair wins over the
- * auto-derived one, since it may carry custom copy), then resolves any
- * variant SKUs to names before returning — see resolveBannerVariantNames.
+ * Every active banner, entirely Promotion-derived (see
+ * getCartRuleDerivedBanners) — the admin's old hand-typed "Product Page
+ * Banners" (custom text/ctaLabel, stored on the legacy `offers` free_shipping
+ * singleton) are no longer read here at all. Banner copy (`text`/`ctaLabel`)
+ * is now always the Promotion's own name / a fixed "Add to Cart" label
+ * (see getCartRuleDerivedBanners) — accepted as a known, intentional
+ * downgrade from hand-written marketing copy, per explicit instruction.
+ * Resolves any variant SKUs to names before returning — see
+ * resolveBannerVariantNames.
  */
-const getAllBannersMerged = async () => {
-  const offer = await getFreeShippingDoc("banners");
-  const adminBanners = (offer?.banners || []).filter((b) => b.isActive);
-  const ruleBanners = await getCartRuleDerivedBanners();
-
-  const adminPairs = new Set(adminBanners.map((b) => `${b.sourceProductId}:${b.recommendedProductId}`));
-  const dedupedRuleBanners = ruleBanners.filter(
-    (b) => !adminPairs.has(`${b.sourceProductId}:${b.recommendedProductId}`),
-  );
-  return resolveBannerVariantNames([...adminBanners, ...dedupedRuleBanners]);
+const getAllBannersMerged = async (placement) => {
+  const banners = await getCartRuleDerivedBanners(placement);
+  const resolved = await resolveBannerVariantNames(banners);
+  console.log(`[FreeShipping:merged] placement=${placement || "(any)"} — ${resolved.length} banner(s) after variant-name resolution`);
+  return resolved;
 };
 
 /**
- * ALL active banners (admin + cart_rule-derived) for a given product page —
- * used by getBannerForProductController. A product can now have MULTIPLE
- * suggestions (carousel on the client) rather than just one. Independent of
- * the parent doc's `isActive` — see isFreeShippingEligible above for why.
+ * ALL active (Promotion-derived) banners for a given product page — used by
+ * getBannerForProductController. A product can have MULTIPLE suggestions
+ * (carousel on the client) rather than just one.
  *
  * @param {string} productId
  */
 export const getBannerForProduct = async (productId) => {
-  const all = await getAllBannersMerged();
-  return all.filter((b) => String(b.sourceProductId) === String(productId));
+  const all = await getAllBannersMerged("pdp");
+  const filtered = all.filter((b) => String(b.sourceProductId) === String(productId));
+  console.log(`[FreeShipping:forProduct] productId=${productId} → ${filtered.length} banner(s): ${JSON.stringify(filtered.map((b) => b.text))}`);
+  return filtered;
 };
 
 /**
- * All active banners across every product — used by
+ * All active (Promotion-derived) banners across every product — used by
  * getAllActiveBannersController (checkout/cart, which aren't tied to one
- * product). Independent of the parent doc's `isActive` — see
- * isFreeShippingEligible above for why.
+ * product).
  */
 export const getAllActiveBanners = async () => {
   return getAllBannersMerged();

@@ -50,6 +50,16 @@ const bannerSchema = new mongoose.Schema(
   {
     sourceProductId: { type: String, required: true, trim: true },
     recommendedProductId: { type: String, required: true, trim: true },
+    // Optional variant scoping — see the matching comment in the admin
+    // repo's server/models/offer.model.js. Reads here are all .lean()
+    // (freeShippingOffer.util.js), which already pass these through
+    // regardless of this declaration; declared for documentation/safety.
+    sourceVariantSku: { type: String, default: "", trim: true },
+    recommendedVariantSku: { type: String, default: "", trim: true },
+    // See the matching comment in the admin repo's offer.model.js — controls
+    // whether the storefront auto-adds the recommended item when the source
+    // is added, intended only for genuinely free companions.
+    autoAddFree: { type: Boolean, default: false },
     text: { type: String, required: true, trim: true },
     ctaLabel: { type: String, default: "Add to Cart", trim: true },
     isActive: { type: Boolean, default: true },

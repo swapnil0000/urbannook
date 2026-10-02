@@ -414,13 +414,30 @@ const FreeShippingBanner = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed off the serialized key so identical content (re-render without a real cart change) doesn't reset the debounce timer
   }, [cartItemsKey]);
 
-  const ruleEvalItems = useMemo(
-    () =>
-      debouncedCartItems
-        .map((item) => ({ productId: item.id || item.mongoId, quantity: itemQty(item.quantity), selectedVariant: item.selectedVariant }))
-        .filter((i) => i.productId && i.quantity > 0),
-    [debouncedCartItems],
-  );
+  // Same hypothetical-cart preview as ProductPageBanner.jsx: when the combo
+  // isn't fully in the cart yet, evaluate price AS IF the source and/or the
+  // currently-selected recommended variant were added, not just whatever's
+  // actually sitting in the cart right now. Without this, switching the
+  // variant dropdown here (Single/Double/Triple Katana stand) never re-ran
+  // the rules engine before the item was actually added, so the price shown
+  // stayed frozen — it only "just worked" for single-variant add-ons (like
+  // the Pen Stand in the Lamp combo) because there was never a second
+  // variant to switch to in the first place.
+  const ruleEvalItems = useMemo(() => {
+    const fromCart = debouncedCartItems
+      .map((item) => ({ productId: item.id || item.mongoId, quantity: itemQty(item.quantity), selectedVariant: item.selectedVariant }))
+      .filter((i) => i.productId && i.quantity > 0);
+    if (!banner) return fromCart;
+    const hypothetical = [
+      ...(sourceInCart || !banner.sourceProductId
+        ? []
+        : [{ productId: banner.sourceProductId, quantity: 1, selectedVariant: banner.sourceVariantName || sourceProduct?.variantDetails?.[0]?.variantName }]),
+      ...(added || !banner.recommendedProductId
+        ? []
+        : [{ productId: banner.recommendedProductId, quantity: 1, selectedVariant: selectedVariant || banner.recommendedVariantName }]),
+    ];
+    return [...fromCart, ...hypothetical];
+  }, [debouncedCartItems, banner, sourceInCart, added, selectedVariant, sourceProduct]);
   const { data: ruleEvalRes } = useEvaluateCartRulesQuery(ruleEvalItems, { skip: ruleEvalItems.length === 0 });
   // RTK Query keeps serving the LAST successful result once a query is
   // skipped — it doesn't clear `data` just because the cart emptied out.
@@ -1318,8 +1335,16 @@ const FreeShippingBanner = ({
                   // (e.g. "2+ Lamps => 50% off Pen Stand") — always takes
                   // priority over both the variant markdown and the cosmetic
                   // badge below; a real reward is never hidden behind a fake one.
+                  // Cap scales with how many times the rule's trigger
+                  // condition is met — server-computed (cartRule.util.js's
+                  // ruleRepeatCount), read from the candidate, never
+                  // re-derived here. Matches rp.payment.controller.js, so
+                  // this never disagrees with what checkout actually charges.
+                  const discountCap = Math.max(1, ...ruleDiscountCandidates.map((c) => c.cap ?? 1));
+                  const discountedUnits = Math.min(lineQty, discountCap);
+                  const fullPriceUnits = lineQty - discountedUnits;
                   const lineDiscounted =
-                    Math.round(ruleDiscountedPrice) * lineQty;
+                    Math.round(ruleDiscountedPrice) * discountedUnits + displayPrice * fullPriceUnits;
                   // Derived from the actual prices rather than read off the
                   // rule, so a flat_off rule (₹X off) shows a correct % too.
                   const rulePercent = Math.round(
@@ -1813,14 +1838,43 @@ const FreeShippingBanner = ({
             <button
               onClick={handleAddToCart}
               disabled={isAdding || isActiveVariantOOS}
-              // Press state instead of the old hover-fill sweep: touch devices
-              // have no hover, so on mobile that green fill simply never
-              // appeared and the tap had no visual feedback at all. `active:`
-              // fires on touch AND on mouse-down, so the press reads the same
-              // everywhere — instant dark-brown fill, no transition delay.
-              className="w-full py-3.5 rounded-full flex items-center justify-center gap-2.5 text-sm font-medium uppercase tracking-wide disabled:opacity-50 bg-paper text-ink active:bg-[#4a2f1b] active:text-paper active:scale-[0.98] transition-[background-color,color,transform] duration-100"
+              // Solid red button (the old bg-paper/border pairing blended
+              // straight into the card's own cream background — the button
+              // was effectively invisible). `group` scopes the wave overlay
+              // below to just this button's own hover. The `active:` state
+              // is kept alongside the hover wave (not replaced by it) —
+              // touch devices have no hover, so mobile still needs its own
+              // instant-feedback fill on tap, per the fix this button
+              // already had.
+              className="group relative w-full py-3.5 rounded-full overflow-hidden flex items-center justify-center gap-2.5 text-sm font-bold uppercase tracking-wide disabled:opacity-50 bg-brand text-white active:bg-brandHi active:scale-[0.98] transition-[transform] duration-100"
             >
-              <span className="flex items-center justify-center gap-2.5">
+              {/* Wavy fill — sits hidden below the button and rises to fill
+                  it on hover (group-hover, Tailwind's translate utilities),
+                  while a separate inner animation drifts the wave shape
+                  sideways in a loop for a "liquid" feel. Two elements
+                  because the rise (Tailwind's transform) and the drift (its
+                  own keyframe, also a transform) would otherwise fight over
+                  the same CSS property on one element. */}
+              <span
+                aria-hidden="true"
+                className="absolute inset-0 overflow-hidden rounded-full pointer-events-none"
+              >
+                <style>{`@keyframes fsbWaveDrift { 0% { transform: translateX(0); } 100% { transform: translateX(-200px); } }`}</style>
+                <span className="absolute inset-x-0 bottom-0 h-full translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out">
+                  <svg
+                    className="absolute bottom-0 left-0 w-[200%] h-full"
+                    viewBox="0 0 400 60"
+                    preserveAspectRatio="none"
+                    style={{ animation: "fsbWaveDrift 2.4s linear infinite" }}
+                  >
+                    <path
+                      d="M0 30 Q50 10 100 30 T200 30 T300 30 T400 30 V60 H0 Z"
+                      fill="rgb(var(--gl-brand-hi))"
+                    />
+                  </svg>
+                </span>
+              </span>
+              <span className="relative z-10 flex items-center justify-center gap-2.5">
                 {isActiveVariantOOS ? (
                   "Out of Stock"
                 ) : isAdding ? (

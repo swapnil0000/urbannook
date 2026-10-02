@@ -9,7 +9,9 @@ import RecommendedProducts from '../../component/RecommendedProducts';
 import OtherVariants from '../../component/OtherVariants';
 import NotifyMeModal from '../../component/NotifyMeModal';
 import ComboBundleSection from '../../component/ComboBundleSection';
+import ComparisonTable from '../../component/ComparisonTable';
 import FreeShippingBanner from '../../component/FreeShippingBanner';
+import ProductPageBanner from '../../component/ProductPageBanner';
 import ImageCarousel from '../../component/ImageCarousel';
 import { motion, AnimatePresence } from 'motion/react';
 import { ScrollColorBand } from '../../component/motion';
@@ -260,6 +262,21 @@ const ProductDetailPage = () => {
     const selectedDetail = product.variantDetails?.find((v) => v.variantName === selectedVariant);
     return (selectedDetail?.variantSubTag && selectedDetail.variantSubTag.trim()) || '';
   }, [product, selectedVariant]);
+
+  // Variant-first, product-level fallback — same rule as variantSubTag above,
+  // for the two other admin-editable fields a variant can now override:
+  // description and specifications. Blank/absent on the variant means "use
+  // the product-level value", never "show nothing" (that would hide real
+  // product-level copy just because this particular variant has no override).
+  const displayDescription = useMemo(() => {
+    const variantDes = selectedVariantObj?.variantDes?.trim();
+    return variantDes || product?.productSubDes || product?.productDes || '';
+  }, [selectedVariantObj, product]);
+
+  const displaySpecs = useMemo(() => {
+    const variantSpecs = selectedVariantObj?.specifications;
+    return variantSpecs && variantSpecs.length > 0 ? variantSpecs : product?.specifications || [];
+  }, [selectedVariantObj, product]);
 
   useEffect(() => {
     setPinStatus(null);
@@ -554,7 +571,7 @@ const ProductDetailPage = () => {
     </div>
   );
 
-  const specs = product.specifications || [];
+  const specs = displaySpecs;
   const structuredData = {
     '@context': 'https://schema.org', '@type': 'Product', name: product.productName, image: galleryImages, description: product.productSubDes || product.productDes, sku: product.productId,
     brand: { '@type': 'Brand', name: 'UrbanNook' },
@@ -592,7 +609,13 @@ const ProductDetailPage = () => {
             </div>
             <div className="flex items-start justify-between gap-3 mt-2">
               <div className="min-w-0">
-                <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-ink leading-tight">{selectedVariant || product.productName}</h1>
+                {/* No line-clamp — a long name used to get cut off with an
+                    ellipsis after 2 lines on mobile. min-h is a MINIMUM, not
+                    a cap, so it still keeps short titles' height consistent
+                    without truncating a longer one. */}
+                <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-ink leading-tight min-h-[66px] md:min-h-[80px]">
+                  {selectedVariant || product.productName}
+                </h1>
                 {selectedVariantSubTag && (
                   <p className="text-base md:text-lg font-normal text-muted leading-snug mt-1">{selectedVariantSubTag}</p>
                 )}
@@ -614,18 +637,23 @@ const ProductDetailPage = () => {
                 <button onClick={copyShareLink} aria-label="Copy link" className="w-9 h-9 grid place-items-center rounded-full border border-hair text-ink hover:border-ink hover:bg-surface transition-colors"><i className="fa-solid fa-link text-xs" /></button>
               </div>
             )}
-            {(product.productDes || product.productSubDes) && <p className="text-sm text-muted leading-relaxed mt-2 line-clamp-2">{product.productDes || product.productSubDes}</p>}
+            {/* {displayDescription && <p className="text-xs text-muted leading-relaxed mt-2">{displayDescription}</p>} */}
 
-            {/* ZONE B — BUY CARD: price → savings → variants → urgency → CTA → trust, one unit */}
-            <div className="mt-5  bg-paper p-4 md:p-5 md:max-w-md">
+            {/* ZONE B — BUY CARD: price → savings → variants → urgency → CTA → trust, one unit.
+                py only, no px: the horizontal p-4/p-5 used to indent this
+                whole block (price, buttons, trust strip) further right than
+                Zone A's title/kicker above it, which sit with no padding of
+                their own — everything below looked shifted right instead of
+                lining up to the same left edge. Vertical spacing is kept. */}
+            <div className="mt-5  bg-paper py-4 md:py-5 md:max-w-md">
               {/* price hero */}
-              <div className="flex items-baseline flex-wrap gap-x-3 gap-y-1">
+              <div className="flex items-center gap-2">
                 <span className="text-4xl md:text-5xl font-extrabold text-ink tracking-tight tabular-nums leading-none">{inr(currentPrice)}</span>
                 {discountPercent > 0 && (
-                  <>
-                    <span className="text-base text-faint line-through tabular-nums">{inr(maxVariantPrice)}</span>
+                  <div className="flex flex-col items-start gap-0.5">
                     <span className="gl-lbl text-[11px] text-sale bg-sale/10 px-2 py-0.5 rounded-md">{discountPercent}% OFF</span>
-                  </>
+                    <span className="text-xs text-faint line-through tabular-nums">{inr(maxVariantPrice)}</span>
+                  </div>
                 )}
               </div>
               {discountPercent > 0 && <p className="text-sm font-semibold text-save mt-1">You save {inr(maxVariantPrice - currentPrice)}</p>}
@@ -655,7 +683,7 @@ const ProductDetailPage = () => {
               />
 
               {/* urgency + delivery */}
-              <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs mt-4">
+              {/* <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs mt-4">
                 {isOutOfStock ? (
                   <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-faint" /><span className="text-muted font-semibold">Out of stock</span></span>
                 ) : selectedVariantLowStock && selectedVariantQty !== 1 ? (
@@ -663,8 +691,8 @@ const ProductDetailPage = () => {
                 ) : (
                   <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-save" /><span className="text-ink font-semibold">In stock</span></span>
                 )}
-                <span className="text-muted">🚚 Ships in 24-48 hrs</span>
-              </div>
+                <span className="text-muted"><i className="fa-solid fa-truck-fast mr-1" aria-hidden="true" />Ships in 24-48 hrs</span>
+              </div> */}
 
               {/* CTA */}
               <div ref={buyBoxRef} className="flex items-center gap-3 mt-4">
@@ -760,10 +788,13 @@ const ProductDetailPage = () => {
 
               {/* trust strip inside the card */}
               <div className="mt-4 pt-4 border-t border-hair grid grid-cols-3 divide-x divide-hair text-center text-[11px] text-muted">
-                <div className="px-1 flex flex-col items-center gap-1"><span className="text-lg">🚚</span>24-48 hrs</div>
-                <div className="px-1 flex flex-col items-center gap-1"><span className="text-lg">💸</span>{product.isCodAvailable ? 'Partial COD' : 'Secure pay'}</div>
-                <div className="px-1 flex flex-col items-center gap-1"><span className="text-lg">↺</span>Free replacement if damaged</div>
+                <div className="px-1 flex flex-col items-center gap-1"><i className="fa-solid fa-truck-fast text-brand text-base" aria-hidden="true" />24-48 hrs</div>
+                <div className="px-1 flex flex-col items-center gap-1"><i className="fa-solid fa-money-bill-wave text-brand text-base" aria-hidden="true" />{product.isCodAvailable ? 'Partial COD' : 'Secure pay'}</div>
+                <div className="px-1 flex flex-col items-center gap-1"><i className="fa-solid fa-rotate-left text-brand text-base" aria-hidden="true" />Free replacement if damaged*</div>
               </div>
+              <p className="mt-1.5 text-[8px] text-faint text-center">
+                *Applicable only with an unboxing video showing the damaged product and its shipping label.
+              </p>
             </div>
 
             {/* OFFERS — UPI / EMI / card offers, applied via Razorpay at checkout */}
@@ -799,12 +830,20 @@ const ProductDetailPage = () => {
                 whose pairing was a guess in code — if you were looking at a pen
                 stand it showed a lamp, otherwise a pen stand — and whose copy
                 ("Frequently bought together") claimed data we do not have.
-                FreeShippingBanner was written for exactly this spot (see its
-                docstring) and was simply never wired in: it reads the offers an
-                admin actually configured, pages through them when a product has
-                several, takes its wording and CTA from the admin, and reports
-                impressions and clicks under this surface. It renders nothing
-                when no offer applies to this product. */}
+                FreeShippingBanner reads the offers an admin actually
+                configured (admin panel Offers page), pages through them when
+                a product has several, takes its wording and CTA from the
+                admin, and reports impressions and clicks under this surface.
+                It renders nothing when no offer applies to this product. */}
+            {/* <FreeShippingBanner productId={productId} surface="pdp" className="mt-4 md:max-w-md" /> */}
+
+            {/* Plain "Buy X, get Y" nudge using the SAME admin-configured
+                Product Page Banners, but with the admin's own banner.text
+                shown as-is (no baked-in "free shipping" wording) — see
+                ProductPageBanner.jsx for why this is a separate component
+                from FreeShippingBanner above. Renders nothing if no banner
+                targets this product. */}
+            <ProductPageBanner productId={productId} className="mt-3 md:max-w-md" />
 
           </div>
         </div>
@@ -815,8 +854,8 @@ const ProductDetailPage = () => {
           <p className="gl-lbl text-brand mb-2 text-center">The full rundown</p>
           <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight mb-6 text-center">Product details</h2>
           <div className="divide-y divide-hair border-y border-hair">
-            {(product.productSubDes || product.productDes) && (
-              <details open className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Description<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary><p className="text-muted mt-3 text-sm leading-relaxed">{product.productSubDes || product.productDes}</p></details>
+            {displayDescription && (
+              <details open className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Description<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary><p className="text-muted mt-3 text-xs leading-relaxed">{displayDescription}</p></details>
             )}
             {specs.length > 0 && (
               <details className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Specifications<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary>
@@ -885,32 +924,10 @@ const ProductDetailPage = () => {
           </ScrollColorBand>
         )}
 
-        {/* WHY URBAN NOOK — comparison / trust table */}
-        <section className="mt-14">
-          <p className="gl-lbl text-brand mb-2 text-center">Why Urban Nook</p>
-          <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight mb-6 text-center">Made different.</h2>
-          <div className="max-w-lg mx-auto rounded-2xl border border-hair overflow-hidden">
-            <div className="grid grid-cols-[1fr_64px_64px] items-center px-4 py-2.5 bg-paper">
-              <span />
-              <span className="text-center text-[11px] font-extrabold uppercase tracking-wide text-brand">Us</span>
-              <span className="text-center text-[11px] font-extrabold uppercase tracking-wide text-faint">Others</span>
-            </div>
-            {[
-              '3D-printed to order',
-              'Original Indian design',
-              'Handcrafted finish',
-              'Partial COD',
-              'Free replacement if damaged',
-              'Made in India 🇮🇳',
-            ].map((label, i) => (
-              <div key={i} className="grid grid-cols-[1fr_64px_64px] items-center px-4 py-2.5 border-t border-hair">
-                <span className="text-sm font-semibold">{label}</span>
-                <span className="grid place-items-center"><span className="w-6 h-6 rounded-full bg-brand text-white grid place-items-center text-xs">✓</span></span>
-                <span className="grid place-items-center text-faint">✕</span>
-              </div>
-            ))}
-          </div>
-        </section>       
+        {/* WHY URBAN NOOK — comparison table (ComparisonTable.jsx). Same
+            layout/animations as before, recoloured to the site's red/black
+            theme using only the existing --gl-* tokens (see that file). */}
+        <ComparisonTable productName={product.productName} />
 
         {/* REVIEWS — full-bleed LIGHT-GREY (surface) band */}
         <div className="w-screen ml-[calc(50%-50vw)] bg-paper mt-16">
@@ -1030,7 +1047,18 @@ const ProductDetailPage = () => {
         {related.length > 0 && (
           <div className="mt-16">
             <div className="flex items-end justify-between mb-6"><h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">You may also like</h2><button onClick={() => navigate('/products')} className="text-sm font-bold underline underline-offset-4 decoration-2 hover:text-brand">View all →</button></div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">{related.map((p, i) => <UnProductCard key={p.productId || i} p={p} index={i} listId="pdp_related" listName="Related" />)}</div>
+            {/* Single scrollable row (matches the old site's layout) instead
+                of a multi-row grid — the card design itself is unchanged. */}
+            <div
+              className="flex gap-4 md:gap-6 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              style={{ touchAction: 'pan-x' }}
+            >
+              {related.map((p, i) => (
+                <div key={p.productId || i} className="snap-start shrink-0 w-[160px] sm:w-[190px] md:w-[220px]">
+                  <UnProductCard p={p} index={i} listId="pdp_related" listName="Related" />
+                </div>
+              ))}
+            </div>
           </div>
         )}
           {productFaqs.length > 0 && (
