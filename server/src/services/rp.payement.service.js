@@ -72,4 +72,27 @@ const razorpayFetchOrderService = async (razorpayOrderId) => {
   }
 };
 
-export { razorpayCreateOrderService, razorpayFetchOrderService };
+/**
+ * All payment attempts on a Razorpay order, newest first. Lets the order-status
+ * poll confirm a capture directly instead of waiting on the webhook.
+ * Returns null on failure, like razorpayFetchOrderService.
+ */
+const razorpayFetchOrderPaymentsService = async (razorpayOrderId) => {
+  const key_id = env.RP_KEY_ID;
+  const key_secret = env.RP_SECRET;
+
+  if (!key_id || !key_secret || !razorpayOrderId) return null;
+
+  try {
+    const razorpay = new Razorpay({ key_id, key_secret });
+    const res = await razorpay.orders.fetchPayments(razorpayOrderId);
+    return res?.items || [];
+  } catch (error) {
+    console.error(
+      `[ERROR] Razorpay payments fetch failed for ${razorpayOrderId}: ${error.message}`,
+    );
+    return null;
+  }
+};
+
+export { razorpayCreateOrderService, razorpayFetchOrderService, razorpayFetchOrderPaymentsService };

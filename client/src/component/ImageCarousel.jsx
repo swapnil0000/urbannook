@@ -22,6 +22,7 @@ export default function ImageCarousel({
   renderOverlay,
   peek = false,
   slideClass = 'w-[64%] sm:w-56',
+  priority = false, // first slide is the page's LCP image → fetchpriority=high
 }) {
   const trackRef = useRef(null);
   const [index, setIndex] = useState(0);
@@ -38,19 +39,31 @@ export default function ImageCarousel({
     setPrevImages(images);
     setIndex(0);
   }
-  useEffect(() => {
-    if (trackRef.current) trackRef.current.scrollLeft = 0;
-  }, [images]);
-
   // Distance between consecutive slides (slide width + gap). Measured from the DOM
-  // so it works for both full-width and peek layouts.
-  const stride = () => {
+  // so it works for both full-width and peek layouts. Cached and refreshed by a
+  // ResizeObserver so scroll handlers never force a synchronous layout (reflow).
+  const strideRef = useRef(0);
+  const measure = () => {
     const el = trackRef.current;
     if (!el) return 1;
     const k = el.children;
-    if (k.length >= 2) return Math.max(1, k[1].offsetLeft - k[0].offsetLeft);
-    return el.clientWidth || 1;
+    strideRef.current = k.length >= 2 ? Math.max(1, k[1].offsetLeft - k[0].offsetLeft) : el.clientWidth || 1;
+    return strideRef.current;
   };
+  const stride = () => strideRef.current || measure();
+
+  useEffect(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    strideRef.current = 0;
+    // Only write scrollLeft when needed — an unconditional write on mount invalidated
+    // layout right before the first measurement.
+    if (el.scrollLeft !== 0) el.scrollLeft = 0;
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => { strideRef.current = 0; });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [images]);
 
   const scrollToIndex = useCallback(
     (i) => {
@@ -62,12 +75,19 @@ export default function ImageCarousel({
     [count, reduced]
   );
 
+  // rAF-throttled: at most one layout read per frame while scrolling.
+  const rafRef = useRef(0);
   const onScroll = useCallback(() => {
-    const el = trackRef.current;
-    if (!el) return;
-    const i = Math.round(el.scrollLeft / stride());
-    setIndex((prev) => (prev === i ? prev : i));
+    if (rafRef.current) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = 0;
+      const el = trackRef.current;
+      if (!el) return;
+      const i = Math.round(el.scrollLeft / stride());
+      setIndex((prev) => (prev === i ? prev : i));
+    });
   }, []);
+  useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
 
   useEffect(() => {
     if (paused || reduced || count <= 1) return;
@@ -114,7 +134,9 @@ export default function ImageCarousel({
       <img
         src={src}
         alt={alt}
-        loading={i === 0 ? 'eager' : 'lazy'}
+        loading={i === 0 && !peek ? 'eager' : 'lazy'}
+        fetchPriority={priority && i === 0 ? 'high' : undefined}
+        decoding={i === 0 && !peek ? 'sync' : 'async'}
         draggable={false}
         className="absolute inset-0 w-full h-full object-cover"
         onError={onImgErr}

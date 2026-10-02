@@ -9,7 +9,7 @@
     "dev:staging": "vite --mode staging",
     "build": "vite build",
     "build:staging": "vite build --mode staging",
-    "build:prod": "vite build --mode production",
+    "build:prod": "vite build --mode production && node scripts/prerender.mjs",
     "preview": "vite preview",
     "preview:prod": "vite preview --mode production",
     "start:prod": "vite --mode production --host 0.0.0.0 --port 3000",
@@ -18,6 +18,10 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@fontsource/anton": "^5.3.0",
+    "@fontsource/archivo": "^5.3.0",
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
     "@react-google-maps/api": "^2.20.8",
     "@react-oauth/google": "^0.13.4",
     "@reduxjs/toolkit": "^2.11.2",

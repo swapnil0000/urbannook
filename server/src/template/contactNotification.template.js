@@ -1,6 +1,6 @@
 import env from "../config/envConfigSetup.js";
 
-const contactNotificationTemplate = ({ name, email, subject, message, mobile, timestamp }) => {
+const contactNotificationTemplate = ({ name, email, subject, message, mobile, productName, variantName, timestamp }) => {
   const formattedDate = new Date(timestamp).toLocaleString('en-IN', {
     dateStyle: 'full',
     timeStyle: 'short',
@@ -91,6 +91,14 @@ const contactNotificationTemplate = ({ name, email, subject, message, mobile, ti
                 ${mobile ? `<a href="tel:${mobile}" class="h-text phone-link" style="color:#141414 !important; text-decoration:none !important; font-weight:600;">${mobile}</a>` : '<span class="m-text" style="color:#CCCCCC; font-style:italic; font-weight:400;">Not provided</span>'}
               </td>
             </tr>
+            ${productName ? `<tr>
+              <td class="m-text" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:9px; color:#AAAAAA; text-transform:uppercase; letter-spacing:1px; padding-bottom:16px; padding-right:20px; white-space:nowrap; vertical-align:top;">Product</td>
+              <td class="h-text" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:14px; font-weight:600; color:#141414; padding-bottom:16px;">${productName}</td>
+            </tr>` : ''}
+            ${variantName ? `<tr>
+              <td class="m-text" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:9px; color:#AAAAAA; text-transform:uppercase; letter-spacing:1px; padding-bottom:16px; padding-right:20px; white-space:nowrap; vertical-align:top;">Variant</td>
+              <td class="h-text" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:14px; font-weight:600; color:#141414; padding-bottom:16px;">${variantName}</td>
+            </tr>` : ''}
             <tr>
               <td class="m-text" style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:9px; color:#AAAAAA; text-transform:uppercase; letter-spacing:1px; padding-right:20px; white-space:nowrap; vertical-align:top;">Subject</td>
               <td style="padding-bottom:0;">

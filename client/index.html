@@ -11,8 +11,11 @@
   <script type="text/javascript">
     (function(c,l,a,r,i,t,y){
         c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-        t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-        y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+        // Deferred until after window load so Clarity doesn't compete with the LCP
+        // image / main bundle. The stub above queues any calls made before then.
+        function go(){t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+        y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);}
+        c.addEventListener('load',function(){setTimeout(go,3000);});
     })(window, document, "clarity", "script", "wdldsf6w73");
  </script>
   <script>
@@ -20,6 +23,8 @@
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
     gtag('config', 'G-B7NGCFCRFG');
+    // Google Ads — same gtag.js library, no extra script
+    gtag('config', 'AW-18461503961');
   </script>
   <!-- Meta Pixel Code (single source, env-driven via VITE_META_PIXEL_ID) -->
   <script>
@@ -27,9 +32,12 @@
     {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
     n.callMethod.apply(n,arguments):n.queue.push(arguments)};
     if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-    n.queue=[];t=b.createElement(e);t.async=!0;
+    n.queue=[];
+    // fbevents.js (~113 KB) is injected after window load; fbq() calls made earlier
+    // sit in the stub queue above and are replayed once it arrives, so no events are lost.
+    f.addEventListener('load',function(){setTimeout(function(){t=b.createElement(e);t.async=!0;
     t.src=v;s=b.getElementsByTagName(e)[0];
-    s.parentNode.insertBefore(t,s)}(window, document,'script',
+    s.parentNode.insertBefore(t,s)},1500)})}(window, document,'script',
     'https://connect.facebook.net/en_US/fbevents.js');
     // Only initialise when a real pixel id is injected at build time.
     var UN_META_PIXEL_ID = '__VITE_META_PIXEL_ID__';
@@ -57,7 +65,8 @@
   <meta name="keywords" content="home decor, 3D printed decor, modern home decor India, lifestyle products, UrbanNook, indoor lighting, minimalist decor" />
   <meta name="author" content="UrbanNook" />
   <meta name="robots" content="index, follow" />
-  <link rel="canonical" href="https://www.urbannook.in/" />
+  <!-- No canonical here: this shell is served for every URL. Each page sets its own
+       (prerendered product HTML, or SEOHead at runtime). -->
 
   <!-- Google Ads -->
   <meta name="google-site-verification" content="46CQHlF4g5BYMKcIhKW_UCkjNByyMpEZE4d3j8NwaPE" />
@@ -67,7 +76,6 @@
   <meta property="og:title" content="UrbanNook — Modern Lifestyle Store" />
   <meta property="og:description" content="Premium 3D printed home decor & lifestyle products. Proudly made in India." />
   <meta property="og:image" content="https://www.urbannook.in/assets/logo_with_text.webp" />
-  <meta property="og:url" content="https://www.urbannook.in/" />
   <meta property="og:site_name" content="UrbanNook" />
   <meta property="og:locale" content="en_IN" />
 
@@ -77,6 +85,20 @@
   <meta name="twitter:description" content="Premium 3D printed home decor & lifestyle products. Proudly made in India." />
   <meta name="twitter:image" content="https://www.urbannook.in/assets/logo_with_text.webp" />
   <meta name="twitter:site" content="@urbannookstore" />
+
+  <!-- Sitewide entity data for search engines / AI answers -->
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@graph":[
+    {"@type":"Organization","@id":"https://www.urbannook.in/#org","name":"UrbanNook","url":"https://www.urbannook.in/",
+     "logo":"https://www.urbannook.in/assets/logo_with_text.webp",
+     "description":"Indian online store for 3D printed home decor, desk lamps, pen stands, anime katanas and lifestyle products. Made in India, shipped pan-India with cash on delivery.",
+     "email":"urbanadmin@urbannook.in","telephone":"+91-9124081005",
+     "address":{"@type":"PostalAddress","addressCountry":"IN"},
+     "sameAs":["https://www.instagram.com/urbannook.store"]},
+    {"@type":"WebSite","@id":"https://www.urbannook.in/#website","url":"https://www.urbannook.in/","name":"UrbanNook",
+     "publisher":{"@id":"https://www.urbannook.in/#org"},"inLanguage":"en-IN"}
+  ]}
+  </script>
 
   <!-- PWA / App -->
   <!-- build: v2.1 -->
@@ -88,80 +110,63 @@
   <meta name="apple-mobile-web-app-title" content="UrbanNook" />
   <link rel="apple-touch-icon" href="/assets/logo_only.webp" />
   
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <link rel="preconnect" href="https://api.urbannook.in" crossorigin />
+  <link rel="preconnect" href="https://assets-prod.urbannook.in" />
   <link rel="dns-prefetch" href="https://accounts.google.com" />
 
-  <!-- Editorial "2040" typography: Anton (display) · Archivo (headings) · Inter (body) · JetBrains Mono (labels) -->
-  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <!-- Fonts (Anton · Archivo · Inter · JetBrains Mono) are self-hosted via @fontsource,
+       imported in src/main.jsx. No Google Fonts request, so nothing font-related blocks render. -->
 
-  <!-- The home hero renders /assets/hero2.webp at every breakpoint, so preload it
-       unconditionally. The previous media-split preload fetched hero21.webp on mobile —
-       an image the hero never uses — and left the real LCP image undiscovered until
-       React had rendered, costing ~2.2s of LCP load delay.
-       Do NOT preload /src/main.jsx here: that path only exists in dev, and Vite inlines
-       it into the built HTML as a base64 data: URI. Vite already injects the correct
-       hashed module script at the end of <body>. -->
-  <link rel="preload" as="image" href="/assets/hero2.webp" fetchpriority="high" />
-  
-  <link rel="preload" as="font" type="font/woff2"
-    href="https://fonts.gstatic.com/s/poppins/v20/pxiEyp8kv8JHgFVrJJfecg.woff2"
-    crossorigin="anonymous" />
+  <!-- Route-aware LCP preload. (The old global /assets/hero2.webp preload is gone — the 2040
+       home no longer renders that image, so it only stole bandwidth.) On product pages we fetch
+       the product JSON in parallel with the JS bundle and preload its first gallery image with
+       high priority, so the LCP image starts downloading long before React renders it. -->
+  <script>
+    (function () {
+      var path = location.pathname;
+      function preload(href) {
+        var l = document.createElement('link');
+        l.rel = 'preload'; l.as = 'image'; l.href = href;
+        l.setAttribute('fetchpriority', 'high');
+        document.head.appendChild(l);
+      }
+      var m = path.match(/^\/product\/([^\/?#]+)(?:\/([^\/?#]+))?/);
+      if (!m) return;
+      var host = location.hostname;
+      var api = (host === 'localhost' || host === '127.0.0.1') ? 'http://localhost:8000/api/v1'
+        : host.indexOf('urbannook.online') !== -1 ? 'https://api-staging.urbannook.online/api/v1'
+        : 'https://api.urbannook.in/api/v1';
+      fetch(api + '/product/' + encodeURIComponent(m[1]), { credentials: 'omit' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (res) {
+          var v = res && res.data && res.data.variantDetails;
+          if (!v || !v.length) return;
+          var sel = null;
+          if (m[2]) for (var i = 0; i < v.length; i++) if (v[i].sku === m[2]) sel = v[i];
+          var img = (sel && sel.variantImage && sel.variantImage[0]) || (v[0].variantImage && v[0].variantImage[0]);
+          if (img) preload(img);
+        })
+        .catch(function () {});
+    })();
+  </script>
 
-  <style>
-    @font-face {
-      font-family: 'Poppins';
-      font-style: normal;
-      font-weight: 400;
-      font-display: swap;
-      src: url(https://fonts.gstatic.com/s/poppins/v20/pxiEyp8kv8JHgFVrJJfecg.woff2) format('woff2');
-      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-    }
-    @font-face {
-      font-family: 'Poppins';
-      font-style: normal;
-      font-weight: 600;
-      font-display: swap;
-      src: url(https://fonts.gstatic.com/s/poppins/v20/pxiByp8kv8JHgFVrLEj6Z1xlFQ.woff2) format('woff2');
-      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-    }
-    @font-face {
-      font-family: 'Poppins';
-      font-style: normal;
-      font-weight: 700;
-      font-display: swap;
-      src: url(https://fonts.gstatic.com/s/poppins/v20/pxiByp8kv8JHgFVrLCz7Z1xlFQ.woff2) format('woff2');
-      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-    }
-    @font-face {
-      font-family: 'Inter';
-      font-style: normal;
-      font-weight: 400;
-      font-display: optional;
-      src: url(https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiA.woff2) format('woff2');
-      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-    }
-    @font-face {
-      font-family: 'Inter';
-      font-style: normal;
-      font-weight: 500;
-      font-display: optional;
-      src: url(https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuI6fAZ9hiA.woff2) format('woff2');
-      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-    }
-  </style>
-
-  <link rel="preload" as="style" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" media="print" onload="this.media='all'" />
+  <!-- Font Awesome: only core + solid + regular + brands (not all.min.css), loaded
+       non-blocking. The @font-face overrides below give the icon fonts font-display:swap. -->
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/combine/npm/@fortawesome/fontawesome-free@6.4.0/css/fontawesome.min.css,npm/@fortawesome/fontawesome-free@6.4.0/css/solid.min.css,npm/@fortawesome/fontawesome-free@6.4.0/css/regular.min.css,npm/@fortawesome/fontawesome-free@6.4.0/css/brands.min.css" media="print" onload="this.media='all'" />
   <noscript>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" />
   </noscript>
+  <style>
+    @font-face{font-family:"Font Awesome 6 Free";font-style:normal;font-weight:900;font-display:swap;src:url(https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/webfonts/fa-solid-900.woff2) format("woff2")}
+    @font-face{font-family:"Font Awesome 6 Free";font-style:normal;font-weight:400;font-display:swap;src:url(https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/webfonts/fa-regular-400.woff2) format("woff2")}
+    @font-face{font-family:"Font Awesome 6 Brands";font-style:normal;font-weight:400;font-display:swap;src:url(https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/webfonts/fa-brands-400.woff2) format("woff2")}
+  </style>
 
   <style>
     body {
       margin: 0;
-      font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
     }

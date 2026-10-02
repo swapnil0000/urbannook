@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import confetti from 'canvas-confetti';
@@ -15,8 +15,8 @@ import ProductPageBanner from '../../component/ProductPageBanner';
 import ImageCarousel from '../../component/ImageCarousel';
 import { motion, AnimatePresence } from 'motion/react';
 import { ScrollColorBand } from '../../component/motion';
-import { trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist, trackVariantSelect, trackShare, trackDeliveryCheck } from '../../utils/analytics';
-import { useGetProductByIdQuery, useGetProductsQuery } from '../../store/api/productsApi';
+import { variantSku, trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist, trackVariantSelect, trackShare, trackDeliveryCheck } from '../../utils/analytics';
+import { productsApi, useGetProductByIdQuery, useGetProductsQuery } from '../../store/api/productsApi';
 import { useAddToCartMutation, useUpdateCartMutation, useCalculateShippingMutation } from '../../store/api/userApi';
 import { useGetProductReviewsQuery, useSubmitProductReviewMutation, useUpdateProductReviewMutation } from '../../store/api/testimonialsApi';
 import { addItem, updateQuantity, removeItem, updateSelection } from '../../store/slices/cartSlice';
@@ -39,6 +39,62 @@ const isVariantOutOfStock = (v) =>
   !!v &&
   (v.variantOutOfStock === true ||
     (v.variantQuantity != null && Number(v.variantQuantity) <= 0));
+
+/* Version picker (e.g. Wooden | LED katana). The server inlines, per variant,
+   the other published variants in its variantGroup as `versions`. No type →
+   nothing shown. The open version is selected; another type opens its own PDP
+   (a separate product). A type with no linked variant is shown greyed out; an
+   out-of-stock one still opens — the existing OOS logic there blocks purchase. */
+const VERSION_TYPE_ORDER = ['Non-LED', 'LED'];
+// "Wooden" was the old name for the Non-LED edition — show it as Non-LED.
+const lc = (s) => {
+  const k = String(s || '').trim().toLowerCase();
+  return k === 'wooden' ? 'non-led' : k;
+};
+
+const VersionPicker = ({ variant, onOpen }) => {
+  if (!variant?.variantGroup && !variant?.variantType) return null;
+  const currentType = variant.variantType || '';
+  const versions = Array.isArray(variant.versions) ? variant.versions : [];
+  // Always show the known types in a fixed order, plus any other type in use.
+  const types = [...VERSION_TYPE_ORDER];
+  [currentType, ...versions.map((o) => o.type)].forEach((t) => {
+    if (t && !types.some((x) => lc(x) === lc(t))) types.push(t);
+  });
+
+  return (
+    <div className="mt-4">
+      <p className="gl-lbl text-[10px] text-muted mb-2">Type</p>
+      <div className="flex flex-wrap gap-2">
+        {types.map((t) => {
+          const isCurrent = lc(t) === lc(currentType);
+          const target = versions.find((o) => lc(o.type) === lc(t));
+          const unavailable = !isCurrent && !target;
+          return (
+            <button
+              key={t}
+              type="button"
+              aria-pressed={isCurrent}
+              disabled={unavailable}
+              onClick={() => !isCurrent && target && onOpen(target)}
+              title={unavailable ? `${t} version not available for this design` : target?.outOfStock ? `${t} version is out of stock` : undefined}
+              className={`min-w-[5.5rem] px-4 py-2 rounded-lg border text-sm font-bold transition-colors ${
+                isCurrent
+                  ? 'border-ink bg-ink text-paper'
+                  : unavailable
+                    ? 'border-hair text-faint bg-surface cursor-not-allowed line-through decoration-1'
+                    : 'border-hair text-ink bg-white hover:border-ink'
+              }`}
+            >
+              {t}
+              {target?.outOfStock && !isCurrent && <span className="block text-[10px] font-semibold text-muted">Out of stock</span>}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 // At or below this many tracked units left, show an urgency "limited stock"
 // badge to nudge the buyer. Tweak freely.
@@ -157,6 +213,13 @@ const ProductDetailPage = () => {
     [product, selectedVariant, availableVariants],
   );
   const selectedVariantOOS = useMemo(() => isVariantOutOfStock(selectedVariantObj), [selectedVariantObj]);
+
+  // Warm the cache for this variant's other versions (Wooden ↔ LED) so a
+  // switch renders instantly instead of swapping content after a fetch.
+  const prefetchProduct = productsApi.usePrefetch('getProductById');
+  useEffect(() => {
+    (selectedVariantObj?.versions || []).forEach((o) => o.productId && prefetchProduct(o.productId));
+  }, [selectedVariantObj, prefetchProduct]);
   const isOutOfStock = (product && product.productStatus !== 'in_stock') || selectedVariantOOS;
   const selectedVariantQty = selectedVariantObj?.variantQuantity;
   const selectedVariantLowStock = useMemo(() => {
@@ -172,7 +235,9 @@ const ProductDetailPage = () => {
     return ['https://urbannook.in/assets/logo.webp'];
   }, [product, selectedVariant]);
 
-  useEffect(() => {
+  // Layout effect (not a plain effect) so a product switch lands on the URL's
+  // variant before paint — no one-frame flash of the product's first variant.
+  useLayoutEffect(() => {
     if (availableVariants.length > 0 && product) {
       let initial = availableVariants[0];
       if (urlVariantSku) {
@@ -232,7 +297,7 @@ const ProductDetailPage = () => {
   useEffect(() => {
     if (product && selectedVariant && viewedProductRef.current !== product.productId) {
       viewedProductRef.current = product.productId;
-      trackViewItem({ itemId: product.productId, itemName: product.productName, itemVariant: selectedVariant, price: currentPrice, quantity: 1 });
+      trackViewItem({ itemId: product.productId, sku: variantSku(product, selectedVariant), itemName: product.productName, itemVariant: selectedVariant, price: currentPrice, quantity: 1 });
     }
   }, [product?.productId, selectedVariant, currentPrice]);
 
@@ -276,17 +341,17 @@ const ProductDetailPage = () => {
         if (!silent) confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 }, colors: ['#E63329', '#C9281F', '#F3C33B', '#ffffff'] });
         setSelectedVariant(effectiveVariant);
         setFeedbackMessage('Added to cart'); setTimeout(() => setFeedbackMessage(''), 2000);
-        trackAddToCart({ itemId: product.productId, itemName: product.productName, itemVariant: effectiveVariant, price: currentPrice, quantity: 1, placement: silent ? 'pdp_buy_now' : 'pdp_main' });
+        trackAddToCart({ itemId: product.productId, sku: variantSku(product, effectiveVariant), itemName: product.productName, itemVariant: effectiveVariant, price: currentPrice, quantity: 1, placement: silent ? 'pdp_buy_now' : 'pdp_main' });
         return true;
       } catch (err) {
         showNotification(err.data?.message || 'Something went wrong', 'error');
         return false;
       }
     } else {
-      dispatch(addItem({ id: product?.productId, mongoId: product?.productId, name: product?.productName, price: currentPrice, image: selectedImage, quantity: 1, selectedVariant: effectiveVariant, giftWrapEligible: !!product?.giftWrapEligible }));
+      dispatch(addItem({ id: product?.productId, mongoId: product?.productId, name: product?.productName, price: currentPrice, image: selectedImage, quantity: 1, selectedVariant: effectiveVariant, giftWrapEligible: !!product?.giftWrapEligible, sku: variantSku(product, effectiveVariant) }));
       setSelectedVariant(effectiveVariant);
       setFeedbackMessage('Added to cart'); setTimeout(() => setFeedbackMessage(''), 2000);
-      trackAddToCart({ itemId: product.productId, itemName: product.productName, itemVariant: effectiveVariant, price: currentPrice, quantity: 1, placement: silent ? 'pdp_buy_now' : 'pdp_main' });
+      trackAddToCart({ itemId: product.productId, sku: variantSku(product, effectiveVariant), itemName: product.productName, itemVariant: effectiveVariant, price: currentPrice, quantity: 1, placement: silent ? 'pdp_buy_now' : 'pdp_main' });
       return true;
     }
   };
@@ -340,12 +405,14 @@ const ProductDetailPage = () => {
               quantity: 1,
               selectedVariant: variant,
               giftWrapEligible: !!combo.giftWrapEligible,
+              sku: variantDetail?.sku || '',
             }),
           );
         }
 
         trackAddToCart({
           itemId: combo.productId,
+          sku: variantDetail?.sku || '',
           itemName: combo.productName,
           itemVariant: variant,
           price,
@@ -377,7 +444,7 @@ const ProductDetailPage = () => {
         try { await updateCart({ productId: product.productId, quantity: 1, action: 'remove', variant: selectedVariant || undefined, image: selectedImage }).unwrap(); await refetchCart(); }
         catch { showNotification('Failed to update cart', 'error'); }
       } else dispatch(removeItem({ id: product?.productId, selectedVariant: selectedVariant || 'N/A' }));
-      trackRemoveFromCart({ itemId: product.productId, itemName: product.productName, itemVariant: selectedVariant, price: currentPrice, quantity: currentCartQty || 1 });
+      trackRemoveFromCart({ itemId: product.productId, sku: variantSku(product, selectedVariant), itemName: product.productName, itemVariant: selectedVariant, price: currentPrice, quantity: currentCartQty || 1 });
       return;
     }
     if (isLoggedIn) {
@@ -524,7 +591,7 @@ const ProductDetailPage = () => {
         <div className="grid lg:grid-cols-2 gap-8 lg:gap-10">
           {/* GALLERY — one big full-width framed image (swipe + dots on mobile, arrows on desktop) */}
           <div className="lg:sticky lg:top-24 self-start w-full min-w-0">
-            <ImageCarousel images={galleryImages} alt={product.productName} onImgErr={onImgErr} onItemClick={(i) => setLightbox({ list: galleryImages, idx: i })} />
+            <ImageCarousel priority images={galleryImages} alt={product.productName} onImgErr={onImgErr} onItemClick={(i) => setLightbox({ list: galleryImages, idx: i })} />
           </div>
 
           {/* INFO */}
@@ -609,6 +676,11 @@ const ProductDetailPage = () => {
                  
                 </>
               )}
+
+              <VersionPicker
+                variant={selectedVariantObj}
+                onOpen={(t) => navigate(t.sku ? `/product/${t.productId}/${t.sku}` : `/products/${t.productId}`, { state: { keepScroll: true } })}
+              />
 
               {/* urgency + delivery */}
               {/* <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs mt-4">
@@ -922,7 +994,7 @@ const ProductDetailPage = () => {
                     <div className="flex items-center justify-between"><Stars n={rev.rating} className="text-sm" />{rev.userId && rev.userId === currentUserId && <button onClick={() => handleEditReview(rev)} className="text-xs text-brand font-semibold">Edit</button>}</div>
                     <p className="text-muted text-sm mt-2">{rev.desc}</p>
                     {imgs.length > 0 && (
-                      <div className="flex gap-2 mt-3">{imgs.map((u, i) => <button key={i} onClick={() => setLightbox({ list: imgs, idx: i })} className="w-14 h-14 rounded-lg overflow-hidden border border-hair"><img src={u} alt="" className="w-full h-full object-cover" /></button>)}</div>
+                      <div className="flex gap-2 mt-3">{imgs.map((u, i) => <button key={i} onClick={() => setLightbox({ list: imgs, idx: i })} className="w-14 h-14 rounded-lg overflow-hidden border border-hair"><img src={u} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" /></button>)}</div>
                     )}
                     <p className="mt-3 text-xs font-bold">{rev.userName || 'Customer'}{rev.verified !== false ? ' · Verified' : ''}</p>
                   </div>
@@ -1066,7 +1138,8 @@ const ProductDetailPage = () => {
         <NotifyMeModal
           productName={product?.productName}
           productId={product?.productId}
-          variantName={selectedVariant || null}
+          variantName={selectedVariant || availableVariants[0] || null}
+          variants={(product?.variantDetails || []).map((v) => ({ name: v.variantName, outOfStock: isVariantOutOfStock(v) }))}
           onClose={() => setShowNotifyModal(false)}
         />
       )}

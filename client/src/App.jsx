@@ -47,7 +47,7 @@ const OpenInBrowserBanner = lazy(() => import('./component/OpenInBrowserBanner')
 const GoogleOneTap = lazy(() => import('./component/GoogleOneTap'));
 // Mounted app-wide, not on the home page: most Instagram ad / bio traffic lands
 // directly on /products or a product page and would never see a home-only popup.
-const IndependenceDayPopup = lazy(() => import('./component/IndependenceDayPopup'));
+const SiteOfferPopup = lazy(() => import('./component/SiteOfferPopup'));
 const ScrollHint = lazy(() => import('./component/ScrollHint'));
 const PasskeyPrompt = lazy(() => import('./component/PasskeyPrompt'));
 
@@ -212,9 +212,9 @@ function App() {
                 <ErrorBoundary>
                   <PasskeyPrompt />
                 </ErrorBoundary>
-                {/* Independence Day 10%-off lead capture — shows once, everywhere */}
+                {/* Site offer popup (₹100 off) with lead capture — shows once, everywhere */}
                 <ErrorBoundary>
-                  <IndependenceDayPopup />
+                  <SiteOfferPopup />
                 </ErrorBoundary>
                 <ErrorBoundary>
                   <ScrollHint />

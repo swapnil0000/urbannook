@@ -99,6 +99,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
   // Map a cart line item → analytics item shape
   const toTrackItem = (item) => ({
     itemId: item.productId || item.id || item.mongoId,
+    sku: item.sku,
     itemName: item.name,
     itemVariant: item.selectedVariant,
     price: Number(item.price) || 0,

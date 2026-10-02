@@ -1,0 +1,29 @@
+# Wrangler config — Cloudflare Worker `urbannook-assets-proxy-prod`
+# (images/uploads on assets-prod.urbannook.in).
+# Deployed by Jenkins (jenkins/prod.Jenkinsfile, stage "Deploy workers") with
+#   npx wrangler@4 deploy --config wrangler.assets-proxy-prod.toml
+# Do NOT edit this worker's code in the Cloudflare dashboard — change
+# urbannook-assets-proxy-prod.js here and deploy through Jenkins.
+#
+# Mirrors the dashboard state as of 2026-09-27 exactly, so a deploy changes
+# the code only:
+#   - Variables AWS_REGION / S3_BUCKET and secrets AWS_ACCESS_KEY_ID /
+#     AWS_SECRET_ACCESS_KEY are set in the dashboard. keep_vars = true stops
+#     wrangler from deleting the plain variables; secrets are never touched.
+#   - Custom domain / workers.dev as currently configured.
+
+name = "urbannook-assets-proxy-prod"
+main = "urbannook-assets-proxy-prod.js"
+compatibility_date = "2026-07-23"
+keep_vars = true
+
+workers_dev = true
+preview_urls = false
+
+routes = [
+  { pattern = "assets-prod.urbannook.in", custom_domain = true },
+]
+
+[observability]
+enabled = true
+head_sampling_rate = 1

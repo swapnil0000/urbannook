@@ -204,6 +204,11 @@ const orderSchema = new mongoose.Schema(
       clientIp: { type: String, default: null },
       clientUserAgent: { type: String, default: null },
       eventSourceUrl: { type: String, default: null },
+      // GA4 `_ga` client id + session id from the checkout browser, so the
+      // webhook's Measurement Protocol fallback purchase lands on the same
+      // GA4 user/session (dedupe + Google Ads click attribution).
+      gaClientId: { type: String, default: null },
+      gaSessionId: { type: String, default: null },
     },
   },
   { timestamps: true },

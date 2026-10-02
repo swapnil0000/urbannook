@@ -131,9 +131,18 @@ function pushPixelEvent(eventName, params = {}, options) {
   window.fbq('track', eventName, params, { eventID });
 }
 
-/** Map an app product shape → GA4 item. Omits empty/placeholder fields. */
-function toItem({ itemId, itemName, itemVariant, price, quantity, index, listId, listName } = {}) {
-  const item = { item_id: itemId, item_name: itemName };
+/**
+ * Map an app product shape → GA4 item. Omits empty/placeholder fields.
+ *
+ * GOOGLE ONLY: `item_id` is the variant SKU when known, so it matches the `id` column of
+ * the Google Merchant feed (server/src/controller/catalog.controller.js → googleProductFeed).
+ * That match is what powers Google Ads dynamic remarketing and PMax cart-data reporting.
+ * Falls back to productId when there is no SKU. Meta is unaffected: Pixel/CAPI
+ * `content_ids` keep using `itemId` (productId), which is what the Meta catalog's
+ * item_group_id matches.
+ */
+function toItem({ itemId, sku, itemName, itemVariant, price, quantity, index, listId, listName } = {}) {
+  const item = { item_id: sku || itemId, item_name: itemName };
   if (itemVariant && itemVariant !== 'N/A') item.item_variant = itemVariant;
   if (price != null) item.price = price;
   if (quantity != null) item.quantity = quantity;
@@ -539,6 +548,41 @@ export function getFbCookies() {
   }
 }
 
+/** SKU of a product's variant by name (for GA4 `item_id`); '' when unknown. */
+export function variantSku(product, variantName) {
+  const vs = product?.variantDetails || [];
+  const v = vs.find((x) => x.variantName === variantName) || (vs.length === 1 ? vs[0] : null);
+  return (v?.sku || '').trim();
+}
+
+/**
+ * Read the GA4 client id (`_ga` cookie) and current session id (`_ga_<stream>`
+ * cookie) so the server can send the webhook fallback purchase as the SAME GA4
+ * user and session — that is what lets GA4 dedupe it against the browser hit and
+ * keeps the Google Ads click attribution on the session.
+ */
+const GA4_STREAM_SUFFIX = 'B7NGCFCRFG'; // G-B7NGCFCRFG → cookie `_ga_B7NGCFCRFG`
+export function getGaIds() {
+  if (typeof document === 'undefined') return {};
+  try {
+    const read = (name) => {
+      const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+      return m ? decodeURIComponent(m[1]) : null;
+    };
+    const out = {};
+    // `GA1.1.<random>.<timestamp>` → client_id is the last two segments
+    const ga = read('_ga')?.split('.');
+    if (ga?.length >= 4) out.gaClientId = `${ga[ga.length - 2]}.${ga[ga.length - 1]}`;
+    // Old format `GS1.1.<session_id>.…`, new format `GS2.1.s<session_id>$o…`
+    const gs = read(`_ga_${GA4_STREAM_SUFFIX}`);
+    const sessionId = gs?.match(/^GS2\.\d+\.s(\d+)/)?.[1] || gs?.match(/^GS1\.\d+\.(\d+)\./)?.[1];
+    if (sessionId) out.gaSessionId = sessionId;
+    return out;
+  } catch {
+    return {};
+  }
+}
+
 /* ---------------------------------------------------------------------------
  * Page / navigation  (React Router does NOT auto-fire pageviews in an SPA)
  * ------------------------------------------------------------------------ */
@@ -577,24 +621,24 @@ export function trackViewItemList({ items = [], listId, listName }) {
   }
 }
 
-export function trackSelectItem({ itemId, itemName, itemVariant, price, listId, listName, index }) {
+export function trackSelectItem({ itemId, sku, itemName, itemVariant, price, listId, listName, index }) {
   try {
     pushEcommerce('select_item', {
       item_list_id: listId,
       item_list_name: listName,
-      items: [toItem({ itemId, itemName, itemVariant, price, index })],
+      items: [toItem({ itemId, sku, itemName, itemVariant, price, index })],
     });
   } catch (error) {
     console.warn('[Analytics] trackSelectItem:', error);
   }
 }
 
-export function trackViewItem({ itemId, itemName, itemVariant, price, quantity = 1 }) {
+export function trackViewItem({ itemId, sku, itemName, itemVariant, price, quantity = 1 }) {
   try {
     pushEcommerce('view_item', {
       currency: CURRENCY,
       value: price,
-      items: [toItem({ itemId, itemName, itemVariant, price, quantity })],
+      items: [toItem({ itemId, sku, itemName, itemVariant, price, quantity })],
     });
     const vcEventId = uuid();
     pushPixelEvent('ViewContent', { content_ids: [itemId], content_name: itemName, content_type: 'product', value: price, currency: CURRENCY }, { eventID: vcEventId });
@@ -604,12 +648,12 @@ export function trackViewItem({ itemId, itemName, itemVariant, price, quantity =
   }
 }
 
-export function trackAddToWishlist({ itemId, itemName, itemVariant, price }) {
+export function trackAddToWishlist({ itemId, sku, itemName, itemVariant, price }) {
   try {
     pushEcommerce('add_to_wishlist', {
       currency: CURRENCY,
       value: price,
-      items: [toItem({ itemId, itemName, itemVariant, price })],
+      items: [toItem({ itemId, sku, itemName, itemVariant, price })],
     });
     pushPixelEvent('AddToWishlist', { content_ids: [itemId], content_name: itemName, value: price, currency: CURRENCY });
   } catch (error) {
@@ -638,7 +682,7 @@ export function trackNotifyMe({ itemId, itemVariant }) {
  * Cart
  * ------------------------------------------------------------------------ */
 
-export function trackAddToCart({ itemId, itemName, itemVariant, price, quantity = 1, placement, offerId, offerType, offerName, offerSource }) {
+export function trackAddToCart({ itemId, sku, itemName, itemVariant, price, quantity = 1, placement, offerId, offerType, offerName, offerSource }) {
   try {
     pushEcommerce('add_to_cart', {
       currency: CURRENCY,
@@ -648,7 +692,7 @@ export function trackAddToCart({ itemId, itemName, itemVariant, price, quantity 
       // (combo/free-shipping nudge, quantity-discount rule). Lets the admin
       // funnel answer "which offer actually produced this add_to_cart".
       ...offerParams({ offerId, offerType, offerName, offerSource }),
-      items: [toItem({ itemId, itemName, itemVariant, price, quantity })],
+      items: [toItem({ itemId, sku, itemName, itemVariant, price, quantity })],
     });
     const atcEventId = uuid();
     pushPixelEvent('AddToCart', { content_ids: [itemId], contents: [{ id: itemId, quantity }], content_name: itemName, content_type: 'product', value: price * quantity, currency: CURRENCY }, { eventID: atcEventId });
@@ -658,12 +702,12 @@ export function trackAddToCart({ itemId, itemName, itemVariant, price, quantity 
   }
 }
 
-export function trackRemoveFromCart({ itemId, itemName, itemVariant, price, quantity = 1 }) {
+export function trackRemoveFromCart({ itemId, sku, itemName, itemVariant, price, quantity = 1 }) {
   try {
     pushEcommerce('remove_from_cart', {
       currency: CURRENCY,
       value: price * quantity,
-      items: [toItem({ itemId, itemName, itemVariant, price, quantity })],
+      items: [toItem({ itemId, sku, itemName, itemVariant, price, quantity })],
     });
   } catch (error) {
     console.warn('[Analytics] trackRemoveFromCart:', error);
@@ -810,11 +854,58 @@ export function trackOrderCreated({ orderId, userType, paymentMethod }) {
 }
 
 /* ---------------------------------------------------------------------------
- * Purchase  (client = Meta/consent signal; canonical GA4 purchase fires server-side)
+ * Purchase
+ * The browser gtag hit below is the primary GA4 purchase (and, via the GA4 import,
+ * the Google Ads conversion). The Razorpay webhook sends the same transaction_id to
+ * GA4 through the Measurement Protocol as a fallback for hits the browser loses
+ * (ad-blockers, closed tabs, late FAILED→PAID recovery) — GA4 dedupes on
+ * transaction_id. See server/src/services/ga4.mp.service.js.
  * ------------------------------------------------------------------------ */
+
+/**
+ * Google Ads Enhanced Conversions: hand the buyer's email/phone/name to the Google
+ * tag. gtag normalises and SHA-256 hashes them before they leave the browser, and
+ * Google uses them to match the sale to an ad click when cookies are missing.
+ * Requires "Include user-provided data from your website" to be ON in the Google
+ * tag settings, otherwise gtag ignores it.
+ */
+function setGoogleUserData({ email, phone, name }) {
+  if (!enabled() || typeof window.gtag !== 'function') return;
+  const userData = {};
+  const cleanEmail = email?.trim().toLowerCase();
+  if (cleanEmail) userData.email = cleanEmail;
+  let digits = phone ? String(phone).replace(/\D/g, '') : '';
+  if (digits.length === 10) digits = `91${digits}`; // bare Indian mobile → add country code
+  if (digits.length >= 11) userData.phone_number = `+${digits}`; // E.164
+  const parts = name?.trim().split(/\s+/) || [];
+  if (parts[0]) {
+    userData.address = { first_name: parts[0] };
+    if (parts.length > 1) userData.address.last_name = parts.slice(1).join(' ');
+  }
+  if (Object.keys(userData).length) window.gtag('set', 'user_data', userData);
+}
+
+/**
+ * Fire a native Google Ads conversion through the on-page gtag (AW-18461503961 is
+ * configured in index.html). `transaction_id` lets Google Ads drop repeats of the
+ * same order, e.g. a refreshed confirmation page.
+ */
+export const trackGoogleAdsConversion = (label, value, transactionId, currency = CURRENCY) => {
+  if (!enabled()) return;
+  if (typeof window.gtag === 'function' && import.meta.env.VITE_GOOGLE_ADS_ID && label) {
+    window.gtag('event', 'conversion', {
+      send_to: `${import.meta.env.VITE_GOOGLE_ADS_ID}/${label}`,
+      value: Number(value) || 0,
+      currency,
+      transaction_id: String(transactionId || ''),
+    });
+  }
+};
 
 export function trackPurchase({ transactionId, value, shipping = 0, tax = 0, coupon, items = [], paymentMethod, eventId, email, phone, name, externalId }) {
   try {
+    // Must be set BEFORE the purchase hit so gtag attaches it to that event.
+    setGoogleUserData({ email, phone, name });
     // Feed Advanced Matching so the BROWSER Purchase pixel carries hashed email/phone/name/external_id.
     // Critical for GUESTS (most traffic): they enter contact at checkout but never logged in, so
     // setMetaAdvancedMatching was never called for them — without this the browser Purchase event
@@ -844,6 +935,8 @@ export function trackPurchase({ transactionId, value, shipping = 0, tax = 0, cou
     // arrives first creates the row and the other is a no-op. Only set when we
     // actually have the orderId — a blank key would collide across all orders.
     eventId ? `purchase:${eventId}` : undefined);
+    // Google Ads purchase conversion. Keyed on our orderId so refreshes don't double count.
+    trackGoogleAdsConversion(import.meta.env.VITE_GADS_LABEL_PURCHASE, value, eventId || transactionId);
     pushPixelEvent(
       'Purchase',
       {

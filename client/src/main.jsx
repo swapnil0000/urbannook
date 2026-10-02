@@ -1,11 +1,27 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+// Self-hosted fonts (latin subset only). Served from our origin with the hashed
+// assets, so there is no render-blocking fonts.googleapis.com request and no extra
+// connection to fonts.gstatic.com. Unused weights cost nothing: @font-face files
+// only download when a matching style is actually rendered.
+import '@fontsource/inter/latin-400.css'
+import '@fontsource/inter/latin-500.css'
+import '@fontsource/inter/latin-600.css'
+import '@fontsource/inter/latin-700.css'
+import '@fontsource/archivo/latin-400.css'
+import '@fontsource/archivo/latin-500.css'
+import '@fontsource/archivo/latin-600.css'
+import '@fontsource/archivo/latin-700.css'
+import '@fontsource/archivo/latin-800.css'
+import '@fontsource/archivo/latin-900.css'
+import '@fontsource/anton/latin-400.css'
+import '@fontsource/jetbrains-mono/latin-400.css'
+import '@fontsource/jetbrains-mono/latin-600.css'
 import './index.css'
 import App from './App.jsx'
 import { CookiesProvider } from 'react-cookie';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import config from './config/env.js';
-import { initializeFonts } from './utils/initFontLoading.js';
 import { initPerformanceMetrics, onMetricsUpdate } from './utils/performanceMetrics.js';
 import { monitorPerformance } from './utils/performanceValidation.js';
 import { escapeToExternalBrowser } from './utils/browserEnv.js';
@@ -20,20 +36,6 @@ if (typeof window !== 'undefined') {
   if (import.meta.env.DEV) {
     monitorPerformance();
   }
-}
-
-if (document.fonts) {
-  initializeFonts().then((results) => {
-    if (results) {
-      console.log('✅ Font loading initialized:', {
-        loaded: results.loaded.length,
-        timedOut: results.timedOut.length,
-        errors: results.errors.length
-      });
-    }
-  }).catch((error) => {
-    console.error('❌ Font loading initialization failed:', error);
-  });
 }
 
 // Register service worker for better caching (production only)

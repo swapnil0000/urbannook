@@ -5,8 +5,8 @@
   "main": "src/server.js",
   "scripts": {
     "dev": "cross-env NODE_ENV=development nodemon src/server.js",
-    "dev:staging": "cross-env NODE_ENV=staging nodemon src/server.js",
-    "dev:prod": "cross-env NODE_ENV=production nodemon src/server.js",
+    "dev:staging": "infisical run --projectId=80b13bde-6879-405e-889f-2f9b28f4c0f4 --env=staging --path=/user/server -- cross-env NODE_ENV=staging nodemon src/server.js",
+    "dev:prod": "infisical run --projectId=80b13bde-6879-405e-889f-2f9b28f4c0f4 --env=prod --path=/user/server -- cross-env NODE_ENV=production nodemon src/server.js",
     "start": "node src/server.js",
     "start:staging": "cross-env NODE_ENV=staging node src/server.js",
     "start:prod": "cross-env NODE_ENV=production node src/server.js",

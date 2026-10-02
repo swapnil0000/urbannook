@@ -24,6 +24,7 @@ import {
 import PaymentProcessing from "../pages/PaymentProcessing.jsx";
 import PaymentFailed from "../pages/PaymentFailed.jsx";
 import OrderConfirm from "../pages/OrderConfirm.jsx";
+import NotFound from "../pages/NotFound.jsx";
 import ProtectedRoute from "../component/ProtectedRoute.jsx";
 
 // Minimal loader for individual route transitions only
@@ -201,8 +202,11 @@ const AppRoutes = () => {
           </Suspense>
         }
       />
-      {/* Catch-all route for 404 - redirect to home */}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      {/* Legacy NFC tag links: the NFC page was removed but printed tags may still
+          point here — keep sending them to home rather than the 404 page. */}
+      <Route path="/nfc/*" element={<Navigate to="/" replace />} />
+      {/* Catch-all: real not-found page (noindex) instead of a soft-404 redirect to home */}
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 };
