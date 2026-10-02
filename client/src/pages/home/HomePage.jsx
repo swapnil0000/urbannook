@@ -12,10 +12,6 @@ import { trackViewItemList, trackAddToCart } from '../../utils/analytics';
 
 const onImgErr = (e) => { e.currentTarget.src = '/assets/logo.webp'; };
 
-const HOME_STRUCTURED_DATA = {
-  '@context': 'https://schema.org', '@type': 'WebSite', name: 'UrbanNook', url: 'https://www.urbannook.in',
-  potentialAction: { '@type': 'SearchAction', target: 'https://www.urbannook.in/products?q={search_term_string}', 'query-input': 'required name=search_term_string' },
-};
 const productList = (res) => res?.data?.products || res?.data?.listofPublishedProducts || [];
 const stars = (n) => { const r = Math.max(1, Math.min(5, n || 5)); return '★'.repeat(r) + '☆'.repeat(5 - r); };
 
@@ -798,7 +794,7 @@ const HomePage = () => {
 
   return (
     <div className="font-inter bg-paper text-ink">
-      <SEOHead url="/" structuredData={HOME_STRUCTURED_DATA} />
+      <SEOHead url="/" />
 
       {/* ══ HERO — the drop ══ */}
       <HeroCarousel

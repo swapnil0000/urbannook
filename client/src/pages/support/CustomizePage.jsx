@@ -136,7 +136,7 @@ const CustomizePage = () => {
   if (done) {
     return (
       <div className="bg-paper min-h-screen font-inter text-ink">
-        <SEOHead title="Customization request sent — UrbanNook" url="/customize" />
+        <SEOHead title="Customization request sent" url="/customize" noIndex />
         <section className="max-w-xl mx-auto px-5 py-24 md:py-32 text-center">
           <p className="gl-lbl text-brand mb-3">Request received</p>
           <h1 className="font-archivo text-4xl md:text-5xl font-extrabold tracking-tight leading-[1.05]">
@@ -173,7 +173,7 @@ const CustomizePage = () => {
   return (
     <div className="bg-paper min-h-screen font-inter text-ink">
       <SEOHead
-        title="Customize your piece — UrbanNook"
+        title="Customize your piece"
         description="Every UrbanNook piece is 3D-printed to order. Tell us the colour, the name or the livery you want and we'll quote it."
         url="/customize"
       />

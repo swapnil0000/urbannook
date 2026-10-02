@@ -16,9 +16,9 @@ const Return = () => {
       {/* --- BACKGROUND ELEMENTS --- */}
       {/* Large Watermark */}
       <div className="absolute top-20 left-0 w-full overflow-hidden pointer-events-none opacity-[0.04]">
-        <h1 className="font-archivo text-[15vw] font-extrabold text-center leading-none text-ink tracking-tighter uppercase whitespace-nowrap">
+        <div aria-hidden="true" className="font-archivo text-[15vw] font-extrabold text-center leading-none text-ink tracking-tighter uppercase whitespace-nowrap">
           Exchange
-        </h1>
+        </div>
       </div>
       
       {/* Ambient Glow */}

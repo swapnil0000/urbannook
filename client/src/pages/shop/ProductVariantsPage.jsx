@@ -41,9 +41,9 @@ const ProductVariantsPage = () => {
   return (
     <div className="min-h-screen bg-paper relative font-inter text-ink selection:bg-brand selection:text-white pb-10">
       <SEOHead
-        title={product?.productName ? `${product.productName} — UrbanNook` : "Choose a Variant"}
+        title={product?.productName || "Choose a Variant"}
         description={product?.productDes || "Choose a variant of this UrbanNook product."}
-        url={`/products/${productId}`}
+        url={`/product/${productId}`}
       />
 
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-brand/5 rounded-full blur-[120px] pointer-events-none"></div>
