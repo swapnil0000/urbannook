@@ -108,7 +108,7 @@ export const isFreeShippingEligible = async (cartProductIds = []) => {
 const getCartRuleDerivedBanners = async (placement) => {
   const everyRule = await getActivePromotionsAsCartRules();
   const allRules = placement ? everyRule.filter((r) => (r.placements || []).includes(placement)) : everyRule;
-  console.log(`[FreeShipping:banners] placement=${placement || "(any)"} — ${everyRule.length} active rule(s) total, ${allRules.length} placed here: [${allRules.map((r) => r.name).join(", ")}]`);
+  // console.log(`[FreeShipping:banners] placement=${placement || "(any)"} — ${everyRule.length} active rule(s) total, ${allRules.length} placed here: [${allRules.map((r) => r.name).join(", ")}]`);
 
   const banners = [];
   const seenPairs = new Set();
@@ -168,7 +168,7 @@ const getCartRuleDerivedBanners = async (placement) => {
     }
   }
 
-  console.log(`[FreeShipping:banners] derived ${banners.length} banner(s): ${JSON.stringify(banners.map((b) => `${b.sourceProductId}->${b.recommendedProductId}`))}`);
+  // console.log(`[FreeShipping:banners] derived ${banners.length} banner(s): ${JSON.stringify(banners.map((b) => `${b.sourceProductId}->${b.recommendedProductId}`))}`);
   return banners;
 };
 

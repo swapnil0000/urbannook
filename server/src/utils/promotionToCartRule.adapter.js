@@ -104,6 +104,6 @@ export async function getActivePromotionsAsCartRules() {
     if (!effects) { console.log(`[PromotionAdapter] "${promo.name}" SKIPPED — rewards not cart_rule-representable: ${JSON.stringify(promo.rewards.map((r) => r.type))}`); continue; }
     rules.push({ _id: promo._id, name: promo.name, isActive: true, conditions, effects, placements: promo.placements || [] });
   }
-  console.log(`[PromotionAdapter] getActivePromotionsAsCartRules() → ${promotions.length} active promotion(s) total, ${rules.length} representable as cart rules`);
+  // console.log(`[PromotionAdapter] getActivePromotionsAsCartRules() → ${promotions.length} active promotion(s) total, ${rules.length} representable as cart rules`);
   return rules;
 }
