@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
+import { categoryPath } from '../../utils/categoryUrl';
 import { useGetProductsQuery } from '../../store/api/productsApi';
 import SEOHead from '../../component/SEOHead';
 import UnProductCard, { firstVariant } from '../../component/UnProductCard';
@@ -46,7 +47,7 @@ const AllProductsPage = () => {
 
   return (
     <div className="font-inter bg-surface text-ink min-h-screen">
-      <SEOHead title="Shop All Products" url="/products" description="Browse UrbanNook's full collection of 3D-printed desk lamps, pen stands & décor. Made in India, fast pan-India delivery." />
+      <SEOHead title="Shop All Products" url={activeCat === 'All' ? '/products' : categoryPath(activeCat)} description="Browse UrbanNook's full collection of 3D-printed desk lamps, pen stands & décor. Made in India, fast pan-India delivery." />
 
       <div className="max-w-[1280px] mx-auto px-5 pt-10">
         <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">Shop All</h1>
@@ -60,7 +61,11 @@ const AllProductsPage = () => {
         <div className="mt-6 -mx-4 sm:-mx-6 px-4 sm:px-6 overflow-x-auto gl-hscroll">
           <div className="flex items-center gap-2.5 w-max">
             <button onClick={() => selectCat('All')} className={chip('All')}>All</button>
-            {categories.map((c) => <button key={c} onClick={() => selectCat(c)} className={chip(c)}>{c}</button>)}
+            {/* Real links so search engines can reach each category page; a
+                normal click still filters in place, as before. */}
+            {categories.map((c) => (
+              <Link key={c} to={categoryPath(c)} onClick={(e) => { e.preventDefault(); selectCat(c); }} className={chip(c)}>{c}</Link>
+            ))}
           </div>
         </div>
       </div>

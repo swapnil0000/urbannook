@@ -1,5 +1,6 @@
 import userRouter from "./user.route.js";
 import productRouter from "./product.route.js";
+import categoryRouter from "./category.route.js";
 import commonRouter from "./common.route.js";
 import userAddressRouter from "./user.address.route.js";
 import userWishListRouter from "./user.wishlist.route.js";
@@ -25,6 +26,7 @@ import promotionRouter from "./promotion.route.js";
 export {
   userRouter,
   productRouter,
+  categoryRouter,
   commonRouter,
   userAddressRouter,
   userCartRouter,

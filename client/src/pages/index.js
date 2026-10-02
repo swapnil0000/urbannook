@@ -17,6 +17,7 @@ export const Return = lazy(() => import("./legal/Return.jsx"));
 export const ContactPage = lazy(() => import("./support/ContactPage.jsx"));
 export const CustomizePage = lazy(() => import("./support/CustomizePage.jsx"));
 export const AllProductsPage = lazy(() => import("./shop/AllProductsPage.jsx"));
+export const CategoryPage = lazy(() => import("./shop/CategoryPage.jsx"));
 export const ProductDetailPage = lazy(() => import("./shop/ProductDetailPage.jsx"));
 export const ProductVariantsPage = lazy(() => import("./shop/ProductVariantsPage.jsx"));
 export const MyProfilePage = lazy(() => import("./account/MyProfilePage.jsx"));

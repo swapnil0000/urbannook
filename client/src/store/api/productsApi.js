@@ -55,8 +55,14 @@ export const productsApi = apiSlice.injectEndpoints({
     
     // Get product categories
     getCategories: builder.query({
-      query: () => 'products/categories',
+      query: () => 'categories',
       providesTags: ['Category'],
+    }),
+
+    // One category page: name, SEO block from admin, indexable flag, products
+    getCategoryBySlug: builder.query({
+      query: (slug) => `category/${encodeURIComponent(slug)}`,
+      providesTags: (result, error, slug) => [{ type: 'Category', id: slug }],
     }),
     
     // Search products
@@ -81,5 +87,6 @@ export const {
   useGetProductsByCategoryQuery,
   useGetFeaturedProductsQuery,
   useGetCategoriesQuery,
+  useGetCategoryBySlugQuery,
   useSearchProductsQuery,
 } = productsApi;
