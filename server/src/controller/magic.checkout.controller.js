@@ -119,6 +119,7 @@ const cartItemsForOrder = (order) =>
     productId: i.productId,
     quantity: i.productSnapshot?.quantity || 1,
     price: i.productSnapshot?.priceAtPurchase,
+    variantSku: i.variantSku,
   }));
 
 /* ===============================================================
@@ -179,7 +180,7 @@ export const magicShippingInfoController = asyncHandler(async (req, res) => {
     const config = await getFreeShippingConfig();
     const thresholdEligible = config.isActive && subtotal >= config.thresholdAmount;
     const productEligible = cartItems.length
-      ? await isFreeShippingEligible(cartItems.map((i) => i.productId))
+      ? await isFreeShippingEligible(cartItems.map((i) => ({ productId: i.productId, quantity: i.quantity, variantSku: i.variantSku })))
       : false;
     freeShipping = freeShipping || thresholdEligible || productEligible;
     if (freeShipping) {
