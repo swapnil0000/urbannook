@@ -172,6 +172,7 @@ export const magicShippingInfoController = asyncHandler(async (req, res) => {
     freeShipping = true;
     console.log(`${TAG}[shipping] free shipping carried over from order-create`);
   }
+  const carriedOverFromOrderCreate = freeShipping;
   try {
     const subtotal = cartItems.reduce(
       (s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1),
@@ -183,9 +184,11 @@ export const magicShippingInfoController = asyncHandler(async (req, res) => {
       ? await isFreeShippingEligible(cartItems.map((i) => ({ productId: i.productId, quantity: i.quantity, variantSku: i.variantSku })))
       : false;
     freeShipping = freeShipping || thresholdEligible || productEligible;
-    if (freeShipping) {
-      console.log(`${TAG}[shipping] free shipping applies (subtotal ₹${subtotal})`);
-    }
+    console.log(
+      `${TAG}[shipping] items=[${cartItems.map((i) => `${i.productId}x${i.quantity}${i.variantSku ? `(${i.variantSku})` : ""}`).join(",")}] ` +
+      `signals={carriedOverFromOrderCreate:${carriedOverFromOrderCreate}, isInternalTestOrder:${!!order?.isInternalTestOrder}, thresholdEligible:${thresholdEligible}(threshold=₹${config.thresholdAmount}, subtotal=₹${subtotal}), productEligible:${productEligible}} ` +
+      `→ freeShipping=${freeShipping}`,
+    );
   } catch (err) {
     // Offer lookup failing must not block checkout — fall back to charging.
     console.error(`${TAG}[shipping] free-shipping check failed, charging: ${err.message}`);
@@ -228,6 +231,7 @@ export const magicShippingInfoController = asyncHandler(async (req, res) => {
     }),
   );
 
+  console.log(`${TAG}[shipping] final rates sent to Razorpay: ${JSON.stringify(results.map((r) => ({ id: r.id, shipping_fee: r.shipping_fee })))}`);
   return res.status(200).json({ addresses: results });
 });
 
