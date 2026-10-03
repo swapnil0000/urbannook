@@ -7,7 +7,7 @@ export const useCartSync = () => {
   const dispatch = useDispatch();
   const { isAuthenticated } = useSelector((state) => state.auth);
 
-  const hasToken = !!localStorage.getItem('authToken');
+  const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('authToken'); // no localStorage during SSR
   const shouldFetchCart = isAuthenticated || hasToken;
 
   const prevAuthRef = useRef(false);
@@ -99,7 +99,7 @@ export const useCartData = () => {
   const dispatch = useDispatch();
   const { isAuthenticated } = useSelector((state) => state.auth);
 
-  const hasToken = !!localStorage.getItem('authToken');
+  const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('authToken'); // no localStorage during SSR
   const shouldFetchCart = isAuthenticated || hasToken;
 
   const { data: cartResponse, refetch } = useGetCartQuery(undefined, {

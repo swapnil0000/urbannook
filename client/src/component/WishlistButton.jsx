@@ -20,7 +20,7 @@ const WishlistButton = ({ productId, className = "", size = "md" }) => {
   const handleWishlistToggle = async (e) => {
     e.stopPropagation();
 
-    const hasToken = !!localStorage.getItem('authToken');
+    const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('authToken'); // no localStorage during SSR
     
     if (!isAuthenticated && !hasToken) {
       openLoginModal();

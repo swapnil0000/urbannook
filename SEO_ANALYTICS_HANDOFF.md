@@ -102,3 +102,36 @@ are **copied as-is**. Only the deploy mechanics around them changed:
      support `?q=`.
    - Prerendered pages should still match: please check that the Product/Breadcrumb JSON-LD
      from `prerender.mjs` stays consistent with these.
+
+## F. Category pages (2026-10-02, PR "seo: category pages")
+
+New routes: `/category/:slug` (e.g. `/category/anime`, `/category/lamp`, `/category/pen-stand`).
+Data comes from the new public API `GET /api/v1/categories` and `GET /api/v1/category/:slug`.
+Categories with fewer than 3 sellable variants get `noindex`; today that is only `/category/decor`.
+
+Requests for `prerender.mjs` / `upload-client.sh`:
+1. **Sitemap:** add every category with `indexable: true` from `GET /api/v1/categories`
+   (URL `/category/<slug>`, priority ~0.8), and leave out the ones that are not indexable.
+2. **Prerender** `/category/<slug>`: H1 = name, intro text, FAQ, links to each variant page,
+   plus CollectionPage/ItemList, BreadcrumbList and FAQPage JSON-LD (the same schema the
+   runtime page outputs in `client/src/pages/shop/CategoryPage.jsx`). These pages are
+   JavaScript-only until this is done.
+3. **Product breadcrumb** JSON-LD: the second level is now the category
+   (`/category/<slug>`), not `/products`. Please match it in the prerendered Breadcrumb.
+4. `/products?category=X` still works with no redirect; its canonical now points to `/category/x`.
+
+## G. Admin → SEO Pages (2026-10-02)
+
+Admins can set SEO for **any URL** in Admin → SEO Pages: title, description, canonical, index/noindex,
+OG title/description/image, intro text, FAQs, custom JSON-LD. The data is in the `seo_pages` collection.
+The storefront reads it with `GET /api/v1/seo?path=<path>` (cached 10 min like products).
+- The runtime `<SEOHead>` merges it over each page's own values (`client/src/utils/seoMerge.js`):
+  a filled admin field wins, an empty one keeps the page value. No entry means no change.
+- An admin `metaTitle` is used **verbatim** (no " | UrbanNook" suffix added).
+- `<SeoPageContent>` (in `App.jsx`, above the footer) shows the intro + FAQs and outputs FAQPage JSON-LD.
+- `index.html` no longer has a static `<meta name="robots" content="index, follow">`. `SEOHead` now
+  outputs the only robots tag, so noindex pages don't carry two conflicting tags.
+
+Request for prerender: when prerendering a URL, apply the same entry (title, description, canonical,
+robots, OG, intro/FAQ) so crawlers without JS see it too. Until then (and until the Cloudflare
+Worker phase), the overrides are only visible to Google after it runs JavaScript.

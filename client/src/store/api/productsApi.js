@@ -55,8 +55,21 @@ export const productsApi = apiSlice.injectEndpoints({
     
     // Get product categories
     getCategories: builder.query({
-      query: () => 'products/categories',
+      query: () => 'categories',
       providesTags: ['Category'],
+    }),
+
+    // Admin → SEO Pages overrides for one URL path; data is null when none.
+    getSeoData: builder.query({
+      query: (path) => `seo?path=${encodeURIComponent(path)}`,
+      providesTags: (result, error, path) => [{ type: 'Seo', id: path }],
+      keepUnusedDataFor: 600,
+    }),
+
+    // One category page: name, indexable flag, products
+    getCategoryBySlug: builder.query({
+      query: (slug) => `category/${encodeURIComponent(slug)}`,
+      providesTags: (result, error, slug) => [{ type: 'Category', id: slug }],
     }),
     
     // Search products
@@ -81,5 +94,7 @@ export const {
   useGetProductsByCategoryQuery,
   useGetFeaturedProductsQuery,
   useGetCategoriesQuery,
+  useGetCategoryBySlugQuery,
+  useGetSeoDataQuery,
   useSearchProductsQuery,
 } = productsApi;

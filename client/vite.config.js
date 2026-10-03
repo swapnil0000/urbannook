@@ -101,7 +101,7 @@ function htmlEnvReplace(gtmId, metaPixelId) {
   };
 }
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, isSsrBuild }) => {
   // Vite does NOT auto-populate process.env from .env files, so load them here
   // and hand the GTM container id to the index.html replace plugin.
   const env = loadEnv(mode, '.', '');
@@ -139,7 +139,10 @@ export default defineConfig(({ mode }) => {
     target: 'es2020', // modern baseline — avoids shipping ES2015 transforms/polyfills to every browser
     cssMinify: true, // CSS minification enabled
     
-    rollupOptions: {
+    // `vite build --ssr` (npm run build:ssr): one Node file, dist-ssr/entry-server.js,
+    // loaded by server.mjs. The browser chunking/naming below doesn't apply to it.
+    ...(isSsrBuild && { copyPublicDir: false }),
+    rollupOptions: isSsrBuild ? { output: { entryFileNames: '[name].js', chunkFileNames: 'chunks/[name]-[hash].js' } } : {
       // Force externalize React Router to separate chunk
       external: (id) => {
         // Don't externalize, but this helps with chunking

@@ -1,9 +1,10 @@
-import { BrowserRouter as Router, useLocation } from 'react-router-dom';
-import { Provider } from 'react-redux';
+import { useLocation } from 'react-router-dom';
+import { Provider, useStore } from 'react-redux';
 import { useEffect, useRef, lazy, Suspense } from 'react';
 import { useDispatch } from 'react-redux';
 import { HelmetProvider } from 'react-helmet-async';
-import { store } from './store/store';
+import { store as browserStore } from './store/store';
+import { restoreGuestCart } from './store/slices/cartSlice';
 import { useCartSync } from './hooks/useCartSync';
 import { useWishlistSync } from './hooks/useWishlistSync';
 import { useScrollRestoration } from './hooks/useScrollRestoration';
@@ -11,6 +12,7 @@ import ErrorBoundary from './component/ErrorBoundary';
 import { setCredentials, logout } from './store/slices/authSlice';
 import { fetchCsrfToken } from './store/api/apiSlice';
 import AppRoutes from './store/AppRoutes';
+import SeoPageContent from './component/SeoPageContent';
 import NewsTicker from './pages/home/NewsTicker';
 import WhatsAppLoginWatcher from './component/layout/auth/WhatsAppLoginWatcher';
 import WhatsAppOneTap from './component/layout/auth/WhatsAppOneTap';
@@ -35,8 +37,13 @@ const PasskeyPrompt = lazy(() => import('./component/PasskeyPrompt'));
 // Component to handle session restoration and token removal detection
 const SessionManager = ({ children }) => {
   const dispatch = useDispatch();
+  const store = useStore();
 
   useEffect(() => {
+    // A server-rendered page starts as a guest with an empty cart (the server
+    // has no localStorage); load this browser's guest cart now.
+    dispatch(restoreGuestCart());
+
     // Check for existing session on app load
     const token = localStorage.getItem('authToken');
     const storedUser = localStorage.getItem('user');
@@ -101,7 +108,7 @@ const SessionManager = ({ children }) => {
       window.removeEventListener('storage', handleStorageChange);
       clearInterval(checkAuthInterval);
     };
-  }, [dispatch]);
+  }, [dispatch, store]);
 
   return children;
 };
@@ -141,15 +148,18 @@ const SyncProvider = ({ children }) => {
   return children;
 };
 
-function App() {
+// The Router lives in the entry files: BrowserRouter in main.jsx, StaticRouter
+// in entry-server.jsx. `store` and `helmetContext` are passed by entry-server
+// for each request; in the browser the app store is used.
+function App({ store = browserStore, helmetContext }) {
   useEffect(() => {
     console.log("%c URBAN NOOK CLIENT ACTIVE - VERSION 2.1.1 (STRICT VARIANT) ", "background: #141414; color: #E63329; font-weight: bold; font-size: 14px; padding: 10px; border-radius: 5px;");
   }, []);
 
   return (
-    <HelmetProvider>
+    <HelmetProvider context={helmetContext}>
     <Provider store={store}>
-        <Router>
+        <>
           <SmoothScroll>
           <RouteTracker />
           <MotionLayer />
@@ -165,6 +175,10 @@ function App() {
               {/* AppRoutes loaded immediately - no lazy loading for critical routing */}
               <ErrorBoundary>
                 <AppRoutes />
+              </ErrorBoundary>
+              {/* Intro + FAQs from Admin → SEO Pages for this URL (if any) */}
+              <ErrorBoundary>
+                <SeoPageContent />
               </ErrorBoundary>
               {/* Polls a pending WhatsApp login at the app level, so the login
                   completes even if the modal closes or the page reloads */}
@@ -203,7 +217,7 @@ function App() {
             </SyncProvider>
           </SessionManager>
           </SmoothScroll>
-        </Router>
+        </>
     </Provider>
     </HelmetProvider>
   );

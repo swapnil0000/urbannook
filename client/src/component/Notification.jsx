@@ -105,15 +105,15 @@ const Notification = () => {
   );
 };
 
-// Add CSS animation for progress bar
-const styleSheet = document.createElement('style');
-styleSheet.textContent = `
+// Add CSS animation for progress bar (browser only — there is no document on the SSR server)
+if (typeof document !== 'undefined' && !document.head.querySelector('style[data-notification-styles]')) {
+  const styleSheet = document.createElement('style');
+  styleSheet.textContent = `
   @keyframes shrink {
     from { width: 100%; }
     to { width: 0%; }
   }
 `;
-if (!document.head.querySelector('style[data-notification-styles]')) {
   styleSheet.setAttribute('data-notification-styles', 'true');
   document.head.appendChild(styleSheet);
 }

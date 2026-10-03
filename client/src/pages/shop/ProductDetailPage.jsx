@@ -1,5 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { categoryPath } from '../../utils/categoryUrl';
+import { SsrStatus } from '../../utils/ssrContext';
 import { useSelector, useDispatch } from 'react-redux';
 import confetti from 'canvas-confetti';
 import SEOHead from '../../component/SEOHead';
@@ -568,6 +570,7 @@ const ProductDetailPage = () => {
   if (error || !product) return (
     <div className="min-h-[70vh] grid place-items-center bg-paper font-inter text-center px-5">
       <SEOHead title="Product not found" noIndex />
+      <SsrStatus code={404} />
       <div><h1 className="text-3xl font-extrabold">Product not found</h1><button onClick={() => navigate('/products')} className="gl-press mt-5 bg-brand text-white font-bold px-7 py-3 rounded-xl hover:bg-brandHi">Back to Shop</button></div>
     </div>
   );
@@ -586,7 +589,9 @@ const ProductDetailPage = () => {
     '@context': 'https://schema.org', '@type': 'BreadcrumbList',
     itemListElement: [
       { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://www.urbannook.in/' },
-      { '@type': 'ListItem', position: 2, name: 'Shop', item: 'https://www.urbannook.in/products' },
+      product.productCategory
+        ? { '@type': 'ListItem', position: 2, name: product.productCategory, item: `https://www.urbannook.in${categoryPath(product.productCategory)}` }
+        : { '@type': 'ListItem', position: 2, name: 'Shop', item: 'https://www.urbannook.in/products' },
       { '@type': 'ListItem', position: 3, name: product.productName, item: `https://www.urbannook.in/product/${product.productId}` },
     ],
   };
@@ -598,7 +603,7 @@ const ProductDetailPage = () => {
       <div className="max-w-[1280px] mx-auto px-5 py-6 md:py-8">
         {/* breadcrumb */}
         <div className="text-sm text-faint mb-5">
-          <button onClick={() => navigate('/')} className="hover:text-brand">Home</button> / <button onClick={() => navigate('/products')} className="hover:text-brand">{product.productCategory || 'Shop'}</button> / <span className="text-ink">{product.productName}</span>
+          <Link to="/" className="hover:text-brand">Home</Link> / <Link to={product.productCategory ? categoryPath(product.productCategory) : '/products'} className="hover:text-brand">{product.productCategory || 'Shop'}</Link> / <span className="text-ink">{product.productName}</span>
         </div>
 
         <div className="grid lg:grid-cols-2 gap-8 lg:gap-10">

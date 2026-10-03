@@ -5,6 +5,8 @@ import helmet from "helmet";
 import {
   userRouter,
   productRouter,
+  categoryRouter,
+  seoRouter,
   commonRouter,
   userAddressRouter,
   userCartRouter,
@@ -216,6 +218,8 @@ app.use(
   "/api/v1",
   userRouter,
   productRouter,
+  categoryRouter,
+  seoRouter,
   commonRouter,
   userWishListRouter,
   userAddressRouter,

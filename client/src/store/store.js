@@ -15,7 +15,8 @@ const logoutCacheResetMiddleware = (storeAPI) => (next) => (action) => {
   return result;
 };
 
-export const store = configureStore({
+export const makeStore = (preloadedState) => configureStore({
+  preloadedState,
   reducer: {
     api: apiSlice.reducer,
     cart: cartSlice,
@@ -26,5 +27,12 @@ export const store = configureStore({
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(apiSlice.middleware, logoutCacheResetMiddleware),
 });
+
+// Browser: the single app store, started from the server's state when the
+// page was server-rendered (see entry-server.jsx / main.jsx). Server: none —
+// entry-server makes a fresh store per request with makeStore().
+export const store = typeof window !== 'undefined'
+  ? makeStore(window.__PRELOADED_STATE__)
+  : undefined;
 
 export default store;

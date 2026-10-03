@@ -58,8 +58,9 @@ const Footer = () => {
       <div>
         <p className="gl-lbl text-white/50 mb-4">Shop</p>
         <ul className="space-y-2 text-sm">
-          <li><Link to="/products?category=Lamp" className="hover:text-white">Desk Lamps</Link></li>
-          <li><Link to="/products?category=Pen%20Stand" className="hover:text-white">Pen Stands</Link></li>
+          <li><Link to="/category/lamp" className="hover:text-white">Desk Lamps</Link></li>
+          <li><Link to="/category/pen-stand" className="hover:text-white">Pen Stands</Link></li>
+          <li><Link to="/category/anime" className="hover:text-white">Anime Katanas &amp; Figures</Link></li>
           <li><Link to="/products" className="hover:text-white">Bestsellers</Link></li>
           <li><Link to="/products" className="hover:text-white">Shop All</Link></li>
         </ul>

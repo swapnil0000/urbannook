@@ -782,7 +782,8 @@ const FreeShippingBanner = ({
     : null;
   const hasRuleDiscount = ruleDiscountedPrice !== null && ruleDiscountedPrice < displayPrice;
 
-  const hasToken = !!localStorage.getItem("authToken");
+  // Only read in click handlers; guarded so server rendering doesn't touch localStorage.
+  const hasToken = typeof window !== "undefined" && !!localStorage.getItem("authToken");
   const isLoggedIn = isAuthenticated || hasToken;
 
   const handleAddToCart = async () => {

@@ -64,7 +64,6 @@
   <meta name="description" content="UrbanNook — Premium 3D printed home decor, lighting & lifestyle products. Proudly made in India. Shop modern, pen stand, 3d printed pen stand, minimal designs delivered pan-India." />
   <meta name="keywords" content="home decor, 3D printed decor, modern home decor India, lifestyle products, UrbanNook, indoor lighting, minimalist decor" />
   <meta name="author" content="UrbanNook" />
-  <meta name="robots" content="index, follow" />
   <!-- No canonical here: this shell is served for every URL. Each page sets its own
        (prerendered product HTML, or SEOHead at runtime). -->
 
@@ -131,6 +130,8 @@
         l.setAttribute('fetchpriority', 'high');
         document.head.appendChild(l);
       }
+      // Server-rendered pages already have the images in the HTML.
+      if (window.__SSR__) return;
       var m = path.match(/^\/product\/([^\/?#]+)(?:\/([^\/?#]+))?/);
       if (!m) return;
       var host = location.hostname;
