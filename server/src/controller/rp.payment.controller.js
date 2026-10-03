@@ -753,12 +753,15 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   // direct comparison, whole-cart (any products count), no rules table.
   const freeShippingConfig = await getFreeShippingConfig();
   const thresholdEligible = freeShippingConfig.isActive && subtotal >= freeShippingConfig.thresholdAmount;
+  const comboFsEligible = await isFreeShippingEligible(orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity, variantSku: oi.variantSku })));
   const freeShippingUnlocked =
-    (await isFreeShippingEligible(items.map((i) => i.productId))) || cartRuleResult.freeShipping || thresholdEligible || promotionResult.freeShipping;
+    comboFsEligible || cartRuleResult.freeShipping || thresholdEligible || promotionResult.freeShipping;
   const chargedShippingAmount = freeShippingUnlocked ? 0 : realShippingAmount;
-  // console.log(
-  //   `[FreeShipping][Order:auth] realShipping=₹${realShippingAmount} chargedShipping=₹${chargedShippingAmount} items=${items.map(i => `${i.productId}x${i.quantity}`).join(",")}`,
-  // );
+  console.log(
+    `[FreeShipping][Order:auth] items=[${orderItems.map((oi) => `${oi.productId}x${oi.productSnapshot.quantity}${oi.variantSku ? `(${oi.variantSku})` : ""}`).join(",")}] ` +
+    `signals={comboFsEligible:${comboFsEligible}, cartRuleFreeShipping:${cartRuleResult.freeShipping}, thresholdEligible:${thresholdEligible}(threshold=₹${freeShippingConfig.thresholdAmount}, subtotal=₹${subtotal}), promotionFreeShipping:${promotionResult.freeShipping}} ` +
+    `→ freeShippingUnlocked=${freeShippingUnlocked}, realShipping=₹${realShippingAmount}, chargedShipping=₹${chargedShippingAmount}`,
+  );
 
   // Gift wrap: server-authoritative price + intent. `cart.giftWrap` is the
   // ONLY source for "did they select it" (never req.body); price always comes
@@ -2031,12 +2034,15 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   // direct comparison, whole-cart (any products count), no rules table.
   const freeShippingConfig = await getFreeShippingConfig();
   const thresholdEligible = freeShippingConfig.isActive && subtotal >= freeShippingConfig.thresholdAmount;
+  const comboFsEligible = await isFreeShippingEligible(orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity, variantSku: oi.variantSku })));
   const freeShippingUnlocked =
-    (await isFreeShippingEligible(items.map((i) => i.productId))) || cartRuleResult.freeShipping || thresholdEligible || promotionResult.freeShipping;
+    comboFsEligible || cartRuleResult.freeShipping || thresholdEligible || promotionResult.freeShipping;
   const chargedShippingAmount = freeShippingUnlocked ? 0 : realShippingAmount;
-  // console.log(
-  //   `[FreeShipping][Order:guest] realShipping=₹${realShippingAmount} chargedShipping=₹${chargedShippingAmount} items=${items.map(i => `${i.productId}x${i.quantity}`).join(",")}`,
-  // );
+  console.log(
+    `[FreeShipping][Order:guest] items=[${orderItems.map((oi) => `${oi.productId}x${oi.productSnapshot.quantity}${oi.variantSku ? `(${oi.variantSku})` : ""}`).join(",")}] ` +
+    `signals={comboFsEligible:${comboFsEligible}, cartRuleFreeShipping:${cartRuleResult.freeShipping}, thresholdEligible:${thresholdEligible}(threshold=₹${freeShippingConfig.thresholdAmount}, subtotal=₹${subtotal}), promotionFreeShipping:${promotionResult.freeShipping}} ` +
+    `→ freeShippingUnlocked=${freeShippingUnlocked}, realShipping=₹${realShippingAmount}, chargedShipping=₹${chargedShippingAmount}`,
+  );
 
   // Gift wrap: guests have no server-side cart to read intent from, so the
   // boolean (only) comes from req.body — that's safe, it just means "include

@@ -47,18 +47,47 @@ export const getFreeShippingConfig = async () => {
  *
  * No longer reads `offers` at all — every signal here is Promotion-sourced.
  *
- * @param {string[]} cartProductIds product IDs currently in the cart/order
+ * Quantity- AND variant-aware, same convention as cartRule.util.js's
+ * ruleIsMatched/quantityByProductVariant: a condition's minQuantity must
+ * actually be met by the cart's quantity for that product, not just
+ * presence, and a condition scoped to one specific variantSku only counts
+ * cart lines resolved to that exact SKU (an unscoped condition still counts
+ * every variant, unchanged). Takes full {productId, quantity, variantSku?}
+ * entries (not bare IDs) — a bare-ID array still works (quantity defaults to
+ * 1, variantSku absent so only unscoped conditions can match), but every
+ * real caller should pass quantity (+ variantSku when resolvable) so a
+ * "2+ Lamps" rule isn't satisfied by just 1 Lamp, and a rule scoped to one
+ * variant isn't satisfied by a different variant of the same product.
+ *
+ * @param {Array<string|{productId:string, quantity?:number, variantSku?:string}>} cartItems
  */
-export const isFreeShippingEligible = async (cartProductIds = []) => {
+export const isFreeShippingEligible = async (cartItems = []) => {
   const rules = await getActivePromotionsAsCartRules();
-  const ids = new Set((cartProductIds || []).map((id) => String(id)));
+  const qtyByProduct = new Map();
+  const qtyByProductVariant = new Map();
+  for (const entry of cartItems || []) {
+    const isObj = typeof entry === "object" && entry !== null;
+    const productId = String(isObj ? entry.productId : entry);
+    const quantity = isObj ? Number(entry.quantity) || 1 : 1;
+    const variantSku = isObj ? entry.variantSku : null;
+    qtyByProduct.set(productId, (qtyByProduct.get(productId) || 0) + quantity);
+    if (variantSku) {
+      const key = `${productId}::${variantSku}`;
+      qtyByProductVariant.set(key, (qtyByProductVariant.get(key) || 0) + quantity);
+    }
+  }
   const eligible = rules.some(
     (rule) =>
       (rule.effects || []).some((e) => e.type === "free_shipping") &&
-      (rule.conditions || []).every((c) => ids.has(String(c.productId))),
+      (rule.conditions || []).every((c) => {
+        const have = c.variantSku
+          ? qtyByProductVariant.get(`${String(c.productId)}::${c.variantSku}`) || 0
+          : qtyByProduct.get(String(c.productId)) || 0;
+        return have >= (c.minQuantity || 1);
+      }),
   );
   console.log(
-    `[FreeShipping] cartIds=[${[...ids].join(",")}] → eligible=${eligible}`,
+    `[FreeShipping] cartQty=[${[...qtyByProduct.entries()].map(([id, q]) => `${id}x${q}`).join(",")}] → eligible=${eligible}`,
   );
   return eligible;
 };
