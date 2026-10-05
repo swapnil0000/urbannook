@@ -66,15 +66,31 @@ const CartDrawer = ({ isOpen, onClose }) => {
   // showed shipping status at all, so the customer only found out at checkout.
   const { data: offerRes } = useGetFreeShippingOfferQuery();
   const { data: bannersRes } = useGetAllFreeShippingBannersQuery();
+  // Sibling variants of the SAME product can share ONE rule's discount pool
+  // instead of each getting their own (e.g. "Exciting Offers": free single
+  // stand / 50%-off double / 50%-off triple is ONE unit shared across all
+  // three, not one each — see cartRule.util.js's createRuleBudgetTracker).
+  // lineDiscounts is computed server-side over the cart in its own array
+  // order, the exact same way checkout actually consumes the budget — a
+  // line whose own entry comes back ineligible must show full price here,
+  // or the drawer total would silently disagree with what gets charged.
+  const getLineEligible = (item) => {
+    const productId = item.mongoId || item.id;
+    const entry = (cartRuleEvalData?.data?.lineDiscounts || []).find(
+      (ld) => String(ld.productId) === String(productId) && ld.selectedVariant === item.selectedVariant,
+    );
+    return !entry || entry.eligible !== false; // no entry (older response/no rule involved) → don't block
+  };
   const getItemDiscountedPrice = (item) => {
     const productId = item.mongoId || item.id;
+    const price = Number(item.price) || 0;
+    if (!getLineEligible(item)) return price;
     // A candidate may be tagged with `variantName` (offer scoped to one
     // variant) — untagged candidates apply to every variant, unchanged from
     // before this field existed. See cartRule.util.js getDiscountCandidatesForItem.
     const candidates = (cartRuleEvalData?.data?.discounts?.[productId] || []).filter(
       (c) => !c.variantName || c.variantName === item.selectedVariant,
     );
-    const price = Number(item.price) || 0;
     if (!candidates?.length) return price;
     const results = candidates.map((c) =>
       c.type === 'percent_off' ? price * (1 - Number(c.value) / 100) : price - Number(c.value),
@@ -90,6 +106,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
   // Read here, never re-derived — the policy lives in exactly one place.
   const getItemDiscountCap = (item) => {
     const productId = item.mongoId || item.id;
+    if (!getLineEligible(item)) return 0;
     const candidates = (cartRuleEvalData?.data?.discounts?.[productId] || []).filter(
       (c) => !c.variantName || c.variantName === item.selectedVariant,
     );
