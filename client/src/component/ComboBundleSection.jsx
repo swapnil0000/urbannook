@@ -359,9 +359,20 @@ const ComboBundleSection = ({
     const name = chosenVariants[entry.product.productId];
     const v = entry.variants.find((x) => x.variantName === name) || entry.variants[0];
     const basePrice = Number(v?.variantPrice ?? 0);
-    const candidates = (bundleRuleEval?.discounts?.[entry.product.productId] || []).filter(
-      (c) => !c.variantName || c.variantName === v?.variantName,
+    // Sibling variants of the SAME product can share ONE rule's discount
+    // pool instead of each getting their own (e.g. "Exciting Offers": free
+    // single stand / 50%-off double / 50%-off triple is ONE unit shared
+    // across all three — see cartRule.util.js's createRuleBudgetTracker).
+    // lineDiscounts is computed server-side the same way checkout actually
+    // consumes the budget, so a line it marks ineligible must show full
+    // price here too.
+    const lineEntry = (bundleRuleEval?.lineDiscounts || []).find(
+      (ld) => String(ld.productId) === String(entry.product.productId) && ld.selectedVariant === v?.variantName,
     );
+    const eligible = !lineEntry || lineEntry.eligible !== false;
+    const candidates = eligible
+      ? (bundleRuleEval?.discounts?.[entry.product.productId] || []).filter((c) => !c.variantName || c.variantName === v?.variantName)
+      : [];
     const price = candidates.length
       ? Math.round(Math.max(Math.min(...candidates.map((c) => (c.type === "percent_off" ? basePrice * (1 - c.value / 100) : basePrice - c.value))), 0))
       : basePrice;

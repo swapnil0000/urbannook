@@ -385,7 +385,18 @@ const ProductPageBanner = ({
   const ruleDiscountedPrice = ruleDiscountCandidates?.length
     ? Math.round(Math.max(Math.min(...ruleDiscountCandidates.map((c) => (c.type === "percent_off" ? displayPrice * (1 - c.value / 100) : displayPrice - c.value))), 0))
     : null;
-  const hasRuleDiscount = ruleDiscountedPrice !== null && ruleDiscountedPrice < displayPrice;
+  // A sibling variant of this same product may already hold the ONE shared
+  // discount a rule like "Exciting Offers" grants (free single stand / 50%
+  // off double / 50% off triple — one unit total, not one per variant; see
+  // cartRule.util.js's createRuleBudgetTracker). lineDiscounts is computed
+  // server-side over the real cart in order, so it reflects exactly what
+  // checkout would actually charge — if this variant's own line comes back
+  // ineligible, the discount shown here would never survive to payment.
+  const lineDiscountEntry = (ruleEval?.lineDiscounts || []).find(
+    (ld) => String(ld.productId) === String(recommendedProduct?.productId) && ld.selectedVariant === activeVariant?.variantName,
+  );
+  const offerClaimedBySibling = ruleDiscountCandidates.length > 0 && !!lineDiscountEntry && !lineDiscountEntry.eligible;
+  const hasRuleDiscount = ruleDiscountedPrice !== null && ruleDiscountedPrice < displayPrice && !offerClaimedBySibling;
 
   const hasToken = !!localStorage.getItem("authToken");
   const isLoggedIn = isAuthenticated || hasToken;
@@ -514,29 +525,20 @@ const ProductPageBanner = ({
     }
   };
 
-  // Auto-add the free variant. Once the source (e.g. LED Katana) is in the
-  // cart AND the backend-evaluated price of the selected variant is ₹0, add it
-  // straight to the cart. A partial discount (e.g. double/triple stand at 50%
-  // off) stays a manual add. Fires once per time the source enters the cart,
-  // so removing the free item doesn't immediately re-add it.
-  const autoAddedRef = useRef(false);
+  // A reward whose evaluated price is exactly ₹0 (e.g. "100% off single
+  // stand") used to be auto-added to the cart the moment its source product
+  // (e.g. the Katana) was present — no click required. That had no check for
+  // whether the customer had already picked a DIFFERENT variant of the same
+  // product through another route (e.g. manually adding the 50%-off double
+  // stand): both lines could land in the cart from one Katana, each getting
+  // its own independent reward, since every reward on a promotion gets its
+  // own full cap rather than sharing one across the group. A real order hit
+  // this exact case (double stand manually added, single stand silently
+  // auto-added for free on top). Requiring a manual click for every reward —
+  // free or partial — closes that gap at the one place it's cheap to fix:
+  // now the customer has to consciously choose which single stand variant
+  // they want, same as the 50%-off ones always required.
   const isFreeViaRule = hasRuleDiscount && ruleDiscountedPrice === 0;
-  useEffect(() => {
-    if (!sourceInCart) { autoAddedRef.current = false; return; }
-    if (autoAddedRef.current || added || !isFreeViaRule || addDisabled || addLoading || isAdding) return;
-    if (!recommendedProduct || !activeVariant) return;
-    autoAddedRef.current = true;
-    (async () => {
-      try {
-        await addRecommendedToCart(activeVariant.variantName || "Standard Variant");
-        if (isLoggedIn) await refetchCart().unwrap();
-      } catch {
-        autoAddedRef.current = false;
-        await refetchCart().unwrap().catch(() => {});
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- addRecommendedToCart is recreated each render
-  }, [sourceInCart, added, isFreeViaRule, addDisabled, addLoading, isAdding, recommendedProduct, activeVariant]);
 
   if (!banner || !recommendedProduct) return null;
 
@@ -687,15 +689,7 @@ const ProductPageBanner = ({
       </div>
 
       <div className="px-4 pb-4 pt-3">
-        {isFreeViaRule ? (
-          <div className="w-full h-[50px] flex items-center justify-center rounded-full text-[11px] font-extrabold uppercase tracking-[0.1em] text-center bg-paper text-ink border border-[#ffce64]">
-            {added && sourceInCart ? (
-              <><i className="fa-solid fa-circle-check mr-1.5 text-brand" /> Free gift added to cart</>
-            ) : (
-              <><i className="fa-solid fa-gift mr-1.5 text-brand" /> Add the {sourceProduct?.productName || "product"} to get this free</>
-            )}
-          </div>
-        ) : addLoading ? (
+        {addLoading ? (
           <button disabled className="relative w-full py-3.5 rounded-full overflow-hidden flex items-center justify-center gap-2.5 text-sm font-extrabold uppercase tracking-wide bg-paper text-ink cursor-wait">
             <style>{`@keyframes ppbLoadSweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }`}</style>
             <span aria-hidden="true" className="absolute inset-y-0 w-1/2" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.65), transparent)", animation: "ppbLoadSweep 1.1s linear infinite" }} />
@@ -749,6 +743,11 @@ const ProductPageBanner = ({
                 "Out of Stock"
               ) : isAdding ? (
                 "Adding…"
+              ) : isFreeViaRule ? (
+                <>
+                  <i className="fa-solid fa-gift" /> Add — FREE
+                  <span className="text-base leading-none">→</span>
+                </>
               ) : hasRuleDiscount ? (
                 <>
                   Add for ₹{Math.round(ruleDiscountedPrice).toLocaleString()}
@@ -762,6 +761,12 @@ const ProductPageBanner = ({
               )}
             </span>
           </button>
+        )}
+        {offerClaimedBySibling && (
+          <p className="mt-2 text-[11px] text-center text-gray-500">
+            <i className="fa-solid fa-circle-info mr-1" />
+            Only one offer is applicable per order — you've already used it on another variant.
+          </p>
         )}
       </div>
     </div>

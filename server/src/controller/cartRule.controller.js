@@ -7,6 +7,11 @@ import {
   evaluateCartRules,
   findClosestUnmatchedRule,
   findQuantityDiscountNudges,
+  getDiscountCandidatesForItem,
+  createRuleBudgetTracker,
+  withRuleBudget,
+  spendRuleBudget,
+  applicableCap,
 } from "../utils/cartRule.util.js";
 
 // Public: evaluates the posted cart (productId + quantity pairs — the client
@@ -84,6 +89,31 @@ const evaluateCartRulesController = asyncHandler(async (req, res) => {
     ]),
   );
 
+  // Per-cart-line eligibility, simulated in the SAME order-dependent way
+  // checkout actually consumes a rule's shared budget (see
+  // createRuleBudgetTracker/withRuleBudget/spendRuleBudget in
+  // cartRule.util.js) — additive, doesn't touch `discounts` above. Needed
+  // because `discounts` is grouped by PRODUCT, not by cart line: it can't
+  // tell the client "this specific variant's sibling already spent the
+  // rule's only unit." A promotion like "Exciting Offers" (free single
+  // stand / 50%-off double / 50%-off triple, one shared unit) used to let
+  // every sibling variant show its own full discount regardless of what
+  // else was in cart — confirmed on a real paid order where a manually
+  // added 50%-off double stand sat alongside an auto-added free single
+  // stand, both off one Katana. The client can now check
+  // lineDiscounts[i].eligible before showing a discounted price/CTA for a
+  // line, instead of discovering the mismatch only at checkout.
+  const ruleBudgets = createRuleBudgetTracker(result.discountCandidatesByProduct);
+  const lineDiscounts = resolvedItems.map((item) => {
+    const rawCandidates = getDiscountCandidatesForItem(result.discountCandidatesByProduct, item.productId, item.variantSku);
+    const candidates = withRuleBudget(rawCandidates, ruleBudgets);
+    if (!candidates.length) return { productId: item.productId, selectedVariant: item.selectedVariant, eligible: false };
+    const cap = applicableCap(candidates);
+    const unitsUsed = Math.min(Number(item.quantity) || 0, cap);
+    spendRuleBudget(candidates, ruleBudgets, unitsUsed);
+    return { productId: item.productId, selectedVariant: item.selectedVariant, eligible: true, cap };
+  });
+
   return res.status(200).json(
     new ApiRes(
       200,
@@ -92,6 +122,7 @@ const evaluateCartRulesController = asyncHandler(async (req, res) => {
         freeShipping: result.freeShipping,
         matchedRuleIds,
         discounts,
+        lineDiscounts,
         closestUnmatchedRule,
         quantityNudges,
       },

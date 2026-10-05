@@ -780,7 +780,16 @@ const FreeShippingBanner = ({
         ),
       )
     : null;
-  const hasRuleDiscount = ruleDiscountedPrice !== null && ruleDiscountedPrice < displayPrice;
+  // A sibling variant of this same product may already hold the ONE shared
+  // discount a rule like "Exciting Offers" grants (free single stand / 50%
+  // off double / 50% off triple — one unit total, not one per variant; see
+  // cartRule.util.js's createRuleBudgetTracker). lineDiscounts reflects
+  // exactly what checkout would actually charge.
+  const lineDiscountEntry = (ruleEval?.lineDiscounts || []).find(
+    (ld) => String(ld.productId) === String(recommendedProduct?.productId) && ld.selectedVariant === activeVariant?.variantName,
+  );
+  const offerClaimedBySibling = ruleDiscountCandidates.length > 0 && !!lineDiscountEntry && !lineDiscountEntry.eligible;
+  const hasRuleDiscount = ruleDiscountedPrice !== null && ruleDiscountedPrice < displayPrice && !offerClaimedBySibling;
 
   const hasToken = !!localStorage.getItem("authToken");
   const isLoggedIn = isAuthenticated || hasToken;
@@ -1903,6 +1912,12 @@ const FreeShippingBanner = ({
                 )}
               </span>
             </button>
+          )}
+          {offerClaimedBySibling && (
+            <p className="mt-2 text-[11px] text-center text-gray-500">
+              <i className="fa-solid fa-circle-info mr-1" />
+              Only one offer is applicable per order — you've already used it on another variant.
+            </p>
           )}
         </div>
       </div>

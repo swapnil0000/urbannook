@@ -265,7 +265,11 @@ export const evaluatePromotions = (cartItems, ctx, activePromotions) => {
         case "discounted_product": {
           const productId = String(reward.targetProductId);
           const list = discountCandidatesByProduct.get(productId) || [];
-          list.push({ type: reward.type, value: reward.value, cap, ...(reward.targetVariantSku ? { variantSku: reward.targetVariantSku } : {}) });
+          // ruleId groups sibling reward lines of the SAME promotion so they
+          // share one cap instead of each independently getting its own —
+          // see createRuleBudgetTracker in rp.payment.controller.js and the
+          // matching comment in cartRule.util.js's evaluateCartRules.
+          list.push({ type: reward.type, value: reward.value, cap, ruleId: String(promo._id), ...(reward.targetVariantSku ? { variantSku: reward.targetVariantSku } : {}) });
           discountCandidatesByProduct.set(productId, list);
           break;
         }

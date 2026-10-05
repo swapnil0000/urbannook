@@ -72,14 +72,28 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
   // always said "calculated at checkout" regardless of actual eligibility.
   const { data: offerRes } = useGetFreeShippingOfferQuery();
   const { data: bannersRes } = useGetAllFreeShippingBannersQuery();
+  // Sibling variants of the SAME product can share ONE rule's discount pool
+  // instead of each getting their own (e.g. "Exciting Offers": free single
+  // stand / 50%-off double / 50%-off triple is ONE unit shared across all
+  // three, not one each — see cartRule.util.js's createRuleBudgetTracker).
+  // lineDiscounts is computed server-side over the cart in its own array
+  // order, the exact same way checkout actually consumes the budget.
+  const getLineEligible = (item) => {
+    const productId = item.mongoId || item.id;
+    const entry = (cartRuleEvalData?.data?.lineDiscounts || []).find(
+      (ld) => String(ld.productId) === String(productId) && ld.selectedVariant === item.selectedVariant,
+    );
+    return !entry || entry.eligible !== false;
+  };
   const getItemDiscountedPrice = (item) => {
     const productId = item.mongoId || item.id;
+    const price = Number(item.price) || 0;
+    if (!getLineEligible(item)) return price;
     // Untagged candidates apply to every variant (unchanged); a `variantName`
     // tag restricts to that one variant — see cartRule.util.js.
     const candidates = (cartRuleEvalData?.data?.discounts?.[productId] || []).filter(
       (c) => !c.variantName || c.variantName === item.selectedVariant,
     );
-    const price = Number(item.price) || 0;
     if (!candidates?.length) return price;
     const results = candidates.map((c) =>
       c.type === "percent_off" ? price * (1 - Number(c.value) / 100) : price - Number(c.value),
@@ -98,6 +112,7 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
   // trigger product unlocks up to 2 discounted units, not a flat 1.
   const getItemDiscountCap = (item) => {
     const productId = item.mongoId || item.id;
+    if (!getLineEligible(item)) return 0;
     const candidates = (cartRuleEvalData?.data?.discounts?.[productId] || []).filter(
       (c) => !c.variantName || c.variantName === item.selectedVariant,
     );

@@ -64,10 +64,6 @@ import { sortVariantsOOSLast, deriveProductStatus, syncVariantOutOfStock } from 
 // generous applicable cap wins — consistent with applyBestDiscount/
 // applyBestPromotionDiscount already picking the best PRICE among
 // candidates for the same line.
-function applicableCap(candidates) {
-  return Math.max(1, ...candidates.map((c) => c.cap ?? 1));
-}
-
 function capDiscountedQuantity(oi, fullUnitPrice, discountedUnitPrice, cap = 1) {
   const quantity = oi.productSnapshot.quantity;
   oi.productSnapshot.priceAtPurchase = discountedUnitPrice;
@@ -218,7 +214,7 @@ const getShippingRateOrFallback = async (params) => {
   }
 };
 import { isFreeShippingEligible, getFreeShippingConfig } from "../utils/freeShippingOffer.util.js";
-import { getActiveCartRules, evaluateCartRules, applyBestDiscount, getDiscountCandidatesForItem } from "../utils/cartRule.util.js";
+import { getActiveCartRules, evaluateCartRules, applyBestDiscount, getDiscountCandidatesForItem, createRuleBudgetTracker, withRuleBudget, spendRuleBudget, applicableCap } from "../utils/cartRule.util.js";
 // Promotion Engine V2 — separate collection/evaluator, additive only. See
 // promotionEngine.util.js's file header and the wiring comment below.
 import {
@@ -556,16 +552,27 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity, variantSku: oi.variantSku })),
     activeCartRules,
   );
+  // Shared across BOTH the cart_rule loop below and the Promotion V2 loop
+  // further down — a rule's ruleId is the same promotion _id either way
+  // (see promotionToCartRule.adapter.js), so one tracker keeps sibling
+  // reward lines in sync regardless of which path evaluated them.
+  const ruleBudgets = createRuleBudgetTracker(cartRuleResult.discountCandidatesByProduct);
   const extraDiscountLines = [];
   for (const oi of orderItems) {
-    const candidates = getDiscountCandidatesForItem(cartRuleResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
+    const rawCandidates = getDiscountCandidatesForItem(cartRuleResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
+    const candidates = withRuleBudget(rawCandidates, ruleBudgets);
     if (candidates?.length) {
       const fullPrice = oi.productSnapshot.priceAtPurchase;
       const discountedPrice = applyBestDiscount(fullPrice, candidates);
       // Cap scales with how many times the rule's own condition is
       // satisfied (e.g. 2x the trigger product → up to 2 discounted units)
-      // — never a flat 1. See applicableCap / ruleRepeatCount.
-      const remainderLine = capDiscountedQuantity(oi, fullPrice, discountedPrice, applicableCap(candidates));
+      // — never a flat 1 — and is already clamped to this rule's remaining
+      // shared budget by withRuleBudget above. See applicableCap /
+      // ruleRepeatCount / createRuleBudgetTracker.
+      const cap = applicableCap(candidates);
+      const unitsUsed = Math.min(oi.productSnapshot.quantity, cap);
+      const remainderLine = capDiscountedQuantity(oi, fullPrice, discountedPrice, cap);
+      spendRuleBudget(candidates, ruleBudgets, unitsUsed);
       if (remainderLine) extraDiscountLines.push(remainderLine);
       // A cart_rule discount that zeroes an item's price out (e.g. a
       // percent_off 100 "get this free" offer) marks it as a promotional
@@ -597,16 +604,29 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   const promoSubtotalSoFar = orderItems.reduce((s, i) => s + i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity, 0);
   const promoCtx = buildCartContext(promoCartItems, { subtotal: promoSubtotalSoFar, productMeta: promoProductMeta, customerType: "registered" });
   const promotionResult = evaluatePromotions(promoCartItems, promoCtx, activePromotions);
+  // A promotion not representable as a flat cart_rule (OR conditions, a
+  // non-product leaf, etc.) never appears in cartRuleResult at all, so its
+  // ruleId wouldn't be seeded yet — merge any new ones in now, same
+  // first-seen-wins seeding as createRuleBudgetTracker itself.
+  for (const candidates of promotionResult.discountCandidatesByProduct.values()) {
+    for (const c of candidates) {
+      if (c.ruleId && !ruleBudgets.has(c.ruleId)) ruleBudgets.set(c.ruleId, c.cap);
+    }
+  }
 
   const extraPromoDiscountLines = [];
   for (const oi of orderItems) {
     if (getDiscountCandidatesForItem(cartRuleResult.discountCandidatesByProduct, oi.productId, oi.variantSku)?.length) continue; // legacy cart_rule already discounted this line
-    const candidates = getPromotionDiscountCandidatesForItem(promotionResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
+    const rawCandidates = getPromotionDiscountCandidatesForItem(promotionResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
+    const candidates = withRuleBudget(rawCandidates, ruleBudgets);
     if (candidates?.length) {
       const fullPrice = oi.productSnapshot.priceAtPurchase;
       const discountedPrice = applyBestPromotionDiscount(fullPrice, candidates);
       // Same dynamic cap as the cart_rule block above.
-      const remainderLine = capDiscountedQuantity(oi, fullPrice, discountedPrice, applicableCap(candidates));
+      const cap = applicableCap(candidates);
+      const unitsUsed = Math.min(oi.productSnapshot.quantity, cap);
+      const remainderLine = capDiscountedQuantity(oi, fullPrice, discountedPrice, cap);
+      spendRuleBudget(candidates, ruleBudgets, unitsUsed);
       if (remainderLine) extraPromoDiscountLines.push(remainderLine);
     }
   }
@@ -1930,13 +1950,19 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity, variantSku: oi.variantSku })),
     activeCartRules,
   );
+  // See the matching comment in razorpayCreateOrderController above.
+  const ruleBudgets = createRuleBudgetTracker(cartRuleResult.discountCandidatesByProduct);
   const extraDiscountLines = [];
   for (const oi of orderItems) {
-    const candidates = getDiscountCandidatesForItem(cartRuleResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
+    const rawCandidates = getDiscountCandidatesForItem(cartRuleResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
+    const candidates = withRuleBudget(rawCandidates, ruleBudgets);
     if (candidates?.length) {
       const fullPrice = oi.productSnapshot.priceAtPurchase;
       const discountedPrice = applyBestDiscount(fullPrice, candidates);
-      const remainderLine = capDiscountedQuantity(oi, fullPrice, discountedPrice, applicableCap(candidates));
+      const cap = applicableCap(candidates);
+      const unitsUsed = Math.min(oi.productSnapshot.quantity, cap);
+      const remainderLine = capDiscountedQuantity(oi, fullPrice, discountedPrice, cap);
+      spendRuleBudget(candidates, ruleBudgets, unitsUsed);
       if (remainderLine) extraDiscountLines.push(remainderLine);
       // See the matching comment in razorpayCreateOrderController above.
       if (oi.productSnapshot.priceAtPurchase === 0) oi.productSnapshot.isPromotionalGift = true;
@@ -1955,15 +1981,24 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   const promoSubtotalSoFar = orderItems.reduce((s, i) => s + i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity, 0);
   const promoCtx = buildCartContext(promoCartItems, { subtotal: promoSubtotalSoFar, productMeta: promoProductMeta, customerType: "guest" });
   const promotionResult = evaluatePromotions(promoCartItems, promoCtx, activePromotions);
+  for (const candidates of promotionResult.discountCandidatesByProduct.values()) {
+    for (const c of candidates) {
+      if (c.ruleId && !ruleBudgets.has(c.ruleId)) ruleBudgets.set(c.ruleId, c.cap);
+    }
+  }
 
   const extraPromoDiscountLines = [];
   for (const oi of orderItems) {
     if (getDiscountCandidatesForItem(cartRuleResult.discountCandidatesByProduct, oi.productId, oi.variantSku)?.length) continue;
-    const candidates = getPromotionDiscountCandidatesForItem(promotionResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
+    const rawCandidates = getPromotionDiscountCandidatesForItem(promotionResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
+    const candidates = withRuleBudget(rawCandidates, ruleBudgets);
     if (candidates?.length) {
       const fullPrice = oi.productSnapshot.priceAtPurchase;
       const discountedPrice = applyBestPromotionDiscount(fullPrice, candidates);
-      const remainderLine = capDiscountedQuantity(oi, fullPrice, discountedPrice, applicableCap(candidates));
+      const cap = applicableCap(candidates);
+      const unitsUsed = Math.min(oi.productSnapshot.quantity, cap);
+      const remainderLine = capDiscountedQuantity(oi, fullPrice, discountedPrice, cap);
+      spendRuleBudget(candidates, ruleBudgets, unitsUsed);
       if (remainderLine) extraPromoDiscountLines.push(remainderLine);
     }
   }
@@ -2320,4 +2355,9 @@ export {
   razorpayKeyGetController,
   razorpayWebHookController,
   guestCreateOrderController,
+  // Pure helper exported for direct unit testing (no controller mocking
+  // needed). applicableCap/createRuleBudgetTracker/withRuleBudget/
+  // spendRuleBudget now live in cartRule.util.js (shared with
+  // cartRule.controller.js's preview endpoint) — import those from there.
+  capDiscountedQuantity,
 };
