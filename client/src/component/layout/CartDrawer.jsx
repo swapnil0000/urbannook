@@ -13,6 +13,7 @@ import { resolveVariantTitle } from '../../utils/variantTitle';
 import { setShowLoginModal, setLoginCallback } from '../../store/slices/uiSlice';
 import { trackViewCart, trackRemoveFromCart, track } from '../../utils/analytics';
 import FreeShippingBanner from '../FreeShippingBanner';
+import FreeShippingStrip from '../FreeShippingStrip';
 import GiftWrapOffer, { GiftWrapLineItem } from '../GiftWrapOffer';
 
 const OptimizedImage = lazy(() => import('../OptimizedImage'));
@@ -372,6 +373,8 @@ const CartDrawer = ({ isOpen, onClose }) => {
             </div>
           ) : (
             <>
+              {/* Free-shipping threshold nudge — hidden unless admin's promotion is on */}
+              <FreeShippingStrip cartTotal={subtotal} variant="compact" className="mb-3" />
               <div className="divide-y divide-hair">
                 {cartItems.map((item) => {
                   const itemQty = typeof item.quantity === 'object' ? Number(item.quantity?.quantity || 0) : Number(item.quantity || 0);

@@ -9,6 +9,7 @@ import {
 import { removeItem } from "../../store/slices/cartSlice";
 import { resolveVariantTitle } from "../../utils/variantTitle";
 import FreeShippingBanner from "../FreeShippingBanner";
+import FreeShippingStrip from '../FreeShippingStrip';
 
 /**
  * Lightweight cart preview — a compact bottom sheet showing what's in the
@@ -198,6 +199,8 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
             <p className="text-center text-sm text-black/50 py-8">Your cart is empty</p>
           ) : (
             <div className="flex flex-col gap-3">
+              {/* Free-shipping threshold nudge — hidden unless admin's promotion is on */}
+              <FreeShippingStrip cartTotal={subtotal} variant="compact" />
               {cartItems.map((item, idx) => {
                 const displayName = resolveVariantTitle(item.name, item.variantTitleTemplate, item.selectedVariant);
                 return (

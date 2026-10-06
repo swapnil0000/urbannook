@@ -26,9 +26,11 @@ const GlMobileNav = lazy(() => import('./component/layout/GlMobileNav'));
 const SocialMediaFAB = lazy(() => import('./component/layout/WhatsAppButton'));
 const OpenInBrowserBanner = lazy(() => import('./component/OpenInBrowserBanner'));
 const GoogleOneTap = lazy(() => import('./component/GoogleOneTap'));
-// Mounted app-wide, not on the home page: most Instagram ad / bio traffic lands
-// directly on /products or a product page and would never see a home-only popup.
-const SiteOfferPopup = lazy(() => import('./component/SiteOfferPopup'));
+// SiteOfferPopup (₹100 off + lead capture) is retired — the store now runs free
+// shipping instead. The component is kept for future campaigns; re-add its lazy
+// import and the <SiteOfferPopup /> mount below to bring it back.
+// Free-shipping announcement in the same slot and style; admin-controlled.
+const FreeShippingPopup = lazy(() => import('./component/FreeShippingPopup'));
 const ScrollHint = lazy(() => import('./component/ScrollHint'));
 const PasskeyPrompt = lazy(() => import('./component/PasskeyPrompt'));
 
@@ -192,9 +194,9 @@ function App() {
                 <ErrorBoundary>
                   <PasskeyPrompt />
                 </ErrorBoundary>
-                {/* Site offer popup (₹100 off) with lead capture — shows once, everywhere */}
+                {/* Free-shipping popup — shows once, everywhere except checkout */}
                 <ErrorBoundary>
-                  <SiteOfferPopup />
+                  <FreeShippingPopup />
                 </ErrorBoundary>
                 <ErrorBoundary>
                   <ScrollHint />

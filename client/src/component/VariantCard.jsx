@@ -25,7 +25,7 @@ const VariantCard = ({ productId, productName, variant, index, listId = "product
       listName: listName || `${productName} — Variants`,
       index,
     });
-    navigate(`/product/${productId}/${variant?.sku || variant?.variantName}`);
+    navigate(`/product/${productId}/${encodeURIComponent(variant?.sku || variant?.variantName)}`);
   };
 
   return (
