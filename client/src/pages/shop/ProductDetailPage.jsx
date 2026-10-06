@@ -22,6 +22,7 @@ import { useGetProductReviewsQuery, useSubmitProductReviewMutation, useUpdatePro
 import { addItem, updateQuantity, removeItem, updateSelection } from '../../store/slices/cartSlice';
 import { useUI } from '../../hooks/useRedux';
 import { useCartData } from '../../hooks/useCartSync';
+import FreeShippingStrip from '../../component/FreeShippingStrip';
 
 const MotionDiv = motion.div;
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
@@ -144,6 +145,7 @@ const ProductDetailPage = () => {
   const [updateCart] = useUpdateCartMutation();
   const [checkPincode, { isLoading: isCheckingPin }] = useCalculateShippingMutation();
   const { refetch: refetchCart } = useCartData();
+  const cartTotal = useSelector((state) => state.cart.totalAmount);
 
   const { data: reviewsData } = useGetProductReviewsQuery(productId);
   const [submitProductReview, { isLoading: isSubmittingReview }] = useSubmitProductReviewMutation();
@@ -241,7 +243,9 @@ const ProductDetailPage = () => {
     if (availableVariants.length > 0 && product) {
       let initial = availableVariants[0];
       if (urlVariantSku) {
-        const matched = product.variantDetails?.find((v) => v.sku === urlVariantSku);
+        // Older/sku-less links carry the variant name instead of the sku.
+        const matched = product.variantDetails?.find((v) => v.sku === urlVariantSku)
+          || product.variantDetails?.find((v) => v.variantName === urlVariantSku);
         if (matched) initial = matched.variantName;
       } else {
         const saved = cartSelections[product.productId];
@@ -479,8 +483,11 @@ const ProductDetailPage = () => {
   };
 
   // ── Share — native sheet on mobile, social buttons on desktop ──
-  const shareUrl = `https://www.urbannook.in/product/${product?.productId}`;
-  const shareText = `${product?.productName || 'Urban Nook'} — Urban Nook`;
+  // Include the selected variant — without it the link opens the product's
+  // first variant (e.g. sharing Tanjiro opened Kokushibo).
+  const shareVariantKey = selectedVariantObj?.sku || selectedVariantObj?.variantName;
+  const shareUrl = `https://www.urbannook.in/product/${product?.productId}${shareVariantKey ? `/${encodeURIComponent(shareVariantKey)}` : ''}`;
+  const shareText = `${selectedVariant || product?.productName || 'Urban Nook'} — Urban Nook`;
   const openShare = (method, href) => {
     trackShare({ contentType: 'product', itemId: product.productId, method });
     window.open(href, '_blank', 'noopener,noreferrer');
@@ -736,6 +743,10 @@ const ProductDetailPage = () => {
                   </>
                 )}
               </div>
+
+              {/* Free-shipping threshold, right under the CTA where the buy
+                  decision happens — hidden unless admin's promotion is on. */}
+              {!isOutOfStock && <FreeShippingStrip cartTotal={cartTotal} variant="compact" className="mt-3" />}
 
               {/* Customization — admin opt-in per product (product.isCustomizable),
                   not every product is customisable. Carries the product (and the

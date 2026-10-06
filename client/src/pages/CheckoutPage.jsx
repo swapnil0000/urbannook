@@ -31,6 +31,7 @@ import FreeShippingBanner from "../component/FreeShippingBanner";
 import { ComponentLoader } from "../component/layout/LoadingSpinner";
 import { getClaimedMobile, getClaimedCode, isOfferLive } from "../config/siteOffer";
 import SiteOfferBanner from "../component/SiteOfferBanner";
+import FreeShippingStrip from "../component/FreeShippingStrip";
 import useOfferTerms from "../hooks/useOfferTerms";
 import { useShippingDelayNotice } from "../hooks/useShippingDelayNotice";
 import { calcLocalDiscount } from "../utils/couponDiscount";
@@ -2007,6 +2008,13 @@ const CheckoutPage = () => {
             isApplying={isApplyingOffer}
             onApply={handleApplyOfferCode}
           />
+        </div>
+      )}
+      {/* Free-shipping threshold — admin-controlled (free_shipping Promotion);
+          renders nothing while that promotion is off. */}
+      {currentStep === reviewStep && (
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4">
+          <FreeShippingStrip cartTotal={cartTotalAmount} />
         </div>
       )}
       {/* ── Main ───────────────────────────────────────────────────────── */}

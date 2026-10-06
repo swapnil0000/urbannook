@@ -71,7 +71,7 @@ const OtherVariants = ({ productId, productName, variants = [], currentVariantNa
                 index={index}
                 listId="other_variants"
                 listName={`${productName} — Other Variants`}
-                href={`/product/${productId}/${variant?.sku || variant?.variantName}`}
+                href={`/product/${productId}/${encodeURIComponent(variant?.sku || variant?.variantName)}`}
                 badge={oos ? "Out of stock" : null}
                 showWishlist={false}
               />
