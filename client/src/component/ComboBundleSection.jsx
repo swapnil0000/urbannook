@@ -103,8 +103,8 @@ const BundleTile = ({
     <div className="flex-1 min-w-0 max-w-[140px] sm:max-w-[190px] flex flex-col items-center text-center">
       <div className="relative w-full">
         <div
-          className={`w-full aspect-square rounded-xl sm:rounded-2xl bg-white/5 border overflow-hidden transition-opacity ${
-            removed ? "opacity-30 border-white/5" : "border-white/10"
+          className={`w-full aspect-square rounded-xl sm:rounded-2xl bg-white border overflow-hidden transition-opacity ${
+            removed ? "opacity-30 border-hair" : "border-hair"
           }`}
         >
           <img src={image} alt={product?.productName} className="w-full h-full object-cover" />
@@ -124,7 +124,7 @@ const BundleTile = ({
                     title={v.variantName}
                     onClick={() => onSelectVariant(v.variantName)}
                     className={`w-3.5 h-3.5 sm:w-5 sm:h-5 rounded-full overflow-hidden border shadow flex items-center justify-center bg-white shrink-0 transition-transform hover:scale-110 ${
-                      isSelected ? "border-brand" : "border-paper"
+                      isSelected ? "border-brand" : "border-white"
                     }`}
                   >
                     {type === "color" && value ? (
@@ -168,8 +168,8 @@ const BundleTile = ({
             aria-label={removed ? `Add ${product?.productName} back` : `Remove ${product?.productName}`}
             className={`absolute -top-1.5 -right-1.5 sm:-top-2 sm:-right-2 w-5 h-5 sm:w-7 sm:h-7 rounded-full border flex items-center justify-center text-[11px] sm:text-[14px] font-bold transition-colors ${
               removed
-                ? "bg-paper text-ink border-paper"
-                : "bg-ink text-white/70 border-white/25 hover:border-white/50 hover:text-white"
+                ? "bg-white text-ink border-hair"
+                : "bg-ink text-white border-ink hover:bg-black"
             }`}
           >
             {removed ? "+" : "−"}
@@ -218,18 +218,30 @@ const BundleTile = ({
           )}
       </div>
 
-      {/* Variant name, clickable through to that product's page */}
+      {/* Name (2 lines max, height reserved so tiles line up), variant and
+          price — clickable through to that product's page */}
       <button
         type="button"
         onClick={goToProduct}
         disabled={removed}
-        className={`mt-1 w-full text-center transition-opacity ${
+        title={product?.productName}
+        className={`mt-2 w-full text-center transition-opacity ${
           removed ? "opacity-30 pointer-events-none" : "hover:opacity-80"
         }`}
       >
-        <span className="block text-[12px] sm:text-xs text-white/45 truncate">
-          {activeVariant?.variantName}
+        <span className="block text-[12px] sm:text-[13px] font-semibold text-ink leading-snug line-clamp-2 min-h-[2.75em] break-words">
+          {product?.productName}
         </span>
+        {variants.length > 1 && activeVariant?.variantName && (
+          <span className="block mt-0.5 text-[11px] sm:text-xs text-muted truncate">
+            {activeVariant.variantName}
+          </span>
+        )}
+        {Number(activeVariant?.variantPrice) > 0 && (
+          <span className="block mt-1 text-[13px] sm:text-sm font-bold text-ink">
+            ₹{Number(activeVariant.variantPrice).toLocaleString("en-IN")}
+          </span>
+        )}
       </button>
     </div>
   );
@@ -400,10 +412,10 @@ const ComboBundleSection = ({
     ]);
 
   return (
-    <section className="mt-5 border-t border-paper/15  sm:mt-12 px-4 lg:px-12">
+    <section className="mt-5 border-t border-hair sm:mt-12 px-4 lg:px-12">
       <div className="max-w-xl mx-auto rounded-xl sm:rounded-2xl overflow-hidden">
         <div className="px-3 sm:px-5 pt-8 pb-1 text-center  border-white/[0.07]">
-          <span className="text-paper/70 font-bold tracking-[0.1em] uppercase text-[12px] sm:text-[12px]">
+          <span className="text-muted font-bold tracking-[0.1em] uppercase text-[12px] sm:text-[12px]">
             {eyebrow}
           </span>
         </div>
@@ -429,7 +441,7 @@ const ComboBundleSection = ({
                 // max-w-[140px] sm:max-w-[190px] and render the same size.
                 <Fragment key={id}>
                   <div className="self-center shrink-0 flex justify-center">
-                    <span className="text-paper text-[26px] sm:text-[30px]">
+                    <span className="text-muted text-[26px] sm:text-[30px]">
                       +
                     </span>
                   </div>
@@ -447,12 +459,12 @@ const ComboBundleSection = ({
           </div>
         </div>
 
-        <div className="px-3 sm:px-5 pb-3 sm:pb-4 pt-0.5 flex flex-col items-center justify-center">
+        <div className="px-3 sm:px-5 pt-2 pb-6 flex flex-col items-center justify-center">
           {mainOutOfStock ? (
             <button
               type="button"
               onClick={onNotifyMe}
-              className="w-full h-9 sm:h-10 rounded-full bg-paper text-ink text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.12em] sm:tracking-[0.15em] hover:bg-white transition-colors flex items-center justify-center gap-2"
+              className="w-full sm:w-auto sm:min-w-[260px] h-12 px-6 rounded-full bg-ink text-white text-[11px] font-bold uppercase tracking-[0.12em] sm:tracking-[0.15em] hover:bg-black transition-colors flex items-center justify-center gap-2"
             >
               <i className="fa-regular fa-bell text-[10px]" />
               Notify Me
@@ -462,10 +474,10 @@ const ComboBundleSection = ({
               type="button"
               onClick={handleConfirm}
               disabled={isAdding || bundleAdded}
-              className={`w-fit h-12 sm:h-12 rounded-full text-[11px] sm:text-[11px] font-bold uppercase tracking-[0.12em] sm:tracking-[0.15em] transition-colors disabled:opacity-100 px-5 flex items-center justify-center gap-1.5 ${
+              className={`w-full sm:w-auto sm:min-w-[260px] h-12 rounded-full text-[12px] font-bold uppercase tracking-[0.1em] whitespace-nowrap transition-colors px-6 flex items-center justify-center gap-1.5 ${
                 bundleAdded
-                  ? "bg-ink text-paper border border-paper/40"
-                  : "bg-paper text-ink hover:bg-white disabled:opacity-50"
+                  ? "bg-white text-ink border border-ink"
+                  : "bg-ink text-white hover:bg-black disabled:opacity-60"
               }`}
             >
               {isAdding ? (
@@ -477,9 +489,9 @@ const ComboBundleSection = ({
                 </>
               ) : (
                 <>
-                  {ctaLabel}
-                  {" • ₹"}
-                  {total.toLocaleString()}
+                  <span className="truncate">{ctaLabel}</span>
+                  <span className="opacity-40">•</span>
+                  <span>₹{total.toLocaleString("en-IN")}</span>
                 </>
               )}
             </button>

@@ -29,6 +29,13 @@ export default function ImageCarousel({
   const [paused, setPaused] = useState(false);
   const [prevImages, setPrevImages] = useState(images);
   const count = images.length;
+  // Seamless loop: the slides are rendered twice. Scrolling only ever moves
+  // forward into the second copy, and once it settles there we jump back by
+  // one copy's width with no animation — the two positions look identical,
+  // so the wrap is invisible (the old version smooth-scrolled back to 0,
+  // rewinding through every slide in a fast blur).
+  const loop = count > 1;
+  const slides = loop ? [...images, ...images] : images;
 
   const reduced =
     typeof window !== 'undefined' &&
@@ -65,15 +72,48 @@ export default function ImageCarousel({
     return () => ro.disconnect();
   }, [images]);
 
+  // Once scrolling settles inside the second copy, jump back one copy width.
+  // Never while a finger/mouse is down — the slide would jump under it.
+  const holdingRef = useRef(false);
+  const normalize = useCallback(() => {
+    const el = trackRef.current;
+    if (!el || !loop || holdingRef.current) return;
+    const span = count * stride();
+    if (el.scrollLeft >= span - 2) el.scrollLeft -= span;
+  }, [count, loop]);
+
+  // `i` is a real index; index - 1 / index + 1 from the arrows may step off
+  // either end, which in loop mode means "keep going", never "rewind".
   const scrollToIndex = useCallback(
     (i) => {
       const el = trackRef.current;
       if (!el || count === 0) return;
-      const target = ((i % count) + count) % count;
-      el.scrollTo({ left: target * stride(), behavior: reduced ? 'auto' : 'smooth' });
+      normalize();
+      const s = stride();
+      let cur = Math.round(el.scrollLeft / s);
+      // Back from the first slide: hop to its twin in the second copy so
+      // "previous" is one short step.
+      if (loop && i < 0) {
+        el.scrollLeft += count * s;
+        cur += count;
+      }
+      const real = ((i % count) + count) % count;
+      const base = cur - (cur % count);
+      // Forward past the last slide: continue into the next copy.
+      const target = loop && i >= count ? base + count + real : base + real;
+      el.scrollTo({ left: target * s, behavior: reduced ? 'auto' : 'smooth' });
     },
-    [count, reduced]
+    [count, reduced, loop, normalize]
   );
+
+  const settleRef = useRef(0);
+  useEffect(() => {
+    const el = trackRef.current;
+    if (!el || !loop) return;
+    const onEnd = () => normalize();
+    el.addEventListener('scrollend', onEnd);
+    return () => { el.removeEventListener('scrollend', onEnd); clearTimeout(settleRef.current); };
+  }, [normalize, loop]);
 
   // rAF-throttled: at most one layout read per frame while scrolling.
   const rafRef = useRef(0);
@@ -83,10 +123,13 @@ export default function ImageCarousel({
       rafRef.current = 0;
       const el = trackRef.current;
       if (!el) return;
-      const i = Math.round(el.scrollLeft / stride());
+      const i = Math.round(el.scrollLeft / stride()) % count;
       setIndex((prev) => (prev === i ? prev : i));
+      // Fallback for browsers without `scrollend` (older Safari).
+      clearTimeout(settleRef.current);
+      settleRef.current = setTimeout(normalize, 160);
     });
-  }, []);
+  }, [count, normalize]);
   useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
 
   useEffect(() => {
@@ -95,23 +138,26 @@ export default function ImageCarousel({
       const el = trackRef.current;
       if (!el) return;
       const s = stride();
-      // Loop: in peek mode the track can't scroll a full slide past the end, so key the
-      // wrap off the real scroll limit (not the index) — once we can't advance further, snap
-      // back to the first slide. Works for both full-width and multi-visible peek layouts.
-      const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 4;
-      el.scrollTo({ left: atEnd ? 0 : el.scrollLeft + s, behavior: 'smooth' });
+      // Always step forward; normalize() folds the second copy back afterwards.
+      // If a wide peek layout still hits the hard end, fold back first.
+      if (el.scrollLeft + el.clientWidth >= el.scrollWidth - 4) el.scrollLeft -= count * s;
+      el.scrollTo({ left: Math.round(el.scrollLeft / s) * s + s, behavior: 'smooth' });
     }, interval);
     return () => clearInterval(id);
   }, [paused, reduced, count, interval]);
 
   if (!count) return null;
 
+  const hold = (on) => {
+    holdingRef.current = on;
+    setPaused(on);
+  };
   const pauseOnInteract = {
-    onPointerDown: () => setPaused(true),
-    onPointerUp: () => setPaused(false),
-    onPointerCancel: () => setPaused(false),
-    onTouchStart: () => setPaused(true),
-    onTouchEnd: () => setPaused(false),
+    onPointerDown: () => hold(true),
+    onPointerUp: () => hold(false),
+    onPointerCancel: () => hold(false),
+    onTouchStart: () => hold(true),
+    onTouchEnd: () => hold(false),
   };
 
   const Dots = count > 1 && (
@@ -129,24 +175,27 @@ export default function ImageCarousel({
     </div>
   );
 
-  const Slide = (src, i, extra = '') => (
-    <div key={i} className={`relative shrink-0 ${extra}`}>
+  const Slide = (src, k, extra = '') => {
+    const i = k % count; // real index; k >= count is the loop copy
+    return (
+    <div key={k} className={`relative shrink-0 ${extra}`} aria-hidden={k >= count || undefined}>
       <img
         src={src}
         alt={alt}
-        loading={i === 0 && !peek ? 'eager' : 'lazy'}
-        fetchPriority={priority && i === 0 ? 'high' : undefined}
-        decoding={i === 0 && !peek ? 'sync' : 'async'}
+        loading={k === 0 && !peek ? 'eager' : 'lazy'}
+        fetchPriority={priority && k === 0 ? 'high' : undefined}
+        decoding={k === 0 && !peek ? 'sync' : 'async'}
         draggable={false}
         className="absolute inset-0 w-full h-full object-cover"
         onError={onImgErr}
       />
       {renderOverlay && <div className="pointer-events-none absolute inset-0 z-[5]">{renderOverlay(i)}</div>}
       {onItemClick && (
-        <button type="button" onClick={() => onItemClick(i)} aria-label="View image" className="absolute inset-0" />
+        <button type="button" onClick={() => onItemClick(i)} aria-label="View image" tabIndex={k >= count ? -1 : undefined} className="absolute inset-0" />
       )}
     </div>
-  );
+    );
+  };
 
   // PEEK — smaller square cards, several visible, no frame/radius.
   if (peek) {
@@ -158,7 +207,7 @@ export default function ImageCarousel({
           {...pauseOnInteract}
           className="flex gap-3 overflow-x-auto gl-hscroll snap-x snap-mandatory -mx-5 px-5 pb-1"
         >
-          {images.map((src, i) => Slide(src, i, `${slideClass} ${aspectClass} overflow-hidden bg-paper/5 snap-start`))}
+          {slides.map((src, k) => Slide(src, k, `${slideClass} ${aspectClass} overflow-hidden bg-paper/5 snap-start`))}
         </div>
         {Dots}
       </div>
@@ -175,7 +224,7 @@ export default function ImageCarousel({
           {...pauseOnInteract}
           className="flex h-full w-full overflow-x-auto gl-hscroll snap-x snap-mandatory"
         >
-          {images.map((src, i) => Slide(src, i, 'w-full h-full snap-center'))}
+          {slides.map((src, k) => Slide(src, k, 'w-full h-full snap-center'))}
         </div>
 
         {count > 1 && (

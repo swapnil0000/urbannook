@@ -338,7 +338,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
       >
 
         {/* --- HEADER --- */}
-        <div className="px-5 py-4 border-b border-hair flex items-center justify-between shrink-0">
+        <div className="px-5 py-3 border-b border-hair flex items-center justify-between shrink-0">
           <div className="flex items-baseline gap-2.5">
             <h2 className="text-xl font-extrabold tracking-tight">Your Cart</h2>
             <span className="gl-lbl text-brand text-[11px]">{cartItems.length} {cartItems.length === 1 ? 'item' : 'items'}</span>
@@ -353,7 +353,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
         </div>
 
         {/* --- SCROLLABLE CONTENT --- */}
-        <div className="flex-1 overflow-y-auto px-5 py-5 scrollbar-hide">
+        <div className="flex-1 overflow-y-auto px-5 py-4 scrollbar-hide">
 
           {cartItems.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center gap-5">
@@ -395,12 +395,12 @@ const CartDrawer = ({ isOpen, onClose }) => {
                   const percentOff = hasDiscount ? Math.round(((rawLineTotal - discountedPrice) / rawLineTotal) * 100) : 0;
 
                   return (
-                    <div key={`${itemId}-${item.selectedVariant || 'N/A'}`} className="flex gap-4 py-4 first:pt-0">
+                    <div key={`${itemId}-${item.selectedVariant || 'N/A'}`} className="flex gap-3 py-3 first:pt-0">
 
                       {/* Image */}
                       <button
                         onClick={() => { onClose(); navigate(`/product/${item.productId || itemId}`); }}
-                        className="w-20 h-20 rounded-xl overflow-hidden border border-hair bg-surface shrink-0"
+                        className="w-16 h-16 rounded-lg overflow-hidden border border-hair bg-surface shrink-0"
                         aria-label={`View ${displayName}`}
                       >
                         <Suspense fallback={<div className="w-full h-full bg-hair animate-pulse" />}>
@@ -433,16 +433,16 @@ const CartDrawer = ({ isOpen, onClose }) => {
                         {(() => {
                           const parts = [item.category, variant].filter(Boolean);
                           return parts.length ? (
-                            <p className="text-[11px] text-muted mt-0.5 font-semibold uppercase tracking-wide">{parts.join(' | ')}</p>
+                            <p className="text-[10px] text-muted mt-0.5 font-semibold uppercase tracking-wide truncate">{parts.join(' | ')}</p>
                           ) : null;
                         })()}
 
-                        <div className="mt-auto pt-2.5 flex items-center justify-between">
+                        <div className="mt-auto pt-1.5 flex items-center justify-between">
                           {/* Quantity */}
-                          <div className="flex items-center border border-hair rounded-full h-8">
+                          <div className="flex items-center border border-hair rounded-full h-7">
                             <button
                               onClick={() => handleQuantityChange(itemId, item.selectedVariant, Math.max(0, itemQty - 1), item.mongoId, itemQty, item.image)}
-                              className="w-8 h-full grid place-items-center text-muted hover:text-brand transition-colors"
+                              className="w-7 h-full grid place-items-center text-muted hover:text-brand transition-colors"
                               aria-label="Decrease quantity"
                             >
                               <i className="fa-solid fa-minus text-[10px]" />
@@ -450,7 +450,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
                             <span className="min-w-[20px] text-center text-xs font-bold tabular-nums">{itemQty}</span>
                             <button
                               onClick={() => handleQuantityChange(itemId, item.selectedVariant, itemQty + 1, item.mongoId, itemQty, item.image)}
-                              className="w-8 h-full grid place-items-center text-muted hover:text-brand transition-colors"
+                              className="w-7 h-full grid place-items-center text-muted hover:text-brand transition-colors"
                               aria-label="Increase quantity"
                             >
                               <i className="fa-solid fa-plus text-[10px]" />
@@ -498,39 +498,30 @@ const CartDrawer = ({ isOpen, onClose }) => {
 
         {/* --- FOOTER (CHECKOUT) --- */}
         {cartItems?.length > 0 && (
-          <div className="px-5 py-5 border-t border-hair shrink-0">
+          <div className="px-5 pt-3 pb-4 border-t border-hair shrink-0 shadow-[0_-8px_20px_-14px_rgba(0,0,0,0.25)]">
             {/* Gift wrap — renders nothing unless the admin's turned the
                 seasonal offer on (Admin -> Offers -> Gift Wrap). */}
-            <div className="border-b border-hair mb-4">
+            <div className="border-b border-hair mb-3 empty:hidden">
               <GiftWrapOffer />
             </div>
 
-            <div className="space-y-2.5 mb-4">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted font-semibold">Subtotal</span>
-                <span className="font-bold">₹{(Number(subtotal) || 0).toLocaleString('en-IN')}</span>
+            {/* Subtotal / shipping / total folded into one block: the total
+                is what matters, the breakdown sits on one line under it. */}
+            <div className="flex items-end justify-between gap-3 mb-4">
+              <div className="min-w-0">
+                <p className="text-sm font-bold">Total</p>
+                <p className="text-[11px] text-muted mt-0.5">
+                  Subtotal ₹{(Number(subtotal) || 0).toLocaleString('en-IN')}
+                  <span className="mx-1.5 text-faint">·</span>
+                  Shipping{' '}
+                  {isFreeShippingEligible ? (
+                    <span className="font-bold text-save">Free</span>
+                  ) : (
+                    <span>at checkout</span>
+                  )}
+                </p>
               </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted font-semibold">Shipping</span>
-                {isFreeShippingEligible ? (
-                  <span className="font-extrabold text-save">Free</span>
-                ) : (
-                  <span className="text-muted">Calculated at checkout</span>
-                )}
-              </div>
-              <div className="flex items-center justify-between pt-2.5 border-t border-hair">
-                <span className="text-sm font-bold">Total</span>
-                <span className="text-xl font-extrabold">₹{(Number(subtotal) || 0).toLocaleString('en-IN')}</span>
-              </div>
-            </div>
-
-            {/* COD availability notice */}
-            <div className="flex items-center gap-2.5 bg-surface border border-hair rounded-xl px-4 py-3 mb-4">
-              <i className="fa-solid fa-hand-holding-dollar text-brand text-base shrink-0" />
-              <div>
-                <p className="text-[11px] font-bold">Partial Cash on Delivery</p>
-                <p className="text-[10px] text-muted mt-0.5 leading-snug">Pay a small advance online · rest at your door</p>
-              </div>
+              <span className="text-xl font-extrabold tabular-nums">₹{(Number(subtotal) || 0).toLocaleString('en-IN')}</span>
             </div>
 
             {/* Static "Avail Coupons at Checkout" badge sitting on the
@@ -563,14 +554,22 @@ const CartDrawer = ({ isOpen, onClose }) => {
               </div>
               <button
                 onClick={handleCheckout}
-                className="gl-press relative z-0 w-full py-4 bg-ink text-white rounded-xl font-bold uppercase tracking-[0.15em] text-[10px] hover:bg-brandHi transition-colors flex items-center justify-center gap-2 px-6"
+                className="gl-press relative z-0 w-full h-12 bg-ink text-white rounded-xl font-bold uppercase tracking-[0.15em] text-[10px] hover:bg-brandHi transition-colors flex items-center justify-center gap-2 px-6"
               >
                   <span>Proceed to Checkout</span>
                   <i className="fa-solid fa-arrow-right-long"></i>
               </button>
             </div>
-            <div className="mt-3 flex justify-center items-center gap-1.5 text-[10px] text-faint font-bold uppercase tracking-widest">
-              <i className="fa-solid fa-lock" /> Secure Checkout
+            {/* Trust line — secure checkout + partial COD on one row */}
+            <div className="mt-2.5 flex flex-wrap justify-center items-center gap-x-3 gap-y-1 text-[10px] text-muted font-semibold">
+              <span className="flex items-center gap-1 uppercase tracking-wider text-faint font-bold">
+                <i className="fa-solid fa-lock" /> Secure Checkout
+              </span>
+              <span className="text-faint">·</span>
+              <span className="flex items-center gap-1">
+                <i className="fa-solid fa-hand-holding-dollar text-brand" />
+                Partial COD — small advance, rest at your door
+              </span>
             </div>
           </div>
         )}

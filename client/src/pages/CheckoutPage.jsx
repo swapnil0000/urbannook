@@ -40,6 +40,7 @@ import { trackBeginCheckout, trackPurchase, trackAddShippingInfo, trackAddPaymen
 const CouponList = lazy(() => import("../component/CouponList"));
 const MobileNumberModal = lazy(() => import("../component/MobileNumberModal"));
 const GoogleAddressFormModal = lazy(() => import("../component/GoogleAddressFormModal"));
+const PaymentCancelFeedbackModal = lazy(() => import("../component/PaymentCancelFeedbackModal"));
 
 // What the courier charges to collect/remit cash at the door — the reason a
 // COD order costs more than the same order paid online. Display-only: the real
@@ -494,6 +495,8 @@ const CheckoutPage = () => {
   const [codSaving, setCodSaving] = useState(0);
   const [paymentError, setPaymentError] = useState(null);
   const [showRetry, setShowRetry] = useState(false);
+  // { razorpayOrderId, value } while the "what stopped you?" form is open after a Razorpay cancel.
+  const [cancelFeedback, setCancelFeedback] = useState(null);
   const [showMapModal, setShowMapModal] = useState(false);
   const [showCouponModal, setShowCouponModal] = useState(false);
   const [isApplyingOffer, setIsApplyingOffer] = useState(false);
@@ -1514,7 +1517,7 @@ const CheckoutPage = () => {
           prefill: { name: guestName.trim(), email: guestEmail.trim(), contact: guestMobile.trim() },
           ...magicCheckoutOptions(orderResult),
           notes: { address, pinCode }, theme: { color: "#E63329" },
-          modal: { ondismiss: () => { trackPaymentModalDismissed({ orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId, value: totalToPay }); setPaymentError("Payment cancelled. Your cart is safe."); setShowRetry(true); }, escape: false, confirm_close: true },
+          modal: { ondismiss: () => { trackPaymentModalDismissed({ orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId, value: totalToPay }); setPaymentError("Payment cancelled. Your cart is safe."); setShowRetry(true); setCancelFeedback({ razorpayOrderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId, value: totalToPay }); }, escape: false, confirm_close: true },
         });
         rp.on("payment.failed", (r) => {
           trackPaymentFailed({ errorCode: r.error?.code, errorDescription: r.error?.description, paymentMethod, value: totalToPay, orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId });
@@ -1606,7 +1609,7 @@ const CheckoutPage = () => {
         prefill: { name: profileName, email: profileEmail, contact: senderMobileStr },
         ...magicCheckoutOptions(orderResult),
         notes: { address, pinCode }, theme: { color: "#E63329" },
-        modal: { ondismiss: () => { trackPaymentModalDismissed({ orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId || orderResult.id, value: totalToPay }); setPaymentError("Payment cancelled. Your cart is safe."); setShowRetry(true); }, escape: false, confirm_close: true },
+        modal: { ondismiss: () => { trackPaymentModalDismissed({ orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId || orderResult.id, value: totalToPay }); setPaymentError("Payment cancelled. Your cart is safe."); setShowRetry(true); setCancelFeedback({ razorpayOrderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId || orderResult.id, value: totalToPay }); }, escape: false, confirm_close: true },
       });
       rp.on("payment.failed", (r) => {
         trackPaymentFailed({ errorCode: r.error?.code, errorDescription: r.error?.description, paymentMethod, value: totalToPay, orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId || orderResult.id });
@@ -1763,6 +1766,18 @@ const CheckoutPage = () => {
     handleChooseCod();
   };
 
+  // Rendered by both the pay-choice screen and the full checkout — the
+  // pay-choice screen returns early, so it needs its own copy.
+  const cancelFeedbackModal = cancelFeedback?.razorpayOrderId ? (
+    <Suspense fallback={null}>
+      <PaymentCancelFeedbackModal
+        razorpayOrderId={cancelFeedback.razorpayOrderId}
+        value={cancelFeedback.value}
+        onClose={() => setCancelFeedback(null)}
+      />
+    </Suspense>
+  ) : null;
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white pt-32">
@@ -1859,10 +1874,7 @@ const CheckoutPage = () => {
             >
               <span className="w-2 h-2 rounded-full bg-ink shrink-0" />
               <span className="min-w-0 flex-1">
-                {/* No sub-line: paying online holds no surprise worth warning
-                    about. Only the option that takes money earlier than the
-                    customer expects has something to say. */}
-                <span className="block font-bold text-[15px] text-ink">Pay online</span>
+                <span className="block font-bold text-[15px] text-ink">Prepaid</span>
                 {busy && (
                   <span className="block text-[13px] text-gray-500 mt-0.5">Opening payment…</span>
                 )}
@@ -1881,14 +1893,7 @@ const CheckoutPage = () => {
             >
               <span className="w-2 h-2 rounded-full bg-gray-300 shrink-0" />
               <span className="min-w-0 flex-1">
-                <span className="block font-bold text-[15px] text-ink">Cash on delivery</span>
-                {/* The advance is 2x the live carrier rate, which needs a
-                    pincode we do not have yet — so this names the charge
-                    without quoting a figure that could change. The exact split
-                    is shown on the review step, before anything is charged. */}
-                <span className="block text-[13px] text-gray-500 mt-0.5">
-                  Advance online now, rest in cash
-                </span>
+                <span className="block font-bold text-[15px] text-ink">Partial COD</span>
               </span>
               <i className="fa-solid fa-chevron-right text-[11px] text-gray-300 shrink-0 transition-transform group-hover:translate-x-0.5" />
             </button>
@@ -1910,6 +1915,7 @@ const CheckoutPage = () => {
             <i className="fa-solid fa-lock text-[9px]" /> Secured by Razorpay
           </p>
         </div>
+        {cancelFeedbackModal}
       </div>
     );
   }
@@ -3267,6 +3273,8 @@ const CheckoutPage = () => {
           isSaving={isSavingMobile}
         />
       </Suspense>
+
+      {cancelFeedbackModal}
 
       {showCouponModal && (
         <div

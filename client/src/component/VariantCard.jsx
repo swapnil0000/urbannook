@@ -47,14 +47,11 @@ const VariantCard = ({ productId, productName, variant, index, listId = "product
       </div>
 
       <div className="p-3.5 flex flex-col flex-grow bg-white border-t border-hair">
-        {/* Always exactly one line, truncated with an ellipsis if the
-            variant name overflows, so a row of these cards never ends up
-            with mismatched heights. */}
-        <div className="h-5 md:h-6 flex items-center w-full mb-1">
-          <h3 className="font-archivo font-bold text-ink leading-snug text-left w-full truncate text-[16px] md:text-[18px]">
-            {variant?.variantName || ""}
-          </h3>
-        </div>
+        {/* Two lines max, ellipsis after; min-h reserves both lines so a
+            row of these cards never ends up with mismatched heights. */}
+        <h3 title={variant?.variantName || ""} className="font-archivo font-bold text-ink leading-snug text-left w-full text-[14px] md:text-[16px] line-clamp-2 min-h-[2.75em] break-words mb-1">
+          {variant?.variantName || ""}
+        </h3>
 
         <div className="flex justify-between items-end pt-2 border-t border-hair mt-auto">
           <div className="flex items-center flex-nowrap gap-1 md:gap-1.5 min-w-0">
