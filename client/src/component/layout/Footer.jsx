@@ -1,8 +1,12 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useJoinCommunityMutation } from '../../store/api/userApi';
 import { useUI } from '../../hooks/useRedux';
+import { useGetProductsQuery } from '../../store/api/productsApi';
+
+// Same display names as the header nav (NewHeader.jsx CATEGORY_LABEL).
+const CATEGORY_LABEL = { Lamp: 'Lamps', 'Pen Stand': 'Pen Stands' };
 
 /* GullyLabs-style footer — dark, clean, trust-forward. */
 const Footer = () => {
@@ -12,6 +16,17 @@ const Footer = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [joinCommunity] = useJoinCommunityMutation();
   const { showNotification, openLoginModal } = useUI();
+
+  // Categories read off the live catalogue, like the header nav — the old
+  // hard-coded Lamp / Pen Stand links missed most of the catalogue. Same
+  // query args as the header, so this is a cache hit, not a new request.
+  const { data: prodRes } = useGetProductsQuery({ page: 1, limit: 24 });
+  const categories = useMemo(() => {
+    const list = prodRes?.data?.products || prodRes?.data?.listofPublishedProducts || [];
+    const seen = [];
+    list.forEach((p) => { const c = p?.productCategory; if (c && !seen.includes(c)) seen.push(c); });
+    return seen;
+  }, [prodRes]);
 
   const handleCommunityJoin = async (e) => {
     e.preventDefault();
@@ -58,9 +73,10 @@ const Footer = () => {
       <div>
         <p className="gl-lbl text-white/50 mb-4">Shop</p>
         <ul className="space-y-2 text-sm">
-          <li><Link to="/products?category=Lamp" className="hover:text-white">Desk Lamps</Link></li>
-          <li><Link to="/products?category=Pen%20Stand" className="hover:text-white">Pen Stands</Link></li>
-          <li><Link to="/products" className="hover:text-white">Bestsellers</Link></li>
+          {categories.map((c) => (
+            <li key={c}><Link to={`/products?category=${encodeURIComponent(c)}`} className="hover:text-white">{CATEGORY_LABEL[c] || c}</Link></li>
+          ))}
+          <li><Link to="/products?tag=best_seller" className="hover:text-white">Bestsellers</Link></li>
           <li><Link to="/products" className="hover:text-white">Shop All</Link></li>
         </ul>
       </div>

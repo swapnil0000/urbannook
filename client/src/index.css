@@ -608,11 +608,15 @@
   .gl-lbl{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:600}
 }
 .gl-pcard{box-shadow:0 1px 2px rgba(20,20,20,.04),0 10px 30px -20px rgba(20,20,20,.18);transition:box-shadow .3s,transform .3s,border-color .3s}
-.gl-pcard:hover{box-shadow:0 18px 44px -18px rgba(20,20,20,.26);transform:translateY(-3px);border-color:rgb(var(--gl-hair))}
 .gl-img{transition:transform .6s cubic-bezier(.2,.7,.2,1),opacity .4s}
-.gl-pcard:hover .gl-img{transform:scale(1.04)}
 .gl-img2{opacity:0;transition:opacity .5s}
-.gl-pcard:hover .gl-img2{opacity:1}
+/* Mouse-only: on touch, a :hover that reveals content (2nd image) or moves
+   the card makes iOS spend the first tap on hover, so cards needed two taps. */
+@media(hover:hover) and (pointer:fine){
+  .gl-pcard:hover{box-shadow:0 18px 44px -18px rgba(20,20,20,.26);transform:translateY(-3px);border-color:rgb(var(--gl-hair))}
+  .gl-pcard:hover .gl-img{transform:scale(1.04)}
+  .gl-pcard:hover .gl-img2{opacity:1}
+}
 .gl-hscroll{scrollbar-width:none}.gl-hscroll::-webkit-scrollbar{display:none}
 .gl-swatch.on{outline:2px solid rgb(var(--gl-brand));outline-offset:2px}
 .gl-press{transition:transform .18s ease}.gl-press:active{transform:scale(.97)}

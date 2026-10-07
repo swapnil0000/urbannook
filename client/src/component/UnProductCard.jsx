@@ -72,9 +72,9 @@ const UnProductCard = ({
         {img2 && <img src={img2} alt="" className="gl-img2 absolute inset-0 w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
       </div>
       <div className="p-3.5 flex flex-col flex-1 min-w-0">
-        <div className="h-5 flex items-center">
-          <h3 className="font-bold text-ink truncate text-[13px]">{p.productName}</h3>
-        </div>
+        {/* Two lines, then an ellipsis; min-h reserves both lines so a
+            one-line name keeps the price at the same Y as its neighbours. */}
+        <h3 title={p.productName} className="font-bold text-ink text-[13px] md:text-[14px] leading-snug line-clamp-2 min-h-[2.75em] break-words">{p.productName}</h3>
         {/* Price, then the % off / struck-MRP stack sitting right next to it
             (gap-1.5, no space-between spread) — smaller text on the stack.
             Sits right under the title (mt-1.5, not mt-auto) so it never gets

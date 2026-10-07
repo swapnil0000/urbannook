@@ -16,6 +16,9 @@ const AllProductsPage = () => {
 
   useEffect(() => { window.scrollTo(0, 0); }, []);
   useEffect(() => { setActiveCat(searchParams.get('category') || 'All'); }, [searchParams]);
+  // ?tag=best_seller (footer "Bestsellers") — narrows to products carrying
+  // that tag, the same tag that puts the "Bestseller" badge on a card.
+  const activeTag = searchParams.get('tag');
 
   const products = useMemo(() => productList(productsResponse), [productsResponse]);
   const categories = useMemo(() => {
@@ -28,8 +31,10 @@ const AllProductsPage = () => {
   // whole category fits on one screen, so sorting solved a problem nobody had
   // while taking the room the categories actually needed.
   const displayProducts = useMemo(
-    () => products.filter((p) => activeCat === 'All' || p.productCategory === activeCat),
-    [products, activeCat],
+    () => products.filter((p) =>
+      (activeCat === 'All' || p.productCategory === activeCat) &&
+      (!activeTag || (p.tags || []).includes(activeTag))),
+    [products, activeCat, activeTag],
   );
 
   useEffect(() => {
@@ -38,6 +43,8 @@ const AllProductsPage = () => {
 
   const selectCat = (c) => {
     setActiveCat(c);
+    // Picking a chip leaves the bestseller view — chips are the way back out of it.
+    searchParams.delete('tag');
     if (c === 'All') { searchParams.delete('category'); setSearchParams(searchParams, { replace: true }); }
     else setSearchParams({ category: c }, { replace: true });
   };
@@ -49,7 +56,7 @@ const AllProductsPage = () => {
       <SEOHead title="Shop All Products" url="/products" description="Browse UrbanNook's full collection of 3D-printed desk lamps, pen stands & décor. Made in India, fast pan-India delivery." />
 
       <div className="max-w-[1280px] mx-auto px-5 pt-10">
-        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">Shop All</h1>
+        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">{activeTag === 'best_seller' ? 'Bestsellers' : 'Shop All'}</h1>
         <p className="text-muted mt-2">3D-printed desk lamps, pen stands &amp; décor.</p>
 
         {/* One line, scrolled sideways — wrapping pushed the grid down a whole
