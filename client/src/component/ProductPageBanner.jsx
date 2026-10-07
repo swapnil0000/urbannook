@@ -44,6 +44,24 @@ const variantColor = (name = "") => {
  * events — is the same code, same classes, just renamed.
  * FreeShippingBanner.jsx itself is completely untouched.
  */
+// Pulls "Free Shipping" out of the admin-written offer line into a green
+// pill so the strongest part of the offer is the first thing read.
+const withFreeShippingHighlight = (text) => {
+  if (!text) return text;
+  const parts = String(text).split(/(free\s+shipping)/i);
+  return parts.map((part, i) =>
+    /^free\s+shipping$/i.test(part) ? (
+      <span key={i} className="inline-flex items-center gap-1 rounded-full bg-save/10 text-save font-bold px-2 py-0.5 mx-0.5 whitespace-nowrap">
+        <i className="fa-solid fa-truck-fast text-[0.85em]" />
+        {part}
+      </span>
+    ) : (
+      // drop the "—" joining the copy to the pill; the pill is the separator
+      /^free\s+shipping$/i.test(parts[i + 1] || "") ? part.replace(/\s*[—–:|-]\s*$/, " ") : part
+    ),
+  );
+};
+
 const ProductPageBanner = ({
   productId,
   showQuantityStepper = false,
@@ -137,7 +155,6 @@ const ProductPageBanner = ({
   const banner = banners[safeBannerIndex] || null;
   const showBannerArrows = banners.length > 1;
   const goToNextBanner = () => setBannerIndex((i) => (i + 1) % banners.length);
-  const goToPrevBanner = () => setBannerIndex((i) => (i - 1 + banners.length) % banners.length);
 
   const { data: recommendedRes, isFetching: isFetchingRecommended } = useGetProductByIdQuery(
     banner?.recommendedProductId,
@@ -544,40 +561,30 @@ const ProductPageBanner = ({
 
   return (
     <div className={`relative isolate rounded-3xl overflow-hidden border border-hair bg-white shadow-sm ${className}`}>
-      {showBannerArrows && (
-        <>
-          <button type="button" onClick={goToPrevBanner} aria-label="Previous suggestion" className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full flex items-center justify-center border border-hair bg-white/95 text-ink shadow hover:bg-white transition-colors">
-            <i className="fa-solid fa-chevron-left text-[10px]" />
-          </button>
-          <button type="button" onClick={goToNextBanner} aria-label="Next suggestion" className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full flex items-center justify-center border border-hair bg-white/95 text-ink shadow hover:bg-white transition-colors">
-            <i className="fa-solid fa-chevron-right text-[10px]" />
-          </button>
-          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1">
-            {banners.map((_, i) => (
-              <span key={i} className="rounded-full transition-all" style={{ width: i === safeBannerIndex ? 12 : 5, height: 5, background: i === safeBannerIndex ? "#E63329" : "rgba(28,48,38,0.25)" }} />
-            ))}
-          </div>
-        </>
-      )}
 
-      <div className="relative z-10 overflow-hidden bg-brand px-4 py-3 flex items-center justify-center gap-2">
-        <style>{`@keyframes ppbRibbonShine { 0% { transform: translateX(-120%); } 100% { transform: translateX(320%); } }`}</style>
-        <i className="fa-solid fa-gift text-[10px] text-paper" />
-        <span className="text-[12px] font-extrabold uppercase tracking-[0.16em] text-white">Special Offer</span>
-        <span className="absolute inset-y-0 w-1/4" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)", animation: "ppbRibbonShine 3.2s ease-in-out infinite" }} />
+      {/* Quiet tinted strip — the page already has a red Buy Now, so this
+          card stays secondary instead of competing with a solid red ribbon. */}
+      <div className="relative z-10 bg-brand/[0.06] border-b border-brand/10 px-4 py-2 flex items-center justify-center gap-1.5">
+        <i className="fa-solid fa-gift text-[10px] text-brand" />
+        <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-brand">Special Offer</span>
+        {showBannerArrows && (
+          <span className="absolute right-3 text-[10px] font-semibold text-brand/70 tabular-nums">
+            {safeBannerIndex + 1} / {banners.length}
+          </span>
+        )}
       </div>
 
       <div className="px-4 pt-3 text-center">
         {comboUnlocked ? (
-          <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-ink">{activeVariantOffer.text}</span>
+          <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-ink">{withFreeShippingHighlight(activeVariantOffer.text)}</span>
         ) : added && !sourceInCart ? (
           <p className="text-[10px] font-semibold text-ink/80">
             Add {sourceProduct?.productName || "this product"} to your cart to unlock{" "}
             <span className="font-bold text-brand">this offer</span>
           </p>
         ) : (
-          <p className="font-semibold tracking-[0.01em] text-ink whitespace-nowrap" style={{ fontSize: "clamp(8px, 3vw, 11px)" }}>
-            {activeVariantOffer.text}
+          <p className="font-semibold text-ink text-[12px] sm:text-[13px] leading-relaxed">
+            {withFreeShippingHighlight(activeVariantOffer.text)}
           </p>
         )}
         {activeVariantOffer.subtitle && (
@@ -588,13 +595,13 @@ const ProductPageBanner = ({
       <div className="px-4 pt-3 flex gap-4">
         <button onClick={goToProduct} title={`View ${recommendedProduct.productName}`} className="relative shrink-0 w-24 h-24 rounded-xl overflow-hidden border border-hair bg-white">
           {discountPercent > 0 && (
-            <span className="absolute top-1.5 left-1.5 z-10 bg-brand text-white text-[10px] font-bold uppercase px-1.5 py-0.5">−{discountPercent}%</span>
+            <span className="absolute top-1.5 left-1.5 z-10 rounded bg-white/95 text-brand text-[10px] font-bold px-1.5 py-0.5 shadow-sm">−{discountPercent}%</span>
           )}
           <img src={displayImage} alt={recommendedProduct.productName} className="w-full h-full object-cover transition-all duration-500" loading="lazy" />
         </button>
 
         <div className="flex-1 min-w-0 flex flex-col justify-center">
-          <button onClick={goToProduct} title={`View ${recommendedProduct.productName}`} className="block w-full text-sm font-extrabold uppercase tracking-tight truncate text-left text-black hover:underline">
+          <button onClick={goToProduct} title={`View ${recommendedProduct.productName}`} className="block w-full text-sm font-bold leading-snug line-clamp-2 text-left text-ink hover:underline">
             {recommendedProduct.productName}
           </button>
 
@@ -664,9 +671,9 @@ const ProductPageBanner = ({
                 const rulePercent = Math.round(((lineDisplayPrice - lineDiscounted) / lineDisplayPrice) * 100);
                 return (
                   <>
-                    <span className="text-lg font-bold tabular-nums text-brand">₹{lineDiscounted.toLocaleString()}</span>
+                    <span className="text-lg font-bold tabular-nums text-ink">₹{lineDiscounted.toLocaleString()}</span>
                     <span className="text-xs text-gray-400 line-through tabular-nums">₹{lineDisplayPrice.toLocaleString()}</span>
-                    <span className="text-[10px] font-bold uppercase rounded-full bg-save text-white px-1.5 py-0.5">{rulePercent}% OFF</span>
+                    <span className="text-[11px] font-semibold text-save">{rulePercent}% off</span>
                   </>
                 );
               }
@@ -674,23 +681,24 @@ const ProductPageBanner = ({
                 const lineMax = maxVariantPrice * lineQty;
                 return (
                   <>
-                    <span className="text-lg font-bold tabular-nums text-brand">₹{lineDisplayPrice.toLocaleString()}</span>
+                    <span className="text-lg font-bold tabular-nums text-ink">₹{lineDisplayPrice.toLocaleString()}</span>
                     <span className="text-xs text-gray-400 line-through tabular-nums">₹{lineMax.toLocaleString()}</span>
-                    <span className="text-[10px] font-bold uppercase bg-black text-white px-1.5 py-0.5">{discountPercent}% OFF · Save ₹{(lineMax - lineDisplayPrice).toLocaleString()}</span>
+                    <span className="text-[11px] font-semibold text-save">Save ₹{(lineMax - lineDisplayPrice).toLocaleString()}</span>
                   </>
                 );
               }
               return (
-                <span className="text-lg font-bold tabular-nums text-brand">₹{lineDisplayPrice.toLocaleString()}</span>
+                <span className="text-lg font-bold tabular-nums text-ink">₹{lineDisplayPrice.toLocaleString()}</span>
               );
             })()}
           </div>
         </div>
       </div>
 
-      <div className="px-4 pb-4 pt-3">
+      <div className="px-4 pb-4 pt-3 flex items-stretch gap-2">
+        <div className="flex-1 min-w-0">
         {addLoading ? (
-          <button disabled className="relative w-full py-3.5 rounded-full overflow-hidden flex items-center justify-center gap-2.5 text-sm font-extrabold uppercase tracking-wide bg-paper text-ink cursor-wait">
+          <button disabled className="relative w-full h-11 rounded-full overflow-hidden flex items-center justify-center gap-2.5 text-[12px] font-extrabold uppercase tracking-wide bg-paper text-ink cursor-wait">
             <style>{`@keyframes ppbLoadSweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }`}</style>
             <span aria-hidden="true" className="absolute inset-y-0 w-1/2" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.65), transparent)", animation: "ppbLoadSweep 1.1s linear infinite" }} />
             <span className="relative z-10 flex items-center gap-2.5">
@@ -699,11 +707,11 @@ const ProductPageBanner = ({
           </button>
         ) : added ? (
           <div className="flex items-center gap-2">
-            <div className="flex-1 h-[50px] flex items-center justify-center rounded-full text-[11px] font-extrabold uppercase tracking-[0.1em] text-center bg-paper text-ink border border-[#ffce64]">
+            <div className="flex-1 h-11 flex items-center justify-center rounded-full text-[11px] font-extrabold uppercase tracking-[0.1em] text-center bg-paper text-ink border border-[#ffce64]">
               <i className="fa-solid fa-circle-check mr-1.5 text-brand" /> Added to Cart
             </div>
             {showQuantityStepper ? (
-              <div className="shrink-0 flex items-center gap-3 rounded-xl border border-hair px-3 h-[52px] bg-white">
+              <div className="shrink-0 flex items-center gap-3 rounded-xl border border-hair px-3 h-11 bg-white">
                 <button onClick={handleDecrement} disabled={isUpdatingQty} title="Decrease quantity" className="disabled:opacity-50 text-gray-500 hover:text-brand">
                   <i className="fa-solid fa-minus text-[10px]" />
                 </button>
@@ -713,7 +721,7 @@ const ProductPageBanner = ({
                 </button>
               </div>
             ) : (
-              <div className="shrink-0 flex items-center gap-3 rounded-full border border-[#ffce64] px-3 h-[50px] bg-paper">
+              <div className="shrink-0 flex items-center gap-3 rounded-full border border-[#ffce64] px-3 h-11 bg-paper">
                 <button onClick={handleDecrement} disabled={isUpdatingQty} title="Decrease quantity" className="disabled:opacity-50 text-ink/60 hover:text-brand">
                   <i className="fa-solid fa-minus text-[10px]" />
                 </button>
@@ -728,17 +736,9 @@ const ProductPageBanner = ({
           <button
             onClick={handleAddToCart}
             disabled={isAdding || addDisabled}
-            className="group relative w-full py-3.5 rounded-full overflow-hidden flex items-center justify-center gap-2.5 text-sm font-bold uppercase tracking-wide disabled:opacity-50 bg-brand text-white active:bg-brandHi active:scale-[0.98] transition-[transform] duration-100"
+            className="w-full h-11 rounded-full flex items-center justify-center gap-2 text-[12px] font-bold uppercase tracking-wide border-[1.5px] border-brand text-brand bg-white hover:bg-brand/[0.06] active:scale-[0.98] transition disabled:opacity-50"
           >
-            <span aria-hidden="true" className="absolute inset-0 overflow-hidden rounded-full pointer-events-none">
-              <style>{`@keyframes ppbWaveDrift { 0% { transform: translateX(0); } 100% { transform: translateX(-200px); } }`}</style>
-              <span className="absolute inset-x-0 bottom-0 h-full translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out">
-                <svg className="absolute bottom-0 left-0 w-[200%] h-full" viewBox="0 0 400 60" preserveAspectRatio="none" style={{ animation: "ppbWaveDrift 2.4s linear infinite" }}>
-                  <path d="M0 30 Q50 10 100 30 T200 30 T300 30 T400 30 V60 H0 Z" fill="rgb(var(--gl-brand-hi))" />
-                </svg>
-              </span>
-            </span>
-            <span className="relative z-10 flex items-center justify-center gap-2.5">
+            <span className="flex items-center justify-center gap-2">
               {sourceOOS || isActiveVariantOOS ? (
                 "Out of Stock"
               ) : isAdding ? (
@@ -762,6 +762,19 @@ const ProductPageBanner = ({
             </span>
           </button>
         )}
+        </div>
+        {showBannerArrows && (
+          <button
+            type="button"
+            onClick={goToNextBanner}
+            aria-label="Next offer"
+            className="shrink-0 h-11 px-4 rounded-full border border-hair bg-white text-ink text-[12px] font-bold flex items-center gap-1.5 hover:border-ink transition-colors"
+          >
+            Next offer <i className="fa-solid fa-chevron-right text-[10px]" />
+          </button>
+        )}
+      </div>
+      <div className="px-4 -mt-2 pb-3 empty:hidden">
         {offerClaimedBySibling && (
           <p className="mt-2 text-[11px] text-center text-gray-500">
             <i className="fa-solid fa-circle-info mr-1" />

@@ -8,7 +8,6 @@ import UnProductCard from '../../component/UnProductCard';
 import RecommendedProducts from '../../component/RecommendedProducts';
 import OtherVariants from '../../component/OtherVariants';
 import NotifyMeModal from '../../component/NotifyMeModal';
-import ComboBundleSection from '../../component/ComboBundleSection';
 import ComparisonTable from '../../component/ComparisonTable';
 import FreeShippingBanner from '../../component/FreeShippingBanner';
 import ProductPageBanner from '../../component/ProductPageBanner';
@@ -138,7 +137,6 @@ const ProductDetailPage = () => {
   const [pinStatus, setPinStatus] = useState(null);        // { ok, msg, charge, eta }
   const [showShare, setShowShare] = useState(false);       // desktop share row fallback
   const [showNotifyModal, setShowNotifyModal] = useState(false); // out-of-stock notify-me
-  const [isAddingCombo, setIsAddingCombo] = useState(false);     // combo bundle add in flight
 
   const { data: productResponse, isLoading, error } = useGetProductByIdQuery(productId);
   const [addToCartAPI, { isLoading: isAdding }] = useAddToCartMutation();
@@ -205,7 +203,6 @@ const ProductDetailPage = () => {
   const availableVariants = useMemo(() => (product?.variantDetails ? product.variantDetails.map((v) => v.variantName) : []), [product]);
 
   // Admin-curated combo + recommendation rows (empty => sections render nothing).
-  const comboProducts = product?.comboProductsDetails || [];
   const recommendedProducts = product?.recommendedProductsDetails || [];
 
   // Stock state for the SELECTED variant — the page-level productStatus is
@@ -364,78 +361,6 @@ const ProductDetailPage = () => {
   const handleBuyNow = async () => {
     if (!isInCart && !(await handleInitialAddToCart({ silent: true }))) return;
     navigate('/checkout');
-  };
-
-  // Adds every item the customer kept in the static "buy together" section
-  // (the main product at whatever variant is selected there, plus each kept
-  // companion). This section is standalone — it doesn't assume the main
-  // product is already in the cart, so it always adds it too; the cart
-  // reducer/server merges quantity when the same product+variant is already in.
-  const handleAddComboBundle = async (selections) => {
-    if (!selections?.length) return;
-
-    setIsAddingCombo(true);
-    const isLoggedIn = isAuthenticated || !!localStorage.getItem("authToken");
-
-    try {
-      // Sequential, not Promise.all — the cart endpoint mutates one shared
-      // cart doc, so parallel writes can clobber each other.
-      for (const { product: combo, variantName } of selections) {
-        const variantDetail =
-          combo.variantDetails?.find((v) => v.variantName === variantName) ||
-          combo.variantDetails?.[0];
-        const image =
-          variantDetail?.variantImage?.[0] ||
-          combo.productImg ||
-          "https://urbannook.in/assets/logo.webp";
-        const price = Number(variantDetail?.variantPrice ?? 0);
-        const variant = variantDetail?.variantName || "Standard Variant";
-
-        if (isLoggedIn) {
-          await addToCartAPI({
-            productId: combo.productId,
-            quantity: 1,
-            variant,
-            image,
-          }).unwrap();
-        } else {
-          dispatch(
-            addItem({
-              id: combo.productId,
-              mongoId: combo.productId,
-              name: combo.productName,
-              price,
-              image,
-              quantity: 1,
-              selectedVariant: variant,
-              giftWrapEligible: !!combo.giftWrapEligible,
-              sku: variantDetail?.sku || '',
-            }),
-          );
-        }
-
-        trackAddToCart({
-          itemId: combo.productId,
-          sku: variantDetail?.sku || '',
-          itemName: combo.productName,
-          itemVariant: variant,
-          price,
-          quantity: 1,
-        });
-      }
-
-      if (isLoggedIn) await refetchCart().unwrap();
-
-      setFeedbackMessage(
-        selections.length > 1 ? "Items added to cart" : "Added to cart",
-      );
-      setTimeout(() => setFeedbackMessage(""), 2000);
-    } catch (err) {
-      console.error("Combo bundle add failed:", err);
-      showNotification(err.data?.message || "Could not add the bundle", "error");
-    } finally {
-      setIsAddingCombo(false);
-    }
   };
 
   const handleUpdateQty = async (newQuantity) => {
@@ -665,7 +590,7 @@ const ProductDetailPage = () => {
                 Zone A's title/kicker above it, which sit with no padding of
                 their own — everything below looked shifted right instead of
                 lining up to the same left edge. Vertical spacing is kept. */}
-            <div className="mt-5  bg-paper py-4 md:py-5 md:max-w-md">
+            <div className="mt-1  bg-paper py-4 md:py-5 md:max-w-md">
               {/* price hero */}
               <div className="flex items-center gap-2">
                 <span className="text-4xl md:text-5xl font-extrabold text-ink tracking-tight tabular-nums leading-none">{inr(currentPrice)}</span>
@@ -1036,25 +961,6 @@ const ProductDetailPage = () => {
         </div>
 
         {/* related */}
-        {/* Admin-curated combo bundle — "buy these together" */}
-        {comboProducts.length > 0 && (
-          <ComboBundleSection
-            mainProduct={product}
-            mainVariantName={selectedVariant || availableVariants[0]}
-            onSelectMainVariant={onSelectVariant}
-            mainOutOfStock={isOutOfStock}
-            onNotifyMe={() => setShowNotifyModal(true)}
-            comboProducts={comboProducts}
-            copy={{
-              eyebrow: product?.comboEyebrow,
-              heading: product?.comboHeading,
-              cta: product?.comboCtaLabel,
-            }}
-            onAddBundle={handleAddComboBundle}
-            isAdding={isAddingCombo}
-          />
-        )}
-
         {/* Other variants of THIS product — after reviews, before cross-sell */}
         <OtherVariants
           productId={product.productId}

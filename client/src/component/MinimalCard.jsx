@@ -41,13 +41,11 @@ const MinimalCard = ({ image, alt, title, price, mrp, pricePrefix, badge, onClic
       </div>
 
       <div className="p-3 flex flex-col items-start gap-1 text-left">
-        {/* Fixed-height wrapper so the price row below always sits at the
-            same Y across a row of cards, regardless of title length. */}
-        <div className="h-[18px] flex items-center w-full">
-          <h3 className="font-archivo font-bold text-ink leading-snug text-left w-full truncate text-[13px]">
-            {title || ""}
-          </h3>
-        </div>
+        {/* Two lines max; min-h reserves both so the price row below sits
+            at the same Y across a row of cards, regardless of title length. */}
+        <h3 title={title || ""} className="font-archivo font-bold text-ink leading-snug text-left w-full text-[13px] line-clamp-2 min-h-[2.75em] break-words">
+          {title || ""}
+        </h3>
 
         {/* Price on the left, MRP + discount stacked to its right — left-
             aligned as a group, deliberately leaving the rest of the row
