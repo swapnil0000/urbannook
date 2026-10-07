@@ -12,9 +12,9 @@ const CancellationPolicy = () => {
       
       {/* Background Elements */}
       <div className="absolute top-20 left-0 w-full overflow-hidden pointer-events-none opacity-[0.04]">
-        <h1 className="font-archivo text-[15vw] font-extrabold text-center leading-none text-ink tracking-tighter uppercase whitespace-nowrap">
+        <div aria-hidden="true" className="font-archivo text-[15vw] font-extrabold text-center leading-none text-ink tracking-tighter uppercase whitespace-nowrap">
           Refund Policy
-        </h1>
+        </div>
       </div>
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-brand/5 rounded-full blur-[120px] pointer-events-none"></div>
 

@@ -14,28 +14,9 @@ import AppRoutes from './store/AppRoutes';
 import NewsTicker from './pages/home/NewsTicker';
 import WhatsAppLoginWatcher from './component/layout/auth/WhatsAppLoginWatcher';
 import WhatsAppOneTap from './component/layout/auth/WhatsAppOneTap';
-import SEOHead from './component/SEOHead';
 import { trackPageView, setUserId, captureAttribution, setMetaAdvancedMatching } from './utils/analytics';
 import MotionLayer from './component/MotionLayer';
 import SmoothScroll from './component/motion/SmoothScroll';
-// check
-const ORG_STRUCTURED_DATA = {
-  '@context': 'https://schema.org',
-  '@type': 'Organization',
-  name: 'UrbanNook',
-  url: 'https://www.urbannook.in',
-  logo: 'https://www.urbannook.in/assets/logo_with_text.webp',
-  sameAs: [
-    'https://www.instagram.com/urbannook.store',
-  ],
-  contactPoint: {
-    '@type': 'ContactPoint',
-    telephone: '+91-91240-81005',
-    contactType: 'customer service',
-    areaServed: 'IN',
-    availableLanguage: ['English', 'Hindi'],
-  },
-};
 
 // Only lazy load non-critical components
 const NewHeader = lazy(() => import('./component/layout/NewHeader'));
@@ -45,9 +26,11 @@ const GlMobileNav = lazy(() => import('./component/layout/GlMobileNav'));
 const SocialMediaFAB = lazy(() => import('./component/layout/WhatsAppButton'));
 const OpenInBrowserBanner = lazy(() => import('./component/OpenInBrowserBanner'));
 const GoogleOneTap = lazy(() => import('./component/GoogleOneTap'));
-// Mounted app-wide, not on the home page: most Instagram ad / bio traffic lands
-// directly on /products or a product page and would never see a home-only popup.
-const IndependenceDayPopup = lazy(() => import('./component/IndependenceDayPopup'));
+// SiteOfferPopup (₹100 off + lead capture) is retired — the store now runs free
+// shipping instead. The component is kept for future campaigns; re-add its lazy
+// import and the <SiteOfferPopup /> mount below to bring it back.
+// Free-shipping announcement in the same slot and style; admin-controlled.
+const FreeShippingPopup = lazy(() => import('./component/FreeShippingPopup'));
 const ScrollHint = lazy(() => import('./component/ScrollHint'));
 const PasskeyPrompt = lazy(() => import('./component/PasskeyPrompt'));
 
@@ -170,7 +153,6 @@ function App() {
     <Provider store={store}>
         <Router>
           <SmoothScroll>
-          <SEOHead structuredData={ORG_STRUCTURED_DATA} />
           <RouteTracker />
           <MotionLayer />
           <SessionManager>
@@ -212,9 +194,9 @@ function App() {
                 <ErrorBoundary>
                   <PasskeyPrompt />
                 </ErrorBoundary>
-                {/* Independence Day 10%-off lead capture — shows once, everywhere */}
+                {/* Free-shipping popup — shows once, everywhere except checkout */}
                 <ErrorBoundary>
-                  <IndependenceDayPopup />
+                  <FreeShippingPopup />
                 </ErrorBoundary>
                 <ErrorBoundary>
                   <ScrollHint />

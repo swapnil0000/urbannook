@@ -1,4 +1,4 @@
-import Offer from "../model/offer.model.js";
+import { getActivePromotionsAsCartRules } from "./promotionToCartRule.adapter.js";
 
 /**
  * Generic cart-promotion rule evaluator. Fully data-driven — no product IDs
@@ -13,11 +13,13 @@ import Offer from "../model/offer.model.js";
  * @param {{productId: string, quantity: number}[]} cartItems
  */
 export const getActiveCartRules = async () => {
-  // Reads the unified `offers` collection (type: "cart_rule", written by the
-  // admin panel's Offers page). Legacy `cartrules` collection is retired —
-  // see UN-ADMIN-panel .../server/scripts/seedOffersFromLegacy.js for the
-  // one-time backfill that must be run on any environment before this.
-  return Offer.find({ type: "cart_rule", isActive: true }).lean();
+  // Now reads the Promotion Engine V2 `promotions` collection, via
+  // promotionToCartRule.adapter.js, instead of the legacy `offers` collection
+  // (type: "cart_rule"). The adapter represents a Promotion in this exact
+  // shape so every function below, and every caller of this one
+  // (cartRule.controller.js, user.cart.service.js, rp.payment.controller.js,
+  // every storefront client component), needed zero other changes.
+  return getActivePromotionsAsCartRules();
 };
 
 const quantityByProduct = (cartItems = []) => {
@@ -61,6 +63,24 @@ const ruleIsMatched = (rule, qtyByProduct, qtyByProductVariant) =>
     return have >= cond.minQuantity;
   });
 
+// How many times this rule's FULL condition set is satisfied at once — e.g.
+// a condition "1+ Katana" with 2 Katanas in cart satisfies it twice, so a
+// reward on that rule should benefit up to 2 units, not just 1. Admin never
+// sets this directly; it's entirely derived from the condition's own
+// `minQuantity` against the real cart quantity — the single source of truth
+// for "how many free/discounted units does this admin-configured rule
+// actually grant right now" stays here, in the evaluation engine, not
+// reimplemented per storefront display surface.
+const ruleRepeatCount = (rule, qtyByProduct, qtyByProductVariant) => {
+  if (!rule.conditions?.length) return 1;
+  return Math.max(1, Math.min(...rule.conditions.map((cond) => {
+    const have = cond.variantSku
+      ? qtyByProductVariant.get(variantKey(String(cond.productId), cond.variantSku)) || 0
+      : qtyByProduct.get(String(cond.productId)) || 0;
+    return Math.floor(have / (cond.minQuantity || 1));
+  })));
+};
+
 /**
  * Evaluates a cart against a set of active rules.
  *
@@ -68,7 +88,7 @@ const ruleIsMatched = (rule, qtyByProduct, qtyByProductVariant) =>
  * @returns {{
  *   matchedRules: object[],
  *   freeShipping: boolean,
- *   discountCandidatesByProduct: Map<string, {type: 'percent_off'|'flat_off', value: number, variantSku?: string}[]>,
+ *   discountCandidatesByProduct: Map<string, {type: 'percent_off'|'flat_off', value: number, cap: number, variantSku?: string}[]>,
  * }}
  */
 export const evaluateCartRules = (cartItems, activeRules) => {
@@ -89,6 +109,7 @@ export const evaluateCartRules = (cartItems, activeRules) => {
   // applies to every variant, unchanged from before this field existed.
   const discountCandidatesByProduct = new Map();
   for (const rule of matchedRules) {
+    const cap = ruleRepeatCount(rule, qtyByProduct, qtyByProductVariant);
     for (const effect of rule.effects) {
       if (effect.type !== "percent_off" && effect.type !== "flat_off") continue;
       const productId = String(effect.targetProductId);
@@ -96,6 +117,20 @@ export const evaluateCartRules = (cartItems, activeRules) => {
       list.push({
         type: effect.type,
         value: effect.value,
+        // How many units of the TARGET this specific rule's current cart
+        // state justifies discounting — see ruleRepeatCount above. Every
+        // consumer (checkout's real charge, every storefront display
+        // surface) reads this instead of assuming a fixed "1".
+        cap,
+        // Which rule granted this candidate — lets the checkout controller
+        // share ONE cap across every SIBLING reward of the same rule (e.g.
+        // "Exciting Offers": free single stand / 50%-off double / 50%-off
+        // triple are 3 candidates, same rule, same product, different
+        // variant). Without this tag each variant's candidate carried its
+        // own untouched copy of `cap`, so a cart with one of EACH variant
+        // could get every one of them discounted off a single trigger
+        // product — see createRuleBudgetTracker in rp.payment.controller.js.
+        ruleId: String(rule._id),
         ...(effect.targetVariantSku ? { variantSku: effect.targetVariantSku } : {}),
       });
       discountCandidatesByProduct.set(productId, list);
@@ -139,6 +174,81 @@ export const applyBestDiscount = (unitPrice, candidates = []) => {
   });
   return Math.round(Math.max(Math.min(...results), 0));
 };
+
+/**
+ * Tracks, for one evaluation (a real checkout OR a client-facing preview —
+ * both must agree), how many units each RULE still has left to discount,
+ * SHARED across every sibling candidate of that rule — e.g. "Exciting
+ * Offers": free single stand / 50%-off double / 50%-off triple are 3
+ * separate candidates targeting 3 different variants of the same product,
+ * but all belong to ONE rule and must share ONE pool of units. Without
+ * this, each variant's candidate carries its own untouched copy of the
+ * rule's cap, so a cart with one of EACH variant gets every one of them
+ * discounted off a single trigger product — confirmed on a real paid order
+ * (double stand manually added at 50% off, single stand then auto-added
+ * for free on top, same Katana "paying" for both).
+ * Used by both rp.payment.controller.js (the real charge) and
+ * cartRule.controller.js's evaluate endpoint (the PDP/cart preview) — same
+ * function, so the price shown before checkout can never drift from what
+ * checkout actually charges.
+ */
+export function createRuleBudgetTracker(discountCandidatesByProduct) {
+  const budgets = new Map();
+  for (const candidates of discountCandidatesByProduct.values()) {
+    for (const c of candidates) {
+      if (c.ruleId && !budgets.has(c.ruleId)) budgets.set(c.ruleId, c.cap);
+    }
+  }
+  return budgets;
+}
+
+/**
+ * Clamps each candidate's cap to its own rule's remaining shared budget
+ * (see createRuleBudgetTracker), dropping any candidate whose rule is
+ * already fully spent. A candidate with no ruleId (shouldn't happen post
+ * evaluateCartRules/evaluatePromotions, but kept defensive) is left
+ * unlimited rather than silently dropped. Feed the result into the
+ * existing applyBestDiscount unchanged — this only narrows which
+ * candidates it's allowed to see, never changes its math.
+ */
+export function withRuleBudget(candidates, budgets) {
+  return candidates
+    .map((c) => {
+      if (!c.ruleId) return c;
+      const remaining = budgets.has(c.ruleId) ? budgets.get(c.ruleId) : c.cap;
+      return remaining > 0 ? { ...c, cap: Math.min(c.cap, remaining) } : null;
+    })
+    .filter(Boolean);
+}
+
+/**
+ * Called after a line has actually been discounted, to spend down every
+ * contributing rule's shared budget by however many units this line used.
+ * Deliberately decrements EVERY ruleId present in `candidates` (not just
+ * whichever one's price "won" applyBestDiscount's comparison) — the rare
+ * case of two DIFFERENT rules both targeting the exact same product+variant
+ * would close the losing rule's budget slightly earlier than strictly
+ * necessary, which is the safe-direction error (never grants MORE discount
+ * than intended; at worst a separate rule's budget is spent a little early).
+ */
+export function spendRuleBudget(candidates, budgets, unitsUsed) {
+  for (const c of candidates) {
+    if (!c.ruleId || !budgets.has(c.ruleId)) continue;
+    budgets.set(c.ruleId, Math.max(0, budgets.get(c.ruleId) - unitsUsed));
+  }
+}
+
+/**
+ * How many units a cart line's matched candidates justify discounting —
+ * the most generous applicable cap wins when more than one rule discounts
+ * the same line, consistent with applyBestDiscount already picking the
+ * best PRICE among candidates for that line. Callers normally pass
+ * candidates already narrowed by withRuleBudget, so this naturally reflects
+ * each rule's remaining shared budget too.
+ */
+export function applicableCap(candidates) {
+  return Math.max(1, ...candidates.map((c) => c.cap ?? 1));
+}
 
 /**
  * For rules NOT yet matched, how much more (per unmet condition) is needed —

@@ -336,6 +336,17 @@ export const userApi = apiSlice.injectEndpoints({
     evaluateCartRules: builder.query({
       query: (items) => ({ url: "cart-rules/evaluate", method: "POST", body: { items: items || [] } }),
     }),
+    // Promotion Engine V2 — separate `promotions` collection, separate
+    // evaluator (server/src/utils/promotionEngine.util.js). Not consumed by
+    // any component yet (no storefront UI built for V2 this round — see the
+    // plan this was built from); exported so a future purpose-built
+    // component can use it without any new API work.
+    getActivePromotionsForProduct: builder.query({
+      query: (productId) => `promotions/for-product/${productId}`,
+    }),
+    evaluatePromotions: builder.query({
+      query: (items) => ({ url: "promotions/evaluate", method: "POST", body: { items: items || [] } }),
+    }),
   }),
 });
 
@@ -378,4 +389,6 @@ export const {
   useGetFreeShippingBannerQuery,
   useGetAllFreeShippingBannersQuery,
   useEvaluateCartRulesQuery,
+  useGetActivePromotionsForProductQuery,
+  useEvaluatePromotionsQuery,
 } = userApi;

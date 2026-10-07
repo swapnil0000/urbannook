@@ -1,7 +1,12 @@
 import { useState } from "react";
 import { getApiUrl } from "../config/appUrls";
 
-const NotifyMeModal = ({ productName, productId, variantName, onClose }) => {
+/**
+ * @param {{name: string, outOfStock?: boolean}[]} variants  every variant of the
+ *   product; when there is more than one the customer picks which one they want
+ */
+const NotifyMeModal = ({ productName, productId, variantName, variants = [], onClose }) => {
+  const [variant, setVariant] = useState(variantName || "");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [mobile, setMobile] = useState("");
@@ -13,6 +18,10 @@ const NotifyMeModal = ({ productName, productId, variantName, onClose }) => {
     e.preventDefault();
     setError("");
 
+    if (variants.length > 1 && !variant) {
+      setError("Please select the variant you want");
+      return;
+    }
     if (name.trim().length < 2) {
       setError("Please enter your name");
       return;
@@ -36,12 +45,12 @@ const NotifyMeModal = ({ productName, productId, variantName, onClose }) => {
           email,
           mobile,
           subject: "Product Inquiry",
-          message: variantName
-            ? `Please notify me when "${productName}" (${variantName}) (Product ID: ${productId}) is back in stock.`
+          message: variant
+            ? `Please notify me when "${productName}" (${variant}) (Product ID: ${productId}) is back in stock.`
             : `Please notify me when "${productName}" (Product ID: ${productId}) is back in stock.`,
           productId,
           productName,
-          variantName: variantName || null,
+          variantName: variant || null,
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -60,7 +69,7 @@ const NotifyMeModal = ({ productName, productId, variantName, onClose }) => {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm bg-ink border border-paper/20 rounded-3xl p-6"
+        className="w-full max-w-sm max-h-[90vh] overflow-y-auto bg-ink border border-paper/20 rounded-3xl p-6"
         onClick={(e) => e.stopPropagation()}
       >
         {done ? (
@@ -70,7 +79,7 @@ const NotifyMeModal = ({ productName, productId, variantName, onClose }) => {
             </div>
             <p className="text-paper font-serif text-lg">You're on the list</p>
             <p className="text-paper/60 text-xs">
-              We'll reach out the moment "{productName}" is back in stock.
+              We'll reach out the moment "{productName}"{variant ? ` (${variant})` : ""} is back in stock.
             </p>
             <button
               onClick={onClose}
@@ -101,6 +110,31 @@ const NotifyMeModal = ({ productName, productId, variantName, onClose }) => {
               <p className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
                 {error}
               </p>
+            )}
+
+            {variants.length > 1 && (
+              <div>
+                <label className="block text-[10px] uppercase tracking-widest text-paper/60 mb-1.5">
+                  Variant
+                </label>
+                <div className="relative">
+                  <select
+                    value={variant}
+                    onChange={(e) => { setVariant(e.target.value); setError(""); }}
+                    className="w-full h-11 appearance-none rounded-xl bg-white/5 border border-paper/20 pl-3 pr-9 text-sm text-paper focus:outline-none focus:border-paper/50 truncate"
+                  >
+                    <option value="" disabled className="bg-ink text-paper/50">
+                      Select a variant
+                    </option>
+                    {variants.map((v) => (
+                      <option key={v.name} value={v.name} className="bg-ink text-paper">
+                        {v.name}{v.outOfStock ? " — Out of stock" : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <i className="fa-solid fa-chevron-down pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-paper/50" />
+                </div>
+              </div>
             )}
 
             <div>

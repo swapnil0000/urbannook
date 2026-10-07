@@ -4,7 +4,14 @@ import User from "../model/user.model.js";
 import { cartDetailsMissing } from "../utils/ValidateRes.js";
 import { applyCouponCodeService } from "../services/coupon.code.service.js";
 import { getPublicOfferConfig } from "../utils/offer.util.js";
-import { getActiveCartRules, evaluateCartRules, applyBestDiscount } from "../utils/cartRule.util.js";
+import { getActiveCartRules, evaluateCartRules, applyBestDiscount, getDiscountCandidatesForItem } from "../utils/cartRule.util.js";
+import {
+  getActivePromotions,
+  evaluatePromotions,
+  buildCartContext,
+  getDiscountCandidatesForItem as getPromotionDiscountCandidatesForItem,
+  applyBestPromotionDiscount,
+} from "../utils/promotionEngine.util.js";
 import {
   ValidationError,
   NotFoundError,
@@ -164,6 +171,26 @@ const getCartService = async ({ userId }) => {
                 }
             }
         },
+        // Variant SKU — the reliable variant identity (see cartRule.util.js's
+        // header comment), needed so cart-rule/promotion discount matching
+        // below can correctly scope to ONE variant instead of applying a
+        // variant-scoped discount to every variant of the product (bug: this
+        // field didn't exist here before, so the discount preview below used
+        // to ignore variant scoping entirely).
+        variantSku: {
+          $let: {
+            vars: {
+              currentV: { $ifNull: ["$items.v.selectedVariant", "$vFromKey"] },
+              vDetails: { $ifNull: ["$p.variantDetails", []] }
+            },
+            in: {
+              $let: {
+                vars: { matched: { $filter: { input: "$$vDetails", as: "vd", cond: { $eq: ["$$vd.variantName", "$$currentV"] } } } },
+                in: { $ifNull: [{ $arrayElemAt: ["$$matched.sku", 0] }, ""] }
+              }
+            }
+          }
+        },
         quantity: { $cond: [{ $isNumber: "$items.v" }, "$items.v", { $ifNull: ["$items.v.quantity", 1] }] },
         stock: "$p.productQuantity",
         // Eligibility requires product-level status AND the selected variant
@@ -175,6 +202,16 @@ const getCartService = async ({ userId }) => {
         // list honest without duplicating the hard order-creation guard in
         // rp.payment.controller.js (assertVariantAvailable), which remains
         // the real enforcement point.
+        // NOTE: this is a raw Mongo aggregation expression, not JS, so it
+        // can't import the canonical isVariantOutOfStock (utils/variantSort.js
+        // in this repo; utils/variantStock.js on the client) the way every
+        // other OOS check in the codebase does — this $or below must be kept
+        // hand-in-sync with those if the rule ever changes. variantOutOfStock
+        // is now auto-synced to quantity at write time for tracked variants
+        // (see variantSort.js's syncVariantOutOfStock), so mOOS alone would
+        // actually be sufficient going forward — the $lte 0 branch is kept
+        // as a defensive fallback for untracked variants and any stale data
+        // written before that sync existed.
         isEligibleForCalc: {
           $cond: [
             {
@@ -268,18 +305,60 @@ const getCartService = async ({ userId }) => {
     noteOptions: giftWrapSelected ? (cartDoc?.giftWrapNoteOptions?.length ? cartDoc.giftWrapNoteOptions : ["none"]) : ["none"],
   };
 
-  // cartSubtotal must reflect active cart-rule discounts (e.g. "2+ Lamps =>
-  // 50% off Pen Stand") — this is what applyCouponCodeService uses as the
-  // base for coupon math, and it must be the SAME post-discount subtotal
-  // rp.payment.controller.js actually charges, or the discount shown at
-  // checkout can disagree with what the server applies at payment time.
+  // cartSubtotal must reflect BOTH active systems — legacy cart_rule AND
+  // Promotion V2 — exactly like rp.payment.controller.js does at real order
+  // creation, or this preview can show a price the customer isn't actually
+  // charged. Two bugs fixed here (found by audit, confirmed via the real
+  // checkout code as the source of truth):
+  //   1. This used to run ONLY the cart_rule adapter (getActiveCartRules),
+  //      which can only represent flat AND-of-product conditions — a
+  //      Promotion using OR/category/tag/cartSubtotal/etc. conditions (which
+  //      the admin editor fully supports) was invisible here but WAS applied
+  //      at real checkout (which runs the full evaluatePromotions engine
+  //      too) — customer saw one price, got charged another.
+  //   2. This matched discounts by productId only, with no variantSku —
+  //      a reward scoped to ONE variant (targetVariantSku) was applied to
+  //      the subtotal for ANY variant, unlike real checkout which always
+  //      scopes by variant (cartRule.util.js's getDiscountCandidatesForItem).
+  const ruleEvalItems = base.availableItems.map((i) => ({ productId: i.productId, quantity: i.quantity, variantSku: i.variantSku || "" }));
+
   const activeRules = await getActiveCartRules();
-  const ruleEvalItems = base.availableItems.map((i) => ({ productId: i.productId, quantity: i.quantity }));
   const { discountCandidatesByProduct } = evaluateCartRules(ruleEvalItems, activeRules);
+
+  const productIds = [...new Set(base.availableItems.map((i) => String(i.productId)))];
+  const cartProducts = productIds.length
+    ? await Product.find({ productId: { $in: productIds } }, { productId: 1, productCategory: 1, productSubCategory: 1, tags: 1 }).lean()
+    : [];
+  const promoProductMeta = new Map(cartProducts.map((p) => [p.productId, { category: p.productCategory, subcategory: p.productSubCategory, tags: p.tags || [] }]));
+  const activePromotions = await getActivePromotions();
+  const promoSubtotalHint = base.availableItems.reduce((s, i) => s + i.price * i.quantity, 0);
+  const promoCtx = buildCartContext(ruleEvalItems, { subtotal: promoSubtotalHint, productMeta: promoProductMeta, customerType: "registered" });
+  const promotionResult = evaluatePromotions(ruleEvalItems, promoCtx, activePromotions);
+
+  // Capped to 1 discounted/free unit per line, same as
+  // rp.payment.controller.js's capDiscountedQuantity — a "buy X get Y free"
+  // reward must not make ALL units of Y free just because quantity > 1 — but
+  // the cap itself SCALES with how many times the rule's own condition is
+  // satisfied (e.g. 2x the trigger product in cart → up to 2 discounted
+  // units), never a flat 1. `cap` is computed entirely server-side by the
+  // evaluation engines (cartRule.util.js/promotionEngine.util.js) from
+  // admin-configured minQuantity vs. real cart quantity — read here, not
+  // re-derived.
   const discountedSubtotal = base.availableItems.reduce((sum, i) => {
-    const candidates = discountCandidatesByProduct.get(String(i.productId)) || [];
-    const discountedPrice = applyBestDiscount(i.price, candidates);
-    return sum + discountedPrice * i.quantity;
+    const cartRuleCandidates = getDiscountCandidatesForItem(discountCandidatesByProduct, i.productId, i.variantSku);
+    let discountedPrice = i.price;
+    let candidates = cartRuleCandidates;
+    if (cartRuleCandidates?.length) {
+      discountedPrice = applyBestDiscount(i.price, cartRuleCandidates);
+    } else {
+      const promoCandidates = getPromotionDiscountCandidatesForItem(promotionResult.discountCandidatesByProduct, i.productId, i.variantSku);
+      if (promoCandidates?.length) { discountedPrice = applyBestPromotionDiscount(i.price, promoCandidates); candidates = promoCandidates; }
+    }
+    if (discountedPrice >= i.price) return sum + i.price * i.quantity;
+    const cap = Math.max(1, ...(candidates || []).map((c) => c.cap ?? 1));
+    const discountedUnits = Math.min(i.quantity, cap);
+    const fullPriceUnits = i.quantity - discountedUnits;
+    return sum + discountedPrice * discountedUnits + i.price * fullPriceUnits;
   }, 0);
 
   return {

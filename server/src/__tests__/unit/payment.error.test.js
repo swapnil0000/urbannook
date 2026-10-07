@@ -15,9 +15,12 @@ jest.unstable_mockModule('../../model/order.model.js', () => ({
 const mockRazorpayPaymentVerificationService = jest.fn();
 const mockRazorpayCreateOrderService = jest.fn();
 
+const mockRazorpayFetchOrderService = jest.fn();
+
 jest.unstable_mockModule('../../services/rp.payement.service.js', () => ({
   razorpayPaymentVerificationService: mockRazorpayPaymentVerificationService,
-  razorpayCreateOrderService: mockRazorpayCreateOrderService
+  razorpayCreateOrderService: mockRazorpayCreateOrderService,
+  razorpayFetchOrderService: mockRazorpayFetchOrderService
 }));
 
 // Import controller after mocking

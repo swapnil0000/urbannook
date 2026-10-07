@@ -44,6 +44,7 @@ class ContactService {
       data: {
         name: contact.name,
         ...(contact.productName ? { productName: contact.productName } : {}),
+        ...(contact.variantName ? { variantName: contact.variantName } : {}),
         email: contact.email,
         subject: contact.subject,
         status: contact.status
@@ -59,12 +60,16 @@ class ContactService {
       subject: contact.subject,
       message: contact.message,
       mobile: contact.mobile,
+      productName: contact.productName,
+      variantName: contact.variantName,
       timestamp: contact.createdAt
     });
 
     await sendEmail(
       'urbanadmin@urbannook.in',
-      `New Contact Form Submission: ${contact.subject}`,
+      contact.productName
+        ? `Notify Me: ${contact.productName}${contact.variantName ? ` (${contact.variantName})` : ''}`
+        : `New Contact Form Submission: ${contact.subject}`,
       emailContent
     );
 

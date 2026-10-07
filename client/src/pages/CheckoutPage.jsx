@@ -30,12 +30,13 @@ import config from "../config/env";
 import CouponInput from "../component/CouponInput";
 import FreeShippingBanner from "../component/FreeShippingBanner";
 import { ComponentLoader } from "../component/layout/LoadingSpinner";
-import { getClaimedMobile, isOfferLive } from "../config/independenceOffer";
-import IndependenceOfferBanner from "../component/IndependenceOfferBanner";
+import { getClaimedMobile, getClaimedCode, isOfferLive } from "../config/siteOffer";
+import SiteOfferBanner from "../component/SiteOfferBanner";
+import FreeShippingStrip from "../component/FreeShippingStrip";
 import useOfferTerms from "../hooks/useOfferTerms";
 import { useShippingDelayNotice } from "../hooks/useShippingDelayNotice";
 import { calcLocalDiscount } from "../utils/couponDiscount";
-import { trackBeginCheckout, trackPurchase, trackAddShippingInfo, trackAddPaymentInfo, trackPaymentFailed, trackPaymentModalDismissed, trackCheckoutStep, trackOrderCreated, trackSelectPaymentMethod, trackDeliveryCheck, trackApplyCoupon, trackRemoveCoupon, getFbCookies, getAnonymousId, cacheAddressForCapi, setMetaAdvancedMatching } from "../utils/analytics";
+import { trackBeginCheckout, trackPurchase, trackAddShippingInfo, trackAddPaymentInfo, trackPaymentFailed, trackPaymentModalDismissed, trackCheckoutStep, trackOrderCreated, trackSelectPaymentMethod, trackDeliveryCheck, trackApplyCoupon, trackRemoveCoupon, getFbCookies, getGaIds, getAnonymousId, cacheAddressForCapi, setMetaAdvancedMatching } from "../utils/analytics";
 
 const CouponList = lazy(() => import("../component/CouponList"));
 const MobileNumberModal = lazy(() => import("../component/MobileNumberModal"));
@@ -483,6 +484,18 @@ const CheckoutPage = () => {
     return saved > steps.length ? 1 : saved;
   });
   const [userProfile, setUserProfile] = useState(null);
+  // WhatsApp login gives us only a phone, so the account starts as "User 2393"
+  // with a placeholder @wa.urbannook.in email. Such a member must type a real
+  // name and email here, otherwise the placeholder lands on the courier label.
+  const [memberName, setMemberName] = useState("");
+  const [memberEmail, setMemberEmail] = useState("");
+  const [memberErrors, setMemberErrors] = useState({});
+  const rawProfileName = String(userProfile?.userName || userProfile?.name || "").trim();
+  const rawProfileEmail = String(userProfile?.email || "").trim();
+  const needsName = !isGuest && !!userProfile && (!rawProfileName || /^User \d{4}$/.test(rawProfileName));
+  const needsEmail = !isGuest && !!userProfile && (!rawProfileEmail || /@wa\.urbannook\.in$/i.test(rawProfileEmail));
+  const profileName = needsName ? memberName.trim() : rawProfileName;
+  const profileEmail = needsEmail ? memberEmail.trim().toLowerCase() : rawProfileEmail;
   const [isLoading, setIsLoading] = useState(true);
   const [address, setAddress] = useState(savedCheckout.current.address || "");
   const [pinCode, setPinCode] = useState(savedCheckout.current.pinCode || "");
@@ -536,7 +549,7 @@ const CheckoutPage = () => {
   const [isApplyingOffer, setIsApplyingOffer] = useState(false);
   // Live campaign terms, so the block's own numbers and this page's discount
   // maths come from the same source as the coupon the server will validate.
-  const { terms: offerTerms } = useOfferTerms();
+  const { terms: offerTerms, loaded: offerTermsLoaded } = useOfferTerms();
   const [showMobileModal, setShowMobileModal] = useState(false);
 
   const [guestName, setGuestName] = useState(savedCheckout.current.guestName || "");
@@ -597,14 +610,28 @@ const CheckoutPage = () => {
   // only ever showed the undiscounted price everywhere, so a rule discount
   // was invisible on checkout even though the real order total (payment
   // controller) already applied it correctly.
+  // Sibling variants of the SAME product can share ONE rule's discount pool
+  // instead of each getting their own (e.g. "Exciting Offers": free single
+  // stand / 50%-off double / 50%-off triple is ONE unit shared across all
+  // three, not one each — see cartRule.util.js's createRuleBudgetTracker).
+  // lineDiscounts is computed server-side over the cart in its own array
+  // order, the exact same way checkout actually consumes the budget.
+  const getLineEligible = (item) => {
+    const productId = item.mongoId || item.id?.split(":")[0];
+    const entry = (cartRuleEvalData?.data?.lineDiscounts || []).find(
+      (ld) => String(ld.productId) === String(productId) && ld.selectedVariant === item.selectedVariant,
+    );
+    return !entry || entry.eligible !== false;
+  };
   const getItemDiscountedPrice = (item) => {
     const productId = item.mongoId || item.id?.split(":")[0];
+    const price = Number(item.price) || 0;
+    if (!getLineEligible(item)) return price;
     // Untagged candidates apply to every variant (unchanged); a `variantName`
     // tag restricts to that one variant — see cartRule.util.js.
     const candidates = (cartRuleEvalData?.data?.discounts?.[productId] || []).filter(
       (c) => !c.variantName || c.variantName === item.selectedVariant,
     );
-    const price = Number(item.price) || 0;
     if (!candidates?.length) return price;
     const results = candidates.map((c) =>
       c.type === "percent_off" ? price * (1 - Number(c.value) / 100) : price - Number(c.value),
@@ -613,14 +640,30 @@ const CheckoutPage = () => {
     // is ₹149.5 mathematically — both round that to ₹150, consistently).
     return Math.round(Math.max(Math.min(...results), 0));
   };
+  // How many units of this line the matching rule(s) actually justify
+  // discounting — server-computed (cartRule.util.js's ruleRepeatCount) from
+  // the rule's own condition quantity vs. real cart quantity: 2x the
+  // trigger product in cart unlocks up to 2 discounted units, not a flat 1.
+  // Read here, never re-derived — this policy lives in exactly one place.
+  const getItemDiscountCap = (item) => {
+    const productId = item.mongoId || item.id?.split(":")[0];
+    if (!getLineEligible(item)) return 0;
+    const candidates = (cartRuleEvalData?.data?.discounts?.[productId] || []).filter(
+      (c) => !c.variantName || c.variantName === item.selectedVariant,
+    );
+    return Math.max(1, ...candidates.map((c) => c.cap ?? 1));
+  };
   // Total ₹ shaved off the cart by matched rule discounts — subtracted from
   // whatever subtotal this page would otherwise display (guest's direct
   // calc, or the coupon endpoint's summary.subtotal, which doesn't know
-  // about cart rules at all).
+  // about cart rules at all). The real charge (rp.payment.controller.js's
+  // capDiscountedQuantity) uses this exact same cap — this page must match
+  // it exactly, or it shows a different total than what Razorpay charges.
   const ruleDiscountSavings = cartItems.reduce((sum, item) => {
     const price = Number(item.price) || 0;
     const discounted = getItemDiscountedPrice(item);
-    return sum + (price - discounted) * (Number(item.quantity) || 0);
+    const discountedUnits = discounted < price ? Math.min(Number(item.quantity) || 0, getItemDiscountCap(item)) : 0;
+    return sum + (price - discounted) * discountedUnits;
   }, 0);
 
   // Checkout-only nudge: if the cart hasn't crossed the free-shipping
@@ -1112,7 +1155,7 @@ const CheckoutPage = () => {
     ) {
       beginCheckoutFiredRef.current = true;
       trackBeginCheckout({
-        items: cartItems.map((i) => ({ itemId: i.mongoId || i.id, itemName: i.name, itemVariant: i.selectedVariant || "N/A", price: i.price, quantity: i.quantity })),
+        items: cartItems.map((i) => ({ itemId: i.mongoId || i.id, sku: i.sku, itemName: i.name, itemVariant: i.selectedVariant || "N/A", price: i.price, quantity: i.quantity })),
         value: pricingDetails.subtotal,
       });
       sessionStorage.setItem("un_begin_checkout_fired", "1");
@@ -1129,7 +1172,7 @@ const CheckoutPage = () => {
   const goToStep = (n) => { setCurrentStep(n); window.scrollTo({ top: 0, behavior: "smooth" }); };
 
   const buildTrackItems = () =>
-    cartItems.map((i) => ({ itemId: i.mongoId || i.id, itemName: i.name, itemVariant: i.selectedVariant || "N/A", price: i.price, quantity: i.quantity }));
+    cartItems.map((i) => ({ itemId: i.mongoId || i.id, sku: i.sku, itemName: i.name, itemVariant: i.selectedVariant || "N/A", price: i.price, quantity: i.quantity }));
 
   const loadRazorpay = () =>
     new Promise((res) => {
@@ -1331,6 +1374,48 @@ const CheckoutPage = () => {
     }
   };
 
+  // ── Popup offer: apply the claimed code for them ─────────────────────────
+  // Someone who claimed the code in the popup should not have to find and type
+  // it again. Runs on every step (not just Review) so the express/Magic order,
+  // which is built before Review, carries the discount too. Once per session:
+  // if they remove it, it stays removed.
+  const OFFER_AUTO_KEY = "un_offer_autoapplied";
+  useEffect(() => {
+    if (!offerTermsLoaded || appliedCoupon || isApplyingOffer || paymentCompletedRef.current) return;
+    if (!cartItems.length || !isOfferLive() || offerTerms.available === false) return;
+    if (!getClaimedCode()) return;
+    if (!isGuest && profileLoading) return;
+    try { if (sessionStorage.getItem(OFFER_AUTO_KEY)) return; } catch { /* ignore */ }
+    // Below the minimum there is nothing to apply yet; try again when the cart grows
+    if (cartTotalAmount < (offerTerms.minCartValue || 0)) return;
+    try { sessionStorage.setItem(OFFER_AUTO_KEY, "1"); } catch { /* ignore */ }
+    // The live code, not the stored one: the admin may have renamed it since
+    handleApplyOfferCode(offerTerms.couponCode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offerTermsLoaded, appliedCoupon, cartTotalAmount, cartItems.length, isGuest, profileLoading, offerTerms]);
+
+  // Guests' discounts are worked out on this page, so a cart that shrinks below
+  // the minimum would keep showing a discount the server then refuses — and the
+  // order would fail at "Pay". Keep the offer code honest as the cart changes.
+  useEffect(() => {
+    if (!isGuest || !appliedCoupon || appliedCoupon !== offerTerms.couponCode) return;
+    const minCart = offerTerms.minCartValue || 0;
+    const discount = cartTotalAmount >= minCart ? calcLocalDiscount(offerTerms, cartTotalAmount) : 0;
+    if (discount > 0) {
+      setPricingDetails((prev) => (prev.discount === discount ? prev : { ...prev, discount }));
+      return;
+    }
+    setAppliedCoupon(null);
+    setPricingDetails((prev) => ({ ...prev, discount: 0 }));
+    // Let it re-apply automatically once they are back over the minimum
+    try { sessionStorage.removeItem(OFFER_AUTO_KEY); } catch { /* ignore */ }
+    showNotification(
+      `${appliedCoupon} removed — add ₹${Math.max(0, minCart - cartTotalAmount).toLocaleString()} more to use it (min order ₹${minCart.toLocaleString()})`,
+      "error",
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGuest, appliedCoupon, cartTotalAmount, offerTerms]);
+
   const handleCouponRemoved = async () => {
     try {
       const r = await applyCouponMutation({ couponCode: null, email: userEmail }).unwrap();
@@ -1359,8 +1444,18 @@ const CheckoutPage = () => {
       if (Object.keys(errors).length) { setGuestErrors(errors); return; }
       setGuestErrors({});
     } else {
+      const errors = {};
+      if (needsName && !memberName.trim()) errors.name = "Full name is required";
+      if (needsEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(memberEmail.trim())) errors.email = "Valid email is required";
+      if (Object.keys(errors).length) { setMemberErrors(errors); return; }
+      setMemberErrors({});
       const m = stripCC(String(senderMobile || ""));
       if (!m || !validateMobile(m)) { showNotification("Please enter a valid 10-digit Indian mobile number", "error"); return; }
+      // Save the real name now; the email is copied over by the order's
+      // profile backfill, which also handles an address owned by another account
+      if (needsName) {
+        updateUserProfile({ name: memberName.trim() }).unwrap().then(() => refetchProfile()).catch(() => {});
+      }
       // Save mobile to profile if it changed
       const existingMobile = String(userProfile?.mobileNumber || userProfile?.mobile || "");
       if (m !== existingMobile) {
@@ -1411,9 +1506,9 @@ const CheckoutPage = () => {
     const useMagic = opts.forceMagic ?? magicEnabled;
     setPaymentError(null);
     {
-      const buyerName = (isGuest ? guestName : (userProfile?.userName || userProfile?.name || "")).trim();
+      const buyerName = (isGuest ? guestName : profileName).trim();
       setMetaAdvancedMatching({
-        email: isGuest ? guestEmail.trim() : userProfile?.email,
+        email: isGuest ? guestEmail.trim() : profileEmail,
         phone: isGuest ? guestMobile.trim() : stripCC(String(senderMobile || "")),
         firstName: buyerName.split(" ")[0],
         lastName: buyerName.split(" ").slice(1).join(" "),
@@ -1450,6 +1545,7 @@ const CheckoutPage = () => {
           giftWrapNoteOptions: giftWrapNoteOptions,
           ...getFbCookies(), // _fbp / _fbc → stored on order for CAPI match quality
           anonymousId: getAnonymousId(), // fallback externalId for guest CAPI
+          ...getGaIds(), // GA4 client/session id → webhook fallback purchase joins the same GA4 session
         }).unwrap();
 
         trackOrderCreated({
@@ -1476,7 +1572,7 @@ const CheckoutPage = () => {
               paymentMethod,
               // Feed buyer PII to the browser Purchase pixel (guest = no prior login → boosts web EMQ)
               email: guestEmail.trim(), phone: guestMobile.trim(), name: guestName.trim(), externalId: getAnonymousId(),
-              items: cartItems.map((i) => ({ itemId: i.mongoId || i.id, itemName: i.name, itemVariant: i.selectedVariant || "N/A", price: i.price, quantity: i.quantity })),
+              items: cartItems.map((i) => ({ itemId: i.mongoId || i.id, sku: i.sku, itemName: i.name, itemVariant: i.selectedVariant || "N/A", price: i.price, quantity: i.quantity })),
             });
             dispatch(clearCart());
             localStorage.removeItem("guestCart"); localStorage.removeItem("guestId");
@@ -1512,6 +1608,7 @@ const CheckoutPage = () => {
     // the address in its own modal, and the server skips the same checks for a
     // Magic order. Demanding them here would block the very path that exists
     // to avoid asking.
+    if (!useMagic && (!profileName || !profileEmail)) { showNotification("Please enter your full name and email", "error"); goToStep(contactStep); return; }
     if (!useMagic && (!senderMobileStr || !validateMobile(senderMobileStr))) { showNotification("Please enter a valid mobile number", "error"); goToStep(contactStep); return; }
     const deliveryMobileStr = stripCC(String(deliveryMobile || ""));
     if (useDifferentDeliveryContact && deliveryMobileStr && !validateMobile(deliveryMobileStr)) {
@@ -1525,11 +1622,11 @@ const CheckoutPage = () => {
           productId: i.mongoId || i.id.split(":")[0], quantity: i.quantity,
           variant: (i.selectedVariant && i.selectedVariant !== "N/A") ? i.selectedVariant : (cartSelections[i.id]?.variant || "N/A"),
         })),
-        senderMobile: senderMobileStr, userEmail: userProfile?.email,
+        senderMobile: senderMobileStr, userEmail: profileEmail,
         receiverMobile: useDifferentDeliveryContact && deliveryMobileStr ? deliveryMobileStr : senderMobileStr,
         addressId: currentAddressId,
         deliveryAddress: {
-          addressId: currentAddressId, fullName: userProfile?.userName || userProfile?.name || "",
+          addressId: currentAddressId, fullName: profileName,
           mobileNumber: useDifferentDeliveryContact && deliveryMobileStr ? deliveryMobileStr : senderMobileStr,
           formattedAddress: address, deliveryAddressFull: address,
           pinCode: pinCode ? parseInt(pinCode, 10) : null,
@@ -1540,6 +1637,7 @@ const CheckoutPage = () => {
         paymentMethod,
         magic: useMagic, // server skips address/shipping and sends line_items
         ...getFbCookies(), // _fbp / _fbc → stored on order for CAPI match quality
+        ...getGaIds(), // GA4 client/session id → webhook fallback purchase joins the same GA4 session
       }).unwrap();
 
       trackOrderCreated({
@@ -1558,6 +1656,7 @@ const CheckoutPage = () => {
         image: "/assets/logo.webp",
         order_id: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId || orderResult.id,
         handler: async (response) => {
+          paymentCompletedRef.current = true;
           try {
             trackPurchase({
               transactionId: response.razorpay_order_id,
@@ -1565,15 +1664,15 @@ const CheckoutPage = () => {
               value: totalToPay, shipping: pricingDetails.shipping, tax: 0,
               paymentMethod,
               // Feed buyer PII to the browser Purchase pixel → boosts web EMQ (phone esp.)
-              email: userProfile?.email, phone: senderMobileStr, name: userProfile?.userName || userProfile?.name, externalId: userProfile?.userId || userProfile?._id || getAnonymousId(),
-              items: cartItems.map((i) => ({ itemId: i.mongoId || i.id, itemName: i.name, itemVariant: i.selectedVariant || "N/A", price: i.price, quantity: i.quantity })),
+              email: profileEmail, phone: senderMobileStr, name: profileName, externalId: userProfile?.userId || userProfile?._id || getAnonymousId(),
+              items: cartItems.map((i) => ({ itemId: i.mongoId || i.id, sku: i.sku, itemName: i.name, itemVariant: i.selectedVariant || "N/A", price: i.price, quantity: i.quantity })),
             });
             sessionStorage.removeItem(CHECKOUT_STATE_KEY);
             sessionStorage.removeItem("un_begin_checkout_fired"); // allow begin_checkout again for the next order
             navigate(`/payment-processing/${response.razorpay_order_id}`);
           } catch (_) { setPaymentError("Payment verification failed. Contact support if amount was debited."); }
         },
-        prefill: { name: userProfile?.userName || userProfile?.name || "", email: userProfile?.email || "", contact: senderMobileStr },
+        prefill: { name: profileName, email: profileEmail, contact: senderMobileStr },
         ...magicCheckoutOptions(orderResult),
         notes: { address, pinCode }, theme: { color: "#E63329" },
         modal: { ondismiss: () => { trackPaymentModalDismissed({ orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId || orderResult.id, value: totalToPay }); setPaymentError("Payment cancelled. Your cart is safe."); setShowRetry(true); }, escape: false, confirm_close: true },
@@ -1615,11 +1714,8 @@ const CheckoutPage = () => {
     giftWrapSelected && giftWrapOffer?.isActive
       ? (Number(giftWrapOffer.price) || 0) * giftWrapEligibleCount
       : 0;
-  const totalToPay = Math.max(
-    0,
-    pricingDetails.subtotal + giftWrapAmount + shippingAmount - pricingDetails.discount - pointsDiscount,
-  );
-  const userName = isGuest ? guestName : (userProfile?.userName || userProfile?.name || "");
+  const totalToPay = pricingDetails.subtotal + giftWrapAmount + shippingAmount - pricingDetails.discount;
+  const userName = isGuest ? guestName : profileName;
   const userInitials = userName ? userName.split(" ").filter(Boolean).map((w) => w[0]).join("").toUpperCase().slice(0, 2) : "?";
 
   // ── Payment-action helpers (money-critical: never charge a stale amount) ──
@@ -1968,19 +2064,26 @@ const CheckoutPage = () => {
         </div>
       )}
 
-      {/* ── Independence Day offer ─────────────────────────────────────────
+      {/* ── Site offer ──────────────────────────────────────────────────────
           Review & Pay only. Account, Contact and Address are all the same
           /checkout route, so without the step check this rode along on every
           one of them — and a coupon is noise until there is a total to apply it
           to. Also takes itself away when the campaign window closes. */}
       {isOfferLive() && currentStep === reviewStep && (
         <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-6">
-          <IndependenceOfferBanner
+          <SiteOfferBanner
             cartTotal={cartTotalAmount}
             appliedCoupon={appliedCoupon}
             isApplying={isApplyingOffer}
             onApply={handleApplyOfferCode}
           />
+        </div>
+      )}
+      {/* Free-shipping threshold — admin-controlled (free_shipping Promotion);
+          renders nothing while that promotion is off. */}
+      {currentStep === reviewStep && (
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4">
+          <FreeShippingStrip cartTotal={cartTotalAmount} />
         </div>
       )}
       {/* ── Main ───────────────────────────────────────────────────────── */}
@@ -2038,10 +2141,24 @@ const CheckoutPage = () => {
                   {/* Full Name */}
                   <Field
                     label="Full Name"
-                    required={isGuest}
-                    error={guestErrors.name}
+                    required={isGuest || needsName}
+                    error={isGuest ? guestErrors.name : memberErrors.name}
                   >
-                    {isGuest
+                    {!isGuest && needsName
+                      ? iconInput(
+                          "fa-user",
+                          <input
+                            type="text"
+                            value={memberName}
+                            onChange={(e) => {
+                              setMemberName(e.target.value);
+                              setMemberErrors((p) => ({ ...p, name: "" }));
+                            }}
+                            placeholder="e.g. Priya Sharma"
+                            className={`${inputCls(memberErrors.name)} pl-10`}
+                          />,
+                        )
+                      : isGuest
                       ? iconInput(
                           "fa-user",
                           <input
@@ -2068,10 +2185,24 @@ const CheckoutPage = () => {
                   {/* Email */}
                   <Field
                     label="Email Address"
-                    required={isGuest}
-                    error={guestErrors.email}
+                    required={isGuest || needsEmail}
+                    error={isGuest ? guestErrors.email : memberErrors.email}
                   >
-                    {isGuest
+                    {!isGuest && needsEmail
+                      ? iconInput(
+                          "fa-envelope",
+                          <input
+                            type="email"
+                            value={memberEmail}
+                            onChange={(e) => {
+                              setMemberEmail(e.target.value);
+                              setMemberErrors((p) => ({ ...p, email: "" }));
+                            }}
+                            placeholder="you@example.com"
+                            className={`${inputCls(memberErrors.email)} pl-10`}
+                          />,
+                        )
+                      : isGuest
                       ? iconInput(
                           "fa-envelope",
                           <input
@@ -2530,13 +2661,22 @@ const CheckoutPage = () => {
                             </p>
                           </div>
                           {(() => {
-                            const discountedPrice =
+                            const discountedUnitPrice =
                               getItemDiscountedPrice(item);
                             const rawPrice = Number(item.price) || 0;
-                            const hasDiscount = discountedPrice < rawPrice;
+                            const hasDiscount = discountedUnitPrice < rawPrice;
+                            const qty = Number(item.quantity) || 0;
+                            // Only 1 unit ever gets the discount/free
+                            // benefit — matches the server's
+                            // capDiscountedQuantity cap in
+                            // rp.payment.controller.js exactly.
+                            const discountedUnits = hasDiscount ? Math.min(qty, getItemDiscountCap(item)) : 0;
+                            const fullPriceUnits = qty - discountedUnits;
+                            const lineTotal = discountedUnitPrice * discountedUnits + rawPrice * fullPriceUnits;
+                            const rawLineTotal = rawPrice * qty;
                             const percentOff = hasDiscount
                               ? Math.round(
-                                  ((rawPrice - discountedPrice) / rawPrice) *
+                                  ((rawLineTotal - lineTotal) / rawLineTotal) *
                                     100,
                                 )
                               : 0;
@@ -2544,16 +2684,12 @@ const CheckoutPage = () => {
                               <div className="text-right shrink-0">
                                 <p className="text-sm font-bold text-save">
                                   ₹
-                                  {(
-                                    discountedPrice * Number(item.quantity)
-                                  ).toLocaleString()}
+                                  {Math.round(lineTotal).toLocaleString()}
                                 </p>
                                 <div className="flex items-center justify-end gap-1">
                                   <span className="text-[10px] text-gray-400 line-through">
                                     ₹
-                                    {(
-                                      rawPrice * Number(item.quantity)
-                                    ).toLocaleString()}
+                                    {rawLineTotal.toLocaleString()}
                                   </span>
                                   <span className="text-[9px] font-bold uppercase rounded-full bg-save text-white px-1.5 py-px">
                                     {percentOff}% OFF
@@ -2562,10 +2698,7 @@ const CheckoutPage = () => {
                               </div>
                             ) : (
                               <p className="text-sm font-bold text-gray-800 shrink-0">
-                                ₹
-                                {(
-                                  rawPrice * Number(item.quantity)
-                                ).toLocaleString()}
+                                ₹{rawLineTotal.toLocaleString()}
                               </p>
                             );
                           })()}
@@ -2640,10 +2773,10 @@ const CheckoutPage = () => {
                     <p className="text-sm font-bold text-gray-800">
                       {isGuest
                         ? guestName
-                        : userProfile?.userName || userProfile?.name}
+                        : profileName}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5 truncate">
-                      {isGuest ? guestEmail : userProfile?.email}
+                      {isGuest ? guestEmail : profileEmail}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5 font-medium">
                       {isGuest ? guestMobile : senderMobile}
@@ -2794,17 +2927,24 @@ const CheckoutPage = () => {
                     )}
                   </div>
                   {(() => {
-                    const discountedPrice = getItemDiscountedPrice(item);
+                    const discountedUnitPrice = getItemDiscountedPrice(item);
                     const rawPrice = Number(item.price) || 0;
-                    const hasDiscount = discountedPrice < rawPrice;
+                    const hasDiscount = discountedUnitPrice < rawPrice;
+                    const qty = Number(item.quantity) || 0;
+                    // Only 1 unit ever gets the discount/free benefit —
+                    // matches rp.payment.controller.js's capDiscountedQuantity.
+                    const discountedUnits = hasDiscount ? Math.min(qty, getItemDiscountCap(item)) : 0;
+                    const fullPriceUnits = qty - discountedUnits;
+                    const lineTotal = discountedUnitPrice * discountedUnits + rawPrice * fullPriceUnits;
+                    const rawLineTotal = rawPrice * qty;
                     const percentOff = hasDiscount
-                      ? Math.round(((rawPrice - discountedPrice) / rawPrice) * 100)
+                      ? Math.round(((rawLineTotal - lineTotal) / rawLineTotal) * 100)
                       : 0;
                     return hasDiscount ? (
                       <div className="text-right shrink-0">
-                        <p className="text-xs font-bold text-save">₹{(discountedPrice * Number(item.quantity)).toLocaleString()}</p>
+                        <p className="text-xs font-bold text-save">₹{Math.round(lineTotal).toLocaleString()}</p>
                         <div className="flex items-center justify-end gap-1">
-                          <span className="text-[9px] text-gray-400 line-through">₹{(rawPrice * Number(item.quantity)).toLocaleString()}</span>
+                          <span className="text-[9px] text-gray-400 line-through">₹{rawLineTotal.toLocaleString()}</span>
                           <span className="text-[9px] font-bold uppercase rounded-full bg-save text-white px-1.5 py-px">
                             {percentOff}% OFF
                           </span>
@@ -2812,7 +2952,7 @@ const CheckoutPage = () => {
                       </div>
                     ) : (
                       <p className="text-xs font-bold text-gray-800 shrink-0">
-                        ₹{(rawPrice * Number(item.quantity)).toLocaleString()}
+                        ₹{rawLineTotal.toLocaleString()}
                       </p>
                     );
                   })()}
@@ -3182,7 +3322,7 @@ const CheckoutPage = () => {
           prefillName={
             isGuest
               ? guestName
-              : userProfile?.userName || userProfile?.name || ""
+              : profileName
           }
           prefillPhone={
             isGuest

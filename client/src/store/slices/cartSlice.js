@@ -100,7 +100,7 @@ const cartSlice = createSlice({
     },
 
     addItem: (state, action) => {
-      const { id, name, price, image, quantity = 1, mongoId, selectedVariant, giftWrapEligible } = action.payload;
+      const { id, name, price, image, quantity = 1, mongoId, selectedVariant, giftWrapEligible, sku } = action.payload;
       const effectiveVariant = selectedVariant || 'N/A';
       const itemId = mongoId || id;
       
@@ -120,7 +120,8 @@ const cartSlice = createSlice({
           image,
           quantity,
           selectedVariant: effectiveVariant,
-          giftWrapEligible: !!giftWrapEligible
+          giftWrapEligible: !!giftWrapEligible,
+          sku: sku || '' // variant SKU → GA4/Google Ads item_id (analytics only)
         });
       }
 
@@ -246,7 +247,9 @@ const cartSlice = createSlice({
           price: getPrice(),
           image: item.productImage || item.image || item.productImg,
           quantity,
-          selectedVariant: item.selectedVariant || 'N/A'
+          selectedVariant: item.selectedVariant || 'N/A',
+          // Variant SKU → GA4/Google Ads item_id (analytics only)
+          sku: item.variantDetails?.find(v => v.variantName === (item.selectedVariant || 'N/A'))?.sku || item.sku || ''
         };
       });
 

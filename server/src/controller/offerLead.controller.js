@@ -1,6 +1,6 @@
 import OfferLead from "../model/offerLead.model.js";
 import Coupon from "../model/coupon.model.js";
-import independenceOffer from "../config/independenceOffer.config.js";
+import siteOffer from "../config/siteOffer.config.js";
 import { ApiRes } from "../utils/index.js";
 import { ValidationError } from "../utils/errors.js";
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
@@ -15,7 +15,7 @@ const TAG = "[OfferLead]";
  * back to a code lookup for the case where the configured id is wrong.
  */
 async function loadCampaignCoupon() {
-  const { couponId, couponCode } = independenceOffer;
+  const { couponId, couponCode } = siteOffer;
 
   if (couponId) {
     const byId = await Coupon.findOne({ couponId, isArchived: false }).lean();
@@ -39,16 +39,16 @@ async function resolveOfferTerms() {
 
   if (!coupon) {
     console.warn(
-      `${TAG} Campaign coupon not found (couponId=${independenceOffer.couponId}, ` +
-        `code=${independenceOffer.couponCode}) — serving config defaults.`,
+      `${TAG} Campaign coupon not found (couponId=${siteOffer.couponId}, ` +
+        `code=${siteOffer.couponCode}) — serving config defaults.`,
     );
     return {
-      couponCode: independenceOffer.couponCode,
-      discountType: independenceOffer.discountType,
-      discountValue: independenceOffer.discountValue,
-      maxDiscount: independenceOffer.maxDiscountCap,
-      minCartValue: independenceOffer.minCartValue,
-      validUntil: independenceOffer.validUntil,
+      couponCode: siteOffer.couponCode,
+      discountType: siteOffer.discountType,
+      discountValue: siteOffer.discountValue,
+      maxDiscount: siteOffer.maxDiscountCap,
+      minCartValue: siteOffer.minCartValue,
+      validUntil: siteOffer.validUntil,
       available: false,
     };
   }
@@ -83,11 +83,11 @@ async function resolveOfferTerms() {
 
   return {
     couponCode: coupon.code,
-    discountType: coupon.discountType ?? independenceOffer.discountType,
-    discountValue: coupon.discountValue ?? independenceOffer.discountValue,
-    maxDiscount: coupon.maxDiscountCap ?? independenceOffer.maxDiscountCap,
-    minCartValue: coupon.minCartValue ?? independenceOffer.minCartValue,
-    validUntil: coupon.validUntil ?? independenceOffer.validUntil,
+    discountType: coupon.discountType ?? siteOffer.discountType,
+    discountValue: coupon.discountValue ?? siteOffer.discountValue,
+    maxDiscount: coupon.maxDiscountCap ?? siteOffer.maxDiscountCap,
+    minCartValue: coupon.minCartValue ?? siteOffer.minCartValue,
+    validUntil: coupon.validUntil ?? siteOffer.validUntil,
     // Lets the storefront hide the offer rather than promote a code that would
     // be refused at checkout.
     available: !!coupon.isActive && !coupon.isTest && withinWindow && hasCapacity,
@@ -113,7 +113,7 @@ const getCampaignController = asyncHandler(async (req, res) => {
   res.set("Cache-Control", "public, max-age=60");
   return res
     .status(200)
-    .json(new ApiRes(200, "independenceCampaign", terms, true));
+    .json(new ApiRes(200, "siteOfferCampaign", terms, true));
 });
 
 /**
@@ -127,7 +127,7 @@ const getCampaignController = asyncHandler(async (req, res) => {
 const claimOfferController = asyncHandler(async (req, res) => {
   const { mobile, campaign, source, pagePath, isInAppBrowser, attribution } = req.body;
 
-  const campaignId = campaign || independenceOffer.campaign;
+  const campaignId = campaign || siteOffer.campaign;
   // Joi already guarantees exactly 10 digits, but strip defensively so the
   // dedupe key always matches the stored value — and so it lines up with the
   // coupon engine's own normalizeMobile() when it enforces one use per customer.
@@ -135,9 +135,9 @@ const claimOfferController = asyncHandler(async (req, res) => {
 
   // Only gate on the campaign's own window — a request arriving after the offer
   // closed should not silently collect a lead for a code that no longer works.
-  if (campaignId === independenceOffer.campaign) {
+  if (campaignId === siteOffer.campaign && siteOffer.validUntil) {
     const now = new Date();
-    if (now > new Date(independenceOffer.validUntil)) {
+    if (now > new Date(siteOffer.validUntil)) {
       throw new ValidationError("This offer has ended. Watch this space for the next one!");
     }
   }
@@ -196,7 +196,7 @@ const claimOfferController = asyncHandler(async (req, res) => {
       200,
       isRepeatClaim
         ? "You've already unlocked this offer — here's your code again 🎉"
-        : "Your Independence Day discount is unlocked 🎉",
+        : "Your discount is unlocked 🎉",
       { ...terms, alreadyClaimed: isRepeatClaim },
       true,
     ),

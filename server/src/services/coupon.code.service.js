@@ -112,6 +112,7 @@ async function validateNewCoupon({ coupon, cartProductTotal, email, mobile, isLo
   if (identifiers.length > 0 && coupon.maxUsesPerUser) {
     const priorCount = await CouponUsage.countDocuments({
       couponId: coupon.couponId,
+      reversed: { $ne: true }, // a cancelled/refunded order's usage must not count against the limit
       $or: [
         ...(normEmail  ? [{ email:  normEmail  }] : []),
         ...(normMobile ? [{ mobile: normMobile }] : []),

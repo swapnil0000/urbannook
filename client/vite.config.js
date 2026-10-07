@@ -149,7 +149,7 @@ export default defineConfig(({ mode }) => {
     cssCodeSplit: true,
     
     // Minification options (Requirements 9.1, 9.2, 9.3)
-    target: 'es2015',
+    target: 'es2020', // modern baseline — avoids shipping ES2015 transforms/polyfills to every browser
     cssMinify: true, // CSS minification enabled
     
     rollupOptions: {

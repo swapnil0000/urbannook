@@ -9,17 +9,20 @@ import RecommendedProducts from '../../component/RecommendedProducts';
 import OtherVariants from '../../component/OtherVariants';
 import NotifyMeModal from '../../component/NotifyMeModal';
 import ComboBundleSection from '../../component/ComboBundleSection';
+import ComparisonTable from '../../component/ComparisonTable';
 import FreeShippingBanner from '../../component/FreeShippingBanner';
+import ProductPageBanner from '../../component/ProductPageBanner';
 import ImageCarousel from '../../component/ImageCarousel';
 import { motion, AnimatePresence } from 'motion/react';
 import { ScrollColorBand } from '../../component/motion';
-import { trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist, trackVariantSelect, trackShare, trackDeliveryCheck } from '../../utils/analytics';
+import { variantSku, trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist, trackVariantSelect, trackShare, trackDeliveryCheck } from '../../utils/analytics';
 import { productsApi, useGetProductByIdQuery, useGetProductsQuery } from '../../store/api/productsApi';
 import { useAddToCartMutation, useUpdateCartMutation, useCalculateShippingMutation } from '../../store/api/userApi';
 import { useGetProductReviewsQuery, useSubmitProductReviewMutation, useUpdateProductReviewMutation } from '../../store/api/testimonialsApi';
 import { addItem, updateQuantity, removeItem, updateSelection } from '../../store/slices/cartSlice';
 import { useUI } from '../../hooks/useRedux';
 import { useCartData } from '../../hooks/useCartSync';
+import FreeShippingStrip from '../../component/FreeShippingStrip';
 
 const MotionDiv = motion.div;
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
@@ -142,6 +145,7 @@ const ProductDetailPage = () => {
   const [updateCart] = useUpdateCartMutation();
   const [checkPincode, { isLoading: isCheckingPin }] = useCalculateShippingMutation();
   const { refetch: refetchCart } = useCartData();
+  const cartTotal = useSelector((state) => state.cart.totalAmount);
 
   const { data: reviewsData } = useGetProductReviewsQuery(productId);
   const [submitProductReview, { isLoading: isSubmittingReview }] = useSubmitProductReviewMutation();
@@ -239,7 +243,9 @@ const ProductDetailPage = () => {
     if (availableVariants.length > 0 && product) {
       let initial = availableVariants[0];
       if (urlVariantSku) {
-        const matched = product.variantDetails?.find((v) => v.sku === urlVariantSku);
+        // Older/sku-less links carry the variant name instead of the sku.
+        const matched = product.variantDetails?.find((v) => v.sku === urlVariantSku)
+          || product.variantDetails?.find((v) => v.variantName === urlVariantSku);
         if (matched) initial = matched.variantName;
       } else {
         const saved = cartSelections[product.productId];
@@ -261,6 +267,21 @@ const ProductDetailPage = () => {
     return (selectedDetail?.variantSubTag && selectedDetail.variantSubTag.trim()) || '';
   }, [product, selectedVariant]);
 
+  // Variant-first, product-level fallback — same rule as variantSubTag above,
+  // for the two other admin-editable fields a variant can now override:
+  // description and specifications. Blank/absent on the variant means "use
+  // the product-level value", never "show nothing" (that would hide real
+  // product-level copy just because this particular variant has no override).
+  const displayDescription = useMemo(() => {
+    const variantDes = selectedVariantObj?.variantDes?.trim();
+    return variantDes || product?.productSubDes || product?.productDes || '';
+  }, [selectedVariantObj, product]);
+
+  const displaySpecs = useMemo(() => {
+    const variantSpecs = selectedVariantObj?.specifications;
+    return variantSpecs && variantSpecs.length > 0 ? variantSpecs : product?.specifications || [];
+  }, [selectedVariantObj, product]);
+
   useEffect(() => {
     setPinStatus(null);
     setPinInput('');
@@ -280,7 +301,7 @@ const ProductDetailPage = () => {
   useEffect(() => {
     if (product && selectedVariant && viewedProductRef.current !== product.productId) {
       viewedProductRef.current = product.productId;
-      trackViewItem({ itemId: product.productId, itemName: product.productName, itemVariant: selectedVariant, price: currentPrice, quantity: 1 });
+      trackViewItem({ itemId: product.productId, sku: variantSku(product, selectedVariant), itemName: product.productName, itemVariant: selectedVariant, price: currentPrice, quantity: 1 });
     }
   }, [product?.productId, selectedVariant, currentPrice]);
 
@@ -324,17 +345,17 @@ const ProductDetailPage = () => {
         if (!silent) confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 }, colors: ['#E63329', '#C9281F', '#F3C33B', '#ffffff'] });
         setSelectedVariant(effectiveVariant);
         setFeedbackMessage('Added to cart'); setTimeout(() => setFeedbackMessage(''), 2000);
-        trackAddToCart({ itemId: product.productId, itemName: product.productName, itemVariant: effectiveVariant, price: currentPrice, quantity: 1, placement: silent ? 'pdp_buy_now' : 'pdp_main' });
+        trackAddToCart({ itemId: product.productId, sku: variantSku(product, effectiveVariant), itemName: product.productName, itemVariant: effectiveVariant, price: currentPrice, quantity: 1, placement: silent ? 'pdp_buy_now' : 'pdp_main' });
         return true;
       } catch (err) {
         showNotification(err.data?.message || 'Something went wrong', 'error');
         return false;
       }
     } else {
-      dispatch(addItem({ id: product?.productId, mongoId: product?.productId, name: product?.productName, price: currentPrice, image: selectedImage, quantity: 1, selectedVariant: effectiveVariant, giftWrapEligible: !!product?.giftWrapEligible }));
+      dispatch(addItem({ id: product?.productId, mongoId: product?.productId, name: product?.productName, price: currentPrice, image: selectedImage, quantity: 1, selectedVariant: effectiveVariant, giftWrapEligible: !!product?.giftWrapEligible, sku: variantSku(product, effectiveVariant) }));
       setSelectedVariant(effectiveVariant);
       setFeedbackMessage('Added to cart'); setTimeout(() => setFeedbackMessage(''), 2000);
-      trackAddToCart({ itemId: product.productId, itemName: product.productName, itemVariant: effectiveVariant, price: currentPrice, quantity: 1, placement: silent ? 'pdp_buy_now' : 'pdp_main' });
+      trackAddToCart({ itemId: product.productId, sku: variantSku(product, effectiveVariant), itemName: product.productName, itemVariant: effectiveVariant, price: currentPrice, quantity: 1, placement: silent ? 'pdp_buy_now' : 'pdp_main' });
       return true;
     }
   };
@@ -388,12 +409,14 @@ const ProductDetailPage = () => {
               quantity: 1,
               selectedVariant: variant,
               giftWrapEligible: !!combo.giftWrapEligible,
+              sku: variantDetail?.sku || '',
             }),
           );
         }
 
         trackAddToCart({
           itemId: combo.productId,
+          sku: variantDetail?.sku || '',
           itemName: combo.productName,
           itemVariant: variant,
           price,
@@ -425,7 +448,7 @@ const ProductDetailPage = () => {
         try { await updateCart({ productId: product.productId, quantity: 1, action: 'remove', variant: selectedVariant || undefined, image: selectedImage }).unwrap(); await refetchCart(); }
         catch { showNotification('Failed to update cart', 'error'); }
       } else dispatch(removeItem({ id: product?.productId, selectedVariant: selectedVariant || 'N/A' }));
-      trackRemoveFromCart({ itemId: product.productId, itemName: product.productName, itemVariant: selectedVariant, price: currentPrice, quantity: currentCartQty || 1 });
+      trackRemoveFromCart({ itemId: product.productId, sku: variantSku(product, selectedVariant), itemName: product.productName, itemVariant: selectedVariant, price: currentPrice, quantity: currentCartQty || 1 });
       return;
     }
     if (isLoggedIn) {
@@ -460,8 +483,11 @@ const ProductDetailPage = () => {
   };
 
   // ── Share — native sheet on mobile, social buttons on desktop ──
-  const shareUrl = `https://www.urbannook.in/product/${product?.productId}`;
-  const shareText = `${product?.productName || 'Urban Nook'} — Urban Nook`;
+  // Include the selected variant — without it the link opens the product's
+  // first variant (e.g. sharing Tanjiro opened Kokushibo).
+  const shareVariantKey = selectedVariantObj?.sku || selectedVariantObj?.variantName;
+  const shareUrl = `https://www.urbannook.in/product/${product?.productId}${shareVariantKey ? `/${encodeURIComponent(shareVariantKey)}` : ''}`;
+  const shareText = `${selectedVariant || product?.productName || 'Urban Nook'} — Urban Nook`;
   const openShare = (method, href) => {
     trackShare({ contentType: 'product', itemId: product.productId, method });
     window.open(href, '_blank', 'noopener,noreferrer');
@@ -548,20 +574,33 @@ const ProductDetailPage = () => {
   if (isLoading) return <div className="min-h-[70vh] grid place-items-center bg-paper"><div className="w-12 h-12 border-2 border-brand border-t-transparent rounded-full animate-spin" /></div>;
   if (error || !product) return (
     <div className="min-h-[70vh] grid place-items-center bg-paper font-inter text-center px-5">
+      <SEOHead title="Product not found" noIndex />
       <div><h1 className="text-3xl font-extrabold">Product not found</h1><button onClick={() => navigate('/products')} className="gl-press mt-5 bg-brand text-white font-bold px-7 py-3 rounded-xl hover:bg-brandHi">Back to Shop</button></div>
     </div>
   );
 
-  const specs = product.specifications || [];
+  const specs = displaySpecs;
   const structuredData = {
     '@context': 'https://schema.org', '@type': 'Product', name: product.productName, image: galleryImages, description: product.productSubDes || product.productDes, sku: product.productId,
     brand: { '@type': 'Brand', name: 'UrbanNook' },
-    offers: { '@type': 'Offer', url: `https://www.urbannook.in/product/${product.productId}`, priceCurrency: 'INR', price: currentPrice, availability: product.productStatus === 'in_stock' ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock' },
+    offers: { '@type': 'Offer', url: `https://www.urbannook.in/product/${product.productId}`, priceCurrency: 'INR', price: currentPrice, availability: product.productStatus === 'in_stock' ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock', itemCondition: 'https://schema.org/NewCondition' },
+    // Only real, approved reviews — never a placeholder rating.
+    ...(totalReviews > 0 && avgRating > 0 && {
+      aggregateRating: { '@type': 'AggregateRating', ratingValue: Number(avgRating).toFixed(1), reviewCount: totalReviews },
+    }),
+  };
+  const breadcrumbData = {
+    '@context': 'https://schema.org', '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://www.urbannook.in/' },
+      { '@type': 'ListItem', position: 2, name: 'Shop', item: 'https://www.urbannook.in/products' },
+      { '@type': 'ListItem', position: 3, name: product.productName, item: `https://www.urbannook.in/product/${product.productId}` },
+    ],
   };
 
   return (
     <div className="font-inter bg-paper text-ink min-h-screen overflow-x-clip">
-      <SEOHead title={product.productName} description={product.productSubDes || product.productDes} url={`/product/${product.productId}`} image={galleryImages[0]} structuredData={structuredData} />
+      <SEOHead title={product.productName} description={product.productSubDes || product.productDes} url={`/product/${product.productId}`} image={galleryImages[0]} type="product" structuredData={[structuredData, breadcrumbData]} />
 
       <div className="max-w-[1280px] mx-auto px-5 py-6 md:py-8">
         {/* breadcrumb */}
@@ -572,7 +611,7 @@ const ProductDetailPage = () => {
         <div className="grid lg:grid-cols-2 gap-8 lg:gap-10">
           {/* GALLERY — one big full-width framed image (swipe + dots on mobile, arrows on desktop) */}
           <div className="lg:sticky lg:top-24 self-start w-full min-w-0">
-            <ImageCarousel images={galleryImages} alt={product.productName} onImgErr={onImgErr} onItemClick={(i) => setLightbox({ list: galleryImages, idx: i })} />
+            <ImageCarousel priority images={galleryImages} alt={product.productName} onImgErr={onImgErr} onItemClick={(i) => setLightbox({ list: galleryImages, idx: i })} />
           </div>
 
           {/* INFO */}
@@ -580,17 +619,23 @@ const ProductDetailPage = () => {
             {/* ZONE A — IDENTITY (on paper): kicker + rating chip, title + heart, lede */}
             <div className="flex items-center justify-between gap-3">
               <p className="gl-lbl text-brand">{product.productSubCategory || product.productCategory || '3D Printed'}</p>
-              {totalReviews > 0 && (
+              {totalReviews > 0 && avgRating > 0 && (
                 <button onClick={() => document.getElementById('reviews')?.scrollIntoView({ behavior: 'smooth' })} className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-hair px-2.5 py-1 hover:border-ink transition-colors">
-                  <Stars n={avgRating || 5} className="text-xs" />
-                  <span className="text-xs font-bold text-ink">{(avgRating || 4.8).toFixed?.(1) || avgRating}</span>
+                  <Stars n={avgRating} className="text-xs" />
+                  <span className="text-xs font-bold text-ink">{Number(avgRating).toFixed(1)}</span>
                   <span className="text-xs text-muted">({totalReviews})</span>
                 </button>
               )}
             </div>
             <div className="flex items-start justify-between gap-3 mt-2">
               <div className="min-w-0">
-                <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-ink leading-tight">{selectedVariant || product.productName}</h1>
+                {/* No line-clamp — a long name used to get cut off with an
+                    ellipsis after 2 lines on mobile. min-h is a MINIMUM, not
+                    a cap, so it still keeps short titles' height consistent
+                    without truncating a longer one. */}
+                <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-ink leading-tight min-h-[66px] md:min-h-[80px]">
+                  {selectedVariant || product.productName}
+                </h1>
                 {selectedVariantSubTag && (
                   <p className="text-base md:text-lg font-normal text-muted leading-snug mt-1">{selectedVariantSubTag}</p>
                 )}
@@ -612,18 +657,23 @@ const ProductDetailPage = () => {
                 <button onClick={copyShareLink} aria-label="Copy link" className="w-9 h-9 grid place-items-center rounded-full border border-hair text-ink hover:border-ink hover:bg-surface transition-colors"><i className="fa-solid fa-link text-xs" /></button>
               </div>
             )}
-            {(product.productDes || product.productSubDes) && <p className="text-sm text-muted leading-relaxed mt-2 line-clamp-2">{product.productDes || product.productSubDes}</p>}
+            {/* {displayDescription && <p className="text-xs text-muted leading-relaxed mt-2">{displayDescription}</p>} */}
 
-            {/* ZONE B — BUY CARD: price → savings → variants → urgency → CTA → trust, one unit */}
-            <div className="mt-5  bg-paper p-4 md:p-5 md:max-w-md">
+            {/* ZONE B — BUY CARD: price → savings → variants → urgency → CTA → trust, one unit.
+                py only, no px: the horizontal p-4/p-5 used to indent this
+                whole block (price, buttons, trust strip) further right than
+                Zone A's title/kicker above it, which sit with no padding of
+                their own — everything below looked shifted right instead of
+                lining up to the same left edge. Vertical spacing is kept. */}
+            <div className="mt-5  bg-paper py-4 md:py-5 md:max-w-md">
               {/* price hero */}
-              <div className="flex items-baseline flex-wrap gap-x-3 gap-y-1">
+              <div className="flex items-center gap-2">
                 <span className="text-4xl md:text-5xl font-extrabold text-ink tracking-tight tabular-nums leading-none">{inr(currentPrice)}</span>
                 {discountPercent > 0 && (
-                  <>
-                    <span className="text-base text-faint line-through tabular-nums">{inr(maxVariantPrice)}</span>
+                  <div className="flex flex-col items-start gap-0.5">
                     <span className="gl-lbl text-[11px] text-sale bg-sale/10 px-2 py-0.5 rounded-md">{discountPercent}% OFF</span>
-                  </>
+                    <span className="text-xs text-faint line-through tabular-nums">{inr(maxVariantPrice)}</span>
+                  </div>
                 )}
               </div>
               {discountPercent > 0 && <p className="text-sm font-semibold text-save mt-1">You save {inr(maxVariantPrice - currentPrice)}</p>}
@@ -653,7 +703,7 @@ const ProductDetailPage = () => {
               />
 
               {/* urgency + delivery */}
-              <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs mt-4">
+              {/* <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs mt-4">
                 {isOutOfStock ? (
                   <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-faint" /><span className="text-muted font-semibold">Out of stock</span></span>
                 ) : selectedVariantLowStock && selectedVariantQty !== 1 ? (
@@ -661,8 +711,8 @@ const ProductDetailPage = () => {
                 ) : (
                   <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-save" /><span className="text-ink font-semibold">In stock</span></span>
                 )}
-                <span className="text-muted">🚚 Ships in 24-48 hrs</span>
-              </div>
+                <span className="text-muted"><i className="fa-solid fa-truck-fast mr-1" aria-hidden="true" />Ships in 24-48 hrs</span>
+              </div> */}
 
               {/* CTA */}
               <div ref={buyBoxRef} className="flex items-center gap-3 mt-4">
@@ -693,6 +743,10 @@ const ProductDetailPage = () => {
                   </>
                 )}
               </div>
+
+              {/* Free-shipping threshold, right under the CTA where the buy
+                  decision happens — hidden unless admin's promotion is on. */}
+              {!isOutOfStock && <FreeShippingStrip cartTotal={cartTotal} variant="compact" className="mt-3" />}
 
               {/* Customization — admin opt-in per product (product.isCustomizable),
                   not every product is customisable. Carries the product (and the
@@ -758,10 +812,13 @@ const ProductDetailPage = () => {
 
               {/* trust strip inside the card */}
               <div className="mt-4 pt-4 border-t border-hair grid grid-cols-3 divide-x divide-hair text-center text-[11px] text-muted">
-                <div className="px-1 flex flex-col items-center gap-1"><span className="text-lg">🚚</span>24-48 hrs</div>
-                <div className="px-1 flex flex-col items-center gap-1"><span className="text-lg">💸</span>{product.isCodAvailable ? 'Partial COD' : 'Secure pay'}</div>
-                <div className="px-1 flex flex-col items-center gap-1"><span className="text-lg">↺</span>Free replacement if damaged</div>
+                <div className="px-1 flex flex-col items-center gap-1"><i className="fa-solid fa-truck-fast text-brand text-base" aria-hidden="true" />24-48 hrs</div>
+                <div className="px-1 flex flex-col items-center gap-1"><i className="fa-solid fa-money-bill-wave text-brand text-base" aria-hidden="true" />{product.isCodAvailable ? 'Partial COD' : 'Secure pay'}</div>
+                <div className="px-1 flex flex-col items-center gap-1"><i className="fa-solid fa-rotate-left text-brand text-base" aria-hidden="true" />Free replacement if damaged*</div>
               </div>
+              <p className="mt-1.5 text-[8px] text-faint text-center">
+                *Applicable only with an unboxing video showing the damaged product and its shipping label.
+              </p>
             </div>
 
             {/* OFFERS — UPI / EMI / card offers, applied via Razorpay at checkout */}
@@ -797,13 +854,20 @@ const ProductDetailPage = () => {
                 whose pairing was a guess in code — if you were looking at a pen
                 stand it showed a lamp, otherwise a pen stand — and whose copy
                 ("Frequently bought together") claimed data we do not have.
-                FreeShippingBanner was written for exactly this spot (see its
-                docstring) and was simply never wired in: it reads the offers an
-                admin actually configured, pages through them when a product has
-                several, takes its wording and CTA from the admin, and reports
-                impressions and clicks under this surface. It renders nothing
-                when no offer applies to this product. */}
-            <FreeShippingBanner productId={productId} surface="pdp" className="mt-4 md:max-w-md" />
+                FreeShippingBanner reads the offers an admin actually
+                configured (admin panel Offers page), pages through them when
+                a product has several, takes its wording and CTA from the
+                admin, and reports impressions and clicks under this surface.
+                It renders nothing when no offer applies to this product. */}
+            {/* <FreeShippingBanner productId={productId} surface="pdp" className="mt-4 md:max-w-md" /> */}
+
+            {/* Plain "Buy X, get Y" nudge using the SAME admin-configured
+                Product Page Banners, but with the admin's own banner.text
+                shown as-is (no baked-in "free shipping" wording) — see
+                ProductPageBanner.jsx for why this is a separate component
+                from FreeShippingBanner above. Renders nothing if no banner
+                targets this product. */}
+            <ProductPageBanner productId={productId} className="mt-3 md:max-w-md" />
 
           </div>
         </div>
@@ -814,8 +878,8 @@ const ProductDetailPage = () => {
           <p className="gl-lbl text-brand mb-2 text-center">The full rundown</p>
           <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight mb-6 text-center">Product details</h2>
           <div className="divide-y divide-hair border-y border-hair">
-            {(product.productSubDes || product.productDes) && (
-              <details open className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Description<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary><p className="text-muted mt-3 text-sm leading-relaxed">{product.productSubDes || product.productDes}</p></details>
+            {displayDescription && (
+              <details open className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Description<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary><p className="text-muted mt-3 text-xs leading-relaxed">{displayDescription}</p></details>
             )}
             {specs.length > 0 && (
               <details className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Specifications<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary>
@@ -884,32 +948,10 @@ const ProductDetailPage = () => {
           </ScrollColorBand>
         )}
 
-        {/* WHY URBAN NOOK — comparison / trust table */}
-        <section className="mt-14">
-          <p className="gl-lbl text-brand mb-2 text-center">Why Urban Nook</p>
-          <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight mb-6 text-center">Made different.</h2>
-          <div className="max-w-lg mx-auto rounded-2xl border border-hair overflow-hidden">
-            <div className="grid grid-cols-[1fr_64px_64px] items-center px-4 py-2.5 bg-paper">
-              <span />
-              <span className="text-center text-[11px] font-extrabold uppercase tracking-wide text-brand">Us</span>
-              <span className="text-center text-[11px] font-extrabold uppercase tracking-wide text-faint">Others</span>
-            </div>
-            {[
-              '3D-printed to order',
-              'Original Indian design',
-              'Handcrafted finish',
-              'Partial COD',
-              'Free replacement if damaged',
-              'Made in India 🇮🇳',
-            ].map((label, i) => (
-              <div key={i} className="grid grid-cols-[1fr_64px_64px] items-center px-4 py-2.5 border-t border-hair">
-                <span className="text-sm font-semibold">{label}</span>
-                <span className="grid place-items-center"><span className="w-6 h-6 rounded-full bg-brand text-white grid place-items-center text-xs">✓</span></span>
-                <span className="grid place-items-center text-faint">✕</span>
-              </div>
-            ))}
-          </div>
-        </section>       
+        {/* WHY URBAN NOOK — comparison table (ComparisonTable.jsx). Same
+            layout/animations as before, recoloured to the site's red/black
+            theme using only the existing --gl-* tokens (see that file). */}
+        <ComparisonTable productName={product.productName} />
 
         {/* REVIEWS — full-bleed LIGHT-GREY (surface) band */}
         <div className="w-screen ml-[calc(50%-50vw)] bg-paper mt-16">
@@ -976,7 +1018,7 @@ const ProductDetailPage = () => {
                     <div className="flex items-center justify-between"><Stars n={rev.rating} className="text-sm" />{rev.userId && rev.userId === currentUserId && <button onClick={() => handleEditReview(rev)} className="text-xs text-brand font-semibold">Edit</button>}</div>
                     <p className="text-muted text-sm mt-2">{rev.desc}</p>
                     {imgs.length > 0 && (
-                      <div className="flex gap-2 mt-3">{imgs.map((u, i) => <button key={i} onClick={() => setLightbox({ list: imgs, idx: i })} className="w-14 h-14 rounded-lg overflow-hidden border border-hair"><img src={u} alt="" className="w-full h-full object-cover" /></button>)}</div>
+                      <div className="flex gap-2 mt-3">{imgs.map((u, i) => <button key={i} onClick={() => setLightbox({ list: imgs, idx: i })} className="w-14 h-14 rounded-lg overflow-hidden border border-hair"><img src={u} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" /></button>)}</div>
                     )}
                     <p className="mt-3 text-xs font-bold">{rev.userName || 'Customer'}{rev.verified !== false ? ' · Verified' : ''}</p>
                   </div>
@@ -1029,7 +1071,18 @@ const ProductDetailPage = () => {
         {related.length > 0 && (
           <div className="mt-16">
             <div className="flex items-end justify-between mb-6"><h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">You may also like</h2><button onClick={() => navigate('/products')} className="text-sm font-bold underline underline-offset-4 decoration-2 hover:text-brand">View all →</button></div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">{related.map((p, i) => <UnProductCard key={p.productId || i} p={p} index={i} listId="pdp_related" listName="Related" />)}</div>
+            {/* Single scrollable row (matches the old site's layout) instead
+                of a multi-row grid — the card design itself is unchanged. */}
+            <div
+              className="flex gap-4 md:gap-6 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              style={{ touchAction: 'pan-x' }}
+            >
+              {related.map((p, i) => (
+                <div key={p.productId || i} className="snap-start shrink-0 w-[160px] sm:w-[190px] md:w-[220px]">
+                  <UnProductCard p={p} index={i} listId="pdp_related" listName="Related" />
+                </div>
+              ))}
+            </div>
           </div>
         )}
           {productFaqs.length > 0 && (
@@ -1109,7 +1162,8 @@ const ProductDetailPage = () => {
         <NotifyMeModal
           productName={product?.productName}
           productId={product?.productId}
-          variantName={selectedVariant || null}
+          variantName={selectedVariant || availableVariants[0] || null}
+          variants={(product?.variantDetails || []).map((v) => ({ name: v.variantName, outOfStock: isVariantOutOfStock(v) }))}
           onClose={() => setShowNotifyModal(false)}
         />
       )}

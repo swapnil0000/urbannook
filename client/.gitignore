@@ -30,3 +30,5 @@ client/.env.production
 *.sln
 *.sw?
 # merge with main 2
+# SEO prerender output (uploaded by prod-deploy.yml)
+dist-prerender

@@ -26,6 +26,10 @@ const PaymentProcessing = () => {
 
     let cancelled = false;
     let attempts = 0;
+    // The server only answers FAILED after checking Razorpay has no captured or
+    // pending payment, but a capture can still be a moment behind — so FAILED
+    // must repeat before we tell someone who may have paid that they did not.
+    let failedStreak = 0;
     const MAX_ATTEMPTS = 30; // 60 seconds max (30 × 2s)
 
     const checkStatus = async () => {
@@ -73,7 +77,8 @@ const PaymentProcessing = () => {
           return;
         }
 
-        if (status === "FAILED") {
+        failedStreak = status === "FAILED" ? failedStreak + 1 : 0;
+        if (status === "FAILED" && failedStreak >= 3) {
           cancelled = true;
           clearInterval(interval);
           showNotificationRef.current("Payment failed. Please try again or contact support.", "error");

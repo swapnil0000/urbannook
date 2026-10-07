@@ -12,7 +12,9 @@ import Cart from "../model/user.cart.model.js";
 import env from "../config/envConfigSetup.js";
 import Coupon from "../model/coupon.model.js";
 import CouponUsage from "../model/couponUsage.model.js";
-import { backfillUserProfileFromCheckout } from "../services/user.profile.service.js";
+import PromotionUsage from "../model/promotionUsage.model.js";
+import Promotion from "../model/promotion.model.js";
+import { backfillUserProfileFromCheckout, PLACEHOLDER_NAME } from "../services/user.profile.service.js";
 import {
   isMagicCheckoutEnabled,
   isMagicGuestsOnly,
@@ -37,15 +39,58 @@ import html_to_pdf from "html-pdf-node";
 import { generateInvoiceHtmlTemplate } from "../template/invoiceTemplate.template.js";
 import { calculateShippingRate, FALLBACK_SHIPPING_CHARGE } from "../services/shipping.service.js";
 import { apiCache } from "../module/cache.manager.module.js";
+import { sortVariantsOOSLast, deriveProductStatus, syncVariantOutOfStock } from "../utils/variantSort.js";
 
 // ── Per-variant stock decrement ───────────────────────────────────────────────
+// A "buy X get Y [% off/free]" reward (cart_rule or Promotion V2) must only
+// discount up to `cap` units of Y — NOT the entire line regardless of
+// quantity. Without this, a customer adding 2+ of the discounted/free
+// product got ALL of them at the discounted price (e.g. 2 stands both free
+// off a single Katana), not just one — a real revenue leak, not a display
+// bug (priceAtPurchase is what's actually charged and invoiced).
+//
+// Mutates `oi` in place to the capped quantity + discounted price, and — if
+// the cart quantity exceeds `cap` — returns a SECOND order item for the
+// remainder at full price (same productId/variant, same pattern already
+// used for the free_product gift line below: a product can legitimately
+// appear as more than one line in `orderItems`). Returns null when no split
+// is needed (quantity already <= cap, or the discount didn't actually lower
+// the price — e.g. a reward with no matching candidate).
+// The admin-configured cap for whichever candidate(s) matched this line —
+// see cartRule.util.js's ruleRepeatCount / promotionEngine.util.js's
+// promotionRepeatCount for how `cap` itself is computed (purely from the
+// rule's own condition minQuantity vs. real cart quantity, never guessed
+// here). When more than one rule discounts the same line, the most
+// generous applicable cap wins — consistent with applyBestDiscount/
+// applyBestPromotionDiscount already picking the best PRICE among
+// candidates for the same line.
+function capDiscountedQuantity(oi, fullUnitPrice, discountedUnitPrice, cap = 1) {
+  const quantity = oi.productSnapshot.quantity;
+  oi.productSnapshot.priceAtPurchase = discountedUnitPrice;
+  if (discountedUnitPrice >= fullUnitPrice || quantity <= cap) return null;
+
+  const remainder = quantity - cap;
+  oi.productSnapshot.quantity = cap;
+  return {
+    productId: oi.productId,
+    variantSku: oi.variantSku,
+    productSnapshot: { ...oi.productSnapshot, quantity: remainder, priceAtPurchase: fullUnitPrice, isPromotionalGift: false },
+  };
+}
+
 // Runs once, atomically, the moment an order is confirmed PAID. For each ordered
 // item we decrement THAT variant's tracked quantity (variantQuantity) by the
 // purchased quantity. Variants with no tracked quantity (null) are skipped —
 // they aren't stock-managed. The update is atomic ($inc on the positionally
-// matched variant) so concurrent orders don't clobber each other. When a
-// quantity crosses 0 the variant auto-derives out-of-stock everywhere (the OOS
-// rule is computed, not stored). Best-effort: never throws into the payment flow.
+// matched variant), GUARDED by variantQuantity >= qty so two concurrent
+// last-unit payment confirmations can't both succeed and push stock negative
+// (the earlier assertVariantAvailable check at order-creation time is a
+// courtesy UX check only — a plain read, not a lock — so this guard at the
+// actual write is what actually prevents overselling). When a quantity
+// crosses 0 the variant auto-derives out-of-stock everywhere (the OOS rule is
+// computed, not stored) — and its position in the array is pushed to the end
+// (see sortVariantsOOSLast) so it doesn't keep sitting among in-stock ones.
+// Best-effort: never throws into the payment flow.
 const decrementStockForOrder = async (order) => {
   let anyChanged = false;
   for (const item of order.items || []) {
@@ -54,16 +99,34 @@ const decrementStockForOrder = async (order) => {
     if (!item.productId || !qty || qty < 1) continue;
     if (!variantName || variantName === "N/A") continue; // single-design / no variant
     try {
+      // Read first to tell "untracked" (variantQuantity null — correctly a
+      // no-op) apart from "tracked but not enough left" (the case the write
+      // guard below exists for) so only the latter gets logged as a problem.
+      const productDoc = await Product.findOne(
+        { productId: item.productId, "variantDetails.variantName": variantName },
+        { "variantDetails.$": 1 },
+      ).lean();
+      const trackedVariant = productDoc?.variantDetails?.[0];
+      if (!trackedVariant || trackedVariant.variantQuantity == null) continue; // not stock-tracked
+
       const res = await Product.updateOne(
         {
           productId: item.productId,
-          variantDetails: { $elemMatch: { variantName, variantQuantity: { $ne: null } } },
+          variantDetails: { $elemMatch: { variantName, variantQuantity: { $ne: null, $gte: qty } } },
         },
         // Decrement the variant AND the product-level total (kept = sum of
         // tracked variant quantities) so both stay consistent between admin saves.
         { $inc: { "variantDetails.$.variantQuantity": -qty, productQuantity: -qty } },
       );
-      if (res.modifiedCount > 0) anyChanged = true;
+      if (res.modifiedCount > 0) {
+        anyChanged = true;
+        await resortVariantsIfNeeded(item.productId);
+      } else {
+        // Tracked, but not enough stock left at decrement time (the race this
+        // guard exists for). Order is already PAID; no refund/cancellation is
+        // triggered here (out of scope), just surfaced for manual follow-up.
+        console.error(`[Stock] insufficient stock at decrement time order=${order.orderId} product=${item.productId} variant=${variantName} qty=${qty}`);
+      }
     } catch (err) {
       console.error(`[Stock] decrement failed order=${order.orderId} product=${item.productId} variant=${variantName}:`, err.message);
     }
@@ -72,6 +135,34 @@ const decrementStockForOrder = async (order) => {
   // the new stock (and any freshly out-of-stock variant) right away.
   if (anyChanged) {
     try { apiCache.clear(); } catch { /* best-effort */ }
+  }
+};
+
+// After a successful decrement: auto-flip variantOutOfStock for the variant
+// that just hit 0 (quantity is the source of truth for any TRACKED variant —
+// this is the ONE write path where quantity changes with zero admin anywhere
+// near the edit form, so it's the one place that actually needs to sync the
+// stored flag itself rather than relying on the admin server's own
+// save-time sync). Then re-sort so any newly-OOS variant sinks to the end —
+// mirrors the admin server's on-save sort (product.controller.js). Also
+// re-derives productStatus from the fresh stock, same reasoning.
+const resortVariantsIfNeeded = async (productId) => {
+  try {
+    const doc = await Product.findOne({ productId }, { variantDetails: 1, productQuantity: 1, productStatus: 1 }).lean();
+    if (!doc?.variantDetails?.length) return;
+    const synced = syncVariantOutOfStock(doc.variantDetails);
+    const flagsChanged = synced.some((v, i) => v.variantOutOfStock !== doc.variantDetails[i]?.variantOutOfStock);
+    const sorted = sortVariantsOOSLast(synced);
+    const reordered = sorted.some((v, i) => v.variantName !== doc.variantDetails[i]?.variantName);
+    const update = {};
+    if (flagsChanged || reordered) update.variantDetails = sorted;
+    const derivedStatus = deriveProductStatus(synced, doc.productQuantity, doc.productStatus);
+    if (derivedStatus !== doc.productStatus) update.productStatus = derivedStatus;
+    if (Object.keys(update).length) {
+      await Product.updateOne({ productId }, { $set: update });
+    }
+  } catch (err) {
+    console.error(`[Stock] OOS resort/status update failed product=${productId}:`, err.message);
   }
 };
 
@@ -123,10 +214,20 @@ const getShippingRateOrFallback = async (params) => {
   }
 };
 import { isFreeShippingEligible, getFreeShippingConfig } from "../utils/freeShippingOffer.util.js";
-import { getActiveCartRules, evaluateCartRules, applyBestDiscount, getDiscountCandidatesForItem } from "../utils/cartRule.util.js";
+import { getActiveCartRules, evaluateCartRules, applyBestDiscount, getDiscountCandidatesForItem, createRuleBudgetTracker, withRuleBudget, spendRuleBudget, applicableCap } from "../utils/cartRule.util.js";
+// Promotion Engine V2 — separate collection/evaluator, additive only. See
+// promotionEngine.util.js's file header and the wiring comment below.
+import {
+  getActivePromotions,
+  evaluatePromotions,
+  buildCartContext,
+  applyBestPromotionDiscount,
+  getDiscountCandidatesForItem as getPromotionDiscountCandidatesForItem,
+} from "../utils/promotionEngine.util.js";
 import { getPublicOfferConfig } from "../utils/offer.util.js";
 import { sendMetaCapiEvent } from "../services/meta.capi.service.js";
 import { recordServerPurchase } from "../services/purchaseEvent.service.js";
+import { sendGa4ServerPurchase } from "../services/ga4.mp.service.js";
 
 // Collect Meta CAPI match-quality signals from the order-creation request.
 // The webhook (Razorpay → server) has no browser context, so we persist these on
@@ -139,6 +240,8 @@ const collectMetaTracking = (req) => ({
     req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.ip || null,
   clientUserAgent: req.headers["user-agent"] || null,
   eventSourceUrl: req.headers["referer"] || req.headers["origin"] || null,
+  gaClientId: req.body?.gaClientId || null, // GA4 Measurement Protocol fallback purchase
+  gaSessionId: req.body?.gaSessionId || null,
 });
 
 // Pull the address Razorpay collected inside the Magic modal onto our order,
@@ -450,21 +553,144 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity, variantSku: oi.variantSku })),
     activeCartRules,
   );
+  // Shared across BOTH the cart_rule loop below and the Promotion V2 loop
+  // further down — a rule's ruleId is the same promotion _id either way
+  // (see promotionToCartRule.adapter.js), so one tracker keeps sibling
+  // reward lines in sync regardless of which path evaluated them.
+  const ruleBudgets = createRuleBudgetTracker(cartRuleResult.discountCandidatesByProduct);
+  const extraDiscountLines = [];
   for (const oi of orderItems) {
-    const candidates = getDiscountCandidatesForItem(cartRuleResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
+    const rawCandidates = getDiscountCandidatesForItem(cartRuleResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
+    const candidates = withRuleBudget(rawCandidates, ruleBudgets);
     if (candidates?.length) {
-      oi.productSnapshot.priceAtPurchase = applyBestDiscount(oi.productSnapshot.priceAtPurchase, candidates);
+      const fullPrice = oi.productSnapshot.priceAtPurchase;
+      const discountedPrice = applyBestDiscount(fullPrice, candidates);
+      // Cap scales with how many times the rule's own condition is
+      // satisfied (e.g. 2x the trigger product → up to 2 discounted units)
+      // — never a flat 1 — and is already clamped to this rule's remaining
+      // shared budget by withRuleBudget above. See applicableCap /
+      // ruleRepeatCount / createRuleBudgetTracker.
+      const cap = applicableCap(candidates);
+      const unitsUsed = Math.min(oi.productSnapshot.quantity, cap);
+      const remainderLine = capDiscountedQuantity(oi, fullPrice, discountedPrice, cap);
+      spendRuleBudget(candidates, ruleBudgets, unitsUsed);
+      if (remainderLine) extraDiscountLines.push(remainderLine);
+      // A cart_rule discount that zeroes an item's price out (e.g. a
+      // percent_off 100 "get this free" offer) marks it as a promotional
+      // gift for admin/order views — same field the Promotion V2
+      // free_product reward uses (see below), so both paths to a genuinely
+      // free line item are marked identically regardless of which system
+      // granted it.
+      if (oi.productSnapshot.priceAtPurchase === 0) oi.productSnapshot.isPromotionalGift = true;
     }
+  }
+  if (extraDiscountLines.length) orderItems.push(...extraDiscountLines);
+
+  // ── Promotion Engine V2 — separate collection, evaluated ADDITIONALLY to
+  // the cart_rule block above, never replacing it. See promotionEngine
+  // .util.js's file header. Only applies a product-level discount to a
+  // product the legacy cart_rule engine did NOT already discount (checked via
+  // cartRuleResult.discountCandidatesByProduct below) — avoids any
+  // double-discount risk without needing a cross-system priority model.
+  // Customer/geo/date-time targeting conditions are evaluated with partial
+  // context here (orderCount/deliveryAddress not resolved at this point in
+  // the flow yet) — a promotion using those simply won't match until that
+  // context is wired through (planned follow-up), same as any other
+  // targeting condition the caller doesn't supply context for.
+  const activePromotions = await getActivePromotions();
+  const promoProductMeta = new Map(
+    products.map((p) => [p.productId, { category: p.productCategory, subcategory: p.productSubCategory, tags: p.tags || [] }]),
+  );
+  const promoCartItems = orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity, variantSku: oi.variantSku }));
+  const promoSubtotalSoFar = orderItems.reduce((s, i) => s + i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity, 0);
+  const promoCtx = buildCartContext(promoCartItems, { subtotal: promoSubtotalSoFar, productMeta: promoProductMeta, customerType: "registered" });
+  const promotionResult = evaluatePromotions(promoCartItems, promoCtx, activePromotions);
+  // A promotion not representable as a flat cart_rule (OR conditions, a
+  // non-product leaf, etc.) never appears in cartRuleResult at all, so its
+  // ruleId wouldn't be seeded yet — merge any new ones in now, same
+  // first-seen-wins seeding as createRuleBudgetTracker itself.
+  for (const candidates of promotionResult.discountCandidatesByProduct.values()) {
+    for (const c of candidates) {
+      if (c.ruleId && !ruleBudgets.has(c.ruleId)) ruleBudgets.set(c.ruleId, c.cap);
+    }
+  }
+
+  const extraPromoDiscountLines = [];
+  for (const oi of orderItems) {
+    if (getDiscountCandidatesForItem(cartRuleResult.discountCandidatesByProduct, oi.productId, oi.variantSku)?.length) continue; // legacy cart_rule already discounted this line
+    const rawCandidates = getPromotionDiscountCandidatesForItem(promotionResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
+    const candidates = withRuleBudget(rawCandidates, ruleBudgets);
+    if (candidates?.length) {
+      const fullPrice = oi.productSnapshot.priceAtPurchase;
+      const discountedPrice = applyBestPromotionDiscount(fullPrice, candidates);
+      // Same dynamic cap as the cart_rule block above.
+      const cap = applicableCap(candidates);
+      const unitsUsed = Math.min(oi.productSnapshot.quantity, cap);
+      const remainderLine = capDiscountedQuantity(oi, fullPrice, discountedPrice, cap);
+      spendRuleBudget(candidates, ruleBudgets, unitsUsed);
+      if (remainderLine) extraPromoDiscountLines.push(remainderLine);
+    }
+  }
+  if (extraPromoDiscountLines.length) orderItems.push(...extraPromoDiscountLines);
+
+  // free_product reward: append a synthetic ₹0 line, flagged
+  // isPromotionalGift so admin/order views can tell it apart from a paid
+  // item. Runs through the EXACT SAME assertVariantAvailable-guarded stock
+  // check as a real line (reused, not reimplemented) — if the gift target is
+  // OOS/deleted, it's silently skipped (order still proceeds), matching the
+  // existing "[Stock] insufficient stock" precedent for real items.
+  for (const gift of promotionResult.freeGifts) {
+    if (!gift.targetProductId) continue; // gift_choice (pick-1-of-N) needs a cart-side choice step — not wired here yet
+    try {
+      const giftProduct = products.find((p) => p.productId === gift.targetProductId) || (await Product.findOne({ productId: gift.targetProductId, productStatus: "in_stock" }));
+      if (!giftProduct) { console.error(`[PromotionV2] free_product target not found/inactive: ${gift.targetProductId} (promotion ${gift.promotionId})`); continue; }
+      const giftVariant = gift.targetVariantSku
+        ? giftProduct.variantDetails?.find((v) => v.sku === gift.targetVariantSku)
+        : giftProduct.variantDetails?.[0];
+      const giftVariantName = giftVariant?.variantName || "N/A";
+      assertVariantAvailable(giftProduct, giftVariantName, 1);
+      orderItems.push({
+        productId: giftProduct.productId,
+        variantSku: giftVariant?.sku || "",
+        productSnapshot: {
+          quantity: 1,
+          productImg: giftVariant?.variantImage?.[0] || giftProduct.productImg || "https://urbannook.in/assets/logo.webp",
+          productName: giftProduct.productName,
+          productCategory: giftProduct.productCategory,
+          productSubCategory: giftProduct.productSubCategory,
+          priceAtPurchase: 0,
+          shipping: "0",
+          selectedVariant: giftVariantName,
+          variantTitleTemplate: giftProduct.variantTitleTemplate || "",
+          variantSku: giftVariant?.sku || "",
+          isPromotionalGift: true,
+        },
+      });
+    } catch (err) {
+      console.error(`[PromotionV2] free_product gift skipped (${gift.targetProductId}, promotion ${gift.promotionId}):`, err.message);
+    }
+  }
+
+  // A WhatsApp-login account starts as "User 2393"; that placeholder must never
+  // reach the order or the courier label, so it is skipped at every step.
+  const realName = (n) => {
+    const clean = String(n ?? "").trim();
+    return clean && !PLACEHOLDER_NAME.test(clean) ? clean : "";
+  };
+  const resolvedFullName =
+    realName(clientAddress?.fullName) ||
+    realName(selectedAddr?.fullName) ||
+    realName(user?.userName) ||
+    realName(user?.name);
+
+  // Magic collects the name in its own modal and the webhook writes it later
+  if (!isMagic && !resolvedFullName) {
+    throw new ValidationError("Please enter your full name to place the order");
   }
 
   const deliveryAddressSnapshot = {
     addressId: addressId,
-    fullName:
-      clientAddress?.fullName ||
-      selectedAddr?.fullName ||
-      user?.userName ||
-      user?.name ||
-      "Customer",
+    fullName: resolvedFullName || "Customer",
     mobileNumber:
       clientAddress?.mobileNumber ||
       selectedAddr?.mobileNumber ||
@@ -524,7 +750,22 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   // Recompute subtotal from actual order items — authoritative, not from cart snapshot.
   // Computed AFTER the cart-rule discount loop above has already reduced any
   // discounted items' priceAtPurchase, so this naturally includes those discounts.
-  const subtotal = orderItems.reduce((s, i) => s + (i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity), 0);
+  let subtotal = orderItems.reduce((s, i) => s + (i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity), 0);
+
+  // Promotion V2 order-level discounts (percent_off_order / flat_off_order —
+  // "spend ₹2000+, get 10% off the whole order") — evaluated against the
+  // GROSS subtotal above (product-level discounts already baked in, same as
+  // any other threshold condition), applied here as a further deduction.
+  // Multiple matched order-level rewards: the one giving the BIGGEST ₹
+  // saving wins (same "best for the customer" convention as product
+  // discounts), capped so it can never exceed the subtotal itself.
+  if (promotionResult.orderLevelDiscounts?.length) {
+    const amounts = promotionResult.orderLevelDiscounts.map((d) =>
+      d.type === "percent_off_order" ? subtotal * (Number(d.value) / 100) : Number(d.value),
+    );
+    const promotionOrderDiscount = Math.round(Math.min(Math.max(...amounts, 0), subtotal));
+    subtotal -= promotionOrderDiscount;
+  }
 
   // Free shipping unlocks via ANY of: the combo-banner offer (source +
   // recommended product both present), any active generic cart rule whose
@@ -533,12 +774,15 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   // direct comparison, whole-cart (any products count), no rules table.
   const freeShippingConfig = await getFreeShippingConfig();
   const thresholdEligible = freeShippingConfig.isActive && subtotal >= freeShippingConfig.thresholdAmount;
+  const comboFsEligible = await isFreeShippingEligible(orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity, variantSku: oi.variantSku })));
   const freeShippingUnlocked =
-    (await isFreeShippingEligible(items.map((i) => i.productId))) || cartRuleResult.freeShipping || thresholdEligible;
+    comboFsEligible || cartRuleResult.freeShipping || thresholdEligible || promotionResult.freeShipping;
   const chargedShippingAmount = freeShippingUnlocked ? 0 : realShippingAmount;
-  // console.log(
-  //   `[FreeShipping][Order:auth] realShipping=₹${realShippingAmount} chargedShipping=₹${chargedShippingAmount} items=${items.map(i => `${i.productId}x${i.quantity}`).join(",")}`,
-  // );
+  console.log(
+    `[FreeShipping][Order:auth] items=[${orderItems.map((oi) => `${oi.productId}x${oi.productSnapshot.quantity}${oi.variantSku ? `(${oi.variantSku})` : ""}`).join(",")}] ` +
+    `signals={comboFsEligible:${comboFsEligible}, cartRuleFreeShipping:${cartRuleResult.freeShipping}, thresholdEligible:${thresholdEligible}(threshold=₹${freeShippingConfig.thresholdAmount}, subtotal=₹${subtotal}), promotionFreeShipping:${promotionResult.freeShipping}} ` +
+    `→ freeShippingUnlocked=${freeShippingUnlocked}, realShipping=₹${realShippingAmount}, chargedShipping=₹${chargedShippingAmount}`,
+  );
 
   // Gift wrap: server-authoritative price + intent. `cart.giftWrap` is the
   // ONLY source for "did they select it" (never req.body); price always comes
@@ -699,6 +943,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       if (identifiers.length > 0 && liveCoupon.maxUsesPerUser) {
         const priorUses = await CouponUsage.countDocuments({
           couponId: couponCodeId,
+          reversed: { $ne: true },
           $or: [
             ...(normEmailCheck  ? [{ email:  normEmailCheck  }] : []),
             ...(normMobileCheck ? [{ mobile: normMobileCheck }] : []),
@@ -843,6 +1088,11 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     userName: deliveryAddressSnapshot.fullName,
     userMobile: deliveryAddressSnapshot.mobileNumber,
     items: orderItems,
+    // Promotion Engine V2 — snapshot of which promotions matched at order-
+    // creation time (see the wiring comment above). Empty when none matched.
+    appliedPromotions: promotionResult.matchedPromotions.map((p) => ({
+      promotionId: String(p._id), name: p.name, rewardTypes: [...new Set((p.rewards || []).map((r) => r.type))],
+    })),
     // Whole-rupee, matching exactly what razorpayChargeAmountPaise actually
     // charges — finalAmount itself can be fractional (realShippingAmount is
     // a live carrier rate, not guaranteed integer), so storing it unrounded
@@ -915,6 +1165,583 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   );
 });
 
+// An order in one of these may still turn out to be paid. FAILED is included:
+// the cleanup cron and a failed first attempt both set it before a retry pays.
+const UNPAID_STATUSES = ["CREATED", "PROCESSING", "FAILED"];
+
+/**
+ * Moves an order to PAID for a captured Razorpay payment and runs everything
+ * that follows it: Magic address capture, guest account, stock, coupon,
+ * emails, invoice and purchase tracking.
+ *
+ * Called from the payment.captured webhook AND from the order-status poll
+ * (after confirming the capture with Razorpay), so a customer who paid is
+ * never left on "failed" just because the webhook is late, was lost, or an
+ * earlier failed attempt on the same order arrived first. Safe to call twice.
+ *
+ * @returns {Promise<object>} the order
+ */
+const fulfilCapturedPayment = async (order, payment) => {
+  const razorpayOrderId = payment.order_id;
+
+    // ── Magic Checkout: the address only exists now ────────────────────
+    // Razorpay collected it in its own modal, so pull it onto the order
+    // BEFORE anything downstream (emails, ShipMozo, order confirmation)
+    // reads deliveryAddress. Also picks up the shipping fee Razorpay added
+    // from our serviceability callback.
+    if (order.isMagicOrder && !order.deliveryAddress?.pinCode) {
+      const rpOrder = await razorpayFetchOrderService(razorpayOrderId);
+      const magicAddress = toOrderDeliveryAddress(rpOrder?.customer_details);
+
+      if (magicAddress) {
+        order.deliveryAddress = magicAddress;
+        order.userName = magicAddress.fullName || order.userName;
+        order.userMobile = magicAddress.mobileNumber || order.userMobile;
+        order.senderMobile = magicAddress.mobileNumber || order.senderMobile;
+        order.receiverMobile = magicAddress.mobileNumber || order.receiverMobile;
+
+        // A Magic guest reaches order-create with no email at all, so the
+        // order carries a placeholder. Replace it with what the customer
+        // actually typed, or the account created below is built on an
+        // address that can never receive mail.
+        const email = rpOrder?.customer_details?.email;
+        if (email && (!order.userEmail || isPlaceholderEmail(order.userEmail))) {
+          order.userEmail = email;
+        }
+
+        // Guest account creation further down reads order.guestInfo, which
+        // is empty on the Magic path until now — without this a Magic guest
+        // never gets an account and "Login to track order" fails for them.
+        if (order.isGuestOrder) {
+          order.guestInfo = {
+            name: order.guestInfo?.name || magicAddress.fullName || "",
+            email: order.guestInfo?.email || email || "",
+            mobile: order.guestInfo?.mobile || magicAddress.mobileNumber || "",
+          };
+        }
+
+        // Razorpay adds shipping_fee (from /magic/shipping-info) and
+        // subtracts any promotion, then re-states the order amount. Trust
+        // its numbers — they are what the customer actually paid.
+        const shippingFeeRupees = Number(rpOrder?.shipping_fee || 0) / 100;
+        if (shippingFeeRupees > 0) {
+          order.shippingInfo = { ...(order.shippingInfo?.toObject?.() || order.shippingInfo || {}), amount: shippingFeeRupees };
+        }
+        const amountAtCreate = Number(order.amount) || 0;
+        const paidRupees = Number(payment.amount || 0) / 100;
+        if (paidRupees > 0) order.amount = Math.ceil(paidRupees);
+
+        // Whatever coupon the customer actually ended up with is the one on
+        // Razorpay's order, not necessarily the one their cart had when the
+        // order was created — inside Magic they can swap it or remove it.
+        // Recording the cart's coupon regardless burned a redemption the
+        // customer never got (usageCount, per-user caps and the CouponUsage
+        // audit all key off order.coupon further down).
+        const rpPromotion = Array.isArray(rpOrder?.promotions) ? rpOrder.promotions[0] : null;
+        if (rpPromotion?.code) {
+          const rpCode = String(rpPromotion.code).toUpperCase().trim();
+          const sameAsCart =
+            order.coupon?.couponCodeName &&
+            String(order.coupon.couponCodeName).toUpperCase().trim() === rpCode;
+          if (!sameAsCart) {
+            const applied = await Coupon.findOne({ code: rpCode, isArchived: false }, { couponId: 1, code: 1 }).lean();
+            order.coupon = {
+              couponCodeId: applied?.couponId || rpPromotion.reference_id || null,
+              couponCodeName: applied?.code || rpCode,
+              discountAmount: Math.round(Number(rpPromotion.value || 0)) / 100,
+              isApplied: true,
+            };
+            console.log(`[MAGIC][webhook] coupon on ${razorpayOrderId} is "${rpCode}" (₹${order.coupon.discountAmount}), not the cart's`);
+          }
+        } else if (order.coupon?.isApplied) {
+          // No promotion echoed back. That does not prove the discount was
+          // lost — Razorpay does not always return `promotions` on a fetch —
+          // so check the money instead: a Magic order is created at
+          // subtotal-minus-discount and Razorpay adds shipping on top, so a
+          // honoured coupon pays (created amount + shipping fee). Anything
+          // materially above that means the customer paid full price and the
+          // redemption must NOT be recorded against them.
+          const expectedRupees = amountAtCreate + shippingFeeRupees;
+          if (paidRupees > expectedRupees + 1) {
+            console.log(
+              `[MAGIC][webhook] coupon "${order.coupon.couponCodeName}" not honoured on ${razorpayOrderId} ` +
+                `(paid ₹${paidRupees} vs expected ₹${expectedRupees}) — not redeeming it`,
+            );
+            order.coupon = { couponCodeId: null, couponCodeName: null, discountAmount: 0, isApplied: false };
+          }
+        }
+
+        await order.save();
+        console.log(
+          `[MAGIC][webhook] address captured for ${razorpayOrderId} — pin ${magicAddress.pinCode}, shipping ₹${shippingFeeRupees}, paid ₹${paidRupees}`,
+        );
+      } else {
+        console.error(
+          `[MAGIC][webhook] no customer_details on ${razorpayOrderId} — order has NO address, fulfilment will fail`,
+        );
+      }
+    }
+
+    // idempotent update
+    if (UNPAID_STATUSES.includes(order.status)) {
+      const wasFailedByCron = order.status === "FAILED";
+
+      // ── STEP 1: Create guest account BEFORE marking PAID ──────────────
+      // This prevents the race condition where the client polling detects
+      // PAID status before the account is created, causing "user not exist"
+      // errors when the user immediately clicks "Login to Track Order".
+      let guestCredentials = null;
+      if (order.isGuestOrder && order.guestInfo?.email) {
+        try {
+          const guestEmail = order.guestInfo.email.toLowerCase();
+          const guestName = order.guestInfo.name || "Customer";
+          const guestMobile = order.guestInfo.mobile;
+          const tempPassword = generateTempPassword();
+
+          let accountUser = await User.findOne({ email: guestEmail });
+          const isExistingUser = !!accountUser;
+
+          if (!accountUser) {
+            accountUser = new User({
+              userId: uuidv7(),
+              name: guestName,
+              email: guestEmail,
+              password: tempPassword,
+              mobileNumber: guestMobile ? parseInt(guestMobile, 10) : null,
+              isVerified: true,
+              role: "USER",
+            });
+            await accountUser.save();
+            await Cart.create({ userId: accountUser.userId, products: {} });
+          }
+          // Existing user: just link the order — never overwrite their password
+
+          await Order.updateOne(
+            { _id: order._id },
+            { $set: { userId: accountUser.userId, isNewGuestAccount: !isExistingUser } },
+          );
+          order.userId = accountUser.userId;
+          order.isNewGuestAccount = !isExistingUser;
+
+          // Only send account-created email for brand-new accounts
+          guestCredentials = isExistingUser ? null : { guestEmail, guestName, tempPassword };
+          console.log(`[INFO] Guest account ready - Email: ${guestEmail}, isNew: ${!isExistingUser}`);
+        } catch (guestAccountError) {
+          console.error("[ERROR] Guest account creation failed:", guestAccountError.message, guestAccountError.stack);
+        }
+      }
+
+      // ── STEP 2: Mark order as PAID (account already exists at this point) ──
+      order.payment.razorpayPaymentId = payment.id;
+      order.status = "PAID";
+
+      const historyNote = wasFailedByCron
+        ? "Late Payment Recovery: Order was FAILED by system (timeout), but payment was confirmed later via webhook."
+        : "Payment successfully captured via Razorpay.";
+
+      // Atomic claim: the webhook and the status poll can both get here for
+      // the same payment. Only the one that flips the status runs the side
+      // effects below (stock, coupon, emails), so they happen exactly once.
+      const claimed = await Order.findOneAndUpdate(
+        { _id: order._id, status: { $in: UNPAID_STATUSES } },
+        {
+          $set: {
+            status: "PAID",
+            "payment.razorpayPaymentId": payment.id,
+            "payment.errorCode": null,
+            "payment.errorDescription": "",
+          },
+          $push: { statusHistory: { status: "PAID", timestamp: new Date(), note: historyNote } },
+        },
+        { new: true },
+      );
+      if (!claimed) {
+        console.log(`[PAYMENT] ${order.orderId} already marked PAID by another path — skipping side effects`);
+        return order;
+      }
+
+      // Decrement per-variant stock now that the order is confirmed PAID.
+      // Guarded by the `order.status !== "PAID"` block above → runs once.
+      await decrementStockForOrder(order);
+
+      // Promotion Engine V2 — permanent usage audit trail, same
+      // never-deleted invariant as CouponUsage, recorded here (once,
+      // guarded by the same atomic claim above) rather than at
+      // order-creation time, since a CREATED-but-never-PAID order should
+      // never count against a promotion's usage limits.
+      //
+      // Usage-limit enforcement mirrors the Coupon pattern immediately
+      // below this block EXACTLY (same atomic-$inc-with-$expr-guard +
+      // per-user countDocuments + rollback-on-race shape), not a new
+      // scheme: maxUsesTotal is enforced via one atomic findOneAndUpdate
+      // per promotion (never over-increments under concurrency — same
+      // guarantee decrementStockForOrder's $gte guard gives stock).
+      // maxUsesPerUser is checked right after via countDocuments and
+      // rolled back on a genuine race, exactly like the coupon per-user
+      // safety net below. The reward/discount was already baked into the
+      // charged amount at order-creation time (courtesy-level, like
+      // assertVariantAvailable for stock) — a limit hit here, same as the
+      // coupon case, only prevents THIS order from corrupting the count
+      // for future ones; it doesn't retroactively re-charge the customer.
+      if (order.appliedPromotions?.length) {
+        const productSubtotalForUsage = order.items.reduce(
+          (s, i) => s + ((i.productSnapshot?.priceAtPurchase || 0) * (i.productSnapshot?.quantity || 0)),
+          0,
+        );
+        const normEmailForPromo = order.userEmail?.toLowerCase().trim() || null;
+        const normMobileForPromo = (order.userMobile || "").replace(/\D/g, "").slice(-10) || null;
+
+        for (const ap of order.appliedPromotions) {
+          try {
+            // Atomic check-and-increment — only succeeds if maxUsesTotal
+            // is unset or usageCount is still under it.
+            const updatedPromo = await Promotion.findOneAndUpdate(
+              {
+                _id: ap.promotionId,
+                $or: [{ maxUsesTotal: null }, { $expr: { $lt: ["$usageCount", "$maxUsesTotal"] } }],
+              },
+              { $inc: { usageCount: 1 } },
+              { new: true },
+            );
+            if (!updatedPromo) {
+              console.warn(`[PromotionV2] order=${order.orderId} promotion=${ap.promotionId} — maxUsesTotal reached, usage not recorded`);
+              continue;
+            }
+
+            let perUserOk = true;
+            if (updatedPromo.maxUsesPerUser && (normEmailForPromo || normMobileForPromo)) {
+              const priorUses = await PromotionUsage.countDocuments({
+                promotionId: ap.promotionId,
+                reversed: { $ne: true },
+                $or: [
+                  ...(normEmailForPromo ? [{ email: normEmailForPromo }] : []),
+                  ...(normMobileForPromo ? [{ mobile: normMobileForPromo }] : []),
+                ],
+              });
+              if (priorUses >= updatedPromo.maxUsesPerUser) {
+                perUserOk = false;
+                await Promotion.updateOne({ _id: ap.promotionId }, { $inc: { usageCount: -1 } });
+                console.warn(`[PromotionV2:Security] order=${order.orderId} promotion=${ap.promotionId} — maxUsesPerUser hit (race). usageCount rolled back. priorUses=${priorUses} limit=${updatedPromo.maxUsesPerUser}`);
+              }
+            }
+            if (!perUserOk) continue;
+
+            await PromotionUsage.create({
+              promotionId: ap.promotionId,
+              promotionName: ap.name,
+              orderId: order.orderId,
+              orderType: "WEBSITE",
+              userId: order.userId || null,
+              email: order.userEmail || "",
+              mobile: order.userMobile || "",
+              rewardsSnapshot: { rewardTypes: ap.rewardTypes },
+              cartValueBeforeDiscount: productSubtotalForUsage,
+              usedAt: new Date(),
+            });
+          } catch (err) {
+            console.error(`[PromotionV2] usage recording failed order=${order.orderId} promotion=${ap.promotionId}:`, err.message);
+          }
+        }
+      }
+
+      // ── STEP 3: Send credentials email now that order is confirmed ────
+      if (guestCredentials) {
+        await sendGuestAccountCreatedEmail(
+          guestCredentials.guestEmail,
+          guestCredentials.guestName,
+          guestCredentials.tempPassword,
+          order.orderId,
+        ).catch((err) =>
+          console.error("[ERROR] Failed to send guest account email:", err.message),
+        );
+      }
+
+      try {
+        await Cart.updateOne(
+          { userId: order.userId },
+          {
+            $set: { products: {} },
+            $unset: { appliedCoupon: 1 },
+          },
+        );
+        console.log(
+          `[INFO] Cart cleared after successful payment - UserId: ${order.userId}, OrderId: ${order.orderId}`,
+        );
+      } catch (cartError) {
+        console.error(
+          `[ERROR] Failed to clear cart after payment - UserId: ${order.userId}, OrderId: ${order.orderId}:`,
+          cartError.message,
+        );
+      }
+
+      // 1.5. COUPON REDEMPTION TRACKING — runs after payment confirmed, not at apply time
+      if (order.coupon?.isApplied && order.coupon?.couponCodeId) {
+        try {
+          const couponId   = order.coupon.couponCodeId;
+          const couponCode = order.coupon.couponCodeName;
+          const discount   = order.coupon.discountAmount || 0;
+
+          // Internal coupons ARE tracked here (usageCount + CouponUsage) so their per-user
+          // limit can be enforced. They are still kept out of analytics — the admin filters
+          // them by isInternal coupon id, not by the presence/absence of usage records.
+          const normMobile = (order.userMobile || order.senderMobile || "")
+            .replace(/\D/g, "").slice(-10) || null;
+          const normEmail  = order.userEmail?.toLowerCase().trim() || null;
+
+          // Atomically increment usageCount — respects maxTotalUses cap
+          const updatedCoupon = await Coupon.findOneAndUpdate(
+            {
+              couponId,
+              isArchived: false,
+              $or: [
+                { maxTotalUses: null },
+                { $expr: { $lt: ["$usageCount", "$maxTotalUses"] } },
+              ],
+            },
+            { $inc: { usageCount: 1 } },
+            { new: true },
+          );
+
+          if (updatedCoupon) {
+            // ── Per-user limit safety net in webhook ─────────────────────
+            // Two simultaneous orders can race past the per-user check at order-creation time
+            // and both reach the webhook. Guard here using countDocuments (this IS the atomic
+            // last line of defence — discount is already given but we prevent audit corruption
+            // and protect against future uses by rolling back the usageCount increment).
+            let perUserOk = true;
+            if (updatedCoupon.maxUsesPerUser && (normEmail || normMobile)) {
+              const priorUses = await CouponUsage.countDocuments({
+                couponId,
+                reversed: { $ne: true }, // a cancelled/refunded order's usage must not count against the limit
+                $or: [
+                  ...(normEmail  ? [{ email:  normEmail  }] : []),
+                  ...(normMobile ? [{ mobile: normMobile }] : []),
+                ],
+              });
+              if (priorUses >= updatedCoupon.maxUsesPerUser) {
+                perUserOk = false;
+                // Roll back the usageCount increment so future orders are not blocked unfairly
+                await Coupon.updateOne({ couponId }, { $inc: { usageCount: -1 } });
+                console.warn(`[Coupon:Security] Order=${order.orderId} code=${couponCode} — per-user limit hit in webhook (race condition). usageCount rolled back. priorUses=${priorUses} limit=${updatedCoupon.maxUsesPerUser}`);
+              }
+            }
+
+            if (perUserOk) {
+              const productSubtotal = order.items.reduce(
+                (s, i) => s + ((i.productSnapshot?.priceAtPurchase || 0) * (i.productSnapshot?.quantity || 0)),
+                0,
+              );
+              await CouponUsage.create({
+                couponId,
+                couponCode,
+                orderId:               order.orderId,
+                orderType:             "WEBSITE",
+                userId:                order.userId || null,
+                email:                 normEmail,
+                mobile:                normMobile,
+                discountAmount:        discount,
+                cartValueBeforeDiscount: productSubtotal,
+                usedAt:                new Date(),
+              });
+
+              // Mark TARGETED assignment as used (embedded in coupon document)
+              if (updatedCoupon.scope === "TARGETED" && (normEmail || normMobile)) {
+                await Coupon.updateOne(
+                  {
+                    couponId,
+                    assignedTo: {
+                      $elemMatch: {
+                        identifier: { $in: [normEmail, normMobile].filter(Boolean) },
+                        usedAt: null,
+                      },
+                    },
+                  },
+                  { $set: { "assignedTo.$.usedAt": new Date() } },
+                );
+              }
+
+              console.log(`[Coupon:Apply] Order=${order.orderId} code=${couponCode} discount=₹${discount} usageCount=${updatedCoupon.usageCount} — tracked`);
+            }
+          } else {
+            console.log(`[Coupon:Apply] Order=${order.orderId} code=${couponCode} — cap already reached, skipped increment`);
+          }
+        } catch (couponErr) {
+          console.error(`[Coupon:Apply] Failed to track coupon for order ${order.orderId}:`, couponErr.message);
+        }
+      }
+
+      // 2. EMAIL NOTIFICATION LOGIC
+      try {
+        if (order.userEmail) {
+          const isCOD = order.paymentMethod === "COD";
+
+          const orderDetails = {
+            orderId: order.orderId,
+            items: order.items.map((item) => ({
+              productName: item.productSnapshot.productName,
+              quantity: item.productSnapshot.quantity,
+              price: item.productSnapshot.priceAtPurchase,
+            })),
+            total: order.amount,
+            orderDate: order.createdAt,
+            senderMobile: order.senderMobile,
+            receiverMobile: order.receiverMobile,
+            paymentMethod: order.paymentMethod,
+            codDetails: order.codDetails,
+          };
+
+          // Send order confirmation email.
+          // A WhatsApp-login customer, and a Magic guest who gave no email,
+          // carry a placeholder address on a domain with no mail server.
+          // Sending there bounces, and bounces at volume get the real
+          // transactional mail filtered. They get WhatsApp instead.
+          const canEmail = order.userEmail && !isPlaceholderEmail(order.userEmail);
+          if (canEmail) {
+            await sendOrderConfirmation(order.userEmail, orderDetails).catch(
+              (err) => {
+                console.error(
+                  "Failed to send order confirmation email:",
+                  err,
+                );
+              },
+            );
+          } else {
+            console.log(`[EMAIL] Skipped confirmation for ${order.orderId} — no real address on file`);
+          }
+
+          // Same confirmation over WhatsApp. It gets read far more often
+          // than email, and a WhatsApp-login customer may have no real
+          // email address at all. Not awaited — a messaging hiccup must
+          // not hold up the payment response. Silently no-ops until the
+          // template id and API key are configured.
+          sendOrderConfirmationWhatsApp({
+            mobileNumber: order.userMobile,
+            name: order.userName,
+            orderId: order.orderId,
+            amount: order.amount,
+          }).catch(() => {});
+
+          // For COD, only the advance was actually captured via Razorpay right now —
+          // the receipt must reflect that amount, not the full order total.
+          const paymentDetails = {
+            paymentId: payment.id,
+            amount: isCOD ? order.codDetails?.partialAmountPaid ?? order.amount : order.amount,
+            orderId: order.orderId,
+            date: new Date(),
+            paymentMethod: isCOD ? "COD" : "Razorpay",
+            codDetails: isCOD ? order.codDetails : null,
+          };
+          if (canEmail) {
+            await sendPaymentReceipt(order.userEmail, paymentDetails).catch(
+              (err) => {
+                console.error("Failed to send payment receipt email:", err);
+              },
+            );
+          }
+        }
+      } catch (emailError) {
+        console.error("Error sending emails:", emailError);
+      }
+
+      try {
+        if (!order.invoiceData || !order.invoiceData.isGenerated) {
+          console.log(
+            `[INFO] Generating PDF Invoice for Order: ${order.orderId}...`,
+          );
+          const invoiceHtml = generateInvoiceHtmlTemplate(order);
+          const file = { content: invoiceHtml };
+          const options = {
+            format: "A4",
+            args: [
+              "--no-sandbox",
+              "--disable-setuid-sandbox",
+              "--disable-dev-shm-usage",
+              "--disable-gpu",
+            ],
+          };
+          const pdfBuffer = await html_to_pdf.generatePdf(file, options);
+          const savedFileKey = await uploadInvoiceToS3(
+            pdfBuffer,
+            order.userId,
+            order.orderId,
+          );
+          await Order.updateOne(
+            { _id: order._id },
+            {
+              $set: {
+                "invoiceData.isGenerated": true,
+                "invoiceData.s3FileKey": savedFileKey,
+              },
+            },
+          );
+
+          console.log(
+            `✅ Invoice uploaded to S3 successfully: ${savedFileKey}`,
+          );
+        }
+      } catch (invoiceError) {
+        console.error(
+          "❌ Error generating or uploading invoice to S3:",
+          invoiceError,
+        );
+      }
+      try {
+        const capiContents = order.items.map((i) => ({
+          id: i.productId,
+          quantity: i.productSnapshot.quantity,
+        }));
+        await sendMetaCapiEvent({
+          eventName: "Purchase",
+          eventId: order.orderId,
+          eventSourceUrl: order.metaTracking?.eventSourceUrl,
+          userData: {
+            // Never hash a placeholder address into Meta's user data. A
+            // WhatsApp-login customer, and a Magic guest who gave no email,
+            // carry one on a domain that does not exist — sending it as a
+            // real identifier pollutes matching instead of improving it.
+            email: isPlaceholderEmail(order.userEmail) ? null : order.userEmail,
+            phone: order.userMobile || order.senderMobile,
+            firstName: (order.userName || order.guestInfo?.name || "").split(" ")[0],
+            lastName: (order.userName || order.guestInfo?.name || "").split(" ").slice(1).join(" "),
+            externalId: order.userId || order.metaTracking?.anonymousId,
+            fbp: order.metaTracking?.fbp,
+            fbc: order.metaTracking?.fbc,
+            clientIp: order.metaTracking?.clientIp,
+            clientUserAgent: order.metaTracking?.clientUserAgent,
+            zip: order.deliveryAddress?.pinCode ? String(order.deliveryAddress.pinCode) : null,
+            city: order.deliveryAddress?.city || null,
+            state: order.deliveryAddress?.state || null,
+          },
+          customData: {
+            currency: "INR",
+            value: order.amount,
+            content_ids: capiContents.map((c) => c.id),
+            contents: capiContents,
+            num_items: capiContents.reduce((n, c) => n + (c.quantity || 1), 0),
+            order_id: order.orderId,
+          },
+        });
+      } catch (capiError) {
+        console.error("[Meta CAPI] Purchase dispatch error:", capiError.message);
+      }
+
+      // First-party purchase → Event collection. Inside the
+      // `order.status !== "PAID"` guard, so it runs exactly once per order
+      // however many times Razorpay replays the webhook. This is what makes
+      // /admin/analytics revenue match reality: the browser-side purchase
+      // is lost to ad-blockers and closed tabs, this one never is.
+      await recordServerPurchase(order, {
+        recoveredFrom: wasFailedByCron ? "FAILED" : undefined,
+      });
+
+      // Same purchase to GA4 via Measurement Protocol — backfills the hits
+      // the browser loses. GA4 dedupes on transaction_id, so orders the
+      // browser already reported are not double counted.
+      await sendGa4ServerPurchase(order);
+    }
+  return order;
+};
+
 const razorpayWebHookController = async (req, res) => {
   const secret = env.RP_WEBHOOK_SECRET;
 
@@ -939,6 +1766,7 @@ const razorpayWebHookController = async (req, res) => {
     const payload = JSON.parse(req.body.toString("utf8"));
     const event = payload.event;
 
+    try {
     switch (event) {
       /* =======================
          PAYMENT SUCCESS
@@ -952,490 +1780,7 @@ const razorpayWebHookController = async (req, res) => {
         });
         if (!order) break;
 
-        // ── Magic Checkout: the address only exists now ────────────────────
-        // Razorpay collected it in its own modal, so pull it onto the order
-        // BEFORE anything downstream (emails, ShipMozo, order confirmation)
-        // reads deliveryAddress. Also picks up the shipping fee Razorpay added
-        // from our serviceability callback.
-        if (order.isMagicOrder && !order.deliveryAddress?.pinCode) {
-          const rpOrder = await razorpayFetchOrderService(razorpayOrderId);
-          const magicAddress = toOrderDeliveryAddress(rpOrder?.customer_details);
-
-          if (magicAddress) {
-            order.deliveryAddress = magicAddress;
-            order.userName = magicAddress.fullName || order.userName;
-            order.userMobile = magicAddress.mobileNumber || order.userMobile;
-            order.senderMobile = magicAddress.mobileNumber || order.senderMobile;
-            order.receiverMobile = magicAddress.mobileNumber || order.receiverMobile;
-
-            // A Magic guest reaches order-create with no email at all, so the
-            // order carries a placeholder. Replace it with what the customer
-            // actually typed, or the account created below is built on an
-            // address that can never receive mail.
-            const email = rpOrder?.customer_details?.email;
-            if (email && (!order.userEmail || isPlaceholderEmail(order.userEmail))) {
-              order.userEmail = email;
-            }
-
-            // Guest account creation further down reads order.guestInfo, which
-            // is empty on the Magic path until now — without this a Magic guest
-            // never gets an account and "Login to track order" fails for them.
-            if (order.isGuestOrder) {
-              order.guestInfo = {
-                name: order.guestInfo?.name || magicAddress.fullName || "",
-                email: order.guestInfo?.email || email || "",
-                mobile: order.guestInfo?.mobile || magicAddress.mobileNumber || "",
-              };
-            }
-
-            // Razorpay adds shipping_fee (from /magic/shipping-info) and
-            // subtracts any promotion, then re-states the order amount. Trust
-            // its numbers — they are what the customer actually paid.
-            const shippingFeeRupees = Number(rpOrder?.shipping_fee || 0) / 100;
-            if (shippingFeeRupees > 0) {
-              order.shippingInfo = { ...(order.shippingInfo?.toObject?.() || order.shippingInfo || {}), amount: shippingFeeRupees };
-            }
-            const amountAtCreate = Number(order.amount) || 0;
-            const paidRupees = Number(payment.amount || 0) / 100;
-            if (paidRupees > 0) order.amount = Math.ceil(paidRupees);
-
-            // Whatever coupon the customer actually ended up with is the one on
-            // Razorpay's order, not necessarily the one their cart had when the
-            // order was created — inside Magic they can swap it or remove it.
-            // Recording the cart's coupon regardless burned a redemption the
-            // customer never got (usageCount, per-user caps and the CouponUsage
-            // audit all key off order.coupon further down).
-            const rpPromotion = Array.isArray(rpOrder?.promotions) ? rpOrder.promotions[0] : null;
-            if (rpPromotion?.code) {
-              const rpCode = String(rpPromotion.code).toUpperCase().trim();
-              const sameAsCart =
-                order.coupon?.couponCodeName &&
-                String(order.coupon.couponCodeName).toUpperCase().trim() === rpCode;
-              if (!sameAsCart) {
-                const applied = await Coupon.findOne({ code: rpCode, isArchived: false }, { couponId: 1, code: 1 }).lean();
-                order.coupon = {
-                  couponCodeId: applied?.couponId || rpPromotion.reference_id || null,
-                  couponCodeName: applied?.code || rpCode,
-                  discountAmount: Math.round(Number(rpPromotion.value || 0)) / 100,
-                  isApplied: true,
-                };
-                console.log(`[MAGIC][webhook] coupon on ${razorpayOrderId} is "${rpCode}" (₹${order.coupon.discountAmount}), not the cart's`);
-              }
-            } else if (order.coupon?.isApplied) {
-              // No promotion echoed back. That does not prove the discount was
-              // lost — Razorpay does not always return `promotions` on a fetch —
-              // so check the money instead: a Magic order is created at
-              // subtotal-minus-discount and Razorpay adds shipping on top, so a
-              // honoured coupon pays (created amount + shipping fee). Anything
-              // materially above that means the customer paid full price and the
-              // redemption must NOT be recorded against them.
-              const expectedRupees = amountAtCreate + shippingFeeRupees;
-              if (paidRupees > expectedRupees + 1) {
-                console.log(
-                  `[MAGIC][webhook] coupon "${order.coupon.couponCodeName}" not honoured on ${razorpayOrderId} ` +
-                    `(paid ₹${paidRupees} vs expected ₹${expectedRupees}) — not redeeming it`,
-                );
-                order.coupon = { couponCodeId: null, couponCodeName: null, discountAmount: 0, isApplied: false };
-              }
-            }
-
-            await order.save();
-            console.log(
-              `[MAGIC][webhook] address captured for ${razorpayOrderId} — pin ${magicAddress.pinCode}, shipping ₹${shippingFeeRupees}, paid ₹${paidRupees}`,
-            );
-          } else {
-            console.error(
-              `[MAGIC][webhook] no customer_details on ${razorpayOrderId} — order has NO address, fulfilment will fail`,
-            );
-          }
-        }
-
-        // idempotent update
-        if (order.status !== "PAID") {
-          const wasFailedByCron = order.status === "FAILED";
-
-          // ── STEP 1: Create guest account BEFORE marking PAID ──────────────
-          // This prevents the race condition where the client polling detects
-          // PAID status before the account is created, causing "user not exist"
-          // errors when the user immediately clicks "Login to Track Order".
-          let guestCredentials = null;
-          if (order.isGuestOrder && order.guestInfo?.email) {
-            try {
-              const guestEmail = order.guestInfo.email.toLowerCase();
-              const guestName = order.guestInfo.name || "Customer";
-              const guestMobile = order.guestInfo.mobile;
-              const tempPassword = generateTempPassword();
-
-              let accountUser = await User.findOne({ email: guestEmail });
-              const isExistingUser = !!accountUser;
-
-              if (!accountUser) {
-                accountUser = new User({
-                  userId: uuidv7(),
-                  name: guestName,
-                  email: guestEmail,
-                  password: tempPassword,
-                  mobileNumber: guestMobile ? parseInt(guestMobile, 10) : null,
-                  isVerified: true,
-                  role: "USER",
-                });
-                await accountUser.save();
-                await Cart.create({ userId: accountUser.userId, products: {} });
-              }
-              // Existing user: just link the order — never overwrite their password
-
-              await Order.updateOne(
-                { _id: order._id },
-                { $set: { userId: accountUser.userId, isNewGuestAccount: !isExistingUser } },
-              );
-
-              // Only send account-created email for brand-new accounts
-              guestCredentials = isExistingUser ? null : { guestEmail, guestName, tempPassword };
-              console.log(`[INFO] Guest account ready - Email: ${guestEmail}, isNew: ${!isExistingUser}`);
-            } catch (guestAccountError) {
-              console.error("[ERROR] Guest account creation failed:", guestAccountError.message, guestAccountError.stack);
-            }
-          }
-
-          // ── STEP 2: Mark order as PAID (account already exists at this point) ──
-          order.payment.razorpayPaymentId = payment.id;
-          order.status = "PAID";
-          order.payment.errorCode = null;
-          order.payment.errorDescription = "";
-
-          const historyNote = wasFailedByCron
-            ? "Late Payment Recovery: Order was FAILED by system (timeout), but payment was confirmed later via webhook."
-            : "Payment successfully captured via Razorpay.";
-
-          order.statusHistory.push({
-            status: "PAID",
-            timestamp: new Date(),
-            note: historyNote,
-          });
-
-          await order.save();
-
-          // Decrement per-variant stock now that the order is confirmed PAID.
-          // Guarded by the `order.status !== "PAID"` block above → runs once.
-          await decrementStockForOrder(order);
-
-          // ── STEP 3: Send credentials email now that order is confirmed ────
-          if (guestCredentials) {
-            await sendGuestAccountCreatedEmail(
-              guestCredentials.guestEmail,
-              guestCredentials.guestName,
-              guestCredentials.tempPassword,
-              order.orderId,
-            ).catch((err) =>
-              console.error("[ERROR] Failed to send guest account email:", err.message),
-            );
-          }
-
-          try {
-            await Cart.updateOne(
-              { userId: order.userId },
-              {
-                $set: { products: {} },
-                $unset: { appliedCoupon: 1 },
-              },
-            );
-            console.log(
-              `[INFO] Cart cleared after successful payment - UserId: ${order.userId}, OrderId: ${order.orderId}`,
-            );
-          } catch (cartError) {
-            console.error(
-              `[ERROR] Failed to clear cart after payment - UserId: ${order.userId}, OrderId: ${order.orderId}:`,
-              cartError.message,
-            );
-          }
-
-          // 1.5. COUPON REDEMPTION TRACKING — runs after payment confirmed, not at apply time
-          if (order.coupon?.isApplied && order.coupon?.couponCodeId) {
-            try {
-              const couponId   = order.coupon.couponCodeId;
-              const couponCode = order.coupon.couponCodeName;
-              const discount   = order.coupon.discountAmount || 0;
-
-              // Internal coupons ARE tracked here (usageCount + CouponUsage) so their per-user
-              // limit can be enforced. They are still kept out of analytics — the admin filters
-              // them by isInternal coupon id, not by the presence/absence of usage records.
-              const normMobile = (order.userMobile || order.senderMobile || "")
-                .replace(/\D/g, "").slice(-10) || null;
-              const normEmail  = order.userEmail?.toLowerCase().trim() || null;
-
-              // Atomically increment usageCount — respects maxTotalUses cap
-              const updatedCoupon = await Coupon.findOneAndUpdate(
-                {
-                  couponId,
-                  isArchived: false,
-                  $or: [
-                    { maxTotalUses: null },
-                    { $expr: { $lt: ["$usageCount", "$maxTotalUses"] } },
-                  ],
-                },
-                { $inc: { usageCount: 1 } },
-                { new: true },
-              );
-
-              if (updatedCoupon) {
-                // ── Per-user limit safety net in webhook ─────────────────────
-                // Two simultaneous orders can race past the per-user check at order-creation time
-                // and both reach the webhook. Guard here using countDocuments (this IS the atomic
-                // last line of defence — discount is already given but we prevent audit corruption
-                // and protect against future uses by rolling back the usageCount increment).
-                let perUserOk = true;
-                if (updatedCoupon.maxUsesPerUser && (normEmail || normMobile)) {
-                  const priorUses = await CouponUsage.countDocuments({
-                    couponId,
-                    $or: [
-                      ...(normEmail  ? [{ email:  normEmail  }] : []),
-                      ...(normMobile ? [{ mobile: normMobile }] : []),
-                    ],
-                  });
-                  if (priorUses >= updatedCoupon.maxUsesPerUser) {
-                    perUserOk = false;
-                    // Roll back the usageCount increment so future orders are not blocked unfairly
-                    await Coupon.updateOne({ couponId }, { $inc: { usageCount: -1 } });
-                    console.warn(`[Coupon:Security] Order=${order.orderId} code=${couponCode} — per-user limit hit in webhook (race condition). usageCount rolled back. priorUses=${priorUses} limit=${updatedCoupon.maxUsesPerUser}`);
-                  }
-                }
-
-                if (perUserOk) {
-                  const productSubtotal = order.items.reduce(
-                    (s, i) => s + ((i.productSnapshot?.priceAtPurchase || 0) * (i.productSnapshot?.quantity || 0)),
-                    0,
-                  );
-                  await CouponUsage.create({
-                    couponId,
-                    couponCode,
-                    orderId:               order.orderId,
-                    orderType:             "WEBSITE",
-                    userId:                order.userId || null,
-                    email:                 normEmail,
-                    mobile:                normMobile,
-                    discountAmount:        discount,
-                    cartValueBeforeDiscount: productSubtotal,
-                    usedAt:                new Date(),
-                  });
-
-                  // Mark TARGETED assignment as used (embedded in coupon document)
-                  if (updatedCoupon.scope === "TARGETED" && (normEmail || normMobile)) {
-                    await Coupon.updateOne(
-                      {
-                        couponId,
-                        assignedTo: {
-                          $elemMatch: {
-                            identifier: { $in: [normEmail, normMobile].filter(Boolean) },
-                            usedAt: null,
-                          },
-                        },
-                      },
-                      { $set: { "assignedTo.$.usedAt": new Date() } },
-                    );
-                  }
-
-                  console.log(`[Coupon:Apply] Order=${order.orderId} code=${couponCode} discount=₹${discount} usageCount=${updatedCoupon.usageCount} — tracked`);
-                }
-              } else {
-                console.log(`[Coupon:Apply] Order=${order.orderId} code=${couponCode} — cap already reached, skipped increment`);
-              }
-            } catch (couponErr) {
-              console.error(`[Coupon:Apply] Failed to track coupon for order ${order.orderId}:`, couponErr.message);
-            }
-          }
-
-          // 1.6. LOYALTY POINTS REDEMPTION — debit the real ledger only now that
-          // payment is confirmed (mirrors coupon tracking above: an order that
-          // never gets paid must not permanently cost the user real points,
-          // even though the discount was already priced into this order at
-          // creation time).
-          if (order.loyalty?.pointsRedeemed > 0) {
-            try {
-              const ledgerEntry = await writeLedgerEntry({
-                userId: order.userId,
-                orderId: order.orderId,
-                orderType: "WEBSITE",
-                type: "REDEEM_ORDER",
-                points: -order.loyalty.pointsRedeemed,
-                reason: `Redeemed at checkout on order ${order.orderId}`,
-                createdBy: "system",
-              });
-              if (ledgerEntry) {
-                await Order.updateOne(
-                  { _id: order._id },
-                  { $set: { "loyalty.balanceAfterRedeem": ledgerEntry.balanceAfter } },
-                );
-              }
-              console.log(`[Loyalty:Redeem] Order=${order.orderId} pointsRedeemed=${order.loyalty.pointsRedeemed} balanceAfter=${ledgerEntry?.balanceAfter ?? "already-written"}`);
-            } catch (loyaltyErr) {
-              console.error(`[Loyalty:Redeem] Failed to write ledger entry for order ${order.orderId}:`, loyaltyErr.message);
-            }
-          }
-
-          // 2. EMAIL NOTIFICATION LOGIC
-          try {
-            if (order.userEmail) {
-              const isCOD = order.paymentMethod === "COD";
-
-              const orderDetails = {
-                orderId: order.orderId,
-                items: order.items.map((item) => ({
-                  productName: item.productSnapshot.productName,
-                  quantity: item.productSnapshot.quantity,
-                  price: item.productSnapshot.priceAtPurchase,
-                })),
-                total: order.amount,
-                orderDate: order.createdAt,
-                senderMobile: order.senderMobile,
-                receiverMobile: order.receiverMobile,
-                paymentMethod: order.paymentMethod,
-                codDetails: order.codDetails,
-              };
-
-              // Send order confirmation email.
-              // A WhatsApp-login customer, and a Magic guest who gave no email,
-              // carry a placeholder address on a domain with no mail server.
-              // Sending there bounces, and bounces at volume get the real
-              // transactional mail filtered. They get WhatsApp instead.
-              const canEmail = order.userEmail && !isPlaceholderEmail(order.userEmail);
-              if (canEmail) {
-                await sendOrderConfirmation(order.userEmail, orderDetails).catch(
-                  (err) => {
-                    console.error(
-                      "Failed to send order confirmation email:",
-                      err,
-                    );
-                  },
-                );
-              } else {
-                console.log(`[EMAIL] Skipped confirmation for ${order.orderId} — no real address on file`);
-              }
-
-              // Same confirmation over WhatsApp. It gets read far more often
-              // than email, and a WhatsApp-login customer may have no real
-              // email address at all. Not awaited — a messaging hiccup must
-              // not hold up the payment response. Silently no-ops until the
-              // template id and API key are configured.
-              sendOrderConfirmationWhatsApp({
-                mobileNumber: order.userMobile,
-                name: order.userName,
-                orderId: order.orderId,
-                amount: order.amount,
-              }).catch(() => {});
-
-              // For COD, only the advance was actually captured via Razorpay right now —
-              // the receipt must reflect that amount, not the full order total.
-              const paymentDetails = {
-                paymentId: payment.id,
-                amount: isCOD ? order.codDetails?.partialAmountPaid ?? order.amount : order.amount,
-                orderId: order.orderId,
-                date: new Date(),
-                paymentMethod: isCOD ? "COD" : "Razorpay",
-                codDetails: isCOD ? order.codDetails : null,
-              };
-              if (canEmail) {
-                await sendPaymentReceipt(order.userEmail, paymentDetails).catch(
-                  (err) => {
-                    console.error("Failed to send payment receipt email:", err);
-                  },
-                );
-              }
-            }
-          } catch (emailError) {
-            console.error("Error sending emails:", emailError);
-          }
-
-          try {
-            if (!order.invoiceData || !order.invoiceData.isGenerated) {
-              console.log(
-                `[INFO] Generating PDF Invoice for Order: ${order.orderId}...`,
-              );
-              const invoiceHtml = generateInvoiceHtmlTemplate(order);
-              const file = { content: invoiceHtml };
-              const options = {
-                format: "A4",
-                args: [
-                  "--no-sandbox",
-                  "--disable-setuid-sandbox",
-                  "--disable-dev-shm-usage",
-                  "--disable-gpu",
-                ],
-              };
-              const pdfBuffer = await html_to_pdf.generatePdf(file, options);
-              const savedFileKey = await uploadInvoiceToS3(
-                pdfBuffer,
-                order.userId,
-                order.orderId,
-              );
-              await Order.updateOne(
-                { _id: order._id },
-                {
-                  $set: {
-                    "invoiceData.isGenerated": true,
-                    "invoiceData.s3FileKey": savedFileKey,
-                  },
-                },
-              );
-
-              console.log(
-                `✅ Invoice uploaded to S3 successfully: ${savedFileKey}`,
-              );
-            }
-          } catch (invoiceError) {
-            console.error(
-              "❌ Error generating or uploading invoice to S3:",
-              invoiceError,
-            );
-          }
-          try {
-            const capiContents = order.items.map((i) => ({
-              id: i.productId,
-              quantity: i.productSnapshot.quantity,
-            }));
-            await sendMetaCapiEvent({
-              eventName: "Purchase",
-              eventId: order.orderId,
-              eventSourceUrl: order.metaTracking?.eventSourceUrl,
-              userData: {
-                // Never hash a placeholder address into Meta's user data. A
-                // WhatsApp-login customer, and a Magic guest who gave no email,
-                // carry one on a domain that does not exist — sending it as a
-                // real identifier pollutes matching instead of improving it.
-                email: isPlaceholderEmail(order.userEmail) ? null : order.userEmail,
-                phone: order.userMobile || order.senderMobile,
-                firstName: (order.userName || order.guestInfo?.name || "").split(" ")[0],
-                lastName: (order.userName || order.guestInfo?.name || "").split(" ").slice(1).join(" "),
-                externalId: order.userId || order.metaTracking?.anonymousId,
-                fbp: order.metaTracking?.fbp,
-                fbc: order.metaTracking?.fbc,
-                clientIp: order.metaTracking?.clientIp,
-                clientUserAgent: order.metaTracking?.clientUserAgent,
-                zip: order.deliveryAddress?.pinCode ? String(order.deliveryAddress.pinCode) : null,
-                city: order.deliveryAddress?.city || null,
-                state: order.deliveryAddress?.state || null,
-              },
-              customData: {
-                currency: "INR",
-                value: order.amount,
-                content_ids: capiContents.map((c) => c.id),
-                contents: capiContents,
-                num_items: capiContents.reduce((n, c) => n + (c.quantity || 1), 0),
-                order_id: order.orderId,
-              },
-            });
-          } catch (capiError) {
-            console.error("[Meta CAPI] Purchase dispatch error:", capiError.message);
-          }
-
-          // First-party purchase → Event collection. Inside the
-          // `order.status !== "PAID"` guard, so it runs exactly once per order
-          // however many times Razorpay replays the webhook. This is what makes
-          // /admin/analytics revenue match reality: the browser-side purchase
-          // is lost to ad-blockers and closed tabs, this one never is.
-          await recordServerPurchase(order, {
-            recoveredFrom: wasFailedByCron ? "FAILED" : undefined,
-          });
-        }
+        await fulfilCapturedPayment(order, payment);
 
         console.log("✅ Payment Captured:", payment.id);
         break;
@@ -1454,7 +1799,7 @@ const razorpayWebHookController = async (req, res) => {
         // at all, even though Razorpay already collected them.
         const order = await Order.findOne({
           "payment.razorpayOrderId": razorpayOrderId,
-          status: { $nin: ["PAID", "DELIVERED", "SHIPPED"] },
+          status: { $in: UNPAID_STATUSES },
         });
 
         if (order) {
@@ -1490,6 +1835,11 @@ const razorpayWebHookController = async (req, res) => {
 
       default:
         console.log("Unhandled event:", event);
+    }
+    } catch (error) {
+      // A 5xx makes Razorpay redeliver; fulfilCapturedPayment is safe to re-run
+      console.error(`[WEBHOOK] ${event} processing failed:`, error);
+      return res.status(500).json({ status: "error" });
     }
     return res.status(200).json({ status: "ok" });
   } else {
@@ -1611,16 +1961,106 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity, variantSku: oi.variantSku })),
     activeCartRules,
   );
+  // See the matching comment in razorpayCreateOrderController above.
+  const ruleBudgets = createRuleBudgetTracker(cartRuleResult.discountCandidatesByProduct);
+  const extraDiscountLines = [];
   for (const oi of orderItems) {
-    const candidates = getDiscountCandidatesForItem(cartRuleResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
+    const rawCandidates = getDiscountCandidatesForItem(cartRuleResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
+    const candidates = withRuleBudget(rawCandidates, ruleBudgets);
     if (candidates?.length) {
-      oi.productSnapshot.priceAtPurchase = applyBestDiscount(oi.productSnapshot.priceAtPurchase, candidates);
+      const fullPrice = oi.productSnapshot.priceAtPurchase;
+      const discountedPrice = applyBestDiscount(fullPrice, candidates);
+      const cap = applicableCap(candidates);
+      const unitsUsed = Math.min(oi.productSnapshot.quantity, cap);
+      const remainderLine = capDiscountedQuantity(oi, fullPrice, discountedPrice, cap);
+      spendRuleBudget(candidates, ruleBudgets, unitsUsed);
+      if (remainderLine) extraDiscountLines.push(remainderLine);
+      // See the matching comment in razorpayCreateOrderController above.
+      if (oi.productSnapshot.priceAtPurchase === 0) oi.productSnapshot.isPromotionalGift = true;
+    }
+  }
+  if (extraDiscountLines.length) orderItems.push(...extraDiscountLines);
+
+  // ── Promotion Engine V2 — see the matching comment in
+  // razorpayCreateOrderController above for the full rationale. Identical
+  // wiring, guest path.
+  const activePromotions = await getActivePromotions();
+  const promoProductMeta = new Map(
+    products.map((p) => [p.productId, { category: p.productCategory, subcategory: p.productSubCategory, tags: p.tags || [] }]),
+  );
+  const promoCartItems = orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity, variantSku: oi.variantSku }));
+  const promoSubtotalSoFar = orderItems.reduce((s, i) => s + i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity, 0);
+  const promoCtx = buildCartContext(promoCartItems, { subtotal: promoSubtotalSoFar, productMeta: promoProductMeta, customerType: "guest" });
+  const promotionResult = evaluatePromotions(promoCartItems, promoCtx, activePromotions);
+  for (const candidates of promotionResult.discountCandidatesByProduct.values()) {
+    for (const c of candidates) {
+      if (c.ruleId && !ruleBudgets.has(c.ruleId)) ruleBudgets.set(c.ruleId, c.cap);
+    }
+  }
+
+  const extraPromoDiscountLines = [];
+  for (const oi of orderItems) {
+    if (getDiscountCandidatesForItem(cartRuleResult.discountCandidatesByProduct, oi.productId, oi.variantSku)?.length) continue;
+    const rawCandidates = getPromotionDiscountCandidatesForItem(promotionResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
+    const candidates = withRuleBudget(rawCandidates, ruleBudgets);
+    if (candidates?.length) {
+      const fullPrice = oi.productSnapshot.priceAtPurchase;
+      const discountedPrice = applyBestPromotionDiscount(fullPrice, candidates);
+      const cap = applicableCap(candidates);
+      const unitsUsed = Math.min(oi.productSnapshot.quantity, cap);
+      const remainderLine = capDiscountedQuantity(oi, fullPrice, discountedPrice, cap);
+      spendRuleBudget(candidates, ruleBudgets, unitsUsed);
+      if (remainderLine) extraPromoDiscountLines.push(remainderLine);
+    }
+  }
+  if (extraPromoDiscountLines.length) orderItems.push(...extraPromoDiscountLines);
+
+  for (const gift of promotionResult.freeGifts) {
+    if (!gift.targetProductId) continue;
+    try {
+      const giftProduct = products.find((p) => p.productId === gift.targetProductId) || (await Product.findOne({ productId: gift.targetProductId, productStatus: "in_stock" }));
+      if (!giftProduct) { console.error(`[PromotionV2] free_product target not found/inactive: ${gift.targetProductId} (promotion ${gift.promotionId})`); continue; }
+      const giftVariant = gift.targetVariantSku
+        ? giftProduct.variantDetails?.find((v) => v.sku === gift.targetVariantSku)
+        : giftProduct.variantDetails?.[0];
+      const giftVariantName = giftVariant?.variantName || "N/A";
+      assertVariantAvailable(giftProduct, giftVariantName, 1);
+      orderItems.push({
+        productId: giftProduct.productId,
+        variantSku: giftVariant?.sku || "",
+        productSnapshot: {
+          quantity: 1,
+          productImg: giftVariant?.variantImage?.[0] || giftProduct.productImg || "https://urbannook.in/assets/logo.webp",
+          productName: giftProduct.productName,
+          productCategory: giftProduct.productCategory,
+          productSubCategory: giftProduct.productSubCategory,
+          priceAtPurchase: 0,
+          shipping: "0",
+          selectedVariant: giftVariantName,
+          variantTitleTemplate: giftProduct.variantTitleTemplate || "",
+          variantSku: giftVariant?.sku || "",
+          isPromotionalGift: true,
+        },
+      });
+    } catch (err) {
+      console.error(`[PromotionV2] free_product gift skipped (${gift.targetProductId}, promotion ${gift.promotionId}):`, err.message);
     }
   }
 
   // Recomputed from orderItems (post cart-rule discount), not accumulated
   // inline during the map above — mirrors the authenticated-user path.
-  const subtotal = orderItems.reduce((s, i) => s + i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity, 0);
+  let subtotal = orderItems.reduce((s, i) => s + i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity, 0);
+
+  // Promotion V2 order-level discounts — see the matching comment in
+  // razorpayCreateOrderController above for the full rationale. Identical
+  // wiring, guest path.
+  if (promotionResult.orderLevelDiscounts?.length) {
+    const amounts = promotionResult.orderLevelDiscounts.map((d) =>
+      d.type === "percent_off_order" ? subtotal * (Number(d.value) / 100) : Number(d.value),
+    );
+    const promotionOrderDiscount = Math.round(Math.min(Math.max(...amounts, 0), subtotal));
+    subtotal -= promotionOrderDiscount;
+  }
 
   // Magic has no pincode yet — Razorpay rates the address through
   // /magic/shipping-info and adds shipping_fee to the order itself, so shipping
@@ -1640,12 +2080,15 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   // direct comparison, whole-cart (any products count), no rules table.
   const freeShippingConfig = await getFreeShippingConfig();
   const thresholdEligible = freeShippingConfig.isActive && subtotal >= freeShippingConfig.thresholdAmount;
+  const comboFsEligible = await isFreeShippingEligible(orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity, variantSku: oi.variantSku })));
   const freeShippingUnlocked =
-    (await isFreeShippingEligible(items.map((i) => i.productId))) || cartRuleResult.freeShipping || thresholdEligible;
+    comboFsEligible || cartRuleResult.freeShipping || thresholdEligible || promotionResult.freeShipping;
   const chargedShippingAmount = freeShippingUnlocked ? 0 : realShippingAmount;
-  // console.log(
-  //   `[FreeShipping][Order:guest] realShipping=₹${realShippingAmount} chargedShipping=₹${chargedShippingAmount} items=${items.map(i => `${i.productId}x${i.quantity}`).join(",")}`,
-  // );
+  console.log(
+    `[FreeShipping][Order:guest] items=[${orderItems.map((oi) => `${oi.productId}x${oi.productSnapshot.quantity}${oi.variantSku ? `(${oi.variantSku})` : ""}`).join(",")}] ` +
+    `signals={comboFsEligible:${comboFsEligible}, cartRuleFreeShipping:${cartRuleResult.freeShipping}, thresholdEligible:${thresholdEligible}(threshold=₹${freeShippingConfig.thresholdAmount}, subtotal=₹${subtotal}), promotionFreeShipping:${promotionResult.freeShipping}} ` +
+    `→ freeShippingUnlocked=${freeShippingUnlocked}, realShipping=₹${realShippingAmount}, chargedShipping=₹${chargedShippingAmount}`,
+  );
 
   // Gift wrap: guests have no server-side cart to read intent from, so the
   // boolean (only) comes from req.body — that's safe, it just means "include
@@ -1716,6 +2159,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     if (identifiers.length > 0 && liveCoupon.maxUsesPerUser) {
       const priorUses = await CouponUsage.countDocuments({
         couponId: liveCoupon.couponId,
+        reversed: { $ne: true },
         $or: [
           { email: guestEmail },
           { mobile: normMobileCoupon },
@@ -1848,6 +2292,11 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     userName: guestInfo?.name?.trim() || "",
     userMobile: cleanMobile,
     items: orderItems,
+    // Promotion Engine V2 — snapshot of which promotions matched at order-
+    // creation time (see the wiring comment above). Empty when none matched.
+    appliedPromotions: promotionResult.matchedPromotions.map((p) => ({
+      promotionId: String(p._id), name: p.name, rewardTypes: [...new Set((p.rewards || []).map((r) => r.type))],
+    })),
     // Whole-rupee, matching exactly what razorpayChargeAmountPaise actually
     // charges — finalAmount itself can be fractional (realShippingAmount is
     // a live carrier rate, not guaranteed integer), so storing it unrounded
@@ -1911,8 +2360,15 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
 });
 
 export {
+  fulfilCapturedPayment,
+  UNPAID_STATUSES,
   razorpayCreateOrderController,
   razorpayKeyGetController,
   razorpayWebHookController,
   guestCreateOrderController,
+  // Pure helper exported for direct unit testing (no controller mocking
+  // needed). applicableCap/createRuleBudgetTracker/withRuleBudget/
+  // spendRuleBudget now live in cartRule.util.js (shared with
+  // cartRule.controller.js's preview endpoint) — import those from there.
+  capDiscountedQuantity,
 };

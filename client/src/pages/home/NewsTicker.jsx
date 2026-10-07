@@ -16,7 +16,7 @@ const NewsTicker = () => {
     'Ready to ship within 48 hrs',
     'Partial COD available',
     'Pan-India delivery',
-    'Made in India 🇮🇳',
+    'Made in India',
   ];
 
   return (
@@ -49,7 +49,7 @@ const NewsTicker = () => {
                 <span className="gl-lbl text-[9px] sm:text-[10px] tracking-[0.18em] text-paper">
                   {headline}
                 </span>
-                <span className="ml-6 sm:ml-8 text-brand text-xs leading-none">✳</span>
+                <i className="fa-solid fa-asterisk ml-6 sm:ml-8 text-brand text-xs leading-none" aria-hidden="true" />
               </div>
             ))}
           </div>

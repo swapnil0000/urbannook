@@ -1,10 +1,19 @@
 name: Prod Deploy
 
-# This workflow triggers automatically whenever code is pushed to the 'main' branch
+# Runs on every push to 'main', and nightly so the prerendered product pages
+# (SEO HTML built from the live product feed) pick up price/stock changes.
 on:
   push:
     branches:
       - main
+  schedule:
+    - cron: '30 21 * * *' # 03:00 IST
+  workflow_dispatch:
+
+# Never run two deploys at once (nightly run overlapping a push deploy)
+concurrency:
+  group: prod-deploy
+  cancel-in-progress: false
 
 jobs:
   # JOB 1: Detect which parts of the codebase were modified
@@ -19,6 +28,7 @@ jobs:
 
       # Uses path filters to check if changes happened in the client or server folder
       - name: Path Filter
+        if: github.event_name == 'push'
         uses: dorny/paths-filter@v3
         id: filter
         with:
@@ -31,7 +41,8 @@ jobs:
   # JOB 2: Build and Deploy the Frontend (React/Vite) to AWS S3 & CloudFront
   deploy-client:
     needs: detect-changes
-    if: needs.detect-changes.outputs.client == 'true'
+    # Nightly/manual runs always rebuild the client (refreshes prerendered pages)
+    if: github.event_name != 'push' || needs.detect-changes.outputs.client == 'true'
     runs-on: ubuntu-latest
     environment: production
     env:
@@ -57,6 +68,9 @@ jobs:
           echo "VITE_GTM_ID=${{ secrets.VITE_GTM_ID }}" >> .env
           echo "VITE_ENABLE_ANALYTICS=${{ secrets.VITE_ENABLE_ANALYTICS }}" >> .env
           echo "VITE_META_PIXEL_ID=${{ secrets.VITE_META_PIXEL_ID }}" >> .env
+          # Google Ads conversion tracking. Unset ⇒ empty ⇒ conversion not sent.
+          echo "VITE_GOOGLE_ADS_ID=${{ secrets.VITE_GOOGLE_ADS_ID }}" >> .env
+          echo "VITE_GADS_LABEL_PURCHASE=${{ secrets.VITE_GADS_LABEL_PURCHASE }}" >> .env
           # Razorpay Magic Checkout (1CC). Vite inlines this at build time, so it
           # can only be set here — not on the API server. Unset ⇒ empty ⇒ off.
           echo "VITE_MAGIC_CHECKOUT_ENABLED=${{ secrets.VITE_MAGIC_CHECKOUT_ENABLED }}" >> .env
@@ -81,7 +95,7 @@ jobs:
         run: |
           # Step 2a: Sync all assets (JS, CSS, Images) allowing them to cache for better performance. 
           # We explicitly exclude index.html and sw.js from this bulk upload.
-          aws s3 sync client/dist/ s3://${{ secrets.AWS_S3_FRONTEND_BUCKET }} --delete --exclude "index.html" --exclude "sw.js" --only-show-errors
+          aws s3 sync client/dist/ s3://${{ secrets.AWS_S3_FRONTEND_BUCKET }} --delete --exclude "index.html" --exclude "sw.js" --exclude "product/*" --only-show-errors
           
           # Step 2b: Upload index.html with strict NO-CACHE headers. 
           # This forces browsers to always fetch the latest version, preventing "Chunk Load / Oops" errors.
@@ -92,12 +106,32 @@ jobs:
             aws s3 cp client/dist/sw.js s3://${{ secrets.AWS_S3_FRONTEND_BUCKET }}/sw.js --metadata-directive REPLACE --cache-control "no-store, no-cache, must-revalidate, max-age=0"
           fi
           
+          # Step 2c2: Crawler files change every build — short cache instead of the default long one.
+          for f in robots.txt sitemap.xml llms.txt; do
+            if [ -f "client/dist/$f" ]; then
+              aws s3 cp "client/dist/$f" s3://${{ secrets.AWS_S3_FRONTEND_BUCKET }}/$f --metadata-directive REPLACE --cache-control "public, max-age=3600"
+            fi
+          done
+
+          # Step 2d: Prerendered product pages (SEO HTML) — extensionless files at the exact keys
+          # CloudFront serves for /product/<id> and /product/<id>/<sku>. S3 product/* is kept in
+          # EXACT sync with this build: every page references this build's hashed JS (the previous
+          # build's JS was just deleted above), so a stale page would load blank. Deleted products
+          # are removed, and if prerender produced nothing (feed down) all pages are removed and
+          # CloudFront falls back to index.html (the SPA) as before.
+          # Pass 1 manages product/<id> keys only; pass 2 manages product/<id>/<sku> keys only.
+          BUCKET=s3://${{ secrets.AWS_S3_FRONTEND_BUCKET }}
+          PR=client/dist-prerender
+          mkdir -p $PR/base/product $PR/variant/product
+          aws s3 sync $PR/base/product/ $BUCKET/product/ --delete --exclude "*/*" --content-type "text/html; charset=utf-8" --cache-control "no-cache, max-age=0" --only-show-errors
+          aws s3 sync $PR/variant/product/ $BUCKET/product/ --delete --exclude "*" --include "*/*" --content-type "text/html; charset=utf-8" --cache-control "no-cache, max-age=0" --only-show-errors
+
           aws cloudfront create-invalidation --distribution-id ${{ secrets.AWS_CLOUDFRONT_ID }} --paths "/*"
 
   # JOB 3: Deploy the Backend (Node.js/Express) to AWS EC2
   deploy-server:
     needs: detect-changes
-    if: needs.detect-changes.outputs.server == 'true'
+    if: github.event_name == 'push' && needs.detect-changes.outputs.server == 'true'
     runs-on: ubuntu-latest
     environment: production
     env:
@@ -146,7 +180,9 @@ jobs:
             # Clean start for fresh code in memory
             pm2 stop urbannook-server || true
             pm2 delete urbannook-server || true
-            pm2 start ecosystem.config.cjs --env production
+            # Secrets come from Infisical via scripts/start-prod.sh (falls back
+            # to .env.production if Infisical is unreachable).
+            pm2 start ecosystem.prod.config.cjs
             pm2 save
             echo "--- DEPLOY RESTART FINISHED ---"
           EOF
