@@ -432,6 +432,41 @@ would follow the exact same pattern as `getProductDisplayController`
 (structural filter: product mentioned in the promotion is anywhere in the
 listed grid; placements gate: `"plp"`).
 
+### 8.6 Everything is ID-based, never name-based — confirmed from the admin editor
+
+Both products and variants are referenced by **stable ID** everywhere a
+promotion stores or matches them — never by display name:
+
+| Reference | Field | Keyed by |
+|---|---|---|
+| Condition's product | `conditionTree`'s `product` leaf | `productId` |
+| Condition's variant (optional) | same leaf | `variantSku` |
+| Reward's target product | `rewards[].targetProductId` | `productId` |
+| Reward's target variant (optional) | `rewards[].targetVariantSku` | `variantSku` |
+| Gift-choice option | `rewards[].giftOptions[].productId` / `.variantSku` | `productId` / `variantSku` |
+| Fetch (PDP) | `GET /promotions/display/product/:productId` | `productId` (URL param) |
+| Engine matching | `promotionEngine.util.js`'s `qtyByProduct`/`qtyByProductVariant` maps | `productId` / `productId::sku` |
+
+This isn't a convention I'm inferring — it's explicit in the admin editor's
+own `VariantSelect` component
+(`urbannook-admin/client/src/components/offers/ProductSelect.jsx:30-32`):
+
+> "The option VALUE is the variant's `sku`, not its display name — sku is
+> the one field this catalog treats as a variant's real, stable identity
+> (names can repeat or get renamed later, which silently broke matching)."
+
+**The one place a name briefly appears, and why it's harmless:** the
+storefront's cart (Redux state) has always stored a line's variant as its
+**name** (e.g. `"Red"`), because that's literally what the customer clicked
+— the cart was never built to carry SKUs. So a Display API request body
+carries `items[].selectedVariant` as that name string. It survives exactly
+one hop: `resolveItemsAndContext`'s `skuByProductAndName` lookup
+(`promotion.controller.js`) converts it to the real SKU **before** it ever
+reaches `conditionTree`/`evaluateConditionTree` — the evaluator itself
+never sees a name, only `productId`/`variantSku`, identically to how the
+real checkout engine (`rp.payment.controller.js`) already does the exact
+same name→SKU resolution for its own cart items.
+
 
 
 
