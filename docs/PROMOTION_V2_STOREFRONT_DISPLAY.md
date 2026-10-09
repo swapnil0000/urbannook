@@ -255,3 +255,229 @@ not decided yet:
 
 None of the above blocks anything — the fetch+filter layer this doc
 describes works today, independent of what UI eventually consumes it.
+
+## 8. Worked example — admin creates an offer, storefront fetches it
+
+Concrete, end-to-end, with real JSON at every step.
+
+### 8.1 Admin creates the promotion
+
+Say the admin opens the Promotions editor and fills in:
+
+- Name: **"Diwali 20% Off — LED Katana"**
+- Type: `product_discount`
+- Condition: *product* `katana-led-01`, quantity `>= 1`
+- Reward: *20% off* that same product
+- Placements (the checkboxes): ✅ PDP, ✅ Cart, ✅ Mini-cart, ✅ Checkout — ❌ PLP, ❌ order confirmation, ❌ order details, ❌ customer account
+- Stackable: yes, Priority: 5
+
+Saving that writes **one document** into the `promotions` collection — this
+is the actual shape (`server/src/model/promotion.model.js`):
+
+```jsonc
+{
+  "_id": "671f3a2b9c1e4a0012ab34cd",
+  "promotionType": "product_discount",
+  "name": "Diwali 20% Off — LED Katana",
+  "isActive": true,
+  "startsAt": null,
+  "endsAt": "2026-11-15T18:30:00.000Z",
+
+  "stackable": true,
+  "exclusive": false,
+  "priority": 5,
+  "promotionGroup": "",
+  "maxPromotionsPerOrder": null,
+  "combinesWithCoupons": true,
+
+  "conditionTree": {
+    "field": "product",
+    "productId": "katana-led-01",
+    "minQuantity": 1
+  },
+  "rewards": [
+    {
+      "type": "percent_off_product",
+      "targetProductId": "katana-led-01",
+      "value": 20,
+      "discountAllUnits": false
+    }
+  ],
+
+  "placements": ["pdp", "cart", "mini_cart", "checkout"],
+  "maxApplications": null,
+  "maxUsesTotal": null,
+  "maxUsesPerUser": null,
+  "usageCount": 0,
+  "linkedCouponCode": "",
+
+  "createdAt": "2026-10-10T09:00:00.000Z",
+  "updatedAt": "2026-10-10T09:00:00.000Z"
+}
+```
+
+Nothing else happens at save time — no cache to bust, no separate "banner"
+record to also write. This one document IS the offer, everywhere.
+
+### 8.2 Customer opens the product page (PDP)
+
+`ProductDetailPage.jsx` (once wired) calls:
+
+```js
+const { data } = useGetProductPromotionsQuery("katana-led-01");
+```
+
+→ `GET /promotions/display/product/katana-led-01`
+
+Server-side (`getProductDisplayController`):
+1. `getActivePromotions()` — this doc qualifies (active, no date window issue).
+2. Gate B: `promotionReferencesProduct(promo, "katana-led-01")` → true (the
+   condition tree names this exact product). Gate A: `placements` includes
+   `"pdp"` → true. Kept.
+3. Context built as a **hypothetical 1-unit cart**: `{ productId:
+   "katana-led-01", quantity: 1 }`, `subtotal: 0` — so the question being
+   asked is "if the customer adds just this, does it qualify?"
+4. Gate C: `qtyByProduct["katana-led-01"] = 1 >= minQuantity 1` → condition
+   met → `qualifying: true`.
+
+Response body:
+
+```jsonc
+{
+  "statusCode": 200,
+  "message": "OK",
+  "success": true,
+  "data": {
+    "promotions": [
+      {
+        "id": "671f3a2b9c1e4a0012ab34cd",
+        "displayType": "discount",
+        "title": "Diwali 20% Off — LED Katana",
+        "subtitle": "20% off",
+        "badge": "20% OFF",
+        "icon": "tag",
+        "priority": 5,
+        "displayRank": 5,
+        "savingsText": "20% off",
+        "progressText": null,
+        "ctaText": "Applied",
+        "couponCodeToEnter": null,
+        "applied": true,
+        "qualifying": true,
+        "placement": "pdp",
+        "explanation": [
+          { "met": true, "text": "Needs 1+ of product katana-led-01 in cart (have 1)." }
+        ],
+        "fullyFunctional": true
+      }
+    ]
+  }
+}
+```
+
+A UI here would read `data.promotions[0]` and render something like a
+"20% OFF" badge with "Diwali 20% Off — LED Katana" under the price — exactly
+once, switching on `displayType === "discount"`.
+
+### 8.3 Customer adds it to cart, opens the cart drawer
+
+`CartDrawer.jsx` (once wired) calls:
+
+```js
+useGetCartPromotionsQuery({
+  items: [{ productId: "katana-led-01", quantity: 1, selectedVariant: "Red" }],
+  placement: "cart",
+  subtotal: 2499,
+});
+```
+
+→ `POST /promotions/display/cart` with that exact body.
+
+Server-side (`getCartDisplayController`):
+1. Gate A: `placements` includes `"cart"` → true.
+2. Gate B: `isPromotionRelevantToCart` → the condition names
+   `katana-led-01`, and that product IS in `cartProductIds` → relevant.
+3. A **real** `evaluatePromotions(...)` run (the same call the actual
+   checkout makes) decides `appliedPromotionIds` — this is what makes
+   `applied` trustworthy rather than guessed.
+4. Gate C runs against the REAL cart context this time (`subtotal: 2499`,
+   real quantity), same result: qualifies.
+
+Response is the same shape as §8.2, just `"placement": "cart"` and
+`applied`/`qualifying` now driven by the real cart instead of a 1-unit
+hypothetical.
+
+### 8.4 Checkout
+
+Identical call shape via `useGetCheckoutPromotionsQuery`, hitting
+`POST /promotions/display/checkout` — the only difference is it also
+accepts `customerType`/`orderCount`/`deliveryAddress`, so a promotion with
+a pincode/state/"returning customer only" condition can be evaluated for
+real here (PDP/cart can't check those yet). This endpoint's result is
+**display only** — the actual charge still comes from
+`rp.payment.controller.js`'s own independent `evaluatePromotions` call at
+order-creation time; nothing here feeds the real total.
+
+### 8.5 What if the admin had left "PLP" checked and nothing else?
+
+Worth knowing: **PLP, order confirmation, order details, and customer
+account are valid `placements` values in the schema, but none of them have
+a working Display API endpoint yet** — only `pdp`, `cart`/`mini_cart`, and
+`checkout` do (see §3's table; `promotion.route.js` only defines those
+three routes). Ticking "PLP" in the admin editor today records the intent
+correctly, but there's nothing on the storefront that calls a
+`/promotions/display/plp` endpoint to read it — that endpoint doesn't
+exist yet. Same gap applies to the other three. Building one for PLP
+would follow the exact same pattern as `getProductDisplayController`
+(structural filter: product mentioned in the promotion is anywhere in the
+listed grid; placements gate: `"plp"`).
+
+
+
+
+<!-- Now let me append a concrete worked example to the doc, end-to-end.
+
+Doc update ho gaya — section §8 add kiya hai with full worked example. Ab seedha chat me bhi samjhata hoon:
+
+Example: Admin ek offer banata hai
+
+Maan lo admin Promotions editor me banata hai: “Diwali 20% Off — LED Katana”, condition = product katana-led-01 cart me ho, reward = us product pe 20% off, checkboxes (placements) me tick kiya: PDP, Cart, Mini-cart, Checkout.
+
+Save karte hi promotions collection me yeh ek hi document banta hai:
+
+{
+  "_id": "671f3a2b9c1e4a0012ab34cd",
+  "promotionType": "product_discount",
+  "name": "Diwali 20% Off — LED Katana",
+  "isActive": true,
+  "conditionTree": { "field": "product", "productId": "katana-led-01", "minQuantity": 1 },
+  "rewards": [{ "type": "percent_off_product", "targetProductId": "katana-led-01", "value": 20 }],
+  "placements": ["pdp", "cart", "mini_cart", "checkout"],
+  "priority": 5
+}
+
+Bas itna — koi alag banner record nahi banta, yeh ek doc hi poora offer hai.
+
+Storefront kaise fetch karega
+
+PDP pe (product page khulte hi):
+
+useGetProductPromotionsQuery("katana-led-01")
+
+→ yeh call karta hai GET /promotions/display/product/katana-led-01. Server check karta hai: placements me “pdp” hai? haan. Condition is product se related hai? haan. Phir ek hypothetical 1-unit cart bana ke condition evaluate karta hai → qualify ho jata hai. Jawab milta hai:
+
+{ "displayType": "discount", "title": "Diwali 20% Off — LED Katana", "badge": "20% OFF", "ctaText": "Applied", "qualifying": true, "applied": true }
+
+UI isko seedha displayType === "discount" pe switch karke render kar sakta hai.
+
+Cart drawer me (jab customer product cart me daal chuka hai):
+
+useGetCartPromotionsQuery({ items: [{productId:"katana-led-01", quantity:1}], placement:"cart", subtotal:2499 })
+
+→ POST /promotions/display/cart. Yahan farq itna hai ki server ek real evaluatePromotions bhi chalata hai (wahi jo asli checkout use karta hai) taaki applied field trustworthy ho, sirf guess na ho.
+
+Checkout pe same tarah useGetCheckoutPromotionsQuery se POST /promotions/display/checkout — bas yeh extra customerType/deliveryAddress/orderCount bhi bhejta hai, taaki pincode/state jaisi conditions bhi check ho sakein.
+
+Ek important gap bhi mila mujhe isi example banate waqt: schema me plp, order_confirmation, order_details, customer_account bhi valid checkbox-values hain, lekin inke liye abhi koi API endpoint bana hi nahi hai — sirf pdp/cart/mini_cart/checkout ke liye hai. Matlab admin “PLP” tick kar sakta hai, lekin storefront par koi route nahi hai jo usse padhe — woh doc me bhi likh diya (§8.5) taaki aage jab PLP banana ho toh pata rahe exact wahi pattern follow karna hai jo PDP controller use karta hai. -->
+
+nothing will be odne on names eb=verything will be basing on id offer be assigned id and fetch and display also basing on id or product id 
