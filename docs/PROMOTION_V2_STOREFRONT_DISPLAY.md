@@ -3,6 +3,13 @@
 Status: **data layer done, UI not built yet.** This doc explains what already
 exists so the next step (building the actual banners/UI) can be planned.
 
+Companion doc: the admin repo's `PROMOTION_V2_ADMIN.md` (repo root) covers
+the other half — how an admin *defines* an offer (the editor's fields,
+exact request body, server-side validation) and what document that
+actually writes to the shared `promotions` collection. Both docs describe
+the same documents from opposite ends: admin writes them, storefront reads
+them, no sync step in between.
+
 ## 1. What got removed, and why this doc exists now
 
 Until 2026-10-09 the storefront showed discounts/banners from THREE separate,
