@@ -3,18 +3,21 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import {
   useUpdateCartMutation,
-  useEvaluateCartRulesQuery,
   useGetFreeShippingOfferQuery,
-  useGetAllFreeShippingBannersQuery,
   useGetGiftWrapOfferQuery,
 } from '../../store/api/userApi';
 import { updateQuantity, removeItem } from '../../store/slices/cartSlice';
 import { resolveVariantTitle } from '../../utils/variantTitle';
 import { setShowLoginModal, setLoginCallback } from '../../store/slices/uiSlice';
 import { trackViewCart, trackRemoveFromCart, track } from '../../utils/analytics';
-import FreeShippingBanner from '../FreeShippingBanner';
 import FreeShippingStrip from '../FreeShippingStrip';
 import GiftWrapOffer, { GiftWrapLineItem } from '../GiftWrapOffer';
+// The old combo-banner/cart-rule discount preview (FreeShippingBanner,
+// useEvaluateCartRulesQuery, useGetAllFreeShippingBannersQuery) was removed
+// entirely 2026-10-09 — this drawer now shows plain cart totals + the
+// free-shipping threshold only. A Promotion V2-based discount preview and
+// add-on nudge is a deliberate follow-up (data layer already exists —
+// useGetCartPromotionsQuery, src/store/api/userApi.js), not an oversight.
 
 const OptimizedImage = lazy(() => import('../OptimizedImage'));
 
@@ -37,82 +40,9 @@ const CartDrawer = ({ isOpen, onClose }) => {
 
   const [updateCart] = useUpdateCartMutation();
 
-  // Generic, data-driven cart-promotion rules (server/src/model/cartRule.model.js)
-  // — same evaluator the payment controller uses for the real order total.
-  // Needed here so the drawer's own price display doesn't disagree with
-  // checkout/the actual charge (previously it never checked this at all,
-  // so a discounted item like Pen Stand at 2+ Lamps still showed ₹299 here).
-  const cartRuleEvalItems = cartItems
-    .map((item) => ({
-      productId: item.mongoId || item.id,
-      quantity: typeof item.quantity === 'object' ? Number(item.quantity?.quantity || 0) : Number(item.quantity || 0),
-      selectedVariant: item.selectedVariant,
-    }))
-    .filter((i) => i.productId && i.quantity > 0);
-  const { data: cartRuleEvalData } = useEvaluateCartRulesQuery(cartRuleEvalItems, {
-    skip: cartRuleEvalItems.length === 0,
-  });
-  // "Buy N more of this same product, get a lower unit price" — reuses the
-  // SAME FreeShippingBanner card as the cross-sell combo nudges below
-  // (merged into one carousel via __quantityNudge, see nudgeSlides) rather
-  // than a separate component or a second stacked card. Stays a candidate
-  // until enough of the product (any variant) is in the cart —
-  // findQuantityDiscountNudges only returns an entry while remaining > 0.
-  const quantityNudges = cartRuleEvalData?.data?.quantityNudges || [];
-
-  // Free-shipping eligibility for the "Shipping" line below — mirrors the
-  // same OR logic used at checkout/payment (rp.payment.controller.js): the
-  // admin combo-banner offer, any active generic cart rule's free_shipping
-  // effect, or the plain cart-value threshold. Previously this drawer never
-  // showed shipping status at all, so the customer only found out at checkout.
+  // Free-shipping eligibility for the "Shipping" line below — threshold-only
+  // for now (see file-header note on the removed discount/banner preview).
   const { data: offerRes } = useGetFreeShippingOfferQuery();
-  const { data: bannersRes } = useGetAllFreeShippingBannersQuery();
-  // Sibling variants of the SAME product can share ONE rule's discount pool
-  // instead of each getting their own (e.g. "Exciting Offers": free single
-  // stand / 50%-off double / 50%-off triple is ONE unit shared across all
-  // three, not one each — see cartRule.util.js's createRuleBudgetTracker).
-  // lineDiscounts is computed server-side over the cart in its own array
-  // order, the exact same way checkout actually consumes the budget — a
-  // line whose own entry comes back ineligible must show full price here,
-  // or the drawer total would silently disagree with what gets charged.
-  const getLineEligible = (item) => {
-    const productId = item.mongoId || item.id;
-    const entry = (cartRuleEvalData?.data?.lineDiscounts || []).find(
-      (ld) => String(ld.productId) === String(productId) && ld.selectedVariant === item.selectedVariant,
-    );
-    return !entry || entry.eligible !== false; // no entry (older response/no rule involved) → don't block
-  };
-  const getItemDiscountedPrice = (item) => {
-    const productId = item.mongoId || item.id;
-    const price = Number(item.price) || 0;
-    if (!getLineEligible(item)) return price;
-    // A candidate may be tagged with `variantName` (offer scoped to one
-    // variant) — untagged candidates apply to every variant, unchanged from
-    // before this field existed. See cartRule.util.js getDiscountCandidatesForItem.
-    const candidates = (cartRuleEvalData?.data?.discounts?.[productId] || []).filter(
-      (c) => !c.variantName || c.variantName === item.selectedVariant,
-    );
-    if (!candidates?.length) return price;
-    const results = candidates.map((c) =>
-      c.type === 'percent_off' ? price * (1 - Number(c.value) / 100) : price - Number(c.value),
-    );
-    // Rounded to match the server's applyBestDiscount exactly (50% off ₹299
-    // is ₹149.5 mathematically — both round that to ₹150, consistently).
-    return Math.round(Math.max(Math.min(...results), 0));
-  };
-  // How many units of this line the matching rule(s) actually justify
-  // discounting — computed server-side (cartRule.util.js's ruleRepeatCount)
-  // from the rule's own condition quantity vs. real cart quantity, e.g. 2x
-  // the trigger product unlocks up to 2 discounted units, not a flat 1.
-  // Read here, never re-derived — the policy lives in exactly one place.
-  const getItemDiscountCap = (item) => {
-    const productId = item.mongoId || item.id;
-    if (!getLineEligible(item)) return 0;
-    const candidates = (cartRuleEvalData?.data?.discounts?.[productId] || []).filter(
-      (c) => !c.variantName || c.variantName === item.selectedVariant,
-    );
-    return Math.max(1, ...candidates.map((c) => c.cap ?? 1));
-  };
 
   // Map a cart line item → analytics item shape
   const toTrackItem = (item) => ({
@@ -206,24 +136,9 @@ const CartDrawer = ({ isOpen, onClose }) => {
 
   if (!mounted && !isOpen) return null;
 
-  // totalAmount (Redux) doesn't know about cart-rule discounts — subtract
-  // the same savings the line-item prices above already reflect, so the
-  // drawer's own subtotal/total never disagrees with what checkout charges.
-  // FIXED: only 1 unit of a line ever gets the discount/free benefit — this
-  // used to multiply the FULL per-unit discount by the whole quantity
-  // (rawPrice - discounted) * qty, so e.g. 2x a 100%-off "free" Stand showed
-  // BOTH as free (and subtracted the full ₹399×2 from the total) instead of
-  // just the 1 unit checkout actually gives free. Matches the server's
-  // capDiscountedQuantity cap in rp.payment.controller.js exactly.
-  const ruleDiscountSavings = cartItems.reduce((sum, item) => {
-    const rawPrice = Number(item.price) || 0;
-    const discounted = getItemDiscountedPrice(item);
-    const qty = typeof item.quantity === 'object' ? Number(item.quantity?.quantity || 0) : Number(item.quantity || 0);
-    const discountedUnits = discounted < rawPrice ? Math.min(qty, getItemDiscountCap(item)) : 0;
-    return sum + (rawPrice - discounted) * discountedUnits;
-  }, 0);
-  // Gift wrap adds to what's actually charged at checkout — same price the
-  // GiftWrapLineItem row above shows, so this can never disagree with it.
+  // Plain totals for now — see file-header note on the removed discount
+  // preview. Gift wrap still adds to what's actually charged at checkout —
+  // same price the GiftWrapLineItem row above shows.
   const giftWrapOffer = giftWrapOfferRes?.data;
   // Qty auto-scales with total ELIGIBLE UNITS in the cart — 2x the same
   // eligible product is 2 gift wraps, not 1 — same rule the server applies
@@ -238,68 +153,12 @@ const CartDrawer = ({ isOpen, onClose }) => {
       ? (Number(giftWrapOffer.price) || 0) * giftWrapEligibleCount
       : 0;
 
-  const subtotal = totalAmount - ruleDiscountSavings + giftWrapAmount;
+  const subtotal = totalAmount + giftWrapAmount;
 
-  // Same three-path eligibility used at checkout: admin combo banner (source
-  // + recommended product both in cart), any active generic cart rule whose
-  // effects include free_shipping, or the plain cart-value threshold.
-  // Combo banners are independent of the offer doc's own `isActive` — that
-  // flag is only the cart-VALUE-threshold on/off switch, not a master kill
-  // switch for banners (each banner has its own isActive; server-side
-  // getAllActiveBanners already only returns those).
   const offerConfig = offerRes?.data;
-  const banners = bannersRes?.data || [];
-  // .split(":")[0] guards against a composite "productId:variant" id (some
-  // guest-cart paths use that key format) — matches the same parsing used
-  // for this exact check on checkout, so the two can never disagree about
-  // which products are "in the cart" for combo purposes.
-  const cartProductIds = new Set(cartItems.map((i) => i.mongoId || i.id?.split(":")[0]));
-  // Which selectedVariant name(s) of a product are actually in the cart —
-  // lets a banner scoped to one variant (sourceVariantName/recommendedVariantName,
-  // see freeShippingOffer.util.js) require that exact variant, not just the
-  // product. A banner with no variant name behaves exactly as before.
-  const cartVariantsByProduct = new Map();
-  cartItems.forEach((i) => {
-    const pid = i.mongoId || i.id?.split(":")[0];
-    if (!pid) return;
-    if (!cartVariantsByProduct.has(pid)) cartVariantsByProduct.set(pid, new Set());
-    if (i.selectedVariant) cartVariantsByProduct.get(pid).add(i.selectedVariant);
-  });
-  const hasProductVariant = (productId, variantName) => {
-    if (!cartProductIds.has(productId)) return false;
-    if (!variantName) return true;
-    return (cartVariantsByProduct.get(productId) || new Set()).has(variantName);
-  };
-  const comboEligible = banners.some(
-    (b) => hasProductVariant(b.sourceProductId, b.sourceVariantName) && hasProductVariant(b.recommendedProductId, b.recommendedVariantName),
-  );
   const thresholdEligible =
     !!offerConfig?.isActive && (offerConfig?.thresholdAmount || 0) > 0 && subtotal >= offerConfig.thresholdAmount;
-  const isFreeShippingEligible = comboEligible || !!cartRuleEvalData?.data?.freeShipping || thresholdEligible;
-
-  // Cross-sell nudge: every banner whose SOURCE product (and its required
-  // variant, if any) is in the cart but its RECOMMENDED add-on isn't — one
-  // persistent card, arrows page through all of them (see bannersOverride on
-  // FreeShippingBanner) instead of a new card mounting/unmounting each time
-  // the cart's nudge-worthy combo changes. Each banner's own isActive is the
-  // only gate — not the parent offer doc's threshold toggle (see comment above).
-  const nudgeBanners = banners.filter(
-    (b) => hasProductVariant(b.sourceProductId, b.sourceVariantName) && !hasProductVariant(b.recommendedProductId, b.recommendedVariantName),
-  );
-
-
-  // Combo cross-sell nudges AND same-product quantity-discount nudges are
-  // paged through in ONE shared carousel card (not two stacked cards) — a
-  // quantity nudge is tagged with __quantityNudge so FreeShippingBanner can
-  // tell the two slide kinds apart (see its `quantityNudge` derivation).
-  const nudgeSlides = [
-    ...nudgeBanners,
-    ...quantityNudges.map((q) => ({
-      sourceProductId: q.productId,
-      recommendedProductId: q.productId,
-      __quantityNudge: q,
-    })),
-  ];
+  const isFreeShippingEligible = thresholdEligible;
 
   return (
     <div className="fixed inset-0 z-[9999] flex justify-end font-inter text-ink">
@@ -381,18 +240,8 @@ const CartDrawer = ({ isOpen, onClose }) => {
                   const itemId = item.mongoId || item.productId || item.id;
                   const variant = item.selectedVariant && item.selectedVariant !== 'N/A' ? item.selectedVariant : null;
                   const displayName = resolveVariantTitle(item.name, item.variantTitleTemplate, item.selectedVariant);
-                  const discountedUnitPrice = getItemDiscountedPrice(item);
                   const rawPrice = Number(item.price) || 0;
-                  const hasDiscount = discountedUnitPrice < rawPrice;
-                  // The cap scales with how many times the rule's trigger
-                  // condition is met (server-computed, see getItemDiscountCap)
-                  // — a line qty of 2+ shows the correct blended total, not
-                  // the per-unit discounted price applied to every unit.
-                  const discountedUnits = hasDiscount ? Math.min(itemQty, getItemDiscountCap(item)) : 0;
-                  const fullPriceUnits = itemQty - discountedUnits;
-                  const discountedPrice = discountedUnitPrice * discountedUnits + rawPrice * fullPriceUnits;
                   const rawLineTotal = rawPrice * itemQty;
-                  const percentOff = hasDiscount ? Math.round(((rawLineTotal - discountedPrice) / rawLineTotal) * 100) : 0;
 
                   return (
                     <div key={`${itemId}-${item.selectedVariant || 'N/A'}`} className="flex gap-3 py-3 first:pt-0">
@@ -457,18 +306,8 @@ const CartDrawer = ({ isOpen, onClose }) => {
                             </button>
                           </div>
 
-                          {/* Price — rule-discounted when a cart rule applies, so this matches checkout */}
-                          {hasDiscount ? (
-                            <div className="text-right">
-                              <p className="text-sm font-extrabold text-save">₹{Math.round(discountedPrice).toLocaleString('en-IN')}</p>
-                              <div className="flex items-center justify-end gap-1">
-                                <span className="text-[10px] text-faint line-through">₹{rawLineTotal.toLocaleString('en-IN')}</span>
-                                <span className="text-[9px] font-bold uppercase rounded-full bg-save text-white px-1.5 py-px">{percentOff}% OFF</span>
-                              </div>
-                            </div>
-                          ) : (
-                            <p className="text-sm font-extrabold">₹{rawPrice.toLocaleString('en-IN')}</p>
-                          )}
+                          {/* Plain price for now — see file-header note on the removed discount preview */}
+                          <p className="text-sm font-extrabold">₹{rawLineTotal.toLocaleString('en-IN')}</p>
                         </div>
                       </div>
                     </div>
@@ -476,22 +315,6 @@ const CartDrawer = ({ isOpen, onClose }) => {
                 })}
                 <GiftWrapLineItem />
               </div>
-
-              {/* Add-on nudge — one persistent card covering BOTH cross-sell
-                  combos (add a different product) and quantity-discount
-                  nudges (add more of a product already in the cart); arrows
-                  page through all of them together instead of stacking a
-                  separate card per nudge type. */}
-              {nudgeSlides.length > 0 && (
-                <FreeShippingBanner
-                  bannersOverride={nudgeSlides}
-                  surface="cart_drawer"
-                  variant="light"
-                  showQuantityStepper
-                  showProgressBar={false}
-                  className="mt-3 sm:mt-6"
-                />
-              )}
             </>
           )}
         </div>

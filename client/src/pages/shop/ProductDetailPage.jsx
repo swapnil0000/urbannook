@@ -9,8 +9,6 @@ import RecommendedProducts from '../../component/RecommendedProducts';
 import OtherVariants from '../../component/OtherVariants';
 import NotifyMeModal from '../../component/NotifyMeModal';
 import ComparisonTable from '../../component/ComparisonTable';
-import FreeShippingBanner from '../../component/FreeShippingBanner';
-import ProductPageBanner from '../../component/ProductPageBanner';
 import ImageCarousel from '../../component/ImageCarousel';
 import { motion, AnimatePresence } from 'motion/react';
 import { ScrollColorBand } from '../../component/motion';
@@ -184,8 +182,9 @@ const ProductDetailPage = () => {
   }, [product]);
 
   // (The "complete the set" pairing that used to live here was a guess in
-  // code — pen stand ⇒ lamp, anything else ⇒ pen stand. The offers an admin
-  // actually configured are read by FreeShippingBanner further down.)
+  // code — pen stand ⇒ lamp, anything else ⇒ pen stand. The admin-configured
+  // combo-banner system that later replaced it was itself removed entirely
+  // 2026-10-09 — see MiniCartPreview.jsx's file-header note.)
 
   const currentPrice = useMemo(() => {
     if (!product?.variantDetails?.length) return 0;
@@ -774,25 +773,14 @@ const ProductDetailPage = () => {
               </ul>
             </div> */}
 
-            {/* ZONE C — the real free-shipping offer.
-                This slot used to hold a hand-rolled "Complete the set" card
-                whose pairing was a guess in code — if you were looking at a pen
-                stand it showed a lamp, otherwise a pen stand — and whose copy
-                ("Frequently bought together") claimed data we do not have.
-                FreeShippingBanner reads the offers an admin actually
-                configured (admin panel Offers page), pages through them when
-                a product has several, takes its wording and CTA from the
-                admin, and reports impressions and clicks under this surface.
-                It renders nothing when no offer applies to this product. */}
-            {/* <FreeShippingBanner productId={productId} surface="pdp" className="mt-4 md:max-w-md" /> */}
-
-            {/* Plain "Buy X, get Y" nudge using the SAME admin-configured
-                Product Page Banners, but with the admin's own banner.text
-                shown as-is (no baked-in "free shipping" wording) — see
-                ProductPageBanner.jsx for why this is a separate component
-                from FreeShippingBanner above. Renders nothing if no banner
-                targets this product. */}
-            <ProductPageBanner productId={productId} className="mt-3 md:max-w-md" />
+            {/* ZONE C — promotion banner slot. The old combo-banner system
+                (FreeShippingBanner/ProductPageBanner, reading the now-deleted
+                cart-rule/offers adapter) was removed entirely 2026-10-09 —
+                this surface now has no renderer yet. The data layer for a
+                replacement already exists (useGetProductPromotionsQuery,
+                src/store/api/userApi.js, hitting Promotion Engine V2's
+                sanitized Display API) — UI here is a deliberate follow-up,
+                not an oversight. */}
 
           </div>
         </div>

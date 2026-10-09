@@ -1,14 +1,11 @@
-import Offer from "../model/offer.model.js";
+import Promotion from "../model/promotion.model.js";
 
-// Generic reader for simple "singleton config" offer types (one doc per
-// type, no sub-lists like free_shipping's banners or cart_rule's
-// conditions/effects — just flat fields an admin toggles/edits). Add a new
-// type here and it's instantly readable via GET /offers/:type — no new
-// controller/route needed.
-const PUBLIC_FIELDS_BY_TYPE = {
-  gift_wrap: "isActive price title note ctaLabel",
-};
-
+// gift_wrap config now lives as a Promotion{promotionType:"gift_wrap_config"}
+// singleton doc, migrated off the legacy `offers` collection 2026-10-08 (see
+// promotion.model.js's giftWrap field) — this codebase no longer reads the
+// `offers` collection anywhere. Kept as a generic PUBLIC_FIELDS_BY_TYPE map
+// (same shape as before) purely so GET /offers/:type and every existing
+// internal caller (getPublicOfferConfig("gift_wrap")) need zero changes.
 const DEFAULTS_BY_TYPE = {
   gift_wrap: {
     isActive: false,
@@ -32,8 +29,15 @@ const DEFAULTS_BY_TYPE = {
  * (e.g. checkout pricing) — one function, one source of truth.
  */
 export const getPublicOfferConfig = async (type) => {
-  const projection = PUBLIC_FIELDS_BY_TYPE[type];
-  if (!projection) return null;
-  const offer = await Offer.findOne({ type }).select(projection).lean();
-  return { ...(DEFAULTS_BY_TYPE[type] || {}), ...(offer || {}) };
+  if (type !== "gift_wrap") return null;
+  const promo = await Promotion.findOne({ promotionType: "gift_wrap_config" }).select("isActive giftWrap").lean();
+  const gw = promo?.giftWrap || {};
+  return {
+    ...DEFAULTS_BY_TYPE.gift_wrap,
+    isActive: promo?.isActive ?? DEFAULTS_BY_TYPE.gift_wrap.isActive,
+    price: gw.price ?? DEFAULTS_BY_TYPE.gift_wrap.price,
+    title: gw.title ?? DEFAULTS_BY_TYPE.gift_wrap.title,
+    note: gw.note ?? DEFAULTS_BY_TYPE.gift_wrap.note,
+    ctaLabel: gw.ctaLabel ?? DEFAULTS_BY_TYPE.gift_wrap.ctaLabel,
+  };
 };

@@ -6,10 +6,7 @@ import {
   FALLBACK_SHIPPING_CHARGE,
 } from "../services/shipping.service.js";
 import { validateNewCoupon } from "../services/coupon.code.service.js";
-import {
-  isFreeShippingEligible,
-  getFreeShippingConfig,
-} from "../utils/freeShippingOffer.util.js";
+import { getFreeShippingConfig } from "../utils/freeShippingOffer.util.js";
 import {
   verifyMagicCallback,
   toRazorpayServiceableAddress,
@@ -165,9 +162,14 @@ export const magicShippingInfoController = asyncHandler(async (req, res) => {
     console.log(`${TAG}[shipping] internal test order — shipping ₹0`);
   }
 
-  // Free shipping decided at order-create — including the cart rules ("2+ lamps"
-  // and friends), which the re-derivation below knows nothing about. Honouring
-  // it here is what stops Magic charging for delivery the cart said was free.
+  // Free shipping decided at order-create — including any Promotion V2
+  // free_shipping reward, which the re-derivation below knows nothing about.
+  // Honouring it here is what stops Magic charging for delivery the cart
+  // said was free. (The separate per-product combo-banner check this used to
+  // also run — isFreeShippingEligible, reading the legacy cart-rule/offers
+  // system — was deleted entirely 2026-10-09, same cutover as
+  // rp.payment.controller.js's matching comment: it's fully redundant with
+  // the Promotion result already folded into freeShippingUnlocked above.)
   if (!freeShipping && order?.freeShippingUnlocked) {
     freeShipping = true;
     console.log(`${TAG}[shipping] free shipping carried over from order-create`);
@@ -180,13 +182,10 @@ export const magicShippingInfoController = asyncHandler(async (req, res) => {
     );
     const config = await getFreeShippingConfig();
     const thresholdEligible = config.isActive && subtotal >= config.thresholdAmount;
-    const productEligible = cartItems.length
-      ? await isFreeShippingEligible(cartItems.map((i) => ({ productId: i.productId, quantity: i.quantity, variantSku: i.variantSku })))
-      : false;
-    freeShipping = freeShipping || thresholdEligible || productEligible;
+    freeShipping = freeShipping || thresholdEligible;
     console.log(
       `${TAG}[shipping] items=[${cartItems.map((i) => `${i.productId}x${i.quantity}${i.variantSku ? `(${i.variantSku})` : ""}`).join(",")}] ` +
-      `signals={carriedOverFromOrderCreate:${carriedOverFromOrderCreate}, isInternalTestOrder:${!!order?.isInternalTestOrder}, thresholdEligible:${thresholdEligible}(threshold=₹${config.thresholdAmount}, subtotal=₹${subtotal}), productEligible:${productEligible}} ` +
+      `signals={carriedOverFromOrderCreate:${carriedOverFromOrderCreate}, isInternalTestOrder:${!!order?.isInternalTestOrder}, thresholdEligible:${thresholdEligible}(threshold=₹${config.thresholdAmount}, subtotal=₹${subtotal})} ` +
       `→ freeShipping=${freeShipping}`,
     );
   } catch (err) {

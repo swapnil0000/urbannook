@@ -4,13 +4,20 @@ import User from "../model/user.model.js";
 import { cartDetailsMissing } from "../utils/ValidateRes.js";
 import { applyCouponCodeService } from "../services/coupon.code.service.js";
 import { getPublicOfferConfig } from "../utils/offer.util.js";
-import { getActiveCartRules, evaluateCartRules, applyBestDiscount, getDiscountCandidatesForItem } from "../utils/cartRule.util.js";
 import {
   getActivePromotions,
   evaluatePromotions,
   buildCartContext,
   getDiscountCandidatesForItem as getPromotionDiscountCandidatesForItem,
   applyBestPromotionDiscount,
+  // Generic cap-tracking utilities (moved off the deleted cartRule.util.js
+  // 2026-10-09 — never actually cart-rule-specific), reused here so this
+  // preview shares the exact same budget-sharing machinery real checkout
+  // uses.
+  createRuleBudgetTracker,
+  withRuleBudget,
+  spendRuleBudget,
+  applicableCap,
 } from "../utils/promotionEngine.util.js";
 import {
   ValidationError,
@@ -283,7 +290,7 @@ const getCartService = async ({ userId }) => {
   // collection — never from anything stored on the cart. If the offer has
   // since been switched off, price collapses to 0 and `selected` is forced
   // false so the cart never shows a phantom paid line for a dead offer.
-  const cartDoc = await Cart.findOne({ userId }).select("giftWrap giftWrapNoteOptions").lean();
+  const cartDoc = await Cart.findOne({ userId }).select("giftWrap giftWrapNoteOptions appliedCoupon").lean();
   const giftWrapConfig = await getPublicOfferConfig("gift_wrap");
   const base = cartData[0] || { availableItems: [], unavailableItems: [], cartSubtotal: 0, totalQuantity: 0 };
 
@@ -305,25 +312,30 @@ const getCartService = async ({ userId }) => {
     noteOptions: giftWrapSelected ? (cartDoc?.giftWrapNoteOptions?.length ? cartDoc.giftWrapNoteOptions : ["none"]) : ["none"],
   };
 
-  // cartSubtotal must reflect BOTH active systems — legacy cart_rule AND
-  // Promotion V2 — exactly like rp.payment.controller.js does at real order
-  // creation, or this preview can show a price the customer isn't actually
-  // charged. Two bugs fixed here (found by audit, confirmed via the real
-  // checkout code as the source of truth):
-  //   1. This used to run ONLY the cart_rule adapter (getActiveCartRules),
-  //      which can only represent flat AND-of-product conditions — a
-  //      Promotion using OR/category/tag/cartSubtotal/etc. conditions (which
-  //      the admin editor fully supports) was invisible here but WAS applied
-  //      at real checkout (which runs the full evaluatePromotions engine
-  //      too) — customer saw one price, got charged another.
-  //   2. This matched discounts by productId only, with no variantSku —
-  //      a reward scoped to ONE variant (targetVariantSku) was applied to
-  //      the subtotal for ANY variant, unlike real checkout which always
-  //      scopes by variant (cartRule.util.js's getDiscountCandidatesForItem).
+  // cartSubtotal must match what real checkout would actually charge, or
+  // this preview lies to the customer. As of 2026-10-08 this evaluates
+  // Promotion V2 ONLY (the legacy cart-rule adapter read the exact same
+  // `promotions` collection and was removed from this preview the same way
+  // it was removed from rp.payment.controller.js's real charge — see that
+  // file's header comment for the full rationale). Two previously-confirmed
+  // bugs this now fixes:
+  //   1. Running the adapter at all here could silently out-compete a
+  //      non-adapter-representable V2 promotion (OR/category/tag/etc.
+  //      conditions) with no price comparison — same Critical Bug #1 as
+  //      checkout, now fixed the same way: one evaluation, one candidate
+  //      pool, best price always wins.
+  //   2. This used to compute each line's discount `cap` independently
+  //      (`Math.max(1, ...candidates.map(c => c.cap))`), with NO cross-line
+  //      shared-budget tracking — unlike real checkout's
+  //      createRuleBudgetTracker/withRuleBudget/spendRuleBudget, which exist
+  //      specifically to stop one rule's sibling reward lines (e.g. 3
+  //      variants of the same product, one rule) from each independently
+  //      claiming the full cap off a single shared trigger. This preview
+  //      could show MORE lines discounted than checkout would actually
+  //      honor — "my cart page lied to me." Now uses the identical
+  //      budget-tracker objects real checkout uses, so a cart evaluated here
+  //      and at checkout a moment later (unchanged) produces the same price.
   const ruleEvalItems = base.availableItems.map((i) => ({ productId: i.productId, quantity: i.quantity, variantSku: i.variantSku || "" }));
-
-  const activeRules = await getActiveCartRules();
-  const { discountCandidatesByProduct } = evaluateCartRules(ruleEvalItems, activeRules);
 
   const productIds = [...new Set(base.availableItems.map((i) => String(i.productId)))];
   const cartProducts = productIds.length
@@ -332,32 +344,39 @@ const getCartService = async ({ userId }) => {
   const promoProductMeta = new Map(cartProducts.map((p) => [p.productId, { category: p.productCategory, subcategory: p.productSubCategory, tags: p.tags || [] }]));
   const activePromotions = await getActivePromotions();
   const promoSubtotalHint = base.availableItems.reduce((s, i) => s + i.price * i.quantity, 0);
-  const promoCtx = buildCartContext(ruleEvalItems, { subtotal: promoSubtotalHint, productMeta: promoProductMeta, customerType: "registered" });
+  const promoCtx = buildCartContext(ruleEvalItems, {
+    subtotal: promoSubtotalHint,
+    productMeta: promoProductMeta,
+    customerType: "registered",
+    // Same gate as real checkout (rp.payment.controller.js) — a coupon-linked
+    // promotion must not preview as applied here if the cart hasn't actually
+    // had that coupon applied, or this preview would show a discount
+    // checkout then doesn't charge.
+    appliedCouponCode: cartDoc?.appliedCoupon?.isApplied ? cartDoc.appliedCoupon.name : null,
+  });
   const promotionResult = evaluatePromotions(ruleEvalItems, promoCtx, activePromotions);
+  // Same shared-budget tracker real checkout builds from this exact result
+  // — a rule's sibling reward lines (e.g. 3 variants, one trigger) share ONE
+  // pool of discountable units here too, not one each.
+  const ruleBudgets = createRuleBudgetTracker(promotionResult.discountCandidatesByProduct);
 
-  // Capped to 1 discounted/free unit per line, same as
-  // rp.payment.controller.js's capDiscountedQuantity — a "buy X get Y free"
-  // reward must not make ALL units of Y free just because quantity > 1 — but
-  // the cap itself SCALES with how many times the rule's own condition is
+  // `cap` SCALES with how many times the promotion's own condition is
   // satisfied (e.g. 2x the trigger product in cart → up to 2 discounted
-  // units), never a flat 1. `cap` is computed entirely server-side by the
-  // evaluation engines (cartRule.util.js/promotionEngine.util.js) from
-  // admin-configured minQuantity vs. real cart quantity — read here, not
-  // re-derived.
+  // units), never a flat 1 — computed server-side by the engine from
+  // admin-configured minQuantity vs. real cart quantity, read here not
+  // re-derived — and is now also clamped to the remaining SHARED budget via
+  // withRuleBudget, then spent via spendRuleBudget, in the same order real
+  // checkout processes lines, so the two can never disagree.
   const discountedSubtotal = base.availableItems.reduce((sum, i) => {
-    const cartRuleCandidates = getDiscountCandidatesForItem(discountCandidatesByProduct, i.productId, i.variantSku);
-    let discountedPrice = i.price;
-    let candidates = cartRuleCandidates;
-    if (cartRuleCandidates?.length) {
-      discountedPrice = applyBestDiscount(i.price, cartRuleCandidates);
-    } else {
-      const promoCandidates = getPromotionDiscountCandidatesForItem(promotionResult.discountCandidatesByProduct, i.productId, i.variantSku);
-      if (promoCandidates?.length) { discountedPrice = applyBestPromotionDiscount(i.price, promoCandidates); candidates = promoCandidates; }
-    }
+    const rawCandidates = getPromotionDiscountCandidatesForItem(promotionResult.discountCandidatesByProduct, i.productId, i.variantSku);
+    const candidates = withRuleBudget(rawCandidates, ruleBudgets);
+    if (!candidates?.length) return sum + i.price * i.quantity;
+    const discountedPrice = applyBestPromotionDiscount(i.price, candidates);
     if (discountedPrice >= i.price) return sum + i.price * i.quantity;
-    const cap = Math.max(1, ...(candidates || []).map((c) => c.cap ?? 1));
+    const cap = applicableCap(candidates);
     const discountedUnits = Math.min(i.quantity, cap);
     const fullPriceUnits = i.quantity - discountedUnits;
+    spendRuleBudget(candidates, ruleBudgets, discountedUnits);
     return sum + discountedPrice * discountedUnits + i.price * fullPriceUnits;
   }, 0);
 

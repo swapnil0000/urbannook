@@ -10,24 +10,37 @@ import {
 } from "../utils/promotionEngine.util.js";
 import { buildPromotionDisplayList } from "../services/promotionPresentation.service.js";
 
-// Public: every currently active, in-date-range V2 promotion — raw list, no
-// cart context. Admin/debug use (there's no storefront UI consuming this
-// yet — see promotion.route.js's header comment).
+// Public: every currently active, in-date-range V2 promotion. Previously
+// returned the RAW Promotion documents (full conditionTree, rewards,
+// linkedCouponCode, maxUsesTotal/maxUsesPerUser, promotionGroup, etc.) to
+// any unauthenticated caller — a genuine data leak (audit 2026-10-08,
+// Critical Bug #8): a scraper could read out every active coupon code and
+// every internal targeting rule. Now routed through the same
+// presentation-layer sanitization the Display API already uses, with an
+// empty cart context (no items) — only the fields the Universal Renderer
+// contract exposes are returned. Still intentionally unauthenticated (admin/
+// debug + a future anonymous PDP consumer, per the route file's original
+// comment), just no longer leaking internal configuration.
 const getActivePromotionsController = asyncHandler(async (_req, res) => {
   const promotions = await getActivePromotions();
-  return res.status(200).json(new ApiRes(200, "OK", promotions, true));
+  const ctx = buildCartContext([], {});
+  const display = buildPromotionDisplayList(promotions, ctx, {});
+  return res.status(200).json(new ApiRes(200, "OK", display, true));
 });
 
 // Public: the subset of active promotions that reference this product,
 // either as a condition or as a reward target — mirrors
 // freeShippingOffer.controller.js's getBannerForProductController (a
 // structural "does this apply to this page" filter, not a live cart
-// evaluation).
+// evaluation). Sanitized the same way as getActivePromotionsController
+// above — see that comment for why.
 const getPromotionsForProductController = asyncHandler(async (req, res) => {
   const { productId } = req.params;
   const all = await getActivePromotions();
   const matching = all.filter((p) => promotionReferencesProduct(p, productId));
-  return res.status(200).json(new ApiRes(200, "OK", matching, true));
+  const { ctx } = await resolveItemsAndContext([{ productId, quantity: 1 }], { subtotal: 0 });
+  const display = buildPromotionDisplayList(matching, ctx, {});
+  return res.status(200).json(new ApiRes(200, "OK", display, true));
 });
 
 // Shared by evaluatePromotionsController and the display/* endpoints below —
@@ -38,7 +51,7 @@ const getPromotionsForProductController = asyncHandler(async (req, res) => {
 // itself never reads anything from this controller, so there's no payment
 //-amount trust boundary being crossed here; the real order total is always
 // computed independently in rp.payment.controller.js.
-async function resolveItemsAndContext(items, { subtotal, customerType, orderCount, deliveryAddress } = {}) {
+async function resolveItemsAndContext(items, { subtotal, customerType, orderCount, deliveryAddress, couponCode } = {}) {
   if (!Array.isArray(items)) throw new ValidationError("items must be an array of { productId, quantity }");
 
   const productIds = [...new Set(items.map((i) => String(i.productId)))];
@@ -68,6 +81,12 @@ async function resolveItemsAndContext(items, { subtotal, customerType, orderCoun
     customerType,
     orderCount,
     deliveryAddress,
+    // Optional — a coupon-linked promotion only previews as matched when the
+    // caller tells us a coupon is actually applied (see
+    // promotionCouponGateOk in promotionEngine.util.js). Not yet sent by
+    // every client surface; omitted = that promotion simply won't show here,
+    // same as any other display caller not yet supplying context it needs.
+    appliedCouponCode: couponCode,
   });
   return { resolvedItems, ctx };
 }
@@ -80,12 +99,12 @@ async function resolveItemsAndContext(items, { subtotal, customerType, orderCoun
 // promotionEngine.util.js, exactly like cartRule.controller.js already does
 // for the legacy engine.
 const evaluatePromotionsController = asyncHandler(async (req, res) => {
-  const { items } = req.body;
+  const { items, couponCode } = req.body;
   // subtotal: 0 (display-only evaluation — the real subtotal, post any
   // legacy cart_rule discount, is checkout's job; conditions needing it
   // just won't match here, same "optimistic, re-validated at order-creation"
   // convention the legacy banner system already uses).
-  const { resolvedItems, ctx } = await resolveItemsAndContext(items, { subtotal: 0 });
+  const { resolvedItems, ctx } = await resolveItemsAndContext(items, { subtotal: 0, couponCode });
 
   const activePromotions = await getActivePromotions();
   const result = evaluatePromotions(resolvedItems, ctx, activePromotions);
@@ -98,7 +117,11 @@ const evaluatePromotionsController = asyncHandler(async (req, res) => {
       200,
       "OK",
       {
-        matchedPromotions: result.matchedPromotions,
+        // id+name only — NOT the raw matched Promotion documents (no
+        // conditionTree/rewards/linkedCouponCode/usage caps). See the leak
+        // fix comment on getActivePromotionsController above; this endpoint
+        // had the same issue for whichever promotions happened to match.
+        matchedPromotions: result.matchedPromotions.map((p) => ({ id: String(p._id), name: p.name })),
         discounts: Object.fromEntries(result.discountCandidatesByProduct.entries()),
         orderLevelDiscounts: result.orderLevelDiscounts,
         freeGifts: result.freeGifts,
@@ -163,7 +186,7 @@ const getProductDisplayController = asyncHandler(async (req, res) => {
 // different placements-field gate, since admin can choose to show a
 // promotion in one but not the other.
 const getCartDisplayController = asyncHandler(async (req, res) => {
-  const { items, placement = "cart" } = req.body;
+  const { items, placement = "cart", couponCode } = req.body;
   if (!["cart", "mini_cart"].includes(placement)) throw new ValidationError('placement must be "cart" or "mini_cart"');
   const cartItems = Array.isArray(items) ? items : [];
   const subtotal = Number(req.body.subtotal) || 0;
@@ -172,7 +195,7 @@ const getCartDisplayController = asyncHandler(async (req, res) => {
   const cartProductIds = [...new Set(cartItems.map((i) => String(i.productId)))];
   const relevant = all.filter((p) => (p.placements || []).includes(placement) && isPromotionRelevantToCart(p, cartProductIds));
 
-  const { ctx } = await resolveItemsAndContext(cartItems, { subtotal });
+  const { ctx } = await resolveItemsAndContext(cartItems, { subtotal, couponCode });
   const matchedResult = evaluatePromotions(cartItems.map((i) => ({ ...i, variantSku: "" })), ctx, all);
   const appliedPromotionIds = new Set(matchedResult.matchedPromotions.map((p) => String(p._id)));
 
@@ -186,7 +209,7 @@ const getCartDisplayController = asyncHandler(async (req, res) => {
 // know this yet) — still display-only, never affects the actual charge
 // (that stays rp.payment.controller.js's job, independently computed).
 const getCheckoutDisplayController = asyncHandler(async (req, res) => {
-  const { items, customerType, orderCount, deliveryAddress } = req.body;
+  const { items, customerType, orderCount, deliveryAddress, couponCode } = req.body;
   const cartItems = Array.isArray(items) ? items : [];
   const subtotal = Number(req.body.subtotal) || 0;
 
@@ -194,7 +217,7 @@ const getCheckoutDisplayController = asyncHandler(async (req, res) => {
   const cartProductIds = [...new Set(cartItems.map((i) => String(i.productId)))];
   const relevant = all.filter((p) => (p.placements || []).includes("checkout") && isPromotionRelevantToCart(p, cartProductIds));
 
-  const { ctx } = await resolveItemsAndContext(cartItems, { subtotal, customerType, orderCount, deliveryAddress });
+  const { ctx } = await resolveItemsAndContext(cartItems, { subtotal, customerType, orderCount, deliveryAddress, couponCode });
   const matchedResult = evaluatePromotions(cartItems.map((i) => ({ ...i, variantSku: "" })), ctx, all);
   const appliedPromotionIds = new Set(matchedResult.matchedPromotions.map((p) => String(p._id)));
 

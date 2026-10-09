@@ -1,15 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSelector, useDispatch } from 'react-redux';
 import SEOHead from '../../component/SEOHead';
 import { productImg, firstVariant, inr } from '../../component/UnProductCard';
 import HomeProductCard from '../../component/HomeProductCard';
 import { Reveal, Stagger, StaggerItem, Parallax, TextReveal, useInView, motion, AnimatePresence } from '../../component/motion';
 import { useGetFeaturedProductsQuery, useGetProductsQuery } from '../../store/api/productsApi';
 import { useGetTestimonialsQuery } from '../../store/api/testimonialsApi';
-import { useGetAllFreeShippingBannersQuery } from '../../store/api/freeShippingApi';
-import { addItem } from '../../store/slices/cartSlice';
-import { trackViewItemList, trackAddToCart } from '../../utils/analytics';
+import { trackViewItemList } from '../../utils/analytics';
 
 const onImgErr = (e) => { e.currentTarget.src = '/assets/logo.webp'; };
 
@@ -337,7 +334,6 @@ const ReferSave = () => {
    ═══════════════════════════════════════════════════════════════════ */
 
 const HERO_ROTATE_MS = 6000;
-const BUNDLE_MS = 6000;   // how long one free-shipping offer holds the panel
 
 const REDUCE_MOTION =
   typeof window !== 'undefined' &&
@@ -704,85 +700,6 @@ const HomePage = () => {
     : 'grid-cols-2 lg:grid-cols-4');
   const collectionCols = colsFor(n);
 
-  // ── Free-shipping cross-sell (server-driven) ──────────────────────
-  // Banner config comes from the free-shipping-offer API. Eligibility (both
-  // source + recommended in cart) is enforced server-side at checkout; here
-  // we only display it and derive the "unlocked" state from the real cart.
-  const dispatch = useDispatch();
-  const cartItems = useSelector((s) => s.cart.items);
-  const cartIds = useMemo(() => new Set(cartItems.map((i) => String(i.mongoId || i.id).split(':')[0])), [cartItems]);
-  const { data: fsRes } = useGetAllFreeShippingBannersQuery();
-
-  /* The API returns one row per DIRECTION, so A→B and B→A both come back for
-     the same pair — six rows for three actual bundles today. Dedupe on the
-     unordered pair, and drop any whose products are not in the loaded
-     catalogue. Only the FIRST row was being read before, so the other offers
-     never reached the page at all. */
-  const bundles = useMemo(() => {
-    const out = [];
-    const seen = new Set();
-    (fsRes?.data || []).forEach((b) => {
-      const src = products.find((x) => x.productId === b.sourceProductId);
-      const rec = products.find((x) => x.productId === b.recommendedProductId);
-      if (!src || !rec || src.productId === rec.productId) return;
-      const key = [src.productId, rec.productId].sort().join('|');
-      if (seen.has(key)) return;
-      seen.add(key);
-      out.push({ key, banner: b, src, rec });
-    });
-    return out;
-  }, [fsRes, products]);
-
-  /* Lead with the bundle the shopper is closest to unlocking — exactly one of
-     its two pieces already in the cart — so the card speaks to their cart
-     instead of being a generic promo. Derived during render, not in an effect,
-     so a manual pick still wins and nothing re-renders itself. */
-  const autoBundle = useMemo(() => {
-    const half = bundles.findIndex((b) => cartIds.has(b.src.productId) !== cartIds.has(b.rec.productId));
-    return half >= 0 ? half : 0;
-  }, [bundles, cartIds]);
-
-  /* Left to itself the panel showed offer 1 and gave no sign the other two
-     existed — no motion, and a dot row under the CTA that nobody looks at.
-     It now rotates on its own, and stops the moment the shopper picks one. */
-  const [pickedBundle, setPickedBundle] = useState(null);
-  const [rotBundle, setRotBundle] = useState(null);
-  const [bundlePaused, setBundlePaused] = useState(false);
-  const rawBi = pickedBundle ?? rotBundle ?? autoBundle;
-  const bi = bundles.length ? ((rawBi % bundles.length) + bundles.length) % bundles.length : 0;
-  const bundle = bundles[bi] || null;
-
-  useEffect(() => {
-    if (pickedBundle != null || bundlePaused || bundles.length < 2 || REDUCE_MOTION) return undefined;
-    const id = setInterval(
-      () => setRotBundle((x) => ((x ?? autoBundle) + 1) % bundles.length),
-      BUNDLE_MS,
-    );
-    return () => clearInterval(id);
-  }, [pickedBundle, bundlePaused, bundles.length, autoBundle]);
-
-  const showBundle = Boolean(bundle);
-  const fsBanner = bundle?.banner || null;
-  const fsSource = bundle?.src || null;
-  const fsRec = bundle?.rec || null;
-  const srcPrice = firstVariant(fsSource)?.variantPrice || 0;
-  const recPrice = firstVariant(fsRec)?.variantPrice || 0;
-  const bundleTotal = srcPrice + recPrice;
-  const srcInCart = showBundle && cartIds.has(fsSource.productId);
-  const recInCart = showBundle && cartIds.has(fsRec.productId);
-  const inCartCount = (srcInCart ? 1 : 0) + (recInCart ? 1 : 0);
-  const bundleUnlocked = inCartCount === 2;
-
-  const addOne = (p) => {
-    const v = firstVariant(p);
-    dispatch(addItem({ id: p.productId, mongoId: p.productId, name: p.productName, price: v.variantPrice, image: v.variantImage?.[0], quantity: 1, selectedVariant: v.variantName }));
-    trackAddToCart?.({ itemId: p.productId, itemName: p.productName, itemVariant: v.variantName || '', price: v.variantPrice || 0, quantity: 1 });
-  };
-  const addBundle = () => {
-    if (fsSource && !cartIds.has(fsSource.productId)) addOne(fsSource);
-    if (fsRec && !cartIds.has(fsRec.productId)) addOne(fsRec);
-  };
-
   const collections = useMemo(() => {
     const seen = [];
     products.forEach((p) => { if (p.productCategory && !seen.find((c) => c.name === p.productCategory)) seen.push({ name: p.productCategory, img: productImg(p), count: '' }); });
@@ -904,138 +821,12 @@ const HomePage = () => {
       </Reveal>
 
 
-      {/* ══ BUNDLE — free-shipping cross-sell (server-driven, interactive) ══ */}
-      {showBundle && (
-        <section className="max-w-[1280px] mx-auto px-5  md:py-14">
-          <style>{`
-            @keyframes un-bprog { from { width: 0; } to { width: 100%; } }
-            .un-bprog { animation: un-bprog ${BUNDLE_MS}ms linear both; }
-            @media (prefers-reduced-motion: reduce) { .un-bprog { animation: none; width: 100%; } }
-          `}</style>
-          <Reveal
-            onMouseEnter={() => setBundlePaused(true)}
-            onMouseLeave={() => setBundlePaused(false)}
-            className={`relative border overflow-hidden grid md:grid-cols-2 transition-colors duration-500 ${bundleUnlocked ? 'border-save/50 bg-surface' : 'border-hair bg-surface'}`}
-          >
-            {/* LEFT — the pitch */}
-            <div className="p-3 md:p-14 flex flex-col justify-center">
-              <p className="gl-lbl text-brand mb-3 flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-brand"></span>
-                Bundle · Free Shipping{bundles.length > 1 && <> · {String(bundles.length).padStart(2, '0')} offers</>}
-              </p>
-
-              {/* The switcher sits ABOVE the headline, not under the CTA where
-                  the old 1px dot row went unnoticed. Each chip shows the two
-                  products in that offer, so it is visible at a glance that
-                  there is more than one — and the bar under the active chip
-                  shows it is cycling on its own. */}
-              {bundles.length > 1 && (() => {
-                /* Segmented bar, the way stories mark progress: one thin
-                   segment per offer, the current one filling with the rotation
-                   timer. It says "there are three of these and they are
-                   cycling" without a row of 28px thumbnails, which at that size
-                   were unreadable mush. Each segment is a full-height tap
-                   target even though the bar itself is 3px. */
-                const autoRunning = pickedBundle == null && !bundlePaused && !REDUCE_MOTION;
-                return (
-                  <div className="mb-5 flex items-center gap-3">
-                    <div className="flex items-center gap-1.5 w-full max-w-[190px]">
-                      {bundles.map((b, k) => (
-                        <button
-                          key={b.key}
-                          onClick={() => setPickedBundle(k)}
-                          aria-label={`Offer ${k + 1} of ${bundles.length}: ${b.src.productName} + ${b.rec.productName}`}
-                          aria-current={k === bi}
-                          className="flex-1 py-2 group"
-                        >
-                          <span className="block h-[3px] bg-ink/15 overflow-hidden">
-                            {k < bi && <span className="block h-full w-full bg-ink/35" />}
-                            {k === bi && (
-                              autoRunning
-                                ? <span key={`p-${bi}`} className="un-bprog block h-full bg-brand" />
-                                : <span className="block h-full w-full bg-brand" />
-                            )}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                    <span className="gl-lbl text-[10px] text-faint tabular-nums shrink-0">
-                      {String(bi + 1).padStart(2, '0')}/{String(bundles.length).padStart(2, '0')}
-                    </span>
-                  </div>
-                );
-              })()}
-              <h3 className="font-archivo text-3xl md:text-5xl font-extrabold tracking-tight leading-[0.92]">
-                {bundleUnlocked ? <>Free shipping<br />unlocked 🎉</> : inCartCount === 1 ? <>You're one<br />away</> : <>Buy the pair,<br />ship free</>}
-              </h3>
-              <p className="text-muted mt-4 max-w-md">
-                {bundleUnlocked ? (
-                  <>Both items are in your cart — delivery is on us at checkout.</>
-                ) : inCartCount === 1 ? (
-                  <>Just add <b className="text-ink">{srcInCart ? fsRec.productName : fsSource.productName}</b> and your delivery is <b className="text-ink">free</b>.</>
-                ) : (
-                  <>Add <b className="text-ink">{fsSource.productName}</b> + <b className="text-ink">{fsRec.productName}</b> together and your delivery is <b className="text-ink">free</b>.</>
-                )}
-              </p>
-
-              {/* savings math */}
-              <div className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1">
-                <span className="text-sm text-muted">₹{srcPrice.toLocaleString()}</span>
-                <span className="text-faint text-sm">+</span>
-                <span className="text-sm text-muted">₹{recPrice.toLocaleString()}</span>
-                <span className="text-faint text-sm">=</span>
-                <span className="font-archivo text-2xl font-extrabold text-ink">₹{bundleTotal.toLocaleString()}</span>
-                <span className={`gl-lbl text-[10px] px-2 py-1 ml-1 ${bundleUnlocked ? 'bg-save text-white' : 'bg-save/10 text-save'}`}>Delivery FREE</span>
-              </div>
-
-              {/* progress toward unlock */}
-              {!bundleUnlocked && (
-                <div className="mt-5 max-w-[220px]">
-                  <div className="h-1.5 bg-black/10 overflow-hidden">
-                    <div className="h-full bg-brand transition-all duration-500" style={{ width: `${(inCartCount / 2) * 100}%` }} />
-                  </div>
-                  <p className="gl-lbl text-[9px] text-faint mt-1.5">{inCartCount} of 2 in cart</p>
-                </div>
-              )}
-
-              {bundleUnlocked ? (
-                <button onClick={() => navigate('/checkout')} className="un-btn gl-press mt-6 self-start bg-ink text-paper font-bold text-sm px-8 py-4">
-                  <span className="un-fill bg-save"></span>Go to Checkout →
-                </button>
-              ) : (
-                <button onClick={addBundle} className="un-btn gl-press mt-6 self-start bg-brand text-white font-bold text-sm px-8 py-4">
-                  <span className="un-fill bg-brandHi"></span>{inCartCount === 1 ? 'Unlock free shipping →' : (fsBanner.ctaLabel || 'Add both to cart')}
-                </button>
-              )}
-
-            </div>
-
-            {/* RIGHT — the two items as an equation, each addable */}
-            <div className="relative flex items-center justify-center gap-2 sm:gap-3 p-6 md:p-8 bg-surface md:min-h-[300px]">
-              {[{ p: fsSource, inCart: srcInCart, price: srcPrice }, { p: fsRec, inCart: recInCart, price: recPrice }].map((it, idx) => (
-                <div key={`${bundle.key}-${it.p.productId}`} className="contents">
-                  {idx === 1 && <span className="font-archivo text-2xl md:text-3xl font-extrabold text-faint shrink-0 self-center mb-10">+</span>}
-                  <div className="flex-1 max-w-[150px]">
-                    <button onClick={() => navigate(`/product/${it.p.productId}`)} aria-label={it.p.productName} className="group relative block w-full aspect-square overflow-hidden border border-hair bg-surface">
-                      <img src={productImg(it.p)} alt={it.p.productName} loading="lazy" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" onError={onImgErr} />
-                      {it.inCart && <span className="absolute top-2 right-2 w-6 h-6 rounded-full bg-save text-white grid place-items-center text-[11px] shadow">✓</span>}
-                    </button>
-                    <p className="text-[11px] font-bold text-ink mt-2 leading-snug line-clamp-1">{it.p.productName}</p>
-                    <div className="flex items-center justify-between gap-1 mt-1">
-                      <span className="text-[11px] font-extrabold text-ink">₹{it.price.toLocaleString()}</span>
-                      {it.inCart ? (
-                        <span className="gl-lbl text-[8px] text-save">✓ Added</span>
-                      ) : (
-                        <button onClick={() => addOne(it.p)} className="gl-lbl text-[8px] text-brand border border-brand/40 px-1.5 py-0.5 hover:bg-brand hover:text-white transition-colors">+ Add</button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Reveal>
-        </section>
-      )}
+      {/* The combo-banner "Bundle — free-shipping cross-sell" section (and
+          the useGetAllFreeShippingBannersQuery it read from) was removed
+          entirely 2026-10-09, same sweep as FreeShippingBanner/
+          ProductPageBanner — see MiniCartPreview.jsx's file-header note. A
+          Promotion V2-based replacement is a deliberate follow-up, not yet
+          built. */}
 
       {/* ══ NEW ARRIVALS — rail; only what actually carries the tag ══ */}
       {/* {!isFewProducts && arrivals.length >= MIN_TAGGED && (

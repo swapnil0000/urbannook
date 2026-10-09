@@ -63,6 +63,14 @@ const rewardSchema = new mongoose.Schema(
     value: { type: Number, min: 0 }, // percent_off: 0-100; flat_off/discounted_product: rupees
     bundlePrice: { type: Number, min: 0 },
     storeCreditAmount: { type: Number, min: 0 },
+    // percent_off_product/flat_off_product/discounted_product only. Default
+    // (false) = ORIGINAL behavior: floor(have/minQuantity) units discounted
+    // (a repeating "every Nth group" tier). true = "buy N, get M% off EVERY
+    // qualifying unit" — crossing the threshold discounts the WHOLE cart
+    // quantity of the target, not just one multiple of it. See the matching
+    // comment on `promotionRepeatCount`/the reward-building loop in
+    // promotionEngine.util.js for the cap calculation this drives.
+    discountAllUnits: { type: Boolean, default: false },
   },
   { _id: false },
 );
@@ -85,6 +93,15 @@ const promotionSchema = new mongoose.Schema(
         "free_gift",
         "coupon_promotion",
         "automatic",
+        // Not a discount — a singleton config doc for the paid gift-wrap
+        // add-on, migrated 2026-10-08 off the legacy `offers` collection
+        // (type:"gift_wrap") so nothing in this codebase reads that
+        // collection anymore (see offer.util.js's getPublicOfferConfig).
+        // Has no conditionTree/rewards (conditional `required` below) and is
+        // explicitly excluded from every discount-matching query
+        // (getActivePromotions, getActivePromotionsAsCartRules) — never
+        // evaluated as a promotion. See giftWrap field below.
+        "gift_wrap_config",
       ],
       index: true,
     },
@@ -103,8 +120,25 @@ const promotionSchema = new mongoose.Schema(
     maxPromotionsPerOrder: { type: Number, default: null },
     combinesWithCoupons: { type: Boolean, default: true },
 
-    conditionTree: { type: conditionTreeSchema, required: true },
-    rewards: { type: [rewardSchema], required: true },
+    // required for every REAL promotion; NOT required only for the
+    // gift_wrap_config singleton — every actual discount-bearing document
+    // still always has both, so the engine's assumptions are unchanged.
+    conditionTree: { type: conditionTreeSchema, required: function () { return this.promotionType !== "gift_wrap_config"; } },
+    rewards: { type: [rewardSchema], required: function () { return this.promotionType !== "gift_wrap_config"; } },
+
+    // gift_wrap_config only — a paid, customer-selectable add-on with its
+    // own fulfillment/packing note and a Razorpay line-item requirement at
+    // checkout (see rp.payment.controller.js's gift-wrap handling) — NOT a
+    // discount, deliberately never expressed as a Promotion reward (no
+    // reward type can represent "add a new priced, non-discountable
+    // service line"). `isActive` above is reused as this config's own
+    // on/off toggle, same field every other promotion already uses.
+    giftWrap: {
+      price: { type: Number, min: 0, default: 0 },
+      title: { type: String, trim: true, default: "Make it a gift" },
+      note: { type: String, trim: true, default: "" },
+      ctaLabel: { type: String, trim: true, default: "Add Gift Wrap" },
+    },
 
     // Where this promotion is allowed to surface once a display API/UI reads
     // it (promotionPresentation.service.js). Defaults to all 8 so existing

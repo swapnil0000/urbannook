@@ -1,4 +1,4 @@
-import { evaluateConditionTree } from "../utils/promotionEngine.util.js";
+import { evaluateConditionTree, promotionCouponGateOk } from "../utils/promotionEngine.util.js";
 
 /**
  * Promotion Engine V2 — Presentation Layer (Phases 2, 4, 6, 7 of the
@@ -109,8 +109,9 @@ function buildIcon(displayType) {
   }[displayType] || "sparkles";
 }
 
-function buildCtaText(promotion, { applied, qualifying }) {
+function buildCtaText(promotion, { applied, qualifying, needsCoupon }) {
   if (applied) return "Applied";
+  if (needsCoupon) return promotion.linkedCouponCode ? `Enter code ${promotion.linkedCouponCode}` : "Enter coupon code";
   if (qualifying) return "Add to cart";
   const hasGiftChoice = (promotion.rewards || []).some((r) => r.type === "gift_choice");
   return hasGiftChoice ? "Choose your gift" : "View offer";
@@ -245,10 +246,23 @@ function rewardLabelFor(promotion) {
  */
 export function buildPromotionDisplayModel(promotion, ctx, { placement, appliedPromotionIds } = {}) {
   const id = String(promotion._id);
-  const qualifying = evaluateConditionTree(promotion.conditionTree, ctx);
-  const applied = appliedPromotionIds ? appliedPromotionIds.has(id) : qualifying;
-  const displayType = buildDisplayType(promotion);
+  const conditionMet = evaluateConditionTree(promotion.conditionTree, ctx);
+  // A coupon-linked promotion's condition tree can be met while the coupon
+  // itself hasn't been entered — real checkout (evaluatePromotions) refuses
+  // to match in that case (promotionCouponGateOk), so this display layer
+  // must agree, or a customer sees "qualifying" for a discount checkout
+  // will not actually give them. See the audit's K.3 finding, fixed here.
+  const couponOk = promotionCouponGateOk(promotion, ctx);
+  const needsCoupon = Boolean(promotion.linkedCouponCode) && !couponOk;
   const hasNonWorkingReward = (promotion.rewards || []).some((r) => !WORKING_REWARD_TYPES.includes(r.type));
+  const fullyFunctional = !hasNonWorkingReward;
+  // A promotion checkout cannot honor must never be advertised as available
+  // or eligible — force it to the same "not qualifying" state a customer
+  // would see for any other unmet promotion, rather than showing a banner
+  // for a reward that will silently do nothing at checkout.
+  const qualifying = fullyFunctional && conditionMet && couponOk;
+  const applied = fullyFunctional && (appliedPromotionIds ? appliedPromotionIds.has(id) : qualifying);
+  const displayType = buildDisplayType(promotion);
 
   return {
     id,
@@ -261,18 +275,21 @@ export function buildPromotionDisplayModel(promotion, ctx, { placement, appliedP
     displayRank: promotion.priority || 0, // alias kept distinct in the contract in case display ordering ever needs to diverge from stacking priority
     savingsText: buildSavingsText(promotion) || null,
     progressText: qualifying ? null : buildProgressText(promotion.conditionTree, ctx, rewardLabelFor(promotion)),
-    ctaText: buildCtaText(promotion, { applied, qualifying }),
+    ctaText: buildCtaText(promotion, { applied, qualifying, needsCoupon }),
+    // The actual code to enter, ONLY surfaced once the customer still needs
+    // it (condition met but coupon not yet applied) — never shown once
+    // applied/not-yet-qualifying-on-conditions, so this isn't a blanket
+    // coupon-code leak, just the actionable "type this in" moment.
+    couponCodeToEnter: needsCoupon && conditionMet ? promotion.linkedCouponCode : null,
     applied,
     qualifying,
     placement: placement || null,
     explanation: explainConditionTree(promotion.conditionTree, ctx),
     // Not part of the Phase 2 shape, but necessary honesty: a promotion
     // using a reward type checkout doesn't apply yet must never be shown
-    // as if it fully works. Admin-side health check (Phase 11) is the
-    // primary signal for this; this flag is the storefront-safe echo of
-    // it so a future UI can choose to suppress/soften such cards instead
-    // of silently promising something checkout won't honor.
-    fullyFunctional: !hasNonWorkingReward,
+    // as if it fully works — now also reflected in qualifying/applied above
+    // (forced false), not just this advisory flag.
+    fullyFunctional,
   };
 }
 

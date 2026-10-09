@@ -1,11 +1,16 @@
 import Promotion from "../model/promotion.model.js";
+import PromotionUsage from "../model/promotionUsage.model.js";
 
 /**
- * Promotion Engine V2 — evaluation engine for the NEW `promotions` collection.
- * Deliberately independent of cartRule.util.js: never imports from it, never
- * mutates its collection, never changes its behavior. Called ADDITIONALLY,
- * alongside the existing getActiveCartRules()/evaluateCartRules() call in
- * rp.payment.controller.js — see the comment there for the merge point.
+ * Promotion Engine V2 — the SINGLE evaluation authority for checkout's real
+ * charge (as of 2026-10-08; see rp.payment.controller.js's header comment on
+ * the discount-application loop for why the previous dual-path/adapter
+ * double-evaluation was retired from the money path). The legacy-shaped
+ * adapter (promotionToCartRule.adapter.js) still exists and still reads this
+ * exact same `promotions` collection — it is NOT removed, only no longer
+ * ALSO evaluated a second time at checkout — and remains the correct path for
+ * the legacy-shaped display surfaces (PDP/mini-cart banners) that still
+ * expect its flattened shape.
  *
  * A promotion's `conditionTree` is a recursive AND/OR node:
  *   { op: "AND"|"OR", children: [conditionTree | leafCondition] }
@@ -19,12 +24,64 @@ export const getActivePromotions = async () => {
   const now = new Date();
   return Promotion.find({
     isActive: true,
+    // gift_wrap_config is a non-discount config singleton stored in this
+    // same collection (migrated off the legacy `offers` collection,
+    // 2026-10-08) — it has no conditionTree/rewards and must never be
+    // evaluated/matched as a real promotion.
+    promotionType: { $ne: "gift_wrap_config" },
     $and: [
       { $or: [{ startsAt: null }, { startsAt: { $lte: now } }] },
       { $or: [{ endsAt: null }, { endsAt: { $gte: now } }] },
     ],
-  }).lean();
+  })
+    // Deterministic ordering — without this, Mongo gives no guarantee for an
+    // unsorted query, so a same-priority tie in resolveStacking's exclusive/
+    // group resolution could silently pick a different winner across
+    // requests/replica reads for identical cart contents (audit finding,
+    // 2026-10-08). priority desc, then oldest-first, then _id as a final
+    // tiebreak so the order is fully deterministic even for two promotions
+    // created in the same millisecond.
+    .sort({ priority: -1, createdAt: 1, _id: 1 })
+    .lean();
 };
+
+/**
+ * Courtesy pre-check (audit 2026-10-08, Critical Bug #5 partial fix) — a
+ * promotion whose maxUsesTotal/maxUsesPerUser cap is ALREADY provably
+ * exhausted (by the time checkout starts, not mid-race) is dropped from the
+ * candidate list entirely, so it simply never matches this cart — same as
+ * any other unmet condition. Previously these caps were only enforced AFTER
+ * the discount was already baked into the charged amount (at
+ * fulfilCapturedPayment, post-payment); a breaching order still got the
+ * discount, only the usage counter was protected going forward. This does
+ * NOT replace that atomic enforcement (still the only race-safe guard, kept
+ * exactly as-is) — it's a non-atomic, read-then-filter courtesy check, same
+ * category as assertVariantAvailable for stock: it closes the common,
+ * non-race case (cap was already visibly hit before this checkout even
+ * began) without pretending to solve concurrent-exhaustion races, which
+ * need the full reservation-lifecycle work tracked separately.
+ */
+export async function excludeUsageExhaustedPromotions(promotions, { email, mobile } = {}) {
+  const normEmail = email ? String(email).toLowerCase().trim() : null;
+  const normMobile = mobile ? String(mobile).replace(/\D/g, "").slice(-10) : null;
+  const kept = [];
+  for (const p of promotions) {
+    if (p.maxUsesTotal != null && p.usageCount >= p.maxUsesTotal) continue;
+    if (p.maxUsesPerUser != null && (normEmail || normMobile)) {
+      const priorUses = await PromotionUsage.countDocuments({
+        promotionId: String(p._id),
+        reversed: { $ne: true },
+        $or: [
+          ...(normEmail ? [{ email: normEmail }] : []),
+          ...(normMobile ? [{ mobile: normMobile }] : []),
+        ],
+      });
+      if (priorUses >= p.maxUsesPerUser) continue;
+    }
+    kept.push(p);
+  }
+  return kept;
+}
 
 // Structural scan (not condition evaluation) — does this promotion mention
 // productId anywhere, as a condition ("product" leaf) or as a reward target
@@ -75,7 +132,7 @@ const quantityByProductVariant = (cartItems = []) => {
  * the caller didn't supply that context (e.g. PDP/cart display, which knows
  * the cart but not yet the delivery address).
  */
-export const buildCartContext = (cartItems, { subtotal, productMeta, customerType, orderCount, deliveryAddress } = {}) => ({
+export const buildCartContext = (cartItems, { subtotal, productMeta, customerType, orderCount, deliveryAddress, appliedCouponCode } = {}) => ({
   qtyByProduct: quantityByProduct(cartItems),
   qtyByProductVariant: quantityByProductVariant(cartItems),
   subtotal: Number(subtotal) || 0,
@@ -84,7 +141,27 @@ export const buildCartContext = (cartItems, { subtotal, productMeta, customerTyp
   customerType: customerType || null, // "guest" | "registered"
   orderCount: orderCount != null ? Number(orderCount) : null,
   deliveryAddress: deliveryAddress || null, // { pincode, state, country }
+  // The coupon code actually applied/entered on THIS cart/order, uppercased
+  // to match how Promotion.linkedCouponCode is stored. null/"" = no coupon —
+  // gates every promotion that has a linkedCouponCode (see
+  // promotionRequiresUnmetCoupon below) so a coupon-linked promotion never
+  // applies just because its cart conditions match; the coupon itself must
+  // actually be entered.
+  appliedCouponCode: appliedCouponCode ? String(appliedCouponCode).trim().toUpperCase() : null,
 });
+
+// A promotion with a `linkedCouponCode` is only allowed to match when the
+// cart's actually-applied coupon is that exact code — otherwise it's
+// evaluated as "automatic" (conditionTree-only) and a customer who never
+// entered the coupon would get the reward for free. Before this,
+// linkedCouponCode was purely cosmetic (only read for the admin card's
+// label and the presentation layer's display-type choice) and every
+// "coupon-linked" promotion silently behaved as fully automatic.
+// Exported — promotionPresentation.service.js also needs this so a
+// coupon-linked promotion's display-layer `qualifying` can't disagree with
+// what real evaluation (evaluatePromotions, above) actually requires.
+export const promotionCouponGateOk = (promotion, ctx) =>
+  !promotion.linkedCouponCode || promotion.linkedCouponCode === ctx.appliedCouponCode;
 
 const compareOp = (have, operator, value) => {
   if (operator === "lte") return have <= value;
@@ -176,11 +253,97 @@ export const applyBestPromotionDiscount = (unitPrice, candidates = []) => {
   return Math.round(Math.max(Math.min(...results), 0));
 };
 
+// ── Shared cross-line budget tracking (moved from the now-deleted
+// cartRule.util.js, 2026-10-09 — these four functions were never actually
+// cart-rule-specific, they're generic per-promotion cap bookkeeping used by
+// the real checkout charge AND the cart preview, so they live with the one
+// remaining engine now.) ────────────────────────────────────────────────
+
+/**
+ * Tracks, for one evaluation (a real checkout OR a client-facing preview —
+ * both must agree), how many units each RULE still has left to discount,
+ * SHARED across every sibling candidate of that rule — e.g. "Exciting
+ * Offers": free single stand / 50%-off double / 50%-off triple are 3
+ * separate candidates targeting 3 different variants of the same product,
+ * but all belong to ONE rule and must share ONE pool of units. Without
+ * this, each variant's candidate carries its own untouched copy of the
+ * rule's cap, so a cart with one of EACH variant gets every one of them
+ * discounted off a single trigger product — confirmed on a real paid order
+ * (double stand manually added at 50% off, single stand then auto-added
+ * for free on top, same Katana "paying" for both).
+ */
+export function createRuleBudgetTracker(discountCandidatesByProduct) {
+  const budgets = new Map();
+  for (const candidates of discountCandidatesByProduct.values()) {
+    for (const c of candidates) {
+      if (c.ruleId && !budgets.has(c.ruleId)) budgets.set(c.ruleId, c.cap);
+    }
+  }
+  return budgets;
+}
+
+/**
+ * Clamps each candidate's cap to its own rule's remaining shared budget
+ * (see createRuleBudgetTracker), dropping any candidate whose rule is
+ * already fully spent. A candidate with no ruleId (shouldn't happen, but
+ * kept defensive) is left unlimited rather than silently dropped. Feed the
+ * result into applyBestPromotionDiscount unchanged — this only narrows
+ * which candidates it's allowed to see, never changes its math.
+ */
+export function withRuleBudget(candidates, budgets) {
+  return candidates
+    .map((c) => {
+      if (!c.ruleId) return c;
+      const remaining = budgets.has(c.ruleId) ? budgets.get(c.ruleId) : c.cap;
+      return remaining > 0 ? { ...c, cap: Math.min(c.cap, remaining) } : null;
+    })
+    .filter(Boolean);
+}
+
+/**
+ * Called after a line has actually been discounted, to spend down every
+ * contributing rule's shared budget by however many units this line used.
+ * Deliberately decrements EVERY ruleId present in `candidates` (not just
+ * whichever one's price "won" applyBestPromotionDiscount's comparison) —
+ * the rare case of two DIFFERENT rules both targeting the exact same
+ * product+variant would close the losing rule's budget slightly earlier
+ * than strictly necessary, which is the safe-direction error (never grants
+ * MORE discount than intended; at worst a separate rule's budget is spent a
+ * little early).
+ */
+export function spendRuleBudget(candidates, budgets, unitsUsed) {
+  for (const c of candidates) {
+    if (!c.ruleId || !budgets.has(c.ruleId)) continue;
+    budgets.set(c.ruleId, Math.max(0, budgets.get(c.ruleId) - unitsUsed));
+  }
+}
+
+/**
+ * How many units a cart line's matched candidates justify discounting —
+ * the most generous applicable cap wins when more than one rule discounts
+ * the same line, consistent with applyBestPromotionDiscount already picking
+ * the best PRICE among candidates for that line. Callers normally pass
+ * candidates already narrowed by withRuleBudget, so this naturally reflects
+ * each rule's remaining shared budget too.
+ */
+export function applicableCap(candidates) {
+  return Math.max(1, ...candidates.map((c) => c.cap ?? 1));
+}
+
 /**
  * Resolves which matched promotions actually stay active after exclusivity/
  * grouping rules. Full non-stackable per-product conflict resolution is a
  * later phase (see the plan) — this handles the two explicit, order-wide
  * rules that are unambiguous today: `exclusive` and `promotionGroup`.
+ *
+ * NOT handled here: `stackable` (audit 2026-10-08 Decision Register item —
+ * its intended semantics relative to `exclusive`/`promotionGroup` were
+ * ambiguous from the schema/code alone: does `stackable:false` mean "acts
+ * like exclusive but without winning priority", "suppresses only OTHER
+ * stackable:false promotions", or something else? Deliberately left
+ * unimplemented rather than guessed — the field still persists on save
+ * (admin can toggle it), it simply has no runtime effect yet, same as
+ * before this audit. Needs an explicit product decision before wiring.
  */
 function resolveStacking(matched) {
   const exclusiveOnes = matched.filter((p) => p.exclusive);
@@ -238,9 +401,22 @@ function promotionRepeatCount(node, ctx) {
   return Infinity; // non-product condition doesn't limit the repeat count
 }
 
+// combinesWithCoupons (default true, audit 2026-10-08 fix — previously
+// schema-only, never read anywhere): an AUTOMATIC promotion (no
+// linkedCouponCode of its own) with combinesWithCoupons:false must not
+// apply on top of a coupon the customer actually entered. Does NOT affect a
+// promotion that has its OWN linkedCouponCode — that relationship is
+// already fully gated by promotionCouponGateOk above, and setting both
+// fields on the same promotion would be contradictory, so linkedCouponCode
+// always wins this check.
+const promotionCombinesWithCouponsOk = (promotion, ctx) =>
+  promotion.combinesWithCoupons !== false || !ctx.appliedCouponCode || Boolean(promotion.linkedCouponCode);
+
 export const evaluatePromotions = (cartItems, ctx, activePromotions) => {
   const matched = resolveStacking(
-    activePromotions.filter((p) => evaluateConditionTree(p.conditionTree, ctx)),
+    activePromotions.filter(
+      (p) => promotionCouponGateOk(p, ctx) && promotionCombinesWithCouponsOk(p, ctx) && evaluateConditionTree(p.conditionTree, ctx),
+    ),
   );
 
   const discountCandidatesByProduct = new Map();
@@ -257,7 +433,13 @@ export const evaluatePromotions = (cartItems, ctx, activePromotions) => {
     // every client reading `cap`. Math.min(realQtyInCart, cap) downstream
     // makes the exact clamp value irrelevant as long as it's "large enough".
     const rawCap = promotionRepeatCount(promo.conditionTree, ctx);
-    const cap = Math.max(1, Number.isFinite(rawCap) ? rawCap : Number.MAX_SAFE_INTEGER);
+    let cap = Math.max(1, Number.isFinite(rawCap) ? rawCap : Number.MAX_SAFE_INTEGER);
+    // maxApplications (audit 2026-10-08 fix — previously schema-only, never
+    // read anywhere): "max repeats per order", clamping the condition's own
+    // natural repeat count. E.g. a "buy 2 get 1 free/discounted" promotion
+    // with maxApplications=2 caps out at 2 applications even if the cart
+    // qualifies 5 times over.
+    if (promo.maxApplications != null) cap = Math.min(cap, Math.max(1, promo.maxApplications));
     for (const reward of promo.rewards || []) {
       switch (reward.type) {
         case "percent_off_product":
@@ -265,11 +447,22 @@ export const evaluatePromotions = (cartItems, ctx, activePromotions) => {
         case "discounted_product": {
           const productId = String(reward.targetProductId);
           const list = discountCandidatesByProduct.get(productId) || [];
+          // discountAllUnits: "buy N, get M% off EVERY qualifying unit" —
+          // once the condition is met at all, the cap is the REAL cart
+          // quantity of the target (not the condition's repeat count), so
+          // e.g. "2+ of X" with 5 in cart discounts all 5, not floor(5/2)=2.
+          // Scoped by variant when the reward itself targets one — same
+          // identity rule as everywhere else (SKU, not name).
+          const rewardCap = reward.discountAllUnits
+            ? Math.max(1, reward.targetVariantSku
+                ? (ctx.qtyByProductVariant.get(variantKey(productId, reward.targetVariantSku)) || 0)
+                : (ctx.qtyByProduct.get(productId) || 0))
+            : cap;
           // ruleId groups sibling reward lines of the SAME promotion so they
           // share one cap instead of each independently getting its own —
           // see createRuleBudgetTracker in rp.payment.controller.js and the
           // matching comment in cartRule.util.js's evaluateCartRules.
-          list.push({ type: reward.type, value: reward.value, cap, ruleId: String(promo._id), ...(reward.targetVariantSku ? { variantSku: reward.targetVariantSku } : {}) });
+          list.push({ type: reward.type, value: reward.value, cap: rewardCap, ruleId: String(promo._id), ...(reward.targetVariantSku ? { variantSku: reward.targetVariantSku } : {}) });
           discountCandidatesByProduct.set(productId, list);
           break;
         }

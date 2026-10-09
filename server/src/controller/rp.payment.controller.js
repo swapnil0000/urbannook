@@ -213,16 +213,23 @@ const getShippingRateOrFallback = async (params) => {
     };
   }
 };
-import { isFreeShippingEligible, getFreeShippingConfig } from "../utils/freeShippingOffer.util.js";
-import { getActiveCartRules, evaluateCartRules, applyBestDiscount, getDiscountCandidatesForItem, createRuleBudgetTracker, withRuleBudget, spendRuleBudget, applicableCap } from "../utils/cartRule.util.js";
-// Promotion Engine V2 — separate collection/evaluator, additive only. See
-// promotionEngine.util.js's file header and the wiring comment below.
+import { getFreeShippingConfig } from "../utils/freeShippingOffer.util.js";
+// Promotion Engine V2 — the single discount-evaluation authority for the
+// real charge (cartRule.util.js and the legacy cart-rule/offers display
+// stack were deleted entirely 2026-10-09 — createRuleBudgetTracker/
+// withRuleBudget/spendRuleBudget/applicableCap now live here too, since they
+// were never actually cart-rule-specific).
 import {
   getActivePromotions,
   evaluatePromotions,
   buildCartContext,
   applyBestPromotionDiscount,
   getDiscountCandidatesForItem as getPromotionDiscountCandidatesForItem,
+  excludeUsageExhaustedPromotions,
+  createRuleBudgetTracker,
+  withRuleBudget,
+  spendRuleBudget,
+  applicableCap,
 } from "../utils/promotionEngine.util.js";
 import { getPublicOfferConfig } from "../utils/offer.util.js";
 import { sendMetaCapiEvent } from "../services/meta.capi.service.js";
@@ -540,94 +547,94 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     };
   });
 
-  // Generic, data-driven cart-promotion rules (server/src/model/cartRule.model.js)
-  // — e.g. "2+ Lamps => free shipping" or "2+ Lamps => 50% off Pen Stand".
-  // Fully additive to the existing combo-banner system below (isFreeShippingEligible):
-  // either mechanism unlocking free shipping is enough, and this is the ONLY
-  // place a rule's product discount is actually applied to the charged price
-  // — baked into `priceAtPurchase` here so subtotal, the persisted order, and
-  // the invoice all agree with each other and with what was charged.
-  const activeCartRules = await getActiveCartRules();
-  const cartRuleResult = evaluateCartRules(
-    orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity, variantSku: oi.variantSku })),
-    activeCartRules,
-  );
-  // Shared across BOTH the cart_rule loop below and the Promotion V2 loop
-  // further down — a rule's ruleId is the same promotion _id either way
-  // (see promotionToCartRule.adapter.js), so one tracker keeps sibling
-  // reward lines in sync regardless of which path evaluated them.
-  const ruleBudgets = createRuleBudgetTracker(cartRuleResult.discountCandidatesByProduct);
-  const extraDiscountLines = [];
-  for (const oi of orderItems) {
-    const rawCandidates = getDiscountCandidatesForItem(cartRuleResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
-    const candidates = withRuleBudget(rawCandidates, ruleBudgets);
-    if (candidates?.length) {
-      const fullPrice = oi.productSnapshot.priceAtPurchase;
-      const discountedPrice = applyBestDiscount(fullPrice, candidates);
-      // Cap scales with how many times the rule's own condition is
-      // satisfied (e.g. 2x the trigger product → up to 2 discounted units)
-      // — never a flat 1 — and is already clamped to this rule's remaining
-      // shared budget by withRuleBudget above. See applicableCap /
-      // ruleRepeatCount / createRuleBudgetTracker.
-      const cap = applicableCap(candidates);
-      const unitsUsed = Math.min(oi.productSnapshot.quantity, cap);
-      const remainderLine = capDiscountedQuantity(oi, fullPrice, discountedPrice, cap);
-      spendRuleBudget(candidates, ruleBudgets, unitsUsed);
-      if (remainderLine) extraDiscountLines.push(remainderLine);
-      // A cart_rule discount that zeroes an item's price out (e.g. a
-      // percent_off 100 "get this free" offer) marks it as a promotional
-      // gift for admin/order views — same field the Promotion V2
-      // free_product reward uses (see below), so both paths to a genuinely
-      // free line item are marked identically regardless of which system
-      // granted it.
-      if (oi.productSnapshot.priceAtPurchase === 0) oi.productSnapshot.isPromotionalGift = true;
-    }
-  }
-  if (extraDiscountLines.length) orderItems.push(...extraDiscountLines);
-
-  // ── Promotion Engine V2 — separate collection, evaluated ADDITIONALLY to
-  // the cart_rule block above, never replacing it. See promotionEngine
-  // .util.js's file header. Only applies a product-level discount to a
-  // product the legacy cart_rule engine did NOT already discount (checked via
-  // cartRuleResult.discountCandidatesByProduct below) — avoids any
-  // double-discount risk without needing a cross-system priority model.
-  // Customer/geo/date-time targeting conditions are evaluated with partial
-  // context here (orderCount/deliveryAddress not resolved at this point in
-  // the flow yet) — a promotion using those simply won't match until that
-  // context is wired through (planned follow-up), same as any other
-  // targeting condition the caller doesn't supply context for.
-  const activePromotions = await getActivePromotions();
+  // ── Promotion Engine V2 — the SINGLE discount-evaluation authority for the
+  // real charge (consolidated 2026-10-08). Previously this controller ran a
+  // legacy "cart_rule" adapter pass FIRST (via getActiveCartRules/
+  // evaluateCartRules), baked its discount into priceAtPurchase, then ran
+  // this Promotion V2 pass SECOND but skipped any line the adapter had
+  // already touched. That adapter (promotionToCartRule.adapter.js) sources
+  // its flattened "cart rules" from this EXACT SAME `promotions` collection
+  // — so the two passes were two evaluations of the same data, and the
+  // skip-if-already-discounted guard meant a promotion only representable in
+  // the richer V2 shape (OR conditions, non-product leaves, etc.) could be
+  // silently out-competed by a worse adapter-representable promotion on the
+  // same line, with no price comparison between the two ever happening
+  // (confirmed, audit 2026-10-08, Critical Bug #1). Evaluating ONLY here
+  // means every active promotion — adapter-representable or not — competes
+  // in the SAME applyBestPromotionDiscount/budget-tracking pass, so the best
+  // price always wins deterministically. The adapter itself is untouched and
+  // still powers the legacy-shaped PDP/mini-cart banner displays
+  // (freeShippingOffer.util.js, cartRule.controller.js) — only its SECOND,
+  // redundant evaluation at this real-money path was removed.
+  let activePromotions = await getActivePromotions();
+  // Courtesy pre-check — drop any promotion whose usage cap is ALREADY
+  // exhausted before this cart even existed, so it can't grant one more
+  // discounted order on top of a breach that already happened (audit
+  // Critical Bug #5, partial fix — see excludeUsageExhaustedPromotions's
+  // own comment for why this isn't the full atomic reservation fix).
+  activePromotions = await excludeUsageExhaustedPromotions(activePromotions, { email: user?.email, mobile: user?.mobileNumber });
   const promoProductMeta = new Map(
     products.map((p) => [p.productId, { category: p.productCategory, subcategory: p.productSubCategory, tags: p.tags || [] }]),
   );
   const promoCartItems = orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity, variantSku: oi.variantSku }));
   const promoSubtotalSoFar = orderItems.reduce((s, i) => s + i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity, 0);
-  const promoCtx = buildCartContext(promoCartItems, { subtotal: promoSubtotalSoFar, productMeta: promoProductMeta, customerType: "registered" });
+  // orderCount: a genuine live count for this authenticated user (not
+  // client-trusted) — lets a "first order"/"returning customer" condition
+  // actually match for this flow.
+  const orderCount = await Order.countDocuments({ userId });
+  // deliveryAddress: resolved from `selectedAddr` (the user's own saved
+  // address, looked up server-side by addressId at line 385) falling back
+  // to `clientAddress` (this request's raw body) only for whichever fields
+  // a saved address doesn't have — same precedence already used to build
+  // deliveryAddressSnapshot later in this function. This is the SAME
+  // address the order actually ships to (not a separate, consequence-free
+  // claim) — a customer misrepresenting it to unlock a geo-discount would
+  // have to actually receive their order at that address, which is the
+  // existing trust level this checkout already accepts for shipping-rate
+  // purposes, not a new hole. Absent on the Magic path (no address known
+  // yet) — a geo-targeted promotion simply won't match there, same as any
+  // other unmet condition.
+  const promoDeliveryAddress = (selectedAddr?.pinCode || clientAddress?.pinCode)
+    ? {
+        pincode: String(selectedAddr?.pinCode || clientAddress?.pinCode || ""),
+        state: selectedAddr?.state || clientAddress?.state || null,
+        country: "India",
+      }
+    : null;
+  const promoCtx = buildCartContext(promoCartItems, {
+    subtotal: promoSubtotalSoFar,
+    productMeta: promoProductMeta,
+    customerType: "registered",
+    orderCount,
+    deliveryAddress: promoDeliveryAddress,
+    // Gates any promotion with a linkedCouponCode — see promotionCouponGateOk
+    // in promotionEngine.util.js. isApplied/couponCodeName are already
+    // resolved from cart.appliedCoupon above (lines 428-431), before this
+    // point, so this is the real, already-validated applied coupon — never
+    // the mere presence of a coupon input.
+    appliedCouponCode: isApplied ? couponCodeName : null,
+  });
   const promotionResult = evaluatePromotions(promoCartItems, promoCtx, activePromotions);
-  // A promotion not representable as a flat cart_rule (OR conditions, a
-  // non-product leaf, etc.) never appears in cartRuleResult at all, so its
-  // ruleId wouldn't be seeded yet — merge any new ones in now, same
-  // first-seen-wins seeding as createRuleBudgetTracker itself.
-  for (const candidates of promotionResult.discountCandidatesByProduct.values()) {
-    for (const c of candidates) {
-      if (c.ruleId && !ruleBudgets.has(c.ruleId)) ruleBudgets.set(c.ruleId, c.cap);
-    }
-  }
+  const ruleBudgets = createRuleBudgetTracker(promotionResult.discountCandidatesByProduct);
 
   const extraPromoDiscountLines = [];
   for (const oi of orderItems) {
-    if (getDiscountCandidatesForItem(cartRuleResult.discountCandidatesByProduct, oi.productId, oi.variantSku)?.length) continue; // legacy cart_rule already discounted this line
     const rawCandidates = getPromotionDiscountCandidatesForItem(promotionResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
     const candidates = withRuleBudget(rawCandidates, ruleBudgets);
     if (candidates?.length) {
       const fullPrice = oi.productSnapshot.priceAtPurchase;
       const discountedPrice = applyBestPromotionDiscount(fullPrice, candidates);
-      // Same dynamic cap as the cart_rule block above.
+      // Cap scales with how many times the promotion's own condition is
+      // satisfied — never a flat 1 — clamped to the remaining shared budget.
       const cap = applicableCap(candidates);
       const unitsUsed = Math.min(oi.productSnapshot.quantity, cap);
       const remainderLine = capDiscountedQuantity(oi, fullPrice, discountedPrice, cap);
       spendRuleBudget(candidates, ruleBudgets, unitsUsed);
       if (remainderLine) extraPromoDiscountLines.push(remainderLine);
+      // A discount that zeroes an item's price out (e.g. a percent_off 100
+      // "get this free" reward) marks it as a promotional gift for
+      // admin/order views — same field the free_product reward uses below.
+      if (oi.productSnapshot.priceAtPurchase === 0) oi.productSnapshot.isPromotionalGift = true;
     }
   }
   if (extraPromoDiscountLines.length) orderItems.push(...extraPromoDiscountLines);
@@ -766,20 +773,21 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     subtotal -= promotionOrderDiscount;
   }
 
-  // Free shipping unlocks via ANY of: the combo-banner offer (source +
-  // recommended product both present), any active generic cart rule whose
-  // effects include free_shipping (e.g. "2+ Lamps"), OR the cart subtotal
-  // simply being at/above the admin-configured thresholdAmount — plain,
-  // direct comparison, whole-cart (any products count), no rules table.
+  // Free shipping unlocks via EITHER: any active Promotion whose reward is
+  // free_shipping (covers the old "combo" shape too — a condition naming the
+  // source product + a free_shipping reward IS just such a Promotion now;
+  // the separate isFreeShippingEligible/combo-banner check was deleted
+  // 2026-10-09 as fully redundant with promotionResult.freeShipping, which
+  // evaluates the exact same Promotion documents directly), OR the cart
+  // subtotal simply being at/above the admin-configured thresholdAmount —
+  // plain, direct comparison, whole-cart (any products count).
   const freeShippingConfig = await getFreeShippingConfig();
   const thresholdEligible = freeShippingConfig.isActive && subtotal >= freeShippingConfig.thresholdAmount;
-  const comboFsEligible = await isFreeShippingEligible(orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity, variantSku: oi.variantSku })));
-  const freeShippingUnlocked =
-    comboFsEligible || cartRuleResult.freeShipping || thresholdEligible || promotionResult.freeShipping;
+  const freeShippingUnlocked = thresholdEligible || promotionResult.freeShipping;
   const chargedShippingAmount = freeShippingUnlocked ? 0 : realShippingAmount;
   console.log(
     `[FreeShipping][Order:auth] items=[${orderItems.map((oi) => `${oi.productId}x${oi.productSnapshot.quantity}${oi.variantSku ? `(${oi.variantSku})` : ""}`).join(",")}] ` +
-    `signals={comboFsEligible:${comboFsEligible}, cartRuleFreeShipping:${cartRuleResult.freeShipping}, thresholdEligible:${thresholdEligible}(threshold=₹${freeShippingConfig.thresholdAmount}, subtotal=₹${subtotal}), promotionFreeShipping:${promotionResult.freeShipping}} ` +
+    `signals={thresholdEligible:${thresholdEligible}(threshold=₹${freeShippingConfig.thresholdAmount}, subtotal=₹${subtotal}), promotionFreeShipping:${promotionResult.freeShipping}} ` +
     `→ freeShippingUnlocked=${freeShippingUnlocked}, realShipping=₹${realShippingAmount}, chargedShipping=₹${chargedShippingAmount}`,
   );
 
@@ -1941,55 +1949,53 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     };
   });
 
-  // Generic, data-driven cart-promotion rules — see the matching comment in
-  // razorpayCreateOrderController above for the full rationale. Applied here
-  // BEFORE subtotal is computed below, so the discount is baked into
-  // priceAtPurchase and subtotal/order/invoice all agree.
-  const activeCartRules = await getActiveCartRules();
-  const cartRuleResult = evaluateCartRules(
-    orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity, variantSku: oi.variantSku })),
-    activeCartRules,
-  );
-  // See the matching comment in razorpayCreateOrderController above.
-  const ruleBudgets = createRuleBudgetTracker(cartRuleResult.discountCandidatesByProduct);
-  const extraDiscountLines = [];
-  for (const oi of orderItems) {
-    const rawCandidates = getDiscountCandidatesForItem(cartRuleResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
-    const candidates = withRuleBudget(rawCandidates, ruleBudgets);
-    if (candidates?.length) {
-      const fullPrice = oi.productSnapshot.priceAtPurchase;
-      const discountedPrice = applyBestDiscount(fullPrice, candidates);
-      const cap = applicableCap(candidates);
-      const unitsUsed = Math.min(oi.productSnapshot.quantity, cap);
-      const remainderLine = capDiscountedQuantity(oi, fullPrice, discountedPrice, cap);
-      spendRuleBudget(candidates, ruleBudgets, unitsUsed);
-      if (remainderLine) extraDiscountLines.push(remainderLine);
-      // See the matching comment in razorpayCreateOrderController above.
-      if (oi.productSnapshot.priceAtPurchase === 0) oi.productSnapshot.isPromotionalGift = true;
-    }
-  }
-  if (extraDiscountLines.length) orderItems.push(...extraDiscountLines);
-
-  // ── Promotion Engine V2 — see the matching comment in
-  // razorpayCreateOrderController above for the full rationale. Identical
-  // wiring, guest path.
-  const activePromotions = await getActivePromotions();
+  // ── Promotion Engine V2 — the SINGLE discount-evaluation authority for the
+  // real charge — see the matching comment in razorpayCreateOrderController
+  // above for the full rationale (consolidated 2026-10-08; the legacy
+  // adapter double-evaluation was retired from this money path, not from the
+  // codebase — it still powers legacy-shaped banner displays elsewhere).
+  // Identical wiring, guest path. orderCount is deliberately left unset here
+  // (not merely omitted by oversight) — a guest's identity is self-reported
+  // email/mobile with no verification, so there's no trustworthy "is this
+  // their first order" signal to compute without inventing one; see the
+  // audit's Decision Register item on guest identity trust.
+  let activePromotions = await getActivePromotions();
+  // Same courtesy pre-check as the authenticated flow above — see
+  // excludeUsageExhaustedPromotions's own comment. Guest identity here is
+  // the self-reported email/mobile (same trust level already accepted for
+  // the existing per-user coupon check in this same controller).
+  activePromotions = await excludeUsageExhaustedPromotions(activePromotions, { email: guestInfo?.email, mobile: cleanMobile });
   const promoProductMeta = new Map(
     products.map((p) => [p.productId, { category: p.productCategory, subcategory: p.productSubCategory, tags: p.tags || [] }]),
   );
   const promoCartItems = orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity, variantSku: oi.variantSku }));
   const promoSubtotalSoFar = orderItems.reduce((s, i) => s + i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity, 0);
-  const promoCtx = buildCartContext(promoCartItems, { subtotal: promoSubtotalSoFar, productMeta: promoProductMeta, customerType: "guest" });
+  // deliveryAddress: this request's own `deliveryAddress` body field — the
+  // SAME address this guest order is shipping to (not a separate,
+  // consequence-free claim), same trust reasoning as the authenticated
+  // flow's matching comment above. Absent on the Magic path (no address
+  // known yet) — a geo-targeted promotion simply won't match there.
+  const promoDeliveryAddress = deliveryAddress?.pinCode
+    ? { pincode: String(deliveryAddress.pinCode), state: deliveryAddress.state || null, country: "India" }
+    : null;
+  const promoCtx = buildCartContext(promoCartItems, {
+    subtotal: promoSubtotalSoFar,
+    productMeta: promoProductMeta,
+    customerType: "guest",
+    deliveryAddress: promoDeliveryAddress,
+    // Gates any promotion with a linkedCouponCode — see promotionCouponGateOk
+    // in promotionEngine.util.js. Using the RAW input (not yet validated) is
+    // safe here: the guest-coupon-validation block below (rawCouponCode?.trim())
+    // THROWS on an invalid/inactive/ineligible code, aborting the whole
+    // request before any response is sent — so by the time this would ever
+    // actually reach the customer, the code is guaranteed genuine.
+    appliedCouponCode: rawCouponCode?.trim() || null,
+  });
   const promotionResult = evaluatePromotions(promoCartItems, promoCtx, activePromotions);
-  for (const candidates of promotionResult.discountCandidatesByProduct.values()) {
-    for (const c of candidates) {
-      if (c.ruleId && !ruleBudgets.has(c.ruleId)) ruleBudgets.set(c.ruleId, c.cap);
-    }
-  }
+  const ruleBudgets = createRuleBudgetTracker(promotionResult.discountCandidatesByProduct);
 
   const extraPromoDiscountLines = [];
   for (const oi of orderItems) {
-    if (getDiscountCandidatesForItem(cartRuleResult.discountCandidatesByProduct, oi.productId, oi.variantSku)?.length) continue;
     const rawCandidates = getPromotionDiscountCandidatesForItem(promotionResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
     const candidates = withRuleBudget(rawCandidates, ruleBudgets);
     if (candidates?.length) {
@@ -2000,6 +2006,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
       const remainderLine = capDiscountedQuantity(oi, fullPrice, discountedPrice, cap);
       spendRuleBudget(candidates, ruleBudgets, unitsUsed);
       if (remainderLine) extraPromoDiscountLines.push(remainderLine);
+      if (oi.productSnapshot.priceAtPurchase === 0) oi.productSnapshot.isPromotionalGift = true;
     }
   }
   if (extraPromoDiscountLines.length) orderItems.push(...extraPromoDiscountLines);
@@ -2062,20 +2069,18 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
         cartItems: rawItemsForShipping
       });
   const realShippingAmount = isMagic ? 0 : (shippingResult?.total_charges || 179);
-  // Free shipping unlocks via ANY of: the combo-banner offer (source +
-  // recommended product both present), any active generic cart rule whose
-  // effects include free_shipping (e.g. "2+ Lamps"), OR the cart subtotal
-  // simply being at/above the admin-configured thresholdAmount — plain,
-  // direct comparison, whole-cart (any products count), no rules table.
+  // Free shipping unlocks via EITHER: any active Promotion whose reward is
+  // free_shipping (the old combo-banner check was deleted 2026-10-09 as
+  // fully redundant with promotionResult.freeShipping — see the matching
+  // comment in the authenticated flow above), OR the cart subtotal simply
+  // being at/above the admin-configured thresholdAmount.
   const freeShippingConfig = await getFreeShippingConfig();
   const thresholdEligible = freeShippingConfig.isActive && subtotal >= freeShippingConfig.thresholdAmount;
-  const comboFsEligible = await isFreeShippingEligible(orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity, variantSku: oi.variantSku })));
-  const freeShippingUnlocked =
-    comboFsEligible || cartRuleResult.freeShipping || thresholdEligible || promotionResult.freeShipping;
+  const freeShippingUnlocked = thresholdEligible || promotionResult.freeShipping;
   const chargedShippingAmount = freeShippingUnlocked ? 0 : realShippingAmount;
   console.log(
     `[FreeShipping][Order:guest] items=[${orderItems.map((oi) => `${oi.productId}x${oi.productSnapshot.quantity}${oi.variantSku ? `(${oi.variantSku})` : ""}`).join(",")}] ` +
-    `signals={comboFsEligible:${comboFsEligible}, cartRuleFreeShipping:${cartRuleResult.freeShipping}, thresholdEligible:${thresholdEligible}(threshold=₹${freeShippingConfig.thresholdAmount}, subtotal=₹${subtotal}), promotionFreeShipping:${promotionResult.freeShipping}} ` +
+    `signals={thresholdEligible:${thresholdEligible}(threshold=₹${freeShippingConfig.thresholdAmount}, subtotal=₹${subtotal}), promotionFreeShipping:${promotionResult.freeShipping}} ` +
     `→ freeShippingUnlocked=${freeShippingUnlocked}, realShipping=₹${realShippingAmount}, chargedShipping=₹${chargedShippingAmount}`,
   );
 
