@@ -66,6 +66,23 @@ export const productsApi = apiSlice.injectEndpoints({
       keepUnusedDataFor: 600,
     }),
 
+    // Published blog posts (Admin → Blog), newest first. `product` filters to
+    // posts linked to that product (the "Read the story" link on its page).
+    getBlogPosts: builder.query({
+      query: ({ product, limit = 50 } = {}) => {
+        const params = new URLSearchParams({ limit: String(limit) });
+        if (product) params.append('product', product);
+        return `blog?${params}`;
+      },
+      providesTags: ['Blog'],
+    }),
+
+    // One published post with its linked products.
+    getBlogPost: builder.query({
+      query: (slug) => `blog/${encodeURIComponent(slug)}`,
+      providesTags: (result, error, slug) => [{ type: 'Blog', id: slug }],
+    }),
+
     // One category page: name, indexable flag, products
     getCategoryBySlug: builder.query({
       query: (slug) => `category/${encodeURIComponent(slug)}`,
@@ -96,5 +113,7 @@ export const {
   useGetCategoriesQuery,
   useGetCategoryBySlugQuery,
   useGetSeoDataQuery,
+  useGetBlogPostsQuery,
+  useGetBlogPostQuery,
   useSearchProductsQuery,
 } = productsApi;

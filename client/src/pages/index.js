@@ -23,3 +23,5 @@ export const ProductVariantsPage = lazy(() => import("./shop/ProductVariantsPage
 export const MyProfilePage = lazy(() => import("./account/MyProfilePage.jsx"));
 export const CustomerSupportPage = lazy(() => import("./support/CustomerSupportPage.jsx"));
 export const AboutPage = lazy(() => import("./info/AboutPage.jsx"));
+export const BlogListPage = lazy(() => import("./blog/BlogListPage.jsx"));
+export const BlogPostPage = lazy(() => import("./blog/BlogPostPage.jsx"));

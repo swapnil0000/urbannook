@@ -87,6 +87,7 @@ const Footer = () => {
           <li><a href="/orders" onClick={handleTrackOrderClick} className="hover:text-white cursor-pointer">Track Order</a></li>
           <li><Link to="/return-policy" className="hover:text-white">Shipping & Exchange</Link></li>
           <li><Link to="/faqs" className="hover:text-white">FAQs</Link></li>
+          <li><Link to="/blog" className="hover:text-white">Journal</Link></li>
           <li><Link to="/contact-us" className="hover:text-white">Contact</Link></li>
         </ul>
       </div>

@@ -169,3 +169,24 @@ Under rule 9 these files are yours; this change is done in the open and needs yo
 **Please check**: the rendered HTML of a product, a variant, a category and `/` in Google's Rich Results
 test after the first deploy, and that analytics (`analytics.js`) still fires once per page view after
 hydration.
+
+## I. Journal / blog (2026-10-16, branch `feat/blog`)
+
+Posts are written in Admin → Blog (TipTap editor) and stored in `blog_posts` (admin owns it; the
+storefront reads published posts read-only). The HTML is sanitised on save in the admin and again by the
+API (`server/src/utils/blogHtml.js`): headings, lists, quotes, links and https images only.
+
+- API: `GET /api/v1/blog?product=&limit=` (published, newest first, no bodies) and `GET /api/v1/blog/:slug`
+  (body + linked products). 10-min API cache like products.
+- Pages: `/blog` (Blog + BreadcrumbList JSON-LD) and `/blog/:slug` (BlogPosting + BreadcrumbList, cover image,
+  "Shop the pieces in this story" product cards). Rendered at build time by `ssg.mjs`, listed in the sitemap
+  and `llms.txt` (Journal section). Footer links to `/blog` ("Journal").
+- Product pages: Description shows only the product's own text (variant description first). The Admin → SEO
+  Pages intro (kept to 2–3 lines) shows in a "Why fans love it" section, with "Know the story →" to the newest
+  blog post linked to that product (hidden while there is none).
+- Variant pages (`/product/<id>/<sku>`) get a fourth breadcrumb level (visible and in BreadcrumbList), and
+  product cards link straight to `/product/<id>` instead of `/products/<id>` (which only 301s there).
+- A new post goes live for crawlers with the next client build (deploy or nightly 21:30 IST).
+
+Please check after deploy: the BlogPosting result in the Rich Results test, and that `page_view` fires on
+`/blog` pages like other pages.

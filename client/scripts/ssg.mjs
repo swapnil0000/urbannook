@@ -11,6 +11,7 @@
  *   dist-prerender/ssg/category/<slug>/index.html        category pages
  *   dist-prerender/ssg/product/<id>/index.html           product pages
  *   dist-prerender/ssg/product/<id>/<sku>/index.html     variant pages (ad / feed landing URLs)
+ *   dist-prerender/ssg/blog/index.html, blog/<slug>/…     journal list and posts (Admin → Blog)
  *   dist-prerender/ssg/about-us/index.html, …            static pages
  *   dist-prerender/ssg/__404/index.html                  not-found page (Worker sends it with HTTP 404)
  *   dist/sitemap.xml, dist/llms.txt
@@ -42,7 +43,7 @@ const CONCURRENCY = 4;
 // AppRoutes.jsx — a path here must be a real page, never the 404.
 const STATIC_PAGES = [
   ['/', 1.0], ['/products', 0.9], ['/about-us', 0.5], ['/contact-us', 0.5], ['/faqs', 0.5],
-  ['/customize', 0.5], ['/customer-support', 0.3], ['/return-policy', 0.3],
+  ['/customize', 0.5], ['/blog', 0.6], ['/customer-support', 0.3], ['/return-policy', 0.3],
   ['/terms-conditions', 0.2], ['/privacy-policy', 0.2],
 ];
 const NOT_FOUND_PROBE = '/__ssg-not-found__';
@@ -91,7 +92,7 @@ ${urls.join('\n')}
 `;
 }
 
-function llmsTxt(products, categories) {
+function llmsTxt(products, categories, posts = []) {
   const lines = products.map((p) => {
     const prices = (p.variantDetails || []).map((v) => Number(v.variantPrice)).filter((n) => n > 0);
     return `- [${p.productName}](${SITE}/product/${p.productId})${prices.length ? `: from ₹${Math.min(...prices)}` : ''}`;
@@ -109,6 +110,9 @@ function llmsTxt(products, categories) {
 
 ## Categories
 ${categories.map((c) => `- [${c.name || c.slug}](${SITE}/category/${c.slug})`).join('\n')}
+
+## Journal
+${posts.map((b) => `- [${b.title}](${SITE}/blog/${b.slug})${b.excerpt ? `: ${b.excerpt}` : ''}`).join('\n')}
 
 ## Products
 ${lines.join('\n')}
@@ -128,12 +132,15 @@ async function main() {
 
   let products = [];
   let categories = [];
+  let posts = [];
   try {
     [products, categories] = await Promise.all([
       loadProducts(api),
       // Optional: an older API without GET /categories still renders everything else.
       getJson(api, 'categories').then((d) => d || []).catch((err) => { console.warn(`[ssg] no categories (${err.message})`); return []; }),
     ]);
+    // Optional too: an API without GET /blog renders everything else.
+    posts = await getJson(api, 'blog?limit=100').then((d) => d || []).catch((err) => { console.warn(`[ssg] no blog posts (${err.message})`); return []; });
   } catch (err) {
     console.warn(`[ssg] API unavailable (${err.message}) — skipped, site deploys as SPA`);
     return;
@@ -142,6 +149,7 @@ async function main() {
   const pages = [
     ...STATIC_PAGES.map(([p]) => p),
     ...categories.map((c) => `/category/${c.slug}`),
+    ...posts.map((b) => `/blog/${b.slug}`),
     ...products.flatMap((p) => [
       `/product/${p.productId}`,
       ...(p.variantDetails || []).filter((v) => v.sku && v.isActive !== false).map((v) => `/product/${p.productId}/${encodeURIComponent(v.sku)}`),
@@ -181,6 +189,7 @@ async function main() {
     ...STATIC_PAGES.filter(([p]) => rendered(p)).map(([loc, priority]) => ({ loc, priority })),
     // Categories with too few products are noindex (API sets indexable: false): keep them out.
     ...categories.filter((c) => c.indexable !== false && rendered(`/category/${c.slug}`)).map((c) => ({ loc: `/category/${c.slug}`, priority: 0.8 })),
+    ...posts.filter((b) => rendered(`/blog/${b.slug}`)).map((b) => ({ loc: `/blog/${b.slug}`, priority: 0.6, images: b.coverImage ? [b.coverImage] : [] })),
     ...products.filter((p) => rendered(`/product/${p.productId}`)).map((p) => ({
       loc: `/product/${p.productId}`,
       priority: 0.8,
@@ -188,9 +197,9 @@ async function main() {
     })),
   ];
   fs.writeFileSync(path.join(DIST, 'sitemap.xml'), sitemap(entries));
-  fs.writeFileSync(path.join(DIST, 'llms.txt'), llmsTxt(products, categories));
+  fs.writeFileSync(path.join(DIST, 'llms.txt'), llmsTxt(products, categories, posts));
 
-  console.log(`[ssg] rendered ${ok}/${pages.length} pages (${products.length} products, ${categories.length} categories), sitemap ${entries.length} URLs`);
+  console.log(`[ssg] rendered ${ok}/${pages.length} pages (${products.length} products, ${categories.length} categories, ${posts.length} blog posts), sitemap ${entries.length} URLs`);
   if (failed.length) console.warn(`[ssg] ${failed.length} page(s) left to the SPA shell:\n  ${failed.join('\n  ')}`);
 }
 

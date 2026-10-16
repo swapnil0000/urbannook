@@ -32,6 +32,8 @@ const PREFETCH = [
   { path: '/product/:productId/:variantSku', load: ({ productId }) => productPage(productId) },
   { path: '/products/:productId', load: ({ productId }) => [['getProductById', productId]] },
   { path: '/about-us', load: () => [['getPublicStats', undefined]] },
+  { path: '/blog', load: () => [['getBlogPosts', { limit: 100 }]] },
+  { path: '/blog/:slug', load: ({ slug }) => [['getBlogPost', slug]] },
   ...['/contact-us', '/faqs', '/customize', '/customer-support', '/rewards', '/terms-conditions', '/privacy-policy', '/return-policy']
     .map((path) => ({ path, load: () => [] })),
 ];
@@ -44,6 +46,8 @@ function productPage(productId) {
     ['getAllFreeShippingBanners', undefined],
     // Free-shipping threshold: the Offer schema's shipping details depend on it.
     ['getFreeShippingOffer', undefined],
+    // Linked blog post ("Read the full story").
+    ['getBlogPosts', { product: productId, limit: 1 }],
   ];
 }
 

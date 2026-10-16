@@ -11,6 +11,7 @@ const DEFAULT_DESCRIPTION =
 
 const SEOHead = ({
   title,
+  rawTitle, // used exactly as written (no " | UrbanNook"), e.g. a blog post's own meta title
   description = DEFAULT_DESCRIPTION,
   image = DEFAULT_IMAGE,
   url,
@@ -23,7 +24,7 @@ const SEOHead = ({
   // or if it fails, the page's own values are used.
   const { data: seoRes } = useGetSeoDataQuery(normalizeSeoPath(pathname));
 
-  const fullTitle = title ? `${title} | ${SITE_NAME}` : `${SITE_NAME} — Modern Lifestyle Store`;
+  const fullTitle = rawTitle || (title ? `${title} | ${SITE_NAME}` : `${SITE_NAME} — Modern Lifestyle Store`);
   // No url → no canonical. Defaulting to the homepage told Google every such page was a duplicate of it.
   const canonicalUrl = url ? `${SITE_URL}${url}` : null;
 
