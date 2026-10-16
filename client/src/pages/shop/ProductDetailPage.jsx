@@ -18,7 +18,7 @@ import ImageCarousel from '../../component/ImageCarousel';
 import { motion, AnimatePresence } from 'motion/react';
 import { ScrollColorBand } from '../../component/motion';
 import { variantSku, trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist, trackVariantSelect, trackShare, trackDeliveryCheck } from '../../utils/analytics';
-import { productsApi, useGetProductByIdQuery, useGetProductsQuery } from '../../store/api/productsApi';
+import { productsApi, useGetProductByIdQuery, useGetProductsQuery, useGetBlogPostsQuery } from '../../store/api/productsApi';
 import { useAddToCartMutation, useUpdateCartMutation, useCalculateShippingMutation, useGetFreeShippingOfferQuery } from '../../store/api/userApi';
 import { shippingDetails, RETURN_POLICY } from '../../utils/productSchema';
 import { useGetProductReviewsQuery, useSubmitProductReviewMutation, useUpdateProductReviewMutation } from '../../store/api/testimonialsApi';
@@ -207,6 +207,9 @@ const ProductDetailPage = () => {
   // FAQs lead "Questions, answered". When both ask the same question, the
   // admin's answer wins, so the page never shows a question twice.
   const { intro: seoIntro, faqs: seoFaqs } = useSeoContent();
+  // Newest published blog post linked to this product (Admin → Blog), for "Read the full story".
+  const { data: storyRes } = useGetBlogPostsQuery({ product: productId, limit: 1 });
+  const story = storyRes?.data?.[0] || null;
   const sameQuestion = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
   const faqs = useMemo(() => {
     const asked = new Set(seoFaqs.map((f) => sameQuestion(f.q)));
@@ -582,6 +585,7 @@ const ProductDetailPage = () => {
       };
     }),
   };
+  const variantCrumb = urlVariantSku && selectedVariant && selectedVariant !== 'N/A' && selectedVariant !== product.productName ? selectedVariant : null;
   const breadcrumbData = {
     '@context': 'https://schema.org', '@type': 'BreadcrumbList',
     itemListElement: [
@@ -590,6 +594,8 @@ const ProductDetailPage = () => {
         ? { '@type': 'ListItem', position: 2, name: product.productCategory, item: `https://www.urbannook.in${categoryPath(product.productCategory)}` }
         : { '@type': 'ListItem', position: 2, name: 'Shop', item: 'https://www.urbannook.in/products' },
       { '@type': 'ListItem', position: 3, name: product.productName, item: `https://www.urbannook.in/product/${product.productId}` },
+      // Variant URL (/product/<id>/<sku>): one more level, the variant itself.
+      ...(variantCrumb ? [{ '@type': 'ListItem', position: 4, name: variantCrumb, item: `https://www.urbannook.in/product/${product.productId}/${urlVariantSku}` }] : []),
     ],
   };
 
@@ -600,7 +606,9 @@ const ProductDetailPage = () => {
       <div className="max-w-[1280px] mx-auto px-5 py-6 md:py-8">
         {/* breadcrumb */}
         <div className="text-sm text-faint mb-5">
-          <Link to="/" className="hover:text-brand">Home</Link> / <Link to={product.productCategory ? categoryPath(product.productCategory) : '/products'} className="hover:text-brand">{product.productCategory || 'Shop'}</Link> / <span className="text-ink">{product.productName}</span>
+          <Link to="/" className="hover:text-brand">Home</Link> / <Link to={product.productCategory ? categoryPath(product.productCategory) : '/products'} className="hover:text-brand">{product.productCategory || 'Shop'}</Link> / {variantCrumb
+            ? <><Link to={`/product/${product.productId}`} className="hover:text-brand">{product.productName}</Link> / <span className="text-ink">{variantCrumb}</span></>
+            : <span className="text-ink">{product.productName}</span>}
         </div>
 
         <div className="grid lg:grid-cols-2 gap-8 lg:gap-10">
@@ -873,8 +881,8 @@ const ProductDetailPage = () => {
           <p className="gl-lbl text-brand mb-2 text-center">The full rundown</p>
           <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight mb-6 text-center">Product details</h2>
           <div className="divide-y divide-hair border-y border-hair">
-            {(displayDescription || seoIntro.length > 0) && (
-              <details open className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Description<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary><p className="text-muted mt-3 text-xs leading-relaxed">{displayDescription}</p>{seoIntro.map((t, i) => <p key={i} className="text-muted mt-3 text-xs leading-relaxed">{t}</p>)}</details>
+            {displayDescription && (
+              <details open className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Description<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary><p className="text-muted mt-3 text-xs leading-relaxed">{displayDescription}</p></details>
             )}
             {specs.length > 0 && (
               <details className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Specifications<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary>
@@ -1068,6 +1076,17 @@ const ProductDetailPage = () => {
             </div>
           </div>
         )}
+          {/* "Why fans love it": the short Admin → SEO Pages intro for this URL (2–3 lines)
+              and, when a published blog post is linked to this product, "Know the story →".
+              The full story lives in the blog, not on the product page. */}
+          {(seoIntro.length > 0 || story) && (
+          <section className="mt-16 max-w-3xl mx-auto text-center">
+            <p className="gl-lbl text-brand mb-2">The story</p>
+            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-5">Why fans love it</h2>
+            {seoIntro.map((t, i) => <p key={i} className="text-muted text-sm leading-relaxed mt-2">{t}</p>)}
+            {story && <Link to={`/blog/${story.slug}`} className="inline-block mt-4 text-sm font-bold text-brand hover:underline">Know the story →</Link>}
+          </section>
+          )}
           {faqs.length > 0 && (
           <section className="mt-16">
             <p className="gl-lbl text-brand mb-2 text-center">Good to know</p>

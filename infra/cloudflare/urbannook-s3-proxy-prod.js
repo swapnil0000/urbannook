@@ -100,7 +100,7 @@ const IMMUTABLE = "public, max-age=31536000, immutable";
 // one that matches but has no rendered page (a product added after the last
 // build, checkout, account pages…) gets the SPA shell with 200 as before.
 const APP_ROUTES = [
-  /^\/$/, /^\/products$/, /^\/product\/[^/]+(\/[^/]+)?$/, /^\/category\/[^/]+$/,
+  /^\/$/, /^\/products$/, /^\/product\/[^/]+(\/[^/]+)?$/, /^\/category\/[^/]+$/, /^\/blog(\/[^/]+)?$/,
   /^\/(about-us|contact-us|customer-support|customize|faqs|rewards|terms-conditions|privacy-policy|return-policy)$/,
   /^\/(checkout|profile|orders|wishlist|settings|payment-failed)$/,
   /^\/(payment-processing|order-confirm)\/[^/]+$/, /^\/nfc(\/.*)?$/,

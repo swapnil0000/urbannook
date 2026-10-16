@@ -132,7 +132,8 @@ There is **no server rendering at request time** and no extra process on the pro
    (`dist-ssr/`, build-only, not uploaded) + `client/scripts/ssg.mjs`. The script reads the live API
    (`VITE_API_BASE_URL`: products, categories, Admin → SEO Pages) and renders every public page with the
    real React app (`client/src/entry-server.jsx`) into `dist-prerender/ssg/<path>/index.html`: home,
-   `/products`, `/category/<slug>`, `/product/<id>`, `/product/<id>/<sku>`, static pages and `__404`.
+   `/products`, `/category/<slug>`, `/product/<id>`, `/product/<id>/<sku>`, `/blog`, `/blog/<slug>` (published posts
+   from Admin → Blog), static pages and `__404`.
    It also writes `sitemap.xml` (only pages that rendered; non-indexable categories left out) and
    `llms.txt`. It never fails the build: a page that can't render, or the whole step when the API is
    down, falls back to the SPA shell.
