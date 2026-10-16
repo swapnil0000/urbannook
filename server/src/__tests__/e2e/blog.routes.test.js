@@ -36,6 +36,17 @@ describe("GET /api/v1/blog", () => {
     const res = await request(app).get("/api/v1/blog").query({ product: "p1" }).expect(200);
     expect(res.body.data.map((p) => p.slug)).toEqual(["zoro-swords"]);
   });
+
+  it("picks the post for a variant SKU, else the product's general posts", async () => {
+    await BlogPost.collection.insertMany([
+      { slug: "tanjiro", title: "Tanjiro", status: "published", publishedAt: new Date("2026-10-05"), productIds: ["p1"], skus: ["TANS"], contentHtml: "<p>x</p>" },
+      { slug: "rengoku", title: "Rengoku", status: "published", publishedAt: new Date("2026-10-06"), productIds: ["p1"], skus: ["RENS"], contentHtml: "<p>x</p>" },
+    ]);
+    const slugs = async (q) => (await request(app).get("/api/v1/blog").query(q).expect(200)).body.data.map((p) => p.slug);
+    expect(await slugs({ product: "p1", sku: "tans", limit: 1 })).toEqual(["tanjiro"]);
+    expect(await slugs({ product: "p1", sku: "ZENS", limit: 1 })).toEqual(["zoro-swords"]); // no post for Zenitsu → general
+    expect(await slugs({ product: "p1" })).toEqual(["zoro-swords"]); // character posts never on the base page
+  });
 });
 
 describe("GET /api/v1/blog/:slug", () => {

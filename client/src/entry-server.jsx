@@ -29,7 +29,7 @@ const PREFETCH = [
   { path: '/products', load: () => [] },
   { path: '/category/:slug', load: ({ slug }) => [['getCategoryBySlug', slug], ['getCategories', undefined]] },
   { path: '/product/:productId', load: ({ productId }) => productPage(productId) },
-  { path: '/product/:productId/:variantSku', load: ({ productId }) => productPage(productId) },
+  { path: '/product/:productId/:variantSku', load: ({ productId, variantSku }) => productPage(productId, variantSku) },
   { path: '/products/:productId', load: ({ productId }) => [['getProductById', productId]] },
   { path: '/about-us', load: () => [['getPublicStats', undefined]] },
   { path: '/blog', load: () => [['getBlogPosts', { limit: 100 }]] },
@@ -38,7 +38,7 @@ const PREFETCH = [
     .map((path) => ({ path, load: () => [] })),
 ];
 
-function productPage(productId) {
+function productPage(productId, variantSku) {
   return [
     ['getProductById', productId],
     ['getProductReviews', productId],
@@ -46,8 +46,9 @@ function productPage(productId) {
     ['getAllFreeShippingBanners', undefined],
     // Free-shipping threshold: the Offer schema's shipping details depend on it.
     ['getFreeShippingOffer', undefined],
-    // Linked blog post ("Read the full story").
-    ['getBlogPosts', { product: productId, limit: 1 }],
+    // Linked blog post ("Know the story"): the one for this variant (SKU), else a
+    // general post for the product. Same args as ProductDetailPage.
+    ['getBlogPosts', { product: productId, sku: variantSku, limit: 1 }],
   ];
 }
 

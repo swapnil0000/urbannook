@@ -207,8 +207,10 @@ const ProductDetailPage = () => {
   // FAQs lead "Questions, answered". When both ask the same question, the
   // admin's answer wins, so the page never shows a question twice.
   const { intro: seoIntro, faqs: seoFaqs } = useSeoContent();
-  // Newest published blog post linked to this product (Admin → Blog), for "Read the full story".
-  const { data: storyRes } = useGetBlogPostsQuery({ product: productId, limit: 1 });
+  // Blog post for "Know the story" (Admin → Blog): the one linked to this
+  // variant's SKU, else a general post for the product. Uses the URL's SKU (not
+  // the picked swatch) so it matches the server-rendered page.
+  const { data: storyRes } = useGetBlogPostsQuery({ product: productId, sku: urlVariantSku, limit: 1 });
   const story = storyRes?.data?.[0] || null;
   const sameQuestion = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
   const faqs = useMemo(() => {

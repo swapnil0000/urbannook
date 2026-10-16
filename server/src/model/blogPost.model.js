@@ -13,6 +13,7 @@ const blogPostSchema = new mongoose.Schema(
     videoUrl: String,
     tags: [String],
     productIds: [String],
+    skus: [String],
     metaTitle: String,
     metaDescription: String,
     author: String,
