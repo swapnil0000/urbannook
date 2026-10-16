@@ -9,17 +9,29 @@ import { cleanBlogHtml, youtubeId } from "../utils/blogHtml.js";
 
 // Published blog posts (Admin → Blog). Behind the same 10-min API cache as the
 // product endpoints (System Guide §7). Bodies are sanitised again here.
-const LIST_FIELDS = "-_id slug title excerpt coverImage coverAlt tags productIds author publishedAt updatedAt readingMinutes";
+const LIST_FIELDS = "-_id slug title excerpt coverImage coverAlt tags productIds skus author publishedAt updatedAt readingMinutes";
 const PRODUCT_FIELDS = "-_id productId productName productCategory variantDetails tags isPublished";
 
-// GET /blog?product=<productId>&limit= — newest first.
+// Posts with no SKUs are about the whole product (e.g. a buying guide).
+const NO_SKUS = { $or: [{ skus: { $exists: false } }, { skus: { $size: 0 } }] };
+
+// GET /blog?product=<productId>&sku=<SKU>&limit= — newest first.
+// With sku: posts linked to that variant; if there are none, the product's
+// general posts. With product only: the product's general posts, so a
+// character's story never shows on another character's page.
 const listBlogPosts = asyncHandler(async (req, res) => {
   const product = /^[a-zA-Z0-9_-]{1,64}$/.test(String(req.query.product || "")) ? String(req.query.product) : null;
+  const sku = /^[a-zA-Z0-9_-]{1,40}$/.test(String(req.query.sku || "")) ? String(req.query.sku).toUpperCase() : null;
   const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 100);
-  const data = await apiCache.handle({ route: "blog:list", product, limit }, () =>
-    BlogPost.find({ status: "published", ...(product ? { productIds: product } : {}) })
-      .select(LIST_FIELDS).sort({ publishedAt: -1 }).limit(limit).lean(),
-  );
+  const find = (filter) => BlogPost.find({ status: "published", ...filter })
+    .select(LIST_FIELDS).sort({ publishedAt: -1 }).limit(limit).lean();
+  const data = await apiCache.handle({ route: "blog:list", product, sku, limit }, async () => {
+    if (sku) {
+      const forSku = await find({ skus: sku });
+      if (forSku.length || !product) return forSku;
+    }
+    return find(product ? { productIds: product, ...NO_SKUS } : {});
+  });
   return res.status(200).json(new ApiRes(200, "Blog posts", data, true));
 });
 

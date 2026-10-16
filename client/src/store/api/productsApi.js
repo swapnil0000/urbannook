@@ -69,9 +69,10 @@ export const productsApi = apiSlice.injectEndpoints({
     // Published blog posts (Admin → Blog), newest first. `product` filters to
     // posts linked to that product (the "Read the story" link on its page).
     getBlogPosts: builder.query({
-      query: ({ product, limit = 50 } = {}) => {
+      query: ({ product, sku, limit = 50 } = {}) => {
         const params = new URLSearchParams({ limit: String(limit) });
         if (product) params.append('product', product);
+        if (sku) params.append('sku', sku);
         return `blog?${params}`;
       },
       providesTags: ['Blog'],
