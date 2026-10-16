@@ -51,18 +51,23 @@ const productListing = asyncHandler(async (req, res) => {
       if (featured === "true") query.tags = "featured";
     }
 
-    const listOfProducts = await Product.find(query)
-      .skip((page - 1) * perPage)
-      .limit(perPage)
-      .sort(sort)
-      .select("-_id -createdAt -updatedAt -__v");
+    const [listOfProducts, totalProducts] = await Promise.all([
+      Product.find(query)
+        .skip((page - 1) * perPage)
+        .limit(perPage)
+        .sort(sort)
+        .select("-_id -createdAt -updatedAt -__v"),
+      Product.countDocuments(query),
+    ]);
 
     return {
       listofPublishedProducts: listOfProducts,
       pagination: {
         NolistofPublishedProducts: listOfProducts.length,
         currentPage: page,
-        totalPages: Math.ceil(listOfProducts?.length / perPage),
+        totalProducts,
+        // Was computed from this page's length, so it was always 1.
+        totalPages: Math.ceil(totalProducts / perPage),
       },
     };
   };

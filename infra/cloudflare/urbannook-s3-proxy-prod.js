@@ -7,11 +7,16 @@
 // CACHE POLICY: the DEPLOY decides caching per file — it sets Cache-Control
 // on every S3 object (jenkins/prod.Jenkinsfile, .github/workflows/prod-deploy.yml):
 //   index.html, sw.js          -> no-cache
-//   product/* (SEO prerender)  -> no-cache
+//   ssg/* (pages rendered at build), product/* (older prerender) -> no-cache
 //   robots/sitemap/llms        -> 1 hour
 //   assets/* (hashed build)    -> uploaded without Cache-Control -> immutable here
 // This worker passes that header through. Fallbacks apply only when S3 has no
 // Cache-Control, and error responses are never cached.
+//
+// PAGES (no file extension): ssg/<path>/index.html if the build rendered it,
+// else an older product/* prerender, else the SPA shell for known app routes,
+// else the rendered not-found page with HTTP 404. /products/<id> and trailing
+// slashes 301 to the one canonical URL. See resolvePage().
 //
 // Source of truth for this code: infra/cloudflare/ in the storefront repo.
 // Deployed by Jenkins (jenkins/prod.Jenkinsfile) with wrangler — never edit in the dashboard.
@@ -90,27 +95,83 @@ async function signedS3Get(env, key) {
 const NO_CACHE = "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0";
 const IMMUTABLE = "public, max-age=31536000, immutable";
 
+// Every route the app knows (client/src/store/AppRoutes.jsx). A page path that
+// matches none of these gets the rendered not-found page with a real 404;
+// one that matches but has no rendered page (a product added after the last
+// build, checkout, account pages…) gets the SPA shell with 200 as before.
+const APP_ROUTES = [
+  /^\/$/, /^\/products$/, /^\/product\/[^/]+(\/[^/]+)?$/, /^\/category\/[^/]+$/,
+  /^\/(about-us|contact-us|customer-support|customize|faqs|rewards|terms-conditions|privacy-policy|return-policy)$/,
+  /^\/(checkout|profile|orders|wishlist|settings|payment-failed)$/,
+  /^\/(payment-processing|order-confirm)\/[^/]+$/, /^\/nfc(\/.*)?$/,
+];
+
+const redirect = (url, pathname) => {
+  const to = new URL(url);
+  to.pathname = pathname;
+  return new Response(null, { status: 301, headers: { Location: to.toString(), "Cache-Control": "public, max-age=3600" } });
+};
+
+/** Which S3 object answers a page (extensionless) path, and with what status. */
+async function resolvePage(env, pathname) {
+  // 1. Page rendered at build time (client/scripts/ssg.mjs → ssg/<path>/index.html).
+  const ssgKey = pathname === "/" ? "ssg/index.html" : `ssg${pathname}/index.html`;
+  let res = await signedS3Get(env, ssgKey);
+  if (res.ok) return { key: ssgKey, res, status: 200 };
+
+  // 2. Older builds' prerendered product pages (product/<id>[/<sku>]) — still
+  //    present after a rollback to a client release from before SSG.
+  if (pathname !== "/") {
+    res = await signedS3Get(env, pathname.slice(1));
+    if (res.ok) return { key: pathname.slice(1), res, status: 200 };
+  }
+
+  // 3. A real app route without a rendered page: the SPA shell renders it.
+  if (APP_ROUTES.some((re) => re.test(pathname))) {
+    return { key: "index.html", res: await signedS3Get(env, "index.html"), status: 200 };
+  }
+
+  // 4. Unknown path: the rendered not-found page with a real 404 (no soft 404).
+  //    Builds without it (SSG skipped) fall back to the SPA shell as before.
+  res = await signedS3Get(env, "ssg/__404/index.html");
+  if (res.ok) return { key: "ssg/__404/index.html", res, status: 404 };
+  return { key: "index.html", res: await signedS3Get(env, "index.html"), status: 200 };
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    let key = url.pathname.replace(/^\//, "") || "index.html";
+    const pathname = url.pathname;
+    const isPage = !pathname.slice(pathname.lastIndexOf("/") + 1).includes(".");
 
-    let res = await signedS3Get(env, key);
+    if (isPage) {
+      // One URL per page: no trailing slash, and the old /products/<id> page
+      // (same product as /product/<id>) moves to /product/<id>.
+      if (pathname.length > 1 && pathname.endsWith("/")) return redirect(url, pathname.replace(/\/+$/, ""));
+      const legacy = pathname.match(/^\/products\/([^/]+)$/);
+      if (legacy) return redirect(url, `/product/${legacy[1]}`);
+    }
 
-    // SPA fallback: no file extension + 404 -> serve index.html (client-side route)
-    if (res.status === 404 && !key.includes(".")) {
-      key = "index.html";
+    let key;
+    let res;
+    let status;
+    if (isPage) {
+      ({ key, res, status } = await resolvePage(env, pathname));
+    } else {
+      key = pathname.replace(/^\//, "");
       res = await signedS3Get(env, key);
+      status = res.status;
     }
 
     const headers = new Headers(res.headers);
     headers.delete("set-cookie");
 
-    if (!res.ok) {
-      // 404 / 403 / 5xx: never cache — e.g. a deleted old JS file must not
-      // stay "missing" in the browser for a year.
+    if (!res.ok || status >= 400) {
+      // 404 / 403 / 5xx (incl. the not-found page): never cache — e.g. a deleted
+      // old JS file must not stay "missing" in the browser for a year.
       headers.set("Cache-Control", "no-store");
-    } else if (key === "index.html" || key === "sw.js") {
+    } else if (key === "index.html" || key === "sw.js" || key.startsWith("ssg/")) {
+      // Pages reference this build's hashed JS: never serve a stale one.
       headers.set("Cache-Control", NO_CACHE);
     } else if (!headers.get("Cache-Control")) {
       // No Cache-Control on the S3 object: only hashed build assets are safe
@@ -119,6 +180,6 @@ export default {
     }
     // else: keep the Cache-Control the deploy set on the S3 object.
 
-    return new Response(res.body, { status: res.status, headers });
+    return new Response(res.body, { status, headers });
   },
 };

@@ -7,6 +7,8 @@ const API_URLS = {
   production: 'https://api.urbannook.in/api/v1',
 };
 
+const isServer = typeof window === 'undefined';
+
 // Environment detection
 const getEnvironment = () => {
   // Check if we're in development mode
@@ -14,6 +16,7 @@ const getEnvironment = () => {
     return 'local';
   }
   
+  if (isServer) return 'production';
   // Always use local API when running on localhost, even in production mode
   // This ensures local testing with `npm run start:prod` hits localhost:8000
   const hostname = window.location.hostname;
@@ -32,6 +35,10 @@ const getEnvironment = () => {
 
 // Get current API URL
 export const getApiUrl = () => {
+  // SSR server (client/server.mjs): call the API directly, e.g. http://localhost:8000/api/v1
+  // on the same machine. Falls back to the public API.
+  if (isServer) return globalThis.process?.env?.SSR_API_URL || API_URLS.production;
+
   // Priority 1: Always use local API when running on localhost
   const hostname = window.location.hostname;
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
@@ -62,7 +69,7 @@ export const getCurrentConfig = () => {
   return {
     environment: env,
     apiUrl: API_URLS[env],
-    hostname: window.location.hostname,
+    hostname: isServer ? '(server)' : window.location.hostname,
     isDev: import.meta.env.DEV,
     customEnv: import.meta.env.VITE_APP_ENV
   };

@@ -461,9 +461,11 @@ const HeroCarousel = ({ products = [], onProduct, onVariant, onShop }) => {
             <p className="gl-lbl text-brand mb-3">
               Drop {String(idx + 1).padStart(2, '0')} · Made to order
             </p>
-            <h1 className="font-archivo text-[2.2rem] sm:text-5xl lg:text-6xl font-extrabold leading-[0.95] tracking-tight break-words">
+            {/* The rotating featured product is a heading of its own, not the page's H1:
+                the H1 (below, visually hidden) says what the whole store is. */}
+            <h2 className="font-archivo text-[2.2rem] sm:text-5xl lg:text-6xl font-extrabold leading-[0.95] tracking-tight break-words">
               {f.name}
-            </h1>
+            </h2>
 
             <div className="mt-4 flex items-baseline flex-wrap gap-x-3 gap-y-1">
               {f.variantCount > 1 && (
@@ -807,6 +809,8 @@ const HomePage = () => {
   return (
     <div className="font-inter bg-paper text-ink">
       <SEOHead url="/" />
+      {/* The page's one H1: what the store is (the hero's rotating product names are H2s). */}
+      <h1 className="sr-only">UrbanNook – 3D printed desk lamps, anime katanas and home decor, made in India</h1>
 
       {/* ══ HERO — the drop ══ */}
       <HeroCarousel
