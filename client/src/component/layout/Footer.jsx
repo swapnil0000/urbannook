@@ -4,6 +4,7 @@ import { useSelector } from 'react-redux';
 import { useJoinCommunityMutation } from '../../store/api/userApi';
 import { useUI } from '../../hooks/useRedux';
 import { useGetProductsQuery } from '../../store/api/productsApi';
+import { categoryPath } from '../../utils/categoryUrl';
 
 // Same display names as the header nav (NewHeader.jsx CATEGORY_LABEL).
 const CATEGORY_LABEL = { Lamp: 'Lamps', 'Pen Stand': 'Pen Stands' };
@@ -74,7 +75,7 @@ const Footer = () => {
         <p className="gl-lbl text-white/50 mb-4">Shop</p>
         <ul className="space-y-2 text-sm">
           {categories.map((c) => (
-            <li key={c}><Link to={`/products?category=${encodeURIComponent(c)}`} className="hover:text-white">{CATEGORY_LABEL[c] || c}</Link></li>
+            <li key={c}><Link to={categoryPath(c)} className="hover:text-white">{CATEGORY_LABEL[c] || c}</Link></li>
           ))}
           <li><Link to="/products?tag=best_seller" className="hover:text-white">Bestsellers</Link></li>
           <li><Link to="/products" className="hover:text-white">Shop All</Link></li>

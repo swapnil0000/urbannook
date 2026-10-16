@@ -74,23 +74,41 @@ const saveGuestGiftNote = (noteOptions) => {
 
 const isGuest = () => !localStorage.getItem('authToken');
 
+// The guest cart as stored in this browser. On the SSR server (no
+// localStorage) it is always empty; a server-rendered page loads the real one
+// after hydration with restoreGuestCart, so the first client render matches
+// the HTML.
+const guestCartState = () => {
+  const hasStorage = typeof window !== 'undefined' && !!window.localStorage;
+  const loggedIn = hasStorage && !!localStorage.getItem('authToken');
+  const items = hasStorage && !loggedIn ? loadGuestCart() : [];
+  return {
+    items,
+    totalQuantity: items.reduce((t, i) => t + (i.quantity || 0), 0),
+    totalAmount: items.reduce((t, i) => t + ((i.price || 0) * (i.quantity || 0)), 0),
+    // Boolean only — see GUEST_GIFT_WRAP_KEY comment above for why no price lives here.
+    giftWrap: hasStorage && !loggedIn ? loadGuestGiftWrap() : false,
+    giftWrapNoteOptions: hasStorage && !loggedIn ? loadGuestGiftNote() : ['none'],
+  };
+};
+
 // Load persisted guest cart on app start — only for guests, not logged-in users
-const isLoggedInOnLoad = !!localStorage.getItem('authToken');
-const persistedItems = isLoggedInOnLoad ? [] : loadGuestCart();
 const initialState = {
-  items: persistedItems,
-  totalQuantity: persistedItems.reduce((t, i) => t + (i.quantity || 0), 0),
-  totalAmount: persistedItems.reduce((t, i) => t + ((i.price || 0) * (i.quantity || 0)), 0),
+  ...guestCartState(),
   selections: {}, // Managed by productId: { quantity, variant }
-  // Boolean only — see GUEST_GIFT_WRAP_KEY comment above for why no price lives here.
-  giftWrap: isLoggedInOnLoad ? false : loadGuestGiftWrap(),
-  giftWrapNoteOptions: isLoggedInOnLoad ? ['none'] : loadGuestGiftNote(),
 };
 
 const cartSlice = createSlice({
   name: 'cart',
   initialState,
   reducers: {
+    // After hydrating a server-rendered page: load this browser's guest cart
+    // (the server rendered it empty). No-op change for logged-in users, whose
+    // cart comes from the API (useCartSync).
+    restoreGuestCart: (state) => {
+      if (state.items.length) return;
+      Object.assign(state, guestCartState());
+    },
     updateSelection: (state, action) => {
       const { productId, quantity, variant } = action.payload;
       state.selections[productId] = {
@@ -322,6 +340,6 @@ const cartSlice = createSlice({
   },
 });
 
-export const { addItem, removeItem, updateQuantity, clearCart, syncCartFromProfile, setCartItems, updateSelection, setGiftWrap } = cartSlice.actions;
+export const { restoreGuestCart, addItem, removeItem, updateQuantity, clearCart, syncCartFromProfile, setCartItems, updateSelection, setGiftWrap } = cartSlice.actions;
 
 export default cartSlice.reducer;

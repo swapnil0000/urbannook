@@ -13,7 +13,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
  */
 export default function ImageCarousel({
   images = [],
-  alt = '',
+  alt = '', // string, or (index) => string for a different alt per image
   interval = 3500,
   className = '',
   onImgErr,
@@ -181,7 +181,7 @@ export default function ImageCarousel({
     <div key={k} className={`relative shrink-0 ${extra}`} aria-hidden={k >= count || undefined}>
       <img
         src={src}
-        alt={alt}
+        alt={k >= count ? '' : typeof alt === 'function' ? alt(i) : alt}
         loading={k === 0 && !peek ? 'eager' : 'lazy'}
         fetchPriority={priority && k === 0 ? 'high' : undefined}
         decoding={k === 0 && !peek ? 'sync' : 'async'}

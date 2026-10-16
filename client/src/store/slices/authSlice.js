@@ -1,14 +1,18 @@
 import { createSlice } from '@reduxjs/toolkit';
 
+// On the SSR server there is no localStorage: every page is rendered as a
+// guest, and SessionManager restores the session in the browser after mount.
+const hasStorage = typeof window !== 'undefined' && !!window.localStorage;
+
 const getInitialToken = () => {
   // Token from localStorage (set from API response body)
   // httpOnly cookies are sent automatically by browser, we can't read them
-  const token = localStorage.getItem('authToken');
+  const token = hasStorage ? localStorage.getItem('authToken') : null;
   return token || null;
 };
 
 const initialState = {
-  user: JSON.parse(localStorage.getItem('user') || 'null'),
+  user: hasStorage ? JSON.parse(localStorage.getItem('user') || 'null') : null,
   token: getInitialToken(),
   isAuthenticated: !!getInitialToken(),
 };

@@ -44,6 +44,7 @@ export default function WhatsAppLoginWatcher() {
   const session = useSyncExternalStore(
     subscribeWhatsAppLogin,
     getWhatsAppLoginSession,
+    () => null, // server render: no pending login
   );
 
   const [checkStatus] = useLazyWhatsappLoginStatusQuery();

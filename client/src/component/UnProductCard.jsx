@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import WishlistButton from './WishlistButton';
 import { trackSelectItem } from '../utils/analytics';
 
@@ -45,7 +45,6 @@ const UnProductCard = ({
   badge: badgeOverride,
   showWishlist = true,
 }) => {
-  const navigate = useNavigate();
   const v = firstVariant(p);
   const badge = badgeOverride !== undefined ? badgeOverride : badgeOf(p);
   const img2 = secondImg(p);
@@ -54,17 +53,18 @@ const UnProductCard = ({
   const price = Number(p?.effectivePrice ?? v.variantPrice ?? 0);
   const mrp = Number(p?.effectiveMrp ?? v.variantMrp ?? 0);
 
-  const go = () => {
+  // A real <a href> (not a div with onClick) so search engines can follow
+  // every card to its product page; navigation is still client-side.
+  const track = () => {
     trackSelectItem?.({ itemId: p.productId, itemName: p.productName, itemVariant: v.variantName || '', price: v.variantPrice || 0, listId, listName, index });
-    navigate(href || productHref(p));
   };
 
   return (
-    <div onClick={go} className="gl-pcard group bg-white rounded-none border border-hair overflow-hidden flex flex-col h-full cursor-pointer">
+    <Link to={href || productHref(p)} onClick={track} className="gl-pcard group bg-white rounded-none border border-hair overflow-hidden flex flex-col h-full cursor-pointer">
       <div className="relative aspect-square overflow-hidden bg-surface">
         {badge && <span className="absolute top-2 left-2 z-10 bg-sale text-white gl-lbl text-[7px] px-1.5 py-0.5 rounded-none shadow-sm">{badge}</span>}
         {showWishlist && (
-          <div className="absolute top-2.5 right-2.5 z-10" onClick={(e) => e.stopPropagation()}>
+          <div className="absolute top-2.5 right-2.5 z-10" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
             <WishlistButton productId={p.productId} />
           </div>
         )}
@@ -91,7 +91,7 @@ const UnProductCard = ({
           )}
         </div>
       </div>
-    </div>
+    </Link>
   );
 };
 
