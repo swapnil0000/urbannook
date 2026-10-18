@@ -84,7 +84,10 @@ const BlogPostPage = () => {
       author: { '@type': 'Organization', name: post.author || 'UrbanNook', url: `${SITE}/about-us` },
       publisher: { '@id': `${SITE}/#org` },
       ...(post.tags?.length ? { keywords: post.tags.join(', ') } : {}),
-      ...(products.length ? { about: products.map((p) => ({ '@type': 'Product', name: p.productName, url: `${SITE}/product/${p.productId}` })) } : {}),
+      // Linked products as plain Things: a Product item without offers/reviews is
+      // flagged "invalid" by Google's product snippets (the product page itself
+      // carries the full Product/Offer schema).
+      ...(products.length ? { about: products.map((p) => ({ '@type': 'Thing', name: p.productName, url: `${SITE}/product/${p.productId}` })) } : {}),
     },
     {
       '@context': 'https://schema.org', '@type': 'BreadcrumbList',

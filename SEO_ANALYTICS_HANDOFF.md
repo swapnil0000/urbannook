@@ -197,3 +197,8 @@ Please check after deploy: the BlogPosting result in the Rich Results test, and 
 `GET /api/v1/catalog/google-feed.tsv` also sends `color` (from the variant name; Rainbow → Multicolor), `material`
 (the product's *Material* / *Base Material* spec) and `size` (a `104cm`-style variant tag, else the variant's
 L × B × H). Empty when unknown. Merchant Center reads the feed daily.
+
+
+### Blog schema (2026-10-19)
+`BlogPosting.about` lists linked products as `Thing` (name + URL), not `Product`: Google flags a `Product` without
+`offers`/`review`/`aggregateRating` as an invalid product snippet. Full `Product`/`Offer` schema stays on the product pages.
