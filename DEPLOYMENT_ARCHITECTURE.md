@@ -144,7 +144,8 @@ There is **no server rendering at request time** and no extra process on the pro
 3. The Worker (`infra/cloudflare/urbannook-s3-proxy-prod.js`, `resolvePage`) for a page URL (no file
    extension): `ssg/<path>/index.html` → older `product/*` page → SPA `index.html` for any known app route
    (checkout, account, a product added after the last build…) → otherwise `ssg/__404/index.html` with a
-   real **HTTP 404**. It also **301**s `/products/<id>` → `/product/<id>` and trailing slashes → no slash.
+   real **HTTP 404**. It also **301**s `/products/<id>` → `/product/<id>`, trailing slashes → no slash, and old policy
+   URLs (`/terms` → `/terms-conditions`; `/cancellation-refund[-policy]`, `/shipping-policy` → `/return-policy`).
    `workers_dev = false`: the site is no longer reachable on `*.workers.dev`.
 4. The browser hydrates the HTML (`client/src/main.jsx`, `window.__SSR__` + `__PRELOADED_STATE__`), so
    it doesn't fetch that page's data again.

@@ -148,6 +148,9 @@ export default {
       // One URL per page: no trailing slash, and the old /products/<id> page
       // (same product as /product/<id>) moves to /product/<id>.
       if (pathname.length > 1 && pathname.endsWith("/")) return redirect(url, pathname.replace(/\/+$/, ""));
+      // Old policy URLs still shown in Google → their current pages.
+      const moved = { "/terms": "/terms-conditions", "/cancellation-refund-policy": "/return-policy", "/cancellation-refund": "/return-policy", "/shipping-policy": "/return-policy" }[pathname];
+      if (moved) return redirect(url, moved);
       const legacy = pathname.match(/^\/products\/([^/]+)$/);
       if (legacy) return redirect(url, `/product/${legacy[1]}`);
     }

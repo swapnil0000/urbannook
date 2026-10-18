@@ -173,6 +173,9 @@ const GOOGLE_HEADER = [
   "identifier_exists",
   "item_group_id",
   "product_type",
+  "color",
+  "material",
+  "size",
 ];
 
 // "Anime Wooden Katana" + "Tanjiro Wooden Katana" → "Tanjiro Wooden Katana": when the
@@ -188,6 +191,26 @@ const googleTitle = (productName, vName) => {
   return (standalone ? vName : `${productName} - ${vName}`).slice(0, 150);
 };
 
+// Optional Google attributes (help matching and filters, e.g. "Desk Organisers").
+// color: from the variant name; material: the product's "Material" spec;
+// size: "104cm"-style tags or the variant's L × B × H.
+const COLORS = ["Sky Blue", "Olive Green", "Lavender", "Beige", "White", "Black", "Blue", "Grey", "Gray", "Yellow",
+  "Red", "Orange", "Purple", "Green", "Pink", "Brown", "Gold", "Silver"];
+const variantColor = (name) => {
+  if (/rainbow|multi/i.test(name)) return "Multicolor";
+  return COLORS.find((c) => new RegExp(`\\b${c}\\b`, "i").test(name)) || "";
+};
+const productMaterial = (specs = []) => {
+  const s = specs.find((x) => /^(base\s*)?material$/i.test(String(x?.key || "").trim()));
+  return s ? plain(s.value).slice(0, 200) : "";
+};
+const variantSize = (v) => {
+  const tag = String(v.variantSubTag || "").match(/(\d+(?:\.\d+)?)\s*cm/i);
+  if (tag) return `${tag[1]} cm`;
+  const d = v.dimensions;
+  return d && d.length && d.breadth && d.height ? `${d.length} × ${d.breadth} × ${d.height} cm` : "";
+};
+
 const variantInStock = (p, v) =>
   p.productStatus === "in_stock" &&
   !v.variantOutOfStock &&
@@ -197,7 +220,7 @@ const googleProductFeed = asyncHandler(async (req, res) => {
   // .lean(): variantMrp / variantDes are written by the admin panel but not declared
   // in this repo's schema, so a hydrated document would silently drop them.
   const products = await Product.find({ isPublished: true, isAddon: { $ne: true } })
-    .select("productId productName productDes productStatus productCategory productSubCategory variantDetails")
+    .select("productId productName productDes productStatus productCategory productSubCategory variantDetails specifications")
     .lean();
 
   const rows = [GOOGLE_HEADER.join("\t")];
@@ -216,6 +239,7 @@ const googleProductFeed = asyncHandler(async (req, res) => {
     const fallbackImage = productFallbackImage(p);
     // Single-variant products are standalone items — no item_group_id.
     const groupId = variants.length > 1 ? p.productId : "";
+    const material = productMaterial(p.specifications);
 
     variants.forEach((v, i) => {
       const price =
@@ -255,6 +279,9 @@ const googleProductFeed = asyncHandler(async (req, res) => {
           "no",
           groupId,
           productType,
+          variantColor(vName),
+          material,
+          variantSize(v),
         ]
           .map(tsv)
           .join("\t")
