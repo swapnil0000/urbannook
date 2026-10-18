@@ -149,7 +149,8 @@ Under rule 9 these files are yours; this change is done in the open and needs yo
   step 1 excludes `ssg/*`. The old `product/*` steps stay (now step 5) so a rollback to an older client
   release still works; on an SSG build they remove the old product pages.
 - Worker: serves `ssg/<path>/index.html`, then old `product/*`, then the SPA shell for known app routes,
-  otherwise the not-found page with **HTTP 404**. `/products/<id>` → **301** `/product/<id>`; trailing
+  otherwise the not-found page with **HTTP 404**. `/products/<id>` → **301** `/product/<id>`; old policy URLs (`/terms`, `/cancellation-refund[-policy]`,
+  `/shipping-policy`) → **301** to the current pages; trailing
   slash → 301. `workers_dev = false`.
 - Sitemap and `llms.txt` are written by `ssg.mjs`. The sitemap lists only pages that rendered, leaves out
   non-indexable categories, and has **no `<lastmod>`** (instead of a fake "today").
@@ -190,3 +191,9 @@ API (`server/src/utils/blogHtml.js`): headings, lists, quotes, links and https i
 
 Please check after deploy: the BlogPosting result in the Rich Results test, and that `page_view` fires on
 `/blog` pages like other pages.
+
+
+### Google Merchant feed attributes (2026-10-18)
+`GET /api/v1/catalog/google-feed.tsv` also sends `color` (from the variant name; Rainbow → Multicolor), `material`
+(the product's *Material* / *Base Material* spec) and `size` (a `104cm`-style variant tag, else the variant's
+L × B × H). Empty when unknown. Merchant Center reads the feed daily.
