@@ -7,8 +7,14 @@ import {
   evaluatePromotions,
   buildCartContext,
   promotionReferencesProduct,
+  evaluateConditionTree,
+  variantKey,
+  quantityForConditionLeaf,
+  promotionCouponGateOk,
+  applyBestPromotionDiscount,
 } from "../utils/promotionEngine.util.js";
 import { buildPromotionDisplayList } from "../services/promotionPresentation.service.js";
+import { buildPromotionPricePreview } from "../services/promotionPricePreview.service.js";
 
 // Public: every currently active, in-date-range V2 promotion. Previously
 // returned the RAW Promotion documents (full conditionTree, rewards,
@@ -29,16 +35,16 @@ const getActivePromotionsController = asyncHandler(async (_req, res) => {
 });
 
 // Public: the subset of active promotions that reference this product,
-// either as a condition or as a reward target — mirrors
-// freeShippingOffer.controller.js's getBannerForProductController (a
-// structural "does this apply to this page" filter, not a live cart
-// evaluation). Sanitized the same way as getActivePromotionsController
-// above — see that comment for why.
+// either as a condition or as a reward target — a structural "does this
+// apply to this page" filter, not a live cart evaluation (same pattern the
+// now-deleted legacy getBannerForProductController used). Sanitized the
+// same way as getActivePromotionsController above — see that comment for
+// why.
 const getPromotionsForProductController = asyncHandler(async (req, res) => {
   const { productId } = req.params;
   const all = await getActivePromotions();
-  const matching = all.filter((p) => promotionReferencesProduct(p, productId));
   const { ctx } = await resolveItemsAndContext([{ productId, quantity: 1 }], { subtotal: 0 });
+  const matching = all.filter((p) => promotionReferencesProduct(p, productId, ctx.productMeta.get(String(productId))));
   const display = buildPromotionDisplayList(matching, ctx, {});
   return res.status(200).json(new ApiRes(200, "OK", display, true));
 });
@@ -58,7 +64,7 @@ async function resolveItemsAndContext(items, { subtotal, customerType, orderCoun
   const products = productIds.length
     ? await Product.find(
         { productId: { $in: productIds } },
-        { productId: 1, variantDetails: 1, productCategory: 1, productSubCategory: 1, tags: 1 },
+        { productId: 1, price: 1, variantDetails: 1, productCategory: 1, productSubCategory: 1, tags: 1 },
       ).lean()
     : [];
   const productById = new Map(products.map((p) => [p.productId, p]));
@@ -88,30 +94,27 @@ async function resolveItemsAndContext(items, { subtotal, customerType, orderCoun
     // same as any other display caller not yet supplying context it needs.
     appliedCouponCode: couponCode,
   });
-  return { resolvedItems, ctx };
+  return { resolvedItems, ctx, productById };
 }
 
-// Public: evaluates the posted cart against every active V2 promotion — same
-// request contract as POST /cart-rules/evaluate (evaluateCartRulesController
-// in cartRule.controller.js): { items: [{productId, quantity, selectedVariant}] },
-// client only ever knows a variant by its NAME, this is the one place that
-// resolves name -> sku (via a Product lookup) before calling into
-// promotionEngine.util.js, exactly like cartRule.controller.js already does
-// for the legacy engine.
+// Public: evaluates the posted cart against every active V2 promotion:
+// { items: [{productId, quantity, selectedVariant}] } — client only ever
+// knows a variant by its NAME, this is the one place that resolves
+// name -> sku (via a Product lookup) before calling into
+// promotionEngine.util.js.
 const evaluatePromotionsController = asyncHandler(async (req, res) => {
   const { items, couponCode } = req.body;
-  // subtotal: 0 (display-only evaluation — the real subtotal, post any
-  // legacy cart_rule discount, is checkout's job; conditions needing it
-  // just won't match here, same "optimistic, re-validated at order-creation"
-  // convention the legacy banner system already uses).
+  // subtotal: 0 (display-only evaluation — the real subtotal is checkout's
+  // job; conditions needing it just won't match here, "optimistic,
+  // re-validated at order-creation" — same convention every display
+  // surface in this file already uses).
   const { resolvedItems, ctx } = await resolveItemsAndContext(items, { subtotal: 0, couponCode });
 
   const activePromotions = await getActivePromotions();
   const result = evaluatePromotions(resolvedItems, ctx, activePromotions);
 
   // Map not JSON-serializable — flatten discountCandidatesByProduct to a
-  // plain object, same convention evaluateCartRulesController already uses
-  // for the legacy engine's equivalent field.
+  // plain object.
   return res.status(200).json(
     new ApiRes(
       200,
@@ -149,7 +152,7 @@ const evaluatePromotionsController = asyncHandler(async (req, res) => {
 function hasProductCondition(node) {
   if (!node) return false;
   if (node.op) return (node.children || []).some(hasProductCondition);
-  return node.field === "product";
+  return node.field === "product" || node.field === "productList";
 }
 // Deliberately CONDITION-only (unlike promotionReferencesProduct, which also
 // matches reward targets — right for "does this promotion mention this
@@ -159,13 +162,334 @@ function hasProductCondition(node) {
 function conditionReferencesProduct(node, productId) {
   if (!node) return false;
   if (node.op) return (node.children || []).some((c) => conditionReferencesProduct(c, productId));
-  return node.field === "product" && String(node.productId) === String(productId);
+  if (node.field === "product") return String(node.productId) === String(productId);
+  if (node.field === "productList") return (node.items || []).some((it) => String(it.productId) === String(productId));
+  return false;
 }
 function isPromotionRelevantToCart(promotion, cartProductIds) {
   if (hasProductCondition(promotion.conditionTree)) {
     return cartProductIds.some((id) => conditionReferencesProduct(promotion.conditionTree, id));
   }
   return true;
+}
+
+function appliedPromotionIdsFromResult(result) {
+  const winningDiscountIds = new Set(
+    [...result.discountCandidatesByProduct.values()].flatMap((candidates) => candidates.map((candidate) => candidate.ruleId)),
+  );
+  return new Set(result.matchedPromotions
+    .filter((promotion) => {
+      const rewards = promotion.rewards || [];
+      return !rewards.length || rewards.some((reward) => !["percent_off_product", "flat_off_product", "discounted_product"].includes(reward.type))
+        || winningDiscountIds.has(String(promotion._id));
+    })
+    .map((promotion) => String(promotion._id)));
+}
+
+// ── "Add N more to unlock" recommendations (2026-10) ───────────────────────
+// Powers the storefront's unlock bottom sheet: for a promotion that's close
+// but not yet qualifying, resolve the SAME unmet leaf buildProgressText (in
+// promotionPresentation.service.js) already found into real, in-stock
+// catalog products the customer could add. Generic over product/category/
+// subcategory/tag leaves — never hardcodes a specific offer/product. Kept in
+// this controller (not the presentation service) because it needs DB reads;
+// the presentation service is deliberately pure JSON-shaping with no I/O.
+
+// Mirrors buildProgressText's own AND/OR walk (promotionPresentation.service.js)
+// but returns the unmet LEAF itself instead of pre-rendered text, and only
+// for leaf types that actually name products (product/category/subcategory/
+// tag) — any other unmet leaf (cartSubtotal, geo, schedule, etc.) has no
+// "which products" answer, so recommendations stay empty for those, same as
+// progressText already does for its own "no safe guess" cases.
+function findFirstUnmetProductLeaf(node, ctx) {
+  if (!node) return null;
+  if (node.op) {
+    const children = node.children || [];
+    // A NOT'd subtree has no sensible "add this product" recommendation —
+    // the fix for an unmet NOT (the negated condition is currently TRUE) is
+    // to have LESS of something, which this "add N more to unlock" surface
+    // can never suggest. Treat the whole subtree as having no recommendable
+    // leaf, same as any other non-product leaf type.
+    if (node.op === "NOT") return null;
+    if (node.op === "OR") {
+      const metBranch = children.find((c) => evaluateConditionTree(c, ctx));
+      if (metBranch) return null; // already qualifies via this branch
+      return findFirstUnmetProductLeaf(children[0], ctx);
+    }
+    for (const child of children) {
+      if (!evaluateConditionTree(child, ctx)) return findFirstUnmetProductLeaf(child, ctx);
+    }
+    return null;
+  }
+  if (evaluateConditionTree(node, ctx)) return null;
+  return ["product", "category", "subcategory", "tag", "productList"].includes(node.field) ? node : null;
+}
+
+function findUnmetProductLeaves(node, ctx) {
+  if (!node || evaluateConditionTree(node, ctx)) return [];
+  if (!node.op) return ["product", "productList", "category", "subcategory", "tag"].includes(node.field) ? [node] : [];
+  // Same reasoning as findFirstUnmetProductLeaf — a NOT's unmet leaf isn't
+  // addable, so it contributes nothing here.
+  if (node.op === "NOT") return [];
+  return (node.children || []).flatMap((child) => findUnmetProductLeaves(child, ctx));
+}
+
+function unmetLeaves(node, ctx) {
+  if (!node || evaluateConditionTree(node, ctx)) return [];
+  if (!node.op) return [node];
+  if (node.op === "NOT") return [];
+  return (node.children || []).flatMap((child) => unmetLeaves(child, ctx));
+}
+
+function needsUnavailableCartContext(node) {
+  if (!node) return false;
+  if (node.op) return (node.children || []).some(needsUnavailableCartContext);
+  return ["customerType", "orderCount", "pincode", "state", "country"].includes(node.field);
+}
+
+function didAddedItemAdvancePromotion(promotion, beforeCtx, afterCtx) {
+  if (!beforeCtx || needsUnavailableCartContext(promotion.conditionTree)) return false;
+  const beforeMet = evaluateConditionTree(promotion.conditionTree, beforeCtx);
+  const afterMet = evaluateConditionTree(promotion.conditionTree, afterCtx);
+  if (beforeMet) return false;
+  if (afterMet) return true;
+  return unmetLeaves(promotion.conditionTree, beforeCtx).some((leaf) => {
+    if (!["gte", "eq", "between"].includes(leaf.operator || "gte")) return false;
+    const before = quantityForConditionLeaf(leaf, beforeCtx)
+      ?? (leaf.field === "cartSubtotal" ? beforeCtx.subtotal : leaf.field === "cartQuantity" ? beforeCtx.totalQty : null);
+    const after = quantityForConditionLeaf(leaf, afterCtx)
+      ?? (leaf.field === "cartSubtotal" ? afterCtx.subtotal : leaf.field === "cartQuantity" ? afterCtx.totalQty : null);
+    const threshold = Number(["cartSubtotal", "cartQuantity"].includes(leaf.field) ? leaf.value : leaf.minQuantity ?? 1);
+    return before != null && after != null && before < threshold && after > before;
+  });
+}
+
+function contextBeforeAdd(resolvedItems, ctx, addedItem) {
+  if (!addedItem?.productId || !Number.isFinite(Number(addedItem.quantity)) || Number(addedItem.quantity) <= 0) return null;
+  const productId = String(addedItem.productId);
+  const selectedVariant = addedItem.selectedVariant && addedItem.selectedVariant !== "N/A" ? addedItem.selectedVariant : "";
+  const index = resolvedItems.findIndex((item) => String(item.productId) === productId && (item.selectedVariant || "") === selectedVariant);
+  if (index < 0 || Number(resolvedItems[index].quantity) < Number(addedItem.quantity)) return null;
+  const before = resolvedItems.map((item, i) => i === index
+    ? { ...item, quantity: Number(item.quantity) - Number(addedItem.quantity) }
+    : item).filter((item) => Number(item.quantity) > 0);
+  return buildCartContext(before, {
+    subtotal: Number(addedItem.previousSubtotal) || 0,
+    productMeta: ctx.productMeta,
+    appliedCouponCode: ctx.appliedCouponCode,
+  });
+}
+
+function cardAdvancesLeaf(card, leaf, ctx) {
+  const before = quantityForConditionLeaf(leaf, ctx);
+  if (before == null || !["gte", "eq", "between"].includes(leaf.operator || "gte")) return false;
+  const next = {
+    ...ctx,
+    qtyByProduct: new Map(ctx.qtyByProduct),
+    qtyByProductVariant: new Map(ctx.qtyByProductVariant),
+  };
+  next.qtyByProduct.set(card.productId, (next.qtyByProduct.get(card.productId) || 0) + 1);
+  if (card.sku) {
+    const key = variantKey(card.productId, card.sku);
+    next.qtyByProductVariant.set(key, (next.qtyByProductVariant.get(key) || 0) + 1);
+  }
+  const after = quantityForConditionLeaf(leaf, next);
+  return before < Number(leaf.minQuantity ?? 1) && after > before;
+}
+
+// Shapes one Product doc (+ optionally a specific variant) into the small,
+// storefront-ready card shape the bottom sheet needs — never the raw
+// product/variant document.
+function toRecommendationCard(product, variant) {
+  const v = variant || product.variantDetails?.find((candidate) =>
+    candidate.variantOutOfStock !== true && (candidate.variantQuantity == null || Number(candidate.variantQuantity) > 0));
+  if (!v) return null;
+  const outOfStock = v.variantOutOfStock === true || (v.variantQuantity != null && Number(v.variantQuantity) <= 0);
+  if (outOfStock) return null;
+  return {
+    productId: product.productId,
+    productName: product.productName,
+    variantName: v.variantName || null,
+    sku: v.sku || null,
+    price: v.variantPrice != null ? Number(v.variantPrice) : null,
+    mrp: v.variantMrp != null ? Number(v.variantMrp) : null,
+    image: v.variantImage?.[0] || product.productImg || null,
+  };
+}
+
+function cardsForTarget(product, variantSku) {
+  const variants = variantSku
+    ? product.variantDetails?.filter((variant) => variant.sku === variantSku) || []
+    : product.variantDetails || [];
+  return variants.map((variant) => toRecommendationCard(product, variant)).filter(Boolean);
+}
+
+function benefitForReward(reward) {
+  if (reward.type === "percent_off_product") return `${reward.value}% off`;
+  if (["flat_off_product", "discounted_product"].includes(reward.type)) return `₹${Number(reward.value).toLocaleString("en-IN")} off`;
+  return null;
+}
+
+function cardWithRewardPrice(card, reward) {
+  const offerPrice = applyBestPromotionDiscount(card.price, [reward]);
+  return {
+    ...card,
+    benefitText: benefitForReward(reward),
+    ...(Number.isFinite(offerPrice) && offerPrice < card.price ? { offerPrice } : {}),
+  };
+}
+
+function rewardTargetIsInCart(reward, ctx) {
+  const productId = String(reward.targetProductId);
+  return reward.targetVariantSku
+    ? (ctx.qtyByProductVariant.get(variantKey(productId, reward.targetVariantSku)) || 0) > 0
+    : (ctx.qtyByProduct.get(productId) || 0) > 0;
+}
+
+// A matched condition can still need the customer to add the product that
+// receives the discount. Return only explicit admin-selected reward targets;
+// broad category/all scopes have no finite set to offer in the sheet.
+async function resolveMissingRewardTargets(promotion, ctx) {
+  const discountRewards = (promotion.rewards || [])
+    .filter((reward) => ["percent_off_product", "flat_off_product", "discounted_product"].includes(reward.type));
+  const targets = discountRewards
+    .flatMap((reward) => reward.targetProductId
+      ? [{ productId: reward.targetProductId, variantSku: reward.targetVariantSku || "", reward }]
+      : reward.targetScope?.field === "productList" ? (reward.targetScope.items || []).map((item) => ({ ...item, reward })) : [])
+    .filter((target) => !rewardTargetIsInCart(target, ctx));
+  const products = targets.length ? await Product.find(
+    { productId: { $in: [...new Set(targets.map((target) => String(target.productId)))] }, productStatus: "in_stock", isPublished: { $ne: false } },
+    PRODUCT_RECOMMENDATION_PROJECTION,
+  ).lean() : [];
+  const byId = new Map(products.map((product) => [String(product.productId), product]));
+  const explicitCards = targets.flatMap((target) => {
+    const product = byId.get(String(target.productId));
+    if (!product) return [];
+    return cardsForTarget(product, target.variantSku).map((card) => cardWithRewardPrice(card, target.reward));
+  });
+  const scopedCards = (await Promise.all(discountRewards
+    .filter((reward) => ["category", "subcategory", "tag"].includes(reward.targetScope?.field))
+    .map(async (reward) => {
+      const scope = reward.targetScope;
+      const query = { productStatus: "in_stock", isPublished: { $ne: false } };
+      if (scope.field === "category") query.productCategory = scope.value;
+      else if (scope.field === "subcategory") query.productSubCategory = scope.value;
+      else query.tags = scope.value;
+      const matches = await Product.find(query, PRODUCT_RECOMMENDATION_PROJECTION).limit(12).lean();
+      return matches.flatMap((product) => cardsForTarget(product).map((card) => cardWithRewardPrice(card, reward)));
+    }))).flat();
+  return [...explicitCards, ...scopedCards]
+    .filter((card, index, cards) => cards.findIndex((other) => other.productId === card.productId && other.sku === card.sku) === index)
+    .slice(0, 6);
+}
+
+const PRODUCT_RECOMMENDATION_PROJECTION = "productId productName productImg productStatus variantDetails";
+
+// Resolves a single unmet leaf into up to `limit` real, in-stock, purchasable
+// recommendation cards — a "product" leaf resolves to that exact
+// product/variant; category/subcategory/tag leaves resolve to a handful of
+// real catalog matches (generic DB query, never a hardcoded list).
+async function resolveRecommendationsForLeaf(leaf, { limit = 6 } = {}) {
+  if (!leaf) return [];
+  if (leaf.field === "product") {
+    const product = await Product.findOne(
+      { productId: leaf.productId, productStatus: "in_stock", isPublished: { $ne: false } },
+      PRODUCT_RECOMMENDATION_PROJECTION,
+    ).lean();
+    if (!product) return [];
+    return cardsForTarget(product, leaf.variantSku).slice(0, limit);
+  }
+  // An admin-picked list of specific products/variants — resolve each entry
+  // directly (no catalog query beyond fetching exactly these productIds),
+  // in the admin's own configured order.
+  if (leaf.field === "productList") {
+    const items = leaf.items || [];
+    const productIds = [...new Set(items.map((it) => String(it.productId)))];
+    if (!productIds.length) return [];
+    const products = await Product.find(
+      { productId: { $in: productIds }, productStatus: "in_stock", isPublished: { $ne: false } },
+      PRODUCT_RECOMMENDATION_PROJECTION,
+    ).lean();
+    const byId = new Map(products.map((p) => [p.productId, p]));
+    const cards = [];
+    for (const it of items) {
+      const product = byId.get(String(it.productId));
+      if (!product) continue;
+      cards.push(...cardsForTarget(product, it.variantSku));
+    }
+    return cards.slice(0, limit);
+  }
+  if (!["category", "subcategory", "tag"].includes(leaf.field)) return [];
+  const query = { productStatus: "in_stock", isPublished: { $ne: false } };
+  if (leaf.field === "category") query.productCategory = leaf.value;
+  else if (leaf.field === "subcategory") query.productSubCategory = leaf.value;
+  else query.tags = leaf.value;
+  const products = await Product.find(query, PRODUCT_RECOMMENDATION_PROJECTION).limit(limit * 2).lean();
+  const cards = products.map((p) => toRecommendationCard(p)).filter(Boolean);
+  return cards.slice(0, limit);
+}
+
+// Resolves the promotion's own reward target(s) into the same card shape —
+// so the sheet can show "unlock THIS" distinctly from "add THESE to
+// qualify". Only reward types with an explicit single targetProductId are
+// resolvable this way; a category-wide scoped reward applies to whatever's
+// already in cart (nothing new to picture) and gift_choice has several
+// options (shown via its own existing savingsText/badge, not a single card).
+async function resolveRewardCard(promotion) {
+  const reward = (promotion.rewards || []).find((r) => r.targetProductId);
+  if (!reward) return null;
+  const product = await Product.findOne(
+    { productId: reward.targetProductId, productStatus: "in_stock", isPublished: { $ne: false } },
+    PRODUCT_RECOMMENDATION_PROJECTION,
+  ).lean();
+  if (!product) return null;
+  const variant = reward.targetVariantSku ? product.variantDetails?.find((v) => v.sku === reward.targetVariantSku) : null;
+  if (reward.targetVariantSku && !variant) return null;
+  const card = toRecommendationCard(product, variant);
+  if (!card) return null;
+  return { ...cardWithRewardPrice(card, reward), rewardType: reward.type, rewardValue: reward.value ?? null };
+}
+
+// Mutates `display` in place, attaching `recommendedProducts`/`rewardProduct`
+// to every entry that's actionable (not yet qualifying, but close enough
+// that progressText already names a concrete next step) — skips everything
+// else so an already-qualifying or structurally-unreachable promotion never
+// pays for extra product lookups.
+async function attachRecommendations(display, promotionsById, ctx) {
+  await Promise.all(
+    display.map(async (entry) => {
+      if (entry.qualifying || !entry.progressText || !entry.fullyFunctional) {
+        entry.recommendedProducts = [];
+        entry.rewardProduct = null;
+        if (entry.rewardTargetPending && entry.fullyFunctional) {
+          const promotion = promotionsById.get(entry.id);
+          if (promotion) {
+            entry.recommendedProducts = await resolveMissingRewardTargets(promotion, ctx);
+          }
+        }
+        return;
+      }
+      const promotion = promotionsById.get(entry.id);
+      if (!promotion) { entry.recommendedProducts = []; entry.rewardProduct = null; return; }
+      if (!promotionCouponGateOk(promotion, ctx) || needsUnavailableCartContext(promotion.conditionTree)) {
+        entry.recommendedProducts = [];
+        entry.rewardProduct = null;
+        return;
+      }
+      const leaves = findUnmetProductLeaves(promotion.conditionTree, ctx);
+      const [cardsByLeaf, rewardProduct] = await Promise.all([
+        Promise.all(leaves.map((leaf) => resolveRecommendationsForLeaf(leaf))),
+        resolveRewardCard(promotion),
+      ]);
+      entry.recommendedProducts = cardsByLeaf.flatMap((cards, index) =>
+        cards.filter((card) => cardAdvancesLeaf(card, leaves[index], ctx)))
+        .filter((card, index, cards) => cards.findIndex((other) => other.productId === card.productId && other.sku === card.sku) === index)
+        .slice(0, 6);
+      if (leaves.length > 1 && entry.recommendedProducts.length) entry.progressText = "Add eligible products to move closer to this offer.";
+      entry.rewardProduct = rewardProduct;
+    }),
+  );
+  return display;
 }
 
 // GET /promotions/display/product/:id — PDP. Structural filter (like
@@ -175,8 +499,10 @@ function isPromotionRelevantToCart(promotion, cartProductIds) {
 const getProductDisplayController = asyncHandler(async (req, res) => {
   const { productId } = req.params;
   const all = await getActivePromotions();
-  const relevant = all.filter((p) => promotionReferencesProduct(p, productId) && (p.placements || []).includes("pdp"));
   const { ctx } = await resolveItemsAndContext([{ productId, quantity: 1 }], { subtotal: 0 });
+  const relevant = all.filter(
+    (p) => promotionReferencesProduct(p, productId, ctx.productMeta.get(String(productId))) && (p.placements || []).includes("pdp"),
+  );
   const display = buildPromotionDisplayList(relevant, ctx, { placement: "pdp" });
   return res.status(200).json(new ApiRes(200, "OK", { promotions: display }, true));
 });
@@ -186,21 +512,32 @@ const getProductDisplayController = asyncHandler(async (req, res) => {
 // different placements-field gate, since admin can choose to show a
 // promotion in one but not the other.
 const getCartDisplayController = asyncHandler(async (req, res) => {
-  const { items, placement = "cart", couponCode } = req.body;
+  const { items, placement = "cart", couponCode, addedItem } = req.body;
   if (!["cart", "mini_cart"].includes(placement)) throw new ValidationError('placement must be "cart" or "mini_cart"');
   const cartItems = Array.isArray(items) ? items : [];
   const subtotal = Number(req.body.subtotal) || 0;
 
-  const all = await getActivePromotions();
+  const all = (await getActivePromotions()).filter((p) => p.maxUsesTotal == null || p.usageCount < p.maxUsesTotal);
   const cartProductIds = [...new Set(cartItems.map((i) => String(i.productId)))];
   const relevant = all.filter((p) => (p.placements || []).includes(placement) && isPromotionRelevantToCart(p, cartProductIds));
 
-  const { ctx } = await resolveItemsAndContext(cartItems, { subtotal, couponCode });
-  const matchedResult = evaluatePromotions(cartItems.map((i) => ({ ...i, variantSku: "" })), ctx, all);
-  const appliedPromotionIds = new Set(matchedResult.matchedPromotions.map((p) => String(p._id)));
+  const { resolvedItems, ctx, productById } = await resolveItemsAndContext(cartItems, { subtotal, couponCode });
+  const beforeCtx = contextBeforeAdd(resolvedItems, ctx, addedItem);
+  const matchedResult = evaluatePromotions(resolvedItems, ctx, all);
+  const pricing = buildPromotionPricePreview(resolvedItems, productById, matchedResult);
+  const appliedPromotionIds = appliedPromotionIdsFromResult(matchedResult);
 
   const display = buildPromotionDisplayList(relevant, ctx, { placement, appliedPromotionIds });
-  return res.status(200).json(new ApiRes(200, "OK", { promotions: display }, true));
+  for (const entry of display) {
+    const promotion = relevant.find((p) => String(p._id) === entry.id);
+    entry.actionableForAdd = Boolean(promotion && didAddedItemAdvancePromotion(promotion, beforeCtx, ctx));
+  }
+  // Recommendations power the "add more to unlock" bottom sheet — only
+  // meaningful for the cart surface (checkout display stays text-only; by
+  // then the customer is mid-payment-flow, not browsing to add products).
+  const promotionsById = new Map(relevant.map((p) => [String(p._id), p]));
+  await attachRecommendations(display, promotionsById, ctx);
+  return res.status(200).json(new ApiRes(200, "OK", { promotions: display, pricing }, true));
 });
 
 // POST /promotions/display/checkout — Checkout. Same as cart display but
@@ -217,12 +554,13 @@ const getCheckoutDisplayController = asyncHandler(async (req, res) => {
   const cartProductIds = [...new Set(cartItems.map((i) => String(i.productId)))];
   const relevant = all.filter((p) => (p.placements || []).includes("checkout") && isPromotionRelevantToCart(p, cartProductIds));
 
-  const { ctx } = await resolveItemsAndContext(cartItems, { subtotal, customerType, orderCount, deliveryAddress, couponCode });
-  const matchedResult = evaluatePromotions(cartItems.map((i) => ({ ...i, variantSku: "" })), ctx, all);
-  const appliedPromotionIds = new Set(matchedResult.matchedPromotions.map((p) => String(p._id)));
+  const { resolvedItems, ctx, productById } = await resolveItemsAndContext(cartItems, { subtotal, customerType, orderCount, deliveryAddress, couponCode });
+  const matchedResult = evaluatePromotions(resolvedItems, ctx, all);
+  const pricing = buildPromotionPricePreview(resolvedItems, productById, matchedResult);
+  const appliedPromotionIds = appliedPromotionIdsFromResult(matchedResult);
 
   const display = buildPromotionDisplayList(relevant, ctx, { placement: "checkout", appliedPromotionIds });
-  return res.status(200).json(new ApiRes(200, "OK", { promotions: display }, true));
+  return res.status(200).json(new ApiRes(200, "OK", { promotions: display, pricing }, true));
 });
 
 export {
@@ -232,4 +570,10 @@ export {
   getProductDisplayController,
   getCartDisplayController,
   getCheckoutDisplayController,
+  // Pure, DB-free helpers — exported for unit testing (see
+  // __tests__/unit/promotionRecommendations.test.js).
+  findFirstUnmetProductLeaf,
+  didAddedItemAdvancePromotion,
+  toRecommendationCard,
+  resolveMissingRewardTargets,
 };

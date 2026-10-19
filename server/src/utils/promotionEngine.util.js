@@ -3,14 +3,12 @@ import PromotionUsage from "../model/promotionUsage.model.js";
 
 /**
  * Promotion Engine V2 — the SINGLE evaluation authority for checkout's real
- * charge (as of 2026-10-08; see rp.payment.controller.js's header comment on
- * the discount-application loop for why the previous dual-path/adapter
- * double-evaluation was retired from the money path). The legacy-shaped
- * adapter (promotionToCartRule.adapter.js) still exists and still reads this
- * exact same `promotions` collection — it is NOT removed, only no longer
- * ALSO evaluated a second time at checkout — and remains the correct path for
- * the legacy-shaped display surfaces (PDP/mini-cart banners) that still
- * expect its flattened shape.
+ * charge (as of 2026-10-08, dual-path/adapter double-evaluation retired from
+ * the money path; as of 2026-10-09 the legacy-shaped adapter itself —
+ * promotionToCartRule.adapter.js, cartRule.util.js, and every legacy-shaped
+ * display surface that read it — was deleted entirely. There is exactly one
+ * evaluation path left, this one, used by every caller: real checkout, the
+ * cart/checkout preview, and the Display API).
  *
  * A promotion's `conditionTree` is a recursive AND/OR node:
  *   { op: "AND"|"OR", children: [conditionTree | leafCondition] }
@@ -85,23 +83,40 @@ export async function excludeUsageExhaustedPromotions(promotions, { email, mobil
 
 // Structural scan (not condition evaluation) — does this promotion mention
 // productId anywhere, as a condition ("product" leaf) or as a reward target
-// (targetProductId / giftOptions[].productId)? Used by the public
+// (targetProductId / giftOptions[].productId / a targetScope matching this
+// product's own category/subcategory/tag, or "all")? Used by the public
 // /promotions/for-product/:productId endpoint to return the PDP-relevant
 // subset without evaluating against a real cart — mirrors what
 // freeShippingOffer.util.js's getBannerForProduct does for the legacy
 // system (a structural "does this apply to this page" filter, not a
-// live cart match).
-export function promotionReferencesProduct(promotion, productId) {
+// live cart match). `productMeta` (this one product's own {category,
+// subcategory, tags}) is only needed to resolve a targetScope reward —
+// omit it and scope-based rewards simply won't count as relevant (safe
+// default, same as every other caller that doesn't yet supply context it
+// needs elsewhere in this file).
+export function promotionReferencesProduct(promotion, productId, productMeta) {
   const id = String(productId);
   const walk = (node) => {
     if (!node) return false;
     if (node.op) return (node.children || []).some(walk);
-    return node.field === "product" && String(node.productId) === id;
+    if (node.field === "product") return String(node.productId) === id;
+    if (node.field === "productList") return (node.items || []).some((it) => String(it.productId) === id);
+    return false;
   };
   if (walk(promotion.conditionTree)) return true;
-  return (promotion.rewards || []).some(
-    (r) => String(r.targetProductId) === id || (r.giftOptions || []).some((g) => String(g.productId) === id),
-  );
+  return (promotion.rewards || []).some((r) => {
+    if (String(r.targetProductId) === id) return true;
+    if ((r.giftOptions || []).some((g) => String(g.productId) === id)) return true;
+    if (r.targetScope?.field) {
+      if (r.targetScope.field === "all") return true;
+      if (r.targetScope.field === "productList") return (r.targetScope.items || []).some((it) => String(it.productId) === id);
+      if (!productMeta) return false;
+      if (r.targetScope.field === "category") return productMeta.category === r.targetScope.value;
+      if (r.targetScope.field === "subcategory") return productMeta.subcategory === r.targetScope.value;
+      if (r.targetScope.field === "tag") return Array.isArray(productMeta.tags) && productMeta.tags.includes(r.targetScope.value);
+    }
+    return false;
+  });
 }
 
 const quantityByProduct = (cartItems = []) => {
@@ -109,7 +124,7 @@ const quantityByProduct = (cartItems = []) => {
   for (const item of cartItems) map.set(String(item.productId), (map.get(String(item.productId)) || 0) + (Number(item.quantity) || 0));
   return map;
 };
-const variantKey = (productId, variantSku) => `${productId}::${variantSku}`;
+export const variantKey = (productId, variantSku) => `${productId}::${variantSku}`;
 const quantityByProductVariant = (cartItems = []) => {
   const map = new Map();
   for (const item of cartItems) {
@@ -163,9 +178,13 @@ export const buildCartContext = (cartItems, { subtotal, productMeta, customerTyp
 export const promotionCouponGateOk = (promotion, ctx) =>
   !promotion.linkedCouponCode || promotion.linkedCouponCode === ctx.appliedCouponCode;
 
-const compareOp = (have, operator, value) => {
+// `maxValue` only matters for "between" (inclusive on both ends) — every
+// other operator ignores it, so existing call sites that never pass it
+// (cartSubtotal/cartQuantity/orderCount) are completely unaffected.
+const compareOp = (have, operator, value, maxValue) => {
   if (operator === "lte") return have <= value;
   if (operator === "eq") return have === value;
+  if (operator === "between") return have >= value && have <= Number(maxValue);
   return have >= value; // default "gte"
 };
 
@@ -183,6 +202,77 @@ const qtyMatchingTaxonomy = (ctx, field, value) => {
   return total;
 };
 
+// Count of DISTINCT products (qty > 0) carrying the given category/
+// subcategory/tag value — "3 different products from category X", as
+// opposed to qtyMatchingTaxonomy's "3 units, from however many products".
+// Added 2026-10-10 (Phase 1, admin offer control system) — a leaf's
+// `countMode: "distinct"` selects this; default/absent `countMode` keeps
+// using qtyMatchingTaxonomy, so every existing promotion is unaffected.
+const distinctMatchingTaxonomy = (ctx, field, value) => {
+  let count = 0;
+  for (const [productId, qty] of ctx.qtyByProduct.entries()) {
+    if (qty <= 0) continue;
+    const meta = ctx.productMeta.get(productId);
+    if (!meta) continue;
+    if (field === "category" && meta.category === value) count += 1;
+    if (field === "subcategory" && meta.subcategory === value) count += 1;
+    if (field === "tag" && Array.isArray(meta.tags) && meta.tags.includes(value)) count += 1;
+  }
+  return count;
+};
+
+// Sum of cart quantity across every entry in a `productList` leaf's own
+// explicit `items: [{productId, variantSku?}]` array — an admin-picked SET
+// of specific products/variants, as opposed to a whole category/subcategory/
+// tag. An entry with a `variantSku` counts only that exact variant; an entry
+// without one counts every variant of that product. Generic over any number
+// of items, any mix of products — never assumes a specific offer shape.
+const qtyMatchingProductList = (ctx, items) => {
+  let total = 0;
+  for (const it of items || []) {
+    total += it.variantSku
+      ? ctx.qtyByProductVariant.get(variantKey(String(it.productId), it.variantSku)) || 0
+      : ctx.qtyByProduct.get(String(it.productId)) || 0;
+  }
+  return total;
+};
+
+// Count of DISTINCT list entries actually present (qty > 0) — "any 2
+// DIFFERENT items from this list", mirroring distinctMatchingTaxonomy's
+// units-vs-distinct distinction for category/subcategory/tag.
+const distinctMatchingProductList = (ctx, items) => {
+  let count = 0;
+  for (const it of items || []) {
+    const have = it.variantSku
+      ? ctx.qtyByProductVariant.get(variantKey(String(it.productId), it.variantSku)) || 0
+      : ctx.qtyByProduct.get(String(it.productId)) || 0;
+    if (have > 0) count += 1;
+  }
+  return count;
+};
+
+// The same quantity counters used by the authoritative leaf evaluator,
+// exposed for the cart sheet's before/after progress check.
+export function quantityForConditionLeaf(leaf, ctx) {
+  if (leaf.field === "product") return leaf.variantSku
+    ? ctx.qtyByProductVariant.get(variantKey(String(leaf.productId), leaf.variantSku)) || 0
+    : ctx.qtyByProduct.get(String(leaf.productId)) || 0;
+  if (leaf.field === "productList") return leaf.countMode === "distinct"
+    ? distinctMatchingProductList(ctx, leaf.items) : qtyMatchingProductList(ctx, leaf.items);
+  if (["category", "subcategory", "tag"].includes(leaf.field)) return leaf.countMode === "distinct"
+    ? distinctMatchingTaxonomy(ctx, leaf.field, leaf.value) : qtyMatchingTaxonomy(ctx, leaf.field, leaf.value);
+  return null;
+}
+
+// Shared by evaluateLeaf and promotionRepeatCount — a `product`/taxonomy
+// leaf's quantity side, operator-aware (Phase 1). `countMode: "distinct"`
+// only applies to category/subcategory/tag/productList (a single `product`
+// leaf has nothing to "count distinctly" — it's already one specific product).
+function leafQuantityMatch(leaf, have) {
+  const operator = leaf.operator || "gte";
+  return compareOp(have, operator, Number(leaf.minQuantity ?? 1), leaf.maxQuantity);
+}
+
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 const nowIST = () => new Date(Date.now() + IST_OFFSET_MS);
 
@@ -192,12 +282,25 @@ function evaluateLeaf(leaf, ctx) {
       const have = leaf.variantSku
         ? ctx.qtyByProductVariant.get(variantKey(String(leaf.productId), leaf.variantSku)) || 0
         : ctx.qtyByProduct.get(String(leaf.productId)) || 0;
-      return have >= (leaf.minQuantity || 1);
+      return leafQuantityMatch(leaf, have);
     }
     case "category":
     case "subcategory":
-    case "tag":
-      return qtyMatchingTaxonomy(ctx, leaf.field, leaf.value) >= (leaf.minQuantity || 1);
+    case "tag": {
+      const have = leaf.countMode === "distinct"
+        ? distinctMatchingTaxonomy(ctx, leaf.field, leaf.value)
+        : qtyMatchingTaxonomy(ctx, leaf.field, leaf.value);
+      return leafQuantityMatch(leaf, have);
+    }
+    // An admin-picked SET of specific products/variants — "any of these N
+    // exact items", as opposed to a whole category/subcategory/tag. Same
+    // quantity-operator/countMode mechanics as every other quantity leaf.
+    case "productList": {
+      const have = leaf.countMode === "distinct"
+        ? distinctMatchingProductList(ctx, leaf.items)
+        : qtyMatchingProductList(ctx, leaf.items);
+      return leafQuantityMatch(leaf, have);
+    }
     case "cartSubtotal":
       return compareOp(ctx.subtotal, leaf.operator, Number(leaf.value));
     case "cartQuantity":
@@ -232,6 +335,12 @@ export function evaluateConditionTree(node, ctx) {
   if (node.op) {
     const children = node.children || [];
     if (children.length === 0) return true;
+    // NOT wraps exactly one child and inverts its result — admin's
+    // "category-wide EXCEPT these products" ask at the condition level
+    // (Admin Offer Control System, Phase 2). A missing child (malformed
+    // tree) is treated as "nothing to negate" → true, same as an empty
+    // AND/OR group above.
+    if (node.op === "NOT") return children[0] ? !evaluateConditionTree(children[0], ctx) : true;
     return node.op === "OR"
       ? children.some((c) => evaluateConditionTree(c, ctx))
       : children.every((c) => evaluateConditionTree(c, ctx)); // default AND
@@ -330,20 +439,56 @@ export function applicableCap(candidates) {
   return Math.max(1, ...candidates.map((c) => c.cap ?? 1));
 }
 
+// ── Phase 4 — per-promotion ₹ discount cap (maxDiscountAmount) ────────────
+// A promotion's reward math (percent/flat off, product- or order-level) has
+// no ₹ amount available until checkout, where real unit prices are known —
+// the engine itself only sees quantities/categories (buildCartContext has no
+// price data). So the cap is enforced in the SAME checkout-controller loop
+// that already tracks `promoDiscountByPromotionId` (the running ₹ total per
+// promotion, built for usage reporting — audit 2026-10-10 finding A10),
+// reusing that exact map rather than inventing a second running total.
+// Extracted here (not left inline per flow) specifically so the
+// authenticated and guest checkout flows — two independently-duplicated
+// copies of this same loop — both enforce it identically; a cap mechanism
+// that only one of the two flows applied would itself be a money leak.
+
+/** One lookup built once per checkout from `evaluatePromotions`'s own `matchedPromotions` — promotionId → its maxDiscountAmount, or null for "unlimited" (the default, unchanged behavior). */
+export function buildMaxDiscountAmountMap(matchedPromotions) {
+  return new Map((matchedPromotions || []).map((p) => [String(p._id), p.maxDiscountAmount ?? null]));
+}
+
+/**
+ * How many of this line's units can actually be discounted without pushing
+ * the winning promotion's running ₹ total past its maxDiscountAmount. A
+ * no-op (returns `naturalCap` unchanged) whenever the promotion has no cap
+ * set, which is every existing promotion today.
+ */
+export function clampCapToDiscountBudget(naturalCap, perUnitDiscount, winningRuleId, promoDiscountByPromotionId, maxDiscountAmountByPromotionId) {
+  if (!winningRuleId || !(perUnitDiscount > 0)) return naturalCap;
+  const budget = maxDiscountAmountByPromotionId.get(winningRuleId);
+  if (budget == null) return naturalCap;
+  const spent = promoDiscountByPromotionId.get(winningRuleId) || 0;
+  const remaining = Math.max(0, budget - spent);
+  return Math.min(naturalCap, Math.floor(remaining / perUnitDiscount));
+}
+
+/** Same clamp as above, for a single order-level discount amount (percent_off_order/flat_off_order) rather than a per-unit product cap. */
+export function clampOrderDiscountToBudget(amount, winningPromotionId, promoDiscountByPromotionId, maxDiscountAmountByPromotionId) {
+  if (!winningPromotionId || !(amount > 0)) return amount;
+  const budget = maxDiscountAmountByPromotionId.get(winningPromotionId);
+  if (budget == null) return amount;
+  const spent = promoDiscountByPromotionId.get(winningPromotionId) || 0;
+  return Math.max(0, Math.min(amount, budget - spent));
+}
+
 /**
  * Resolves which matched promotions actually stay active after exclusivity/
- * grouping rules. Full non-stackable per-product conflict resolution is a
- * later phase (see the plan) — this handles the two explicit, order-wide
- * rules that are unambiguous today: `exclusive` and `promotionGroup`.
- *
- * NOT handled here: `stackable` (audit 2026-10-08 Decision Register item —
- * its intended semantics relative to `exclusive`/`promotionGroup` were
- * ambiguous from the schema/code alone: does `stackable:false` mean "acts
- * like exclusive but without winning priority", "suppresses only OTHER
- * stackable:false promotions", or something else? Deliberately left
- * unimplemented rather than guessed — the field still persists on save
- * (admin can toggle it), it simply has no runtime effect yet, same as
- * before this audit. Needs an explicit product decision before wiring.
+ * grouping rules. Handles the two explicit, order-wide rules: `exclusive`
+ * and `promotionGroup`. Per-PRODUCT conflict resolution (two different,
+ * non-exclusive, non-grouped promotions both targeting the same product)
+ * is a separate, narrower pass — see resolveProductWinners below,
+ * which is where `stackable` actually gets enforced now (decided
+ * 2026-10-10 — see that function's header for the full rationale).
  */
 function resolveStacking(matched) {
   const exclusiveOnes = matched.filter((p) => p.exclusive);
@@ -369,7 +514,7 @@ function resolveStacking(matched) {
  *   matchedPromotions: object[],
  *   discountCandidatesByProduct: Map<string, {type, value, variantSku?}[]>,
  *   orderLevelDiscounts: {type:'percent_off_order'|'flat_off_order', value:number, promotionId:string}[],
- *   freeGifts: {promotionId:string, name:string, targetProductId?:string, targetVariantSku?:string, giftOptions?:object[]}[],
+ *   freeGifts: {promotionId:string, name:string, targetProductId?:string, targetVariantSku?:string, quantity?:number, giftOptions?:object[]}[],
  *   bundleRewards: {promotionId:string, targetProductId:string, targetVariantSku?:string, bundlePrice:number}[],
  *   cheapestItemAdjustments: {promotionId:string, mode:'free'|'discount', value?:number}[],
  *   storeCreditGrants: {promotionId:string, amount:number}[],
@@ -388,17 +533,95 @@ function resolveStacking(matched) {
 function promotionRepeatCount(node, ctx) {
   if (!node) return Infinity;
   if (node.op) {
+    // A NOT'd subtree has no natural "how many times satisfied" notion —
+    // same "doesn't limit the count" treatment every non-product leaf
+    // already gets, not the negated child's own count (which would mean
+    // something entirely different: how many times the UN-negated form
+    // would have matched).
+    if (node.op === "NOT") return Infinity;
     const childCounts = (node.children || []).map((c) => promotionRepeatCount(c, ctx));
     if (!childCounts.length) return Infinity;
     return node.op === "OR" ? Math.max(...childCounts) : Math.min(...childCounts);
   }
   if (node.field === "product") {
+    // Only "gte" (the default, and every pre-Phase-1 promotion) has a
+    // meaningful "how many times satisfied" notion — floor(have/minQuantity)
+    // for "2+ of X" repeating every 2 units. lte/eq/between are fixed-window
+    // gates (e.g. "exactly 3" or "between 2 and 4") that don't naturally
+    // repeat — same "doesn't limit the count" treatment every non-product
+    // leaf already gets, not a new exception.
+    if ((node.operator || "gte") !== "gte") return Infinity;
     const have = node.variantSku
       ? ctx.qtyByProductVariant.get(variantKey(String(node.productId), node.variantSku)) || 0
       : ctx.qtyByProduct.get(String(node.productId)) || 0;
     return Math.floor(have / (node.minQuantity || 1));
   }
   return Infinity; // non-product condition doesn't limit the repeat count
+}
+
+// ── Phase 3 — quantity tiers (Admin Offer Control System) ─────────────────
+// A reward's `tiers: [{minQuantity, value}]` resolves its applied value off
+// the SAME live quantity figure promotionRepeatCount's own condition
+// measures — NOT the reward target's quantity, since the condition and the
+// reward target can legitimately be different products (e.g. "2+ of X"
+// gating a tiered discount on Y). AND/OR take the min/max across children,
+// same convention as promotionRepeatCount; a NOT'd or non-product
+// condition has no meaningful quantity figure here (returns 0, so tiers
+// never apply and resolveTierValue falls back to the flat `value` field).
+function promotionTriggerQuantity(node, ctx) {
+  // Infinity, NOT 0, for "this leaf/subtree has no quantity opinion" — same
+  // identity-for-Math.min convention promotionRepeatCount already uses.
+  // Returning 0 here would be WRONG: inside an AND group (e.g. "2+ Katana
+  // AND cartSubtotal >= 1000", or "2+ Katana AND NOT stand-pricey" — both
+  // completely ordinary condition shapes), Math.min would let that single
+  // non-quantity sibling poison the whole group down to 0 regardless of the
+  // other children's real quantities, silently breaking every tiered reward
+  // on any promotion whose condition combines a product leaf with anything
+  // else (confirmed via combination testing, 2026-10-19 — tiers resolved to
+  // the flat-value fallback for EVERY such promotion shape before this fix).
+  if (!node) return Infinity;
+  if (node.op) {
+    if (node.op === "NOT") return Infinity;
+    const quantities = (node.children || []).map((c) => promotionTriggerQuantity(c, ctx));
+    if (!quantities.length) return Infinity;
+    return node.op === "OR" ? Math.max(...quantities) : Math.min(...quantities);
+  }
+  if (node.field === "product") {
+    return node.variantSku
+      ? ctx.qtyByProductVariant.get(variantKey(String(node.productId), node.variantSku)) || 0
+      : ctx.qtyByProduct.get(String(node.productId)) || 0;
+  }
+  if (node.field === "productList") {
+    return node.countMode === "distinct" ? distinctMatchingProductList(ctx, node.items) : qtyMatchingProductList(ctx, node.items);
+  }
+  if (["category", "subcategory", "tag"].includes(node.field)) {
+    return node.countMode === "distinct" ? distinctMatchingTaxonomy(ctx, node.field, node.value) : qtyMatchingTaxonomy(ctx, node.field, node.value);
+  }
+  return Infinity; // non-quantity condition (cartSubtotal, geo, schedule, ...) — doesn't limit which tier applies
+}
+
+/**
+ * Resolves a reward's effective value: whichever tier's minQuantity the
+ * live trigger quantity has crossed (highest qualifying tier wins — never
+ * cumulative/stacked across tiers), or the flat `value` field when `tiers`
+ * is absent/empty/none crossed. Backward compatible by construction — a
+ * reward with no `tiers` always returns its own `value` unchanged.
+ */
+function resolveTierValue(reward, conditionTree, ctx) {
+  // Admin validation always requires a real `value` even when tiers is set
+  // (it's the documented fallback), so this path is normally unreachable —
+  // guarded anyway so a malformed/API-written promotion degrades to "no
+  // discount" instead of producing NaN through the price math.
+  const safeFlatValue = Number.isFinite(reward.value) ? reward.value : 0;
+  if (!Array.isArray(reward.tiers) || reward.tiers.length === 0) return safeFlatValue;
+  const have = promotionTriggerQuantity(conditionTree, ctx);
+  let applicable = null;
+  for (const tier of reward.tiers) {
+    if (have >= Number(tier.minQuantity) && (!applicable || Number(tier.minQuantity) > Number(applicable.minQuantity))) {
+      applicable = tier;
+    }
+  }
+  return applicable ? Number(applicable.value) : safeFlatValue;
 }
 
 // combinesWithCoupons (default true, audit 2026-10-08 fix — previously
@@ -411,6 +634,140 @@ function promotionRepeatCount(node, ctx) {
 // always wins this check.
 const promotionCombinesWithCouponsOk = (promotion, ctx) =>
   promotion.combinesWithCoupons !== false || !ctx.appliedCouponCode || Boolean(promotion.linkedCouponCode);
+
+// Which product(s) a percent_off_product/flat_off_product/discounted_product
+// reward actually discounts. Two shapes, mutually exclusive (validated at
+// write time, admin-side `validateRewards`):
+//   - `targetProductId` (+ optional `targetVariantSku`) — ONE specific
+//     product, exactly as before this function existed. Every pre-existing
+//     promotion keeps working unchanged.
+//   - `targetScope: { field: "category"|"subcategory"|"tag"|"all", value? }`
+//     — resolves to every DISTINCT product currently in the cart matching
+//     that taxonomy value ("all" = every product in the cart, no filter).
+//     This is what "X% off everything in category Y" / "X% off the whole
+//     order's products" actually are — a reward whose target is a SET,
+//     resolved against the live cart, reusing the exact same taxonomy
+//     vocabulary conditionTree leaves already use. A product only ever
+//     enters the set if it's actually in the cart — there is no "discount a
+//     product that isn't there" case to handle.
+function resolveRewardTargetProductIds(reward, ctx) {
+  if (reward.targetProductId) return [String(reward.targetProductId)];
+  const scope = reward.targetScope;
+  if (!scope || !scope.field) return [];
+  const cartProductIds = [...ctx.qtyByProduct.keys()];
+  // Reward-level exclusion (Admin Offer Control System, Phase 2) — distinct
+  // from condition-level NOT (which gates whether the promotion matches at
+  // all): this filters WHICH resolved productIds actually get the
+  // discount, e.g. "10% off category X EXCEPT these 2 products". Applied
+  // uniformly at the end so every scope.field below gets it for free,
+  // rather than threading it into each branch separately.
+  const excludeIds = new Set((scope.excludeProductIds || []).map(String));
+  const applyExclusion = (ids) => (excludeIds.size ? ids.filter((pid) => !excludeIds.has(pid)) : ids);
+  if (scope.field === "all") return applyExclusion(cartProductIds);
+  if (scope.field === "productList") {
+    const listIds = new Set((scope.items || []).map((it) => String(it.productId)));
+    return applyExclusion(cartProductIds.filter((pid) => listIds.has(pid)));
+  }
+  if (!["category", "subcategory", "tag"].includes(scope.field)) return [];
+  return applyExclusion(cartProductIds.filter((pid) => {
+    const meta = ctx.productMeta.get(pid);
+    if (!meta) return false;
+    if (scope.field === "category") return meta.category === scope.value;
+    if (scope.field === "subcategory") return meta.subcategory === scope.value;
+    return Array.isArray(meta.tags) && meta.tags.includes(scope.value);
+  }));
+}
+
+// True iff `candidate`'s own promotion should win a per-product conflict
+// over the current `winner`'s promotion — see resolveProductWinners.
+// Exported — rp.payment.controller.js's Phase 5 cheapest-item wiring reuses
+// this exact tiebreak to pick ONE winning promotion when more than one
+// cheapestItemAdjustments entry matched, instead of a second copy of the
+// same priority/stackable/createdAt logic.
+export function isBetterPromoForProduct(candidate, winner) {
+  if (candidate.priority !== winner.priority) return candidate.priority > winner.priority;
+  // Equal priority: a promotion explicitly marked non-stackable is saying
+  // "don't let anything else touch this product" — that refusal should win
+  // over a promotion that's fine sharing, rather than being silently
+  // overridden by whichever happened to be best-priced.
+  if (candidate.stackable !== winner.stackable) return !candidate.stackable;
+  // Still tied: earliest-created wins — same deterministic tiebreak
+  // getActivePromotions' own query sort already uses, so this never
+  // depends on Map/array iteration order.
+  return new Date(candidate.createdAt || 0) < new Date(winner.createdAt || 0);
+}
+
+/**
+ * Enforces "only one promotion ever discounts/gifts a given product" —
+ * decided 2026-10-10 (previously left unimplemented, see resolveStacking's
+ * prior header comment). If two or more DIFFERENT matched promotions both
+ * have a reward touching the same product — a product-level discount
+ * (explicit targetProductId, or targetScope resolving to it) OR a
+ * free_product gift naming it — only the single BEST promotion's claim on
+ * that product survives, chosen by (highest priority, then stackable:false
+ * beats stackable:true, then earliest-created as a final deterministic
+ * tiebreak). This is what makes `stackable`/`priority` real, enforced rules
+ * instead of admin-only labels, and it's a strict single-winner choice
+ * (never compounds two discounts on one product) deliberately — compounding
+ * would multiply the surface for a rounding/order-of-operations bug that
+ * over-discounts, which is the one failure mode a discount engine can
+ * never have.
+ *
+ * free_product and a product-level discount are different reward
+ * mechanisms, but both can target the exact same product from two
+ * different promotions — the winner contest has to run across BOTH
+ * together, not just within discountCandidatesByProduct alone (audit
+ * finding, 2026-10-18: a lower-priority promotion's free gift of a product
+ * a higher-priority promotion was already discounting used to go through
+ * untouched). `gift_choice` has no single target product (customer picks
+ * from `giftOptions`) and is left untouched by this pass.
+ *
+ * Candidates from the SAME winning promotion (e.g. two reward rows in one
+ * promotion both targeting this product) are untouched by this pass —
+ * applyBestPromotionDiscount already picks the best among same-promotion
+ * discount candidates exactly as before.
+ */
+function resolveProductWinners(discountCandidatesByProduct, freeGifts, promoMetaById) {
+  const fallbackMeta = { priority: 0, stackable: true, createdAt: null };
+
+  const ruleIdsByProduct = new Map();
+  for (const [productId, candidates] of discountCandidatesByProduct.entries()) {
+    ruleIdsByProduct.set(productId, new Set(candidates.map((c) => c.ruleId).filter(Boolean)));
+  }
+  for (const gift of freeGifts) {
+    if (!gift.targetProductId) continue;
+    const set = ruleIdsByProduct.get(gift.targetProductId) || new Set();
+    set.add(gift.promotionId);
+    ruleIdsByProduct.set(gift.targetProductId, set);
+  }
+
+  const winnerByProduct = new Map();
+  for (const [productId, ruleIdSet] of ruleIdsByProduct.entries()) {
+    const ruleIds = [...ruleIdSet];
+    let winnerId = ruleIds[0];
+    let winnerMeta = promoMetaById.get(winnerId) || fallbackMeta;
+    for (const id of ruleIds.slice(1)) {
+      const meta = promoMetaById.get(id) || fallbackMeta;
+      if (isBetterPromoForProduct(meta, winnerMeta)) {
+        winnerId = id;
+        winnerMeta = meta;
+      }
+    }
+    winnerByProduct.set(productId, winnerId);
+  }
+
+  for (const [productId, candidates] of discountCandidatesByProduct.entries()) {
+    const winnerId = winnerByProduct.get(productId);
+    if (winnerId == null || candidates.length <= 1) continue;
+    discountCandidatesByProduct.set(productId, candidates.filter((c) => c.ruleId === winnerId));
+  }
+
+  return freeGifts.filter((gift) => {
+    if (!gift.targetProductId) return true;
+    const winnerId = winnerByProduct.get(gift.targetProductId);
+    return winnerId == null || gift.promotionId === winnerId;
+  });
+}
 
 export const evaluatePromotions = (cartItems, ctx, activePromotions) => {
   const matched = resolveStacking(
@@ -426,6 +783,9 @@ export const evaluatePromotions = (cartItems, ctx, activePromotions) => {
   const cheapestItemAdjustments = [];
   const storeCreditGrants = [];
   let freeShipping = false;
+  const promoMetaById = new Map(
+    matched.map((p) => [String(p._id), { priority: p.priority || 0, stackable: p.stackable !== false, createdAt: p.createdAt || null }]),
+  );
 
   for (const promo of matched) {
     // Clamped to a large finite sentinel — Infinity survives in-process but
@@ -445,34 +805,77 @@ export const evaluatePromotions = (cartItems, ctx, activePromotions) => {
         case "percent_off_product":
         case "flat_off_product":
         case "discounted_product": {
-          const productId = String(reward.targetProductId);
-          const list = discountCandidatesByProduct.get(productId) || [];
-          // discountAllUnits: "buy N, get M% off EVERY qualifying unit" —
-          // once the condition is met at all, the cap is the REAL cart
-          // quantity of the target (not the condition's repeat count), so
-          // e.g. "2+ of X" with 5 in cart discounts all 5, not floor(5/2)=2.
-          // Scoped by variant when the reward itself targets one — same
-          // identity rule as everywhere else (SKU, not name).
-          const rewardCap = reward.discountAllUnits
-            ? Math.max(1, reward.targetVariantSku
-                ? (ctx.qtyByProductVariant.get(variantKey(productId, reward.targetVariantSku)) || 0)
-                : (ctx.qtyByProduct.get(productId) || 0))
-            : cap;
-          // ruleId groups sibling reward lines of the SAME promotion so they
-          // share one cap instead of each independently getting its own —
-          // see createRuleBudgetTracker in rp.payment.controller.js and the
-          // matching comment in cartRule.util.js's evaluateCartRules.
-          list.push({ type: reward.type, value: reward.value, cap: rewardCap, ruleId: String(promo._id), ...(reward.targetVariantSku ? { variantSku: reward.targetVariantSku } : {}) });
-          discountCandidatesByProduct.set(productId, list);
+          // A scoped reward (targetScope: category/subcategory/tag/all) has
+          // no single "trigger product" to cap against — by definition it
+          // means "every matching unit currently in the cart", so it always
+          // uses the real cart quantity, same as discountAllUnits would for
+          // a single-product reward. targetVariantSku only makes sense
+          // paired with an explicit single targetProductId (validated
+          // admin-side), so it's never read for a scoped reward.
+          const isScoped = !reward.targetProductId && !!reward.targetScope;
+          const targetProductIds = resolveRewardTargetProductIds(reward, ctx);
+          // Phase 3 — resolved ONCE per reward (not per product): the tier
+          // is determined by the promotion's own condition quantity, the
+          // same for every product this reward line touches.
+          const effectiveValue = resolveTierValue(reward, promo.conditionTree, ctx);
+          for (const productId of targetProductIds) {
+            const list = discountCandidatesByProduct.get(productId) || [];
+            // discountAllUnits: "buy N, get M% off EVERY qualifying unit" —
+            // once the condition is met at all, the cap is the REAL cart
+            // quantity of the target (not the condition's repeat count), so
+            // e.g. "2+ of X" with 5 in cart discounts all 5, not floor(5/2)=2.
+            // Scoped by variant when the reward itself targets one — same
+            // identity rule as everywhere else (SKU, not name).
+            // Math.min with `cap` here (not a bare full-quantity grant) so an
+            // explicit maxApplications still bounds a scoped reward — `cap`
+            // already defaults to Number.MAX_SAFE_INTEGER when nothing
+            // constrains it (no product leaf, no maxApplications), so this
+            // is a no-op in that case and only takes effect when the admin
+            // actually set a limit (audit finding, 2026-10-18: previously
+            // ignored maxApplications entirely for scoped rewards).
+            const rewardCap = isScoped
+              ? Math.min(Math.max(1, ctx.qtyByProduct.get(productId) || 0), cap)
+              : reward.discountAllUnits
+                ? Math.max(1, reward.targetVariantSku
+                    ? (ctx.qtyByProductVariant.get(variantKey(productId, reward.targetVariantSku)) || 0)
+                    : (ctx.qtyByProduct.get(productId) || 0))
+                : cap;
+            // ruleId groups sibling reward lines of the SAME promotion so they
+            // share one cap instead of each independently getting its own —
+            // see createRuleBudgetTracker in rp.payment.controller.js and the
+            // matching comment in cartRule.util.js's evaluateCartRules.
+            list.push({ type: reward.type, value: effectiveValue, cap: rewardCap, ruleId: String(promo._id), ...(!isScoped && reward.targetVariantSku ? { variantSku: reward.targetVariantSku } : {}) });
+            discountCandidatesByProduct.set(productId, list);
+          }
           break;
         }
         case "percent_off_order":
         case "flat_off_order":
           orderLevelDiscounts.push({ type: reward.type, value: reward.value, promotionId: String(promo._id) });
           break;
-        case "free_product":
-          freeGifts.push({ promotionId: String(promo._id), name: promo.name, targetProductId: reward.targetProductId, targetVariantSku: reward.targetVariantSku });
+        case "free_product": {
+          // Scales with the SAME repeat count (cap) product-level rewards
+          // already use — "buy 2 get 1 free" crossed twice (4 qualifying
+          // units) grants 2 free units, not a hardcoded 1 regardless of how
+          // many times the condition is actually satisfied (audit
+          // 2026-10-10, finding A6). maxApplications (already folded into
+          // `cap` above) still clamps this the same way it clamps every
+          // other reward.
+          //
+          // Guard: `cap` is Number.MAX_SAFE_INTEGER when the condition tree
+          // has no product leaf at all (e.g. a pure cartSubtotal condition)
+          // AND maxApplications is unset — that sentinel is safe for
+          // product-level rewards because a downstream Math.min(realCartQty,
+          // cap) always bounds it, but free_product creates BRAND NEW order
+          // items with no existing cart quantity to clamp against. Without
+          // this guard, "spend ₹500, get a free gift" would try to grant
+          // ~9 quadrillion free units. Falls back to the sensible default
+          // (grant it once) whenever nothing actually bounds the repeat
+          // count.
+          const freeGiftQuantity = cap === Number.MAX_SAFE_INTEGER ? 1 : cap;
+          freeGifts.push({ promotionId: String(promo._id), name: promo.name, targetProductId: reward.targetProductId, targetVariantSku: reward.targetVariantSku, quantity: freeGiftQuantity });
           break;
+        }
         case "gift_choice":
           freeGifts.push({ promotionId: String(promo._id), name: promo.name, giftOptions: reward.giftOptions || [] });
           break;
@@ -483,11 +886,21 @@ export const evaluatePromotions = (cartItems, ctx, activePromotions) => {
           bundleRewards.push({ promotionId: String(promo._id), targetProductId: reward.targetProductId, targetVariantSku: reward.targetVariantSku, bundlePrice: reward.bundlePrice });
           break;
         case "cheapest_item_free":
-          cheapestItemAdjustments.push({ promotionId: String(promo._id), mode: "free" });
+        case "cheapest_item_discount": {
+          // Phase 5 — optional targetScope narrows which order lines the
+          // "cheapest" search considers (e.g. "cheapest item IN category X
+          // free") — reuses the exact same scope-resolution Phase A built
+          // for product-level discounts. Absent targetScope = whole order,
+          // unchanged from before this field existed.
+          const scopeProductIds = reward.targetScope ? resolveRewardTargetProductIds(reward, ctx) : null;
+          cheapestItemAdjustments.push({
+            promotionId: String(promo._id),
+            mode: reward.type === "cheapest_item_free" ? "free" : "discount",
+            value: reward.type === "cheapest_item_discount" ? reward.value : undefined,
+            scopeProductIds,
+          });
           break;
-        case "cheapest_item_discount":
-          cheapestItemAdjustments.push({ promotionId: String(promo._id), mode: "discount", value: reward.value });
-          break;
+        }
         case "store_credit":
           storeCreditGrants.push({ promotionId: String(promo._id), amount: reward.storeCreditAmount || 0 });
           break;
@@ -497,7 +910,9 @@ export const evaluatePromotions = (cartItems, ctx, activePromotions) => {
     }
   }
 
-  return { matchedPromotions: matched, discountCandidatesByProduct, orderLevelDiscounts, freeGifts, bundleRewards, cheapestItemAdjustments, storeCreditGrants, freeShipping };
+  const resolvedFreeGifts = resolveProductWinners(discountCandidatesByProduct, freeGifts, promoMetaById);
+
+  return { matchedPromotions: matched, discountCandidatesByProduct, orderLevelDiscounts, freeGifts: resolvedFreeGifts, bundleRewards, cheapestItemAdjustments, storeCreditGrants, freeShipping };
 };
 
 export const getDiscountCandidatesForItem = (discountCandidatesByProduct, productId, variantSku) => {

@@ -29,8 +29,12 @@ const applyCouponCodeController = asyncHandler(async (req, res) => {
 });
 
 const getAllCouponCodeController = asyncHandler(async (req, res) => {
-  const { userId, code } = req.body;
-  const result = await getAllCouponCodeService({ userId, code });
+  const { userId, code, items } = req.body;
+  // Only used for guests (no userId) — a logged-in user's cart is read
+  // server-side instead (see getAllCouponCodeService), so this is never
+  // trusted as the source of truth when userId is present.
+  const cartProductIds = Array.isArray(items) ? items.map((i) => i.productId).filter(Boolean) : [];
+  const result = await getAllCouponCodeService({ userId, code, cartProductIds });
   return res
     .status(result.statusCode)
     .json(

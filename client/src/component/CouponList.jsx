@@ -3,10 +3,10 @@ import { useGetAvailableCouponsQuery, useApplyCouponMutation } from '../store/ap
 import { useUI, useAuth } from '../hooks/useRedux';
 import { calcLocalDiscount } from '../utils/couponDiscount';
 
-const CouponList = ({ onCouponApplied, userId, isGuest, cartTotal }) => {
+const CouponList = ({ onCouponApplied, userId, isGuest, cartTotal, items }) => {
   const [applyingCode, setApplyingCode] = useState(null);
 
-  const { data: couponsData, isLoading, error } = useGetAvailableCouponsQuery(userId);
+  const { data: couponsData, isLoading, error } = useGetAvailableCouponsQuery({ userId, items });
   const [applyCoupon] = useApplyCouponMutation();
   const { showNotification } = useUI();
   const { user } = useAuth();

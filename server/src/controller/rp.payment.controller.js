@@ -12,6 +12,7 @@ import Cart from "../model/user.cart.model.js";
 import env from "../config/envConfigSetup.js";
 import Coupon from "../model/coupon.model.js";
 import CouponUsage from "../model/couponUsage.model.js";
+import { couponProductGateOk } from "../services/coupon.code.service.js";
 import PromotionUsage from "../model/promotionUsage.model.js";
 import Promotion from "../model/promotion.model.js";
 import { backfillUserProfileFromCheckout, PLACEHOLDER_NAME } from "../services/user.profile.service.js";
@@ -76,6 +77,97 @@ function capDiscountedQuantity(oi, fullUnitPrice, discountedUnitPrice, cap = 1) 
     variantSku: oi.variantSku,
     productSnapshot: { ...oi.productSnapshot, quantity: remainder, priceAtPurchase: fullUnitPrice, isPromotionalGift: false },
   };
+}
+
+// Phase 5 — cheapest_item_free/cheapest_item_discount. Adjusts exactly ONE
+// unit of `oi` (not its whole line quantity, even if quantity > 1 — "the
+// cheapest item" is singular), same remainder-line split pattern as
+// capDiscountedQuantity above, reused rather than reinvented.
+function applyCheapestItemAdjustment(oi, mode, value) {
+  const quantity = oi.productSnapshot.quantity;
+  const fullPrice = oi.productSnapshot.priceAtPurchase;
+  const adjustedPrice = mode === "free" ? 0 : Math.max(0, Math.round(fullPrice * (1 - Number(value || 0) / 100)));
+  oi.productSnapshot.priceAtPurchase = adjustedPrice;
+  if (adjustedPrice === 0) oi.productSnapshot.isPromotionalGift = true;
+  const amount = fullPrice - adjustedPrice;
+  if (quantity <= 1) return { amount, remainderLine: null };
+  const remainder = quantity - 1;
+  oi.productSnapshot.quantity = 1;
+  return {
+    amount,
+    remainderLine: {
+      productId: oi.productId,
+      variantSku: oi.variantSku,
+      productSnapshot: { ...oi.productSnapshot, quantity: remainder, priceAtPurchase: fullPrice, isPromotionalGift: false },
+    },
+  };
+}
+
+// Phase 5 — picks the single winning cheapestItemAdjustments entry (same
+// priority/stackable/createdAt tiebreak as resolveProductWinners elsewhere
+// in this engine, reused via isBetterPromoForProduct) and applies it to
+// whichever order line currently has the LOWEST post-discount unit price
+// (CURRENT price, not list price — "cheapest" means cheapest to the
+// customer right now, consistent with discounts already baked in by the
+// per-item loop above this is called after), optionally narrowed to the
+// reward's own targetScope. A free_product gift line or an already-zeroed
+// line never counts as a candidate — those aren't "paid items" to begin
+// with. No-op (returns unchanged orderItems) when nothing qualifies.
+function applyCheapestItemReward(orderItems, cheapestItemAdjustments, matchedPromotions, promoDiscountByPromotionId, discountCandidatesByProduct, maxDiscountAmountByPromotionId) {
+  if (!cheapestItemAdjustments?.length) return;
+  const metaById = new Map(matchedPromotions.map((p) => [String(p._id), { priority: p.priority || 0, stackable: p.stackable !== false, createdAt: p.createdAt || null }]));
+  const fallbackMeta = { priority: 0, stackable: true, createdAt: null };
+  let winner = cheapestItemAdjustments[0];
+  let winnerMeta = metaById.get(winner.promotionId) || fallbackMeta;
+  for (const adj of cheapestItemAdjustments.slice(1)) {
+    const meta = metaById.get(adj.promotionId) || fallbackMeta;
+    if (isBetterPromoForProduct(meta, winnerMeta)) { winner = adj; winnerMeta = meta; }
+  }
+
+  // Single-winner protection (combination-testing finding, 2026-10-19):
+  // a product that already has a winning product-level discount candidate
+  // (resolveProductWinners already ran, so any survivor here IS the single
+  // winner for that product) is NOT eligible to also be picked as the
+  // cheapest item for a DIFFERENT promotion's cheapest-item reward — that
+  // would compound two promotions on one product, the exact thing
+  // resolveProductWinners exists to prevent for discountCandidatesByProduct/
+  // freeGifts. A product with no discount candidates at all is unaffected.
+  const alreadyWonElsewhere = new Set(
+    [...(discountCandidatesByProduct?.entries() || [])]
+      .filter(([, candidates]) => candidates.length && candidates[0].ruleId !== winner.promotionId)
+      .map(([productId]) => productId),
+  );
+
+  const candidates = orderItems.filter((oi) =>
+    oi.productSnapshot.priceAtPurchase > 0
+    && !oi.productSnapshot.isPromotionalGift
+    && !alreadyWonElsewhere.has(oi.productId)
+    && (!winner.scopeProductIds || winner.scopeProductIds.includes(oi.productId)),
+  );
+  if (!candidates.length) return;
+  let cheapest = candidates[0];
+  for (const oi of candidates.slice(1)) {
+    if (oi.productSnapshot.priceAtPurchase < cheapest.productSnapshot.priceAtPurchase) cheapest = oi;
+  }
+
+  // Phase 4 composition: maxDiscountAmount bounds a cheapest-item reward
+  // exactly like it bounds every other reward type. "free" is all-or-
+  // nothing (can't half-free one unit), so if the remaining budget can't
+  // cover the FULL value, skip the adjustment entirely rather than
+  // partially/over-granting it.
+  const budget = maxDiscountAmountByPromotionId?.get(winner.promotionId);
+  if (budget != null) {
+    const spent = promoDiscountByPromotionId.get(winner.promotionId) || 0;
+    const remaining = Math.max(0, budget - spent);
+    const fullValue = cheapest.productSnapshot.priceAtPurchase;
+    if (remaining < fullValue) return; // not enough budget left to grant this at all
+  }
+
+  const { amount, remainderLine } = applyCheapestItemAdjustment(cheapest, winner.mode, winner.value);
+  if (remainderLine) orderItems.push(remainderLine);
+  if (amount > 0) {
+    promoDiscountByPromotionId.set(winner.promotionId, (promoDiscountByPromotionId.get(winner.promotionId) || 0) + amount);
+  }
 }
 
 // Runs once, atomically, the moment an order is confirmed PAID. For each ordered
@@ -230,6 +322,10 @@ import {
   withRuleBudget,
   spendRuleBudget,
   applicableCap,
+  buildMaxDiscountAmountMap,
+  isBetterPromoForProduct,
+  clampCapToDiscountBudget,
+  clampOrderDiscountToBudget,
 } from "../utils/promotionEngine.util.js";
 import { getPublicOfferConfig } from "../utils/offer.util.js";
 import { sendMetaCapiEvent } from "../services/meta.capi.service.js";
@@ -562,10 +658,9 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   // (confirmed, audit 2026-10-08, Critical Bug #1). Evaluating ONLY here
   // means every active promotion — adapter-representable or not — competes
   // in the SAME applyBestPromotionDiscount/budget-tracking pass, so the best
-  // price always wins deterministically. The adapter itself is untouched and
-  // still powers the legacy-shaped PDP/mini-cart banner displays
-  // (freeShippingOffer.util.js, cartRule.controller.js) — only its SECOND,
-  // redundant evaluation at this real-money path was removed.
+  // price always wins deterministically. The adapter itself (and the
+  // legacy-shaped PDP/mini-cart banner displays it powered) was deleted
+  // entirely the next day (2026-10-09) — nothing reads it anymore, anywhere.
   let activePromotions = await getActivePromotions();
   // Courtesy pre-check — drop any promotion whose usage cap is ALREADY
   // exhausted before this cart even existed, so it can't grant one more
@@ -616,6 +711,34 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   });
   const promotionResult = evaluatePromotions(promoCartItems, promoCtx, activePromotions);
   const ruleBudgets = createRuleBudgetTracker(promotionResult.discountCandidatesByProduct);
+  const maxDiscountAmountByPromotionId = buildMaxDiscountAmountMap(promotionResult.matchedPromotions);
+
+  // Gross (pre-discount) product subtotal — snapshotted BEFORE the loop below
+  // mutates priceAtPurchase, so PromotionUsage.cartValueBeforeDiscount (set
+  // at webhook time, see STEP 2 below) can be the true pre-discount figure
+  // instead of silently reading the already-discounted saved items (audit
+  // 2026-10-10, finding A10).
+  const promotionGrossProductSubtotal = orderItems.reduce(
+    (s, i) => s + i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity, 0,
+  );
+  // ₹ actually granted by each matched promotion on this order — product-
+  // line discounts it won here, plus its own order-level discount if it
+  // wins that further down. Snapshotted onto appliedPromotions so
+  // PromotionUsage.discountAmount is never left at its schema default of 0
+  // (same audit finding — previously NOTHING populated this, ever).
+  const promoDiscountByPromotionId = new Map();
+  // Which products each promotion actually touched on this order — Map<
+  // promotionId, Map<productId, {productName, quantity}>> — so PromotionUsage
+  // can answer "on what products" without recomputing the engine later
+  // (2026-10-10, admin usage-reporting ask).
+  const promoProductsByPromotionId = new Map();
+  const addPromoProduct = (promotionId, productId, productName, qty) => {
+    if (!promotionId || !productId || qty <= 0) return;
+    if (!promoProductsByPromotionId.has(promotionId)) promoProductsByPromotionId.set(promotionId, new Map());
+    const byProduct = promoProductsByPromotionId.get(promotionId);
+    const existing = byProduct.get(productId);
+    byProduct.set(productId, { productName, quantity: (existing?.quantity || 0) + qty });
+  };
 
   const extraPromoDiscountLines = [];
   for (const oi of orderItems) {
@@ -624,20 +747,50 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     if (candidates?.length) {
       const fullPrice = oi.productSnapshot.priceAtPurchase;
       const discountedPrice = applyBestPromotionDiscount(fullPrice, candidates);
+      // Every surviving candidate here shares one ruleId by construction —
+      // resolveProductWinners already dropped every OTHER
+      // promotion's candidates for this exact product before this ever ran.
+      const winningRuleId = candidates[0]?.ruleId;
       // Cap scales with how many times the promotion's own condition is
-      // satisfied — never a flat 1 — clamped to the remaining shared budget.
-      const cap = applicableCap(candidates);
-      const unitsUsed = Math.min(oi.productSnapshot.quantity, cap);
-      const remainderLine = capDiscountedQuantity(oi, fullPrice, discountedPrice, cap);
-      spendRuleBudget(candidates, ruleBudgets, unitsUsed);
-      if (remainderLine) extraPromoDiscountLines.push(remainderLine);
-      // A discount that zeroes an item's price out (e.g. a percent_off 100
-      // "get this free" reward) marks it as a promotional gift for
-      // admin/order views — same field the free_product reward uses below.
-      if (oi.productSnapshot.priceAtPurchase === 0) oi.productSnapshot.isPromotionalGift = true;
+      // satisfied — never a flat 1 — clamped to the remaining shared budget,
+      // then further clamped (Phase 4) so this promotion's running ₹ total
+      // never crosses its own maxDiscountAmount (no-op when unset).
+      const cap = clampCapToDiscountBudget(
+        applicableCap(candidates), fullPrice - discountedPrice, winningRuleId,
+        promoDiscountByPromotionId, maxDiscountAmountByPromotionId,
+      );
+      // cap can now be 0 (budget-exhausted, Phase 4) where it previously
+      // never was (applicableCap always returns >= 1) — capDiscountedQuantity
+      // unconditionally mutates priceAtPurchase to the discounted price even
+      // when cap is 0, which would wrongly zero-rate the line. Skip the split
+      // entirely and leave the item at full price, same as "no candidate
+      // matched at all".
+      if (cap > 0) {
+        const unitsUsed = Math.min(oi.productSnapshot.quantity, cap);
+        const itemDiscountAmount = (fullPrice - discountedPrice) * unitsUsed;
+        if (winningRuleId && itemDiscountAmount > 0) {
+          promoDiscountByPromotionId.set(winningRuleId, (promoDiscountByPromotionId.get(winningRuleId) || 0) + itemDiscountAmount);
+        }
+        if (winningRuleId && unitsUsed > 0) {
+          addPromoProduct(winningRuleId, oi.productId, oi.productSnapshot.productName, unitsUsed);
+        }
+        const remainderLine = capDiscountedQuantity(oi, fullPrice, discountedPrice, cap);
+        spendRuleBudget(candidates, ruleBudgets, unitsUsed);
+        if (remainderLine) extraPromoDiscountLines.push(remainderLine);
+        // A discount that zeroes an item's price out (e.g. a percent_off 100
+        // "get this free" reward) marks it as a promotional gift for
+        // admin/order views — same field the free_product reward uses below.
+        if (oi.productSnapshot.priceAtPurchase === 0) oi.productSnapshot.isPromotionalGift = true;
+      }
     }
   }
   if (extraPromoDiscountLines.length) orderItems.push(...extraPromoDiscountLines);
+  // Phase 5 — runs AFTER product-level discounts are baked in, so "cheapest"
+  // reflects the customer's current (post-discount) price, not list price.
+  applyCheapestItemReward(
+    orderItems, promotionResult.cheapestItemAdjustments, promotionResult.matchedPromotions, promoDiscountByPromotionId,
+    promotionResult.discountCandidatesByProduct, maxDiscountAmountByPromotionId,
+  );
 
   // free_product reward: append a synthetic ₹0 line, flagged
   // isPromotionalGift so admin/order views can tell it apart from a paid
@@ -654,12 +807,19 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
         ? giftProduct.variantDetails?.find((v) => v.sku === gift.targetVariantSku)
         : giftProduct.variantDetails?.[0];
       const giftVariantName = giftVariant?.variantName || "N/A";
-      assertVariantAvailable(giftProduct, giftVariantName, 1);
+      // Scales with the promotion's own repeat count (e.g. "buy 2 get 1
+      // free" crossed twice grants 2 free units) — see promotionEngine
+      // .util.js's free_product case. Defaults to 1 defensively (should
+      // never actually be missing — kept only so an old/malformed result
+      // shape degrades to the previous behavior instead of erroring).
+      const giftQty = Math.max(1, Number(gift.quantity) || 1);
+      assertVariantAvailable(giftProduct, giftVariantName, giftQty);
+      addPromoProduct(gift.promotionId, giftProduct.productId, giftProduct.productName, giftQty);
       orderItems.push({
         productId: giftProduct.productId,
         variantSku: giftVariant?.sku || "",
         productSnapshot: {
-          quantity: 1,
+          quantity: giftQty,
           productImg: giftVariant?.variantImage?.[0] || giftProduct.productImg || "https://urbannook.in/assets/logo.webp",
           productName: giftProduct.productName,
           productCategory: giftProduct.productCategory,
@@ -769,8 +929,24 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     const amounts = promotionResult.orderLevelDiscounts.map((d) =>
       d.type === "percent_off_order" ? subtotal * (Number(d.value) / 100) : Number(d.value),
     );
-    const promotionOrderDiscount = Math.round(Math.min(Math.max(...amounts, 0), subtotal));
+    let promotionOrderDiscount = Math.round(Math.min(Math.max(...amounts, 0), subtotal));
+    let winningOrderPromoId = null;
+    if (promotionOrderDiscount > 0) {
+      const winningIdx = amounts.indexOf(Math.max(...amounts));
+      winningOrderPromoId = promotionResult.orderLevelDiscounts[winningIdx]?.promotionId;
+      // Phase 4 — clamp BEFORE subtracting from subtotal, so the actual
+      // charge reflects the capped amount, not the uncapped one.
+      promotionOrderDiscount = clampOrderDiscountToBudget(
+        promotionOrderDiscount, winningOrderPromoId, promoDiscountByPromotionId, maxDiscountAmountByPromotionId,
+      );
+    }
     subtotal -= promotionOrderDiscount;
+    // Attribute this order-level discount to whichever promotion actually
+    // won it, same per-promotion tracking the product-level loop above
+    // does (audit 2026-10-10, finding A10).
+    if (promotionOrderDiscount > 0 && winningOrderPromoId) {
+      promoDiscountByPromotionId.set(winningOrderPromoId, (promoDiscountByPromotionId.get(winningOrderPromoId) || 0) + promotionOrderDiscount);
+    }
   }
 
   // Free shipping unlocks via EITHER: any active Promotion whose reward is
@@ -921,6 +1097,18 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       console.log(`[Coupon:PaymentRecheck] REJECT — global cap reached (${liveCoupon.usageCount}/${liveCoupon.maxTotalUses})`);
       throw new ValidationError(
         "This coupon has reached its maximum usage limit. Please remove it from your cart and try again."
+      );
+    }
+
+    // Re-check product gate against the re-derived cart (user may have
+    // removed the required product after applying the coupon) — presence
+    // only, never scaled by quantity. This is what actually makes
+    // Coupon.eligibleProductIds a real, enforced restriction rather than an
+    // admin-only label.
+    if (!couponProductGateOk(liveCoupon, uniqueProductIds)) {
+      console.log(`[Coupon:PaymentRecheck] REJECT — product gate not met (requires one of [${(liveCoupon.eligibleProductIds || []).join(", ")}])`);
+      throw new ValidationError(
+        "This coupon requires a specific product in your cart. Please remove it from your cart and try again."
       );
     }
 
@@ -1099,7 +1287,12 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     // creation time (see the wiring comment above). Empty when none matched.
     appliedPromotions: promotionResult.matchedPromotions.map((p) => ({
       promotionId: String(p._id), name: p.name, rewardTypes: [...new Set((p.rewards || []).map((r) => r.type))],
+      discountAmount: Math.round(promoDiscountByPromotionId.get(String(p._id)) || 0),
+      discountedProducts: [...(promoProductsByPromotionId.get(String(p._id))?.entries() || [])].map(
+        ([productId, v]) => ({ productId, productName: v.productName, quantity: v.quantity }),
+      ),
     })),
+    promotionGrossProductSubtotal: Math.round(promotionGrossProductSubtotal),
     // Whole-rupee, matching exactly what razorpayChargeAmountPaise actually
     // charges — finalAmount itself can be fractional (realShippingAmount is
     // a live carrier rate, not guaranteed integer), so storing it unrounded
@@ -1381,7 +1574,15 @@ const fulfilCapturedPayment = async (order, payment) => {
       // coupon case, only prevents THIS order from corrupting the count
       // for future ones; it doesn't retroactively re-charge the customer.
       if (order.appliedPromotions?.length) {
-        const productSubtotalForUsage = order.items.reduce(
+        // The TRUE pre-discount product subtotal, snapshotted at order-
+        // creation time (see razorpayCreateOrderController/
+        // guestCreateOrderController) — order.items' own priceAtPurchase is
+        // already POST-discount by the time the order is saved, so
+        // recomputing from it here would silently mislabel the post-
+        // discount figure as "before discount" (audit 2026-10-10, finding
+        // A10). Falls back to the (wrong but previously-the-only-option)
+        // post-discount sum for any order that predates this field.
+        const productSubtotalForUsage = order.promotionGrossProductSubtotal || order.items.reduce(
           (s, i) => s + ((i.productSnapshot?.priceAtPurchase || 0) * (i.productSnapshot?.quantity || 0)),
           0,
         );
@@ -1432,6 +1633,8 @@ const fulfilCapturedPayment = async (order, payment) => {
               email: order.userEmail || "",
               mobile: order.userMobile || "",
               rewardsSnapshot: { rewardTypes: ap.rewardTypes },
+              discountAmount: ap.discountAmount || 0,
+              discountedProducts: ap.discountedProducts || [],
               cartValueBeforeDiscount: productSubtotalForUsage,
               usedAt: new Date(),
             });
@@ -1952,8 +2155,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   // ── Promotion Engine V2 — the SINGLE discount-evaluation authority for the
   // real charge — see the matching comment in razorpayCreateOrderController
   // above for the full rationale (consolidated 2026-10-08; the legacy
-  // adapter double-evaluation was retired from this money path, not from the
-  // codebase — it still powers legacy-shaped banner displays elsewhere).
+  // adapter was deleted entirely 2026-10-09, not just retired from this path).
   // Identical wiring, guest path. orderCount is deliberately left unset here
   // (not merely omitted by oversight) — a guest's identity is self-reported
   // email/mobile with no verification, so there's no trustworthy "is this
@@ -1993,6 +2195,26 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   });
   const promotionResult = evaluatePromotions(promoCartItems, promoCtx, activePromotions);
   const ruleBudgets = createRuleBudgetTracker(promotionResult.discountCandidatesByProduct);
+  const maxDiscountAmountByPromotionId = buildMaxDiscountAmountMap(promotionResult.matchedPromotions);
+
+  // See the matching comment in razorpayCreateOrderController above —
+  // identical wiring, guest path.
+  const promotionGrossProductSubtotal = orderItems.reduce(
+    (s, i) => s + i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity, 0,
+  );
+  const promoDiscountByPromotionId = new Map();
+  // Which products each promotion actually touched on this order — Map<
+  // promotionId, Map<productId, {productName, quantity}>> — so PromotionUsage
+  // can answer "on what products" without recomputing the engine later
+  // (2026-10-10, admin usage-reporting ask).
+  const promoProductsByPromotionId = new Map();
+  const addPromoProduct = (promotionId, productId, productName, qty) => {
+    if (!promotionId || !productId || qty <= 0) return;
+    if (!promoProductsByPromotionId.has(promotionId)) promoProductsByPromotionId.set(promotionId, new Map());
+    const byProduct = promoProductsByPromotionId.get(promotionId);
+    const existing = byProduct.get(productId);
+    byProduct.set(productId, { productName, quantity: (existing?.quantity || 0) + qty });
+  };
 
   const extraPromoDiscountLines = [];
   for (const oi of orderItems) {
@@ -2001,15 +2223,37 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     if (candidates?.length) {
       const fullPrice = oi.productSnapshot.priceAtPurchase;
       const discountedPrice = applyBestPromotionDiscount(fullPrice, candidates);
-      const cap = applicableCap(candidates);
-      const unitsUsed = Math.min(oi.productSnapshot.quantity, cap);
-      const remainderLine = capDiscountedQuantity(oi, fullPrice, discountedPrice, cap);
-      spendRuleBudget(candidates, ruleBudgets, unitsUsed);
-      if (remainderLine) extraPromoDiscountLines.push(remainderLine);
-      if (oi.productSnapshot.priceAtPurchase === 0) oi.productSnapshot.isPromotionalGift = true;
+      const winningRuleId = candidates[0]?.ruleId;
+      const cap = clampCapToDiscountBudget(
+        applicableCap(candidates), fullPrice - discountedPrice, winningRuleId,
+        promoDiscountByPromotionId, maxDiscountAmountByPromotionId,
+      );
+      // cap can be 0 here (budget-exhausted, Phase 4) — capDiscountedQuantity
+      // unconditionally mutates priceAtPurchase even at cap 0, so skip the
+      // split entirely rather than wrongly zero-rating the line.
+      if (cap > 0) {
+        const unitsUsed = Math.min(oi.productSnapshot.quantity, cap);
+        const itemDiscountAmount = (fullPrice - discountedPrice) * unitsUsed;
+        if (winningRuleId && itemDiscountAmount > 0) {
+          promoDiscountByPromotionId.set(winningRuleId, (promoDiscountByPromotionId.get(winningRuleId) || 0) + itemDiscountAmount);
+        }
+        if (winningRuleId && unitsUsed > 0) {
+          addPromoProduct(winningRuleId, oi.productId, oi.productSnapshot.productName, unitsUsed);
+        }
+        const remainderLine = capDiscountedQuantity(oi, fullPrice, discountedPrice, cap);
+        spendRuleBudget(candidates, ruleBudgets, unitsUsed);
+        if (remainderLine) extraPromoDiscountLines.push(remainderLine);
+        if (oi.productSnapshot.priceAtPurchase === 0) oi.productSnapshot.isPromotionalGift = true;
+      }
     }
   }
   if (extraPromoDiscountLines.length) orderItems.push(...extraPromoDiscountLines);
+  // Phase 5 — runs AFTER product-level discounts are baked in, so "cheapest"
+  // reflects the customer's current (post-discount) price, not list price.
+  applyCheapestItemReward(
+    orderItems, promotionResult.cheapestItemAdjustments, promotionResult.matchedPromotions, promoDiscountByPromotionId,
+    promotionResult.discountCandidatesByProduct, maxDiscountAmountByPromotionId,
+  );
 
   for (const gift of promotionResult.freeGifts) {
     if (!gift.targetProductId) continue;
@@ -2020,12 +2264,19 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
         ? giftProduct.variantDetails?.find((v) => v.sku === gift.targetVariantSku)
         : giftProduct.variantDetails?.[0];
       const giftVariantName = giftVariant?.variantName || "N/A";
-      assertVariantAvailable(giftProduct, giftVariantName, 1);
+      // Scales with the promotion's own repeat count (e.g. "buy 2 get 1
+      // free" crossed twice grants 2 free units) — see promotionEngine
+      // .util.js's free_product case. Defaults to 1 defensively (should
+      // never actually be missing — kept only so an old/malformed result
+      // shape degrades to the previous behavior instead of erroring).
+      const giftQty = Math.max(1, Number(gift.quantity) || 1);
+      assertVariantAvailable(giftProduct, giftVariantName, giftQty);
+      addPromoProduct(gift.promotionId, giftProduct.productId, giftProduct.productName, giftQty);
       orderItems.push({
         productId: giftProduct.productId,
         variantSku: giftVariant?.sku || "",
         productSnapshot: {
-          quantity: 1,
+          quantity: giftQty,
           productImg: giftVariant?.variantImage?.[0] || giftProduct.productImg || "https://urbannook.in/assets/logo.webp",
           productName: giftProduct.productName,
           productCategory: giftProduct.productCategory,
@@ -2054,8 +2305,24 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     const amounts = promotionResult.orderLevelDiscounts.map((d) =>
       d.type === "percent_off_order" ? subtotal * (Number(d.value) / 100) : Number(d.value),
     );
-    const promotionOrderDiscount = Math.round(Math.min(Math.max(...amounts, 0), subtotal));
+    let promotionOrderDiscount = Math.round(Math.min(Math.max(...amounts, 0), subtotal));
+    let winningOrderPromoId = null;
+    if (promotionOrderDiscount > 0) {
+      const winningIdx = amounts.indexOf(Math.max(...amounts));
+      winningOrderPromoId = promotionResult.orderLevelDiscounts[winningIdx]?.promotionId;
+      // Phase 4 — clamp BEFORE subtracting from subtotal, so the actual
+      // charge reflects the capped amount, not the uncapped one.
+      promotionOrderDiscount = clampOrderDiscountToBudget(
+        promotionOrderDiscount, winningOrderPromoId, promoDiscountByPromotionId, maxDiscountAmountByPromotionId,
+      );
+    }
     subtotal -= promotionOrderDiscount;
+    // Attribute this order-level discount to whichever promotion actually
+    // won it, same per-promotion tracking the product-level loop above
+    // does (audit 2026-10-10, finding A10).
+    if (promotionOrderDiscount > 0 && winningOrderPromoId) {
+      promoDiscountByPromotionId.set(winningOrderPromoId, (promoDiscountByPromotionId.get(winningOrderPromoId) || 0) + promotionOrderDiscount);
+    }
   }
 
   // Magic has no pincode yet — Razorpay rates the address through
@@ -2145,6 +2412,9 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     }
     if (liveCoupon.maxTotalUses != null && liveCoupon.usageCount >= liveCoupon.maxTotalUses) {
       throw new ValidationError("This coupon has reached its maximum number of uses.");
+    }
+    if (!couponProductGateOk(liveCoupon, productIds)) {
+      throw new ValidationError("This coupon requires a specific product in your cart.");
     }
 
     // Per-user limit check (by email + mobile)
@@ -2290,7 +2560,12 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     // creation time (see the wiring comment above). Empty when none matched.
     appliedPromotions: promotionResult.matchedPromotions.map((p) => ({
       promotionId: String(p._id), name: p.name, rewardTypes: [...new Set((p.rewards || []).map((r) => r.type))],
+      discountAmount: Math.round(promoDiscountByPromotionId.get(String(p._id)) || 0),
+      discountedProducts: [...(promoProductsByPromotionId.get(String(p._id))?.entries() || [])].map(
+        ([productId, v]) => ({ productId, productName: v.productName, quantity: v.quantity }),
+      ),
     })),
+    promotionGrossProductSubtotal: Math.round(promotionGrossProductSubtotal),
     // Whole-rupee, matching exactly what razorpayChargeAmountPaise actually
     // charges — finalAmount itself can be fractional (realShippingAmount is
     // a live carrier rate, not guaranteed integer), so storing it unrounded
@@ -2365,4 +2640,8 @@ export {
   // spendRuleBudget now live in cartRule.util.js (shared with
   // cartRule.controller.js's preview endpoint) — import those from there.
   capDiscountedQuantity,
+  // Phase 5 (Admin Offer Control System) — same "export for direct unit
+  // testing" convention as capDiscountedQuantity above.
+  applyCheapestItemAdjustment,
+  applyCheapestItemReward,
 };

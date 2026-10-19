@@ -81,6 +81,8 @@ const initialState = {
   items: persistedItems,
   totalQuantity: persistedItems.reduce((t, i) => t + (i.quantity || 0), 0),
   totalAmount: persistedItems.reduce((t, i) => t + ((i.price || 0) * (i.quantity || 0)), 0),
+  lastSuccessfulAdd: null,
+  addSequence: 0,
   selections: {}, // Managed by productId: { quantity, variant }
   // Boolean only — see GUEST_GIFT_WRAP_KEY comment above for why no price lives here.
   giftWrap: isLoggedInOnLoad ? false : loadGuestGiftWrap(),
@@ -91,6 +93,10 @@ const cartSlice = createSlice({
   name: 'cart',
   initialState,
   reducers: {
+    recordSuccessfulAdd: (state, action) => {
+      state.addSequence += 1;
+      state.lastSuccessfulAdd = { ...action.payload, sequence: state.addSequence };
+    },
     updateSelection: (state, action) => {
       const { productId, quantity, variant } = action.payload;
       state.selections[productId] = {
@@ -108,6 +114,8 @@ const cartSlice = createSlice({
         (item.mongoId === itemId || item.id === itemId) && 
         (item.selectedVariant || 'N/A') === (effectiveVariant)
       );
+      const previousSubtotal = state.totalAmount;
+      const previousQuantity = existingItem?.quantity || 0;
 
       if (existingItem) {
         existingItem.quantity += quantity;
@@ -127,6 +135,10 @@ const cartSlice = createSlice({
 
       state.totalQuantity += quantity;
       state.totalAmount += (Number(price) || 0) * quantity;
+      if (quantity > 0) {
+        state.addSequence += 1;
+        state.lastSuccessfulAdd = { productId: itemId, selectedVariant: effectiveVariant, quantity, previousQuantity, previousSubtotal, sequence: state.addSequence };
+      }
 
       // Persist to localStorage for guest users so cart survives refresh
       const isGuestUser = isGuest();
@@ -181,9 +193,15 @@ const cartSlice = createSlice({
 
       if (existingItem && quantity > 0) {
         const diff = quantity - existingItem.quantity;
+        const previousSubtotal = state.totalAmount;
+        const previousQuantity = existingItem.quantity;
         existingItem.quantity = quantity;
         state.totalQuantity += diff;
         state.totalAmount += diff * (Number(existingItem.price) || 0);
+        if (diff > 0) {
+          state.addSequence += 1;
+          state.lastSuccessfulAdd = { productId: id, selectedVariant: effectiveVariant, quantity: diff, previousQuantity, previousSubtotal, sequence: state.addSequence };
+        }
       }
 
       if (isGuest()) {
@@ -322,6 +340,6 @@ const cartSlice = createSlice({
   },
 });
 
-export const { addItem, removeItem, updateQuantity, clearCart, syncCartFromProfile, setCartItems, updateSelection, setGiftWrap } = cartSlice.actions;
+export const { recordSuccessfulAdd, addItem, removeItem, updateQuantity, clearCart, syncCartFromProfile, setCartItems, updateSelection, setGiftWrap } = cartSlice.actions;
 
 export default cartSlice.reducer;

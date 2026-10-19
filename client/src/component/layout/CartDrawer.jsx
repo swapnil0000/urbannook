@@ -8,16 +8,16 @@ import {
 } from '../../store/api/userApi';
 import { updateQuantity, removeItem } from '../../store/slices/cartSlice';
 import { resolveVariantTitle } from '../../utils/variantTitle';
-import { setShowLoginModal, setLoginCallback } from '../../store/slices/uiSlice';
 import { trackViewCart, trackRemoveFromCart, track } from '../../utils/analytics';
 import FreeShippingStrip from '../FreeShippingStrip';
 import GiftWrapOffer, { GiftWrapLineItem } from '../GiftWrapOffer';
+import PromotionBannerList from '../promotions/PromotionBannerList';
+import { useCartPromotions } from '../../hooks/useCartPromotions';
 // The old combo-banner/cart-rule discount preview (FreeShippingBanner,
 // useEvaluateCartRulesQuery, useGetAllFreeShippingBannersQuery) was removed
-// entirely 2026-10-09 — this drawer now shows plain cart totals + the
-// free-shipping threshold only. A Promotion V2-based discount preview and
-// add-on nudge is a deliberate follow-up (data layer already exists —
-// useGetCartPromotionsQuery, src/store/api/userApi.js), not an oversight.
+// entirely 2026-10-09. Replaced 2026-10 by the Promotion V2 Display API —
+// PromotionBannerList (applied/qualifying offers) + the global
+// PromotionUnlockSheet (add-more-to-unlock, mounted at app root).
 
 const OptimizedImage = lazy(() => import('../OptimizedImage'));
 
@@ -43,6 +43,12 @@ const CartDrawer = ({ isOpen, onClose }) => {
   // Free-shipping eligibility for the "Shipping" line below — threshold-only
   // for now (see file-header note on the removed discount/banner preview).
   const { data: offerRes } = useGetFreeShippingOfferQuery();
+
+  // Promotion V2 — applied/qualifying offers shown as banners below; shares
+  // its subscription with the app-root PromotionUnlockSheet (same
+  // placement="cart" args), so opening the drawer never fires a second
+  // promotion evaluation.
+  const { promotions: cartPromotions, pricing: promotionPricing } = useCartPromotions('cart');
 
   // Map a cart line item → analytics item shape
   const toTrackItem = (item) => ({
@@ -136,9 +142,8 @@ const CartDrawer = ({ isOpen, onClose }) => {
 
   if (!mounted && !isOpen) return null;
 
-  // Plain totals for now — see file-header note on the removed discount
-  // preview. Gift wrap still adds to what's actually charged at checkout —
-  // same price the GiftWrapLineItem row above shows.
+  // Promotion V2 returns a server-calculated product discount preview. Gift
+  // wrap still adds the Admin-configured amount charged at checkout.
   const giftWrapOffer = giftWrapOfferRes?.data;
   // Qty auto-scales with total ELIGIBLE UNITS in the cart — 2x the same
   // eligible product is 2 gift wraps, not 1 — same rule the server applies
@@ -153,12 +158,15 @@ const CartDrawer = ({ isOpen, onClose }) => {
       ? (Number(giftWrapOffer.price) || 0) * giftWrapEligibleCount
       : 0;
 
-  const subtotal = totalAmount + giftWrapAmount;
+  const promotionSavings = Number(promotionPricing?.savings) || 0;
+  const subtotal = (promotionPricing?.discountedSubtotal ?? totalAmount) + giftWrapAmount;
 
+  // Free shipping is a single admin-configured field — cart subtotal vs a ₹
+  // threshold, nothing product-specific — so a plain comparison is the
+  // correct (and only) eligibility check.
   const offerConfig = offerRes?.data;
-  const thresholdEligible =
+  const isFreeShippingEligible =
     !!offerConfig?.isActive && (offerConfig?.thresholdAmount || 0) > 0 && subtotal >= offerConfig.thresholdAmount;
-  const isFreeShippingEligible = thresholdEligible;
 
   return (
     <div className="fixed inset-0 z-[9999] flex justify-end font-inter text-ink">
@@ -234,6 +242,8 @@ const CartDrawer = ({ isOpen, onClose }) => {
             <>
               {/* Free-shipping threshold nudge — hidden unless admin's promotion is on */}
               <FreeShippingStrip cartTotal={subtotal} variant="compact" className="mb-3" />
+              {/* Other active Promotion V2 offers — renders nothing when none apply */}
+              <PromotionBannerList promotions={cartPromotions} pricing={promotionPricing} className="mb-3" />
               <div className="divide-y divide-hair">
                 {cartItems.map((item) => {
                   const itemQty = typeof item.quantity === 'object' ? Number(item.quantity?.quantity || 0) : Number(item.quantity || 0);
@@ -242,6 +252,9 @@ const CartDrawer = ({ isOpen, onClose }) => {
                   const displayName = resolveVariantTitle(item.name, item.variantTitleTemplate, item.selectedVariant);
                   const rawPrice = Number(item.price) || 0;
                   const rawLineTotal = rawPrice * itemQty;
+                  const priceLine = promotionPricing?.lines?.find((line) =>
+                    line.productId === String(itemId) &&
+                    (line.selectedVariant || 'N/A') === (item.selectedVariant || 'N/A'));
 
                   return (
                     <div key={`${itemId}-${item.selectedVariant || 'N/A'}`} className="flex gap-3 py-3 first:pt-0">
@@ -306,8 +319,13 @@ const CartDrawer = ({ isOpen, onClose }) => {
                             </button>
                           </div>
 
-                          {/* Plain price for now — see file-header note on the removed discount preview */}
-                          <p className="text-sm font-extrabold">₹{rawLineTotal.toLocaleString('en-IN')}</p>
+                          <div className="text-right">
+                            {priceLine?.savings > 0 && <p className="text-[11px] text-muted line-through">₹{priceLine.originalLineTotal.toLocaleString('en-IN')}</p>}
+                            <p className={`text-sm font-extrabold ${priceLine?.savings > 0 ? 'text-brand' : ''}`}>
+                              ₹{(priceLine?.lineTotal ?? rawLineTotal).toLocaleString('en-IN')}
+                            </p>
+                            {priceLine?.savings > 0 && <p className="text-[10px] font-bold text-save">Save ₹{priceLine.savings.toLocaleString('en-IN')}</p>}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -343,6 +361,12 @@ const CartDrawer = ({ isOpen, onClose }) => {
                     <span>at checkout</span>
                   )}
                 </p>
+                {promotionSavings > 0 && (
+                  <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px]">
+                    <span className="text-muted">Original <span className="line-through">₹{((promotionPricing?.subtotal ?? totalAmount) + giftWrapAmount).toLocaleString('en-IN')}</span></span>
+                    <span className="font-extrabold text-save">You save ₹{promotionSavings.toLocaleString('en-IN')}</span>
+                  </p>
+                )}
               </div>
               <span className="text-xl font-extrabold tabular-nums">₹{(Number(subtotal) || 0).toLocaleString('en-IN')}</span>
             </div>

@@ -337,14 +337,12 @@ export const magicApplyPromotionController = asyncHandler(async (req, res) => {
   const coupon = await Coupon.findOne({ code: cleanCode, isArchived: false }).lean();
   if (!coupon) return fail("Invalid or inactive coupon.");
 
-  // Product subtotal the discount applies to. The DB order's amount is the
-  // source of truth; Razorpay's order_amount is a fallback.
-  // VERIFY: confirm the field name and whether it already includes shipping.
   const order = await orderByReceipt(receipt, {
     amount: 1,
     coupon: 1,
     userId: 1,
     isGuestOrder: 1,
+    items: 1,
   });
 
   if (order?.coupon?.isApplied) {
@@ -354,8 +352,15 @@ export const magicApplyPromotionController = asyncHandler(async (req, res) => {
     );
   }
 
-  const subtotalRupees =
-    Number(order?.amount) || Number(payload.order_amount) / 100 || 0;
+  // Product subtotal the discount applies to — summed from the order's own
+  // items (priceAtPurchase, already net of any product-level promo discount,
+  // same base rp.payment.controller.js's own coupon math uses), NEVER
+  // `order.amount`/`order.order_amount` — those are the FINAL charge
+  // (subtotal + gift wrap + shipping - discount), and silently computing a
+  // coupon's %/minCartValue off that over-counts gift wrap into the base
+  // (audit 2026-10-10, finding A9) — a coupon must only ever see products.
+  const magicOrderItems = cartItemsForOrder(order);
+  const subtotalRupees = magicOrderItems.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 0), 0);
 
   if (subtotalRupees <= 0) {
     return fail("Could not read your cart total. Please retry.", "REQUIREMENT_NOT_MET");
@@ -371,6 +376,7 @@ export const magicApplyPromotionController = asyncHandler(async (req, res) => {
     discountRupees = await validateNewCoupon({
       coupon,
       cartProductTotal: subtotalRupees,
+      cartProductIds: magicOrderItems.map((i) => i.productId),
       email,
       mobile: stripCountryCode(contact),
       // Magic carries no session of ours, but the order does: it was created

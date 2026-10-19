@@ -7,12 +7,12 @@ import {
 import { removeItem } from "../../store/slices/cartSlice";
 import { resolveVariantTitle } from "../../utils/variantTitle";
 import FreeShippingStrip from '../FreeShippingStrip';
+import PromotionBannerList from '../promotions/PromotionBannerList';
+import { useCartPromotions } from '../../hooks/useCartPromotions';
 // The old combo-banner/cart-rule discount preview (FreeShippingBanner,
 // useEvaluateCartRulesQuery, useGetAllFreeShippingBannersQuery) was removed
-// entirely 2026-10-09 — this preview now shows plain cart totals + the
-// free-shipping threshold only. A Promotion V2-based discount preview and
-// add-on nudge is a deliberate follow-up (data layer already exists —
-// useGetCartPromotionsQuery, src/store/api/userApi.js), not an oversight.
+// entirely 2026-10-09. Replaced 2026-10 by the Promotion V2 Display API —
+// see PromotionBannerList below.
 
 /**
  * Lightweight cart preview — a compact bottom sheet showing what's in the
@@ -66,10 +66,13 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
   const subtotal = Number(totalAmount) || 0;
 
   const { data: offerRes } = useGetFreeShippingOfferQuery();
+  const { promotions: cartPromotions } = useCartPromotions('mini_cart');
+  // Free shipping is a single admin-configured field — cart subtotal vs a ₹
+  // threshold, nothing product-specific — so a plain comparison is the
+  // correct (and only) eligibility check.
   const offerConfig = offerRes?.data;
-  const thresholdEligible =
+  const isFreeShippingEligible =
     !!offerConfig?.isActive && (offerConfig?.thresholdAmount || 0) > 0 && subtotal >= offerConfig.thresholdAmount;
-  const isFreeShippingEligible = thresholdEligible;
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setMounted(true));
@@ -105,6 +108,7 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
             <div className="flex flex-col gap-3">
               {/* Free-shipping threshold nudge — hidden unless admin's promotion is on */}
               <FreeShippingStrip cartTotal={subtotal} variant="compact" />
+              <PromotionBannerList promotions={cartPromotions} />
               {cartItems.map((item, idx) => {
                 const displayName = resolveVariantTitle(item.name, item.variantTitleTemplate, item.selectedVariant);
                 return (

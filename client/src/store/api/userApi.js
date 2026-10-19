@@ -1,5 +1,29 @@
 import { apiSlice } from "./apiSlice";
 import { getApiUrl } from "../../config/appUrls";
+import { recordSuccessfulAdd } from "../slices/cartSlice";
+
+const cartAddSnapshot = (state, productId, variant) => ({
+  previousSubtotal: state.cart.totalAmount,
+  previousQuantity: state.cart.items
+    .filter((item) => String(item.productId || item.mongoId || item.id) === String(productId)
+      && (item.selectedVariant || "N/A") === (variant || "N/A"))
+    .reduce((sum, item) => sum + (Number(item.quantity) || 0), 0),
+});
+
+async function recordCartMutationAdd(data, { dispatch, getState, queryFulfilled }) {
+  const before = cartAddSnapshot(getState(), data.productId, data.variant);
+  try {
+    await queryFulfilled;
+    dispatch(recordSuccessfulAdd({
+      productId: data.productId,
+      selectedVariant: data.variant || "N/A",
+      quantity: Number(data.quantity) || 1,
+      ...before,
+    }));
+  } catch {
+    // A failed add must never open the promotion sheet.
+  }
+}
 
 export const userApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
@@ -25,6 +49,7 @@ export const userApi = apiSlice.injectEndpoints({
         body: data,
       }),
       invalidatesTags: ["Cart"],
+      onQueryStarted: recordCartMutationAdd,
     }),
     updateCart: builder.mutation({
       query: (data) => ({
@@ -33,6 +58,7 @@ export const userApi = apiSlice.injectEndpoints({
         body: data,
       }),
       invalidatesTags: ["Cart"],
+      onQueryStarted: (data, api) => data.action === "add" ? recordCartMutationAdd(data, api) : undefined,
     }),
     mergeGuestCart: builder.mutation({
       query: (data) => ({
@@ -119,12 +145,20 @@ export const userApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["User"],
     }),
+    // `items` (cart productIds) only matters for guests — a logged-in
+    // user's cart is read server-side instead, so it's safe to pass
+    // undefined/omit for that case. Needed so a product-gated coupon
+    // (Coupon.eligibleProductIds) is filtered out of this list until the
+    // required product is actually in the (guest) cart.
     getAvailableCoupons: builder.query({
-      query: (userId) => ({
-        url: "coupon/list",
-        method: "POST",
-        body: { userId },
-      }),
+      query: (arg) => {
+        const { userId, items } = typeof arg === "object" && arg !== null ? arg : { userId: arg };
+        return {
+          url: "coupon/list",
+          method: "POST",
+          body: { userId, items },
+        };
+      },
       providesTags: ["Coupon"],
     }),
     // Look up a single coupon by exact code (used by guests for hidden/secret codes).
@@ -324,10 +358,10 @@ export const userApi = apiSlice.injectEndpoints({
       keepUnusedDataFor: 0,
     }),
     getCartPromotions: builder.query({
-      query: ({ items, placement = "cart", subtotal, couponCode } = {}) => ({
+      query: ({ items, placement = "cart", subtotal, couponCode, addedItem } = {}) => ({
         url: "promotions/display/cart",
         method: "POST",
-        body: { items: items || [], placement, subtotal, couponCode },
+        body: { items: items || [], placement, subtotal, couponCode, addedItem },
       }),
       keepUnusedDataFor: 0,
     }),

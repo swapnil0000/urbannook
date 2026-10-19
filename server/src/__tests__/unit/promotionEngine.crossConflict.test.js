@@ -57,7 +57,13 @@ const v2OnlyPromo = {
   _id: "promo-40pct",
   name: "40% off Katana (V2-only, OR condition)",
   isActive: true,
-  priority: 0,
+  // Higher priority than adapterRepresentablePromo — since 2026-10-10,
+  // resolveProductWinners picks exactly one promotion per product by
+  // priority (then stackable, then earliest-created), NOT automatically by
+  // best price. Equal-priority promotions are a different, deliberately
+  // deterministic (earliest-created-wins) tiebreak, tested separately below
+  // ("earliest-created wins an equal-priority tie").
+  priority: 10,
   stackable: true,
   exclusive: false,
   promotionGroup: "",
@@ -95,7 +101,30 @@ describe("Cross-engine discount conflict — consolidated single-pass evaluation
     const cartItems = [{ productId: PRODUCT_ID, quantity: 1, variantSku: "" }];
     const { results } = runConsolidatedDiscountPass(cartItems, [adapterRepresentablePromo, v2OnlyPromo]);
     const line = results.find((r) => r.productId === PRODUCT_ID);
-    // Best price wins: 1000 * (1-0.40) = 600, NOT 1000 * (1-0.10) = 900.
+    // Higher-priority promotion wins: 1000 * (1-0.40) = 600, NOT the
+    // lower-priority 1000 * (1-0.10) = 900 — never both/stacked either.
+    expect(line.discountedUnitPrice).toBe(600);
+  });
+
+  test("two equal-priority, equally-stackable promotions on the same product: earliest-created wins the tie (never stacks)", () => {
+    const cartItems = [{ productId: PRODUCT_ID, quantity: 1, variantSku: "" }];
+    const older = { ...adapterRepresentablePromo, _id: "promo-older-10pct", priority: 5, createdAt: new Date("2026-01-01") };
+    const newer = { ...v2OnlyPromo, _id: "promo-newer-40pct", priority: 5, createdAt: new Date("2026-06-01") };
+    const { results } = runConsolidatedDiscountPass(cartItems, [older, newer]);
+    const line = results.find((r) => r.productId === PRODUCT_ID);
+    // Earliest-created wins the equal-priority/equal-stackable tie — the
+    // older (10%) promotion, not the newer (40%) one, and never both summed.
+    expect(line.discountedUnitPrice).toBe(900);
+  });
+
+  test("equal priority, one non-stackable: the non-stackable promotion wins the tie", () => {
+    const cartItems = [{ productId: PRODUCT_ID, quantity: 1, variantSku: "" }];
+    const stackableOlder = { ...adapterRepresentablePromo, _id: "promo-stackable-10pct", priority: 5, stackable: true, createdAt: new Date("2026-01-01") };
+    const nonStackableNewer = { ...v2OnlyPromo, _id: "promo-nonstackable-40pct", priority: 5, stackable: false, createdAt: new Date("2026-06-01") };
+    const { results } = runConsolidatedDiscountPass(cartItems, [stackableOlder, nonStackableNewer]);
+    const line = results.find((r) => r.productId === PRODUCT_ID);
+    // stackable:false wins the tie even though it was created later —
+    // refusing to share the product beats plain creation order.
     expect(line.discountedUnitPrice).toBe(600);
   });
 
@@ -128,9 +157,11 @@ describe("Cross-engine discount conflict — consolidated single-pass evaluation
 // describe block originally also tested was deleted entirely 2026-10-09
 // along with the rest of the legacy display stack — the "cross-engine"
 // scenario above is kept because it's still a real property of the ONE
-// remaining engine (two differently-shaped conditionTrees on the same
-// product, best price wins), it just no longer involves an actual second
-// engine/adapter.
+// remaining engine (two differently-shaped conditionTrees can both match
+// the same product), it just no longer involves an actual second engine/
+// adapter. Updated 2026-10-10: which one wins is now decided by
+// resolveProductWinners (priority, then stackable, then
+// earliest-created) — never by automatically picking the better price.
 
 describe("excludeUsageExhaustedPromotions — courtesy pre-check (audit Critical Bug #5, partial fix)", () => {
   test("a promotion with maxUsesTotal already reached is excluded entirely", async () => {

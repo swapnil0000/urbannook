@@ -42,6 +42,37 @@ const rewardSchema = new mongoose.Schema(
     },
     targetProductId: { type: String, trim: true },
     targetVariantSku: { type: String, trim: true, default: "" },
+    // percent_off_product/flat_off_product/discounted_product ONLY, and
+    // mutually exclusive with targetProductId (admin controller enforces
+    // exactly one of the two is set) — targets a SET of products resolved
+    // against the live cart at evaluation time instead of one specific
+    // product: "all" = every product in the cart, category/subcategory/tag
+    // = every cart product matching that value (same vocabulary
+    // conditionTree leaves already use — see promotionEngine.util.js's
+    // resolveRewardTargetProductIds). This is what "X% off everything in
+    // category Y" / "X% off every product in the order" actually are —
+    // added 2026-10-10, no new reward type needed, the existing per-product
+    // discount machinery (best-price-per-product, shared rule budgets,
+    // single-winner-by-priority) already generalizes over however many
+    // productIds a reward resolves to.
+    // "productList" = an admin-picked explicit set of specific products/
+    // variants (`items`), added 2026-10-11 — mirrors the admin repo's
+    // identical schema exactly.
+    targetScope: {
+      field: { type: String, enum: ["category", "subcategory", "tag", "all", "productList"] },
+      value: { type: String, trim: true, default: "" },
+      items: {
+        type: [{ productId: { type: String, trim: true }, variantSku: { type: String, trim: true }, _id: false }],
+        default: undefined,
+      },
+      // Phase 2 (Admin Offer Control System) — reward-level exclusion:
+      // "10% off category X EXCEPT these specific products". Distinct from
+      // condition-level NOT below (gates whether the promotion matches at
+      // all); this only filters which resolved productIds actually get the
+      // discount — see resolveRewardTargetProductIds. Optional, default
+      // empty = every existing scoped reward unaffected.
+      excludeProductIds: { type: [{ type: String, trim: true }], default: undefined },
+    },
     // Optional per-reward display name — a promotion with multiple rewards
     // (e.g. one reward per stand variant: Single/Double/Triple Layer) used
     // to show the SAME promotion-level `name` for every one of them on the
@@ -61,6 +92,15 @@ const rewardSchema = new mongoose.Schema(
       default: undefined,
     },
     value: { type: Number, min: 0 }, // percent_off: 0-100; flat_off/discounted_product: rupees
+    // Phase 3 (Admin Offer Control System) — "2+ → 10% off, 4+ → 20% off"
+    // as ONE promotion. Alongside (not replacing) `value` above — optional;
+    // absent/empty behaves exactly as today. See
+    // promotionEngine.util.js's resolveTierValue for how the applied value
+    // is picked (highest qualifying tier wins, never cumulative).
+    tiers: {
+      type: [{ minQuantity: { type: Number, min: 1 }, value: { type: Number, min: 0 }, _id: false }],
+      default: undefined,
+    },
     bundlePrice: { type: Number, min: 0 },
     storeCreditAmount: { type: Number, min: 0 },
     // percent_off_product/flat_off_product/discounted_product only. Default
@@ -157,6 +197,15 @@ const promotionSchema = new mongoose.Schema(
     // "buy 2 get 1" rule with no cap; a cap of 1 means it only ever triggers
     // once per order no matter how many complete groups qualify).
     maxApplications: { type: Number, default: null },
+
+    // Max ₹ this ONE promotion can grant across a whole order, summed over
+    // every product-level + order-level reward line it wins — null =
+    // unlimited (unchanged behavior). Mirrors Coupon.maxDiscountCap's exact
+    // naming/semantics (Admin Offer Control System, Phase 4). Enforced in
+    // promotionEngine.util.js via the SAME per-promotion running-total
+    // tracking rp.payment.controller.js already keeps for usage reporting —
+    // see promoDiscountByPromotionId / applyPromotionDiscountCaps.
+    maxDiscountAmount: { type: Number, default: null },
 
     // ── Abuse-prevention limits (mirrors Coupon's existing pattern exactly:
     // couponcodes has maxTotalUses/maxUsesPerUser) ─────────────────────────

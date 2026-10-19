@@ -33,6 +33,11 @@ const GoogleOneTap = lazy(() => import('./component/GoogleOneTap'));
 const FreeShippingPopup = lazy(() => import('./component/FreeShippingPopup'));
 const ScrollHint = lazy(() => import('./component/ScrollHint'));
 const PasskeyPrompt = lazy(() => import('./component/PasskeyPrompt'));
+// Smart combo/upsell bottom sheet (Promotion V2) — watches the cart from the
+// app root so it fires on an add from ANY surface (PDP, cart drawer, etc.),
+// not just one page. See the component's own header comment for the full
+// trigger/dismissal contract.
+const PromotionUnlockSheet = lazy(() => import('./component/promotions/PromotionUnlockSheet'));
 
 // Component to handle session restoration and token removal detection
 const SessionManager = ({ children }) => {
@@ -197,6 +202,10 @@ function App() {
                 {/* Free-shipping popup — shows once, everywhere except checkout */}
                 <ErrorBoundary>
                   <FreeShippingPopup />
+                </ErrorBoundary>
+                {/* Promotion V2 "add more to unlock" bottom sheet */}
+                <ErrorBoundary>
+                  <PromotionUnlockSheet />
                 </ErrorBoundary>
                 <ErrorBoundary>
                   <ScrollHint />

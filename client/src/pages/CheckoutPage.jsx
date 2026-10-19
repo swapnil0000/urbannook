@@ -29,6 +29,10 @@ import { ComponentLoader } from "../component/layout/LoadingSpinner";
 import { getClaimedMobile, getClaimedCode, isOfferLive } from "../config/siteOffer";
 import SiteOfferBanner from "../component/SiteOfferBanner";
 import FreeShippingStrip from "../component/FreeShippingStrip";
+import PromotionBannerList from "../component/promotions/PromotionBannerList";
+import SealBadgeCard, { UnderlineAmount } from "../component/promotions/SealBadgeCard";
+import { useGetCheckoutPromotionsQuery } from "../store/api/userApi";
+import { buildPromotionCartItems } from "../utils/promotionCartItems";
 import useOfferTerms from "../hooks/useOfferTerms";
 import { useShippingDelayNotice } from "../hooks/useShippingDelayNotice";
 import { calcLocalDiscount } from "../utils/couponDiscount";
@@ -100,151 +104,15 @@ const iconInput = (icon, children) => (
 
 // Green "You're saving ₹X" banner. Savings = (subtotal + real shipping) −
 // what they're actually paying — i.e. every rupee shaved off, whether from
-// a coupon or from the free-shipping offer, in one honest number.
+// a coupon or from the free-shipping offer, in one honest number. Shares
+// the same premium seal-badge card shell as every other promotion surface
+// (see SealBadgeCard.jsx) — previously built inline just for this one line.
 const SavingsBanner = ({ amount, freeShipping = false }) => (
-  <div
-    style={{
-      position: "relative",
-      display: "flex",
-      alignItems: "center",
-      gap: 14,
-      width: "100%",
-      minHeight: 64,
-      boxSizing: "border-box",
-      padding: "14px 16px",
-      borderRadius: 16,
-      background:
-        "linear-gradient(135deg, oklch(0.93 0.09 152) 0%, oklch(0.90 0.11 150) 60%, oklch(0.92 0.10 148) 100%)",
-      overflow: "hidden",
-      textAlign: "center",
-    }}
-  >
-    {/* diagonal shine streaks */}
-    <div
-      style={{
-        position: "absolute",
-        top: "-40%",
-        left: "55%",
-        width: 60,
-        height: "220%",
-        background: "linear-gradient(120deg, transparent 0%, oklch(1 0 0 / 0.35) 45%, transparent 100%)",
-        transform: "rotate(18deg)",
-        pointerEvents: "none",
-      }}
-    />
-    <div
-      style={{
-        position: "absolute",
-        top: "-40%",
-        left: "78%",
-        width: 24,
-        height: "220%",
-        background: "linear-gradient(120deg, transparent 0%, oklch(1 0 0 / 0.22) 45%, transparent 100%)",
-        transform: "rotate(18deg)",
-        pointerEvents: "none",
-      }}
-    />
-
-    {/* seal badge */}
-    <div
-      style={{
-        position: "relative",
-        flex: "0 0 auto",
-        width: 38,
-        height: 38,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1,
-      }}
-    >
-      <div
-        style={{
-          position: "absolute",
-          inset: -6,
-          borderRadius: "50%",
-          background: "oklch(0.62 0.14 155 / 0.35)",
-          filter: "blur(6px)",
-        }}
-      />
-      <div
-        style={{
-          position: "relative",
-          width: 36,
-          height: 36,
-          background: "oklch(0.47 0.10 165)",
-          clipPath:
-            "polygon(50% 0%, 61% 7%, 73% 2%, 79% 13%, 91% 15%, 92% 27%, 100% 35%, 95% 46%, 100% 57%, 91% 65%, 89% 77%, 77% 78%, 70% 89%, 58% 84%, 47% 92%, 38% 83%, 26% 87%, 21% 76%, 9% 73%, 11% 61%, 2% 52%, 9% 42%, 5% 30%, 16% 25%, 19% 13%, 31% 14%, 39% 4%)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <span style={{ color: "oklch(0.99 0 0)", fontSize: 16, fontWeight: 700, lineHeight: 1 }}>%</span>
-      </div>
-    </div>
-
-    {/* text */}
-    <div
-      style={{
-        position: "relative",
-        zIndex: 1,
-        flex: 1,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 3,
-      }}
-    >
-      {/* Big prominent free-shipping line — only when the offer combo has
-          actually zeroed the shipping charge. */}
-      {freeShipping && (
-        <span
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 7,
-            fontSize: 14,
-            fontWeight: 800,
-            letterSpacing: "0.02em",
-            textTransform: "uppercase",
-            lineHeight: 1.1,
-            color: "oklch(0.30 0.05 155)",
-          }}
-        >
-          <i className="fa-solid fa-truck-fast" style={{ color: "oklch(0.47 0.10 165)" }} />
-          Free Shipping Unlocked
-        </span>
-      )}
-
-      <div
-        style={{
-          display: "flex",
-          alignItems: "baseline",
-          justifyContent: "center",
-          flexWrap: "wrap",
-          gap: 5,
-          fontSize: freeShipping ? 13 : 17,
-          fontWeight: 500,
-          color: "oklch(0.30 0.05 155)",
-        }}
-      >
-        <span>You're saving</span>
-        <span style={{ position: "relative", fontWeight: 800, color: "oklch(0.16 0.01 155)", display: "inline-block" }}>
-          ₹{amount.toLocaleString()}
-          <svg
-            viewBox="0 0 100 14"
-            preserveAspectRatio="none"
-            style={{ position: "absolute", left: -2, right: -2, bottom: -7, width: "calc(100% + 4px)", height: 10 }}
-          >
-            <path d="M2,7 Q50,2 98,8" fill="none" stroke="oklch(0.55 0.14 155)" strokeWidth="3.5" strokeLinecap="round" />
-          </svg>
-        </span>
-        <span>on this order</span>
-      </div>
-    </div>
-  </div>
+  <SealBadgeCard eyebrowIcon={freeShipping ? "fa-truck-fast" : null} eyebrowText={freeShipping ? "Free Shipping Unlocked" : null}>
+    <span>You're saving</span>
+    <UnderlineAmount>₹{amount.toLocaleString()}</UnderlineAmount>
+    <span>on this order</span>
+  </SealBadgeCard>
 );
 
 // Stand-in for a ₹ figure that is mid-recalculation.
@@ -252,23 +120,20 @@ const AmountPlaceholder = () => (
   <span className="inline-block h-3.5 w-14 animate-pulse rounded bg-gray-200" aria-label="Calculating" />
 );
 
-const PriceRows = ({ subtotal, shipping, discount, giftWrapAmount = 0, appliedCoupon, totalToPay, itemCount, isLoadingShipping, paymentMethod, onApplyCoupon, onRemoveCoupon }) => {
+const PriceRows = ({ subtotal, promotionSavings = 0, shipping, discount, giftWrapAmount = 0, appliedCoupon, totalToPay, itemCount, isLoadingShipping, onApplyCoupon, onRemoveCoupon }) => {
   const shippingAmount = typeof shipping === "object" ? shipping?.amount : shipping;
   // COD advance must be based on the REAL carrier rate, not the (possibly
   // free-shipping-zeroed) charged amount — same real/charged split as the
   // server. realAmount is only present on the object form; the plain-number
   // form of `shipping` is legacy/display-only and never feeds COD math.
   const realShippingAmount = typeof shipping === "object" ? (shipping?.realAmount ?? shipping?.amount) : shipping;
-  const isCOD = paymentMethod === "COD";
-  const codPartialAmount = isCOD && realShippingAmount ? Math.min(Math.ceil(realShippingAmount) * 2, totalToPay) : 0;
-  const codRemainingAmount = isCOD ? Math.max(0, totalToPay - codPartialAmount) : 0;
 
   const isShippingFree = shippingAmount === 0 && realShippingAmount > 0;
   const hasDiscount = appliedCoupon && discount > 0;
   // (lamp + stand + ... + real shipping) − what they're actually paying = savings.
   // giftWrapAmount is added to both sides — it's a real add-on charge, not a
   // discount opportunity, so opting into it must never change this number.
-  const totalSavings = Math.max(0, subtotal + giftWrapAmount + (realShippingAmount || 0) - totalToPay);
+  const totalSavings = Math.max(0, subtotal + promotionSavings + giftWrapAmount + (realShippingAmount || 0) - totalToPay);
 
   return (
     <div className="space-y-2">
@@ -280,9 +145,16 @@ const PriceRows = ({ subtotal, shipping, discount, giftWrapAmount = 0, appliedCo
           </span>
         </span>
         <span className="font-bold text-gray-900">
-          ₹{subtotal.toLocaleString()}
+          ₹{(subtotal + promotionSavings).toLocaleString('en-IN')}
         </span>
       </div>
+
+      {promotionSavings > 0 && (
+        <div className="flex items-center justify-between gap-3 text-xs text-save">
+          <span className="font-semibold">Promotion savings</span>
+          <span className="font-extrabold tabular-nums">−₹{promotionSavings.toLocaleString('en-IN')}</span>
+        </div>
+      )}
 
       {giftWrapAmount > 0 && (
         <div className="flex justify-between items-center text-sm">
@@ -409,8 +281,6 @@ const CheckoutPage = () => {
   const cartLoadedRef = useRef(false);
   const addressManuallyResetRef = useRef(false);
 
-  // Helper: get current step label for content rendering
-  const getStepLabel = (step) => STEPS[step - 1]?.label || "";
   const contactStep = STEPS.findIndex(s => s.label === "Contact") + 1;
   const addressStep = STEPS.findIndex(s => s.label === "Address") + 1;
   const reviewStep = STEPS.findIndex(s => s.label === "Review & Pay") + 1;
@@ -531,13 +401,25 @@ const CheckoutPage = () => {
   const [calculateShipping, { isLoading: isCalculatingShipping }] = useCalculateShippingMutation();
   const { data: freeShippingOfferData } = useGetFreeShippingOfferQuery();
   const { data: giftWrapOfferData } = useGetGiftWrapOfferQuery();
-  // The old generic cart-rule evaluator/combo-banner nudge system (and the
-  // ruleDiscountSavings display-correction it fed) was removed entirely
-  // 2026-10-09 — see the file-header-equivalent note on MiniCartPreview.jsx.
-  // This page now shows plain, undiscounted prices; a Promotion V2-based
-  // checkout display is a deliberate follow-up (data layer already exists —
-  // useGetCheckoutPromotionsQuery, src/store/api/userApi.js).
-  const ruleDiscountSavings = 0;
+  // Promotion V2 — checkout-placement display (applied/qualifying offers
+  // shown via PromotionBannerList below; also the source of truth for
+  // "is free shipping REALLY eligible for these exact cart items", used by
+  // the shipping-rate effect further down — see its own comment). Declared
+  // early (before that effect) so it's already initialized wherever it's
+  // referenced. Fetched only once address/pincode is in so pincode/state-
+  // gated promotions can evaluate for real.
+  const { currentData: checkoutPromotionsData } = useGetCheckoutPromotionsQuery(
+    { items: buildPromotionCartItems(cartItems), subtotal: cartItems.reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0), customerType: isGuest ? 'guest' : 'registered', deliveryAddress: pinCode ? { pincode: pinCode } : undefined, couponCode: appliedCoupon || undefined },
+    { skip: currentStep !== reviewStep || cartItems.length === 0 },
+  );
+  const checkoutPromotions = checkoutPromotionsData?.data?.promotions || [];
+  // Same server-evaluated item discount preview shown in the cart. It is
+  // subtracted from the raw/coupon subtotal for display only; order creation
+  // independently applies the promotion when calculating the real charge.
+  const ruleDiscountSavings = Number(checkoutPromotionsData?.data?.pricing?.savings) || 0;
+  const checkoutPriceLine = (item) => checkoutPromotionsData?.data?.pricing?.lines?.find((line) =>
+    line.productId === String(item.productId || item.mongoId || item.id) &&
+    (line.selectedVariant || 'N/A') === (item.selectedVariant || 'N/A'));
 
   // When user logs in mid-checkout (guest → auth), AUTH_STEPS has fewer steps.
   // Clamp currentStep so STEPS[currentStep-1] is never undefined.
@@ -768,16 +650,14 @@ const CheckoutPage = () => {
         const result = paymentMethod === "COD" ? codRes : prepaidRes;
 
         if (result.success && result.data) {
-          // Free shipping: plain cart-value threshold only — see the
-          // file-header-equivalent note on MiniCartPreview.jsx (the old
-          // combo-banner/cart-rule system was removed entirely 2026-10-09).
-          // Mirrors the server's getFreeShippingConfig threshold check.
+          // Free shipping is a single admin-configured field — cart subtotal
+          // vs a ₹ threshold, nothing product-specific — so a plain
+          // comparison is the correct (and only) eligibility check.
           const offerConfig = freeShippingOfferData?.data;
           const cartSubtotal =
             cartItems.reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0) - ruleDiscountSavings;
-          const thresholdEligible =
+          const isFreeShippingEligible =
             !!offerConfig?.isActive && (offerConfig?.thresholdAmount || 0) > 0 && cartSubtotal >= offerConfig.thresholdAmount;
-          const isFreeShippingEligible = thresholdEligible;
           // realAmount = actual carrier rate, always — this is what the COD
           // 2x-advance must be based on (matches the server's realShippingAmount).
           // amount = what the customer's total/display reflects — 0 when free
@@ -817,7 +697,7 @@ const CheckoutPage = () => {
 
     fetchShippingRate();
     return () => { cancelled = true; };
-  }, [currentStep, reviewStep, pinCode, cartItems.length, cartItems.reduce((s, i) => s + Number(i.quantity || 0), 0), paymentMethod, freeShippingOfferData, ruleDiscountSavings]);
+  }, [currentStep, reviewStep, pinCode, cartItems, paymentMethod, freeShippingOfferData, ruleDiscountSavings]);
 
   useEffect(() => {
     if (savedAddressData?.success) {
@@ -895,7 +775,9 @@ const CheckoutPage = () => {
             const r2 = await applyCouponMutation({ couponCode: null, email: userEmail }).unwrap();
             if (r2.success && r2.data?.summary)
               setPricingDetails(prev => ({ ...prev, subtotal: (r2.data.summary.subtotal || 0) - ruleDiscountSavings, discount: r2.data.summary.discount || 0 }));
-          } catch (_) {}
+          } catch {
+            // Keep the cart's last known quote until the next successful sync.
+          }
         }
       }
     };
@@ -1431,7 +1313,7 @@ const CheckoutPage = () => {
             sessionStorage.removeItem(CHECKOUT_STATE_KEY);
             sessionStorage.removeItem("un_begin_checkout_fired"); // allow begin_checkout again for the next order
             navigate(`/payment-processing/${response.razorpay_order_id}`);
-          } catch (_) { setPaymentError("Payment verification failed. Contact support if amount was debited."); }
+          } catch { setPaymentError("Payment verification failed. Contact support if amount was debited."); }
         },
         prefill: { name: profileName, email: profileEmail, contact: senderMobileStr },
         ...magicCheckoutOptions(orderResult),
@@ -1476,8 +1358,6 @@ const CheckoutPage = () => {
       ? (Number(giftWrapOffer.price) || 0) * giftWrapEligibleCount
       : 0;
   const totalToPay = pricingDetails.subtotal + giftWrapAmount + shippingAmount - pricingDetails.discount;
-  const userName = isGuest ? guestName : profileName;
-  const userInitials = userName ? userName.split(" ").filter(Boolean).map((w) => w[0]).join("").toUpperCase().slice(0, 2) : "?";
 
   // ── Payment-action helpers (money-critical: never charge a stale amount) ──
   const COD_HANDLING_FEE = 35; // portion of the advance that is the non-refundable COD fee (label only, no math change)
@@ -1652,8 +1532,9 @@ const CheckoutPage = () => {
           <div className="mt-6 bg-white rounded-2xl border border-gray-100 p-5">
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-500">Subtotal</span>
-              <span className="font-semibold text-ink tabular-nums">₹{Math.round(pricingDetails.subtotal).toLocaleString("en-IN")}</span>
+              <span className="font-semibold text-ink tabular-nums">₹{Math.round(pricingDetails.subtotal + ruleDiscountSavings).toLocaleString("en-IN")}</span>
             </div>
+            {ruleDiscountSavings > 0 && <div className="mt-2.5 flex items-center justify-between text-sm text-save"><span>Promotion savings</span><span className="font-bold tabular-nums">−₹{ruleDiscountSavings.toLocaleString('en-IN')}</span></div>}
             {giftWrapAmount > 0 && (
               <div className="flex items-center justify-between text-sm mt-2.5">
                 <span className="text-gray-500">Gift wrap</span>
@@ -1844,10 +1725,22 @@ const CheckoutPage = () => {
         </div>
       )}
       {/* Free-shipping threshold — admin-controlled (free_shipping Promotion);
-          renders nothing while that promotion is off. */}
-      {currentStep === reviewStep && (
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4">
+          renders nothing while that promotion is off. Only shown here while
+          NOT YET unlocked (the "add ₹X more" progress nudge) — once it IS
+          unlocked, the order summary's own SavingsBanner below is the single
+          place that confirms it, so the two don't show the same "FREE
+          SHIPPING UNLOCKED" seal card twice on one page. */}
+      {currentStep === reviewStep && cartTotalAmount < (Number(freeShippingOfferData?.data?.thresholdAmount) || Infinity) && (
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4 space-y-3">
           <FreeShippingStrip cartTotal={cartTotalAmount} />
+          <PromotionBannerList promotions={checkoutPromotions} pricing={checkoutPromotionsData?.data?.pricing} />
+        </div>
+      )}
+      {/* Once unlocked, PromotionBannerList (other active offers) still needs
+          to render somewhere — same spot, standalone. */}
+      {currentStep === reviewStep && cartTotalAmount >= (Number(freeShippingOfferData?.data?.thresholdAmount) || Infinity) && checkoutPromotions.length > 0 && (
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4">
+          <PromotionBannerList promotions={checkoutPromotions} pricing={checkoutPromotionsData?.data?.pricing} />
         </div>
       )}
       {/* ── Main ───────────────────────────────────────────────────────── */}
@@ -2428,10 +2321,13 @@ const CheckoutPage = () => {
                             const rawPrice = Number(item.price) || 0;
                             const qty = Number(item.quantity) || 0;
                             const rawLineTotal = rawPrice * qty;
+                            const priceLine = checkoutPriceLine(item);
                             return (
-                              <p className="text-sm font-bold text-gray-800 shrink-0">
-                                ₹{rawLineTotal.toLocaleString()}
-                              </p>
+                              <div className="shrink-0 text-right">
+                                {priceLine?.savings > 0 && <p className="text-[11px] text-gray-400 line-through">₹{priceLine.originalLineTotal.toLocaleString('en-IN')}</p>}
+                                <p className="text-sm font-bold text-gray-800">₹{(priceLine?.lineTotal ?? rawLineTotal).toLocaleString('en-IN')}</p>
+                                {priceLine?.savings > 0 && <p className="text-[10px] font-bold text-save">Save ₹{priceLine.savings.toLocaleString('en-IN')}</p>}
+                              </div>
                             );
                           })()}
                         </div>
@@ -2441,6 +2337,7 @@ const CheckoutPage = () => {
                   <div className="px-5 py-4 border-t border-gray-50">
                     <PriceRows
                       subtotal={pricingDetails.subtotal}
+                      promotionSavings={ruleDiscountSavings}
                       shipping={pricingDetails.shipping}
                       discount={pricingDetails.discount}
                       giftWrapAmount={giftWrapAmount}
@@ -2647,10 +2544,13 @@ const CheckoutPage = () => {
                     const rawPrice = Number(item.price) || 0;
                     const qty = Number(item.quantity) || 0;
                     const rawLineTotal = rawPrice * qty;
+                    const priceLine = checkoutPriceLine(item);
                     return (
-                      <p className="text-xs font-bold text-gray-800 shrink-0">
-                        ₹{rawLineTotal.toLocaleString()}
-                      </p>
+                      <div className="shrink-0 text-right">
+                        {priceLine?.savings > 0 && <p className="text-[10px] text-gray-400 line-through">₹{priceLine.originalLineTotal.toLocaleString('en-IN')}</p>}
+                        <p className="text-xs font-bold text-gray-800">₹{(priceLine?.lineTotal ?? rawLineTotal).toLocaleString('en-IN')}</p>
+                        {priceLine?.savings > 0 && <p className="text-[10px] font-bold text-save">Save ₹{priceLine.savings.toLocaleString('en-IN')}</p>}
+                      </div>
                     );
                   })()}
                 </div>
@@ -2662,6 +2562,7 @@ const CheckoutPage = () => {
             <div className="px-5 py-5 border-t border-gray-100">
               <PriceRows
                 subtotal={pricingDetails.subtotal}
+                promotionSavings={ruleDiscountSavings}
                 shipping={pricingDetails.shipping}
                 discount={pricingDetails.discount}
                 giftWrapAmount={giftWrapAmount}
@@ -2760,7 +2661,7 @@ const CheckoutPage = () => {
           {mobileSummaryOpen && (
             <div className="bg-white border-t border-gray-100 px-4 pt-3 pb-2 max-h-[45vh] overflow-y-auto shadow-[0_-12px_40px_rgba(0,0,0,0.12)] animate-in fade-in duration-200">
               <div className="max-w-sm mx-auto">
-                <PriceRows subtotal={pricingDetails.subtotal} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} isLoadingShipping={isCalculatingShipping} paymentMethod={paymentMethod} />
+                <PriceRows subtotal={pricingDetails.subtotal} promotionSavings={ruleDiscountSavings} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} isLoadingShipping={isCalculatingShipping} paymentMethod={paymentMethod} />
               </div>
             </div>
           )}
@@ -3063,6 +2964,7 @@ const CheckoutPage = () => {
                   discount={pricingDetails.discount}
                   isGuest={isGuest}
                   cartTotal={cartTotalAmount}
+                  items={cartItems.map((i) => ({ productId: i.mongoId || i.id.split(":")[0] }))}
                   onCouponApplied={
                     isGuest ? handleGuestCouponApplied : handleCouponApplied
                   }
@@ -3083,6 +2985,7 @@ const CheckoutPage = () => {
                     userId={userProfile?.userId}
                     isGuest={isGuest}
                     cartTotal={cartTotalAmount}
+                    items={cartItems.map((i) => ({ productId: i.mongoId || i.id.split(":")[0] }))}
                   />
                 </Suspense>
               </div>
