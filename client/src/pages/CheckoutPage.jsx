@@ -1139,6 +1139,30 @@ const CheckoutPage = () => {
     paymentMethod !== "COD" &&
     payChoice === "EXPRESS";
 
+  // Razorpay sometimes closes its modal without calling `handler` even though
+  // the money went through (UPI intent / app switch on mobile). Before telling
+  // the customer "cancelled", ask the server — it checks Razorpay directly.
+  const handleModalDismiss = async (rpOrderId, value) => {
+    if (paymentCompletedRef.current) return;
+    try {
+      const token = localStorage.getItem("authToken");
+      const res = await fetch(`${getApiUrl()}/user/order/status/${rpOrderId}`, {
+        credentials: "include",
+        headers: { ...(token && { Authorization: `Bearer ${token}` }) },
+      });
+      const status = (await res.json())?.data?.status;
+      if (status === "PAID" || status === "PROCESSING") {
+        paymentCompletedRef.current = true;
+        navigate(`/payment-processing/${rpOrderId}`);
+        return;
+      }
+    } catch { /* fall through to the cancelled message */ }
+    trackPaymentModalDismissed({ orderId: rpOrderId, value });
+    setPaymentError("Payment cancelled. Your cart is safe.");
+    setShowRetry(true);
+    setCancelFeedback({ razorpayOrderId: rpOrderId, value });
+  };
+
   // Extra checkout.js options that switch the modal into Magic. Note this is a
   // CHECKOUT option — the order itself is made a Magic order by its line_items.
   //
@@ -1517,7 +1541,7 @@ const CheckoutPage = () => {
           prefill: { name: guestName.trim(), email: guestEmail.trim(), contact: guestMobile.trim() },
           ...magicCheckoutOptions(orderResult),
           notes: { address, pinCode }, theme: { color: "#E63329" },
-          modal: { ondismiss: () => { trackPaymentModalDismissed({ orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId, value: totalToPay }); setPaymentError("Payment cancelled. Your cart is safe."); setShowRetry(true); setCancelFeedback({ razorpayOrderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId, value: totalToPay }); }, escape: false, confirm_close: true },
+          modal: { ondismiss: () => { handleModalDismiss(orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId, totalToPay); }, escape: false, confirm_close: true },
         });
         rp.on("payment.failed", (r) => {
           trackPaymentFailed({ errorCode: r.error?.code, errorDescription: r.error?.description, paymentMethod, value: totalToPay, orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId });
@@ -1609,7 +1633,7 @@ const CheckoutPage = () => {
         prefill: { name: profileName, email: profileEmail, contact: senderMobileStr },
         ...magicCheckoutOptions(orderResult),
         notes: { address, pinCode }, theme: { color: "#E63329" },
-        modal: { ondismiss: () => { trackPaymentModalDismissed({ orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId || orderResult.id, value: totalToPay }); setPaymentError("Payment cancelled. Your cart is safe."); setShowRetry(true); setCancelFeedback({ razorpayOrderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId || orderResult.id, value: totalToPay }); }, escape: false, confirm_close: true },
+        modal: { ondismiss: () => { handleModalDismiss(orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId || orderResult.id, totalToPay); }, escape: false, confirm_close: true },
       });
       rp.on("payment.failed", (r) => {
         trackPaymentFailed({ errorCode: r.error?.code, errorDescription: r.error?.description, paymentMethod, value: totalToPay, orderId: orderResult.data?.razorpayOrderId || orderResult.razorpayOrderId || orderResult.id });
