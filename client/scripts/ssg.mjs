@@ -9,6 +9,7 @@
  *   dist-prerender/ssg/index.html                        home page ("/")
  *   dist-prerender/ssg/products/index.html               shop listing
  *   dist-prerender/ssg/category/<slug>/index.html        category pages
+ *   dist-prerender/ssg/products/<id>/index.html          variant chooser (shop grid → here; not in the sitemap)
  *   dist-prerender/ssg/product/<id>/index.html           product pages
  *   dist-prerender/ssg/product/<id>/<sku>/index.html     variant pages (ad / feed landing URLs)
  *   dist-prerender/ssg/blog/index.html, blog/<slug>/…     journal list and posts (Admin → Blog)
@@ -151,6 +152,7 @@ async function main() {
     ...categories.map((c) => `/category/${c.slug}`),
     ...posts.map((b) => `/blog/${b.slug}`),
     ...products.flatMap((p) => [
+      `/products/${p.productId}`,
       `/product/${p.productId}`,
       ...(p.variantDetails || []).filter((v) => v.sku && v.isActive !== false).map((v) => `/product/${p.productId}/${encodeURIComponent(v.sku)}`),
     ]),

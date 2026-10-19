@@ -9,9 +9,9 @@ const secondImg = (p) => p?.secondaryImages?.[0] || p?.variantDetails?.[1]?.vari
 // Shop grid → variant list → PDP. Tapping a product card opens that
 // product's variant page (/products/:id); the PDP is reached from there, per
 // the product flow introduced on main. Products with a single variant still
-// route through it so there is exactly one path into the PDP.
-// The product page itself (/products/<id> only redirects there).
-const productHref = (p) => `/product/${p.productId}`;
+// route through it so there is exactly one path into the PDP. (That page's
+// canonical is /product/<id>, so search engines treat it as the product.)
+const productHref = (p) => `/products/${p.productId}`;
 const badgeOf = (p) => {
   const t = p?.tags || [];
   if (t.includes('best_seller')) return 'Bestseller';

@@ -15,8 +15,10 @@
 //
 // PAGES (no file extension): ssg/<path>/index.html if the build rendered it,
 // else an older product/* prerender, else the SPA shell for known app routes,
-// else the rendered not-found page with HTTP 404. /products/<id> and trailing
-// slashes 301 to the one canonical URL. See resolvePage().
+// else the rendered not-found page with HTTP 404. Trailing slashes 301 to the
+// URL without one. /products/<id> is the variant chooser shoppers reach from
+// the shop grid — served, not redirected (its canonical is /product/<id>).
+// See resolvePage().
 //
 // Source of truth for this code: infra/cloudflare/ in the storefront repo.
 // Deployed by Jenkins (jenkins/prod.Jenkinsfile) with wrangler — never edit in the dashboard.
@@ -100,7 +102,7 @@ const IMMUTABLE = "public, max-age=31536000, immutable";
 // one that matches but has no rendered page (a product added after the last
 // build, checkout, account pages…) gets the SPA shell with 200 as before.
 const APP_ROUTES = [
-  /^\/$/, /^\/products$/, /^\/product\/[^/]+(\/[^/]+)?$/, /^\/category\/[^/]+$/, /^\/blog(\/[^/]+)?$/,
+  /^\/$/, /^\/products$/, /^\/products\/[^/]+$/, /^\/product\/[^/]+(\/[^/]+)?$/, /^\/category\/[^/]+$/, /^\/blog(\/[^/]+)?$/,
   /^\/(about-us|contact-us|customer-support|customize|faqs|rewards|terms-conditions|privacy-policy|return-policy)$/,
   /^\/(checkout|profile|orders|wishlist|settings|payment-failed)$/,
   /^\/(payment-processing|order-confirm)\/[^/]+$/, /^\/nfc(\/.*)?$/,
@@ -145,14 +147,11 @@ export default {
     const isPage = !pathname.slice(pathname.lastIndexOf("/") + 1).includes(".");
 
     if (isPage) {
-      // One URL per page: no trailing slash, and the old /products/<id> page
-      // (same product as /product/<id>) moves to /product/<id>.
+      // One URL per page: no trailing slash.
       if (pathname.length > 1 && pathname.endsWith("/")) return redirect(url, pathname.replace(/\/+$/, ""));
       // Old policy URLs still shown in Google → their current pages.
       const moved = { "/terms": "/terms-conditions", "/cancellation-refund-policy": "/return-policy", "/cancellation-refund": "/return-policy", "/shipping-policy": "/return-policy" }[pathname];
       if (moved) return redirect(url, moved);
-      const legacy = pathname.match(/^\/products\/([^/]+)$/);
-      if (legacy) return redirect(url, `/product/${legacy[1]}`);
     }
 
     let key;
