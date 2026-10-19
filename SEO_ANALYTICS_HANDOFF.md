@@ -202,3 +202,14 @@ L × B × H). Empty when unknown. Merchant Center reads the feed daily.
 ### Blog schema (2026-10-19)
 `BlogPosting.about` lists linked products as `Thing` (name + URL), not `Product`: Google flags a `Product` without
 `offers`/`review`/`aggregateRating` as an invalid product snippet. Full `Product`/`Offer` schema stays on the product pages.
+
+## I. Google Merchant feed made Ads-policy safe (2026-10-20, branch `feat/google-ads-feed-compliance`)
+
+`GET /api/v1/catalog/google-feed.tsv` (`server/src/controller/catalog.controller.js`) now:
+- **Removes car brand names** (BMW, Porsche, Ferrari, … — list `CAR_BRANDS`) from `title` and
+  `description`, because they are trademarks and get Shopping ads disapproved. Titles get a
+  "Car Enthusiast" prefix (e.g. "Car Enthusiast Brake Caliper Lamp"); in descriptions a list of
+  names becomes "iconic cars". `id`/SKU and `link` are unchanged, so Merchant Center history is kept.
+- **Leaves out swords** (katana, sword, dagger, knife — `WEAPON_RE`), which Google restricts as weapons
+  even when decorative. Promote them through Meta, Instagram and SEO instead.
+- The website and the Meta feed (`meta-feed.csv`) are unchanged.
