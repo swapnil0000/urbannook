@@ -13,8 +13,11 @@ const PER_PAGE = 24;
 // One card per sellable variant, linking to that variant's own page — a
 // category with one product and four variants (BMW, Ferrari, …) shows four
 // cards. Variants hidden by admin (isActive:false) are skipped.
-const toItems = (products = []) =>
-  products.flatMap((p) => {
+// Cards are interleaved round-robin across products (1st variant of each
+// product, then the 2nd of each, …) so a product with many variants (21
+// wooden katanas) doesn't fill the whole first page and hide the others.
+const toItems = (products = []) => {
+  const perProduct = products.map((p) => {
     const variants = (p.variantDetails || []).filter((v) => v && v.isActive !== false);
     if (!variants.length) return [{ key: p.productId, p, href: `/product/${p.productId}` }];
     return variants.map((v, i) => ({
@@ -26,6 +29,13 @@ const toItems = (products = []) =>
       soldOut: v.variantOutOfStock === true || (v.variantQuantity != null && v.variantQuantity <= 0),
     }));
   });
+  const total = perProduct.reduce((n, list) => n + list.length, 0);
+  const out = [];
+  for (let i = 0; out.length < total; i++) {
+    for (const list of perProduct) if (list[i]) out.push(list[i]);
+  }
+  return out;
+};
 
 const CategoryPage = () => {
   const { slug } = useParams();

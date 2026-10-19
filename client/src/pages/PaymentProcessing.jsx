@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { clearCart } from "../store/slices/cartSlice";
-import { useClearCartMutation } from "../store/api/userApi";
+import { useClearCartMutation, userApi } from "../store/api/userApi";
 import { useUI } from "../hooks/useRedux";
 import { getApiUrl } from "../config/appUrls";
 
@@ -62,6 +62,8 @@ const PaymentProcessing = () => {
           cancelled = true;
           clearInterval(interval);
           dispatch(clearCart());
+          // Order history is cached — drop it so My Orders shows this order as paid
+          dispatch(userApi.util.invalidateTags(["Orders"]));
           localStorage.removeItem("guestCart");
           localStorage.removeItem("guestId");
 
