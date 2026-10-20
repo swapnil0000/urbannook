@@ -303,3 +303,22 @@ describe("discountMagicLineItems", () => {
     });
   });
 });
+
+describe("UnCash (loyalty points) discount", () => {
+  test("comes off the prepaid total after the coupon", () => {
+    const c = computeOrderCharge({ subtotal: 1499, chargedShippingAmount: 89, discountAmount: 100, pointsDiscount: 34 });
+    expect(c.finalAmount).toBe(1499 + 89 - 100 - 34);
+    expect(c.razorpayChargeAmountPaise).toBe(1454 * 100);
+  });
+
+  test("on COD the advance stays 2x real shipping and the remainder drops", () => {
+    const c = computeOrderCharge({ subtotal: 1499, chargedShippingAmount: 89, realShippingAmount: 89, pointsDiscount: 34, paymentMethod: "COD" });
+    expect(c.codPartialAmount).toBe(178);
+    expect(c.codRemainingAmount).toBe(1499 + 89 - 34 - 178);
+  });
+
+  test("never pushes the total below zero", () => {
+    const c = computeOrderCharge({ subtotal: 50, pointsDiscount: 500 });
+    expect(c.finalAmount).toBe(0);
+  });
+});

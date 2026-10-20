@@ -5,6 +5,7 @@ export { default as HomePage } from "./home/HomePage.jsx";
 
 // Keep other pages lazy loaded
 export const CheckoutPage = lazy(() => import("../pages/CheckoutPage"));
+export const UnCashCalculationPage = lazy(() => import("./info/UnCashCalculationPage.jsx"));
 export const MyOrdersPage = lazy(() => import("./account/MyOrdersPage.jsx"));
 export const WishlistPage = lazy(() => import("./account/WishlistPage.jsx"));
 export const RewardsPage = lazy(() => import("./info/RewardsPage.jsx"));

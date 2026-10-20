@@ -22,6 +22,9 @@
  *                                           is based on this even when the
  *                                           customer is charged nothing
  * @param {number}  p.discountAmount         coupon discount in rupees
+ * @param {number}  p.pointsDiscount         UnCash (loyalty points) discount in
+ *                                           rupees — already validated against
+ *                                           balance + cap by loyalty.service
  * @param {boolean} p.isInternalTestOrder    INTERNAL_TEST coupon ⇒ flat ₹1
  * @param {boolean} p.isMagic
  * @param {string}  p.paymentMethod          "COD" | anything else
@@ -32,6 +35,7 @@ export const computeOrderCharge = ({
   chargedShippingAmount = 0,
   realShippingAmount = 0,
   discountAmount = 0,
+  pointsDiscount = 0,
   isInternalTestOrder = false,
   isMagic = false,
   paymentMethod = "PREPAID",
@@ -48,7 +52,7 @@ export const computeOrderCharge = ({
   // Razorpay reliably honours.
   const finalAmount = isInternalTestOrder
     ? 1
-    : Math.max(subtotal + giftWrapAmount + chargedShippingAmount - discountAmount, 0);
+    : Math.max(subtotal + giftWrapAmount + chargedShippingAmount - discountAmount - pointsDiscount, 0);
 
   // Magic is prepaid-only: its serviceability callback always answers cod:false,
   // so a COD request can never arrive on the Magic path.

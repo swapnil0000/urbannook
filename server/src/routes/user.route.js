@@ -93,6 +93,8 @@ import {
   magicApplyPromotionController,
 } from "../controller/magic.checkout.controller.js";
 
+import { userGetLoyalty, userGetRedeemQuote } from "../controller/loyalty.controller.js";
+
 const userRouter = Router();
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -201,6 +203,12 @@ userRouter.post(
   authGuardService("USER"),
   generateOrderInvoice,
 );
+
+/* ===============================================================
+   LOYALTY POINTS (PROTECTED)
+================================================================ */
+userRouter.get("/user/loyalty", authGuardService("USER"), userGetLoyalty);
+userRouter.get("/user/loyalty/redeem-quote", authGuardService("USER"), userGetRedeemQuote);
 
 /* ===============================================================
    CART MANAGEMENT (PROTECTED)

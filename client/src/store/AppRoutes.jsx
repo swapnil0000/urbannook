@@ -15,6 +15,7 @@ import {
   WishlistPage,
   CustomerSupportPage,
   RewardsPage,
+  UnCashCalculationPage,
   SettingsPage,
   TermsConditions,
   CancellationPolicy,
@@ -183,6 +184,14 @@ const AppRoutes = () => {
           <Suspense fallback={<MinimalLoader />}>
             <SEOHead title="Rewards Program" description="Earn and redeem UrbanNook reward points on your orders of 3D-printed décor and desk accessories." url="/rewards" />
             <RewardsPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/uncash-calculation"
+        element={
+          <Suspense fallback={<MinimalLoader />}>
+            <UnCashCalculationPage />
           </Suspense>
         }
       />

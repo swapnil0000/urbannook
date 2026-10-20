@@ -32,6 +32,7 @@ import {
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
 import { ValidationError, NotFoundError } from "../utils/errors.js";
 import { computeOrderCharge } from "../utils/orderAmount.util.js";
+import { validateAndPriceRedeem, writeLedgerEntry, getLoyaltyConfig, getUserBalance } from "../services/loyalty.service.js";
 import { buildPlaceholderEmail, isPlaceholderEmail } from "../utils/placeholderEmail.js";
 import { uploadInvoiceToS3 } from "../utils/s3.utils.js";
 import Address from "../model/address.new.model.js";
@@ -966,12 +967,29 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   // computeOrderCharge so the guest checkout below cannot drift from this one.
   // A cart-applied coupon now stays in the amount on Magic too; it reaches
   // Razorpay as a `promotion` a few lines down.
+  // UnCash (loyalty points) — normal checkout only (not Magic, not the ₹1
+  // internal test order). Validated here against the live balance and the
+  // admin cap, which applies to the product value after the coupon. Points are
+  // only debited from the ledger once the order is PAID (fulfilCapturedPayment).
+  const requestedPoints = Math.max(0, Math.floor(Number(req.body?.redeemPoints) || 0));
+  const redeem = !isMagic && !isInternalTestOrder && requestedPoints > 0
+    ? await validateAndPriceRedeem({ userId, cartValue: Math.max(0, subtotal - discountAmount), requestedPoints })
+    : { pointsRedeemed: 0, discountFromPoints: 0, balanceBeforeOrder: null };
+  // Snapshot the balance on every order while loyalty is on, so order history
+  // can show "balance before this order" even when no points were used.
+  if (redeem.balanceBeforeOrder == null) {
+    const loyaltyCfg = await getLoyaltyConfig();
+    redeem.balanceBeforeOrder = loyaltyCfg.isEnabled ? await getUserBalance(userId) : null;
+  }
+  const pointsDiscount = Math.min(redeem.discountFromPoints, Math.max(0, subtotal - discountAmount));
+
   const charge = computeOrderCharge({
     subtotal,
     giftWrapAmount,
     chargedShippingAmount,
     realShippingAmount,
     discountAmount,
+    pointsDiscount,
     isInternalTestOrder,
     isMagic,
     paymentMethod: reqPaymentMethod,
@@ -1126,6 +1144,15 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       discountAmount,
       isApplied,
     },
+    ...(redeem.balanceBeforeOrder != null
+      ? {
+          loyalty: {
+            balanceBeforeOrder: redeem.balanceBeforeOrder,
+            pointsRedeemed: redeem.pointsRedeemed,
+            discountFromPoints: pointsDiscount,
+          },
+        }
+      : {}),
     metaTracking: collectMetaTracking(req),
     note: "Amount is the final amount paid by the user",
   });
@@ -1146,6 +1173,8 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
         magic: isMagic,
         paymentMethod: isCOD ? "COD" : "PREPAID",
         codDetails: isCOD ? { partialAmountPaid: codPartialAmount, remainingAmount: codRemainingAmount } : null,
+        pointsRedeemed: redeem.pointsRedeemed,
+        discountFromPoints: pointsDiscount,
         senderMobile: finalSenderMobile,
         receiverMobile: finalReceiverMobile,
       },
@@ -1352,6 +1381,31 @@ const fulfilCapturedPayment = async (order, payment) => {
       // Decrement per-variant stock now that the order is confirmed PAID.
       // Guarded by the `order.status !== "PAID"` block above → runs once.
       await decrementStockForOrder(order);
+
+      // UnCash: debit the points this order redeemed — only now that it is
+      // paid, so an abandoned/failed checkout never costs the customer points.
+      // Deduped on `${orderId}:REDEEM_ORDER`. Never blocks fulfilment.
+      if (claimed.loyalty?.pointsRedeemed > 0) {
+        try {
+          const entry = await writeLedgerEntry({
+            userId: claimed.userId,
+            orderId: claimed.orderId,
+            orderType: "WEBSITE",
+            type: "REDEEM_ORDER",
+            points: -claimed.loyalty.pointsRedeemed,
+            reason: `Used on order ${claimed.orderId}`,
+            createdBy: "system",
+          });
+          if (entry) {
+            if (entry.balanceAfter < 0) {
+              console.warn(`[Loyalty] ${claimed.orderId}: balance went negative (${entry.balanceAfter}) — points spent elsewhere between checkout and payment`);
+            }
+            await Order.updateOne({ _id: claimed._id }, { $set: { "loyalty.balanceAfterRedeem": entry.balanceAfter } });
+          }
+        } catch (err) {
+          console.error(`[Loyalty] REDEEM_ORDER debit failed for ${claimed.orderId}:`, err.message);
+        }
+      }
 
       // Promotion Engine V2 — permanent usage audit trail, same
       // never-deleted invariant as CouponUsage, recorded here (once,
