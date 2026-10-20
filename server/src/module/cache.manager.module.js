@@ -73,12 +73,6 @@ class CacheManager {
     });
     this.currentMemoryUsage += itemSize;
 
-    if (this.isDev) {
-      const usageKB = (this.currentMemoryUsage / 1024).toFixed(2);
-      console.log(
-        `--- 📦 Cache: ${usageKB}KB / ${this.maxMemoryBytes / 1024}KB ---`,
-      );
-    }
   }
 
   clear() {

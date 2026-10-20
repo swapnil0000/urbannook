@@ -42,19 +42,12 @@ async function validateNewCoupon({ coupon, cartProductTotal, email, mobile, isLo
   const tag = "[Coupon:Storefront]";
   const now = new Date();
 
-  console.log(
-    `${tag} ELIGIBILITY CHECK "${coupon.code}" — scope=${coupon.scope} audience=${coupon.audience} ` +
-    `isLoggedIn=${isLoggedIn} email=${email || "-"} mobile=${mobile || "-"} assignedToCount=${coupon.assignedTo?.length ?? 0} ` +
-    `cartProductTotal=₹${cartProductTotal}`
-  );
 
   if (!coupon.isActive) {
-    console.log(`${tag} REJECT "${coupon.code}" — not active`);
     throw new ValidationError("This coupon is not currently active.");
   }
   // MEMBERS_ONLY coupons require a logged-in account — guests cannot redeem them
   if (coupon.audience === "MEMBERS_ONLY" && !isLoggedIn) {
-    console.log(`${tag} REJECT "${coupon.code}" — MEMBERS_ONLY, not authenticated`);
     throw new ValidationError("This coupon is only available for registered members. Please sign in to use it.");
   }
 
@@ -64,7 +57,6 @@ async function validateNewCoupon({ coupon, cartProductTotal, email, mobile, isLo
   if (coupon.isTest && !isValidInternal) {
     // isTest coupons are invisible to storefront users.
     // Only valid INTERNAL_TEST coupons (isInternal=true + discountType=INTERNAL_TEST) are exempt.
-    console.log(`${tag} REJECT "${coupon.code}" — in Testing mode (isTest=true)`);
     throw new NotFoundError("Invalid or inactive coupon");
   }
   if (coupon.isInternal && !isValidInternal) {
@@ -74,28 +66,22 @@ async function validateNewCoupon({ coupon, cartProductTotal, email, mobile, isLo
   }
   // INTERNAL_TEST coupons must be TARGETED — a PUBLIC ₹1 coupon is a security risk
   if (isValidInternal && coupon.scope !== "TARGETED") {
-    console.log(`${tag} REJECT "${coupon.code}" — internal coupon must be TARGETED scope`);
     throw new ValidationError("This coupon is restricted. Contact admin.");
   }
   // Internal test coupons require a signed-in account so the assigned email is verified.
   if (isValidInternal && !isLoggedIn) {
-    console.log(`${tag} REJECT "${coupon.code}" — internal coupon requires login`);
     throw new ValidationError("This coupon is only available to signed-in team members. Please sign in to use it.");
   }
   if (coupon.validFrom && now < new Date(coupon.validFrom)) {
-    console.log(`${tag} REJECT "${coupon.code}" — not valid yet (starts ${coupon.validFrom})`);
     throw new ValidationError("This coupon is not valid yet.");
   }
   if (coupon.validUntil && now > new Date(coupon.validUntil)) {
-    console.log(`${tag} REJECT "${coupon.code}" — expired (was valid until ${coupon.validUntil})`);
     throw new ValidationError("This coupon has expired.");
   }
   if (cartProductTotal < (coupon.minCartValue || 0)) {
-    console.log(`${tag} REJECT "${coupon.code}" — cart ₹${cartProductTotal} < min ₹${coupon.minCartValue}`);
     throw new ValidationError(`Minimum order of ₹${coupon.minCartValue} required for this coupon`);
   }
   if (coupon.maxTotalUses != null && coupon.usageCount >= coupon.maxTotalUses) {
-    console.log(`${tag} REJECT "${coupon.code}" — global cap reached (${coupon.usageCount}/${coupon.maxTotalUses})`);
     throw new ValidationError("This coupon has reached its maximum number of uses.");
   }
 
@@ -118,7 +104,6 @@ async function validateNewCoupon({ coupon, cartProductTotal, email, mobile, isLo
         ...(normMobile ? [{ mobile: normMobile }] : []),
       ],
     });
-    console.log(`${tag} Prior uses by this user for "${coupon.code}": ${priorCount} (limit: ${coupon.maxUsesPerUser})`);
     if (priorCount >= coupon.maxUsesPerUser) {
       throw new ValidationError(
         coupon.maxUsesPerUser === 1
@@ -135,26 +120,21 @@ async function validateNewCoupon({ coupon, cartProductTotal, email, mobile, isLo
     }
     const assignment = (coupon.assignedTo || []).find((a) => identifiers.includes(a.identifier));
     if (!assignment) {
-      console.log(`${tag} REJECT "${coupon.code}" — TARGETED: not assigned to ${identifiers.join(" / ")}`);
       throw new ValidationError("This coupon has not been assigned to you.");
     }
     if (assignment.usedAt && !skipSingleUseGate) {
-      console.log(`${tag} REJECT "${coupon.code}" — TARGETED: already used`);
       throw new ValidationError("Your personal coupon has already been used.");
     }
   }
 
   // Discount applies to product subtotal only (shipping excluded — industry standard)
   const discountAmount = calculateDiscount(coupon, cartProductTotal);
-  console.log(`${tag} ✅ "${coupon.code}" valid — discount ₹${discountAmount} on product subtotal ₹${cartProductTotal}`);
   return discountAmount;
 }
 
 // ── Main apply service ────────────────────────────────────────────────────────
 
 const applyCouponCodeService = async ({ userId, couponCodeName, email, mobile }) => {
-  const tag = "[Coupon:Storefront]";
-  console.log(`${tag} applyCouponCodeService called: userId=${userId} code="${couponCodeName || "-"}" email=${email || "-"} mobile=${mobile || "-"}`);
 
   const cartRes = await getCartService({ userId });
 
@@ -184,16 +164,12 @@ const applyCouponCodeService = async ({ userId, couponCodeName, email, mobile })
   }
 
   const cleanCode = couponCodeName.trim().toUpperCase();
-  console.log(`${tag} Apply attempt: code="${cleanCode}" email=${email || "-"} mobile=${mobile || "-"} subtotal=₹${cartSubtotal}`);
 
   // --- CASE 3: Try new admin coupon model first ---
   // Debug: confirm which collection and DB we're querying
-  console.log(`${tag} Querying collection: ${Coupon.collection.collectionName} on db: ${Coupon.db.name}`);
   const newCoupon = await Coupon.findOne({ code: cleanCode, isArchived: false }).lean();
-  console.log(`${tag} New model result: ${newCoupon ? JSON.stringify({ code: newCoupon.code, isActive: newCoupon.isActive, isTest: newCoupon.isTest, isArchived: newCoupon.isArchived }) : "null (not found)"}`);
 
   if (newCoupon) {
-    console.log(`${tag} Found in new model: couponId=${newCoupon.couponId} isActive=${newCoupon.isActive} isTest=${newCoupon.isTest} type=${newCoupon.discountType}`);
 
     // throws ValidationError/NotFoundError on any failure
     const discountAmount = await validateNewCoupon({
@@ -210,7 +186,6 @@ const applyCouponCodeService = async ({ userId, couponCodeName, email, mobile })
     if (newCoupon.isInternal && newCoupon.discountType === "INTERNAL_TEST") {
       finalDiscount   = 0;        // payment formula: subtotal + shipping - 0, then isInternal override → ₹1
       finalGrandTotal = 1;        // display ₹1 in cart so user knows what they'll pay
-      console.log(`${tag} Internal coupon applied — grandTotal set to ₹1 for display; payment controller confirms ₹1 with real shipping`);
     } else {
       finalDiscount   = discountAmount;
       finalGrandTotal = Math.max(cartSubtotal - discountAmount, 0);
@@ -236,7 +211,6 @@ const applyCouponCodeService = async ({ userId, couponCodeName, email, mobile })
   // --- Not found in the new coupon model — reject. ---
   // Legacy CouponCode fallback (and its waitlist-signup gate) retired: every coupon
   // is now served by the new Coupon model.
-  console.log(`${tag} REJECT "${cleanCode}" — not found`);
   throw new NotFoundError("Invalid or inactive coupon");
 };
 
@@ -245,8 +219,6 @@ const applyCouponCodeService = async ({ userId, couponCodeName, email, mobile })
 // render without knowing which model a coupon came from.
 
 const getAllCouponCodeService = async ({ userId, code }) => {
-  const tag = "[Coupon:List]";
-  console.log(`${tag} getAllCouponCodeService called: userId=${userId || "-"} code="${code || "-"}"`);
 
   // ── Single-coupon lookup by exact code (used by guests typing a code manually) ──
   // Lets the storefront show the correct discount for HIDDEN coupons without listing them.
@@ -266,19 +238,6 @@ const getAllCouponCodeService = async ({ userId, code }) => {
       { couponId: 1, code: 1, title: 1, notes: 1, discountType: 1, discountValue: 1, maxDiscountCap: 1, minCartValue: 1, validUntil: 1 },
     ).lean();
 
-    if (!one) {
-      // Debug-only lookup to explain WHY it didn't match (this query result is never returned to the client).
-      const raw = await Coupon.findOne({ code: cleanCode }, { scope: 1, audience: 1, isActive: 1, isArchived: 1, isTest: 1 }).lean();
-      console.log(
-        `${tag} Code "${cleanCode}" NOT returned by public lookup. ` +
-        (raw
-          ? `Found in DB but filtered out: scope=${raw.scope} audience=${raw.audience} isActive=${raw.isActive} isArchived=${raw.isArchived} isTest=${raw.isTest} ` +
-            `(scope must be PUBLIC, audience must not be MEMBERS_ONLY, isActive=true, isArchived=false, isTest=false — this is by design for TARGETED/MEMBERS_ONLY coupons, they're never returned by this code-lookup endpoint either)`
-          : `No coupon with this code exists at all.`)
-      );
-    } else {
-      console.log(`${tag} Code "${cleanCode}" matched and returned.`);
-    }
 
     const data = one
       ? [{
