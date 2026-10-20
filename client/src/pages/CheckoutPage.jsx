@@ -16,9 +16,9 @@ import {
   useGetFreeShippingOfferQuery,
   useGetAllFreeShippingBannersQuery,
   useEvaluateCartRulesQuery,
-  useGetRedeemQuoteQuery,
   useGetGiftWrapOfferQuery,
   useSyncGuestCartMutation,
+  useGetLoyaltySummaryQuery,
 } from "../store/api/userApi";
 import { setShowLoginModal, setLoginCallback } from "../store/slices/uiSlice";
 import { useUI } from "../hooks/useRedux";
@@ -256,7 +256,56 @@ const AmountPlaceholder = () => (
   <span className="inline-block h-3.5 w-14 animate-pulse rounded bg-gray-200" aria-label="Calculating" />
 );
 
-const PriceRows = ({ subtotal, shipping, discount, giftWrapAmount = 0, appliedCoupon, totalToPay, itemCount, isLoadingShipping, paymentMethod, onApplyCoupon, onRemoveCoupon, redeemQuote, pointsToRedeem, onPointsChange, pointsDiscount }) => {
+// UnCash box under the total, logged-in users only, while loyalty is on
+// (admin → Loyalty Points). "Use UnCash" toggle (hidden on Magic Checkout —
+// redeem is normal checkout only) + the points this order will earn, which
+// mirrors the admin earn sweep: floor(amount paid × earnPercent / 100), after
+// delivery. The (i) opens the full calculation page.
+const UnCashBox = ({ uncash, totalToPay }) => {
+  if (!uncash?.enabled) return null;
+  const earn = Math.floor(((Number(totalToPay) || 0) * (uncash.earnPercent || 0)) / 100);
+  return (
+    <div className="rounded-lg bg-amber-50/70 border border-amber-100 px-3 py-2.5 text-xs space-y-2">
+      {uncash.canRedeem && (
+        <label className="flex items-center gap-2.5 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={uncash.on}
+            onChange={(e) => uncash.setOn(e.target.checked)}
+            className="w-4 h-4 accent-[#a89068] shrink-0"
+          />
+          <span className="min-w-0 flex-1 leading-snug text-gray-700">
+            Use <b className="text-ink">{uncash.maxPoints} UnCash</b> and save <b className="text-emerald-700">₹{uncash.maxDiscount.toLocaleString()}</b>
+            <span className="block text-[10px] text-gray-400">
+              Balance {uncash.balance} · up to {uncash.maxRedeemPercent}% of the order
+            </span>
+          </span>
+        </label>
+      )}
+      <div className="flex items-center gap-2.5">
+        <i className="fa-solid fa-coins shrink-0 text-[#a89068] text-sm" />
+        <p className="min-w-0 flex-1 leading-snug text-gray-600">
+          You'll earn <b className="text-ink">{earn} UnCash</b> after delivery
+          {!uncash.canRedeem && (
+            <span className="block text-[10px] text-gray-400">Current balance: {uncash.balance} UnCash</span>
+          )}
+        </p>
+        <a
+          href="/uncash-calculation"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="How UnCash is calculated"
+          title="How UnCash is calculated"
+          className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-gray-400 hover:text-ink hover:bg-amber-100"
+        >
+          <i className="fa-solid fa-circle-info text-sm" />
+        </a>
+      </div>
+    </div>
+  );
+};
+
+const PriceRows = ({ subtotal, shipping, discount, giftWrapAmount = 0, uncash = null, appliedCoupon, totalToPay, itemCount, isLoadingShipping, paymentMethod, onApplyCoupon, onRemoveCoupon }) => {
   const shippingAmount = typeof shipping === "object" ? shipping?.amount : shipping;
   // COD advance must be based on the REAL carrier rate, not the (possibly
   // free-shipping-zeroed) charged amount — same real/charged split as the
@@ -348,53 +397,13 @@ const PriceRows = ({ subtotal, shipping, discount, giftWrapAmount = 0, appliedCo
         </div>
       )}
 
-      {/* Loyalty points row — same plain-row rhythm as the coupon row above it
-          (icon + label, right-aligned amount/action), no card/overlay. A
-          toggle switch (not a checkbox) applies the max redeemable amount,
-          matching how wallet/credit rows read on Myntra/Flipkart-style
-          checkouts. The conversion rate lives in a hover tooltip instead of
-          a separate modal/page. */}
-      {redeemQuote?.isEnabled && redeemQuote.balance > 0 && (
+      {uncash?.discount > 0 && (
         <div className="flex justify-between items-center text-sm">
-          <span className="flex items-center gap-1.5 text-gray-500">
-            <i className="fa-solid fa-wallet text-[#a89068] text-[11px]" />
-            UnCash
-            <span className="text-[10px] font-bold text-[#a89068] bg-[#a89068]/10 px-1.5 py-0.5 rounded uppercase tracking-wide">
-              {redeemQuote.maxRedeemable.toLocaleString()} avail.
-            </span>
-            <span className="group relative inline-flex">
-              <i className="fa-solid fa-circle-info text-[11px] text-gray-300 hover:text-[#a89068] cursor-help" aria-hidden="true" />
-              <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-max -translate-x-1/2 rounded-lg bg-[#2e443c] px-2.5 py-1.5 text-center text-[10px] font-semibold leading-4 text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                1 UN = ₹1
-                <span className="absolute left-1/2 top-full h-2 w-2 -translate-x-1/2 -translate-y-1 rotate-45 bg-[#2e443c]" />
-              </span>
-            </span>
+          <span className="text-gray-500 flex items-center gap-1.5">
+            <i className="fa-solid fa-coins text-[#a89068] text-[11px]" /> UnCash ({uncash.points} used)
           </span>
-          <span className="flex items-center gap-2.5">
-            {pointsToRedeem > 0 && <span className="font-bold text-emerald-600">−₹{pointsDiscount.toLocaleString()}</span>}
-            <button
-              type="button"
-              role="switch"
-              aria-checked={pointsToRedeem > 0}
-              aria-label="Use UnCash on this order"
-              onClick={() => onPointsChange?.(pointsToRedeem > 0 ? 0 : redeemQuote.maxRedeemable)}
-              className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${pointsToRedeem > 0 ? "bg-[#2e443c]" : "bg-gray-200"}`}
-            >
-              <span
-                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${pointsToRedeem > 0 ? "translate-x-[18px]" : "translate-x-1"}`}
-              />
-            </button>
-          </span>
+          <span className="font-bold text-emerald-600">−₹{uncash.discount.toLocaleString()}</span>
         </div>
-      )}
-      {redeemQuote?.isEnabled && redeemQuote.balance > 0 && (
-        <a
-          href="/uncash-calculation"
-          className="-mt-1 block text-right text-[10px] font-semibold text-[#a89068] hover:text-[#2e443c]"
-        >
-          How is this calculated?
-          <i className="fa-solid fa-arrow-up-right-from-square ml-1 text-[9px]" />
-        </a>
       )}
 
       <div className="border-t border-gray-100 pt-3">
@@ -410,6 +419,8 @@ const PriceRows = ({ subtotal, shipping, discount, giftWrapAmount = 0, appliedCo
       </div>
 
       {totalSavings > 0 && <SavingsBanner amount={totalSavings} freeShipping={isShippingFree} />}
+
+      <UnCashBox uncash={uncash} totalToPay={totalToPay} />
 
       {/* {isCOD && realShippingAmount > 0 && (
         <div className="border-t border-dashed border-amber-200 pt-3 space-y-0 rounded-xl bg-amber-50/60 -mx-1 px-3 pb-3 mt-1">
@@ -575,10 +586,6 @@ const CheckoutPage = () => {
   const [createGuestOrder, { isLoading: isOrderingGuest }] = useCreateGuestOrderMutation();
   const isOrdering = isGuest ? isOrderingGuest : isOrderingAuth;
   const [applyCouponMutation] = useApplyCouponMutation();
-  // Loyalty points — guests have no account/balance, so the quote is skipped
-  // for them; cartTotalAmount isn't defined yet at this point in the file, so
-  // the quote query sits just below it (see `redeemQuote` further down).
-  const [pointsToRedeem, setPointsToRedeem] = useState(0);
   const [deleteAddressMutation] = useDeleteAddressMutation();
   const [updateCart] = useUpdateCartMutation();
   const [syncGuestCart] = useSyncGuestCartMutation();
@@ -1097,21 +1104,6 @@ const CheckoutPage = () => {
   const cartTotalAmount =
     cartItems.reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0) - ruleDiscountSavings;
   const userEmail = userProfile?.email;
-
-  // Loyalty redeem — guests have no account, so this is skipped for them.
-  // cartValue is deliberately the product subtotal (shipping excluded), same
-  // base the backend prices and caps against.
-  const { data: redeemQuoteData } = useGetRedeemQuoteQuery(cartTotalAmount, {
-    skip: isGuest || !cartTotalAmount,
-  });
-  const redeemQuote = redeemQuoteData?.data;
-  useEffect(() => {
-    // Clamp down if the cart shrank below the previously-picked amount.
-    if (redeemQuote && pointsToRedeem > redeemQuote.maxRedeemable) {
-      setPointsToRedeem(redeemQuote.maxRedeemable || 0);
-    }
-  }, [redeemQuote, pointsToRedeem]);
-  const pointsDiscount = pointsToRedeem * (redeemQuote?.pointToRupeeRatio || 1);
 
   useEffect(() => {
     if (isGuest) {
@@ -1663,6 +1655,8 @@ const CheckoutPage = () => {
         },
         paymentMethod,
         magic: useMagic, // server skips address/shipping and sends line_items
+        // UnCash — server re-validates against balance + cap and prices it itself.
+        ...(!useMagic && uncashPoints > 0 ? { redeemPoints: uncashPoints } : {}),
         ...getFbCookies(), // _fbp / _fbc → stored on order for CAPI match quality
         ...getGaIds(), // GA4 client/session id → webhook fallback purchase joins the same GA4 session
       }).unwrap();
@@ -1741,7 +1735,37 @@ const CheckoutPage = () => {
     giftWrapSelected && giftWrapOffer?.isActive
       ? (Number(giftWrapOffer.price) || 0) * giftWrapEligibleCount
       : 0;
-  const totalToPay = pricingDetails.subtotal + giftWrapAmount + shippingAmount - pricingDetails.discount;
+  // UnCash redeem — mirrors validateAndPriceRedeem on the server: cap is
+  // maxRedeemPercentOfCart% of the product value after the coupon, converted
+  // to points, never more than the balance. Not offered on Magic Checkout.
+  const { data: loyaltyData } = useGetLoyaltySummaryQuery(undefined, { skip: isGuest });
+  const loyalty = !isGuest ? loyaltyData?.data : null;
+  const [useUnCash, setUseUnCash] = useState(false);
+  const uncashBase = Math.max(0, pricingDetails.subtotal - pricingDetails.discount);
+  const uncashRatio = Number(loyalty?.pointToRupeeRatio) || 1;
+  const uncashMaxPoints = loyalty?.isEnabled
+    ? Math.max(0, Math.min(loyalty.balance || 0, Math.floor((uncashBase * (loyalty.maxRedeemPercentOfCart || 0)) / 100 / uncashRatio)))
+    : 0;
+  const uncashMaxDiscount = Math.min(uncashMaxPoints * uncashRatio, uncashBase);
+  const uncashCanRedeem = !!loyalty?.isEnabled && !magicEnabled && uncashMaxPoints > 0;
+  const uncashPoints = uncashCanRedeem && useUnCash ? uncashMaxPoints : 0;
+  const uncashDiscount = uncashCanRedeem && useUnCash ? uncashMaxDiscount : 0;
+  const uncash = loyalty?.isEnabled
+    ? {
+        enabled: true,
+        balance: loyalty.balance || 0,
+        earnPercent: loyalty.earnPercent || 0,
+        maxRedeemPercent: loyalty.maxRedeemPercentOfCart || 0,
+        canRedeem: uncashCanRedeem,
+        maxPoints: uncashMaxPoints,
+        maxDiscount: uncashMaxDiscount,
+        on: useUnCash && uncashCanRedeem,
+        setOn: setUseUnCash,
+        points: uncashPoints,
+        discount: uncashDiscount,
+      }
+    : null;
+  const totalToPay = pricingDetails.subtotal + giftWrapAmount + shippingAmount - pricingDetails.discount - uncashDiscount;
   const userName = isGuest ? guestName : profileName;
   const userInitials = userName ? userName.split(" ").filter(Boolean).map((w) => w[0]).join("").toUpperCase().slice(0, 2) : "?";
 
@@ -2747,14 +2771,11 @@ const CheckoutPage = () => {
                       itemCount={cartItems.length}
                       isLoadingShipping={isCalculatingShipping}
                       paymentMethod={paymentMethod}
+                      uncash={uncash}
                       onApplyCoupon={() => setShowCouponModal(true)}
                       onRemoveCoupon={
                         isGuest ? handleGuestCouponRemoved : handleCouponRemoved
                       }
-                      redeemQuote={redeemQuote}
-                      pointsToRedeem={pointsToRedeem}
-                      onPointsChange={setPointsToRedeem}
-                      pointsDiscount={pointsDiscount}
                     />
                   </div>
                 </div>
@@ -3003,14 +3024,11 @@ const CheckoutPage = () => {
                 itemCount={cartItems.length}
                 isLoadingShipping={isCalculatingShipping}
                 paymentMethod={paymentMethod}
+                uncash={uncash}
                 onApplyCoupon={() => setShowCouponModal(true)}
                 onRemoveCoupon={
                   isGuest ? handleGuestCouponRemoved : handleCouponRemoved
                 }
-                redeemQuote={redeemQuote}
-                pointsToRedeem={pointsToRedeem}
-                onPointsChange={setPointsToRedeem}
-                pointsDiscount={pointsDiscount}
               />
             </div>
 
@@ -3109,7 +3127,7 @@ const CheckoutPage = () => {
           {mobileSummaryOpen && (
             <div className="bg-white border-t border-gray-100 px-4 pt-3 pb-2 max-h-[45vh] overflow-y-auto shadow-[0_-12px_40px_rgba(0,0,0,0.12)] animate-in fade-in duration-200">
               <div className="max-w-sm mx-auto">
-                <PriceRows subtotal={pricingDetails.subtotal} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} isLoadingShipping={isCalculatingShipping} paymentMethod={paymentMethod} />
+                <PriceRows subtotal={pricingDetails.subtotal} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} isLoadingShipping={isCalculatingShipping} paymentMethod={paymentMethod} uncash={uncash} />
               </div>
             </div>
           )}
@@ -3273,6 +3291,13 @@ const CheckoutPage = () => {
                   </span>
                 )}
               </div>
+
+              {uncashDiscount > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500">UnCash ({uncashPoints} used)</span>
+                  <span className="font-semibold text-emerald-600">−₹{uncashDiscount.toLocaleString()}</span>
+                </div>
+              )}
 
               <div className="border-t border-dashed border-gray-200 my-1" />
 

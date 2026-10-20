@@ -34,11 +34,11 @@ const UnCashCalculationPage = () => {
           <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#f5deb3]">Urbannook Moni</p>
           <h1 className="mt-3 text-3xl font-bold md:text-4xl">UnCash calculation</h1>
           <p className="mt-3 max-w-xl text-sm leading-6 text-white/75">
-            Use your active UnCash balance as a discount during checkout.
+            Earn UnCash on every delivered order and use it as a discount at checkout.
           </p>
           <div className="mt-7 inline-flex items-center gap-3 rounded-xl bg-white/10 px-4 py-3">
             <i className="fa-solid fa-coins text-[#f5deb3]" />
-            <span className="font-bold">1 UnCash = ₹1</span>
+            <span className="font-bold">1 UnCash = ₹{UNCASH_VALUE_IN_RUPEES}</span>
           </div>
         </header>
 
@@ -46,7 +46,7 @@ const UnCashCalculationPage = () => {
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a89068]">How it works</p>
           <h2 className="mt-2 text-2xl font-bold">Generic calculation</h2>
           <p className="mt-4 text-sm leading-7 text-gray-600">
-            You earn UnCash after a delivered order, and you can use it as a discount on a future order. The value stays simple: <strong className="text-[#2e443c]">1 UnCash = ₹1</strong>.
+            You earn UnCash after a delivered order, and you can use it as a discount on a future order. The value stays simple: <strong className="text-[#2e443c]">1 UnCash = ₹{UNCASH_VALUE_IN_RUPEES}</strong>.
           </p>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             <div className="rounded-xl bg-[#f7f5f0] p-4 text-sm">
@@ -81,12 +81,24 @@ const UnCashCalculationPage = () => {
             </div>
             <div className="flex justify-between gap-4">
               <span>Maximum discount</span>
-              <strong className="text-emerald-600">₹{(5000 * UNCASH_MAX_REDEEM_PERCENT) / 100}</strong>
+              <strong className="text-emerald-600">₹{((5000 * UNCASH_MAX_REDEEM_PERCENT) / 100) * UNCASH_VALUE_IN_RUPEES}</strong>
             </div>
           </div>
           <p className="mt-5 text-xs leading-5 text-gray-500">
-            If you have 600 UnCash, you can use 600 and get ₹600 off. If you have 2,000 UnCash, only 1,000 can be used on this ₹5,000 order because of the {UNCASH_MAX_REDEEM_PERCENT}% limit.
+            If you have 600 UnCash, you can use all 600. If you have 2,000 UnCash, only {(5000 * UNCASH_MAX_REDEEM_PERCENT) / 100} can be used on this ₹5,000 order because of the {UNCASH_MAX_REDEEM_PERCENT}% limit.
           </p>
+        </section>
+
+        <section className="mt-6 rounded-2xl bg-white p-6 shadow-sm md:p-8">
+          <div className="flex items-start gap-3">
+            <i className="fa-solid fa-rotate-left mt-1 text-[#a89068]" />
+            <div>
+              <h2 className="text-xl font-bold">If an order is returned</h2>
+              <p className="mt-3 text-sm leading-7 text-gray-600">
+                UnCash is earned only on orders you keep. If an order is returned, refunded, cancelled or comes back undelivered, the UnCash earned on it is taken back automatically, and any UnCash you used on it is given back to your balance. You will see it as a separate "taken back" line in your UnCash history and on that order.
+              </p>
+            </div>
+          </div>
         </section>
 
         <section className="mt-6 rounded-2xl bg-white p-6 shadow-sm md:p-8">
@@ -95,7 +107,7 @@ const UnCashCalculationPage = () => {
             <div>
               <h2 className="text-xl font-bold">Maximum usage on one order</h2>
               <p className="mt-3 text-sm leading-7 text-gray-600">
-                You can use up to {UNCASH_MAX_REDEEM_PERCENT}% of the product value in one order. This keeps UnCash from paying for the complete order. Any balance that is not used stays active in your account for a future order.
+                You can use up to {UNCASH_MAX_REDEEM_PERCENT}% of the product value in one order. This keeps UnCash from paying for the complete order. Any balance that is not used stays active in your account for a future order. UnCash works together with a coupon (the limit is worked out on the price after the coupon) and on both prepaid and Cash on Delivery orders. Tick "Use UnCash" on the checkout page to apply it; it is taken from your balance only once the order is confirmed.
               </p>
             </div>
           </div>

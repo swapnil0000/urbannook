@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useAuth, useUI } from '../../hooks/useRedux';
-import { useGetUserProfileQuery, useUpdateUserProfileMutation } from '../../store/api/userApi';
+import { useGetUserProfileQuery, useUpdateUserProfileMutation, useGetLoyaltySummaryQuery } from '../../store/api/userApi';
 import PasskeyEnroll from '../../component/layout/auth/PasskeyEnroll';
 
 const MyProfilePage = () => {
@@ -339,7 +339,7 @@ const MyProfilePage = () => {
                 </div>
               ) : (
                 <p className="text-sm text-gray-400 italic">
-                  No points yet — you'll earn points on this order 24 hours after it's delivered.
+                  No points yet — you'll earn UnCash on your orders after they're delivered.
                 </p>
               )}
             </div>

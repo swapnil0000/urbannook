@@ -2,7 +2,7 @@ import { useEffect, lazy, Suspense, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useSelector } from "react-redux";
-import { useOrderHistoryQuery } from "../../store/api/userApi";
+import { useOrderHistoryQuery, useGetLoyaltySummaryQuery } from "../../store/api/userApi";
 import { ComponentLoader } from "../../component/layout/LoadingSpinner";
 import { useUI } from "../../hooks/useRedux";
 import { getApiUrl } from "../../config/appUrls";
@@ -11,7 +11,62 @@ import { resolveVariantTitle } from "../../utils/variantTitle";
 // Lazy load heavy components
 const OrderTracker = lazy(() => import("../../component/OrderTracker"));
 
+// Per-order UnCash summary: balance before, used, earned (or pending until
+// delivery), taken back / returned after a return, and the balance this order
+// leaves you with. Only for orders placed while loyalty was on (they carry a
+// `loyalty` snapshot) or that used/earned points.
+const UnCashRow = ({ label, value, cls = "" }) => (
+  <div className="flex justify-between items-center text-[10px] text-gray-500">
+    <span>{label}</span>
+    <span className={`font-bold ${cls}`}>{value}</span>
+  </div>
+);
+const UNCASH_REVERSED = ["RETURNED", "REFUNDED", "CANCELLED", "RTO"];
+const UnCashOrderCard = ({ order, loyaltyEnabled, earnPercent }) => {
+  const l = order.loyalty;
+  if (!l) return null;
+  const used = Number(l.pointsRedeemed) || 0;
+  const earned = l.isEarnCredited ? Number(l.pointsEarned) || 0 : 0;
+  const takenBack = l.isEarnReversed ? Number(l.pointsReversed) || 0 : 0;
+  const returned = l.isRedeemRefunded ? used : 0;
+  const before = Number(l.balanceBeforeOrder) || 0;
+  const cancelled = UNCASH_REVERSED.includes(order.resolutionStatus);
+  const pending =
+    !l.isEarnCredited && !cancelled && loyaltyEnabled && order.status === "PAID"
+      ? Math.floor(((Number(order.amount) || 0) * earnPercent) / 100)
+      : 0;
+  if (!used && !earned && !pending && !takenBack && !before) return null;
+  const after = before - used + earned - takenBack + returned;
+  return (
+    <div className="mt-2 px-5 py-4 bg-amber-50/60 rounded-2xl border border-amber-100 flex flex-col gap-2">
+      <p className="text-[9px] font-bold uppercase tracking-widest text-[#a89068] flex items-center gap-1.5">
+        <i className="fa-solid fa-coins" /> UnCash on this order
+      </p>
+      <UnCashRow label="Balance before this order" value={`${before} pts`} />
+      {used > 0 && <UnCashRow label={`Used (₹${(Number(l.discountFromPoints) || 0).toLocaleString()} off)`} value={`−${used} pts`} cls="text-red-500" />}
+      {earned > 0 && <UnCashRow label="Earned" value={`+${earned} pts`} cls="text-emerald-600" />}
+      {pending > 0 && (
+        <UnCashRow
+          label={order.fulfillmentStatus === "DELIVERED" ? "Earning — being credited" : "You'll earn after delivery"}
+          value={`~${pending} pts`}
+          cls="text-amber-600"
+        />
+      )}
+      {takenBack > 0 && <UnCashRow label="Taken back (order returned)" value={`−${takenBack} pts`} cls="text-red-500" />}
+      {returned > 0 && <UnCashRow label="Used UnCash given back" value={`+${returned} pts`} cls="text-emerald-600" />}
+      <div className="flex justify-between items-center pt-2 border-t border-amber-100 text-[10px] text-ink font-bold">
+        <span>{pending > 0 ? "Balance after this order (before earning)" : "Balance after this order"}</span>
+        <span>{after} pts</span>
+      </div>
+    </div>
+  );
+};
+
 const MyOrdersPage = () => {
+  // "UnCash earning" hint only while the loyalty feature is switched on (admin → Loyalty Points).
+  const { data: loyaltyData } = useGetLoyaltySummaryQuery();
+  const loyaltyEnabled = !!loyaltyData?.data?.isEnabled;
+  const loyaltyEarnPercent = Number(loyaltyData?.data?.earnPercent) || 0;
   const navigate = useNavigate();
   const { isAuthenticated, user } = useSelector((state) => state.auth);
   const authToken = useSelector((state) => state.auth?.token);
@@ -402,28 +457,12 @@ const MyOrdersPage = () => {
                             <span className="text-emerald-600">-₹{order.loyalty.discountFromPoints.toLocaleString()}</span>
                           </div>
                         )}
-                        {order.loyalty?.pointsRedeemed > 0 && (
-                          <div className="flex justify-between items-center text-[9px] text-gray-400 font-bold uppercase tracking-widest">
-                            <span>Balance before → after</span>
-                            <span>{order.loyalty.balanceBeforeOrder} → {order.loyalty.balanceAfterRedeem}</span>
-                          </div>
-                        )}
-                        {order.loyalty?.isEarnCredited ? (
-                          <div className="flex justify-between items-center text-[9px] text-gray-400 font-bold uppercase tracking-widest">
-                            <span>UnCash earned</span>
-                            <span className="text-emerald-600">+{order.loyalty.pointsEarned} pts</span>
-                          </div>
-                        ) : order.status === "DELIVERED" ? (
-                          <div className="flex justify-between items-center text-[9px] text-gray-400 font-bold uppercase tracking-widest">
-                            <span>UnCash earning</span>
-                            <span>Credits ~24h after delivery</span>
-                          </div>
-                        ) : null}
                         <div className="flex justify-between items-center pt-3 border-t border-gray-100 mt-1">
                           <span className="text-[10px] text-ink font-bold uppercase tracking-widest">Grand Total</span>
                           <span className="text-xl font-archivo text-ink font-bold">₹{order.amount.toLocaleString()}</span>
                         </div>
                       </div>
+                      <UnCashOrderCard order={order} loyaltyEnabled={loyaltyEnabled} earnPercent={loyaltyEarnPercent} />
                     </div>
                   )}
                 </div>

@@ -35,10 +35,13 @@ export async function getUserBalance(userId) {
   return last?.balanceAfter ?? 0;
 }
 
-// min(balance, cartValue * maxRedeemPercentOfCart%) — the ceiling that stops
-// a user from ever zeroing out a cart with points alone.
+// min(balance, points worth cartValue * maxRedeemPercentOfCart%) — the
+// ceiling that stops a user from ever zeroing out a cart with points alone.
+// The % cap is in rupees, so it is converted to points via pointToRupeeRatio.
 export function computeRedeemCap(balance, cartValue, config) {
-  const cap = Math.floor((cartValue * config.maxRedeemPercentOfCart) / 100);
+  const ratio = Number(config.pointToRupeeRatio) || 1;
+  const capRupees = (Math.max(0, cartValue) * config.maxRedeemPercentOfCart) / 100;
+  const cap = Math.floor(capRupees / ratio);
   return Math.max(0, Math.min(balance, cap));
 }
 

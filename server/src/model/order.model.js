@@ -93,6 +93,14 @@ const orderSchema = new mongoose.Schema(
       isEarnCredited: { type: Boolean, default: false },
       earnCreditedAt: { type: Date, default: null },
       balanceAfterEarn: { type: Number, default: null },
+      // Written by the admin earn sweep when an order that earned is later
+      // returned / refunded / cancelled / RTO (points taken back).
+      isEarnReversed: { type: Boolean, default: false },
+      earnReversedAt: { type: Date, default: null },
+      pointsReversed: { type: Number, default: 0 },
+      // Points used on this order given back after a return (admin sweep).
+      isRedeemRefunded: { type: Boolean, default: false },
+      redeemRefundedAt: { type: Date, default: null },
     },
     deliveryAddress: {
       addressId: String,
