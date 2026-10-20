@@ -1,8 +1,11 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { categoryPath } from '../../utils/categoryUrl';
+import { SsrStatus } from '../../utils/ssrContext';
 import { useSelector, useDispatch } from 'react-redux';
 import confetti from 'canvas-confetti';
 import SEOHead from '../../component/SEOHead';
+import { useSeoContent, faqPageJsonLd } from '../../utils/seoContent';
 import WishlistButton from '../../component/WishlistButton';
 import UnProductCard from '../../component/UnProductCard';
 import RecommendedProducts from '../../component/RecommendedProducts';
@@ -15,8 +18,9 @@ import ImageCarousel from '../../component/ImageCarousel';
 import { motion, AnimatePresence } from 'motion/react';
 import { ScrollColorBand } from '../../component/motion';
 import { variantSku, trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist, trackVariantSelect, trackShare, trackDeliveryCheck } from '../../utils/analytics';
-import { productsApi, useGetProductByIdQuery, useGetProductsQuery } from '../../store/api/productsApi';
-import { useAddToCartMutation, useUpdateCartMutation, useCalculateShippingMutation } from '../../store/api/userApi';
+import { productsApi, useGetProductByIdQuery, useGetProductsQuery, useGetBlogPostsQuery } from '../../store/api/productsApi';
+import { useAddToCartMutation, useUpdateCartMutation, useCalculateShippingMutation, useGetFreeShippingOfferQuery } from '../../store/api/userApi';
+import { shippingDetails, RETURN_POLICY } from '../../utils/productSchema';
 import { useGetProductReviewsQuery, useSubmitProductReviewMutation, useUpdateProductReviewMutation } from '../../store/api/testimonialsApi';
 import { addItem, updateQuantity, removeItem, updateSelection } from '../../store/slices/cartSlice';
 import { useUI } from '../../hooks/useRedux';
@@ -129,7 +133,6 @@ const ProductDetailPage = () => {
   const cartSelections = useSelector((state) => state.cart.selections);
   const currentUserId = useSelector((state) => state.auth.user?.userId);
 
-  const [selectedVariant, setSelectedVariant] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const buyBoxRef = useRef(null);
   const [buyBoxVisible, setBuyBoxVisible] = useState(true); // controls the sticky mobile CTA
@@ -139,6 +142,9 @@ const ProductDetailPage = () => {
   const [showNotifyModal, setShowNotifyModal] = useState(false); // out-of-stock notify-me
 
   const { data: productResponse, isLoading, error } = useGetProductByIdQuery(productId);
+  // Cart-value free-shipping offer (same query FreeShippingStrip uses): drives the
+  // shipping details in this page's Offer schema.
+  const { data: freeShippingRes } = useGetFreeShippingOfferQuery();
   const [addToCartAPI, { isLoading: isAdding }] = useAddToCartMutation();
   const [updateCart] = useUpdateCartMutation();
   const [checkPincode, { isLoading: isCheckingPin }] = useCalculateShippingMutation();
@@ -158,6 +164,17 @@ const ProductDetailPage = () => {
   const [visibleReviews, setVisibleReviews] = useState(4); // progressive "show more" reviews
 
   const product = productResponse?.data;
+  // When the product is already in the store on the first render (page rendered at
+  // build time, and the browser hydrating it), pick the URL's variant right away so
+  // the HTML carries that variant's title, price and MRP and matches the browser's
+  // first render. Otherwise the layout effect below picks it once the product loads.
+  const [selectedVariant, setSelectedVariant] = useState(() => {
+    const details = product?.variantDetails;
+    if (!details?.length) return '';
+    const matched = urlVariantSku
+      && (details.find((v) => v.sku === urlVariantSku) || details.find((v) => v.variantName === urlVariantSku));
+    return matched ? matched.variantName : details[0].variantName;
+  });
   const { data: relRes } = useGetProductsQuery({ page: 1, limit: 8 });
   const related = useMemo(() => productList(relRes).filter((p) => p.productId !== productId).slice(0, 4), [relRes, productId]);
 
@@ -173,7 +190,10 @@ const ProductDetailPage = () => {
     const list = [
       { q: 'How long does delivery take?', a: 'Every piece is 3D-printed to order and ships pan-India within 24-48 hours, with tracking.' },
     ];
-    if (isLamp) list.push({ q: 'How is it powered?', a: 'It runs on a USB adapter (included) — just plug in and switch it on. No batteries required.' });
+    // Answer from the admin "Power Source" spec when set — never guess (not every lamp is USB).
+    const powerSpec = [...(product.specifications || []), ...((product.variantDetails || []).flatMap((v) => v.specifications || []))]
+      .find((sp) => /power/i.test(sp?.key || '') && sp?.value);
+    if (powerSpec) list.push({ q: 'How is it powered?', a: `${powerSpec.value}. Just plug in and switch it on.` });
     list.push({ q: 'What is it made of?', a: `Precision 3D-printed with a durable build and a hand-finished ${isLamp ? 'glossy resin' : 'premium'} coat, so no two are exactly alike.` });
     list.push({
       q: product.isCodAvailable ? 'Is Cash on Delivery available?' : 'What payment methods do you accept?',
@@ -182,6 +202,21 @@ const ProductDetailPage = () => {
     list.push({ q: 'Can I return or exchange it?', a: "We don't accept returns or exchanges for change of mind, colour or preference. If your item arrives damaged, defective or wrong, report it within 3 days with an unboxing video and we'll replace it free." });
     return list;
   }, [product]);
+
+  // Admin → SEO Pages for this URL: its intro goes under the Description and its
+  // FAQs lead "Questions, answered". When both ask the same question, the
+  // admin's answer wins, so the page never shows a question twice.
+  const { intro: seoIntro, faqs: seoFaqs } = useSeoContent();
+  // Blog post for "Know the story" (Admin → Blog): the one linked to this
+  // variant's SKU, else a general post for the product. Uses the URL's SKU (not
+  // the picked swatch) so it matches the server-rendered page.
+  const { data: storyRes } = useGetBlogPostsQuery({ product: productId, sku: urlVariantSku, limit: 1 });
+  const story = storyRes?.data?.[0] || null;
+  const sameQuestion = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const faqs = useMemo(() => {
+    const asked = new Set(seoFaqs.map((f) => sameQuestion(f.q)));
+    return [...seoFaqs, ...productFaqs.filter((f) => !asked.has(sameQuestion(f.q)))];
+  }, [seoFaqs, productFaqs]);
 
   // (The "complete the set" pairing that used to live here was a guess in
   // code — pen stand ⇒ lamp, anything else ⇒ pen stand. The offers an admin
@@ -193,12 +228,19 @@ const ProductDetailPage = () => {
     return (sel && sel.variantPrice) || product.variantDetails[0].variantPrice || 0;
   }, [product, selectedVariant]);
 
+  // Strike-through price = the selected variant's MRP set in the admin panel
+  // (variantMrp). Products without an MRP keep the old behaviour (highest variant
+  // price) so nothing changes for them until an MRP is entered.
   const { maxVariantPrice, discountPercent } = useMemo(() => {
     if (!product?.variantDetails?.length) return { maxVariantPrice: 0, discountPercent: 0 };
-    const maxPrice = Math.max(...product.variantDetails.map((v) => v.variantPrice || 0));
-    const discount = maxPrice > currentPrice ? Math.round(((maxPrice - currentPrice) / maxPrice) * 100) : 0;
-    return { maxVariantPrice: maxPrice, discountPercent: discount };
-  }, [product, currentPrice]);
+    const sel = product.variantDetails.find((v) => v.variantName === selectedVariant);
+    const hasAnyMrp = product.variantDetails.some((v) => Number(v.variantMrp) > 0);
+    const compareAt = hasAnyMrp
+      ? Number(sel?.variantMrp) || 0
+      : Math.max(...product.variantDetails.map((v) => v.variantPrice || 0));
+    const discount = compareAt > currentPrice ? Math.round(((compareAt - currentPrice) / compareAt) * 100) : 0;
+    return { maxVariantPrice: compareAt, discountPercent: discount };
+  }, [product, currentPrice, selectedVariant]);
 
   const availableVariants = useMemo(() => (product?.variantDetails ? product.variantDetails.map((v) => v.variantName) : []), [product]);
 
@@ -500,43 +542,81 @@ const ProductDetailPage = () => {
   if (error || !product) return (
     <div className="min-h-[70vh] grid place-items-center bg-paper font-inter text-center px-5">
       <SEOHead title="Product not found" noIndex />
+      <SsrStatus code={404} />
       <div><h1 className="text-3xl font-extrabold">Product not found</h1><button onClick={() => navigate('/products')} className="gl-press mt-5 bg-brand text-white font-bold px-7 py-3 rounded-xl hover:bg-brandHi">Back to Shop</button></div>
     </div>
   );
 
   const specs = displaySpecs;
+  const pageDescription = displayDescription;
+  // Image alt text: the selected variant's name ("BMW Brake Caliper Lamp") when there is one.
+  const imageTitle = selectedVariant && selectedVariant !== 'N/A' ? selectedVariant : product.productName;
+  // One ProductGroup with an Offer per variant (variant pages canonicalise here).
+  const productUrl = `https://www.urbannook.in/product/${product.productId}`;
   const structuredData = {
-    '@context': 'https://schema.org', '@type': 'Product', name: product.productName, image: galleryImages, description: product.productSubDes || product.productDes, sku: product.productId,
+    '@context': 'https://schema.org',
+    '@type': 'ProductGroup',
+    '@id': `${productUrl}#product`,
+    name: product.productName,
+    url: productUrl,
+    description: product.productSubDes || product.productDes,
     brand: { '@type': 'Brand', name: 'UrbanNook' },
-    offers: { '@type': 'Offer', url: `https://www.urbannook.in/product/${product.productId}`, priceCurrency: 'INR', price: currentPrice, availability: product.productStatus === 'in_stock' ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock', itemCondition: 'https://schema.org/NewCondition' },
-    // Only real, approved reviews — never a placeholder rating.
-    ...(totalReviews > 0 && avgRating > 0 && {
-      aggregateRating: { '@type': 'AggregateRating', ratingValue: Number(avgRating).toFixed(1), reviewCount: totalReviews },
+    productGroupID: product.productId,
+    ...(product.materialAndCare ? { material: product.materialAndCare } : {}),
+    ...(totalReviews > 0 && avgRating > 0
+      ? { aggregateRating: { '@type': 'AggregateRating', ratingValue: Number(avgRating).toFixed(1), reviewCount: totalReviews, bestRating: 5, worstRating: 1 } }
+      : {}),
+    hasVariant: (product.variantDetails || []).filter((v) => v.isActive !== false).map((v) => {
+      const price = Number(v.variantPrice) || 0;
+      return {
+        '@type': 'Product',
+        name: v.variantName || product.productName,
+        ...(v.sku ? { sku: v.sku } : {}),
+        ...(v.variantDes ? { description: v.variantDes } : {}),
+        image: v.variantImage?.length ? v.variantImage : galleryImages,
+        offers: {
+          '@type': 'Offer',
+          url: v.sku ? `${productUrl}/${v.sku}` : productUrl,
+          priceCurrency: 'INR',
+          price,
+          availability: product.productStatus === 'in_stock' && !isVariantOutOfStock(v) ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+          itemCondition: 'https://schema.org/NewCondition',
+          ...(shippingDetails(price, freeShippingRes?.data) ? { shippingDetails: shippingDetails(price, freeShippingRes?.data) } : {}),
+          hasMerchantReturnPolicy: RETURN_POLICY,
+        },
+      };
     }),
   };
+  const variantCrumb = urlVariantSku && selectedVariant && selectedVariant !== 'N/A' && selectedVariant !== product.productName ? selectedVariant : null;
   const breadcrumbData = {
     '@context': 'https://schema.org', '@type': 'BreadcrumbList',
     itemListElement: [
       { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://www.urbannook.in/' },
-      { '@type': 'ListItem', position: 2, name: 'Shop', item: 'https://www.urbannook.in/products' },
+      product.productCategory
+        ? { '@type': 'ListItem', position: 2, name: product.productCategory, item: `https://www.urbannook.in${categoryPath(product.productCategory)}` }
+        : { '@type': 'ListItem', position: 2, name: 'Shop', item: 'https://www.urbannook.in/products' },
       { '@type': 'ListItem', position: 3, name: product.productName, item: `https://www.urbannook.in/product/${product.productId}` },
+      // Variant URL (/product/<id>/<sku>): one more level, the variant itself.
+      ...(variantCrumb ? [{ '@type': 'ListItem', position: 4, name: variantCrumb, item: `https://www.urbannook.in/product/${product.productId}/${urlVariantSku}` }] : []),
     ],
   };
 
   return (
     <div className="font-inter bg-paper text-ink min-h-screen overflow-x-clip">
-      <SEOHead title={product.productName} description={product.productSubDes || product.productDes} url={`/product/${product.productId}`} image={galleryImages[0]} type="product" structuredData={[structuredData, breadcrumbData]} />
+      <SEOHead title={urlVariantSku && selectedVariant && selectedVariant !== 'N/A' ? selectedVariant : product.productName} description={pageDescription} url={`/product/${product.productId}`} image={galleryImages[0]} type="product" structuredData={[structuredData, breadcrumbData, ...(seoFaqs.length ? [faqPageJsonLd(faqs)] : [])]} />
 
       <div className="max-w-[1280px] mx-auto px-5 py-6 md:py-8">
         {/* breadcrumb */}
         <div className="text-sm text-faint mb-5">
-          <button onClick={() => navigate('/')} className="hover:text-brand">Home</button> / <button onClick={() => navigate('/products')} className="hover:text-brand">{product.productCategory || 'Shop'}</button> / <span className="text-ink">{product.productName}</span>
+          <Link to="/" className="hover:text-brand">Home</Link> / <Link to={product.productCategory ? categoryPath(product.productCategory) : '/products'} className="hover:text-brand">{product.productCategory || 'Shop'}</Link> / {variantCrumb
+            ? <><Link to={`/product/${product.productId}`} className="hover:text-brand">{product.productName}</Link> / <span className="text-ink">{variantCrumb}</span></>
+            : <span className="text-ink">{product.productName}</span>}
         </div>
 
         <div className="grid lg:grid-cols-2 gap-8 lg:gap-10">
           {/* GALLERY — one big full-width framed image (swipe + dots on mobile, arrows on desktop) */}
           <div className="lg:sticky lg:top-24 self-start w-full min-w-0">
-            <ImageCarousel priority images={galleryImages} alt={product.productName} onImgErr={onImgErr} onItemClick={(i) => setLightbox({ list: galleryImages, idx: i })} />
+            <ImageCarousel priority images={galleryImages} alt={(i) => `${imageTitle} – photo ${i + 1}`} onImgErr={onImgErr} onItemClick={(i) => setLightbox({ list: galleryImages, idx: i })} />
           </div>
 
           {/* INFO */}
@@ -811,8 +891,15 @@ const ProductDetailPage = () => {
                 <div className="mt-3 text-sm">{specs.map((s, i) => <div key={i} className="flex justify-between py-1.5 border-b border-hair last:border-0"><span className="text-muted">{s.key}</span><span className="font-medium text-right">{s.value}</span></div>)}</div>
               </details>
             )}
+            {(product.materialAndCare || product.warranty) && (
+              <details className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Material &amp; Care<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary>
+                {product.materialAndCare && <p className="text-muted mt-3 text-sm leading-relaxed">{product.materialAndCare}</p>}
+                {product.warranty && <p className="text-muted mt-2 text-sm leading-relaxed"><span className="font-semibold text-ink">Warranty:</span> {product.warranty}</p>}
+              </details>
+            )}
             <details className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Shipping &amp; Exchange<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary><p className="text-muted mt-3 text-sm">Made to order, ships pan-India within 24-48 hours. Free replacement if it arrives damaged or wrong .{product.isCodAvailable ? ' Partial COD available.' : ''}</p></details>
           </div>
+          {product.disclaimer && <p className="text-xs text-faint mt-4 text-center leading-relaxed">{product.disclaimer}</p>}
         </section>
         </div>
 
@@ -832,7 +919,7 @@ const ProductDetailPage = () => {
               <ImageCarousel
                 peek
                 images={galleryImages}
-                alt={product.productName}
+                alt={(i) => `${imageTitle} – ${specs[i]?.key ? `${specs[i].key.toLowerCase()} detail` : `detail ${i + 1}`}`}
                 onImgErr={onImgErr}
                 onItemClick={(i) => setLightbox({ list: galleryImages, idx: i })}
                 renderOverlay={(i) => (
@@ -859,7 +946,7 @@ const ProductDetailPage = () => {
               <ImageCarousel
                 peek
                 images={communityShotUrls}
-                alt={`${product.productName} in real setups`}
+                alt={(i) => `${imageTitle} in a customer's setup – photo ${i + 1}`}
                 onImgErr={onImgErr}
                 onItemClick={(i) => setLightbox({ list: communityShotUrls, idx: i })}
                 renderOverlay={(i) => (
@@ -991,12 +1078,23 @@ const ProductDetailPage = () => {
             </div>
           </div>
         )}
-          {productFaqs.length > 0 && (
+          {/* "Why fans love it": the short Admin → SEO Pages intro for this URL (2–3 lines)
+              and, when a published blog post is linked to this product, "Know the story →".
+              The full story lives in the blog, not on the product page. */}
+          {(seoIntro.length > 0 || story) && (
+          <section className="mt-16 max-w-3xl mx-auto text-center">
+            <p className="gl-lbl text-brand mb-2">The story</p>
+            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-5">Why fans love it</h2>
+            {seoIntro.map((t, i) => <p key={i} className="text-muted text-sm leading-relaxed mt-2">{t}</p>)}
+            {story && <Link to={`/blog/${story.slug}`} className="inline-block mt-4 text-sm font-bold text-brand hover:underline">Know the story →</Link>}
+          </section>
+          )}
+          {faqs.length > 0 && (
           <section className="mt-16">
             <p className="gl-lbl text-brand mb-2 text-center">Good to know</p>
             <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-8 text-center">Questions, answered</h2>
             <div className="max-w-3xl mx-auto divide-y divide-hair border-y border-hair">
-              {productFaqs.map((f, i) => (
+              {faqs.map((f, i) => (
                 <details key={i} className="group py-4">
                   <summary className="flex items-center justify-between gap-4 cursor-pointer font-bold list-none">
                     <span>{f.q}</span>

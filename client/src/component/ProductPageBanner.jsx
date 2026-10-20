@@ -415,7 +415,8 @@ const ProductPageBanner = ({
   const offerClaimedBySibling = ruleDiscountCandidates.length > 0 && !!lineDiscountEntry && !lineDiscountEntry.eligible;
   const hasRuleDiscount = ruleDiscountedPrice !== null && ruleDiscountedPrice < displayPrice && !offerClaimedBySibling;
 
-  const hasToken = !!localStorage.getItem("authToken");
+  // Only read in click handlers; guarded so server rendering doesn't touch localStorage.
+  const hasToken = typeof window !== "undefined" && !!localStorage.getItem("authToken");
   const isLoggedIn = isAuthenticated || hasToken;
 
   // Adds the SOURCE product (the one this banner is attached to, e.g. the

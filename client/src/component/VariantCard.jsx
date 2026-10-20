@@ -1,21 +1,23 @@
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { trackSelectItem } from "../utils/analytics";
 import { isVariantOutOfStock } from "../utils/variantStock";
 
 /**
  * Shared variant-level card — one product's single variant (own title,
  * image, price). Used on the /products/:id variant-list page. Tapping it
- * goes to the existing /product/:productId/:sku PDP route.
+ * goes to the existing /product/:productId/:sku PDP route. It is a real
+ * <a href> (not a click handler) so search engines can follow it from the
+ * pre-rendered HTML to the product page.
  */
 const VariantCard = ({ productId, productName, variant, index, listId = "product_variants", listName }) => {
-  const navigate = useNavigate();
-
   const price = Number(variant?.variantPrice || 0);
   const mrp = Number(variant?.variantMrp || 0);
   const thumbnail = variant?.variantImage?.[0] || "/placeholder.jpg";
   const oos = isVariantOutOfStock(variant);
 
-  const goToVariant = () => {
+  const href = `/product/${productId}/${encodeURIComponent(variant?.sku || variant?.variantName)}`;
+
+  const trackClick = () => {
     trackSelectItem({
       itemId: productId,
       itemName: productName,
@@ -25,12 +27,12 @@ const VariantCard = ({ productId, productName, variant, index, listId = "product
       listName: listName || `${productName} — Variants`,
       index,
     });
-    navigate(`/product/${productId}/${encodeURIComponent(variant?.sku || variant?.variantName)}`);
   };
 
   return (
-    <div
-      onClick={goToVariant}
+    <Link
+      to={href}
+      onClick={trackClick}
       className="gl-pcard group relative rounded-none overflow-hidden bg-white border border-hair flex flex-col h-full cursor-pointer"
     >
       <div className="relative w-full aspect-square bg-surface overflow-hidden">
@@ -75,7 +77,7 @@ const VariantCard = ({ productId, productName, variant, index, listId = "product
           </div>
         </div>
       </div>
-    </div>
+    </Link>
   );
 };
 

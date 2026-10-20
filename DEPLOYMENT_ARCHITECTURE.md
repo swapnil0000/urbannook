@@ -116,12 +116,43 @@ Components and where they run:
 
 | Component | Runs on | Notes |
 |---|---|---|
-| Storefront frontend | S3 `urbannook-prod-frontend`, served by Cloudflare Worker `urbannook-s3-proxy-prod` (no CloudFront) | Built by Jenkins, static files. Not part of the release/rollback scheme yet. |
+| Storefront frontend | S3 `urbannook-prod-frontend`, served by Cloudflare Worker `urbannook-s3-proxy-prod` (no CloudFront) | Built by Jenkins, static files — including every public page rendered at build time (§2.1). Client releases are stored and rolled back as `client-<release>.tar.gz`. |
 | Storefront API | **Prod EC2** (pm2, fork mode, 1 instance) | The thing this document protects. |
 | Admin frontend | Vercel | Independent of prod EC2. |
 | Admin API | Render | Independent of prod EC2 → can roll prod back even when prod is down. |
 | Staging | Separate EC2, auto-stops at 22:00, started from admin | No real traffic. Runs the storefront API as **systemd** `urbannook-server.service` (not pm2): `infisical run --env=staging --projectId=80b13bde-… --path=/user/server -- node src/server.js`. Restart with `sudo systemctl restart urbannook-server` — secrets are only read at start. Also runs `jenkins.service` + `jenkins-agent-staging.service`. |
 | Artifacts | S3 bucket (versioning ON) 📋 | Off-server copies of every release. |
+
+
+### 2.1 How a website page is served (build-time rendering, "SSG")
+
+There is **no server rendering at request time** and no extra process on the prod EC2.
+
+1. `npm run build:prod` (Jenkins, nightly and on every client deploy) = `vite build` + `vite build --ssr`
+   (`dist-ssr/`, build-only, not uploaded) + `client/scripts/ssg.mjs`. The script reads the live API
+   (`VITE_API_BASE_URL`: products, categories, Admin → SEO Pages) and renders every public page with the
+   real React app (`client/src/entry-server.jsx`) into `dist-prerender/ssg/<path>/index.html`: home,
+   `/products`, `/category/<slug>`, `/product/<id>`, `/product/<id>/<sku>`, `/blog`, `/blog/<slug>` (published posts
+   from Admin → Blog), static pages and `__404`.
+   It also writes `sitemap.xml` (only pages that rendered; non-indexable categories left out) and
+   `llms.txt`. It never fails the build: a page that can't render, or the whole step when the API is
+   down, falls back to the SPA shell.
+2. `jenkins/scripts/upload-client.sh` syncs `dist-prerender/ssg/` → `s3://urbannook-prod-frontend/ssg/`
+   with `--delete`, `text/html`, `no-cache` (same rule as `index.html`). An empty folder (API down, or a
+   rollback to a release from before SSG) removes the old pages. Older releases' `product/*` pages are
+   still uploaded and served for rollbacks.
+3. The Worker (`infra/cloudflare/urbannook-s3-proxy-prod.js`, `resolvePage`) for a page URL (no file
+   extension): `ssg/<path>/index.html` → older `product/*` page → SPA `index.html` for any known app route
+   (checkout, account, a product added after the last build…) → otherwise `ssg/__404/index.html` with a
+   real **HTTP 404**. It also **301**s `/products/<id>` → `/product/<id>`, trailing slashes → no slash, and old policy
+   URLs (`/terms` → `/terms-conditions`; `/cancellation-refund[-policy]`, `/shipping-policy` → `/return-policy`).
+   `workers_dev = false`: the site is no longer reachable on `*.workers.dev`.
+4. The browser hydrates the HTML (`client/src/main.jsx`, `window.__SSR__` + `__PRELOADED_STATE__`), so
+   it doesn't fetch that page's data again.
+
+Freshness: rendered pages are as fresh as the last client build (deploy or nightly 21:30 IST). Prices and
+stock in the page update on hydration from the live API, so shoppers always see live values; crawlers see
+the build-time values. `client/server.mjs` (runtime SSR) is for local preview only (`npm run dev:ssr`).
 
 ---
 
@@ -164,7 +195,7 @@ started with `cwd` = `/home/ubuntu/urbannook-prod/current`.
 ```
 prod/
   server/server-<release>.tar.gz     server builds (incl. node_modules)
-  client/client-<release>.tar.gz     website builds (dist + prerendered pages)
+  client/client-<release>.tar.gz     website builds (dist + dist-prerender/ssg rendered pages)
   db/<YYYYMMDD-HHMM>-<reason>/       DB snapshots: manifest.json + <collection>.jsonl.gz
                                      (nightly, manual, and "predeploy-<N>" before each server deploy)
   bundles/<id>/                      one per prod deploy / rollback (see 4.2)
@@ -316,5 +347,6 @@ admin rights for 1–2 people only.
 | 9 | Admin feature A (view) → B (rollback) → C (upload) | 🚧 A+B built 2026-09-28: admin Time Machine page reads `prod/state.json` + release lists from S3 (works with Jenkins off) and Jenkins builds/live logs via the Jenkins API (user `admin-panel`, API token in admin env `JENKINS_URL/USER/TOKEN`). Actions start only fixed jobs: `UrbanNook-Prod-Deploy`, `UrbanNook-Prod-Rollback` (COMPONENT server|client + RELEASE — also used for mix deploys), staging job. Prod actions: super_admin direct (audit-logged), others via Approvals (`RELEASE_ACTION`). Client releases stored as `prod/client/client-<release>.tar.gz`. C (upload zip) 📋 |
 | 10 | Health-check auto-rollback | ✅ Live 2026-09-28 — failed `/health` → pm2 goes back to the folder it was running before the deploy |
 | 11 | Instance resize, then cluster mode after §8 fixes | 📋 |
+| 12 | Build-time rendering of every public page (SSG, §2.1), real 404s, `/products/<id>` 301, `workers.dev` off | 🚧 Built on branch `seo/ssg-foundation` (2026-10-15), not deployed |
 
 Update this table in the same PR that changes a step's status.

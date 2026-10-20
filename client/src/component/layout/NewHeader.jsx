@@ -8,6 +8,7 @@ import { setShowLoginModal, clearLoginCallback } from '../../store/slices/uiSlic
 import { useLogoutMutation } from '../../store/api/authApi';
 import { useAuth, useUI } from '../../hooks/useRedux';
 import { clearCsrfToken } from '../../store/api/apiSlice';
+import { categoryPath } from '../../utils/categoryUrl';
 
 /* Labels the team already uses. Anything new falls back to the admin's own
    category name — better a plain "Decor" than an invented "Decors". */
@@ -64,7 +65,7 @@ const NewHeader = () => {
   const categoryLinks = useMemo(
     () => categories.map((c) => ({
       name: CATEGORY_LABEL[c] || c,
-      path: `/products?category=${encodeURIComponent(c)}`,
+      path: categoryPath(c),
       key: `cat-${c}`,
     })),
     [categories],
