@@ -144,6 +144,7 @@ const CategoryPage = () => {
                 p={p}
                 href={href}
                 index={i}
+                imageLoading={i < 2 ? 'priority' : i < 6 ? 'lazy' : 'afterLoad'}
                 listId={`category_${category.slug}`}
                 listName={`Category: ${name}`}
                 badge={soldOut ? 'Sold out' : undefined}

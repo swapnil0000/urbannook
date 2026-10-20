@@ -95,7 +95,7 @@ const AllProductsPage = () => {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
             {displayProducts.map((p, i) => (
               <RevealCard key={p.productId || i} index={i}>
-                <UnProductCard p={p} index={i} listId="all_products" listName="All Products" />
+                <UnProductCard p={p} index={i} imageLoading={i < 2 ? 'priority' : i < 6 ? 'lazy' : 'afterLoad'} listId="all_products" listName="All Products" />
               </RevealCard>
             ))}
           </div>

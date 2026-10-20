@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import WishlistButton from './WishlistButton';
+import { useAfterLoad, canHover } from '../hooks/useAfterLoad';
 import { trackSelectItem } from '../utils/analytics';
 
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
@@ -31,11 +32,19 @@ const badgeOf = (p) => {
  * no leftover space for a taller sibling card to push into, so a flush,
  * even-height row (items-stretch) never grows a dead gap under the title.
  */
-const HomeProductCard = ({ p, index = 0, listId = 'grid', listName = 'Grid' }) => {
+/**
+ * deferImage (default true): the home page's product rows are below the first screen, so
+ * their photos load after the page has loaded (hooks/useAfterLoad.js) instead of sharing
+ * the connection with the hero image. Pass false for a row that is on the first screen.
+ */
+const HomeProductCard = ({ p, index = 0, listId = 'grid', listName = 'Grid', deferImage = true }) => {
   const navigate = useNavigate();
   const v = firstVariant(p);
   const badge = badgeOf(p);
-  const img2 = secondImg(p);
+  const afterLoad = useAfterLoad();
+  const showImg = !deferImage || afterLoad;
+  // Hover-only photo: never on phones, and only after load on desktop.
+  const img2 = afterLoad && canHover() ? secondImg(p) : null;
   const price = Number(p?.effectivePrice ?? v.variantPrice ?? 0);
   const mrp = Number(p?.effectiveMrp ?? v.variantMrp ?? 0);
 
@@ -51,8 +60,8 @@ const HomeProductCard = ({ p, index = 0, listId = 'grid', listName = 'Grid' }) =
         <div className="absolute top-2.5 right-2.5 z-10" onClick={(e) => e.stopPropagation()}>
           <WishlistButton productId={p.productId} />
         </div>
-        <img src={productImg(p)} alt={p.productName} loading="lazy" className="gl-img w-full h-full object-cover" onError={(e) => { e.currentTarget.src = '/assets/logo.webp'; }} />
-        {img2 && <img src={img2} alt="" className="gl-img2 absolute inset-0 w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
+        {showImg && <img src={productImg(p)} alt={p.productName} loading="lazy" decoding="async" className="gl-img w-full h-full object-cover" onError={(e) => { e.currentTarget.src = '/assets/logo.webp'; }} />}
+        {img2 && <img src={img2} alt="" loading="lazy" decoding="async" className="gl-img2 absolute inset-0 w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
       </div>
       <div className="p-3.5 flex flex-col flex-1 min-w-0">
         <span className="gl-lbl text-[10px] text-sale">{p.productCategory || 'Urban Nook'}</span>

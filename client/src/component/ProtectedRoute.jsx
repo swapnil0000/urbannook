@@ -32,7 +32,6 @@ const ProtectedRoute = ({ children }) => {
   // Force immediate logout if mismatch detected
   useEffect(() => {
     if (hasMismatch) {
-      console.log('[ProtectedRoute] Auth mismatch detected - forcing logout');
       dispatch(logout());
     }
   }, [hasMismatch, dispatch]);

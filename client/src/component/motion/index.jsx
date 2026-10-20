@@ -1,6 +1,11 @@
 /* eslint-disable react-refresh/only-export-components -- shared motion primitives + tokens live together intentionally */
 import { Fragment, useRef } from "react";
-import { motion, useScroll, useTransform, useInView, AnimatePresence } from "motion/react";
+// `m` instead of `motion`: same components, but without the animation engine bundled in.
+// The engine (domAnimation) is loaded as a separate chunk by <LazyMotion> in SmoothScroll.jsx,
+// so ~half of the old main bundle no longer blocks the first render. Exported as `motion`
+// so call sites (motion.div, motion[as]) stay the same. No layout / drag animations are used
+// (those would need domMax).
+import { m as motion, useScroll, useTransform, useInView, AnimatePresence } from "motion/react";
 
 /**
  * Shared motion primitives for Urban Nook.

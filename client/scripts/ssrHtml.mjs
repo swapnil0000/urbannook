@@ -38,6 +38,37 @@ export function buildPage(template, { appHtml: rawAppHtml, state }) {
   html = html.replace('</head>', `${head}\n</head>`);
   html = html.replace('<div id="root"></div>',
     `<div id="root">${appHtml}</div>\n<script>window.__PRELOADED_STATE__=${serialize(state)}</script>`);
-  return html;
+  return deferAppScripts(html);
+}
+
+// Built template only (the dev template loads /src/main.jsx through Vite): Vite's entry
+// <script type="module" src="/assets/js/index-*.js"> and its <link rel="modulepreload">s.
+const ENTRY_SCRIPT = /<script type="module" crossorigin src="(\/assets\/[^"]+\.js)"><\/script>\s*/;
+const MODULEPRELOAD = /<link rel="modulepreload" crossorigin href="(\/assets\/[^"]+\.js)">\s*/g;
+
+/**
+ * A server-rendered page is already complete HTML, so the app's JavaScript (~200 KB) is only
+ * needed to make it interactive. Fetched from <head> it competed with the CSS, fonts and the
+ * hero image for a phone's bandwidth and pushed First / Largest Contentful Paint back by
+ * seconds (PageSpeed mobile). Here it starts right after the first paint instead: same
+ * files, same order, the vendor chunks still preloaded in parallel — just not before the
+ * page is on screen. Pages that are not server-rendered (checkout, account) keep the
+ * template's normal tags, since they show nothing without the app.
+ */
+export function deferAppScripts(html) {
+  const entry = html.match(ENTRY_SCRIPT);
+  if (!entry) return html;
+  const preloads = [...html.matchAll(MODULEPRELOAD)].map((m) => m[1]);
+  const links = preloads.map((h) => `p(${JSON.stringify(h)});`).join('');
+  const loader = `<script>(function(){var d=document;function p(h){var l=d.createElement('link');l.rel='modulepreload';l.crossOrigin='';l.href=h;d.head.appendChild(l);}`
+    + `function go(){${links}var s=d.createElement('script');s.type='module';s.crossOrigin='';s.src=${JSON.stringify(entry[1])};d.head.appendChild(s);}`
+    // After the whole page is parsed (hydration needs all of #root), painted once, and the
+    // page's main image (fetchpriority="high": hero / first product photo) has loaded —
+    // at most 1.5 s, so a slow image never keeps the page from becoming interactive.
+    + `function paint(){if(window.requestAnimationFrame){requestAnimationFrame(function(){setTimeout(go,0);});}else{go();}}`
+    + `function after(){var img=d.querySelector('img[fetchpriority="high"]');if(!img||img.complete){paint();return;}`
+    + `var done=false;function once(){if(!done){done=true;paint();}}img.addEventListener('load',once);img.addEventListener('error',once);setTimeout(once,1500);}`
+    + `if(d.readyState==='loading'){d.addEventListener('DOMContentLoaded',after);}else{after();}})();</script>\n`;
+  return html.replace(MODULEPRELOAD, '').replace(ENTRY_SCRIPT, loader);
 }
 

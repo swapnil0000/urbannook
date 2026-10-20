@@ -1,4 +1,6 @@
-import { StrictMode } from 'react'
+import { StrictMode, startTransition } from 'react'
+// First: holds Google sign-in's script until the visitor interacts (see the file).
+import './utils/deferGsiScript.js'
 import { createRoot, hydrateRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 // Self-hosted fonts (latin subset only). Served from our origin with the hashed
@@ -18,8 +20,10 @@ import '@fontsource/archivo/latin-900.css'
 import '@fontsource/anton/latin-400.css'
 import '@fontsource/jetbrains-mono/latin-400.css'
 import '@fontsource/jetbrains-mono/latin-600.css'
+import './generated/fa-subset.css' // Font Awesome subset, generated at build time — scripts/build-icon-font.mjs
 import './index.css'
 import App from './App.jsx'
+import { preloadPageFor } from './pages/index.js'
 import { CookiesProvider } from 'react-cookie';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import config from './config/env.js';
@@ -32,9 +36,9 @@ if (typeof window !== 'undefined') {
   // On Android, hand the page straight to Chrome BEFORE React mounts (no-op elsewhere).
   escapeToExternalBrowser();
 
-  initPerformanceMetrics();
-  
+  // Dev only: FCP / LCP / Speed Index printed to the console (nothing reads them in production).
   if (import.meta.env.DEV) {
+    initPerformanceMetrics();
     monitorPerformance();
   }
 }
@@ -44,19 +48,10 @@ if (typeof window !== 'undefined') {
 if ('serviceWorker' in navigator && config.features.enableServiceWorker) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
-      .then((registration) => {
-        console.log('✅ SW registered: ', registration);
-      })
       .catch((registrationError) => {
         console.log('❌ SW registration failed: ', registrationError);
       });
   });
-} else {
-  // Gracefully handle browsers that don't support service workers
-  // Validates: Requirements 5.6
-  if (!('serviceWorker' in navigator)) {
-    console.log('ℹ️ Service workers not supported in this browser. Continuing without caching.');
-  }
 }
 
 // Validate Google Client ID is configured
@@ -100,9 +95,20 @@ const rootEl = document.getElementById('root');
 if (window.__SSR__ && rootEl.hasChildNodes()) {
   // The server's copy of the page's <title>/<meta>/<link> (for crawlers).
   // React inserts its own on hydration; drop these so there is one of each.
-  document.head.querySelectorAll('[data-ssr]').forEach((el) => el.remove());
-  hydrateRoot(rootEl, app, {
-    onRecoverableError: (error) => console.warn('[SSR] hydration recovered:', error?.message || error),
+  // Load the lazy chunks this page renders (its page + header + footer) BEFORE hydrating.
+  // Hydrating while one of them is still downloading lets any early state update (cart
+  // sync, login restore, Motion's engine) replace that part of the page with its Suspense
+  // fallback for a moment — on product pages a blank page + footer jump (CLS 1.77).
+  // The browser keeps showing the server HTML meanwhile, so nothing is lost to the user.
+  Promise.all([preloadPageFor(window.location.pathname), App.preloadLayout()]).then(() => {
+    document.head.querySelectorAll('[data-ssr]').forEach((el) => el.remove());
+    // In a transition, React hydrates in small slices and lets the browser handle input in
+    // between, instead of one long task (Total Blocking Time). Same as Next.js does.
+    startTransition(() => {
+      hydrateRoot(rootEl, app, {
+        onRecoverableError: (error) => console.warn('[SSR] hydration recovered:', error?.message || error),
+      });
+    });
   });
 } else {
   // index.html (or the prerendered page) has default SEO tags; every page sets

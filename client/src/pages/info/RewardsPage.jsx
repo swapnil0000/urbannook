@@ -24,7 +24,6 @@ const RewardsPage = () => {
 
   const redeemReward = (reward) => {
     if (userPoints >= reward.points) {
-      console.log('Redeeming reward:', reward);
       // Redeem reward logic
     }
   };

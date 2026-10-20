@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import { animate } from 'motion';
 
 /**
  * URBAN NOOK — editorial "2040" motion layer.
@@ -8,7 +7,7 @@ import { animate } from 'motion';
  *   - magnetic pull on `.un-magnet`
  *   - 3D tilt + glare on `.un-card`
  *   - scroll reveals on `.un-reveal`  (IntersectionObserver + MutationObserver)
- *   - spring press on `.un-btn` via Motion (motion.dev), progressive enhancement
+ *   - spring-like press on `.un-btn` via the Web Animations API, progressive enhancement
  * Everything is disabled for touch devices / prefers-reduced-motion.
  */
 const MotionLayer = () => {
@@ -76,12 +75,18 @@ const MotionLayer = () => {
       });
     }
 
-    /* ---------- press spring on .un-btn / .un-chip (Motion, bundled locally) ---------- */
-    if (!reduced) {
+    /* ---------- press "spring" on .un-btn / .un-chip ----------
+       The browser's own Web Animations API on the `scale` property (so it never fights the
+       element's transform): a quick press, then an overshooting ease back. It used to be
+       Motion's vanilla animate(), which pulled a second copy of Motion's engine into the
+       main bundle for this one effect. */
+    if (!reduced && typeof Element !== 'undefined' && Element.prototype.animate) {
       const onDown = (e) => {
         const b = e.target.closest && e.target.closest('.un-btn,.un-chip');
-        if (b) animate(b, { scale: 0.95 }, { duration: 0.12 }).finished
-          .then(() => animate(b, { scale: 1 }, { type: 'spring', stiffness: 460, damping: 15 }));
+        if (!b) return;
+        b.animate([{ scale: '1' }, { scale: '0.95' }], { duration: 120, easing: 'ease-out' }).finished
+          .then(() => b.animate([{ scale: '0.95' }, { scale: '1' }], { duration: 380, easing: 'cubic-bezier(.34,1.56,.64,1)' }))
+          .catch(() => {});
       };
       document.body.addEventListener('pointerdown', onDown);
       cleanups.push(() => document.body.removeEventListener('pointerdown', onDown));

@@ -42,7 +42,7 @@ function productPage(productId, variantSku) {
   return [
     ['getProductById', productId],
     ['getProductReviews', productId],
-    ['getProducts', { page: 1, limit: 8 }],
+    // Related products use the global { page: 1, limit: 24 } list below (no second copy).
     ['getAllFreeShippingBanners', undefined],
     // Free-shipping threshold: the Offer schema's shipping details depend on it.
     ['getFreeShippingOffer', undefined],

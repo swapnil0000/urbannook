@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useAfterLoad } from '../hooks/useAfterLoad';
 
 /**
  * Scroll-snap image carousel with three behaviours at once:
@@ -24,6 +25,7 @@ export default function ImageCarousel({
   slideClass = 'w-[64%] sm:w-56',
   priority = false, // first slide is the page's LCP image → fetchpriority=high
 }) {
+  const afterLoad = useAfterLoad();
   const trackRef = useRef(null);
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -177,9 +179,12 @@ export default function ImageCarousel({
 
   const Slide = (src, k, extra = '') => {
     const i = k % count; // real index; k >= count is the loop copy
+    // Page's main gallery (priority): only the first photo is on screen at load, the others
+    // wait until the page has loaded so they don't slow the first one (LCP) on a phone.
+    const wait = priority && k > 0 && !afterLoad;
     return (
     <div key={k} className={`relative shrink-0 ${extra}`} aria-hidden={k >= count || undefined}>
-      <img
+      {!wait && <img
         src={src}
         alt={k >= count ? '' : typeof alt === 'function' ? alt(i) : alt}
         loading={k === 0 && !peek ? 'eager' : 'lazy'}
@@ -188,7 +193,7 @@ export default function ImageCarousel({
         draggable={false}
         className="absolute inset-0 w-full h-full object-cover"
         onError={onImgErr}
-      />
+      />}
       {renderOverlay && <div className="pointer-events-none absolute inset-0 z-[5]">{renderOverlay(i)}</div>}
       {onItemClick && (
         <button type="button" onClick={() => onItemClick(i)} aria-label="View image" tabIndex={k >= count ? -1 : undefined} className="absolute inset-0" />

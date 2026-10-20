@@ -18,11 +18,14 @@ import WhatsAppLoginWatcher from './component/layout/auth/WhatsAppLoginWatcher';
 import WhatsAppOneTap from './component/layout/auth/WhatsAppOneTap';
 import { trackPageView, setUserId, captureAttribution, setMetaAdvancedMatching } from './utils/analytics';
 import MotionLayer from './component/MotionLayer';
+import { lazyWithPreload } from './utils/lazyWithPreload.jsx';
 import SmoothScroll from './component/motion/SmoothScroll';
 
 // Only lazy load non-critical components
-const NewHeader = lazy(() => import('./component/layout/NewHeader'));
-const Footer = lazy(() => import('./component/layout/Footer'));
+// Header + footer are server-rendered: preloadable, so main.jsx can load them before
+// hydrating (utils/lazyWithPreload.jsx — avoids a blank flash / layout shift).
+const NewHeader = lazyWithPreload(() => import('./component/layout/NewHeader'));
+const Footer = lazyWithPreload(() => import('./component/layout/Footer'));
 const Notification = lazy(() => import('./component/Notification'));
 const GlMobileNav = lazy(() => import('./component/layout/GlMobileNav'));
 const SocialMediaFAB = lazy(() => import('./component/layout/WhatsAppButton'));
@@ -81,12 +84,10 @@ const SessionManager = ({ children }) => {
     const handleStorageChange = (e) => {
       // Detect when authToken is removed
       if (e.key === 'authToken' && e.newValue === null) {
-        console.log('[Auth] Token removed - logging out');
         dispatch(logout());
       }
       // Detect when user is removed
       if (e.key === 'user' && e.newValue === null) {
-        console.log('[Auth] User data removed - logging out');
         dispatch(logout());
       }
     };
@@ -99,7 +100,6 @@ const SessionManager = ({ children }) => {
       
       // If Redux thinks we're authenticated but tokens are missing, force logout
       if (reduxState.isAuthenticated && (!currentToken || !currentUser)) {
-        console.log('[Auth] Token mismatch detected - forcing logout');
         dispatch(logout());
       }
     }, 1000); // Check every second
@@ -154,10 +154,6 @@ const SyncProvider = ({ children }) => {
 // in entry-server.jsx. `store` and `helmetContext` are passed by entry-server
 // for each request; in the browser the app store is used.
 function App({ store = browserStore, helmetContext }) {
-  useEffect(() => {
-    console.log("%c URBAN NOOK CLIENT ACTIVE - VERSION 2.1.1 (STRICT VARIANT) ", "background: #141414; color: #E63329; font-weight: bold; font-size: 14px; padding: 10px; border-radius: 5px;");
-  }, []);
-
   return (
     <HelmetProvider context={helmetContext}>
     <Provider store={store}>
@@ -224,6 +220,9 @@ function App({ store = browserStore, helmetContext }) {
     </HelmetProvider>
   );
 }
+
+/** Chunks a server-rendered page needs on first render (main.jsx, before hydrateRoot). */
+App.preloadLayout = () => Promise.all([NewHeader.preload(), Footer.preload()]).catch(() => {});
 
 export default App;
 

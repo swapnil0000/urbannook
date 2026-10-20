@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import WishlistButton from './WishlistButton';
 import { trackSelectItem } from '../utils/analytics';
+import { useAfterLoad, canHover } from '../hooks/useAfterLoad';
 
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
 const firstVariant = (p) => p?.variantDetails?.[0] || {};
@@ -45,10 +46,23 @@ const UnProductCard = ({
   href,
   badge: badgeOverride,
   showWishlist = true,
+  /*
+   * How the photo loads (PageSpeed / LCP):
+   *   'priority'  — first cards of a grid, on screen at load: eager + fetchpriority=high
+   *   'lazy'      — default (native lazy loading)
+   *   'afterLoad' — further down: only after the page has loaded (hooks/useAfterLoad.js),
+   *                 so on a phone they don't share the connection with the first cards
+   */
+  imageLoading = 'lazy',
 }) => {
   const v = firstVariant(p);
   const badge = badgeOverride !== undefined ? badgeOverride : badgeOf(p);
-  const img2 = secondImg(p);
+  // The second photo only shows on hover: phones never need it, and on desktop it waits
+  // until the page has loaded so it doesn't compete with what is on screen.
+  const afterLoad = useAfterLoad();
+  const img2 = afterLoad && canHover() ? secondImg(p) : null;
+  const showImg = imageLoading !== 'afterLoad' || afterLoad;
+  const eager = imageLoading === 'priority';
   // Struck MRP + % off, same source of truth as ProductCard: the first
   // variant's own variantMrp (never a synthesised markup).
   const price = Number(p?.effectivePrice ?? v.variantPrice ?? 0);
@@ -69,8 +83,8 @@ const UnProductCard = ({
             <WishlistButton productId={p.productId} />
           </div>
         )}
-        <img src={productImg(p)} alt={p.productName} loading="lazy" className="gl-img w-full h-full object-cover" onError={(e) => { e.currentTarget.src = '/assets/logo.webp'; }} />
-        {img2 && <img src={img2} alt="" className="gl-img2 absolute inset-0 w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
+        {showImg && <img src={productImg(p)} alt={p.productName} loading={eager ? 'eager' : 'lazy'} fetchPriority={eager ? 'high' : undefined} decoding={eager ? 'sync' : 'async'} className="gl-img w-full h-full object-cover" onError={(e) => { e.currentTarget.src = '/assets/logo.webp'; }} />}
+        {img2 && <img src={img2} alt="" loading="lazy" decoding="async" className="gl-img2 absolute inset-0 w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
       </div>
       <div className="p-3.5 flex flex-col flex-1 min-w-0">
         {/* Two lines, then an ellipsis; min-h reserves both lines so a

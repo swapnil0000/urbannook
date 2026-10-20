@@ -202,3 +202,16 @@ L × B × H). Empty when unknown. Merchant Center reads the feed daily.
 ### Blog schema (2026-10-19)
 `BlogPosting.about` lists linked products as `Thing` (name + URL), not `Product`: Google flags a `Product` without
 `offers`/`review`/`aggregateRating` as an invalid product snippet. Full `Product`/`Offer` schema stays on the product pages.
+
+## J. PageSpeed: third-party tags load on first interaction (2026-10-20, branch `perf/pagespeed-mobile`) — needs SEO owner sign-off
+- `client/index.html`: one small loader (`window.__unThirdParty`) at the top of `<head>`. The queues are set up at once, as before:
+  `dataLayer` (with the real `gtm.start` time), `gtag('js'/'config', G-B7NGCFCRFG / AW-18461503961)`, the `fbq` stub + `init` +
+  `PageView`, the `clarity` stub. Only the **downloads** moved: `gtm.js`, `gtag/js`, `fbevents.js` and Clarity's tag start on the
+  visitor's first scroll / tap / key / mouse move, or 8 s after `window.load`, whichever comes first. Every event pushed before
+  that waits in its queue and is sent then (same mechanism the Meta pixel and Clarity already used with their 1.5 s / 3 s delays).
+- Google sign-in's `gsi/client` (loaded by `<GoogleOAuthProvider>`) waits for the same moment: `client/src/utils/deferGsiScript.js`.
+- Why: together ~800 KB of script that downloaded and ran during the first render. Local Lighthouse, mobile, these tags blocked vs
+  loaded: ~75–80 vs ~55–60 — the biggest single cost on the PageSpeed score.
+- Trade-off: a visitor who leaves within 8 s of load without scrolling or tapping is not counted in GA4 / Ads / Meta / Clarity.
+- Please also check in GTM: on product pages GA4's `gtag/js?id=G-B7NGCFCRFG` loads twice (once from `index.html`, once by the
+  container, `&cx=c`) — possible double pageviews.
