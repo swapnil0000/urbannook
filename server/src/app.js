@@ -25,6 +25,8 @@ import {
   freeShippingOfferRouter,
   passkeyRouter,
   cartRuleRouter,
+  themeRouter,
+  siteBannerRouter,
   offerLeadRouter,
   offerRouter,
   guestCartRouter,
@@ -256,3 +258,6 @@ app.use(
 app.use(errorHandler);
 
 export default app;
+
+
+// trigre buil

@@ -19,7 +19,14 @@ if (missingVars.length > 0) {
   missingVars.forEach(varName => {
     console.error(`   - ${varName}: ${requiredEnvVars[varName]}`);
   });
-  
+  console.error(
+    '   These are inlined into the bundle by Vite at dev-server-start/build time from ' +
+    'process.env or a local .env file — they are NOT fetched at runtime in the browser. ' +
+    'If they exist in Infisical but are missing here, the dev/build script was not run ' +
+    'through `infisical run` (check package.json scripts and the terminal running `npm run dev` ' +
+    'for the "[env] ..." source trace logged by vite.config.js).'
+  );
+
   // In development, show helpful error
   if (env.DEV) {
     throw new Error(`Missing environment variables: ${missingVars.join(', ')}`);

@@ -21,6 +21,8 @@ import freeShippingOfferRouter from "./freeShippingOffer.route.js";
 import passkeyRouter from "./passkey.route.js";
 import cartRuleRouter from "./cartRule.route.js";
 import offerLeadRouter from "./offerLead.route.js";
+import themeRouter from "./theme.route.js";
+import siteBannerRouter from "./siteBanner.route.js";
 import offerRouter from "./offer.route.js";
 import guestCartRouter from "./guestCart.route.js";
 import webhookRouter from "./webhook.route.js";
@@ -50,6 +52,8 @@ export {
   passkeyRouter,
   cartRuleRouter,
   offerLeadRouter,
+  themeRouter,
+  siteBannerRouter,
   offerRouter,
   guestCartRouter,
   webhookRouter,
