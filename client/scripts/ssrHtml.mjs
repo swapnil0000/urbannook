@@ -62,12 +62,16 @@ export function deferAppScripts(html) {
   const links = preloads.map((h) => `p(${JSON.stringify(h)});`).join('');
   const loader = `<script>(function(){var d=document;function p(h){var l=d.createElement('link');l.rel='modulepreload';l.crossOrigin='';l.href=h;d.head.appendChild(l);}`
     + `function go(){${links}var s=d.createElement('script');s.type='module';s.crossOrigin='';s.src=${JSON.stringify(entry[1])};d.head.appendChild(s);}`
-    // After the whole page is parsed (hydration needs all of #root), painted once, and the
-    // page's main image (fetchpriority="high": hero / first product photo) has loaded —
-    // at most 1.5 s, so a slow image never keeps the page from becoming interactive.
+    // After the whole page is parsed (hydration needs all of #root), painted once, and ALL of
+    // the page's main images (fetchpriority="high": hero, first product photo, first grid
+    // cards) have loaded — at most 1.5 s, so a slow image never keeps the page from becoming
+    // interactive. All, not the first: on a category page the first card's small photo used
+    // to finish early and start ~215 KB of JS while the second (the LCP image) was still
+    // downloading.
     + `function paint(){if(window.requestAnimationFrame){requestAnimationFrame(function(){setTimeout(go,0);});}else{go();}}`
-    + `function after(){var img=d.querySelector('img[fetchpriority="high"]');if(!img||img.complete){paint();return;}`
-    + `var done=false;function once(){if(!done){done=true;paint();}}img.addEventListener('load',once);img.addEventListener('error',once);setTimeout(once,1500);}`
+    + `function after(){var imgs=[].slice.call(d.querySelectorAll('img[fetchpriority="high"]')).filter(function(i){return !i.complete;});`
+    + `if(!imgs.length){paint();return;}var left=imgs.length,done=false;function once(){if(!done){done=true;paint();}}`
+    + `function one(){if(--left<=0){once();}}imgs.forEach(function(i){i.addEventListener('load',one);i.addEventListener('error',one);});setTimeout(once,1500);}`
     + `if(d.readyState==='loading'){d.addEventListener('DOMContentLoaded',after);}else{after();}})();</script>\n`;
   return html.replace(MODULEPRELOAD, '').replace(ENTRY_SCRIPT, loader);
 }
