@@ -19,7 +19,6 @@ export const clearCartCompletely = async (dispatch, clearCart, apiBaseUrl) => {
       credentials: 'include'
     });
     
-    console.log('Cart cleared successfully on both frontend and backend');
   } catch (error) {
     console.error('Failed to clear backend cart:', error);
     // Still keep frontend cart cleared even if backend fails

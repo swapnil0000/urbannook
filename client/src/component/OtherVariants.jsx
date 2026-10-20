@@ -69,6 +69,7 @@ const OtherVariants = ({ productId, productName, variants = [], currentVariantNa
               <UnProductCard
                 p={asProduct}
                 index={index}
+                imageLoading="afterLoad"
                 listId="other_variants"
                 listName={`${productName} — Other Variants`}
                 href={`/product/${productId}/${encodeURIComponent(variant?.sku || variant?.variantName)}`}

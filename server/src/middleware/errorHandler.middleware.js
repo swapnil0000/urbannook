@@ -106,8 +106,6 @@ ${JSON.stringify(req.body, null, 2)}
           alertErr.message,
         );
       });
-  } else {
-    console.log(`[INFO] Non-500 error (${statusCode}), skipping alert`);
   }
 
   // Determine error message

@@ -30,7 +30,6 @@ export const getFreeShippingConfig = async () => {
     isActive: promo?.isActive ?? false,
     thresholdAmount: promo?.conditionTree?.value ?? 0,
   };
-  console.log(`[FreeShipping:config] promo found=${!!promo} name="${promo?.name || "none"}" → ${JSON.stringify(result)}`);
   return result;
 };
 
@@ -85,9 +84,6 @@ export const isFreeShippingEligible = async (cartItems = []) => {
           : qtyByProduct.get(String(c.productId)) || 0;
         return have >= (c.minQuantity || 1);
       }),
-  );
-  console.log(
-    `[FreeShipping] cartQty=[${[...qtyByProduct.entries()].map(([id, q]) => `${id}x${q}`).join(",")}] → eligible=${eligible}`,
   );
   return eligible;
 };
@@ -251,7 +247,6 @@ async function resolveBannerVariantNames(banners) {
 const getAllBannersMerged = async (placement) => {
   const banners = await getCartRuleDerivedBanners(placement);
   const resolved = await resolveBannerVariantNames(banners);
-  console.log(`[FreeShipping:merged] placement=${placement || "(any)"} — ${resolved.length} banner(s) after variant-name resolution`);
   return resolved;
 };
 
@@ -265,7 +260,6 @@ const getAllBannersMerged = async (placement) => {
 export const getBannerForProduct = async (productId) => {
   const all = await getAllBannersMerged("pdp");
   const filtered = all.filter((b) => String(b.sourceProductId) === String(productId));
-  console.log(`[FreeShipping:forProduct] productId=${productId} → ${filtered.length} banner(s): ${JSON.stringify(filtered.map((b) => b.text))}`);
   return filtered;
 };
 

@@ -105,9 +105,8 @@ const sendEmailWithRetry = async (to, subject, html, retries = 3) => {
         html,
       });
       
-      console.log(`[INFO] Email sent successfully to ${to} (Message ID: ${info.messageId})`);
+      console.log(`[INFO] Email sent (Message ID: ${info.messageId})`);
 
-            console.log(`mail sent successfully to ${to} (Message ID: ${info.messageId})`);
 
       return {
         statusCode: 200,

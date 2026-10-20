@@ -47,12 +47,10 @@ const userLogin = asyncHandler(async (req, res) => {
 const userRegister = asyncHandler(async (req, res) => {
   const { name, email, password, mobileNumber } = req.body || {};
   
-  console.log(`[INFO] User registration attempt - Email: ${email}, Name: ${name}`);
   
   //fieldMissing and existing User check
   let result = await registerService(name, email, password, mobileNumber);
 
-  console.log(`[INFO] User registration successful - Email: ${email}, UserId: ${result?.data?.user?.id}`);
 
   // Return complete user data with token for auto-login
   return res

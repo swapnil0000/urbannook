@@ -99,9 +99,9 @@ export async function getActivePromotionsAsCartRules() {
   const rules = [];
   for (const promo of promotions) {
     const conditions = extractFlatProductConditions(promo.conditionTree);
-    if (!conditions) { console.log(`[PromotionAdapter] "${promo.name}" SKIPPED — conditionTree not flat-product-representable: ${JSON.stringify(promo.conditionTree)}`); continue; }
+    if (!conditions) { continue; }
     const effects = extractEffects(promo.rewards);
-    if (!effects) { console.log(`[PromotionAdapter] "${promo.name}" SKIPPED — rewards not cart_rule-representable: ${JSON.stringify(promo.rewards.map((r) => r.type))}`); continue; }
+    if (!effects) { continue; }
     rules.push({ _id: promo._id, name: promo.name, isActive: true, conditions, effects, placements: promo.placements || [] });
   }
   // console.log(`[PromotionAdapter] getActivePromotionsAsCartRules() → ${promotions.length} active promotion(s) total, ${rules.length} representable as cart rules`);

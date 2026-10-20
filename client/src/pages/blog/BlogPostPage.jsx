@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useGetBlogPostQuery } from '../../store/api/productsApi';
@@ -48,11 +48,31 @@ const Stars = ({ n }) => <span aria-label={`${n} out of 5`} className="text-[#a8
 // (washi paper, sumi ink, vermilion seal). contentHtml is sanitised on save
 // (admin) and again by the API (server/src/utils/blogHtml.js), so it is
 // rendered as HTML here. Sections carry data-anim="…" hooks for transitions.
+/*
+ * Google Fonts with `text=`: only the characters this page shows. The two Japanese families
+ * are split by Google into ~100 unicode-range files; without `text=` a post pulled ~30 of them
+ * (~700 KB) at top priority and the cover image (LCP) waited behind them on a phone. With
+ * `text=` Google returns one small file per weight. The set = printable ASCII (UI labels),
+ * this page's own symbols / kanji, and every character in the post's data (title, body,
+ * products, reviews). Sorted, so server and browser build the same URL.
+ */
+const PAGE_GLYPHS = '·×—“”…→─▶◆◯★☆の侍像刀器巣庫映武物語都間‘’–₹•';
+const ASCII = Array.from({ length: 95 }, (_, i) => String.fromCharCode(32 + i)).join('');
+const fontUrl = (post) => {
+  const chars = [...new Set([...ASCII, ...PAGE_GLYPHS, ...JSON.stringify(post || {})])]
+    .filter((c) => c.codePointAt(0) >= 32)
+    .sort()
+    .join('');
+  return 'https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Noto+Serif+JP:wght@400;600'
+    + `&display=swap&text=${encodeURIComponent(chars)}`;
+};
+
 const BlogPostPage = () => {
   const { slug } = useParams();
   const { data, isLoading, error } = useGetBlogPostQuery(slug);
   const [zoom, setZoom] = useState(null);
   const post = data?.data;
+  const fontsHref = useMemo(() => fontUrl(post), [post]);
 
   if (isLoading) {
     return <div className="min-h-[70vh] grid place-items-center bg-[#f3ead8]"><div className="w-12 h-12 border-2 border-[#b7282e] border-t-transparent rounded-full animate-spin" /></div>;
@@ -113,7 +133,7 @@ const BlogPostPage = () => {
       />
       <Helmet>
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Noto+Serif+JP:wght@400;600&display=swap" />
+        <link rel="stylesheet" href={fontsHref} />
       </Helmet>
 
       {/* ── Hero: sumi-ink night, cover image, vertical title, hanko seal ── */}
@@ -176,7 +196,7 @@ const BlogPostPage = () => {
           <h2 className="jp-h2 text-center mb-10">Shop the pieces in this story</h2>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
             {products.map((p, i) => (
-              <UnProductCard key={p.productId} p={p} href={`/product/${p.productId}`} index={i} listId={`blog_${post.slug}`} listName={`Blog: ${post.title}`} showWishlist={false} />
+              <UnProductCard key={p.productId} p={p} href={`/product/${p.productId}`} index={i} imageLoading="afterLoad" listId={`blog_${post.slug}`} listName={`Blog: ${post.title}`} showWishlist={false} />
             ))}
           </div>
         </section>

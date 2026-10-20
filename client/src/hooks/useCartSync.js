@@ -44,7 +44,6 @@ export const useCartSync = () => {
 
     // If merge is in progress, skip — the merge handler will update Redux
     if (isMergingRef.current) {
-      console.log('[useCartSync] Merge in progress, skipping sync');
       return;
     }
 
@@ -84,7 +83,6 @@ export const useCartSync = () => {
     }
 
     // Normal sync after merge is done — keep Redux in sync with backend
-    console.log('[useCartSync] Normal sync, backend items:', backendItems.length);
     if (backendItems.length > 0) {
       dispatch(setCartItems(cartResponse.data));
     } else {

@@ -37,31 +37,10 @@ import {
 
 const TAG = "[MAGIC]";
 
-// These callbacks carry the customer's email and phone, and everything logged
-// here lands in a log aggregator nobody has scrubbed. Enough is kept to match
-// a request to a customer while debugging; the rest is masked.
-const redact = (payload = {}) => {
-  const masked = { ...payload };
-  if (masked.email) {
-    const [user, domain] = String(masked.email).split("@");
-    masked.email = domain ? `${user.slice(0, 2)}***@${domain}` : "***";
-  }
-  if (masked.contact) {
-    const digits = String(masked.contact).replace(/\D/g, "");
-    masked.contact = digits ? `***${digits.slice(-4)}` : "***";
-  }
-  return masked;
-};
-
 // Authenticate + parse a raw callback body. Returns the payload, or null after
 // the response has already been sent (caller must return immediately).
 const authedPayload = (channel, req, res) => {
-  // Logged before the auth check so a rejected call still shows up while
-  // debugging which method/shape Razorpay actually uses for this callback.
   const rawBody = Buffer.isBuffer(req.body) ? req.body.toString("utf8") : "";
-  console.log(
-    `${TAG}[${channel}] ${req.method} hit — body ${rawBody.length}b, query keys [${Object.keys(req.query || {}).join(", ")}]`,
-  );
 
   const auth = verifyMagicCallback(channel, req.body, req.headers, req.query);
   if (!auth.ok) {
@@ -75,13 +54,11 @@ const authedPayload = (channel, req, res) => {
   // whichever it actually sends, the parameters are found.
   if (!rawBody.trim()) {
     const { k, ...params } = req.query || {};
-    console.log(`${TAG}[${channel}] auth=${auth.reason} query-payload=${JSON.stringify(redact(params))}`);
     return params;
   }
 
   try {
     const parsed = JSON.parse(rawBody);
-    console.log(`${TAG}[${channel}] auth=${auth.reason} payload=${JSON.stringify(redact(parsed))}`);
     return parsed;
   } catch {
     // Shape only — the body itself may carry the customer's details.
@@ -161,16 +138,12 @@ export const magicShippingInfoController = asyncHandler(async (req, res) => {
   // whatever this callback returns ON TOP of the order amount, so charging
   // normal shipping here means the test order is not ₹1 any more.
   let freeShipping = !!order?.isInternalTestOrder;
-  if (freeShipping) {
-    console.log(`${TAG}[shipping] internal test order — shipping ₹0`);
-  }
 
   // Free shipping decided at order-create — including the cart rules ("2+ lamps"
   // and friends), which the re-derivation below knows nothing about. Honouring
   // it here is what stops Magic charging for delivery the cart said was free.
   if (!freeShipping && order?.freeShippingUnlocked) {
     freeShipping = true;
-    console.log(`${TAG}[shipping] free shipping carried over from order-create`);
   }
   const carriedOverFromOrderCreate = freeShipping;
   try {
@@ -184,11 +157,6 @@ export const magicShippingInfoController = asyncHandler(async (req, res) => {
       ? await isFreeShippingEligible(cartItems.map((i) => ({ productId: i.productId, quantity: i.quantity, variantSku: i.variantSku })))
       : false;
     freeShipping = freeShipping || thresholdEligible || productEligible;
-    console.log(
-      `${TAG}[shipping] items=[${cartItems.map((i) => `${i.productId}x${i.quantity}${i.variantSku ? `(${i.variantSku})` : ""}`).join(",")}] ` +
-      `signals={carriedOverFromOrderCreate:${carriedOverFromOrderCreate}, isInternalTestOrder:${!!order?.isInternalTestOrder}, thresholdEligible:${thresholdEligible}(threshold=₹${config.thresholdAmount}, subtotal=₹${subtotal}), productEligible:${productEligible}} ` +
-      `→ freeShipping=${freeShipping}`,
-    );
   } catch (err) {
     // Offer lookup failing must not block checkout — fall back to charging.
     console.error(`${TAG}[shipping] free-shipping check failed, charging: ${err.message}`);
@@ -231,7 +199,6 @@ export const magicShippingInfoController = asyncHandler(async (req, res) => {
     }),
   );
 
-  console.log(`${TAG}[shipping] final rates sent to Razorpay: ${JSON.stringify(results.map((r) => ({ id: r.id, shipping_fee: r.shipping_fee })))}`);
   return res.status(200).json({ addresses: results });
 });
 
@@ -256,7 +223,6 @@ export const magicGetPromotionsController = asyncHandler(async (req, res) => {
     // the coupon sheet on top of that invites a second discount on one order.
     const existing = await orderByReceipt(payload.order_id, { coupon: 1 });
     if (existing?.coupon?.isApplied) {
-      console.log(`${TAG}[getPromotions] coupon "${existing.coupon.couponCodeName}" already applied — no list`);
       return res.status(200).json({ promotions: [] });
     }
 
@@ -293,7 +259,6 @@ export const magicGetPromotionsController = asyncHandler(async (req, res) => {
         description: describe(c),
       }));
 
-    console.log(`${TAG}[getPromotions] returning ${promotions.length} coupon(s)`);
     return res.status(200).json({ promotions });
   } catch (err) {
     // Auto-fetch calls this on every checkout open. An error must not stall the
@@ -389,7 +354,6 @@ export const magicApplyPromotionController = asyncHandler(async (req, res) => {
     return fail("This coupon gives no discount on your cart.");
   }
 
-  console.log(`${TAG}[applyPromotion] "${cleanCode}" ok — ₹${discountRupees} off ₹${subtotalRupees}`);
 
   return res.status(200).json({
     promotion: {

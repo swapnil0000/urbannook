@@ -137,6 +137,11 @@ There is **no server rendering at request time** and no extra process on the pro
    It also writes `sitemap.xml` (only pages that rendered; non-indexable categories left out) and
    `llms.txt`. It never fails the build: a page that can't render, or the whole step when the API is
    down, falls back to the SPA shell.
+   Font Awesome icons are a self-hosted subset of only the `fa-*` icons used in `src/`, generated at the start of
+   every Vite build / dev server (plugin in `vite.config.js` → `scripts/build-icon-font.mjs`, from the
+   `@fortawesome/fontawesome-free` dev dependency) into `src/generated/` — git-ignored, no font files in the repo.
+   Rendered pages (`scripts/ssrHtml.mjs` → `deferAppScripts`) load the app's JS after the page's first paint and
+   main image, not from `<head>`; the SPA shell (checkout, account) keeps the normal module script.
 2. `jenkins/scripts/upload-client.sh` syncs `dist-prerender/ssg/` → `s3://urbannook-prod-frontend/ssg/`
    with `--delete`, `text/html`, `no-cache` (same rule as `index.html`). An empty folder (API down, or a
    rollback to a release from before SSG) removes the old pages. Older releases' `product/*` pages are

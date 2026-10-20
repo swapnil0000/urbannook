@@ -2,6 +2,7 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "node:url";
 import { webcrypto } from "node:crypto";
+import { generateIconFont } from './scripts/build-icon-font.mjs'
 
 // Fix crypto.getRandomValues issue in Node.js environment
 if (!globalThis.crypto) {
@@ -86,6 +87,20 @@ function bundleSizeMonitor() {
 }
 
 /**
+ * Font Awesome subset (scripts/build-icon-font.mjs): generated into src/generated/ (git-ignored)
+ * at the start of every build and dev server, so no font binaries live in the repo and every
+ * build path (npm scripts, Jenkins' `npx vite build`, the SSR build) has the current icons.
+ */
+function iconFontSubset() {
+  return {
+    name: 'icon-font-subset',
+    async buildStart() {
+      await generateIconFont({ log: (m) => this.info?.(m) ?? console.log(m) });
+    },
+  };
+}
+
+/**
  * HTML Environment Variable Replace Plugin
  * Replaces %VITE_GTM_ID% placeholder in index.html with the actual GTM container ID
  */
@@ -106,7 +121,7 @@ export default defineConfig(({ mode, isSsrBuild }) => {
   // and hand the GTM container id to the index.html replace plugin.
   const env = loadEnv(mode, '.', '');
   return {
-  plugins: [react(), bundleSizeMonitor(), htmlEnvReplace(env.VITE_GTM_ID, env.VITE_META_PIXEL_ID)],
+  plugins: [iconFontSubset(), react(), bundleSizeMonitor(), htmlEnvReplace(env.VITE_GTM_ID, env.VITE_META_PIXEL_ID)],
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),

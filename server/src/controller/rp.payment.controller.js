@@ -252,15 +252,12 @@ const collectMetaTracking = (req) => ({
 // is responsible for `order.save()`. Returns true if an address was written.
 const captureMagicAddressIfMissing = async (order, razorpayOrderId) => {
   if (!order?.isMagicOrder) {
-    console.log(`[MAGIC][address-capture] skip ${razorpayOrderId} — not a Magic order`);
     return false;
   }
   if (order.deliveryAddress?.pinCode) {
-    console.log(`[MAGIC][address-capture] skip ${razorpayOrderId} — address already on order`);
     return false;
   }
 
-  console.log(`[MAGIC][address-capture] fetching Razorpay order ${razorpayOrderId} for customer_details`);
   const rpOrder = await razorpayFetchOrderService(razorpayOrderId);
   const magicAddress = toOrderDeliveryAddress(rpOrder?.customer_details);
   if (!magicAddress) {
@@ -777,11 +774,6 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   const freeShippingUnlocked =
     comboFsEligible || cartRuleResult.freeShipping || thresholdEligible || promotionResult.freeShipping;
   const chargedShippingAmount = freeShippingUnlocked ? 0 : realShippingAmount;
-  console.log(
-    `[FreeShipping][Order:auth] items=[${orderItems.map((oi) => `${oi.productId}x${oi.productSnapshot.quantity}${oi.variantSku ? `(${oi.variantSku})` : ""}`).join(",")}] ` +
-    `signals={comboFsEligible:${comboFsEligible}, cartRuleFreeShipping:${cartRuleResult.freeShipping}, thresholdEligible:${thresholdEligible}(threshold=₹${freeShippingConfig.thresholdAmount}, subtotal=₹${subtotal}), promotionFreeShipping:${promotionResult.freeShipping}} ` +
-    `→ freeShippingUnlocked=${freeShippingUnlocked}, realShipping=₹${realShippingAmount}, chargedShipping=₹${chargedShippingAmount}`,
-  );
 
   // Gift wrap: server-authoritative price + intent. `cart.giftWrap` is the
   // ONLY source for "did they select it" (never req.body); price always comes
@@ -862,10 +854,6 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       const scopeIdentifiers   = [normEmailForScope, normMobileForScope].filter(Boolean);
       const assignment = (liveCoupon.assignedTo || []).find((a) => scopeIdentifiers.includes(a.identifier));
 
-      console.log(
-        `[Coupon:PaymentRecheck] TARGETED re-check: identifiers=${scopeIdentifiers.join("/") || "-"} ` +
-        `assignmentFound=${!!assignment} usedAt=${assignment?.usedAt || "-"} isValidInternal=${isValidInternal}`
-      );
 
       if (!assignment) {
         console.log(`[Coupon:PaymentRecheck] REJECT — TARGETED: no assignment found for ${scopeIdentifiers.join("/") || "(no identifiers)"}`);
@@ -948,7 +936,6 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
             ...(normMobileCheck ? [{ mobile: normMobileCheck }] : []),
           ],
         });
-        console.log(`[Coupon:PaymentRecheck] Per-user check: identifiers=${identifiers.join("/")} priorUses=${priorUses} limit=${liveCoupon.maxUsesPerUser}`);
         if (priorUses >= liveCoupon.maxUsesPerUser) {
           console.log(`[Coupon:PaymentRecheck] REJECT — per-user limit reached`);
           throw new ValidationError(
@@ -959,7 +946,6 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
         }
       }
     }
-    console.log(`[Coupon:PaymentRecheck] ✅ PASSED — couponCodeId=${couponCodeId} discountAmount=₹${discountAmount} isInternalTestOrder=${isInternalTestOrder}`);
   }
 
   // Everything about what we charge — COD advance included — lives in
@@ -1314,7 +1300,6 @@ const fulfilCapturedPayment = async (order, payment) => {
 
           // Only send account-created email for brand-new accounts
           guestCredentials = isExistingUser ? null : { guestEmail, guestName, tempPassword };
-          console.log(`[INFO] Guest account ready - Email: ${guestEmail}, isNew: ${!isExistingUser}`);
         } catch (guestAccountError) {
           console.error("[ERROR] Guest account creation failed:", guestAccountError.message, guestAccountError.stack);
         }
@@ -1452,9 +1437,6 @@ const fulfilCapturedPayment = async (order, payment) => {
             $set: { products: {} },
             $unset: { appliedCoupon: 1 },
           },
-        );
-        console.log(
-          `[INFO] Cart cleared after successful payment - UserId: ${order.userId}, OrderId: ${order.orderId}`,
         );
       } catch (cartError) {
         console.error(
@@ -1634,9 +1616,6 @@ const fulfilCapturedPayment = async (order, payment) => {
 
       try {
         if (!order.invoiceData || !order.invoiceData.isGenerated) {
-          console.log(
-            `[INFO] Generating PDF Invoice for Order: ${order.orderId}...`,
-          );
           const invoiceHtml = generateInvoiceHtmlTemplate(order);
           const file = { content: invoiceHtml };
           const options = {
@@ -1664,9 +1643,6 @@ const fulfilCapturedPayment = async (order, payment) => {
             },
           );
 
-          console.log(
-            `✅ Invoice uploaded to S3 successfully: ${savedFileKey}`,
-          );
         }
       } catch (invoiceError) {
         console.error(
@@ -2073,11 +2049,6 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   const freeShippingUnlocked =
     comboFsEligible || cartRuleResult.freeShipping || thresholdEligible || promotionResult.freeShipping;
   const chargedShippingAmount = freeShippingUnlocked ? 0 : realShippingAmount;
-  console.log(
-    `[FreeShipping][Order:guest] items=[${orderItems.map((oi) => `${oi.productId}x${oi.productSnapshot.quantity}${oi.variantSku ? `(${oi.variantSku})` : ""}`).join(",")}] ` +
-    `signals={comboFsEligible:${comboFsEligible}, cartRuleFreeShipping:${cartRuleResult.freeShipping}, thresholdEligible:${thresholdEligible}(threshold=₹${freeShippingConfig.thresholdAmount}, subtotal=₹${subtotal}), promotionFreeShipping:${promotionResult.freeShipping}} ` +
-    `→ freeShippingUnlocked=${freeShippingUnlocked}, realShipping=₹${realShippingAmount}, chargedShipping=₹${chargedShippingAmount}`,
-  );
 
   // Gift wrap: guests have no server-side cart to read intent from, so the
   // boolean (only) comes from req.body — that's safe, it just means "include
@@ -2190,7 +2161,6 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     couponCodeId = liveCoupon.couponId;
     couponCodeName = liveCoupon.code;
     isApplied = true;
-    console.log(`[Coupon:Guest] Applied "${cleanCode}" — discount ₹${discountAmount} on subtotal ₹${subtotal}`);
   }
 
   // Same maths as the logged-in checkout above — one shared function so the

@@ -15,8 +15,7 @@ import ComparisonTable from '../../component/ComparisonTable';
 import FreeShippingBanner from '../../component/FreeShippingBanner';
 import ProductPageBanner from '../../component/ProductPageBanner';
 import ImageCarousel from '../../component/ImageCarousel';
-import { motion, AnimatePresence } from 'motion/react';
-import { ScrollColorBand } from '../../component/motion';
+import { ScrollColorBand, motion, AnimatePresence } from '../../component/motion';
 import { variantSku, trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist, trackVariantSelect, trackShare, trackDeliveryCheck } from '../../utils/analytics';
 import { productsApi, useGetProductByIdQuery, useGetProductsQuery, useGetBlogPostsQuery } from '../../store/api/productsApi';
 import { useAddToCartMutation, useUpdateCartMutation, useCalculateShippingMutation, useGetFreeShippingOfferQuery } from '../../store/api/userApi';
@@ -175,7 +174,11 @@ const ProductDetailPage = () => {
       && (details.find((v) => v.sku === urlVariantSku) || details.find((v) => v.variantName === urlVariantSku));
     return matched ? matched.variantName : details[0].variantName;
   });
-  const { data: relRes } = useGetProductsQuery({ page: 1, limit: 8 });
+  // Same args as the header / footer (and the SSR prefetch in entry-server.jsx): one cached
+  // list. A separate { limit: 8 } query used to embed a second copy of the first 8 products
+  // (~100 KB) in every product page's HTML. Page 1 is the same order, so the first 4 related
+  // products are the same.
+  const { data: relRes } = useGetProductsQuery({ page: 1, limit: 24 });
   const related = useMemo(() => productList(relRes).filter((p) => p.productId !== productId).slice(0, 4), [relRes, productId]);
 
   // Product FAQs — use CMS-provided product.faqs if present, else generate helpful
@@ -1072,7 +1075,7 @@ const ProductDetailPage = () => {
             >
               {related.map((p, i) => (
                 <div key={p.productId || i} className="snap-start shrink-0 w-[160px] sm:w-[190px] md:w-[220px]">
-                  <UnProductCard p={p} index={i} listId="pdp_related" listName="Related" />
+                  <UnProductCard p={p} index={i} imageLoading="afterLoad" listId="pdp_related" listName="Related" />
                 </div>
               ))}
             </div>

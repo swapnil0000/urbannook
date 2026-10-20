@@ -34,14 +34,7 @@ const sendAlert = async (pushMsg) => {
 
     const webhookUrl = env.ZOHO_WEBHOOK_TOKEN;
 
-    // Masking the token in logs for security
-    const maskedUrl = webhookUrl.includes("zapikey=")
-      ? webhookUrl.replace(/zapikey=([^&]+)/, "zapikey=***")
-      : webhookUrl.substring(0, 50) + "***";
-
     console.log("[INFO] Sending alert to Zoho Cliq...");
-    console.log("[DEBUG] Webhook URL (masked):", maskedUrl);
-    console.log("[DEBUG] Message length:", pushMsg.length, "characters");
 
     // Send alert to Zoho Cliq
     const response = await axios.post(
@@ -58,8 +51,6 @@ const sendAlert = async (pushMsg) => {
     );
 
     console.log("[SUCCESS] ✅ Alert sent to Zoho Cliq successfully!");
-    console.log("[DEBUG] Response status:", response.status);
-    console.log("[DEBUG] Response data:", JSON.stringify(response.data));
 
     return { success: true, message: "Alert sent successfully" };
   } catch (error) {

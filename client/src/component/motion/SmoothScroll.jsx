@@ -1,6 +1,9 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
-import { MotionConfig } from "motion/react";
+import { LazyMotion, MotionConfig } from "motion/react";
+
+// Motion's animation engine, fetched as its own chunk (see component/motion/index.jsx).
+const loadFeatures = () => import("./features.js").then((mod) => mod.default);
 
 /**
  * Scroll + motion provider.
@@ -12,7 +15,8 @@ import { MotionConfig } from "motion/react";
  *
  * This wrapper still:
  *  - resets scroll to top on route change, and
- *  - applies MotionConfig so every animation respects prefers-reduced-motion.
+ *  - applies MotionConfig so every animation respects prefers-reduced-motion, and
+ *  - loads Motion's animation engine lazily (LazyMotion) so it isn't in the main bundle.
  */
 export default function SmoothScroll({ children }) {
   const { pathname, state } = useLocation();
@@ -24,5 +28,9 @@ export default function SmoothScroll({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
-  return <MotionConfig reducedMotion="user">{children}</MotionConfig>;
+  return (
+    <LazyMotion features={loadFeatures}>
+      <MotionConfig reducedMotion="user">{children}</MotionConfig>
+    </LazyMotion>
+  );
 }

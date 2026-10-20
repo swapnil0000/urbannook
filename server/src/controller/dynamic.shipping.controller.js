@@ -21,7 +21,6 @@ const dynamicShippingCal = asyncHandler(async (req, res) => {
 
   if (!pincode) {
     console.error("[CONTROLLER] ❌ Validation Error: Pincode is missing");
-    console.log("*".repeat(80) + "\n");
     return res.status(400).json(
       new ApiRes(400, "Pincode is required", null, false)
     );
@@ -29,7 +28,6 @@ const dynamicShippingCal = asyncHandler(async (req, res) => {
 
   if (!cartItems || !Array.isArray(cartItems) || cartItems.length === 0) {
     console.error("[CONTROLLER] ❌ Validation Error: Cart items missing or invalid");
-    console.log("*".repeat(80) + "\n");
     return res.status(400).json(
       new ApiRes(400, "Cart items are required", null, false)
     );
@@ -43,7 +41,6 @@ const dynamicShippingCal = asyncHandler(async (req, res) => {
     paymentType: paymentType || "PREPAID"
   });
 
-  console.log("\n[CONTROLLER] Service returned result:", JSON.stringify(selectedService, null, 2));
   // console.log("[CONTROLLER] Sending response to client");
   // console.log("*".repeat(80) + "\n");
 

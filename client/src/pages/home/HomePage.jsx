@@ -10,6 +10,12 @@ import { useGetTestimonialsQuery } from '../../store/api/testimonialsApi';
 import { useGetAllFreeShippingBannersQuery } from '../../store/api/freeShippingApi';
 import { addItem } from '../../store/slices/cartSlice';
 import { trackViewItemList, trackAddToCart } from '../../utils/analytics';
+import { useAfterLoad } from '../../hooks/useAfterLoad';
+
+/* Below-the-fold photos (reviews, carousels, categories, product rows): requested only once
+   the page has loaded, so they don't share a slow phone's connection with the hero (LCP)
+   image. Their boxes have a fixed size and a background, so nothing shifts when they arrive. */
+const AfterLoadImg = (props) => (useAfterLoad() ? <img decoding="async" {...props} /> : null);
 
 const onImgErr = (e) => { e.currentTarget.src = '/assets/logo.webp'; };
 
@@ -99,7 +105,7 @@ const ReviewCard = ({ t, img, tag, onClick }) => (
     onClick={onClick}
     className="group relative shrink-0 w-[288px] sm:w-[330px] aspect-[5/6] overflow-hidden bg-hair mr-4 md:mr-5 cursor-pointer transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_24px_50px_-24px_rgba(20,20,20,0.55)]"
   >
-    <img src={img} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform duration-[800ms] ease-out group-hover:scale-125" onError={onImgErr} />
+    <AfterLoadImg src={img} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform duration-[800ms] ease-out group-hover:scale-125" onError={onImgErr} />
     <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent" />
     <span className="absolute top-4 right-4 gl-lbl text-[8px] text-white/90 border border-white/40 px-2 py-1 backdrop-blur-sm">✓ Verified</span>
     <figcaption className="absolute inset-x-3 bottom-3 p-4 bg-paper/95 backdrop-blur">
@@ -186,7 +192,7 @@ const CoverflowCarousel = ({ images }) => {
                 transition: 'transform 0.7s cubic-bezier(0.25,1,0.5,1), opacity 0.7s ease, filter 0.7s ease',
               }}
             >
-              <img src={src} alt="" loading="lazy" className="w-full h-full object-cover pointer-events-none" onError={onImgErr} />
+              <AfterLoadImg src={src} alt="" loading="lazy" className="w-full h-full object-cover pointer-events-none" onError={onImgErr} />
             </div>
           );
         })}
@@ -270,7 +276,7 @@ const StickyAddBar = ({ product, onAdd }) => {
           style={{ bottom: 'calc(env(safe-area-inset-bottom) + 58px)' }}
         >
           <div className="flex items-center gap-3 bg-ink text-paper border border-white/10 shadow-[0_-8px_30px_rgba(0,0,0,0.45)] p-2">
-            <img src={productImg(product)} alt="" className="w-12 h-12 object-cover shrink-0 bg-white/10" onError={onImgErr} />
+            <img src={productImg(product)} alt="" loading="lazy" className="w-12 h-12 object-cover shrink-0 bg-white/10" onError={onImgErr} />
             <div className="min-w-0 flex-1">
               <p className="text-[12px] font-bold truncate leading-tight">{product.productName}</p>
               <p className="text-[11px] text-paper/60 leading-tight"><b className="text-paper">{inr(v.variantPrice)}</b> · Free shipping on the pair</p>
@@ -532,7 +538,16 @@ const HeroCarousel = ({ products = [], onProduct, onVariant, onShop }) => {
                 className="flex gap-3 md:gap-4 overflow-x-auto gl-hscroll snap-x snap-mandatory pb-1"
                 style={{ touchAction: 'pan-x' }}
               >
-                {f.tiles.map((t) => (
+                {f.tiles.map((t, ti) => {
+                  /* Only the first tile of the first drop is above the fold on load:
+                     it is the LCP image, so it loads first with high priority. Every
+                     other tile is lazy — without that, React preloads all of them in
+                     <head> and they fight the LCP image for bandwidth on mobile. */
+                  const lcp = idx === 0 && ti === 0;
+                  /* The other tiles only peek in from the right on a phone: their photos wait
+                     until the page has loaded so the hero photo gets the connection to itself. */
+                  const TileImg = lcp ? 'img' : AfterLoadImg;
+                  return (
                   /* Fixed width AND fixed aspect, so every tile is the same size
                      whatever the photo's ratio is — the shots run 0.75 to 1.0,
                      and sizing each tile to its own photo made the rail change
@@ -549,17 +564,25 @@ const HeroCarousel = ({ products = [], onProduct, onVariant, onShop }) => {
                           product or leaving a hard letterbox edge. The shots
                           sit on soft studio gradients, so the blurred backdrop
                           reads as a continuation of that backdrop. */}
-                      <img
+                      <TileImg
                         src={t.img}
                         alt=""
                         aria-hidden="true"
+                        loading={lcp ? 'eager' : 'lazy'}
+                        /* Same URL as the photo below, so one download — but this scaled,
+                           blurred copy is the largest thing on screen (Lighthouse's LCP
+                           element), so it must ask for the image at high priority too. */
+                        fetchPriority={lcp ? 'high' : 'auto'}
+                        decoding="async"
                         onError={onImgErr}
                         className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl"
                       />
-                      <img
+                      <TileImg
                         src={t.img}
                         alt={t.label}
-                        loading="eager"
+                        loading={lcp ? 'eager' : 'lazy'}
+                        fetchPriority={lcp ? 'high' : 'auto'}
+                        decoding={lcp ? 'sync' : 'async'}
                         onError={onImgErr}
                         className="relative w-full h-full object-contain transition-transform duration-[900ms] group-hover:scale-[1.04]"
                       />
@@ -569,7 +592,8 @@ const HeroCarousel = ({ products = [], onProduct, onVariant, onShop }) => {
                       <span className="gl-lbl text-[10px] text-brand shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">Shop →</span>
                     </div>
                   </button>
-                ))}
+                  );
+                })}
               </div>
 
               {/* desktop scrub — mobile just swipes */}
@@ -1021,7 +1045,7 @@ const HomePage = () => {
                   {idx === 1 && <span className="font-archivo text-2xl md:text-3xl font-extrabold text-faint shrink-0 self-center mb-10">+</span>}
                   <div className="flex-1 max-w-[150px]">
                     <button onClick={() => navigate(`/product/${it.p.productId}`)} aria-label={it.p.productName} className="group relative block w-full aspect-square overflow-hidden border border-hair bg-surface">
-                      <img src={productImg(it.p)} alt={it.p.productName} loading="lazy" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" onError={onImgErr} />
+                      <AfterLoadImg src={productImg(it.p)} alt={it.p.productName} loading="lazy" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" onError={onImgErr} />
                       {it.inCart && <span className="absolute top-2 right-2 w-6 h-6 rounded-full bg-save text-white grid place-items-center text-[11px] shadow">✓</span>}
                     </button>
                     <p className="text-[11px] font-bold text-ink mt-2 leading-snug line-clamp-1">{it.p.productName}</p>
@@ -1093,7 +1117,7 @@ const HomePage = () => {
             {collections.map((c, i) => (
               <StaggerItem key={i}>
                 <button onClick={() => navigate(c.soon ? '/products' : `/products?category=${encodeURIComponent(c.name)}`)} className="gl-pcard un-card group relative rounded-none overflow-hidden aspect-[4/5] bg-hair cursor-pointer text-left w-full">
-                  <img src={c.img} alt={c.name} loading="lazy" className="gl-img absolute inset-0 w-full h-full object-cover" onError={onImgErr} />
+                  <AfterLoadImg src={c.img} alt={c.name} loading="lazy" className="gl-img absolute inset-0 w-full h-full object-cover" onError={onImgErr} />
                   <span className="un-glare"></span>
                   <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-transparent"></div>
                   {c.soon && <span className="absolute top-3 left-3 z-[3] gl-lbl text-[8px] bg-white/90 text-ink px-2 py-1 rounded">Coming soon</span>}
@@ -1114,7 +1138,7 @@ const HomePage = () => {
               {products.slice(0, 8).map((p, i) => (
                 <StaggerItem key={i}>
                   <button onClick={() => navigate(`/product/${p.productId}`)} className="gl-pcard un-card group relative aspect-square rounded-none overflow-hidden bg-hair cursor-pointer w-full">
-                    <img src={productImg(p)} alt="" loading="lazy" className="gl-img w-full h-full object-cover" onError={onImgErr} />
+                    <AfterLoadImg src={productImg(p)} alt="" loading="lazy" className="gl-img w-full h-full object-cover" onError={onImgErr} />
                     <span className="un-glare"></span>
                     <span className="absolute bottom-3 left-3 z-[3] bg-white/90 backdrop-blur text-ink text-xs font-bold px-2.5 py-1.5 rounded-full opacity-0 group-hover:opacity-100 transition">Shop this →</span>
                   </button>
