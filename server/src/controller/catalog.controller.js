@@ -57,9 +57,11 @@ const HEADER = [
 ];
 
 const metaProductFeed = asyncHandler(async (req, res) => {
-  const products = await Product.find({ isPublished: true }).select(
-    "productId productName productDes productStatus productCategory variantDetails"
-  );
+  // .lean() so admin-only variant fields (isActive) aren't dropped by this repo's
+  // schema; add-ons (gift wrap etc.) aren't sold on their own, so they stay out.
+  const products = await Product.find({ isPublished: true, isAddon: { $ne: true } })
+    .select("productId productName productDes productStatus productCategory variantDetails")
+    .lean();
 
   const rows = [HEADER.join(",")];
   let skipped = 0;
@@ -70,7 +72,6 @@ const metaProductFeed = asyncHandler(async (req, res) => {
       continue;
     }
 
-    const availability = p.productStatus === "in_stock" ? "in stock" : "out of stock";
     const description = plain(p.productDes) || plain(p.productName);
     const link = `${DOMAIN}/product/${p.productId}`;
     const productType = plain(p.productCategory);
@@ -84,6 +85,14 @@ const metaProductFeed = asyncHandler(async (req, res) => {
     }
 
     variants.forEach((v, i) => {
+      // Variants hidden in the admin aren't on the site — don't advertise them.
+      if (v.isActive === false) {
+        skipped += 1;
+        return;
+      }
+      // Per-variant stock (same rule as the Google feed), so ads stop showing a
+      // sold-out katana while its product still has other variants in stock.
+      const availability = variantInStock(p, v) ? "in stock" : "out of stock";
       const price =
         typeof v.variantPrice === "number" && v.variantPrice > 0
           ? v.variantPrice

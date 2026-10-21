@@ -128,10 +128,38 @@ const userOrderPreviousHistory = asyncHandler(async (req, res) => {
     query.userEmail = userEmail;
   }  
   
-  const orders = await Order.find(query)
+  const allOrders = await Order.find(query)
     .sort({ createdAt: -1 })
     .lean()
     .select("-_id");
+
+  // An unpaid status here is only what the webhooks told us. A customer who
+  // paid while the webhook is late or lost (or paid on a retry after a failed
+  // attempt) would see "Failed" — so check recent unpaid orders with Razorpay,
+  // same as the order-status poll does. Unpaid checkout attempts that never
+  // took money are not orders, so they are left out of the list.
+  const RECONCILE_WINDOW_MS = 48 * 60 * 60 * 1000;
+  const orders = [];
+  for (const o of allOrders) {
+    if (!UNPAID_STATUSES.includes(o.status)) {
+      orders.push(o);
+      continue;
+    }
+    const rpOrderId = o.payment?.razorpayOrderId;
+    const isRecent = Date.now() - new Date(o.createdAt).getTime() < RECONCILE_WINDOW_MS;
+    if (!rpOrderId || !isRecent) continue;
+
+    const payments = await razorpayFetchOrderPaymentsService(rpOrderId);
+    const captured = payments?.find((p) => p.status === "captured");
+    if (captured) {
+      const doc = await Order.findOne({ "payment.razorpayOrderId": rpOrderId });
+      const paid = await fulfilCapturedPayment(doc, captured);
+      const { _id, ...rest } = paid.toObject ? paid.toObject() : paid;
+      orders.push({ ...rest, status: "PAID" });
+    } else if (payments?.some((p) => p.status === "authorized")) {
+      orders.push({ ...o, status: "PROCESSING" });
+    }
+  }
 
   return res.status(200).json(
     new ApiRes(
