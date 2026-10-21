@@ -391,7 +391,7 @@ const PromotionUnlockSheet = () => {
                 </span>
                 {promo?.rewardTargetPending ? "One step away" : "Almost there"}
               </span>
-              {promo?.badge && <span className="truncate text-[11px] font-bold text-muted">{promo.badge}</span>}
+              {/* {promo?.badge && <span className="truncate text-[11px] font-bold text-muted">{promo.badge}</span>} */}
             </div>
 
             <h3 id="promotion-sheet-title" className="truncate pr-10 text-xl font-black leading-tight tracking-tight text-ink sm:text-2xl" title={promo?.title}>{promo?.title}</h3>
@@ -399,14 +399,14 @@ const PromotionUnlockSheet = () => {
               {promo?.rewardTargetPending ? "Your cart qualifies. Add an eligible reward item to apply the offer." : promo?.progressText}
             </p>
 
-            {promo?.savingsText && (
+            {/* {promo?.savingsText && (
               <div className="mt-4 flex items-center gap-3 border border-brand/25 bg-brand/5 p-3">
                 <span className="grid h-9 w-9 shrink-0 place-items-center bg-brand text-white">
                   <i className="fa-solid fa-tag text-sm" aria-hidden="true" />
                 </span>
                 <p className="truncate text-sm font-extrabold text-ink" title={promo.savingsText}>{promo.savingsText}</p>
               </div>
-            )}
+            )} */}
 
             {reward && !promo?.rewardTargetPending && (
               <div className="mt-4 flex items-center gap-3 border border-hair bg-surface/60 p-2.5">

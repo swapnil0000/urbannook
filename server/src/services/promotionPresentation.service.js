@@ -79,8 +79,39 @@ function tierValueRange(r) {
   return min === max ? String(min) : `${min}–${max}`;
 }
 
+// Multiple reward lines that each name their OWN distinct product+variant
+// target are ALTERNATIVES — the customer adds ONE of them (see "choose your
+// reward item" in the unlock sheet / recommendedProducts) and gets only
+// THAT line's own discount, never every line at once. Joining their parts
+// with "+" (the old behavior) wrongly read as "every discount applies to
+// this cart simultaneously" (e.g. a 3-variant "buy this stand, one gets
+// 100% off, the other two 50% off" promotion showed "100% off + 50% off +
+// 50% off", implying all three stack). Detected generically off the shape
+// every scoped/single-target reward already carries (targetProductId +
+// targetVariantSku) — not special-cased to any one promotion.
+function hasAlternativeTargets(rewards) {
+  if (rewards.length < 2) return false;
+  const keys = rewards.map((r) => (r.targetProductId ? `${r.targetProductId}::${r.targetVariantSku || ""}` : null));
+  if (keys.some((k) => !k)) return false; // any reward with no single target breaks the "pick one" shape
+  return new Set(keys).size === keys.length; // every line names a DIFFERENT product+variant
+}
+
 function buildSavingsText(promotion) {
   const rewards = promotion.rewards || [];
+  if (hasAlternativeTargets(rewards)) {
+    const values = rewards.map((r) => {
+      if (["percent_off_product", "flat_off_product", "discounted_product"].includes(r.type)) return Number(r.value) || 0;
+      return null;
+    });
+    const allHaveValues = values.every((v) => v != null);
+    const allPercent = rewards.every((r) => r.type === "percent_off_product");
+    if (allHaveValues) {
+      const max = Math.max(...values);
+      return allPercent ? `Up to ${max}% off` : `Up to ${formatRupees(max)} off`;
+    }
+    return "Choose your reward"; // mixed types (e.g. a free gift among percent-off lines) — no single "up to X" number is meaningful
+  }
+
   const parts = [];
   for (const r of rewards) {
     const range = tierValueRange(r);
