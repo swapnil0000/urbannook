@@ -570,8 +570,7 @@ export {
   getProductDisplayController,
   getCartDisplayController,
   getCheckoutDisplayController,
-  // Pure, DB-free helpers — exported for unit testing (see
-  // __tests__/unit/promotionRecommendations.test.js).
+  // Pure, DB-free helpers — exported for unit testing.
   findFirstUnmetProductLeaf,
   didAddedItemAdvancePromotion,
   toRecommendationCard,
