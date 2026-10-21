@@ -33,7 +33,7 @@ const UnCashOrderCard = ({ order, loyaltyEnabled, earnPercent }) => {
   const cancelled = UNCASH_REVERSED.includes(order.resolutionStatus);
   const pending =
     !l.isEarnCredited && !cancelled && loyaltyEnabled && order.status === "PAID"
-      ? Math.floor(((Number(order.amount) || 0) * earnPercent) / 100)
+      ? Math.floor(((l.earnBase != null ? Number(l.earnBase) : Number(order.amount) || 0) * earnPercent) / 100)
       : 0;
   if (!used && !earned && !pending && !takenBack && !before) return null;
   const after = before - used + earned - takenBack + returned;
@@ -42,7 +42,6 @@ const UnCashOrderCard = ({ order, loyaltyEnabled, earnPercent }) => {
       <p className="text-[9px] font-bold uppercase tracking-widest text-[#a89068] flex items-center gap-1.5">
         <i className="fa-solid fa-coins" /> UnCash on this order
       </p>
-      <UnCashRow label="Balance before this order" value={`${before} pts`} />
       {used > 0 && <UnCashRow label={`Used (₹${(Number(l.discountFromPoints) || 0).toLocaleString()} off)`} value={`−${used} pts`} cls="text-red-500" />}
       {earned > 0 && <UnCashRow label="Earned" value={`+${earned} pts`} cls="text-emerald-600" />}
       {pending > 0 && (

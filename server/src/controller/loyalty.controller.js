@@ -24,6 +24,21 @@ export const userGetLoyalty = asyncHandler(async (req, res) => {
   );
 });
 
+// GET /loyalty/info — public (no login): just the rules, so a guest at
+// checkout or on /uncash-calculation sees the real numbers and knows to log
+// in to use points. No user data.
+export const getLoyaltyInfo = asyncHandler(async (req, res) => {
+  const config = await getLoyaltyConfig();
+  return res.status(200).json(
+    new ApiRes(200, "Loyalty info", {
+      isEnabled: config.isEnabled,
+      earnPercent: config.earnPercent,
+      pointToRupeeRatio: config.pointToRupeeRatio,
+      maxRedeemPercentOfCart: config.maxRedeemPercentOfCart,
+    }, true),
+  );
+});
+
 // GET /user/loyalty/redeem-quote?cartValue=NNN — how many points this user
 // could redeem on a cart of this size, for the checkout page to show before
 // the user actually commits to an order.

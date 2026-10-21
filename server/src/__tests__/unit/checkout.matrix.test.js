@@ -317,6 +317,14 @@ describe("UnCash (loyalty points) discount", () => {
     expect(c.codRemainingAmount).toBe(1499 + 89 - 34 - 178);
   });
 
+  test("Magic: comes off the amount sent to Razorpay (shipping is added by Razorpay later)", () => {
+    const c = computeOrderCharge({ subtotal: 2998, discountAmount: 100, pointsDiscount: 34, isMagic: true });
+    expect(c.finalAmount).toBe(2998 - 100 - 34);
+    expect(c.razorpayChargeAmountPaise).toBe(2864 * 100);
+    const li = [{ type: "e-commerce", sku: "sku0", price: 299800, offer_price: 299800, tax_amount: 0, quantity: 1, name: "Item 0" }];
+    expect(discountMagicLineItems(li, c.razorpayChargeAmountPaise).total).toBe(286400);
+  });
+
   test("never pushes the total below zero", () => {
     const c = computeOrderCharge({ subtotal: 50, pointsDiscount: 500 });
     expect(c.finalAmount).toBe(0);

@@ -84,6 +84,9 @@ const orderSchema = new mongoose.Schema(
     // repo's order.model.js for the field-by-field rationale. LoyaltyLedger
     // (this collection, shared) is always the balance source of truth.
     loyalty: {
+      // Product value after coupon + UnCash (no shipping / gift wrap) — what
+      // the admin earn sweep credits earnPercent of.
+      earnBase: { type: Number, default: null },
       balanceBeforeOrder: { type: Number, default: 0 },
       pointsRedeemed: { type: Number, default: 0 },
       discountFromPoints: { type: Number, default: 0 },

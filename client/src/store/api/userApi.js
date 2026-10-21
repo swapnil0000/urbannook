@@ -23,6 +23,10 @@ export const userApi = apiSlice.injectEndpoints({
       providesTags: ["Loyalty"],
       keepUnusedDataFor: 0, // balance must always reflect the latest order/redeem
     }),
+    // Public rules (no login) — for guests at checkout / on the UnCash page.
+    getLoyaltyInfo: builder.query({
+      query: () => "loyalty/info",
+    }),
     getRedeemQuote: builder.query({
       query: (cartValue) => `user/loyalty/redeem-quote?cartValue=${cartValue || 0}`,
       keepUnusedDataFor: 0,
@@ -355,6 +359,7 @@ export const {
   useUpdateUserProfileMutation,
   useGetLoyaltySummaryQuery,
   useGetRedeemQuoteQuery,
+  useGetLoyaltyInfoQuery,
   useAddToCartMutation,
   useUpdateCartMutation,
   useMergeGuestCartMutation,

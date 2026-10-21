@@ -19,6 +19,7 @@ import {
   useGetGiftWrapOfferQuery,
   useSyncGuestCartMutation,
   useGetLoyaltySummaryQuery,
+  useGetLoyaltyInfoQuery,
 } from "../store/api/userApi";
 import { setShowLoginModal, setLoginCallback } from "../store/slices/uiSlice";
 import { useUI } from "../hooks/useRedux";
@@ -256,14 +257,16 @@ const AmountPlaceholder = () => (
   <span className="inline-block h-3.5 w-14 animate-pulse rounded bg-gray-200" aria-label="Calculating" />
 );
 
-// UnCash box under the total, logged-in users only, while loyalty is on
-// (admin → Loyalty Points). "Use UnCash" toggle (hidden on Magic Checkout —
-// redeem is normal checkout only) + the points this order will earn, which
-// mirrors the admin earn sweep: floor(amount paid × earnPercent / 100), after
-// delivery. The (i) opens the full calculation page.
-const UnCashBox = ({ uncash, totalToPay }) => {
+// UnCash box under the total while loyalty is on (admin → Loyalty Points).
+// Logged-in: "Use UnCash" toggle (every payment method, Express/Magic too) +
+// the points this order will earn. Guests: earn line + "log in to use". Earn
+// mirrors the admin earn sweep: floor(cart value after coupon and UnCash —
+// no shipping — × earnPercent / 100), after delivery. The (i) opens the
+// full calculation page.
+const UnCashBox = ({ uncash }) => {
+  const dispatch = useDispatch();
   if (!uncash?.enabled) return null;
-  const earn = Math.floor(((Number(totalToPay) || 0) * (uncash.earnPercent || 0)) / 100);
+  const earn = Math.floor(((Number(uncash.earnBase) || 0) * (uncash.earnPercent || 0)) / 100);
   return (
     <div className="rounded-lg bg-amber-50/70 border border-amber-100 px-3 py-2.5 text-xs space-y-2">
       {uncash.canRedeem && (
@@ -286,9 +289,13 @@ const UnCashBox = ({ uncash, totalToPay }) => {
         <i className="fa-solid fa-coins shrink-0 text-[#a89068] text-sm" />
         <p className="min-w-0 flex-1 leading-snug text-gray-600">
           You'll earn <b className="text-ink">{earn} UnCash</b> after delivery
-          {!uncash.canRedeem && (
+          {uncash.guest ? (
+            <span className="block text-[10px] text-gray-500">
+              Saved to the account with this email / mobile number.
+            </span>
+          ) : !uncash.canRedeem ? (
             <span className="block text-[10px] text-gray-400">Current balance: {uncash.balance} UnCash</span>
-          )}
+          ) : null}
         </p>
         <a
           href="/uncash-calculation"
@@ -301,6 +308,26 @@ const UnCashBox = ({ uncash, totalToPay }) => {
           <i className="fa-solid fa-circle-info text-sm" />
         </a>
       </div>
+      {uncash.guest && (
+        // Points belong to an account, so they can only be used after the
+        // customer proves it is theirs: the normal login (WhatsApp OTP on the
+        // mobile number, or Google / email). The checkout stays as it is and
+        // the balance + "Use UnCash" appear once they are back.
+        <button
+          type="button"
+          onClick={() => {
+            dispatch(setLoginCallback("navigate:/checkout"));
+            dispatch(setShowLoginModal(true));
+          }}
+          className="w-full flex items-center justify-between gap-2 rounded-md border border-amber-200 bg-white px-3 py-2 text-left hover:bg-amber-50"
+        >
+          <span className="min-w-0">
+            <span className="block font-bold text-ink">Have UnCash? Verify to use it</span>
+            <span className="block text-[10px] text-gray-500">Log in with your mobile (WhatsApp OTP) or email to see your balance</span>
+          </span>
+          <i className="fa-solid fa-arrow-right shrink-0 text-[#a89068]" />
+        </button>
+      )}
     </div>
   );
 };
@@ -420,7 +447,7 @@ const PriceRows = ({ subtotal, shipping, discount, giftWrapAmount = 0, uncash = 
 
       {totalSavings > 0 && <SavingsBanner amount={totalSavings} freeShipping={isShippingFree} />}
 
-      <UnCashBox uncash={uncash} totalToPay={totalToPay} />
+      <UnCashBox uncash={uncash} />
 
       {/* {isCOD && realShippingAmount > 0 && (
         <div className="border-t border-dashed border-amber-200 pt-3 space-y-0 rounded-xl bg-amber-50/60 -mx-1 px-3 pb-3 mt-1">
@@ -1655,8 +1682,9 @@ const CheckoutPage = () => {
         },
         paymentMethod,
         magic: useMagic, // server skips address/shipping and sends line_items
-        // UnCash — server re-validates against balance + cap and prices it itself.
-        ...(!useMagic && uncashPoints > 0 ? { redeemPoints: uncashPoints } : {}),
+        // UnCash (every method, Magic included) — server re-validates against
+        // balance + cap and prices it itself.
+        ...(uncashPoints > 0 ? { redeemPoints: uncashPoints } : {}),
         ...getFbCookies(), // _fbp / _fbc → stored on order for CAPI match quality
         ...getGaIds(), // GA4 client/session id → webhook fallback purchase joins the same GA4 session
       }).unwrap();
@@ -1739,7 +1767,9 @@ const CheckoutPage = () => {
   // maxRedeemPercentOfCart% of the product value after the coupon, converted
   // to points, never more than the balance. Not offered on Magic Checkout.
   const { data: loyaltyData } = useGetLoyaltySummaryQuery(undefined, { skip: isGuest });
+  const { data: loyaltyInfoData } = useGetLoyaltyInfoQuery(undefined, { skip: !isGuest });
   const loyalty = !isGuest ? loyaltyData?.data : null;
+  const loyaltyInfo = isGuest ? loyaltyInfoData?.data : null;
   const [useUnCash, setUseUnCash] = useState(false);
   const uncashBase = Math.max(0, pricingDetails.subtotal - pricingDetails.discount);
   const uncashRatio = Number(loyalty?.pointToRupeeRatio) || 1;
@@ -1747,10 +1777,21 @@ const CheckoutPage = () => {
     ? Math.max(0, Math.min(loyalty.balance || 0, Math.floor((uncashBase * (loyalty.maxRedeemPercentOfCart || 0)) / 100 / uncashRatio)))
     : 0;
   const uncashMaxDiscount = Math.min(uncashMaxPoints * uncashRatio, uncashBase);
-  const uncashCanRedeem = !!loyalty?.isEnabled && !magicEnabled && uncashMaxPoints > 0;
+  const uncashCanRedeem = !!loyalty?.isEnabled && uncashMaxPoints > 0;
   const uncashPoints = uncashCanRedeem && useUnCash ? uncashMaxPoints : 0;
   const uncashDiscount = uncashCanRedeem && useUnCash ? uncashMaxDiscount : 0;
-  const uncash = loyalty?.isEnabled
+  const uncash = isGuest
+    ? loyaltyInfo?.isEnabled
+      ? {
+          enabled: true,
+          guest: true,
+          earnPercent: loyaltyInfo.earnPercent || 0,
+          canRedeem: false,
+          earnBase: uncashBase,
+          discount: 0,
+        }
+      : null
+    : loyalty?.isEnabled
     ? {
         enabled: true,
         balance: loyalty.balance || 0,
@@ -1763,6 +1804,7 @@ const CheckoutPage = () => {
         setOn: setUseUnCash,
         points: uncashPoints,
         discount: uncashDiscount,
+        earnBase: Math.max(0, uncashBase - uncashDiscount),
       }
     : null;
   const totalToPay = pricingDetails.subtotal + giftWrapAmount + shippingAmount - pricingDetails.discount - uncashDiscount;

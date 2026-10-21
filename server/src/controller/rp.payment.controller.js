@@ -967,12 +967,14 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   // computeOrderCharge so the guest checkout below cannot drift from this one.
   // A cart-applied coupon now stays in the amount on Magic too; it reaches
   // Razorpay as a `promotion` a few lines down.
-  // UnCash (loyalty points) — normal checkout only (not Magic, not the ₹1
-  // internal test order). Validated here against the live balance and the
-  // admin cap, which applies to the product value after the coupon. Points are
-  // only debited from the ledger once the order is PAID (fulfilCapturedPayment).
+  // UnCash (loyalty points) — every logged-in checkout: prepaid, COD and
+  // Magic (on Magic the discount rides on the line items like a cart coupon,
+  // see discountMagicLineItems). Not on the ₹1 internal test order. Validated
+  // here against the live balance and the admin cap, which applies to the
+  // product value after the coupon. Points are only debited from the ledger
+  // once the order is PAID (fulfilCapturedPayment).
   const requestedPoints = Math.max(0, Math.floor(Number(req.body?.redeemPoints) || 0));
-  const redeem = !isMagic && !isInternalTestOrder && requestedPoints > 0
+  const redeem = !isInternalTestOrder && requestedPoints > 0
     ? await validateAndPriceRedeem({ userId, cartValue: Math.max(0, subtotal - discountAmount), requestedPoints })
     : { pointsRedeemed: 0, discountFromPoints: 0, balanceBeforeOrder: null };
   // Snapshot the balance on every order while loyalty is on, so order history
@@ -1144,15 +1146,21 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       discountAmount,
       isApplied,
     },
-    ...(redeem.balanceBeforeOrder != null
-      ? {
-          loyalty: {
+    loyalty: {
+      // What UnCash is earned on after delivery: product value after the
+      // coupon and the UnCash discount — no shipping, no gift wrap.
+      // Magic: null — the customer can change the coupon inside Razorpay's
+      // modal, so the admin sweep works it out after payment from the final
+      // order (items − coupon − UnCash).
+      earnBase: isInternalTestOrder ? 0 : isMagic ? null : Math.max(0, subtotal - discountAmount - pointsDiscount),
+      ...(redeem.balanceBeforeOrder != null
+        ? {
             balanceBeforeOrder: redeem.balanceBeforeOrder,
             pointsRedeemed: redeem.pointsRedeemed,
             discountFromPoints: pointsDiscount,
-          },
-        }
-      : {}),
+          }
+        : {}),
+    },
     metaTracking: collectMetaTracking(req),
     note: "Amount is the final amount paid by the user",
   });
@@ -2327,6 +2335,9 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     // converted once the order is PAID, instead of showing them as
     // permanently abandoned. Falls back to a fresh id only if the client
     // somehow didn't send one (older client build, etc).
+    // Guests can't redeem UnCash, but once the order is PAID it is linked to
+    // a real account and earns on this base after delivery (no shipping).
+    loyalty: { earnBase: isInternalTestOrder ? 0 : isMagic ? null : Math.max(0, subtotal - discountAmount) },
     userId: anonymousId ? `guest_${anonymousId}` : `guest_${uuidv7()}`,
     // On Magic these are blank until the webhook reads customer_details. The
     // order model requires an email, so it gets a placeholder on the domain

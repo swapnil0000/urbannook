@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import SEOHead from "../../component/SEOHead";
-import { useGetLoyaltySummaryQuery } from "../../store/api/userApi";
+import { useGetLoyaltyInfoQuery } from "../../store/api/userApi";
 
 // Fallbacks only for logged-out visitors (the live query needs auth) — kept in
 // sync with server/src/services/loyalty.service.js's DEFAULT_CONFIG so a guest
@@ -11,7 +11,8 @@ const FALLBACK_EARN_PERCENT = 2;
 const FALLBACK_MAX_REDEEM_PERCENT = 20;
 
 const UnCashCalculationPage = () => {
-  const { data: loyaltyData } = useGetLoyaltySummaryQuery();
+  // Public rules — works for guests too (no login needed to read them).
+  const { data: loyaltyData } = useGetLoyaltyInfoQuery();
   const loyalty = loyaltyData?.data;
 
   const UNCASH_VALUE_IN_RUPEES = loyalty?.pointToRupeeRatio ?? FALLBACK_VALUE_IN_RUPEES;
@@ -51,7 +52,8 @@ const UnCashCalculationPage = () => {
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             <div className="rounded-xl bg-[#f7f5f0] p-4 text-sm">
               <p className="font-bold text-[#2e443c]">How much you earn</p>
-              <p className="mt-2 font-semibold text-[#2e443c]">UnCash earned = order value × {UNCASH_EARN_PERCENT}%</p>
+              <p className="mt-2 font-semibold text-[#2e443c]">UnCash earned = cart value after coupon and UnCash × {UNCASH_EARN_PERCENT}%</p>
+              <p className="mt-1 text-xs text-gray-500">Shipping and gift wrap do not count.</p>
             </div>
             <div className="rounded-xl bg-[#f7f5f0] p-4 text-sm">
               <p className="font-bold text-[#2e443c]">How discount is calculated</p>
@@ -87,6 +89,31 @@ const UnCashCalculationPage = () => {
           <p className="mt-5 text-xs leading-5 text-gray-500">
             If you have 600 UnCash, you can use all 600. If you have 2,000 UnCash, only {(5000 * UNCASH_MAX_REDEEM_PERCENT) / 100} can be used on this ₹5,000 order because of the {UNCASH_MAX_REDEEM_PERCENT}% limit.
           </p>
+        </section>
+
+        <section className="mt-6 rounded-2xl bg-white p-6 shadow-sm md:p-8">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a89068]">Earn &amp; use</p>
+          <h2 className="mt-2 text-2xl font-bold">Who can earn and who can use UnCash</h2>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 text-sm">
+            <div className="rounded-xl bg-[#f7f5f0] p-4">
+              <p className="font-bold text-[#2e443c]"><i className="fa-solid fa-coins mr-1.5 text-[#a89068]" />Earning — no login needed</p>
+              <p className="mt-2 leading-6 text-gray-600">
+                Every order earns UnCash once it is delivered, even if you checked out as a guest. A guest order is saved to the account with your email / mobile number, so the UnCash waits there for you.
+              </p>
+            </div>
+            <div className="rounded-xl bg-[#f7f5f0] p-4">
+              <p className="font-bold text-[#2e443c]"><i className="fa-solid fa-user-check mr-1.5 text-[#a89068]" />Using — log in first</p>
+              <p className="mt-2 leading-6 text-gray-600">
+                To use UnCash, log in with the same mobile number (WhatsApp OTP) or email. You can do this right on the checkout page with "Have UnCash? Verify to use it" — your cart stays as it is. Your balance shows on My Profile, and at checkout you tick <strong className="text-[#2e443c]">"Use UnCash"</strong> above the total.
+              </p>
+            </div>
+          </div>
+          <ul className="mt-5 space-y-2 text-sm leading-6 text-gray-600">
+            <li><strong className="text-[#2e443c]">Prepaid (UPI / card / net banking):</strong> the UnCash discount comes off the amount you pay.</li>
+            <li><strong className="text-[#2e443c]">Cash on Delivery:</strong> the small advance stays the same; the UnCash discount comes off the amount you pay on delivery.</li>
+            <li><strong className="text-[#2e443c]">Express checkout:</strong> works the same way. Tick "Use UnCash" before you tap Express and the discount is already in the amount Razorpay shows.</li>
+            <li>UnCash is taken from your balance only after the payment goes through. If the payment fails, nothing is used.</li>
+          </ul>
         </section>
 
         <section className="mt-6 rounded-2xl bg-white p-6 shadow-sm md:p-8">

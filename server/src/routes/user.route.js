@@ -93,7 +93,7 @@ import {
   magicApplyPromotionController,
 } from "../controller/magic.checkout.controller.js";
 
-import { userGetLoyalty, userGetRedeemQuote } from "../controller/loyalty.controller.js";
+import { userGetLoyalty, userGetRedeemQuote, getLoyaltyInfo } from "../controller/loyalty.controller.js";
 
 const userRouter = Router();
 const authLimiter = rateLimit({
@@ -207,6 +207,7 @@ userRouter.post(
 /* ===============================================================
    LOYALTY POINTS (PROTECTED)
 ================================================================ */
+userRouter.get("/loyalty/info", getLoyaltyInfo); // public — rules only, for guests
 userRouter.get("/user/loyalty", authGuardService("USER"), userGetLoyalty);
 userRouter.get("/user/loyalty/redeem-quote", authGuardService("USER"), userGetRedeemQuote);
 
