@@ -102,3 +102,103 @@ are **copied as-is**. Only the deploy mechanics around them changed:
      support `?q=`.
    - Prerendered pages should still match: please check that the Product/Breadcrumb JSON-LD
      from `prerender.mjs` stays consistent with these.
+
+## F. Category pages (2026-10-02, PR "seo: category pages")
+
+New routes: `/category/:slug` (e.g. `/category/anime`, `/category/lamp`, `/category/pen-stand`).
+Data comes from the new public API `GET /api/v1/categories` and `GET /api/v1/category/:slug`.
+Categories with fewer than 3 sellable variants get `noindex`; today that is only `/category/decor`.
+
+Requests for `prerender.mjs` / `upload-client.sh`:
+1. **Sitemap:** add every category with `indexable: true` from `GET /api/v1/categories`
+   (URL `/category/<slug>`, priority ~0.8), and leave out the ones that are not indexable.
+2. **Prerender** `/category/<slug>`: H1 = name, intro text, FAQ, links to each variant page,
+   plus CollectionPage/ItemList, BreadcrumbList and FAQPage JSON-LD (the same schema the
+   runtime page outputs in `client/src/pages/shop/CategoryPage.jsx`). These pages are
+   JavaScript-only until this is done.
+3. **Product breadcrumb** JSON-LD: the second level is now the category
+   (`/category/<slug>`), not `/products`. Please match it in the prerendered Breadcrumb.
+4. `/products?category=X` still works with no redirect; its canonical now points to `/category/x`.
+
+## G. Admin → SEO Pages (2026-10-02)
+
+Admins can set SEO for **any URL** in Admin → SEO Pages: title, description, canonical, index/noindex,
+OG title/description/image, intro text, FAQs, custom JSON-LD. The data is in the `seo_pages` collection.
+The storefront reads it with `GET /api/v1/seo?path=<path>` (cached 10 min like products).
+- The runtime `<SEOHead>` merges it over each page's own values (`client/src/utils/seoMerge.js`):
+  a filled admin field wins, an empty one keeps the page value. No entry means no change.
+- An admin `metaTitle` is used **verbatim** (no " | UrbanNook" suffix added).
+- `<SeoPageContent>` (in `App.jsx`, above the footer) shows the intro + FAQs and outputs FAQPage JSON-LD.
+- `index.html` no longer has a static `<meta name="robots" content="index, follow">`. `SEOHead` now
+  outputs the only robots tag, so noindex pages don't carry two conflicting tags.
+
+Request for prerender: when prerendering a URL, apply the same entry (title, description, canonical,
+robots, OG, intro/FAQ) so crawlers without JS see it too. Until then (and until the Cloudflare
+Worker phase), the overrides are only visible to Google after it runs JavaScript.
+
+## H. Build-time rendering replaces `prerender.mjs` (2026-10-15, branch `seo/ssg-foundation`) — needs SEO owner sign-off
+
+Under rule 9 these files are yours; this change is done in the open and needs your review on the PR.
+
+**What changed**
+- `client/scripts/prerender.mjs` is **removed**. `build:prod` now runs `vite build`, `vite build --ssr`
+  and `client/scripts/ssg.mjs`, which renders **every public page with the real React app** (not
+  hand-built HTML) from the live API: home, `/products`, `/category/<slug>`, `/product/<id>`,
+  `/product/<id>/<sku>`, static pages, and a not-found page. Output: `dist-prerender/ssg/<path>/index.html`.
+- `jenkins/scripts/upload-client.sh`: new step 4 syncs `ssg/` (`--delete`, `text/html`, `no-cache`);
+  step 1 excludes `ssg/*`. The old `product/*` steps stay (now step 5) so a rollback to an older client
+  release still works; on an SSG build they remove the old product pages.
+- Worker: serves `ssg/<path>/index.html`, then old `product/*`, then the SPA shell for known app routes,
+  otherwise the not-found page with **HTTP 404**. `/products/<id>` → **301** `/product/<id>`; old policy URLs (`/terms`, `/cancellation-refund[-policy]`,
+  `/shipping-policy`) → **301** to the current pages; trailing
+  slash → 301. `workers_dev = false`.
+- Sitemap and `llms.txt` are written by `ssg.mjs`. The sitemap lists only pages that rendered, leaves out
+  non-indexable categories, and has **no `<lastmod>`** (instead of a fake "today").
+
+**Your open items from B / E / F / G**
+| Item | Status |
+|---|---|
+| B1/B2 "₹Infinity", null Offer price | Gone: pages use the same JSON-LD as the runtime page (`ProductDetailPage.jsx`). |
+| B3 fake `lastmod` | Removed (no lastmod). |
+| B4 feed failure wipes pages | Same behaviour by design: a failed build has no pages, the old ones (pointing at deleted JS) are removed, the SPA serves. |
+| B5 TSV parsing | Gone: JSON API, no feed parsing. |
+| B6 hidden-text risk | Gone: the HTML is the visible page itself. |
+| E: `/cancellation-refund` in sitemap / llms.txt | Removed; that URL now returns a real 404. |
+| F1–F3 category pages in sitemap + prerendered, category breadcrumb | Done by rendering the real `CategoryPage` / `ProductDetailPage`. |
+| G Admin → SEO Pages in prerendered HTML | Done: the render prefetches `GET /seo?path=` like the browser. |
+
+**Please check**: the rendered HTML of a product, a variant, a category and `/` in Google's Rich Results
+test after the first deploy, and that analytics (`analytics.js`) still fires once per page view after
+hydration.
+
+## I. Journal / blog (2026-10-16, branch `feat/blog`)
+
+Posts are written in Admin → Blog (TipTap editor) and stored in `blog_posts` (admin owns it; the
+storefront reads published posts read-only). The HTML is sanitised on save in the admin and again by the
+API (`server/src/utils/blogHtml.js`): headings, lists, quotes, links and https images only.
+
+- API: `GET /api/v1/blog?product=&limit=` (published, newest first, no bodies) and `GET /api/v1/blog/:slug`
+  (body + linked products). 10-min API cache like products.
+- Pages: `/blog` (Blog + BreadcrumbList JSON-LD) and `/blog/:slug` (BlogPosting + BreadcrumbList, cover image,
+  "Shop the pieces in this story" product cards). Rendered at build time by `ssg.mjs`, listed in the sitemap
+  and `llms.txt` (Journal section). Footer links to `/blog` ("Journal").
+- Product pages: Description shows only the product's own text (variant description first). The Admin → SEO
+  Pages intro (kept to 2–3 lines) shows in a "Why fans love it" section, with "Know the story →" to the newest
+  blog post linked to that product (hidden while there is none).
+- Variant pages (`/product/<id>/<sku>`) get a fourth breadcrumb level (visible and in BreadcrumbList), and
+  product cards link straight to `/product/<id>` instead of `/products/<id>` (which only 301s there).
+- A new post goes live for crawlers with the next client build (deploy or nightly 21:30 IST).
+
+Please check after deploy: the BlogPosting result in the Rich Results test, and that `page_view` fires on
+`/blog` pages like other pages.
+
+
+### Google Merchant feed attributes (2026-10-18)
+`GET /api/v1/catalog/google-feed.tsv` also sends `color` (from the variant name; Rainbow → Multicolor), `material`
+(the product's *Material* / *Base Material* spec) and `size` (a `104cm`-style variant tag, else the variant's
+L × B × H). Empty when unknown. Merchant Center reads the feed daily.
+
+
+### Blog schema (2026-10-19)
+`BlogPosting.about` lists linked products as `Thing` (name + URL), not `Product`: Google flags a `Product` without
+`offers`/`review`/`aggregateRating` as an invalid product snippet. Full `Product`/`Offer` schema stays on the product pages.

@@ -9,16 +9,16 @@
 #   - Variables AWS_REGION / S3_BUCKET and secrets AWS_ACCESS_KEY_ID /
 #     AWS_SECRET_ACCESS_KEY are set in the dashboard. keep_vars = true stops
 #     wrangler from deleting the plain variables; secrets are never touched.
-#   - Routes / custom domain / workers.dev as currently configured.
+#   - Routes / custom domain as currently configured (workers.dev turned off for SEO).
 
 name = "urbannook-s3-proxy-prod"
 main = "urbannook-s3-proxy-prod.js"
 compatibility_date = "2026-07-24"
 keep_vars = true
 
-# Currently enabled in the dashboard. Consider turning off later
-# (the whole site is also reachable on *.workers.dev — duplicate content for SEO).
-workers_dev = true
+# Off: with it on, the whole site was also reachable on *.workers.dev —
+# duplicate content for search engines. The site is only on urbannook.in.
+workers_dev = false
 preview_urls = false
 
 routes = [

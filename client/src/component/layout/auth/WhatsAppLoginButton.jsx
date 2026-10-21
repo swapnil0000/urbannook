@@ -25,6 +25,7 @@ export default function WhatsAppLoginButton({ onError }) {
   const session = useSyncExternalStore(
     subscribeWhatsAppLogin,
     getWhatsAppLoginSession,
+    () => null, // server render: no pending login
   );
 
   /* Tracked per code rather than as a plain boolean, so starting a fresh

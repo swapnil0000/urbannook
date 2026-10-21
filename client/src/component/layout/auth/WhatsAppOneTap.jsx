@@ -59,6 +59,7 @@ export default function WhatsAppOneTap() {
   const pendingSession = useSyncExternalStore(
     subscribeWhatsAppLogin,
     getWhatsAppLoginSession,
+    () => null, // server render: no pending login
   );
 
   const [visible, setVisible] = useState(false);

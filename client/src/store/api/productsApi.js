@@ -55,8 +55,39 @@ export const productsApi = apiSlice.injectEndpoints({
     
     // Get product categories
     getCategories: builder.query({
-      query: () => 'products/categories',
+      query: () => 'categories',
       providesTags: ['Category'],
+    }),
+
+    // Admin → SEO Pages overrides for one URL path; data is null when none.
+    getSeoData: builder.query({
+      query: (path) => `seo?path=${encodeURIComponent(path)}`,
+      providesTags: (result, error, path) => [{ type: 'Seo', id: path }],
+      keepUnusedDataFor: 600,
+    }),
+
+    // Published blog posts (Admin → Blog), newest first. `product` filters to
+    // posts linked to that product (the "Read the story" link on its page).
+    getBlogPosts: builder.query({
+      query: ({ product, sku, limit = 50 } = {}) => {
+        const params = new URLSearchParams({ limit: String(limit) });
+        if (product) params.append('product', product);
+        if (sku) params.append('sku', sku);
+        return `blog?${params}`;
+      },
+      providesTags: ['Blog'],
+    }),
+
+    // One published post with its linked products.
+    getBlogPost: builder.query({
+      query: (slug) => `blog/${encodeURIComponent(slug)}`,
+      providesTags: (result, error, slug) => [{ type: 'Blog', id: slug }],
+    }),
+
+    // One category page: name, indexable flag, products
+    getCategoryBySlug: builder.query({
+      query: (slug) => `category/${encodeURIComponent(slug)}`,
+      providesTags: (result, error, slug) => [{ type: 'Category', id: slug }],
     }),
     
     // Search products
@@ -81,5 +112,9 @@ export const {
   useGetProductsByCategoryQuery,
   useGetFeaturedProductsQuery,
   useGetCategoriesQuery,
+  useGetCategoryBySlugQuery,
+  useGetSeoDataQuery,
+  useGetBlogPostsQuery,
+  useGetBlogPostQuery,
   useSearchProductsQuery,
 } = productsApi;

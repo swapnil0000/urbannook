@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
+import { createRoot, hydrateRoot } from 'react-dom/client'
+import { BrowserRouter } from 'react-router-dom'
 // Self-hosted fonts (latin subset only). Served from our origin with the hashed
 // assets, so there is no render-blocking fonts.googleapis.com request and no extra
 // connection to fonts.gstatic.com. Unused weights cost nothing: @font-face files
@@ -80,12 +81,34 @@ window.addEventListener('unhandledrejection', (event) => {
   }
 });
 
-createRoot(document.getElementById('root')).render(
+const app = (
   <StrictMode>
     <GoogleOAuthProvider clientId={config.googleClientId}>
       <CookiesProvider>
-         <App />
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
       </CookiesProvider>
     </GoogleOAuthProvider>
-  </StrictMode>,
-)
+  </StrictMode>
+);
+
+// Public pages come server-rendered (client/server.mjs sets window.__SSR__):
+// attach to that HTML instead of rebuilding it. Everything else (account,
+// checkout, or when the SSR server was skipped) renders from scratch as before.
+const rootEl = document.getElementById('root');
+if (window.__SSR__ && rootEl.hasChildNodes()) {
+  // The server's copy of the page's <title>/<meta>/<link> (for crawlers).
+  // React inserts its own on hydration; drop these so there is one of each.
+  document.head.querySelectorAll('[data-ssr]').forEach((el) => el.remove());
+  hydrateRoot(rootEl, app, {
+    onRecoverableError: (error) => console.warn('[SSR] hydration recovered:', error?.message || error),
+  });
+} else {
+  // index.html (or the prerendered page) has default SEO tags; every page sets
+  // its own through SEOHead, and React 19 adds those without removing these.
+  document.head
+    .querySelectorAll('title, meta[name="description"], meta[property^="og:"], meta[name^="twitter:"], link[rel="canonical"]')
+    .forEach((el) => el.remove());
+  createRoot(rootEl).render(app);
+}

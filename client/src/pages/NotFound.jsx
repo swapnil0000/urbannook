@@ -1,12 +1,15 @@
 import { Link } from 'react-router-dom';
 import SEOHead from '../component/SEOHead';
+import { SsrStatus } from '../utils/ssrContext';
 
-// Unknown URLs used to redirect to "/", which search engines treat as a soft 404
+// Unknown URLs used to redirect to "/", which search engines treat as a soft 404.
+// When server-rendered, the response is a real HTTP 404 (SsrStatus).
 // (and it silently broke mistyped ad/landing URLs). Show a real not-found page,
 // marked noindex, with a way back into the store.
 const NotFound = () => (
   <div className="bg-paper min-h-[70vh] text-ink font-inter flex items-center justify-center px-6 py-20">
     <SEOHead title="Page not found" noIndex />
+    <SsrStatus code={404} />
     <div className="max-w-md text-center">
       <p className="text-sm text-faint mb-3">404</p>
       <h1 className="font-archivo text-3xl md:text-4xl font-extrabold mb-4">This page doesn't exist</h1>

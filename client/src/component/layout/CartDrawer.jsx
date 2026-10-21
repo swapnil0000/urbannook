@@ -97,7 +97,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
       placement: 'cart_drawer',
     });
 
-    const hasToken = !!localStorage.getItem('authToken');
+    const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('authToken'); // no localStorage during SSR
     const isLoggedIn = isAuthenticated || hasToken;
 
     if (isLoggedIn) {
@@ -121,7 +121,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
     );
     if (removed) trackRemoveFromCart(toTrackItem(removed));
 
-    const hasToken = !!localStorage.getItem('authToken');
+    const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('authToken'); // no localStorage during SSR
     const isLoggedIn = isAuthenticated || hasToken;
 
     if (isLoggedIn) {

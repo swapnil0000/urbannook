@@ -5,6 +5,7 @@ import {
   HomePage,
   ContactPage,
   AllProductsPage,
+  CategoryPage,
   CustomizePage,
   ProductDetailPage,
   ProductVariantsPage,
@@ -21,6 +22,8 @@ import {
   Faq,
   Return,
   AboutPage,
+  BlogListPage,
+  BlogPostPage,
 } from "../pages/index.js";
 import PaymentProcessing from "../pages/PaymentProcessing.jsx";
 import PaymentFailed from "../pages/PaymentFailed.jsx";
@@ -40,6 +43,22 @@ const AppRoutes = () => {
     <Routes>
       {/* HomePage loads immediately - no Suspense needed */}
       <Route path="/" element={<HomePage />} />
+      <Route
+        path="/blog"
+        element={
+          <Suspense fallback={<MinimalLoader />}>
+            <BlogListPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/blog/:slug"
+        element={
+          <Suspense fallback={<MinimalLoader />}>
+            <BlogPostPage />
+          </Suspense>
+        }
+      />
       <Route
         path="/about-us"
         element={
@@ -69,6 +88,14 @@ const AppRoutes = () => {
         element={
           <Suspense fallback={<MinimalLoader />}>
             <AllProductsPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/category/:slug"
+        element={
+          <Suspense fallback={<MinimalLoader />}>
+            <CategoryPage />
           </Suspense>
         }
       />
