@@ -149,8 +149,8 @@ export default {
     if (isPage) {
       // One URL per page: no trailing slash.
       if (pathname.length > 1 && pathname.endsWith("/")) return redirect(url, pathname.replace(/\/+$/, ""));
-      // Old policy URLs still shown in Google → their current pages.
-      const moved = { "/terms": "/terms-conditions", "/cancellation-refund-policy": "/return-policy", "/cancellation-refund": "/return-policy", "/shipping-policy": "/return-policy" }[pathname];
+      // Old or broken URLs still shown in Google → their current pages.
+      const moved = { "/product": "/products", "/terms": "/terms-conditions", "/cancellation-refund-policy": "/return-policy", "/cancellation-refund": "/return-policy", "/shipping-policy": "/return-policy" }[pathname];
       if (moved) return redirect(url, moved);
     }
 

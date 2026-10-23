@@ -8,6 +8,32 @@ import NotFound from '../NotFound';
 import { trackViewItemList } from '../../utils/analytics';
 
 const SITE = 'https://www.urbannook.in';
+
+// Default copy per page kind (the API's `kind`): "category" is a productCategory
+// page; "collection", "series" and "game" are variant collections built by the
+// server (server/src/utils/category.util.js → buildCollections). Shoppers search
+// "anime katana", "demon slayer katana", "vergil sword", so titles say that.
+// Admin → SEO Pages (/category/<slug>) can still override title, description,
+// intro and FAQs for any of them.
+const pageCopy = ({ kind, slug, name, itemCount }) => {
+  const tail = 'Gift wrap, partial COD and delivery across India.';
+  if (slug === 'anime-katana') return {
+    h1: 'Anime Katana: Wooden & LED Swords',
+    title: 'Anime Katana – Wooden & LED Swords, Buy Online in India',
+    description: `${itemCount} anime katanas from Demon Slayer, One Piece, Naruto, Bleach and games: 104 cm wooden and LED display swords. ${tail}`,
+  };
+  if (kind === 'series') return {
+    h1: `${name} Swords & Collectibles`,
+    title: `${name} Katana, Swords & Collectibles – Buy in India`,
+    description: `${itemCount} ${name} katanas, swords and collectibles: wooden and LED display swords and figures for fans. ${tail}`,
+  };
+  if (kind === 'game') return {
+    h1: name,
+    title: `${name} – Gaming Katana Replicas, Buy in India`,
+    description: `${itemCount} katanas from video games: wooden and LED display replicas for gamers and collectors. ${tail}`,
+  };
+  return { h1: name, title: `${name} – Buy Online in India`, description: `Shop ${itemCount} ${name} designs at UrbanNook. ${tail}` };
+};
 const PER_PAGE = 24;
 
 // One card per sellable variant, linking to that variant's own page — a
@@ -48,7 +74,8 @@ const CategoryPage = () => {
   const totalPages = Math.max(1, Math.ceil(items.length / PER_PAGE));
   const page = Math.min(Math.max(1, parseInt(searchParams.get('page'), 10) || 1), totalPages);
   const pageItems = useMemo(() => items.slice((page - 1) * PER_PAGE, page * PER_PAGE), [items, page]);
-  const otherCategories = (allRes?.data || []).filter((c) => c.slug !== slug);
+  // Chips: every other page that is worth a visit (indexable), categories first.
+  const otherCategories = (allRes?.data || []).filter((c) => c.slug !== slug && c.indexable !== false);
 
   useEffect(() => { window.scrollTo(0, 0); }, [slug, page]);
   useEffect(() => {
@@ -77,13 +104,13 @@ const CategoryPage = () => {
   }
 
   const { name, indexable, itemCount } = category;
+  const copy = pageCopy(category);
   const basePath = `/category/${category.slug}`;
   const pagePath = (n) => (n > 1 ? `${basePath}?page=${n}` : basePath);
 
-  // Defaults; Admin → SEO Pages (/category/<slug>) can override any of these,
-  // and adds the intro text + FAQs above the footer (SeoPageContent).
-  const title = `${name} – Buy Online in India`;
-  const description = `Shop ${itemCount} ${name} designs at UrbanNook — 3D-printed and made in India. Cash on delivery and pan-India shipping.`;
+  // Defaults (pageCopy above); Admin → SEO Pages (/category/<slug>) can override
+  // them, and adds the intro text + FAQs above the footer (SeoPageContent).
+  const { title, description } = copy;
 
   const structuredData = [
     {
@@ -119,7 +146,7 @@ const CategoryPage = () => {
         <nav aria-label="Breadcrumb" className="text-sm text-faint mb-5">
           <Link to="/" className="hover:text-brand">Home</Link> / <Link to="/products" className="hover:text-brand">Shop</Link> / <span className="text-ink">{name}</span>
         </nav>
-        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">{name}</h1>
+        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">{copy.h1}</h1>
         <p className="text-muted mt-2">{itemCount} {itemCount === 1 ? 'design' : 'designs'}</p>
 
 
