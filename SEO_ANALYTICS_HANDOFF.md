@@ -216,3 +216,14 @@ L × B × H). Empty when unknown. Merchant Center reads the feed daily.
   already approved in Merchant Center). Watch Google Ads → Policy Manager; if katana ads get disapproved,
   exclude them in the campaign rather than the feed.
 - The website and the Meta feed (`meta-feed.csv`) are unchanged.
+
+## J. Home page product cards are crawlable links (2026-10-24, branch `seo/crawlable-product-links`)
+
+`HomeProductCard` was a `<div onClick>`, so the server-rendered home page had **no** links to any product
+page (checked as Googlebot: 0 `/product*` hrefs), while blogs and categories did. It is now a router `<Link>`
+(same destination `/products/<id>`, same look, same `select_item` tracking), like `UnProductCard`.
+Local SSR check: home goes from 0 to 9 product links.
+
+Also checked on 2026-10-24: the live sitemap lists only 3 categories and `/category/anime-katana` is an empty
+SPA shell, but a local `ssg.mjs` run against the live API renders all 143 pages incl. every collection/series
+(sitemap 115 URLs). The live build predates the collections; the next client build fixes it.
