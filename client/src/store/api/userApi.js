@@ -161,6 +161,20 @@ export const userApi = apiSlice.injectEndpoints({
       },
       providesTags: ["Coupon"],
     }),
+    // "Offers & Discounts" cards — admin coupons, never including the code itself.
+    getCouponOffers: builder.query({
+      query: (arg) => ({ url: "coupon/offers", method: "POST", body: { _for: arg || "guest" } }),
+      providesTags: ["Coupon"],
+      keepUnusedDataFor: 60,
+    }),
+    // Releases a code only after the server confirms the verified mobile number.
+    revealCouponCode: builder.mutation({
+      query: ({ couponId, mobile }) => ({
+        url: "coupon/reveal",
+        method: "POST",
+        body: { couponId, mobile },
+      }),
+    }),
     // Look up a single coupon by exact code (used by guests for hidden/secret codes).
     // Same endpoint as the list — returns [] if the code is unknown.
     lookupCoupon: builder.mutation({
@@ -403,6 +417,8 @@ export const {
   useOrderHistoryQuery,
   useApplyCouponMutation,
   useGetAvailableCouponsQuery,
+  useGetCouponOffersQuery,
+  useRevealCouponCodeMutation,
   useLookupCouponMutation,
   useGetRazorpayKeyQuery,
   useCreateOrderMutation,

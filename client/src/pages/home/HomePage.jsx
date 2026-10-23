@@ -4,6 +4,7 @@ import SEOHead from '../../component/SEOHead';
 import { productImg, firstVariant, inr } from '../../component/UnProductCard';
 import HomeProductCard from '../../component/HomeProductCard';
 import FestiveSections from '../../component/festive/FestiveSections';
+import CouponOffersSection from '../../component/offers/CouponOffersSection';
 import RangoliDivider from '../../component/festive/RangoliDivider';
 import { Reveal, Stagger, StaggerItem, Parallax, TextReveal, useInView, motion, AnimatePresence } from '../../component/motion';
 import { useGetFeaturedProductsQuery, useGetProductsQuery } from '../../store/api/productsApi';
@@ -786,6 +787,8 @@ const HomePage = () => {
       ) : null}
 
       {!isFewProducts && bestsellers.length >= MIN_TAGGED && <FestiveSections />}
+
+      <CouponOffersSection />
 
 
         <Reveal className="max-w-[1280px] mx-auto px-5 py-5 md:py-7" y={18}>

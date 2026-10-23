@@ -31,6 +31,13 @@ const userSchema = mongoose.Schema(
       required: false,
       default: null,
     },
+    // Set ONLY by the WhatsApp login flow, which proves the person controls this
+    // number. mobileNumber above can be typed into a profile unverified, so
+    // anything that needs a proven number (coupon-code reveal) must check this.
+    verifiedMobile: {
+      type: Number,
+      default: null,
+    },
     googleId: {
       type: String,
       sparse: true,

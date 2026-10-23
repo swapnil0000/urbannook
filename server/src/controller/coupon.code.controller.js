@@ -2,6 +2,10 @@ import {
   applyCouponCodeService,
   getAllCouponCodeService,
 } from "../services/coupon.code.service.js";
+import {
+  getCouponOffersService,
+  revealCouponCodeService,
+} from "../services/coupon.offers.service.js";
 import { ApiRes } from "../utils/index.js";
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
 
@@ -47,4 +51,23 @@ const getAllCouponCodeController = asyncHandler(async (req, res) => {
     );
 });
 
-export { applyCouponCodeController, getAllCouponCodeController };
+const getCouponOffersController = asyncHandler(async (req, res) => {
+  const result = await getCouponOffersService({ userId: req.user?.userId });
+  return res.status(result.statusCode).json(new ApiRes(result.statusCode, result.message, result.data, result.success));
+});
+
+const revealCouponCodeController = asyncHandler(async (req, res) => {
+  const result = await revealCouponCodeService({
+    userId: req.user.userId,
+    couponId: req.body?.couponId,
+    mobile: req.body?.mobile,
+  });
+  return res.status(result.statusCode).json(new ApiRes(result.statusCode, result.message, result.data, result.success));
+});
+
+export {
+  applyCouponCodeController,
+  getAllCouponCodeController,
+  getCouponOffersController,
+  revealCouponCodeController,
+};

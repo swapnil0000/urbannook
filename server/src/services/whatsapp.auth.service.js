@@ -445,8 +445,9 @@ const findOrCreateWhatsAppUser = async (mobileNumber) => {
   if (user) {
     // WhatsApp has proven the number, so an older unverified account can be
     // treated as verified
-    if (!user.isVerified) {
+    if (!user.isVerified || user.verifiedMobile !== mobileNumber) {
       user.isVerified = true;
+      user.verifiedMobile = mobileNumber;
       await user.save();
     }
     return { user, isNewUser: false };
@@ -458,6 +459,7 @@ const findOrCreateWhatsAppUser = async (mobileNumber) => {
     email: buildPlaceholderEmail(mobileNumber),
     password: null,
     mobileNumber,
+    verifiedMobile: mobileNumber,
     isVerified: true,
     role: "USER",
   });
