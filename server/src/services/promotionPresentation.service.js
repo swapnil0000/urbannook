@@ -1,4 +1,4 @@
-import { evaluateConditionTree } from "../utils/promotionEngine.util.js";
+import { evaluateConditionTree, promotionCouponGateOk, variantKey } from "../utils/promotionEngine.util.js";
 
 /**
  * Promotion Engine V2 — Presentation Layer (Phases 2, 4, 6, 7 of the
@@ -54,7 +54,7 @@ const REWARD_TYPE_TO_DISPLAY_TYPE = {
   store_credit: DISPLAY_TYPES.PROMOTION,
 };
 
-const WORKING_REWARD_TYPES = ["percent_off_product", "flat_off_product", "discounted_product", "free_product", "free_shipping", "percent_off_order", "flat_off_order"];
+const WORKING_REWARD_TYPES = ["percent_off_product", "flat_off_product", "discounted_product", "free_product", "free_shipping", "percent_off_order", "flat_off_order", "cheapest_item_free", "cheapest_item_discount"];
 
 function buildDisplayType(promotion) {
   if (promotion.linkedCouponCode) return DISPLAY_TYPES.COUPON;
@@ -68,13 +68,58 @@ function formatRupees(n) {
 }
 
 // ── Savings text (Phase 2) ─────────────────────────────────────────────────
+// Phase 3 — tiers: [{minQuantity, value}] span a RANGE of values instead of
+// one flat number; shown as "10–20% off, by quantity" rather than picking
+// one tier to claim (no cart context here to know which tier actually
+// applies — this is a static, promotion-level description).
+function tierValueRange(r) {
+  if (!Array.isArray(r.tiers) || r.tiers.length === 0) return null;
+  const values = r.tiers.map((t) => Number(t.value));
+  const min = Math.min(...values), max = Math.max(...values);
+  return min === max ? String(min) : `${min}–${max}`;
+}
+
+// Multiple reward lines that each name their OWN distinct product+variant
+// target are ALTERNATIVES — the customer adds ONE of them (see "choose your
+// reward item" in the unlock sheet / recommendedProducts) and gets only
+// THAT line's own discount, never every line at once. Joining their parts
+// with "+" (the old behavior) wrongly read as "every discount applies to
+// this cart simultaneously" (e.g. a 3-variant "buy this stand, one gets
+// 100% off, the other two 50% off" promotion showed "100% off + 50% off +
+// 50% off", implying all three stack). Detected generically off the shape
+// every scoped/single-target reward already carries (targetProductId +
+// targetVariantSku) — not special-cased to any one promotion.
+function hasAlternativeTargets(rewards) {
+  if (rewards.length < 2) return false;
+  const keys = rewards.map((r) => (r.targetProductId ? `${r.targetProductId}::${r.targetVariantSku || ""}` : null));
+  if (keys.some((k) => !k)) return false; // any reward with no single target breaks the "pick one" shape
+  return new Set(keys).size === keys.length; // every line names a DIFFERENT product+variant
+}
+
 function buildSavingsText(promotion) {
   const rewards = promotion.rewards || [];
+  if (hasAlternativeTargets(rewards)) {
+    const values = rewards.map((r) => {
+      if (["percent_off_product", "flat_off_product", "discounted_product"].includes(r.type)) return Number(r.value) || 0;
+      return null;
+    });
+    const allHaveValues = values.every((v) => v != null);
+    const allPercent = rewards.every((r) => r.type === "percent_off_product");
+    if (allHaveValues) {
+      const max = Math.max(...values);
+      return allPercent ? `Up to ${max}% off` : `Up to ${formatRupees(max)} off`;
+    }
+    return "Choose your reward"; // mixed types (e.g. a free gift among percent-off lines) — no single "up to X" number is meaningful
+  }
+
   const parts = [];
   for (const r of rewards) {
-    if (r.type === "percent_off_product" || r.type === "percent_off_order") parts.push(`${r.value}% off`);
-    else if (r.type === "flat_off_product" || r.type === "flat_off_order" || r.type === "discounted_product") parts.push(`${formatRupees(r.value)} off`);
-    else if (r.type === "free_product") parts.push("Free gift");
+    const range = tierValueRange(r);
+    if (r.type === "percent_off_product" || r.type === "percent_off_order") {
+      parts.push(range ? `${range}% off, by quantity` : `${r.value}% off`);
+    } else if (r.type === "flat_off_product" || r.type === "flat_off_order" || r.type === "discounted_product") {
+      parts.push(range ? `₹${range} off, by quantity` : `${formatRupees(r.value)} off`);
+    } else if (r.type === "free_product") parts.push("Free gift");
     else if (r.type === "gift_choice") parts.push("Free gift — your choice");
     else if (r.type === "free_shipping") parts.push("Free shipping");
     else if (r.type === "bundle_price") parts.push(`Bundle at ${formatRupees(r.bundlePrice)}`);
@@ -87,7 +132,14 @@ function buildBadge(promotion) {
   if (types.has("free_product") || types.has("gift_choice")) return "FREE GIFT";
   if (types.has("free_shipping")) return "FREE SHIPPING";
   if (types.has("percent_off_product") || types.has("percent_off_order")) {
-    const pct = Math.max(...promotion.rewards.filter((r) => r.value != null).map((r) => r.value), 0);
+    // The best a customer could reach — a tiered reward's highest tier
+    // value, not its flat `value` fallback (which may be lower/unrelated).
+    const pct = Math.max(
+      ...promotion.rewards.map((r) => (Array.isArray(r.tiers) && r.tiers.length
+        ? Math.max(...r.tiers.map((t) => Number(t.value) || 0))
+        : (r.value ?? 0))),
+      0,
+    );
     return pct > 0 ? `${pct}% OFF` : "OFFER";
   }
   return "OFFER";
@@ -109,8 +161,9 @@ function buildIcon(displayType) {
   }[displayType] || "sparkles";
 }
 
-function buildCtaText(promotion, { applied, qualifying }) {
+function buildCtaText(promotion, { applied, qualifying, needsCoupon }) {
   if (applied) return "Applied";
+  if (needsCoupon) return promotion.linkedCouponCode ? `Enter code ${promotion.linkedCouponCode}` : "Enter coupon code";
   if (qualifying) return "Add to cart";
   const hasGiftChoice = (promotion.rewards || []).some((r) => r.type === "gift_choice");
   return hasGiftChoice ? "Choose your gift" : "View offer";
@@ -136,6 +189,9 @@ function describeLeaf(leaf, ctx) {
     case "subcategory":
     case "tag":
       text = `Needs ${leaf.minQuantity || 1}+ item(s) from ${TAXONOMY_LABEL[leaf.field]} "${leaf.value}".`;
+      break;
+    case "productList":
+      text = `Needs ${leaf.minQuantity || 1}+ item(s) from a specific product list (${(leaf.items || []).length} eligible).`;
       break;
     case "cartSubtotal":
       text = `Needs cart subtotal ${leaf.operator} ${formatRupees(leaf.value)} (currently ${formatRupees(ctx.subtotal)}).`;
@@ -169,6 +225,14 @@ function describeLeaf(leaf, ctx) {
 function explainConditionTree(node, ctx) {
   if (!node) return [{ met: true, text: "No conditions — always eligible." }];
   if (node.op) {
+    // NOT: explain the negated child, but invert `met` and prefix the text
+    // so this reads as the NOT's own status, not the raw (un-negated)
+    // child's — otherwise a satisfied NOT (child unmet) would confusingly
+    // show met:false with the child's own unmet-leaf wording.
+    if (node.op === "NOT") {
+      const childExplanations = (node.children || []).map((c) => explainConditionTree(c, ctx)).flat();
+      return childExplanations.map((e) => ({ met: !e.met, text: `NOT (${e.text})` }));
+    }
     const childExplanations = (node.children || []).map((c) => explainConditionTree(c, ctx)).flat();
     return childExplanations;
   }
@@ -190,6 +254,11 @@ function buildProgressText(conditionTree, ctx, rewardLabel) {
     if (!node) return null;
     if (node.op) {
       const children = node.children || [];
+      // A NOT'd subtree has no "add N more" message — the fix for an unmet
+      // NOT would be having LESS of something, which this surface can never
+      // phrase as "add ___ more". Same reasoning as the controller's
+      // findFirstUnmetProductLeaf, which this function mirrors.
+      if (node.op === "NOT") return null;
       if (node.op === "OR") {
         const metBranch = children.find((c) => evaluateConditionTree(c, ctx));
         if (metBranch) return null; // already qualifies via this branch
@@ -207,10 +276,24 @@ function buildProgressText(conditionTree, ctx, rewardLabel) {
     }
     if (node.field === "product") {
       const have = node.variantSku
-        ? ctx.qtyByProductVariant.get(`${node.productId}::${node.variantSku}`) || 0
+        ? ctx.qtyByProductVariant.get(variantKey(String(node.productId), node.variantSku)) || 0
         : ctx.qtyByProduct.get(String(node.productId)) || 0;
       const remaining = (node.minQuantity || 1) - have;
       if (remaining > 0) return `Add ${remaining} more of this item to unlock ${rewardLabel}.`;
+    }
+    // An admin-picked list of specific products/variants — "add N more from
+    // this set", same distance math as a single product leaf, just summed
+    // (or counted distinctly) across every entry in the list.
+    if (node.field === "productList") {
+      const items = node.items || [];
+      const qtyFor = (it) => (it.variantSku
+        ? ctx.qtyByProductVariant.get(variantKey(String(it.productId), it.variantSku)) || 0
+        : ctx.qtyByProduct.get(String(it.productId)) || 0);
+      const have = node.countMode === "distinct"
+        ? items.filter((it) => qtyFor(it) > 0).length
+        : items.reduce((s, it) => s + qtyFor(it), 0);
+      const remaining = (node.minQuantity || 1) - have;
+      if (remaining > 0) return `Add ${remaining} more of these items to unlock ${rewardLabel}.`;
     }
     if (node.field === "cartQuantity" && node.operator === "gte") {
       const remaining = Number(node.value) - ctx.totalQty;
@@ -245,10 +328,45 @@ function rewardLabelFor(promotion) {
  */
 export function buildPromotionDisplayModel(promotion, ctx, { placement, appliedPromotionIds } = {}) {
   const id = String(promotion._id);
-  const qualifying = evaluateConditionTree(promotion.conditionTree, ctx);
-  const applied = appliedPromotionIds ? appliedPromotionIds.has(id) : qualifying;
-  const displayType = buildDisplayType(promotion);
+  const conditionMet = evaluateConditionTree(promotion.conditionTree, ctx);
+  // A coupon-linked promotion's condition tree can be met while the coupon
+  // itself hasn't been entered — real checkout (evaluatePromotions) refuses
+  // to match in that case (promotionCouponGateOk), so this display layer
+  // must agree, or a customer sees "qualifying" for a discount checkout
+  // will not actually give them. See the audit's K.3 finding, fixed here.
+  const couponOk = promotionCouponGateOk(promotion, ctx);
+  const needsCoupon = Boolean(promotion.linkedCouponCode) && !couponOk;
   const hasNonWorkingReward = (promotion.rewards || []).some((r) => !WORKING_REWARD_TYPES.includes(r.type));
+  const fullyFunctional = !hasNonWorkingReward;
+  // A promotion checkout cannot honor must never be advertised as available
+  // or eligible — force it to the same "not qualifying" state a customer
+  // would see for any other unmet promotion, rather than showing a banner
+  // for a reward that will silently do nothing at checkout.
+  const qualifying = fullyFunctional && conditionMet && couponOk;
+  const rewards = promotion.rewards || [];
+  const targetedDiscount = (reward) => ["percent_off_product", "flat_off_product", "discounted_product"].includes(reward.type)
+    && (reward.targetProductId || ["productList", "category", "subcategory", "tag"].includes(reward.targetScope?.field));
+  const targetInCart = (target) => target.variantSku
+    ? (ctx.qtyByProductVariant.get(variantKey(String(target.productId), target.variantSku)) || 0) > 0
+    : (ctx.qtyByProduct.get(String(target.productId)) || 0) > 0;
+  const rewardHasCartTarget = (reward) => {
+    if (reward.targetProductId) return targetInCart({ productId: reward.targetProductId, variantSku: reward.targetVariantSku });
+    const scope = reward.targetScope;
+    if (scope?.field === "productList") return (scope.items || []).some(targetInCart);
+    return [...ctx.qtyByProduct.entries()].some(([productId, quantity]) => {
+      if (quantity <= 0) return false;
+      const meta = ctx.productMeta.get(productId);
+      if (!meta) return false;
+      if (scope?.field === "category") return meta.category === scope.value;
+      if (scope?.field === "subcategory") return meta.subcategory === scope.value;
+      return scope?.field === "tag" && Array.isArray(meta.tags) && meta.tags.includes(scope.value);
+    });
+  };
+  const rewardTargetPending = qualifying && (!appliedPromotionIds || appliedPromotionIds.has(id))
+    && rewards.length > 0 && rewards.every(targetedDiscount)
+    && !rewards.some(rewardHasCartTarget);
+  const applied = !rewardTargetPending && fullyFunctional && (appliedPromotionIds ? appliedPromotionIds.has(id) : qualifying);
+  const displayType = buildDisplayType(promotion);
 
   return {
     id,
@@ -261,18 +379,22 @@ export function buildPromotionDisplayModel(promotion, ctx, { placement, appliedP
     displayRank: promotion.priority || 0, // alias kept distinct in the contract in case display ordering ever needs to diverge from stacking priority
     savingsText: buildSavingsText(promotion) || null,
     progressText: qualifying ? null : buildProgressText(promotion.conditionTree, ctx, rewardLabelFor(promotion)),
-    ctaText: buildCtaText(promotion, { applied, qualifying }),
+    ctaText: buildCtaText(promotion, { applied, qualifying, needsCoupon }),
+    // The actual code to enter, ONLY surfaced once the customer still needs
+    // it (condition met but coupon not yet applied) — never shown once
+    // applied/not-yet-qualifying-on-conditions, so this isn't a blanket
+    // coupon-code leak, just the actionable "type this in" moment.
+    couponCodeToEnter: needsCoupon && conditionMet ? promotion.linkedCouponCode : null,
     applied,
     qualifying,
+    rewardTargetPending,
     placement: placement || null,
     explanation: explainConditionTree(promotion.conditionTree, ctx),
     // Not part of the Phase 2 shape, but necessary honesty: a promotion
     // using a reward type checkout doesn't apply yet must never be shown
-    // as if it fully works. Admin-side health check (Phase 11) is the
-    // primary signal for this; this flag is the storefront-safe echo of
-    // it so a future UI can choose to suppress/soften such cards instead
-    // of silently promising something checkout won't honor.
-    fullyFunctional: !hasNonWorkingReward,
+    // as if it fully works — now also reflected in qualifying/applied above
+    // (forced false), not just this advisory flag.
+    fullyFunctional,
   };
 }
 

@@ -14,6 +14,8 @@ import { fetchCsrfToken } from './store/api/apiSlice';
 import AppRoutes from './store/AppRoutes';
 import SeoPageContent from './component/SeoPageContent';
 import NewsTicker from './pages/home/NewsTicker';
+import FestiveEffects from './component/festive/FestiveEffects';
+import { SiteCampaignProvider } from './hooks/useSiteCampaign';
 import WhatsAppLoginWatcher from './component/layout/auth/WhatsAppLoginWatcher';
 import WhatsAppOneTap from './component/layout/auth/WhatsAppOneTap';
 import { trackPageView, setUserId, captureAttribution, setMetaAdvancedMatching } from './utils/analytics';
@@ -35,6 +37,11 @@ const GoogleOneTap = lazy(() => import('./component/GoogleOneTap'));
 const FreeShippingPopup = lazy(() => import('./component/FreeShippingPopup'));
 const ScrollHint = lazy(() => import('./component/ScrollHint'));
 const PasskeyPrompt = lazy(() => import('./component/PasskeyPrompt'));
+// Smart combo/upsell bottom sheet (Promotion V2) — watches the cart from the
+// app root so it fires on an add from ANY surface (PDP, cart drawer, etc.),
+// not just one page. See the component's own header comment for the full
+// trigger/dismissal contract.
+const PromotionUnlockSheet = lazy(() => import('./component/promotions/PromotionUnlockSheet'));
 
 // Component to handle session restoration and token removal detection
 const SessionManager = ({ children }) => {
@@ -161,6 +168,7 @@ function App({ store = browserStore, helmetContext }) {
   return (
     <HelmetProvider context={helmetContext}>
     <Provider store={store}>
+      <SiteCampaignProvider>
         <>
           <SmoothScroll>
           <RouteTracker />
@@ -173,6 +181,7 @@ function App({ store = browserStore, helmetContext }) {
               <ErrorBoundary>
                 <NewsTicker/>
                 <NewHeader/>
+                <FestiveEffects/>
               </ErrorBoundary>
               {/* AppRoutes loaded immediately - no lazy loading for critical routing */}
               <ErrorBoundary>
@@ -212,6 +221,10 @@ function App({ store = browserStore, helmetContext }) {
                 <ErrorBoundary>
                   <FreeShippingPopup />
                 </ErrorBoundary>
+                {/* Promotion V2 "add more to unlock" bottom sheet */}
+                <ErrorBoundary>
+                  <PromotionUnlockSheet />
+                </ErrorBoundary>
                 <ErrorBoundary>
                   <ScrollHint />
                 </ErrorBoundary>
@@ -220,6 +233,7 @@ function App({ store = browserStore, helmetContext }) {
           </SessionManager>
           </SmoothScroll>
         </>
+      </SiteCampaignProvider>
     </Provider>
     </HelmetProvider>
   );

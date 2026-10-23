@@ -9,10 +9,14 @@
  * and SEPARATELY the Double stand (50% off) got BOTH discounted off a
  * single Katana, when only ONE stand (any variant) should ever benefit.
  *
- * Exercises the real exported helpers (createRuleBudgetTracker,
- * withRuleBudget, spendRuleBudget, applicableCap, capDiscountedQuantity)
- * together with the real evaluateCartRules/applyBestDiscount — not a
- * reimplemented mirror — against the exact "Exciting Offers" shape.
+ * Ported 2026-10-09 from the legacy cart_rule-shaped version of this same
+ * test (cartRule.util.js/evaluateCartRules were deleted entirely — checkout
+ * now evaluates ONLY Promotion Engine V2) onto the real exported helpers
+ * (evaluatePromotions, buildCartContext, applyBestPromotionDiscount,
+ * createRuleBudgetTracker, withRuleBudget, spendRuleBudget, applicableCap,
+ * capDiscountedQuantity) against the exact same "Exciting Offers" shape,
+ * now expressed as a Promotion conditionTree+rewards document. Same 5 cases,
+ * same assertions, same protection — just the real system, not a deleted one.
  */
 import { jest } from "@jest/globals";
 
@@ -24,14 +28,15 @@ jest.unstable_mockModule("../../services/rp.payement.service.js", () => ({
 }));
 
 const {
-  evaluateCartRules,
-  applyBestDiscount,
+  evaluatePromotions,
+  buildCartContext,
+  applyBestPromotionDiscount,
   getDiscountCandidatesForItem,
   createRuleBudgetTracker,
   withRuleBudget,
   spendRuleBudget,
   applicableCap,
-} = await import("../../utils/cartRule.util.js");
+} = await import("../../utils/promotionEngine.util.js");
 const { capDiscountedQuantity } = await import("../../controller/rp.payment.controller.js");
 
 const KATANA = "0893c4fd-3020-4fa0-9529-9c12044931fb";
@@ -40,36 +45,34 @@ const SINGLE_SKU = "ANIKSTSGLS";
 const DOUBLE_SKU = "ANIKSTDBLS";
 const TRIPLE_SKU = "ANIKSTTRIS";
 
-// Same shape getActivePromotionsAsCartRules() hands evaluateCartRules —
-// mirrors the real "Exciting Offers" promotion exactly.
-const EXCITING_OFFERS_RULE = {
+// Same promotion, now in real conditionTree+rewards shape.
+const EXCITING_OFFERS_PROMO = {
   _id: "promo-exciting-offers",
   name: "Exciting Offers",
   isActive: true,
-  conditions: [{ productId: KATANA, minQuantity: 1 }],
-  effects: [
-    { type: "percent_off", value: 100, targetProductId: STAND, targetVariantSku: SINGLE_SKU },
-    { type: "percent_off", value: 50, targetProductId: STAND, targetVariantSku: DOUBLE_SKU },
-    { type: "percent_off", value: 50, targetProductId: STAND, targetVariantSku: TRIPLE_SKU },
+  conditionTree: { field: "product", productId: KATANA, minQuantity: 1 },
+  rewards: [
+    { type: "percent_off_product", value: 100, targetProductId: STAND, targetVariantSku: SINGLE_SKU },
+    { type: "percent_off_product", value: 50, targetProductId: STAND, targetVariantSku: DOUBLE_SKU },
+    { type: "percent_off_product", value: 50, targetProductId: STAND, targetVariantSku: TRIPLE_SKU },
   ],
 };
 
 // Mirrors the real controller's per-item loop exactly (same functions, same
 // order of operations) so this test proves the actual checkout behavior,
 // not just the standalone helpers in isolation.
-function applyDiscounts(orderItems, activeRules) {
-  const cartRuleResult = evaluateCartRules(
-    orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity, variantSku: oi.variantSku })),
-    activeRules,
-  );
-  const ruleBudgets = createRuleBudgetTracker(cartRuleResult.discountCandidatesByProduct);
+function applyDiscounts(orderItems, activePromotions) {
+  const cartItems = orderItems.map((oi) => ({ productId: oi.productId, quantity: oi.productSnapshot.quantity, variantSku: oi.variantSku }));
+  const ctx = buildCartContext(cartItems, { subtotal: orderItems.reduce((s, i) => s + i.productSnapshot.priceAtPurchase * i.productSnapshot.quantity, 0) });
+  const { discountCandidatesByProduct } = evaluatePromotions(cartItems, ctx, activePromotions);
+  const ruleBudgets = createRuleBudgetTracker(discountCandidatesByProduct);
   const extraLines = [];
   for (const oi of orderItems) {
-    const rawCandidates = getDiscountCandidatesForItem(cartRuleResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
+    const rawCandidates = getDiscountCandidatesForItem(discountCandidatesByProduct, oi.productId, oi.variantSku);
     const candidates = withRuleBudget(rawCandidates, ruleBudgets);
     if (candidates?.length) {
       const fullPrice = oi.productSnapshot.priceAtPurchase;
-      const discountedPrice = applyBestDiscount(fullPrice, candidates);
+      const discountedPrice = applyBestPromotionDiscount(fullPrice, candidates);
       const cap = applicableCap(candidates);
       const unitsUsed = Math.min(oi.productSnapshot.quantity, cap);
       const remainderLine = capDiscountedQuantity(oi, fullPrice, discountedPrice, cap);
@@ -93,7 +96,7 @@ describe("Shared rule budget — sibling reward lines of the same promotion", ()
       orderItem(STAND, SINGLE_SKU, 399), // added first
       orderItem(STAND, DOUBLE_SKU, 449), // added second
     ];
-    const result = applyDiscounts(items, [EXCITING_OFFERS_RULE]);
+    const result = applyDiscounts(items, [EXCITING_OFFERS_PROMO]);
     const single = result.find((i) => i.variantSku === SINGLE_SKU);
     const double = result.find((i) => i.variantSku === DOUBLE_SKU);
     expect(single.productSnapshot.priceAtPurchase).toBe(0); // first in cart — gets the free reward
@@ -105,7 +108,7 @@ describe("Shared rule budget — sibling reward lines of the same promotion", ()
       orderItem(KATANA, "", 2499),
       orderItem(STAND, DOUBLE_SKU, 449),
     ];
-    const result = applyDiscounts(items, [EXCITING_OFFERS_RULE]);
+    const result = applyDiscounts(items, [EXCITING_OFFERS_PROMO]);
     const double = result.find((i) => i.variantSku === DOUBLE_SKU);
     expect(double.productSnapshot.priceAtPurchase).toBe(225); // 50% off 449, rounded
   });
@@ -116,7 +119,7 @@ describe("Shared rule budget — sibling reward lines of the same promotion", ()
       orderItem(STAND, DOUBLE_SKU, 449), // added first this time
       orderItem(STAND, SINGLE_SKU, 399), // added second
     ];
-    const result = applyDiscounts(items, [EXCITING_OFFERS_RULE]);
+    const result = applyDiscounts(items, [EXCITING_OFFERS_PROMO]);
     const double = result.find((i) => i.variantSku === DOUBLE_SKU);
     const single = result.find((i) => i.variantSku === SINGLE_SKU);
     expect(double.productSnapshot.priceAtPurchase).toBe(225);
@@ -129,7 +132,7 @@ describe("Shared rule budget — sibling reward lines of the same promotion", ()
       orderItem(STAND, SINGLE_SKU, 399),
       orderItem(STAND, DOUBLE_SKU, 449),
     ];
-    const result = applyDiscounts(items, [EXCITING_OFFERS_RULE]);
+    const result = applyDiscounts(items, [EXCITING_OFFERS_PROMO]);
     const single = result.find((i) => i.variantSku === SINGLE_SKU);
     const double = result.find((i) => i.variantSku === DOUBLE_SKU);
     expect(single.productSnapshot.priceAtPurchase).toBe(0);
@@ -141,7 +144,7 @@ describe("Shared rule budget — sibling reward lines of the same promotion", ()
       orderItem(STAND, SINGLE_SKU, 399),
       orderItem(STAND, DOUBLE_SKU, 449),
     ];
-    const result = applyDiscounts(items, [EXCITING_OFFERS_RULE]);
+    const result = applyDiscounts(items, [EXCITING_OFFERS_PROMO]);
     expect(result.find((i) => i.variantSku === SINGLE_SKU).productSnapshot.priceAtPurchase).toBe(399);
     expect(result.find((i) => i.variantSku === DOUBLE_SKU).productSnapshot.priceAtPurchase).toBe(449);
   });

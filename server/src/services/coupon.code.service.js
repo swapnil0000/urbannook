@@ -36,9 +36,23 @@ function calculateDiscount(coupon, cartProductTotal) {
 
 // ── New-model coupon validation ───────────────────────────────────────────────
 
+// Presence-only check — never scaled by quantity. 2 units of the qualifying
+// product doesn't grant 2 coupons or change the discount amount; it's a
+// plain yes/no gate, same as every other eligibility check here. Empty/unset
+// eligibleProductIds = no restriction, identical to today's behavior for
+// every coupon that doesn't use this field.
+function couponProductGateOk(coupon, cartProductIds) {
+  if (!coupon.eligibleProductIds?.length) return true;
+  const have = new Set((cartProductIds || []).map(String));
+  return coupon.eligibleProductIds.some((id) => have.has(String(id)));
+}
+
 // cartProductTotal = product subtotal only — discount applies to products, not shipping (industry standard)
 // isLoggedIn: true for authenticated users; false/undefined for guests
-async function validateNewCoupon({ coupon, cartProductTotal, email, mobile, isLoggedIn }) {
+// cartProductIds: distinct productIds currently in the cart/order — only
+// needed for coupons with eligibleProductIds set; omit/empty is fine for
+// every other coupon (couponProductGateOk is a no-op when the field is unset).
+async function validateNewCoupon({ coupon, cartProductTotal, cartProductIds, email, mobile, isLoggedIn }) {
   const tag = "[Coupon:Storefront]";
   const now = new Date();
 
@@ -93,6 +107,10 @@ async function validateNewCoupon({ coupon, cartProductTotal, email, mobile, isLo
   if (cartProductTotal < (coupon.minCartValue || 0)) {
     console.log(`${tag} REJECT "${coupon.code}" — cart ₹${cartProductTotal} < min ₹${coupon.minCartValue}`);
     throw new ValidationError(`Minimum order of ₹${coupon.minCartValue} required for this coupon`);
+  }
+  if (!couponProductGateOk(coupon, cartProductIds)) {
+    console.log(`${tag} REJECT "${coupon.code}" — product gate not met (requires one of [${(coupon.eligibleProductIds || []).join(", ")}])`);
+    throw new ValidationError("This coupon requires a specific product in your cart.");
   }
   if (coupon.maxTotalUses != null && coupon.usageCount >= coupon.maxTotalUses) {
     console.log(`${tag} REJECT "${coupon.code}" — global cap reached (${coupon.usageCount}/${coupon.maxTotalUses})`);
@@ -199,6 +217,7 @@ const applyCouponCodeService = async ({ userId, couponCodeName, email, mobile })
     const discountAmount = await validateNewCoupon({
       coupon: newCoupon,
       cartProductTotal: cartSubtotal,
+      cartProductIds: availableItems.map((i) => i.productId),
       email,
       mobile,
       isLoggedIn: !!userId,
@@ -244,9 +263,21 @@ const applyCouponCodeService = async ({ userId, couponCodeName, email, mobile })
 // Returns a unified array of coupons in a normalised shape that CouponList can
 // render without knowing which model a coupon came from.
 
-const getAllCouponCodeService = async ({ userId, code }) => {
+// cartProductIds: only meaningful for GUESTS, whose cart lives client-side
+// (there's nothing server-side to look up) — the caller must pass the
+// guest's current cart productIds. For a logged-in user, the server's own
+// stored cart (getCartService) is the trusted source instead; anything a
+// logged-in client might pass here is ignored, same trust boundary
+// applyCouponCodeService already uses.
+const getAllCouponCodeService = async ({ userId, code, cartProductIds }) => {
   const tag = "[Coupon:List]";
   console.log(`${tag} getAllCouponCodeService called: userId=${userId || "-"} code="${code || "-"}"`);
+
+  let effectiveCartProductIds = cartProductIds;
+  if (userId) {
+    const cartRes = await getCartService({ userId });
+    effectiveCartProductIds = cartRes.success ? cartRes.data.availableItems.map((i) => i.productId) : [];
+  }
 
   // ── Single-coupon lookup by exact code (used by guests typing a code manually) ──
   // Lets the storefront show the correct discount for HIDDEN coupons without listing them.
@@ -304,10 +335,17 @@ const getAllCouponCodeService = async ({ userId, code }) => {
   // Exclude audience:"MEMBERS_ONLY" which requires a logged-in account.
   const newCoupons = await Coupon.find(
     { scope: "PUBLIC", audience: { $ne: "MEMBERS_ONLY" }, isActive: true, isArchived: false, isTest: false, isHidden: { $ne: true } },
-    { couponId: 1, code: 1, title: 1, notes: 1, discountType: 1, discountValue: 1, maxDiscountCap: 1, minCartValue: 1, validUntil: 1 },
+    { couponId: 1, code: 1, title: 1, notes: 1, discountType: 1, discountValue: 1, maxDiscountCap: 1, minCartValue: 1, validUntil: 1, eligibleProductIds: 1 },
   ).lean();
 
-  for (const c of newCoupons) {
+  // Product-gated coupons only appear once their required product is
+  // actually in the cart — this IS the "coupon enable hua" moment: it's
+  // invisible before, newly listed after. Real re-validation still happens
+  // at apply/charge time regardless (validateNewCoupon), this is purely the
+  // discovery/listing surface.
+  const visibleCoupons = newCoupons.filter((c) => couponProductGateOk(c, effectiveCartProductIds));
+
+  for (const c of visibleCoupons) {
     results.push({
       id:            c.couponId,
       code:          c.code,
@@ -329,4 +367,4 @@ const getAllCouponCodeService = async ({ userId, code }) => {
 // validateNewCoupon is exported so the Magic Checkout apply-coupon callback can reuse
 // the exact same eligibility rules (per-user caps, TARGETED assignment, MEMBERS_ONLY,
 // validity window, min-cart) without going through the cart-mutating apply service.
-export { applyCouponCodeService, getAllCouponCodeService, validateNewCoupon };
+export { applyCouponCodeService, getAllCouponCodeService, validateNewCoupon, couponProductGateOk };

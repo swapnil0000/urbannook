@@ -52,10 +52,38 @@ const orderSchema = new mongoose.Schema(
           promotionId: String,
           name: String,
           rewardTypes: [String],
+          // ₹ actually granted by THIS promotion on this order (product-line
+          // discounts it won + its own order-level discount if it won that
+          // too) — snapshotted at order-creation time so PromotionUsage's
+          // discountAmount (see rp.payment.controller.js's webhook) isn't
+          // left at its schema default of 0 forever (audit 2026-10-10,
+          // finding A10). Absent/0 on any order created before this field
+          // existed, same "doesn't predate the engine" convention as
+          // rewardTypes above.
+          discountAmount: { type: Number, default: 0 },
+          // Which products this promotion actually discounted/gifted on this
+          // order — snapshotted at creation time (additive, 2026-10-10) so
+          // the webhook can copy it straight onto PromotionUsage.discounted
+          // Products without recomputing the engine. Empty for a whole-order
+          // reward (percent_off_order/flat_off_order).
+          discountedProducts: {
+            type: [{ productId: String, productName: String, quantity: Number, _id: false }],
+            default: [],
+          },
         },
       ],
       default: [],
     },
+    // Product subtotal BEFORE any Promotion V2 discount was applied —
+    // snapshotted at order-creation time, since `items[].productSnapshot
+    // .priceAtPurchase` already holds the POST-discount price by the time
+    // the order is saved (the discount loop mutates it in place). Without
+    // this, PromotionUsage.cartValueBeforeDiscount could only ever be
+    // reconstructed from the already-discounted saved items — i.e. it would
+    // silently hold the post-discount value under the pre-discount name
+    // (audit 2026-10-10, finding A10). 0/absent for any order with no
+    // matched promotions or predating this field.
+    promotionGrossProductSubtotal: { type: Number, default: 0 },
     invoiceData: {
       isGenerated: { type: Boolean, default: false },
       s3FileKey: { type: String, default: null },

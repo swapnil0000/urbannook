@@ -127,9 +127,14 @@ export default defineConfig(({ mode, isSsrBuild }) => {
   },
 
   // Vite reads `esbuild` at the top level, NOT under `build`. Keep it here or the
-  // console/debugger stripping silently does nothing.
+  // console/debugger stripping silently does nothing. Only strip for the real
+  // production build — `development` AND `staging` are both used for local
+  // dev/debugging (dev:staging is the normal local workflow here), and
+  // silently eating every console.log in either with zero indication why
+  // cost a long debugging session (2026-10-11) chasing a "component never
+  // renders" ghost that was actually just console.log being erased.
   esbuild: {
-    drop: ['console', 'debugger'],
+    drop: mode === 'production' ? ['console', 'debugger'] : [],
   },
 
   test: {

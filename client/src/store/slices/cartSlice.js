@@ -95,6 +95,8 @@ const guestCartState = () => {
 // Load persisted guest cart on app start — only for guests, not logged-in users
 const initialState = {
   ...guestCartState(),
+  lastSuccessfulAdd: null,
+  addSequence: 0,
   selections: {}, // Managed by productId: { quantity, variant }
 };
 
@@ -102,6 +104,10 @@ const cartSlice = createSlice({
   name: 'cart',
   initialState,
   reducers: {
+    recordSuccessfulAdd: (state, action) => {
+      state.addSequence += 1;
+      state.lastSuccessfulAdd = { ...action.payload, sequence: state.addSequence };
+    },
     // After hydrating a server-rendered page: load this browser's guest cart
     // (the server rendered it empty). No-op change for logged-in users, whose
     // cart comes from the API (useCartSync).
@@ -126,6 +132,8 @@ const cartSlice = createSlice({
         (item.mongoId === itemId || item.id === itemId) && 
         (item.selectedVariant || 'N/A') === (effectiveVariant)
       );
+      const previousSubtotal = state.totalAmount;
+      const previousQuantity = existingItem?.quantity || 0;
 
       if (existingItem) {
         existingItem.quantity += quantity;
@@ -145,6 +153,10 @@ const cartSlice = createSlice({
 
       state.totalQuantity += quantity;
       state.totalAmount += (Number(price) || 0) * quantity;
+      if (quantity > 0) {
+        state.addSequence += 1;
+        state.lastSuccessfulAdd = { productId: itemId, selectedVariant: effectiveVariant, quantity, previousQuantity, previousSubtotal, sequence: state.addSequence };
+      }
 
       // Persist to localStorage for guest users so cart survives refresh
       const isGuestUser = isGuest();
@@ -199,9 +211,15 @@ const cartSlice = createSlice({
 
       if (existingItem && quantity > 0) {
         const diff = quantity - existingItem.quantity;
+        const previousSubtotal = state.totalAmount;
+        const previousQuantity = existingItem.quantity;
         existingItem.quantity = quantity;
         state.totalQuantity += diff;
         state.totalAmount += diff * (Number(existingItem.price) || 0);
+        if (diff > 0) {
+          state.addSequence += 1;
+          state.lastSuccessfulAdd = { productId: id, selectedVariant: effectiveVariant, quantity: diff, previousQuantity, previousSubtotal, sequence: state.addSequence };
+        }
       }
 
       if (isGuest()) {
@@ -340,6 +358,6 @@ const cartSlice = createSlice({
   },
 });
 
-export const { restoreGuestCart, addItem, removeItem, updateQuantity, clearCart, syncCartFromProfile, setCartItems, updateSelection, setGiftWrap } = cartSlice.actions;
+export const { recordSuccessfulAdd, restoreGuestCart, addItem, removeItem, updateQuantity, clearCart, syncCartFromProfile, setCartItems, updateSelection, setGiftWrap } = cartSlice.actions;
 
 export default cartSlice.reducer;

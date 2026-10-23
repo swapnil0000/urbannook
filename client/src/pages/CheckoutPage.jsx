@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, lazy, Suspense, useRef, Fragment } from "react";
+import { useState, useEffect, lazy, Suspense, useRef, Fragment } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 
@@ -14,8 +14,6 @@ import {
   useUpdateUserProfileMutation,
   useCalculateShippingMutation,
   useGetFreeShippingOfferQuery,
-  useGetAllFreeShippingBannersQuery,
-  useEvaluateCartRulesQuery,
   useGetGiftWrapOfferQuery,
   useSyncGuestCartMutation,
   useGetLoyaltySummaryQuery,
@@ -28,11 +26,14 @@ import { fetchCsrfToken } from "../store/api/apiSlice";
 import { getApiUrl } from "../config/appUrls";
 import config from "../config/env";
 import CouponInput from "../component/CouponInput";
-import FreeShippingBanner from "../component/FreeShippingBanner";
 import { ComponentLoader } from "../component/layout/LoadingSpinner";
 import { getClaimedMobile, getClaimedCode, isOfferLive } from "../config/siteOffer";
 import SiteOfferBanner from "../component/SiteOfferBanner";
 import FreeShippingStrip from "../component/FreeShippingStrip";
+import PromotionBannerList from "../component/promotions/PromotionBannerList";
+import SealBadgeCard, { UnderlineAmount } from "../component/promotions/SealBadgeCard";
+import { useGetCheckoutPromotionsQuery } from "../store/api/userApi";
+import { buildPromotionCartItems } from "../utils/promotionCartItems";
 import useOfferTerms from "../hooks/useOfferTerms";
 import { useShippingDelayNotice } from "../hooks/useShippingDelayNotice";
 import { calcLocalDiscount } from "../utils/couponDiscount";
@@ -104,151 +105,15 @@ const iconInput = (icon, children) => (
 
 // Green "You're saving ₹X" banner. Savings = (subtotal + real shipping) −
 // what they're actually paying — i.e. every rupee shaved off, whether from
-// a coupon or from the free-shipping offer, in one honest number.
+// a coupon or from the free-shipping offer, in one honest number. Shares
+// the same premium seal-badge card shell as every other promotion surface
+// (see SealBadgeCard.jsx) — previously built inline just for this one line.
 const SavingsBanner = ({ amount, freeShipping = false }) => (
-  <div
-    style={{
-      position: "relative",
-      display: "flex",
-      alignItems: "center",
-      gap: 14,
-      width: "100%",
-      minHeight: 64,
-      boxSizing: "border-box",
-      padding: "14px 16px",
-      borderRadius: 16,
-      background:
-        "linear-gradient(135deg, oklch(0.93 0.09 152) 0%, oklch(0.90 0.11 150) 60%, oklch(0.92 0.10 148) 100%)",
-      overflow: "hidden",
-      textAlign: "center",
-    }}
-  >
-    {/* diagonal shine streaks */}
-    <div
-      style={{
-        position: "absolute",
-        top: "-40%",
-        left: "55%",
-        width: 60,
-        height: "220%",
-        background: "linear-gradient(120deg, transparent 0%, oklch(1 0 0 / 0.35) 45%, transparent 100%)",
-        transform: "rotate(18deg)",
-        pointerEvents: "none",
-      }}
-    />
-    <div
-      style={{
-        position: "absolute",
-        top: "-40%",
-        left: "78%",
-        width: 24,
-        height: "220%",
-        background: "linear-gradient(120deg, transparent 0%, oklch(1 0 0 / 0.22) 45%, transparent 100%)",
-        transform: "rotate(18deg)",
-        pointerEvents: "none",
-      }}
-    />
-
-    {/* seal badge */}
-    <div
-      style={{
-        position: "relative",
-        flex: "0 0 auto",
-        width: 38,
-        height: 38,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1,
-      }}
-    >
-      <div
-        style={{
-          position: "absolute",
-          inset: -6,
-          borderRadius: "50%",
-          background: "oklch(0.62 0.14 155 / 0.35)",
-          filter: "blur(6px)",
-        }}
-      />
-      <div
-        style={{
-          position: "relative",
-          width: 36,
-          height: 36,
-          background: "oklch(0.47 0.10 165)",
-          clipPath:
-            "polygon(50% 0%, 61% 7%, 73% 2%, 79% 13%, 91% 15%, 92% 27%, 100% 35%, 95% 46%, 100% 57%, 91% 65%, 89% 77%, 77% 78%, 70% 89%, 58% 84%, 47% 92%, 38% 83%, 26% 87%, 21% 76%, 9% 73%, 11% 61%, 2% 52%, 9% 42%, 5% 30%, 16% 25%, 19% 13%, 31% 14%, 39% 4%)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <span style={{ color: "oklch(0.99 0 0)", fontSize: 16, fontWeight: 700, lineHeight: 1 }}>%</span>
-      </div>
-    </div>
-
-    {/* text */}
-    <div
-      style={{
-        position: "relative",
-        zIndex: 1,
-        flex: 1,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 3,
-      }}
-    >
-      {/* Big prominent free-shipping line — only when the offer combo has
-          actually zeroed the shipping charge. */}
-      {freeShipping && (
-        <span
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 7,
-            fontSize: 14,
-            fontWeight: 800,
-            letterSpacing: "0.02em",
-            textTransform: "uppercase",
-            lineHeight: 1.1,
-            color: "oklch(0.30 0.05 155)",
-          }}
-        >
-          <i className="fa-solid fa-truck-fast" style={{ color: "oklch(0.47 0.10 165)" }} />
-          Free Shipping Unlocked
-        </span>
-      )}
-
-      <div
-        style={{
-          display: "flex",
-          alignItems: "baseline",
-          justifyContent: "center",
-          flexWrap: "wrap",
-          gap: 5,
-          fontSize: freeShipping ? 13 : 17,
-          fontWeight: 500,
-          color: "oklch(0.30 0.05 155)",
-        }}
-      >
-        <span>You're saving</span>
-        <span style={{ position: "relative", fontWeight: 800, color: "oklch(0.16 0.01 155)", display: "inline-block" }}>
-          ₹{amount.toLocaleString()}
-          <svg
-            viewBox="0 0 100 14"
-            preserveAspectRatio="none"
-            style={{ position: "absolute", left: -2, right: -2, bottom: -7, width: "calc(100% + 4px)", height: 10 }}
-          >
-            <path d="M2,7 Q50,2 98,8" fill="none" stroke="oklch(0.55 0.14 155)" strokeWidth="3.5" strokeLinecap="round" />
-          </svg>
-        </span>
-        <span>on this order</span>
-      </div>
-    </div>
-  </div>
+  <SealBadgeCard eyebrowIcon={freeShipping ? "fa-truck-fast" : null} eyebrowText={freeShipping ? "Free Shipping Unlocked" : null}>
+    <span>You're saving</span>
+    <UnderlineAmount>₹{amount.toLocaleString()}</UnderlineAmount>
+    <span>on this order</span>
+  </SealBadgeCard>
 );
 
 // Stand-in for a ₹ figure that is mid-recalculation.
@@ -305,23 +170,20 @@ const UnCashBox = ({ uncash, totalToPay }) => {
   );
 };
 
-const PriceRows = ({ subtotal, shipping, discount, giftWrapAmount = 0, uncash = null, appliedCoupon, totalToPay, itemCount, isLoadingShipping, paymentMethod, onApplyCoupon, onRemoveCoupon }) => {
+const PriceRows = ({ subtotal, promotionSavings = 0, shipping, discount, giftWrapAmount = 0, uncash = null, appliedCoupon, totalToPay, itemCount, isLoadingShipping, paymentMethod, onApplyCoupon, onRemoveCoupon }) => {
   const shippingAmount = typeof shipping === "object" ? shipping?.amount : shipping;
   // COD advance must be based on the REAL carrier rate, not the (possibly
   // free-shipping-zeroed) charged amount — same real/charged split as the
   // server. realAmount is only present on the object form; the plain-number
   // form of `shipping` is legacy/display-only and never feeds COD math.
   const realShippingAmount = typeof shipping === "object" ? (shipping?.realAmount ?? shipping?.amount) : shipping;
-  const isCOD = paymentMethod === "COD";
-  const codPartialAmount = isCOD && realShippingAmount ? Math.min(Math.ceil(realShippingAmount) * 2, totalToPay) : 0;
-  const codRemainingAmount = isCOD ? Math.max(0, totalToPay - codPartialAmount) : 0;
 
   const isShippingFree = shippingAmount === 0 && realShippingAmount > 0;
   const hasDiscount = appliedCoupon && discount > 0;
   // (lamp + stand + ... + real shipping) − what they're actually paying = savings.
   // giftWrapAmount is added to both sides — it's a real add-on charge, not a
   // discount opportunity, so opting into it must never change this number.
-  const totalSavings = Math.max(0, subtotal + giftWrapAmount + (realShippingAmount || 0) - totalToPay);
+  const totalSavings = Math.max(0, subtotal + promotionSavings + giftWrapAmount + (realShippingAmount || 0) - totalToPay);
 
   return (
     <div className="space-y-2">
@@ -333,9 +195,16 @@ const PriceRows = ({ subtotal, shipping, discount, giftWrapAmount = 0, uncash = 
           </span>
         </span>
         <span className="font-bold text-gray-900">
-          ₹{subtotal.toLocaleString()}
+          ₹{(subtotal + promotionSavings).toLocaleString('en-IN')}
         </span>
       </div>
+
+      {promotionSavings > 0 && (
+        <div className="flex items-center justify-between gap-3 text-xs text-save">
+          <span className="font-semibold">Promotion savings</span>
+          <span className="font-extrabold tabular-nums">−₹{promotionSavings.toLocaleString('en-IN')}</span>
+        </div>
+      )}
 
       {giftWrapAmount > 0 && (
         <div className="flex justify-between items-center text-sm">
@@ -473,8 +342,6 @@ const CheckoutPage = () => {
   const cartLoadedRef = useRef(false);
   const addressManuallyResetRef = useRef(false);
 
-  // Helper: get current step label for content rendering
-  const getStepLabel = (step) => STEPS[step - 1]?.label || "";
   const contactStep = STEPS.findIndex(s => s.label === "Contact") + 1;
   const addressStep = STEPS.findIndex(s => s.label === "Address") + 1;
   const reviewStep = STEPS.findIndex(s => s.label === "Review & Pay") + 1;
@@ -595,149 +462,25 @@ const CheckoutPage = () => {
   const [calculateShipping, { isLoading: isCalculatingShipping }] = useCalculateShippingMutation();
   const { data: freeShippingOfferData } = useGetFreeShippingOfferQuery();
   const { data: giftWrapOfferData } = useGetGiftWrapOfferQuery();
-  const { data: allFreeShippingBannersData } = useGetAllFreeShippingBannersQuery();
-  // Generic, data-driven cart-promotion rules (server/src/model/cartRule.model.js)
-  // — same evaluator the payment controller uses for the real order total,
-  // ORed into the combo-banner eligibility check below so this page can
-  // never disagree with what checkout actually charges.
-  const cartRuleEvalItems = useMemo(
-    () =>
-      cartItems
-        .map((i) => ({ productId: i.mongoId || i.id?.split(":")[0], quantity: Number(i.quantity) || 0, selectedVariant: i.selectedVariant }))
-        .filter((i) => i.productId && i.quantity > 0),
-    [cartItems],
+  // Promotion V2 — checkout-placement display (applied/qualifying offers
+  // shown via PromotionBannerList below; also the source of truth for
+  // "is free shipping REALLY eligible for these exact cart items", used by
+  // the shipping-rate effect further down — see its own comment). Declared
+  // early (before that effect) so it's already initialized wherever it's
+  // referenced. Fetched only once address/pincode is in so pincode/state-
+  // gated promotions can evaluate for real.
+  const { currentData: checkoutPromotionsData } = useGetCheckoutPromotionsQuery(
+    { items: buildPromotionCartItems(cartItems), subtotal: cartItems.reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0), customerType: isGuest ? 'guest' : 'registered', deliveryAddress: pinCode ? { pincode: pinCode } : undefined, couponCode: appliedCoupon || undefined },
+    { skip: currentStep !== reviewStep || cartItems.length === 0 },
   );
-  const { data: cartRuleEvalData } = useEvaluateCartRulesQuery(cartRuleEvalItems, {
-    skip: cartRuleEvalItems.length === 0,
-  });
-
-  // A generic cart rule (e.g. "2+ Lamps => 50% off Pen Stand") may discount
-  // a specific item's price. Mirrors the server's applyBestDiscount exactly
-  // (best resulting price wins if more than one rule discounts the same
-  // product) so what's shown here never disagrees with what actually gets
-  // charged. Used both for per-line-item display AND for correcting the
-  // subtotal fed into the final "amount to pay" below — previously this page
-  // only ever showed the undiscounted price everywhere, so a rule discount
-  // was invisible on checkout even though the real order total (payment
-  // controller) already applied it correctly.
-  // Sibling variants of the SAME product can share ONE rule's discount pool
-  // instead of each getting their own (e.g. "Exciting Offers": free single
-  // stand / 50%-off double / 50%-off triple is ONE unit shared across all
-  // three, not one each — see cartRule.util.js's createRuleBudgetTracker).
-  // lineDiscounts is computed server-side over the cart in its own array
-  // order, the exact same way checkout actually consumes the budget.
-  const getLineEligible = (item) => {
-    const productId = item.mongoId || item.id?.split(":")[0];
-    const entry = (cartRuleEvalData?.data?.lineDiscounts || []).find(
-      (ld) => String(ld.productId) === String(productId) && ld.selectedVariant === item.selectedVariant,
-    );
-    return !entry || entry.eligible !== false;
-  };
-  const getItemDiscountedPrice = (item) => {
-    const productId = item.mongoId || item.id?.split(":")[0];
-    const price = Number(item.price) || 0;
-    if (!getLineEligible(item)) return price;
-    // Untagged candidates apply to every variant (unchanged); a `variantName`
-    // tag restricts to that one variant — see cartRule.util.js.
-    const candidates = (cartRuleEvalData?.data?.discounts?.[productId] || []).filter(
-      (c) => !c.variantName || c.variantName === item.selectedVariant,
-    );
-    if (!candidates?.length) return price;
-    const results = candidates.map((c) =>
-      c.type === "percent_off" ? price * (1 - Number(c.value) / 100) : price - Number(c.value),
-    );
-    // Rounded to match the server's applyBestDiscount exactly (50% off ₹299
-    // is ₹149.5 mathematically — both round that to ₹150, consistently).
-    return Math.round(Math.max(Math.min(...results), 0));
-  };
-  // How many units of this line the matching rule(s) actually justify
-  // discounting — server-computed (cartRule.util.js's ruleRepeatCount) from
-  // the rule's own condition quantity vs. real cart quantity: 2x the
-  // trigger product in cart unlocks up to 2 discounted units, not a flat 1.
-  // Read here, never re-derived — this policy lives in exactly one place.
-  const getItemDiscountCap = (item) => {
-    const productId = item.mongoId || item.id?.split(":")[0];
-    if (!getLineEligible(item)) return 0;
-    const candidates = (cartRuleEvalData?.data?.discounts?.[productId] || []).filter(
-      (c) => !c.variantName || c.variantName === item.selectedVariant,
-    );
-    return Math.max(1, ...candidates.map((c) => c.cap ?? 1));
-  };
-  // Total ₹ shaved off the cart by matched rule discounts — subtracted from
-  // whatever subtotal this page would otherwise display (guest's direct
-  // calc, or the coupon endpoint's summary.subtotal, which doesn't know
-  // about cart rules at all). The real charge (rp.payment.controller.js's
-  // capDiscountedQuantity) uses this exact same cap — this page must match
-  // it exactly, or it shows a different total than what Razorpay charges.
-  const ruleDiscountSavings = cartItems.reduce((sum, item) => {
-    const price = Number(item.price) || 0;
-    const discounted = getItemDiscountedPrice(item);
-    const discountedUnits = discounted < price ? Math.min(Number(item.quantity) || 0, getItemDiscountCap(item)) : 0;
-    return sum + (price - discounted) * discountedUnits;
-  }, 0);
-
-  // Checkout-only nudge: if the cart hasn't crossed the free-shipping
-  // threshold yet, show a banner for the first cart item that has one
-  // configured, so a customer who missed it on the PDP gets one more chance
-  // before paying. Free shipping is a product-COMBO rule (source + recommended
-  // both in cart), so we show the banner for a combo whose source product IS
-  // in the cart but whose recommended add-on ISN'T yet — that's the only case
-  // with something left to upsell. If both are already in the cart the combo
-  // is complete (nothing to nudge), and if the source isn't in the cart the
-  // offer doesn't apply to this cart at all.
-  // TODO: only supports a single banner (first match) even if multiple cart
-  // items each have one configured — fine for now (single active offer),
-  // revisit if multiple simultaneous offers are ever needed.
-  // Every banner whose source product is in the cart but the recommended
-  // add-on isn't — one persistent card on checkout too, arrows page through
-  // all of them (see bannersOverride on FreeShippingBanner) instead of a new
-  // card replacing the old one each time the cart's nudge-worthy combo
-  // changes. Combo banners are independent of the offer doc's own `isActive`
-  // — that flag is only the cart-VALUE-threshold on/off switch, not a master
-  // kill switch for banners (each banner has its own isActive; server-side
-  // getAllActiveBanners already only returns those).
-  const checkoutNudgeBanners = useMemo(() => {
-    const banners = allFreeShippingBannersData?.data || [];
-    if (banners.length === 0) return [];
-    const cartProductIds = new Set(cartItems.map((i) => i.mongoId || i.id?.split(":")[0]));
-    // Which selectedVariant name(s) of a product are actually in the cart —
-    // lets a banner scoped to one variant (sourceVariantName/recommendedVariantName,
-    // see freeShippingOffer.util.js) require that exact variant, not just the
-    // product. A banner with no variant name behaves exactly as before.
-    const cartVariantsByProduct = new Map();
-    cartItems.forEach((i) => {
-      const pid = i.mongoId || i.id?.split(":")[0];
-      if (!pid) return;
-      if (!cartVariantsByProduct.has(pid)) cartVariantsByProduct.set(pid, new Set());
-      if (i.selectedVariant) cartVariantsByProduct.get(pid).add(i.selectedVariant);
-    });
-    const hasProductVariant = (productId, variantName) => {
-      if (!cartProductIds.has(productId)) return false;
-      if (!variantName) return true;
-      return (cartVariantsByProduct.get(productId) || new Set()).has(variantName);
-    };
-    return banners.filter(
-      (b) => hasProductVariant(b.sourceProductId, b.sourceVariantName) && !hasProductVariant(b.recommendedProductId, b.recommendedVariantName),
-    );
-  }, [allFreeShippingBannersData, cartItems]);
-
-  // The moment adding the recommended item completes the last combo,
-  // `checkoutNudgeBanners` above goes empty in the SAME render as the cart
-  // update — which used to unmount FreeShippingBanner outright, killing its
-  // own bar-fill/confetti/"Unlocked" celebration sequence mid-flight. Hold
-  // the last non-empty list visible for a beat after it empties so that
-  // sequence gets to finish before we actually remove the banner from the page.
-  const [visibleNudgeBanners, setVisibleNudgeBanners] = useState([]);
-  useEffect(() => {
-    if (checkoutNudgeBanners.length > 0) {
-      setVisibleNudgeBanners(checkoutNudgeBanners);
-      return;
-    }
-    if (visibleNudgeBanners.length === 0) return;
-    const timer = setTimeout(() => setVisibleNudgeBanners([]), 1900);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally omits visibleNudgeBanners so the timer isn't re-armed by its own update
-  }, [checkoutNudgeBanners]);
+  const checkoutPromotions = checkoutPromotionsData?.data?.promotions || [];
+  // Same server-evaluated item discount preview shown in the cart. It is
+  // subtracted from the raw/coupon subtotal for display only; order creation
+  // independently applies the promotion when calculating the real charge.
+  const ruleDiscountSavings = Number(checkoutPromotionsData?.data?.pricing?.savings) || 0;
+  const checkoutPriceLine = (item) => checkoutPromotionsData?.data?.pricing?.lines?.find((line) =>
+    line.productId === String(item.productId || item.mongoId || item.id) &&
+    (line.selectedVariant || 'N/A') === (item.selectedVariant || 'N/A'));
 
   // When user logs in mid-checkout (guest → auth), AUTH_STEPS has fewer steps.
   // Clamp currentStep so STEPS[currentStep-1] is never undefined.
@@ -968,50 +711,14 @@ const CheckoutPage = () => {
         const result = paymentMethod === "COD" ? codRes : prepaidRes;
 
         if (result.success && result.data) {
-          // Free shipping: product-COMBO rule. Still call the rate API above to
-          // confirm the pincode is serviceable, but zero the charged amount
-          // only when the cart contains a full offer combo (source +
-          // recommended product). Mirrors the server's isFreeShippingEligible.
+          // Free shipping is a single admin-configured field — cart subtotal
+          // vs a ₹ threshold, nothing product-specific — so a plain
+          // comparison is the correct (and only) eligibility check.
           const offerConfig = freeShippingOfferData?.data;
-          const banners = allFreeShippingBannersData?.data || [];
-          const cartProductIds = new Set(cartItems.map((i) => i.mongoId || i.id?.split(":")[0]));
-          // Which selectedVariant name(s) of a product are actually in the cart —
-          // lets a banner scoped to one variant (sourceVariantName/recommendedVariantName,
-          // see freeShippingOffer.util.js) require that exact variant, not just
-          // the product. A banner with no variant name behaves exactly as before.
-          const cartVariantsByProduct = new Map();
-          cartItems.forEach((i) => {
-            const pid = i.mongoId || i.id?.split(":")[0];
-            if (!pid) return;
-            if (!cartVariantsByProduct.has(pid)) cartVariantsByProduct.set(pid, new Set());
-            if (i.selectedVariant) cartVariantsByProduct.get(pid).add(i.selectedVariant);
-          });
-          const hasProductVariant = (productId, variantName) => {
-            if (!cartProductIds.has(productId)) return false;
-            if (!variantName) return true;
-            return (cartVariantsByProduct.get(productId) || new Set()).has(variantName);
-          };
-          // Combo eligibility is independent of the offer doc's own isActive
-          // (that flag is only the cart-value threshold switch) — see the
-          // matching comment on checkoutNudgeBanners above.
-          const comboEligible = banners.some(
-            (b) => hasProductVariant(b.sourceProductId, b.sourceVariantName) && hasProductVariant(b.recommendedProductId, b.recommendedVariantName),
-          );
-          // Plain cart-value threshold — whole cart, any products count.
-          // Mirrors the server's direct subtotal >= thresholdAmount check,
-          // computed AFTER rule discounts (server discounts items first,
-          // then compares the resulting subtotal to the threshold).
           const cartSubtotal =
             cartItems.reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0) - ruleDiscountSavings;
-          const thresholdEligible =
+          const isFreeShippingEligible =
             !!offerConfig?.isActive && (offerConfig?.thresholdAmount || 0) > 0 && cartSubtotal >= offerConfig.thresholdAmount;
-          // Either the old combo-banner offer, any active generic cart
-          // rule's free_shipping effect, or the cart-value threshold is
-          // enough — mirrors the OR logic in rp.payment.controller.js exactly.
-          const isFreeShippingEligible = comboEligible || !!cartRuleEvalData?.data?.freeShipping || thresholdEligible;
-          // console.log(
-          //   `[FreeShipping][Client] cartIds=[${[...cartProductIds].join(",")}] isActive=${offerConfig?.isActive} comboEligible=${comboEligible} ruleEligible=${!!cartRuleEvalData?.data?.freeShipping} thresholdEligible=${thresholdEligible} → eligible=${isFreeShippingEligible}`,
-          // );
           // realAmount = actual carrier rate, always — this is what the COD
           // 2x-advance must be based on (matches the server's realShippingAmount).
           // amount = what the customer's total/display reflects — 0 when free
@@ -1051,7 +758,7 @@ const CheckoutPage = () => {
 
     fetchShippingRate();
     return () => { cancelled = true; };
-  }, [currentStep, reviewStep, pinCode, cartItems.length, cartItems.reduce((s, i) => s + Number(i.quantity || 0), 0), paymentMethod, freeShippingOfferData, allFreeShippingBannersData, cartRuleEvalData, ruleDiscountSavings]);
+  }, [currentStep, reviewStep, pinCode, cartItems, paymentMethod, freeShippingOfferData, ruleDiscountSavings]);
 
   useEffect(() => {
     if (savedAddressData?.success) {
@@ -1129,7 +836,9 @@ const CheckoutPage = () => {
             const r2 = await applyCouponMutation({ couponCode: null, email: userEmail }).unwrap();
             if (r2.success && r2.data?.summary)
               setPricingDetails(prev => ({ ...prev, subtotal: (r2.data.summary.subtotal || 0) - ruleDiscountSavings, discount: r2.data.summary.discount || 0 }));
-          } catch (_) {}
+          } catch {
+            // Keep the cart's last known quote until the next successful sync.
+          }
         }
       }
     };
@@ -1691,7 +1400,7 @@ const CheckoutPage = () => {
             sessionStorage.removeItem(CHECKOUT_STATE_KEY);
             sessionStorage.removeItem("un_begin_checkout_fired"); // allow begin_checkout again for the next order
             navigate(`/payment-processing/${response.razorpay_order_id}`);
-          } catch (_) { setPaymentError("Payment verification failed. Contact support if amount was debited."); }
+          } catch { setPaymentError("Payment verification failed. Contact support if amount was debited."); }
         },
         prefill: { name: profileName, email: profileEmail, contact: senderMobileStr },
         ...magicCheckoutOptions(orderResult),
@@ -1942,8 +1651,9 @@ const CheckoutPage = () => {
           <div className="mt-6 bg-white rounded-2xl border border-gray-100 p-5">
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-500">Subtotal</span>
-              <span className="font-semibold text-ink tabular-nums">₹{Math.round(pricingDetails.subtotal).toLocaleString("en-IN")}</span>
+              <span className="font-semibold text-ink tabular-nums">₹{Math.round(pricingDetails.subtotal + ruleDiscountSavings).toLocaleString("en-IN")}</span>
             </div>
+            {ruleDiscountSavings > 0 && <div className="mt-2.5 flex items-center justify-between text-sm text-save"><span>Promotion savings</span><span className="font-bold tabular-nums">−₹{ruleDiscountSavings.toLocaleString('en-IN')}</span></div>}
             {giftWrapAmount > 0 && (
               <div className="flex items-center justify-between text-sm mt-2.5">
                 <span className="text-gray-500">Gift wrap</span>
@@ -2134,10 +1844,22 @@ const CheckoutPage = () => {
         </div>
       )}
       {/* Free-shipping threshold — admin-controlled (free_shipping Promotion);
-          renders nothing while that promotion is off. */}
-      {currentStep === reviewStep && (
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4">
+          renders nothing while that promotion is off. Only shown here while
+          NOT YET unlocked (the "add ₹X more" progress nudge) — once it IS
+          unlocked, the order summary's own SavingsBanner below is the single
+          place that confirms it, so the two don't show the same "FREE
+          SHIPPING UNLOCKED" seal card twice on one page. */}
+      {currentStep === reviewStep && cartTotalAmount < (Number(freeShippingOfferData?.data?.thresholdAmount) || Infinity) && (
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4 space-y-3">
           <FreeShippingStrip cartTotal={cartTotalAmount} />
+          <PromotionBannerList promotions={checkoutPromotions} pricing={checkoutPromotionsData?.data?.pricing} />
+        </div>
+      )}
+      {/* Once unlocked, PromotionBannerList (other active offers) still needs
+          to render somewhere — same spot, standalone. */}
+      {currentStep === reviewStep && cartTotalAmount >= (Number(freeShippingOfferData?.data?.thresholdAmount) || Infinity) && checkoutPromotions.length > 0 && (
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4">
+          <PromotionBannerList promotions={checkoutPromotions} pricing={checkoutPromotionsData?.data?.pricing} />
         </div>
       )}
       {/* ── Main ───────────────────────────────────────────────────────── */}
@@ -2715,45 +2437,16 @@ const CheckoutPage = () => {
                             </p>
                           </div>
                           {(() => {
-                            const discountedUnitPrice =
-                              getItemDiscountedPrice(item);
                             const rawPrice = Number(item.price) || 0;
-                            const hasDiscount = discountedUnitPrice < rawPrice;
                             const qty = Number(item.quantity) || 0;
-                            // Only 1 unit ever gets the discount/free
-                            // benefit — matches the server's
-                            // capDiscountedQuantity cap in
-                            // rp.payment.controller.js exactly.
-                            const discountedUnits = hasDiscount ? Math.min(qty, getItemDiscountCap(item)) : 0;
-                            const fullPriceUnits = qty - discountedUnits;
-                            const lineTotal = discountedUnitPrice * discountedUnits + rawPrice * fullPriceUnits;
                             const rawLineTotal = rawPrice * qty;
-                            const percentOff = hasDiscount
-                              ? Math.round(
-                                  ((rawLineTotal - lineTotal) / rawLineTotal) *
-                                    100,
-                                )
-                              : 0;
-                            return hasDiscount ? (
-                              <div className="text-right shrink-0">
-                                <p className="text-sm font-bold text-save">
-                                  ₹
-                                  {Math.round(lineTotal).toLocaleString()}
-                                </p>
-                                <div className="flex items-center justify-end gap-1">
-                                  <span className="text-[10px] text-gray-400 line-through">
-                                    ₹
-                                    {rawLineTotal.toLocaleString()}
-                                  </span>
-                                  <span className="text-[9px] font-bold uppercase rounded-full bg-save text-white px-1.5 py-px">
-                                    {percentOff}% OFF
-                                  </span>
-                                </div>
+                            const priceLine = checkoutPriceLine(item);
+                            return (
+                              <div className="shrink-0 text-right">
+                                {priceLine?.savings > 0 && <p className="text-[11px] text-gray-400 line-through">₹{priceLine.originalLineTotal.toLocaleString('en-IN')}</p>}
+                                <p className="text-sm font-bold text-gray-800">₹{(priceLine?.lineTotal ?? rawLineTotal).toLocaleString('en-IN')}</p>
+                                {priceLine?.savings > 0 && <p className="text-[10px] font-bold text-save">Save ₹{priceLine.savings.toLocaleString('en-IN')}</p>}
                               </div>
-                            ) : (
-                              <p className="text-sm font-bold text-gray-800 shrink-0">
-                                ₹{rawLineTotal.toLocaleString()}
-                              </p>
                             );
                           })()}
                         </div>
@@ -2763,6 +2456,7 @@ const CheckoutPage = () => {
                   <div className="px-5 py-4 border-t border-gray-50">
                     <PriceRows
                       subtotal={pricingDetails.subtotal}
+                      promotionSavings={ruleDiscountSavings}
                       shipping={pricingDetails.shipping}
                       discount={pricingDetails.discount}
                       giftWrapAmount={giftWrapAmount}
@@ -2779,17 +2473,6 @@ const CheckoutPage = () => {
                     />
                   </div>
                 </div>
-                {visibleNudgeBanners.length > 0 && (
-                  <div className="px-5 pb-5">
-                    <FreeShippingBanner
-                      bannersOverride={visibleNudgeBanners}
-                      surface="checkout"
-                      variant="light"
-                      showQuantityStepper
-                      showProgressBar={false}
-                    />
-                  </div>
-                )}
               </div>
 
               {/* Coupon moved into the price breakdown ("Apply Coupon" row above
@@ -2978,33 +2661,16 @@ const CheckoutPage = () => {
                     )}
                   </div>
                   {(() => {
-                    const discountedUnitPrice = getItemDiscountedPrice(item);
                     const rawPrice = Number(item.price) || 0;
-                    const hasDiscount = discountedUnitPrice < rawPrice;
                     const qty = Number(item.quantity) || 0;
-                    // Only 1 unit ever gets the discount/free benefit —
-                    // matches rp.payment.controller.js's capDiscountedQuantity.
-                    const discountedUnits = hasDiscount ? Math.min(qty, getItemDiscountCap(item)) : 0;
-                    const fullPriceUnits = qty - discountedUnits;
-                    const lineTotal = discountedUnitPrice * discountedUnits + rawPrice * fullPriceUnits;
                     const rawLineTotal = rawPrice * qty;
-                    const percentOff = hasDiscount
-                      ? Math.round(((rawLineTotal - lineTotal) / rawLineTotal) * 100)
-                      : 0;
-                    return hasDiscount ? (
-                      <div className="text-right shrink-0">
-                        <p className="text-xs font-bold text-save">₹{Math.round(lineTotal).toLocaleString()}</p>
-                        <div className="flex items-center justify-end gap-1">
-                          <span className="text-[9px] text-gray-400 line-through">₹{rawLineTotal.toLocaleString()}</span>
-                          <span className="text-[9px] font-bold uppercase rounded-full bg-save text-white px-1.5 py-px">
-                            {percentOff}% OFF
-                          </span>
-                        </div>
+                    const priceLine = checkoutPriceLine(item);
+                    return (
+                      <div className="shrink-0 text-right">
+                        {priceLine?.savings > 0 && <p className="text-[10px] text-gray-400 line-through">₹{priceLine.originalLineTotal.toLocaleString('en-IN')}</p>}
+                        <p className="text-xs font-bold text-gray-800">₹{(priceLine?.lineTotal ?? rawLineTotal).toLocaleString('en-IN')}</p>
+                        {priceLine?.savings > 0 && <p className="text-[10px] font-bold text-save">Save ₹{priceLine.savings.toLocaleString('en-IN')}</p>}
                       </div>
-                    ) : (
-                      <p className="text-xs font-bold text-gray-800 shrink-0">
-                        ₹{rawLineTotal.toLocaleString()}
-                      </p>
                     );
                   })()}
                 </div>
@@ -3016,6 +2682,7 @@ const CheckoutPage = () => {
             <div className="px-5 py-5 border-t border-gray-100">
               <PriceRows
                 subtotal={pricingDetails.subtotal}
+                promotionSavings={ruleDiscountSavings}
                 shipping={pricingDetails.shipping}
                 discount={pricingDetails.discount}
                 giftWrapAmount={giftWrapAmount}
@@ -3031,18 +2698,6 @@ const CheckoutPage = () => {
                 }
               />
             </div>
-
-            {visibleNudgeBanners.length > 0 && (
-              <div className="px-5 pb-5">
-                <FreeShippingBanner
-                  bannersOverride={visibleNudgeBanners}
-                  surface="checkout"
-                  variant="light"
-                  showQuantityStepper
-                  showProgressBar={false}
-                />
-              </div>
-            )}
 
             {/* Pay buttons (review step only) */}
             {currentStep === reviewStep && (
@@ -3127,7 +2782,7 @@ const CheckoutPage = () => {
           {mobileSummaryOpen && (
             <div className="bg-white border-t border-gray-100 px-4 pt-3 pb-2 max-h-[45vh] overflow-y-auto shadow-[0_-12px_40px_rgba(0,0,0,0.12)] animate-in fade-in duration-200">
               <div className="max-w-sm mx-auto">
-                <PriceRows subtotal={pricingDetails.subtotal} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} isLoadingShipping={isCalculatingShipping} paymentMethod={paymentMethod} uncash={uncash} />
+                <PriceRows subtotal={pricingDetails.subtotal} promotionSavings={ruleDiscountSavings} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} isLoadingShipping={isCalculatingShipping} paymentMethod={paymentMethod} uncash={uncash} />
               </div>
             </div>
           )}
@@ -3437,6 +3092,7 @@ const CheckoutPage = () => {
                   discount={pricingDetails.discount}
                   isGuest={isGuest}
                   cartTotal={cartTotalAmount}
+                  items={cartItems.map((i) => ({ productId: i.mongoId || i.id.split(":")[0] }))}
                   onCouponApplied={
                     isGuest ? handleGuestCouponApplied : handleCouponApplied
                   }
@@ -3457,6 +3113,7 @@ const CheckoutPage = () => {
                     userId={userProfile?.userId}
                     isGuest={isGuest}
                     cartTotal={cartTotalAmount}
+                    items={cartItems.map((i) => ({ productId: i.mongoId || i.id.split(":")[0] }))}
                   />
                 </Suspense>
               </div>
