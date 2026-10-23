@@ -9,11 +9,13 @@ import { cleanBlogHtml, youtubeId } from "../utils/blogHtml.js";
 import { SERIES, seriesOf } from "../utils/series.util.js";
 
 // The franchise a post is about (Demon Slayer, One Piece, … or a video game),
-// from its title, else its tags — the same table as the /category/<series>
-// collection pages, so a post links to its series page and shows under it.
-// Posts about no single franchise (gift guides, lamps, desk decor) get null.
+// from its title, else its tags when they name exactly one franchise — the same
+// table as the /category/<series> collection pages, so a post links to its
+// series page and shows under it. Posts about several franchises or none (gift
+// guides tagged "demon slayer" and "one piece", lamps, desk decor) get null.
 const postSeries = (post) => {
-  const s = seriesOf(post.title) || seriesOf((post.tags || []).join(" "));
+  const fromTags = [...new Set((post.tags || []).map((t) => seriesOf(t)).filter(Boolean))];
+  const s = seriesOf(post.title) || (fromTags.length === 1 ? fromTags[0] : null);
   return s ? { slug: s.slug, name: s.name, kind: s.kind } : null;
 };
 
