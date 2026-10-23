@@ -247,10 +247,12 @@ const googleSafeTitle = (productName, vName) => {
   return branded && !/\bcar\b/i.test(title) ? `Car Enthusiast ${title}`.slice(0, 150) : title;
 };
 
-// Google Ads policy, part 2: swords count as weapons, even decorative ones, so katana rows
-// are disapproved and the account can be flagged. Leave them out of the Google feed
-// (they stay in the Meta feed and on the site).
-const WEAPON_RE = /\b(katanas?|swords?|daggers?|knife|knives|machete)\b/i;
+// Google Ads policy, part 2: throwing weapons and blades (kunai, shuriken, knives) fall
+// under Google's weapons policy and risk account flags. Leave them out of the Google feed
+// (they stay in the Meta feed and on the site). Wooden / LED katanas and their display
+// stands are decorative and were already approved in Merchant Center, so they stay in;
+// watch Google Ads → Policy Manager and pull them from campaigns if ads get disapproved.
+const WEAPON_RE = /\b(kunais?|shurikens?|daggers?|knife|knives|machete)\b/i;
 const isWeapon = (p) =>
   [p.productName, p.productCategory, p.productSubCategory, ...(p.variantDetails || []).map((v) => v.variantName)]
     .some((s) => s && WEAPON_RE.test(String(s)));

@@ -29,8 +29,16 @@ describe("GET /api/v1/catalog/google-feed.tsv", () => {
     expect(head.slice(-3)).toEqual(["color", "material", "size"]);
     expect(row("PENLAV")).toMatchObject({ color: "Lavender", material: "PLA/PLA+", size: "12 × 7.5 × 11 cm" });
     expect(row("PENRBW")).toMatchObject({ color: "Multicolor", size: "" });
-    // Swords are restricted by Google Ads, so katanas never reach the Google feed.
-    expect(lines.find((l) => l[0] === "KATTAN")).toBeUndefined();
+    expect(row("KATTAN")).toMatchObject({ color: "", material: "Wood-Core Construction", size: "104 cm" });
+  });
+
+  it("leaves throwing weapons (kunai) out of the Google feed", async () => {
+    await Product.collection.insertMany([
+      { productId: "kun", uiProductId: "UN-KUN", productName: "Naruto Kunai Collection", isPublished: true, productStatus: "in_stock",
+        variantDetails: [{ sku: "KUNNAR", variantName: "Naruto Kunai", variantPrice: 499, variantImage: ["https://x/k.webp"], variantQuantity: 2 }] },
+    ]);
+    const res = await request(app).get("/api/v1/catalog/google-feed.tsv").expect(200);
+    expect(res.text).not.toMatch(/KUNNAR/);
   });
 
   it("removes car brand names (trademarks) from titles and descriptions", async () => {
