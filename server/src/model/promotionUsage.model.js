@@ -20,6 +20,12 @@ const promotionUsageSchema = new mongoose.Schema(
     rewardsSnapshot:         { type: mongoose.Schema.Types.Mixed, default: {} },
     discountAmount:          { type: Number, default: 0 },
     cartValueBeforeDiscount: { type: Number },
+    // Which products this promotion actually discounted/gifted on THIS
+    // order — additive field (2026-10-10) so admin's usage view can answer
+    // "on what products was this applied", not just "how much". Empty for
+    // an order-level-only reward (percent_off_order/flat_off_order), since
+    // those apply to the whole order rather than named products.
+    discountedProducts:      { type: [{ productId: String, productName: String, quantity: Number, _id: false }], default: [] },
     usedAt:                  { type: Date, default: Date.now },
     reversed:                { type: Boolean, default: false },
     reversedAt:              { type: Date, default: null },

@@ -11,6 +11,11 @@ const couponSchema = new mongoose.Schema(
     discountValue:  { type: Number },
     maxDiscountCap: { type: Number },
     minCartValue:   { type: Number, default: 0 },
+    // Mirrors admin's coupon.model.js — empty = no product restriction
+    // (today's behavior, unchanged). Reading this field is a later phase;
+    // schema parity only for now so a document admin writes with it set
+    // isn't silently dropped by this read-only mirror's schema.
+    eligibleProductIds: { type: [String], default: [] },
     scope:          { type: String, enum: ["PUBLIC", "TARGETED"], default: "PUBLIC" },
     audience:       { type: String, enum: ["EVERYONE", "MEMBERS_ONLY"], default: "EVERYONE" },
     maxTotalUses:   { type: Number },

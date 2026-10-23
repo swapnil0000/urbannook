@@ -24,13 +24,13 @@ import {
   adminAnalyticsRouter,
   freeShippingOfferRouter,
   passkeyRouter,
-  cartRuleRouter,
   offerLeadRouter,
   offerRouter,
   guestCartRouter,
   webhookRouter,
   promotionRouter,
   paymentFeedbackRouter,
+  siteCampaignRouter,
 } from "./routes/index.js";
 import cookieParser from "cookie-parser";
 import healthRouter from "./routes/health.route.js";
@@ -239,13 +239,13 @@ app.use(
   adminAnalyticsRouter,
   freeShippingOfferRouter,
   passkeyRouter,
-  cartRuleRouter,
   offerLeadRouter,
   offerRouter,
   guestCartRouter,
   webhookRouter,
   promotionRouter,
   paymentFeedbackRouter,
+  siteCampaignRouter,
 );
 
 // TEMP deploy-verification log — remove once cart-rules deploy is confirmed
@@ -256,3 +256,5 @@ app.use(
 app.use(errorHandler);
 
 export default app;
+
+// trigger build
