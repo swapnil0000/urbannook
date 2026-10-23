@@ -6,6 +6,16 @@ import { asyncHandler } from "../middleware/errorHandler.middleware.js";
 import { NotFoundError } from "../utils/errors.js";
 import { apiCache } from "../module/cache.manager.module.js";
 import { cleanBlogHtml, youtubeId } from "../utils/blogHtml.js";
+import { SERIES, seriesOf } from "../utils/series.util.js";
+
+// The franchise a post is about (Demon Slayer, One Piece, … or a video game),
+// from its title, else its tags — the same table as the /category/<series>
+// collection pages, so a post links to its series page and shows under it.
+// Posts about no single franchise (gift guides, lamps, desk decor) get null.
+const postSeries = (post) => {
+  const s = seriesOf(post.title) || seriesOf((post.tags || []).join(" "));
+  return s ? { slug: s.slug, name: s.name, kind: s.kind } : null;
+};
 
 // Published blog posts (Admin → Blog). Behind the same 10-min API cache as the
 // product endpoints (System Guide §7). Bodies are sanitised again here.
@@ -15,7 +25,9 @@ const PRODUCT_FIELDS = "-_id productId productName productCategory variantDetail
 // Posts with no SKUs are about the whole product (e.g. a buying guide).
 const NO_SKUS = { $or: [{ skus: { $exists: false } }, { skus: { $size: 0 } }] };
 
-// GET /blog?product=<productId>&sku=<SKU>&limit= — newest first.
+// GET /blog?product=<productId>&sku=<SKU>&series=<slug>&limit= — newest first,
+// each post with its `series` (see postSeries). With series: only that
+// franchise's posts (the "stories" row on /category/<series>).
 // With sku: posts linked to that variant; if there are none, the product's
 // general posts. With product only: the product's general posts, so a
 // character's story never shows on another character's page.
@@ -23,14 +35,23 @@ const listBlogPosts = asyncHandler(async (req, res) => {
   const product = /^[a-zA-Z0-9_-]{1,64}$/.test(String(req.query.product || "")) ? String(req.query.product) : null;
   const sku = /^[a-zA-Z0-9_-]{1,40}$/.test(String(req.query.sku || "")) ? String(req.query.sku).toUpperCase() : null;
   const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 100);
+  // A series filter for a page that is no franchise (/category/decor) → no posts.
+  const series = req.query.series === undefined ? null : String(req.query.series).slice(0, 40);
   const find = (filter) => BlogPost.find({ status: "published", ...filter })
     .select(LIST_FIELDS).sort({ publishedAt: -1 }).limit(limit).lean();
-  const data = await apiCache.handle({ route: "blog:list", product, sku, limit }, async () => {
+  const data = await apiCache.handle({ route: "blog:list", product, sku, series, limit }, async () => {
+    const withSeries = (posts) => posts.map((p) => ({ ...p, series: postSeries(p) }));
+    if (series !== null) {
+      if (!SERIES.some((s) => s.slug === series)) return [];
+      // Few posts in all: read them all, keep this franchise's, newest first.
+      const all = withSeries(await BlogPost.find({ status: "published" }).select(LIST_FIELDS).sort({ publishedAt: -1 }).lean());
+      return all.filter((p) => p.series?.slug === series).slice(0, limit);
+    }
     if (sku) {
       const forSku = await find({ skus: sku });
-      if (forSku.length || !product) return forSku;
+      if (forSku.length || !product) return withSeries(forSku);
     }
-    return find(product ? { productIds: product, ...NO_SKUS } : {});
+    return withSeries(await find(product ? { productIds: product, ...NO_SKUS } : {}));
   });
   return res.status(200).json(new ApiRes(200, "Blog posts", data, true));
 });
@@ -56,6 +77,7 @@ const blogPostDetails = asyncHandler(async (req, res) => {
     return {
       ...post,
       videoId: youtubeId(post.videoUrl) || null,
+      series: postSeries(post),
       reviews: reviews.map((r) => ({
         productId: r.productId,
         name: String(r.userName || "").trim().split(/\s+/)[0] || "Customer",
