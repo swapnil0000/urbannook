@@ -210,6 +210,9 @@ L × B × H). Empty when unknown. Merchant Center reads the feed daily.
   `description`, because they are trademarks and get Shopping ads disapproved. Titles get a
   "Car Enthusiast" prefix (e.g. "Car Enthusiast Brake Caliper Lamp"); in descriptions a list of
   names becomes "iconic cars". `id`/SKU and `link` are unchanged, so Merchant Center history is kept.
-- **Leaves out swords** (katana, sword, dagger, knife — `WEAPON_RE`), which Google restricts as weapons
-  even when decorative. Promote them through Meta, Instagram and SEO instead.
+- **Leaves out throwing weapons and blades** (kunai, shuriken, dagger, knife — `WEAPON_RE`), which fall
+  under Google's weapons policy. Promote them through Meta, Instagram and SEO instead.
+  *2026-10-24:* wooden / LED katanas and katana display stands are back in the Google feed (they were
+  already approved in Merchant Center). Watch Google Ads → Policy Manager; if katana ads get disapproved,
+  exclude them in the campaign rather than the feed.
 - The website and the Meta feed (`meta-feed.csv`) are unchanged.
