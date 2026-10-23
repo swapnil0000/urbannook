@@ -23,7 +23,7 @@ const loadCatalog = () =>
 // GET /categories — every category that has published products (no product data).
 const listCategories = asyncHandler(async (req, res) => {
   const { categories } = await loadCatalog();
-  const data = categories.map(({ productIds, ...c }) => c);
+  const data = categories.map(({ productIds, variantSkus, ...c }) => c);
   return res.status(200).json(new ApiRes(200, "Category List", data, true));
 });
 
@@ -35,8 +35,14 @@ const categoryDetails = asyncHandler(async (req, res) => {
   if (!category) throw new NotFoundError("Category doesn't exist");
 
   const ids = new Set(category.productIds);
-  const { productIds, ...meta } = category;
-  const data = { ...meta, products: products.filter((p) => ids.has(p.productId)) };
+  const { productIds, variantSkus, ...meta } = category;
+  let list = products.filter((p) => ids.has(p.productId));
+  // Collection pages (series, "Anime Katana"): only the variants that belong.
+  if (variantSkus) {
+    const skus = new Set(variantSkus);
+    list = list.map((p) => ({ ...p, variantDetails: (p.variantDetails || []).filter((v) => skus.has(v.sku)) }));
+  }
+  const data = { ...meta, products: list };
   return res.status(200).json(new ApiRes(200, "Category Details", data, true));
 });
 
