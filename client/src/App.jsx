@@ -14,6 +14,8 @@ import { fetchCsrfToken } from './store/api/apiSlice';
 import AppRoutes from './store/AppRoutes';
 import SeoPageContent from './component/SeoPageContent';
 import NewsTicker from './pages/home/NewsTicker';
+import FestiveEffects from './component/festive/FestiveEffects';
+import { SiteCampaignProvider } from './hooks/useSiteCampaign';
 import WhatsAppLoginWatcher from './component/layout/auth/WhatsAppLoginWatcher';
 import WhatsAppOneTap from './component/layout/auth/WhatsAppOneTap';
 import { trackPageView, setUserId, captureAttribution, setMetaAdvancedMatching } from './utils/analytics';
@@ -166,6 +168,7 @@ function App({ store = browserStore, helmetContext }) {
   return (
     <HelmetProvider context={helmetContext}>
     <Provider store={store}>
+      <SiteCampaignProvider>
         <>
           <SmoothScroll>
           <RouteTracker />
@@ -178,6 +181,7 @@ function App({ store = browserStore, helmetContext }) {
               <ErrorBoundary>
                 <NewsTicker/>
                 <NewHeader/>
+                <FestiveEffects/>
               </ErrorBoundary>
               {/* AppRoutes loaded immediately - no lazy loading for critical routing */}
               <ErrorBoundary>
@@ -229,6 +233,7 @@ function App({ store = browserStore, helmetContext }) {
           </SessionManager>
           </SmoothScroll>
         </>
+      </SiteCampaignProvider>
     </Provider>
     </HelmetProvider>
   );

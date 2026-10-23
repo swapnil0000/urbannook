@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import SEOHead from '../../component/SEOHead';
 import { productImg, firstVariant, inr } from '../../component/UnProductCard';
 import HomeProductCard from '../../component/HomeProductCard';
+import FestiveSections from '../../component/festive/FestiveSections';
+import RangoliDivider from '../../component/festive/RangoliDivider';
 import { Reveal, Stagger, StaggerItem, Parallax, TextReveal, useInView, motion, AnimatePresence } from '../../component/motion';
 import { useGetFeaturedProductsQuery, useGetProductsQuery } from '../../store/api/productsApi';
 import { useGetTestimonialsQuery } from '../../store/api/testimonialsApi';
@@ -757,6 +759,7 @@ const HomePage = () => {
       {/* ══ SOCIAL PROOF + PAYMENT — editorial stat tiles ══ */}
     
       {/* ══ PRODUCTS — adaptive to catalog size ══ */}
+      <RangoliDivider />
       {isFewProducts ? (
         /* Small, curated catalog: ONE collection, no repeated grids. */
         <section className="bg-surface border-y border-hair mt-4">
@@ -781,6 +784,8 @@ const HomePage = () => {
           </div>
         </section>
       ) : null}
+
+      {!isFewProducts && bestsellers.length >= MIN_TAGGED && <FestiveSections />}
 
 
         <Reveal className="max-w-[1280px] mx-auto px-5 py-5 md:py-7" y={18}>

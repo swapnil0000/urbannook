@@ -4,6 +4,8 @@ import { addItem } from "../../store/slices/cartSlice";
 import { useAddToCartMutation } from "../../store/api/userApi";
 import { useCartPromotions } from "../../hooks/useCartPromotions";
 import { track, trackAddToCart, trackViewPromotion, trackSelectPromotion } from "../../utils/analytics";
+import { useSiteCampaign } from "../../hooks/useSiteCampaign";
+import { Garland, Diya } from "../festive/FestiveLights";
 
 /**
  * Smart combo/upsell bottom sheet: after a successful cart add,
@@ -91,6 +93,10 @@ const RecommendationCard = ({ product, onAdd, isAdding, isBusy, isSingle }) => (
 );
 
 const PromotionUnlockSheet = () => {
+  // Festive framing only while a campaign is live and the admin left section
+  // accents on; otherwise this sheet renders exactly as before.
+  const { can } = useSiteCampaign();
+  const festive = can('sectionAccents');
   const dispatch = useDispatch();
   const { isAuthenticated } = useSelector((s) => s.auth);
   const showCartModal = useSelector((s) => s.ui.showCartModal);
@@ -349,12 +355,18 @@ const PromotionUnlockSheet = () => {
         aria-modal="true"
         aria-labelledby="promotion-sheet-title"
         aria-describedby="promotion-sheet-description"
-        className={`relative flex max-h-[88dvh] min-w-0 w-[100dvw] flex-col overflow-hidden border border-hair bg-paper shadow-2xl sm:w-full sm:max-w-[540px] transition-transform duration-300 ease-out motion-reduce:transition-none ${
-          visible ? "translate-y-0" : "translate-y-full"
-        }`}
+        className={`relative flex max-h-[88dvh] min-w-0 w-[100dvw] flex-col overflow-hidden border shadow-2xl sm:w-full sm:max-w-[540px] transition-transform duration-300 ease-out motion-reduce:transition-none ${
+          festive ? "border-star/60 bg-ink" : "border-hair bg-paper"
+        } ${visible ? "translate-y-0" : "translate-y-full"}`}
       >
+        {festive && (
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-[22px] overflow-hidden" aria-hidden="true">
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-star/70 to-transparent" />
+            <Garland arcs={4} />
+          </div>
+        )}
         <div
-          className="mx-auto mt-3 h-1 w-11 shrink-0 bg-ink/15 sm:mt-2.5"
+          className={`mx-auto h-1 w-11 shrink-0 ${festive ? "mt-7 bg-paper/30 sm:mt-7" : "mt-3 bg-ink/15 sm:mt-2.5"}`}
           onTouchStart={(event) => { touchStartRef.current = event.touches[0]?.clientY ?? null; }}
           onTouchEnd={(event) => {
             if (touchStartRef.current != null && event.changedTouches[0]?.clientY - touchStartRef.current > 80) close(true);
@@ -366,13 +378,13 @@ const PromotionUnlockSheet = () => {
           type="button"
           onClick={() => close(true)}
           aria-label="Dismiss offer"
-          className="absolute right-4 top-4 grid h-9 w-9 place-items-center border border-hair text-ink transition-colors hover:bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+          className={`absolute right-4 z-20 grid h-9 w-9 place-items-center border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${festive ? "top-7 border-paper/35 text-paper hover:bg-white/10" : "top-4 border-hair text-ink hover:bg-surface"}`}
         >
           <i className="fa-solid fa-xmark text-sm" aria-hidden="true" />
         </button>
 
         {justUnlocked ? (
-          <div className="px-5 py-8 text-center sm:px-7" role="status" aria-live="polite">
+          <div className="bg-paper px-5 py-8 text-center sm:px-7" role="status" aria-live="polite">
             <span className="mx-auto mb-3 grid h-12 w-12 place-items-center border-2 border-save bg-save/10 text-save">
               <i className="fa-solid fa-check text-lg" aria-hidden="true" />
             </span>
@@ -382,22 +394,44 @@ const PromotionUnlockSheet = () => {
             </p>
           </div>
         ) : (
-          <div className="min-h-0 overflow-y-auto px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-4 sm:px-7">
+          <div className="min-h-0 overflow-y-auto bg-paper px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-4 sm:px-7">
+            <div
+              className={festive ? "relative -mx-5 -mt-4 mb-4 px-5 pb-9 pt-2 sm:-mx-7 sm:px-7" : ""}
+              style={festive ? { background: "radial-gradient(70% 120% at 50% -10%, rgb(var(--gl-brand) / 0.28), transparent 70%), rgb(var(--gl-ink))" } : undefined}
+            >
             <div className="mb-3 flex items-center gap-2 pr-10">
-              <span className="inline-flex shrink-0 items-center gap-1.5 border border-ink bg-ink px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-white">
+              <span className={`inline-flex shrink-0 items-center gap-1.5 border px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-white ${festive ? "border-paper/30 bg-white/10" : "border-ink bg-ink"}`}>
                 <span className="relative flex h-2 w-2 shrink-0">
                   <span className="absolute inline-flex h-full w-full animate-ping bg-brand opacity-75 motion-reduce:hidden" />
                   <span className="relative inline-flex h-2 w-2 bg-brand" />
                 </span>
                 {promo?.rewardTargetPending ? "One step away" : "Almost there"}
               </span>
+              {festive && (
+                <span className="inline-flex shrink-0 items-center gap-1.5 border border-star/60 bg-star/15 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.1em] text-star">
+                  <span aria-hidden="true">✦</span> Festive offer
+                </span>
+              )}
               {/* {promo?.badge && <span className="truncate text-[11px] font-bold text-muted">{promo.badge}</span>} */}
             </div>
 
-            <h3 id="promotion-sheet-title" className="truncate pr-10 text-xl font-black leading-tight tracking-tight text-ink sm:text-2xl" title={promo?.title}>{promo?.title}</h3>
-            <p id="promotion-sheet-description" className="mt-2 text-[13px] leading-relaxed text-muted">
+            <h3 id="promotion-sheet-title" className={`truncate pr-10 text-xl font-black leading-tight tracking-tight sm:text-2xl ${festive ? "text-paper" : "text-ink"}`} title={promo?.title}>{promo?.title}</h3>
+            <p id="promotion-sheet-description" className={`mt-2 text-[13px] leading-relaxed ${festive ? "text-paper/75" : "text-muted"}`}>
               {promo?.rewardTargetPending ? "Your cart qualifies. Add an eligible reward item to apply the offer." : promo?.progressText}
             </p>
+            {festive && (
+              <>
+                <Diya className="pointer-events-none absolute bottom-2 left-4" />
+                <Diya className="pointer-events-none absolute bottom-2 right-4" />
+                <span className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] bg-gradient-to-r from-transparent via-star to-transparent" aria-hidden="true" />
+              </>
+            )}
+            </div>
+            {festive && (
+              <div className="pointer-events-none relative -mt-4 mb-2 h-[22px] overflow-hidden" aria-hidden="true">
+                <Garland arcs={4} tone="onLight" />
+              </div>
+            )}
 
             {/* {promo?.savingsText && (
               <div className="mt-4 flex items-center gap-3 border border-brand/25 bg-brand/5 p-3">
@@ -442,8 +476,14 @@ const PromotionUnlockSheet = () => {
               ))}
             </div>
             {addError && <p className="mt-3 border border-brand/20 bg-brand/5 px-3 py-2 text-xs font-semibold text-brand" role="alert">{addError}</p>}
-            <p className="mt-4 text-center text-[11px] leading-relaxed text-muted">Offer applies after eligible items are in your cart. Final total is confirmed at checkout.</p>
+            <p className={`mt-4 text-center text-[11px] leading-relaxed text-muted ${festive ? "px-8" : ""}`}>Offer applies after eligible items are in your cart. Final total is confirmed at checkout.</p>
           </div>
+        )}
+        {festive && !justUnlocked && (
+          <>
+            <Diya tone="onLight" className="pointer-events-none absolute bottom-3 left-3 z-20" />
+            <Diya tone="onLight" className="pointer-events-none absolute bottom-3 right-3 z-20" />
+          </>
         )}
       </div>
     </div>

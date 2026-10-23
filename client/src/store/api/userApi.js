@@ -373,6 +373,16 @@ export const userApi = apiSlice.injectEndpoints({
       }),
       keepUnusedDataFor: 0,
     }),
+    // Homepage combo cards — promotions with placements including "home"
+    // whose conditionTree names exactly 2 products (a "buy A+B together"
+    // shape). Server resolves the 2 products, runs the SAME evaluatePromotions
+    // engine checkout uses against a hypothetical 1-each cart, and returns
+    // the real computed mrp/price/save — nothing here is a parallel pricing
+    // system. keepUnusedDataFor: 0 so an admin edit is reflected immediately.
+    getHomeComboOffers: builder.query({
+      query: () => "promotions/display/home",
+      keepUnusedDataFor: 0,
+    }),
   }),
 });
 
@@ -413,4 +423,5 @@ export const {
   useGetProductPromotionsQuery,
   useGetCartPromotionsQuery,
   useGetCheckoutPromotionsQuery,
+  useGetHomeComboOffersQuery,
 } = userApi;

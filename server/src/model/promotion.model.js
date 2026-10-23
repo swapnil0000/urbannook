@@ -188,9 +188,34 @@ const promotionSchema = new mongoose.Schema(
     placements: {
       type: [{
         type: String,
-        enum: ["pdp", "plp", "cart", "mini_cart", "checkout", "order_confirmation", "order_details", "customer_account"],
+        enum: ["pdp", "plp", "cart", "mini_cart", "checkout", "order_confirmation", "order_details", "customer_account", "home"],
       }],
       default: ["pdp", "plp", "cart", "mini_cart", "checkout", "order_confirmation", "order_details", "customer_account"],
+    },
+
+    // Cosmetic-only, read by the "home" placement's display endpoint
+    // (getHomeDisplayController) — never touches condition/reward evaluation
+    // or checkout math. Lets an admin dress up a 2-product "buy A+B
+    // together" promotion (AND conditionTree + a discounted_product/
+    // percent_off_product/flat_off_product reward on one of the two) as a
+    // homepage combo card: a custom title already exists (`name` above);
+    // these fill in the rest. Every field optional/blank-default — a
+    // promotion that never sets this is completely unaffected.
+    homeCard: {
+      bannerImage: { type: String, trim: true, default: "" },
+      subtitle: { type: String, trim: true, default: "" },
+      badgeText: { type: String, trim: true, default: "" },
+      ctaLabel: { type: String, trim: true, default: "" },
+      // Offer-card presentation (all optional). Prices/MRP/savings are NEVER
+      // typed here — they're computed from the real promotion; these only
+      // choose how the already-computed savings are worded.
+      badgeLabel: { type: String, trim: true, default: "" },     // festive tag on the image, e.g. "Diwali Special"
+      priceLabel: { type: String, trim: true, default: "" },     // blank = "Combo Price" / themed label
+      savingsMode: { type: String, enum: ["amount", "percent", "label"], default: "amount" },
+      savingsLabel: { type: String, trim: true, default: "" },   // used for mode "label" (e.g. "Combo Deal")
+      ctaAction: { type: String, enum: ["cart", "link"], default: "cart" },
+      ctaUrl: { type: String, trim: true, default: "" },         // used when ctaAction is "link"
+      order: { type: Number, default: 0 },                       // lower shows first
     },
 
     // Buy-X-Get-Y repeat cap — null = unlimited (buy 6, get 3 free for a

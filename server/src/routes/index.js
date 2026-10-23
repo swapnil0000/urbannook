@@ -25,6 +25,7 @@ import guestCartRouter from "./guestCart.route.js";
 import webhookRouter from "./webhook.route.js";
 import promotionRouter from "./promotion.route.js";
 import paymentFeedbackRouter from "./paymentFeedback.route.js";
+import siteCampaignRouter from "./siteCampaign.route.js";
 export {
   userRouter,
   productRouter,
@@ -53,4 +54,5 @@ export {
   webhookRouter,
   promotionRouter,
   paymentFeedbackRouter,
+  siteCampaignRouter,
 };

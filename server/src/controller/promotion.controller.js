@@ -12,6 +12,7 @@ import {
   quantityForConditionLeaf,
   promotionCouponGateOk,
   applyBestPromotionDiscount,
+  getDiscountCandidatesForItem,
 } from "../utils/promotionEngine.util.js";
 import { buildPromotionDisplayList } from "../services/promotionPresentation.service.js";
 import { buildPromotionPricePreview } from "../services/promotionPricePreview.service.js";
@@ -563,6 +564,129 @@ const getCheckoutDisplayController = asyncHandler(async (req, res) => {
   return res.status(200).json(new ApiRes(200, "OK", { promotions: display, pricing }, true));
 });
 
+// Which exact productIds a conditionTree names via "product" leaves —
+// recursive over AND/OR groups, ignores every other leaf shape (category/
+// cartSubtotal/etc. have no single product to extract). Used only to find
+// the 2-product "buy A+B together" shape for the homepage combo card; has
+// no bearing on real evaluation (evaluateConditionTree, unchanged).
+function collectConditionProductIds(node) {
+  const ids = new Set();
+  const walk = (n) => {
+    if (!n) return;
+    if (n.op) { (n.children || []).forEach(walk); return; }
+    if (n.field === "product" && n.productId) ids.add(String(n.productId));
+  };
+  walk(node);
+  return [...ids];
+}
+
+// Public: GET /promotions/display/home — homepage combo cards. Only
+// promotions with placements including "home" AND whose conditionTree names
+// exactly 2 distinct products (the "buy A+B together" shape — see
+// PROMOTION_TEMPLATES' combo_free_shipping template in the admin repo for
+// the same condition shape). For each, builds a hypothetical "exactly these
+// 2 products, 1 each" cart and runs it through the SAME evaluatePromotions
+// engine checkout uses — against every active promotion, not just this one,
+// same "hypothetical cart" convention getProductDisplayController already
+// uses for the PDP. mrp/price/save are the real, computed numbers; nothing
+// here is typed in by the admin.
+const getHomeDisplayController = asyncHandler(async (_req, res) => {
+  const all = await getActivePromotions();
+  const candidates = all
+    .filter((p) => (p.placements || []).includes("home"))
+    .map((promo) => ({ promo, productIds: collectConditionProductIds(promo.conditionTree) }))
+    .filter((c) => c.productIds.length === 2);
+
+  if (candidates.length === 0) return res.status(200).json(new ApiRes(200, "OK", { combos: [] }, true));
+
+  const allProductIds = [...new Set(candidates.flatMap((c) => c.productIds))];
+  const products = await Product.find(
+    { productId: { $in: allProductIds } },
+    { productId: 1, productName: 1, variantDetails: 1, productCategory: 1, productSubCategory: 1, tags: 1 },
+  ).lean();
+  const productById = new Map(products.map((p) => [p.productId, p]));
+  const productMeta = new Map(
+    products.map((p) => [p.productId, { category: p.productCategory, subcategory: p.productSubCategory, tags: p.tags || [] }]),
+  );
+
+  const firstActiveVariant = (product) =>
+    (product?.variantDetails || []).find(
+      (v) => v.isActive !== false && !v.variantOutOfStock && !(v.variantQuantity != null && Number(v.variantQuantity) <= 0),
+    ) || product?.variantDetails?.[0] || null;
+
+  const display = candidates
+    .map(({ promo, productIds }) => {
+      const items = productIds.map((id) => productById.get(id)).filter(Boolean);
+      if (items.length !== 2) return null; // a referenced product was deleted/renamed since this promotion was saved
+      const variants = items.map((p) => firstActiveVariant(p));
+      if (variants.some((v) => !v)) return null; // every linked product needs a sellable variant
+
+      const cartItems = items.map((p, i) => ({ productId: p.productId, quantity: 1, variantSku: variants[i].sku || "" }));
+      const ctx = buildCartContext(cartItems, { subtotal: 0, productMeta });
+      const result = evaluatePromotions(cartItems, ctx, all);
+
+      const fullPrices = variants.map((v) => Number(v.variantPrice || 0));
+      const discountedPrices = items.map((p, i) => {
+        const raw = getDiscountCandidatesForItem(result.discountCandidatesByProduct, p.productId, variants[i].sku);
+        return raw.length ? applyBestPromotionDiscount(fullPrices[i], raw) : fullPrices[i];
+      });
+
+      const mrp = fullPrices.reduce((s, n) => s + n, 0);
+      const price = discountedPrices.reduce((s, n) => s + n, 0);
+      const homeCard = promo.homeCard || {};
+      // A combo's reward isn't always a ₹ price cut (free_shipping/
+      // free_product give no product-level discount at all, so save would
+      // be 0 and the storefront's "Save ₹X" pill would have nothing to
+      // show) — surfaced here so the card can fall back to a "Free
+      // Shipping"/"Free Gift" pill instead of silently showing no badge.
+      // free_product.promotionId is matched against this promo specifically
+      // (resolveProductWinners can drop it for another promo); freeShipping
+      // is a flat flag because nothing else in this hypothetical 1-each
+      // cart could plausibly grant it besides this promo's own reward.
+      const grantsFreeProduct = result.freeGifts.some((g) => String(g.promotionId) === String(promo._id));
+
+      return {
+        id: promo._id,
+        title: promo.name,
+        subtitle: homeCard.subtitle?.trim() || items.map((p) => p.productName).join(" + "),
+        badgeText: homeCard.badgeText || "",
+        ctaLabel: homeCard.ctaLabel?.trim() || "Add to Cart",
+        bannerImage: homeCard.bannerImage || null,
+        // null when no bannerImage — storefront renders a 50/50 split of
+        // these two images itself, never a hardcoded placeholder.
+        fallbackImages: homeCard.bannerImage ? null : variants.map((v) => v.variantImage?.[0] || ""),
+        mrp,
+        price,
+        save: Math.max(0, mrp - price),
+        // Rounded from the computed numbers above — never typed by an admin.
+        percentOff: mrp > 0 ? Math.round((Math.max(0, mrp - price) / mrp) * 100) : 0,
+        freeShipping: result.freeShipping,
+        freeGift: grantsFreeProduct,
+        priority: promo.priority || 0,
+        // Presentation-only choices from the admin's offer-card editor.
+        badgeLabel: homeCard.badgeLabel || "",
+        priceLabel: homeCard.priceLabel || "",
+        savingsMode: homeCard.savingsMode || "amount",
+        savingsLabel: homeCard.savingsLabel || "",
+        ctaAction: homeCard.ctaAction === "link" && homeCard.ctaUrl ? "link" : "cart",
+        ctaUrl: homeCard.ctaUrl || "",
+        order: Number(homeCard.order) || 0,
+        items: items.map((p, i) => ({
+          productId: p.productId,
+          productName: p.productName,
+          variantName: variants[i].variantName || "",
+          sku: variants[i].sku || "",
+          price: discountedPrices[i],
+          image: variants[i].variantImage?.[0] || "",
+        })),
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.order - b.order || b.priority - a.priority);
+
+  return res.status(200).json(new ApiRes(200, "OK", { combos: display }, true));
+});
+
 export {
   getActivePromotionsController,
   getPromotionsForProductController,
@@ -570,6 +694,7 @@ export {
   getProductDisplayController,
   getCartDisplayController,
   getCheckoutDisplayController,
+  getHomeDisplayController,
   // Pure, DB-free helpers — exported for unit testing.
   findFirstUnmetProductLeaf,
   didAddedItemAdvancePromotion,

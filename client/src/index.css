@@ -565,6 +565,45 @@
 @keyframes un-rise{to{transform:none}}
 .un-rise .un-ch{display:inline-block;transform:translateY(115%) rotate(4deg);animation:un-rise .9s cubic-bezier(.16,1,.3,1) forwards}
 
+/* ── Festive layer ───────────────────────────────────────────────────────
+   Everything below only exists while <html data-festive="…"> is set (a live,
+   server-approved campaign) or inside components that themselves only render
+   then. Transform/opacity animations only; all stopped under reduced-motion. */
+@keyframes un-twinkle{0%,100%{opacity:.5}50%{opacity:1}}
+@keyframes un-flame{0%,100%{transform:scaleY(1);opacity:.95}50%{transform:scaleY(1.14);opacity:1}}
+@keyframes un-sway{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}
+@keyframes un-spin{to{transform:rotate(360deg)}}
+@keyframes un-float{
+  0%{transform:translate3d(0,0,0) scale(.6);opacity:0}
+  12%{opacity:.8}
+  85%{opacity:.5}
+  100%{transform:translate3d(var(--dx,0px),-105vh,0) scale(1);opacity:0}
+}
+@keyframes un-sparkrise{0%{transform:translate3d(0,0,0) scale(.6);opacity:0}15%{opacity:.8}100%{transform:translate3d(var(--dx,0px),-240px,0) scale(1);opacity:0}}
+@keyframes un-confetti{0%{transform:translate3d(0,-20px,0) rotate(0);opacity:0}10%{opacity:.9}90%{opacity:.7}100%{transform:translate3d(var(--dx,0px),var(--fall,420px),0) rotate(540deg);opacity:0}}
+@keyframes un-burst{0%,100%{transform:scale(.7);opacity:.25}50%{transform:scale(1.08);opacity:.95}}
+@keyframes un-shine{0%{transform:translateX(-120%) skewX(-18deg)}60%,100%{transform:translateX(320%) skewX(-18deg)}}
+@keyframes un-glow{0%,100%{box-shadow:0 0 0 0 rgb(var(--gl-star)/0)}50%{box-shadow:0 0 22px 2px rgb(var(--gl-star)/.28)}}
+.un-bulb{animation:un-twinkle 2.8s ease-in-out infinite}
+.un-flame{animation:un-flame 1.8s ease-in-out infinite}
+.un-sway{animation:un-sway 4.2s ease-in-out infinite}
+.un-spin{animation:un-spin 90s linear infinite}
+.un-spark{clip-path:polygon(50% 0,61% 39%,100% 50%,61% 61%,50% 100%,39% 61%,0 50%,39% 39%);animation:un-float linear infinite;will-change:transform,opacity}
+.un-spark-sec{clip-path:polygon(50% 0,61% 39%,100% 50%,61% 61%,50% 100%,39% 61%,0 50%,39% 39%);animation:un-sparkrise linear infinite}
+.un-confetti{animation:un-confetti linear infinite;will-change:transform,opacity}
+.un-burst{animation:un-burst 2.8s ease-in-out infinite}
+.un-shine{overflow:hidden}
+.un-shine:not(.absolute){position:relative}
+.un-shine::after{content:"";position:absolute;inset:0;width:40%;background:linear-gradient(90deg,transparent,rgb(255 255 255/.55),transparent);animation:un-shine 4.5s ease-in-out infinite}
+.un-fest-glow{animation:un-glow 5s ease-in-out infinite}
+@media (prefers-reduced-motion: reduce){
+  .un-bulb,.un-flame,.un-sway,.un-spin,.un-fest-glow{animation:none!important}
+  .un-bulb{opacity:.9}
+  .un-spark,.un-spark-sec,.un-confetti{display:none!important}
+  .un-burst{animation:none!important;opacity:.7}
+  .un-shine::after{display:none}
+}
+
 /* editorial marquee ticker */
 .un-marquee{display:inline-flex;flex-wrap:nowrap;white-space:normal;animation:un-scrollx 26s linear infinite}
 .un-marquee:hover{animation-play-state:paused}

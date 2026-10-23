@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "storefront-client-staging",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "client", "run", "dev:staging", "--", "--port", "5173", "--strictPort"],
+      "port": 5173
+    },
+    {
+      "name": "storefront-server-staging",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd server && infisical run --projectId=80b13bde-6879-405e-889f-2f9b28f4c0f4 --env=staging --path=/user/server -- env NODE_ENV=development node src/server.js"],
+      "port": 8000
+    }
+  ]
+}
