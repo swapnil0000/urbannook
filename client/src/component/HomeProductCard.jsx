@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import WishlistButton from './WishlistButton';
 import { trackSelectItem } from '../utils/analytics';
 
@@ -32,23 +32,23 @@ const badgeOf = (p) => {
  * even-height row (items-stretch) never grows a dead gap under the title.
  */
 const HomeProductCard = ({ p, index = 0, listId = 'grid', listName = 'Grid' }) => {
-  const navigate = useNavigate();
   const v = firstVariant(p);
   const badge = badgeOf(p);
   const img2 = secondImg(p);
   const price = Number(p?.effectivePrice ?? v.variantPrice ?? 0);
   const mrp = Number(p?.effectiveMrp ?? v.variantMrp ?? 0);
 
-  const go = () => {
+  // A real <a href> (not a div with onClick) so search engines can follow the
+  // home page's links to products; the router still handles the click.
+  const track = () => {
     trackSelectItem?.({ itemId: p.productId, itemName: p.productName, itemVariant: v.variantName || '', price: v.variantPrice || 0, listId, listName, index });
-    navigate(productHref(p));
   };
 
   return (
-    <div onClick={go} className="gl-pcard group bg-white rounded-none border border-hair overflow-hidden flex flex-col h-full cursor-pointer">
+    <Link to={productHref(p)} onClick={track} className="gl-pcard group bg-white rounded-none border border-hair overflow-hidden flex flex-col h-full cursor-pointer">
       <div className="relative aspect-square overflow-hidden bg-surface">
         {badge && <span className="absolute top-2 left-2 z-10 bg-sale text-white gl-lbl text-[9px] px-2 py-1 rounded-md shadow-sm">{badge}</span>}
-        <div className="absolute top-2.5 right-2.5 z-10" onClick={(e) => e.stopPropagation()}>
+        <div className="absolute top-2.5 right-2.5 z-10" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
           <WishlistButton productId={p.productId} />
         </div>
         <img src={productImg(p)} alt={p.productName} loading="lazy" className="gl-img w-full h-full object-cover" onError={(e) => { e.currentTarget.src = '/assets/logo.webp'; }} />
@@ -67,7 +67,7 @@ const HomeProductCard = ({ p, index = 0, listId = 'grid', listName = 'Grid' }) =
           <span className="gl-lbl text-[10px] text-sale mt-0.5">{Math.round(((mrp - price) / mrp) * 100)}% off</span>
         )}
       </div>
-    </div>
+    </Link>
   );
 };
 

@@ -229,6 +229,16 @@ const BlogPostPage = () => {
               </div>
             </aside>
           )}
+
+          {/* Franchise links: the collection page and the rest of this series' stories. */}
+          {post.series && (
+            <p className="jp-series" data-anim="series">
+              More {post.series.name}:{' '}
+              <Link to={`/category/${post.series.slug}`}>shop every {post.series.name} piece</Link>
+              {' · '}
+              <Link to={`/blog#${post.series.slug}`}>read more {post.series.name} stories</Link>
+            </p>
+          )}
         </article>
 
         {/* Desktop: sticky sidebar that stays beside the story while reading. */}
@@ -349,6 +359,8 @@ const BlogPostPage = () => {
         .jp-pick-cta { margin-top: .35rem; font-size: .78rem; font-weight: 700; color: var(--shu); letter-spacing: .02em; }
         .jp-btn { display: inline-block; background: var(--shu); color: #fff; font-family: Inter, system-ui, sans-serif; font-weight: 700; padding: .8rem 1.6rem; letter-spacing: .03em; transition: background .2s; }
         .jp-btn:hover { background: #8f1d22; }
+        .jp-series { margin-top: 2rem; padding-top: 1.25rem; border-top: 1px solid rgba(28,26,23,.15); font-family: Inter, system-ui, sans-serif; font-size: .95rem; }
+        .jp-series a { color: var(--shu); font-weight: 700; text-decoration: underline; text-underline-offset: 4px; }
         .jp-endcard { margin-top: 3rem; display: grid; grid-template-columns: 140px 1fr; gap: 1.25rem; align-items: center; padding: 1.25rem; background: var(--washi-2); border-top: 3px solid var(--shu); }
         .jp-endcard img { width: 140px; height: 140px; object-fit: cover; background: #fff; border: 6px solid #fff; }
         @media (max-width: 480px) { .jp-endcard { grid-template-columns: 1fr; } .jp-endcard img { width: 100%; height: auto; aspect-ratio: 1; } }

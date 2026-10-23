@@ -26,7 +26,7 @@ export const SERIES = [
   {
     slug: "naruto", name: "Naruto", kind: "anime",
     keywords: ["naruto", "sasuke", "kusanagi", "kakashi", "itachi", "minato", "kunai", "zabuza", "kubikiribocho", "asuma",
-      "pain six paths", "nagato", "madara", "obito", "boruto"],
+      "six paths", "akatsuki", "nagato", "madara", "obito", "boruto"],
   },
   { slug: "bleach", name: "Bleach", kind: "anime", keywords: ["bleach", "ichigo", "zangetsu", "aizen", "byakuya", "kenpachi"] },
   { slug: "dragon-ball", name: "Dragon Ball", kind: "anime", keywords: ["dragon ball", "goku", "vegeta", "gohan", "frieza"] },

@@ -32,6 +32,18 @@ describe("GET /api/v1/blog", () => {
     expect(res.body.data[0].contentHtml).toBeUndefined();
   });
 
+  it("tags each post with its franchise and filters by series", async () => {
+    await BlogPost.collection.insertOne({ slug: "tanjiro", title: "Tanjiro's sword", status: "published", publishedAt: new Date("2026-08-01"), contentHtml: "<p>x</p>" });
+    const all = await request(app).get("/api/v1/blog").expect(200);
+    const bySlug = Object.fromEntries(all.body.data.map((p) => [p.slug, p.series]));
+    expect(bySlug["zoro-swords"]).toEqual({ slug: "one-piece", name: "One Piece", kind: "anime" });
+    expect(bySlug.older).toBeNull();
+    const ds = await request(app).get("/api/v1/blog?series=demon-slayer").expect(200);
+    expect(ds.body.data.map((p) => p.slug)).toEqual(["tanjiro"]);
+    const decor = await request(app).get("/api/v1/blog?series=decor").expect(200);
+    expect(decor.body.data).toEqual([]); // a page that is no franchise gets no posts
+  });
+
   it("filters by linked product", async () => {
     const res = await request(app).get("/api/v1/blog").query({ product: "p1" }).expect(200);
     expect(res.body.data.map((p) => p.slug)).toEqual(["zoro-swords"]);
