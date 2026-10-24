@@ -213,8 +213,14 @@ const promotionSchema = new mongoose.Schema(
       priceLabel: { type: String, trim: true, default: "" },     // blank = "Combo Price" / themed label
       savingsMode: { type: String, enum: ["amount", "percent", "label"], default: "amount" },
       savingsLabel: { type: String, trim: true, default: "" },   // used for mode "label" (e.g. "Combo Deal")
-      ctaAction: { type: String, enum: ["cart", "link"], default: "cart" },
+      ctaAction: { type: String, enum: ["cart", "link", "choose"], default: "cart" },
       ctaUrl: { type: String, trim: true, default: "" },         // used when ctaAction is "link"
+      // "reward" cards advertise a ladder offer ("Buy any 2 katana, get a Dual
+      // Stand free") without a fixed 2-product pair, so they show the free
+      // item instead of a computed combo price. ctaAction "choose" opens a
+      // small picker of these links (e.g. Wooden Katana / LED Katana).
+      cardKind: { type: String, enum: ["combo", "reward"], default: "combo" },
+      ctaChoices: { type: [{ _id: false, label: { type: String, trim: true }, url: { type: String, trim: true } }], default: [] },
       order: { type: Number, default: 0 },                       // lower shows first
     },
 

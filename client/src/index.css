@@ -795,3 +795,30 @@
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
+/* ============================================================
+   DIWALI OFFERS SECTION  (.un-offers) — scoped to ComboOfferSection.
+   The global HARD-EDGED THEME zeroes every class containing "rounded-"
+   (except rounded-full). These components therefore use their own
+   un-r-* radius classes, which that rule never matches, so nothing global
+   changes. Colours come only from the --gl-* tokens (the green save pill
+   is the one explicit brand-approved hex).
+   ============================================================ */
+.un-offers .un-r-card{border-radius:0}
+.un-offers .un-r-media{border-radius:0}
+.un-offers .un-r-12{border-radius:0}
+.un-offers .un-r-8{border-radius:0}
+.un-offers .un-r-4{border-radius:0}
+.un-offers .un-r-tray{border-radius:16px}
+.un-offers .un-r-panel-all{border-radius:16px}
+.un-offers .un-r-save{border-radius:12px 0 12px 0;background:linear-gradient(135deg,#2f9d47 0%,#25843a 55%,#1e6f30 100%)}
+.un-offers .un-panel-shadow{box-shadow:0 6px 12px -7px rgb(0 0 0/.35)}
+.un-offers .un-r-pop{border-radius:0}
+.un-offers .un-card{
+  border:2px solid rgb(var(--gl-star)/.72);
+  background:linear-gradient(180deg,color-mix(in srgb,rgb(var(--gl-paper)) 52%,#fff),rgb(var(--gl-paper)));
+  box-shadow:0 20px 38px -20px rgb(0 0 0/.8),0 0 30px -8px rgb(var(--gl-star)/.28),inset 0 0 0 1px rgb(255 255 255/.5);
+}
+.un-offers .un-nav{border:1.5px solid rgb(var(--gl-paper)/.4);color:rgb(var(--gl-paper)/.9);transition:border-color .2s,color .2s}
+.un-offers .un-nav:hover{border-color:rgb(var(--gl-star));color:rgb(var(--gl-star))}
+.un-offers .un-track{scroll-padding-inline:16px}
+@media (prefers-reduced-motion:reduce){.un-offers .un-card{transition:none}}

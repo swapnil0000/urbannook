@@ -105,7 +105,9 @@ const PromotionUnlockSheet = () => {
   const lastSuccessfulAdd = useSelector((s) => s.cart.lastSuccessfulAdd);
   const [pendingAdd, setPendingAdd] = useState(null);
   const [activePromoId, setActivePromoId] = useState(null);
-  const { promotions, pricing, isFetching } = useCartPromotions("cart", null, pendingAdd, Boolean(pendingAdd || activePromoId));
+  // Home offer cards open this same sheet for specific promotions (before anything is in the cart).
+  const [externalIds, setExternalIds] = useState(null);
+  const { promotions, pricing, isFetching } = useCartPromotions("cart", null, pendingAdd, Boolean(pendingAdd || activePromoId), externalIds);
   const [addToCartAPI] = useAddToCartMutation();
 
   const [visible, setVisible] = useState(false);
@@ -121,6 +123,18 @@ const PromotionUnlockSheet = () => {
   const closeTimerRef = useRef(null);
   const touchStartRef = useRef(null);
   const addingRef = useRef(false);
+
+  useEffect(() => {
+    const onOpen = (e) => {
+      const ids = (e.detail?.promotionIds || []).map(String).filter(Boolean).slice(0, 4);
+      if (!ids.length) return;
+      clearTimeout(closeTimerRef.current);
+      setExternalIds(ids);
+      setActivePromoId(ids[0]);
+    };
+    window.addEventListener("un:open-offer-sheet", onOpen);
+    return () => window.removeEventListener("un:open-offer-sheet", onOpen);
+  }, []);
 
   const seenAddSequenceRef = useRef(lastSuccessfulAdd?.sequence || 0);
   const prevQtyRef = useRef(totalQuantity);
@@ -287,7 +301,7 @@ const PromotionUnlockSheet = () => {
     setJustUnlocked(false);
     setPendingAdd(null);
     clearTimeout(closeTimerRef.current);
-    closeTimerRef.current = setTimeout(() => setActivePromoId(null), 300);
+    closeTimerRef.current = setTimeout(() => { setActivePromoId(null); setExternalIds(null); }, 300);
   };
 
   const handleAdd = async (product) => {
@@ -338,9 +352,17 @@ const PromotionUnlockSheet = () => {
 
   if (!activePromoId) return null;
   const promo = livePromo || (lastPromoRef.current?.id === activePromoId ? lastPromoRef.current : null);
-  const recommended = promo?.recommendedProducts || [];
   const reward = promo?.rewardProduct;
   const appliedSavings = pricing?.savingsByPromotion?.[promo?.id] || 0;
+  // Every other offer the same add put within reach (e.g. "2 wooden" AND
+  // "wooden + LED" both want one more katana), capped at 3, anchored promo first.
+  const stillActionable = (p) => p.actionableForAdd && ((p.qualifying && p.rewardTargetPending) || (!p.qualifying && p.progressText))
+    && p.recommendedProducts?.length > 0 && !dismissedIds.has(p.id);
+  const rows = externalIds
+    ? externalIds.map((id) => promotions.find((p) => p.id === id)).filter((p) => p && (p.recommendedProducts?.length || p.applied)).slice(0, 4)
+    : promo
+      ? [promo, ...promotions.filter((p) => p.id !== promo.id && stillActionable(p))].slice(0, 3)
+      : [];
 
   return (
     <div className="fixed inset-0 z-[9998] flex items-end justify-start sm:justify-center" data-promotion-sheet>
@@ -415,9 +437,9 @@ const PromotionUnlockSheet = () => {
               {/* {promo?.badge && <span className="truncate text-[11px] font-bold text-muted">{promo.badge}</span>} */}
             </div>
 
-            <h3 id="promotion-sheet-title" className={`truncate pr-10 text-xl font-black leading-tight tracking-tight sm:text-2xl ${festive ? "text-paper" : "text-ink"}`} title={promo?.title}>{promo?.title}</h3>
+            <h3 id="promotion-sheet-title" className={`truncate pr-10 text-xl font-black leading-tight tracking-tight sm:text-2xl ${festive ? "text-paper" : "text-ink"}`} title={rows.length > 1 ? "Unlock your free reward" : promo?.title}>{rows.length > 1 ? "Unlock your free reward" : promo?.title}</h3>
             <p id="promotion-sheet-description" className={`mt-2 text-[13px] leading-relaxed ${festive ? "text-paper/75" : "text-muted"}`}>
-              {promo?.rewardTargetPending ? "Your cart qualifies. Add an eligible reward item to apply the offer." : promo?.progressText}
+              {rows.length > 1 ? "You're one step away — pick whichever suits you." : promo?.rewardTargetPending ? "Your cart qualifies. Add an eligible reward item to apply the offer." : promo?.progressText}
             </p>
             {festive && (
               <>
@@ -442,7 +464,7 @@ const PromotionUnlockSheet = () => {
               </div>
             )} */}
 
-            {reward && !promo?.rewardTargetPending && (
+            {reward && rows.length < 2 && !promo?.rewardTargetPending && (
               <div className="mt-4 flex items-center gap-3 border border-hair bg-surface/60 p-2.5">
                 <div className="h-14 w-14 shrink-0 overflow-hidden bg-paper">
                   {reward.image && <img src={reward.image} alt={reward.productName} className="h-full w-full object-contain" loading="lazy" />}
@@ -455,26 +477,39 @@ const PromotionUnlockSheet = () => {
               </div>
             )}
 
-            <div className="mb-3 mt-5 flex items-end justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate text-[10px] font-extrabold uppercase tracking-[0.13em] text-brand">Complete your offer</p>
-                <p className="mt-0.5 truncate text-sm font-bold text-ink">{promo?.rewardTargetPending ? "Choose your reward item" : "Add an eligible item"}</p>
-              </div>
-              {recommended.length > 2 && <span className="shrink-0 text-[10px] font-semibold text-muted">Swipe <i className="fa-solid fa-arrow-right ml-1" aria-hidden="true" /></span>}
-            </div>
-            <div className={`flex gap-3 pb-1 ${recommended.length > 1 ? "-mx-5 snap-x snap-mandatory overflow-x-auto overscroll-x-contain px-5 scrollbar-hide sm:-mx-7 sm:px-7" : ""}`} aria-label="Eligible products">
-              {recommended.map((product) => (
-                <div key={`${product.productId}-${product.sku || ""}`} className={recommended.length > 1 ? "shrink-0 snap-start" : "w-full"}>
-                  <RecommendationCard
-                    product={product}
-                    onAdd={handleAdd}
-                    isAdding={addingProductId === `${product.productId}:${product.sku || ""}`}
-                    isBusy={Boolean(addingProductId)}
-                    isSingle={recommended.length === 1}
-                  />
+            {/* One row per offer the customer is one step from — each scrolls
+                sideways through its own eligible products. */}
+            {rows.map((row, rowIndex) => {
+              const items = row.recommendedProducts || [];
+              return (
+                <div key={row.id} className={rowIndex === 0 ? "mt-5" : "mt-5 border-t border-hair pt-4"}>
+                  <div className="mb-3 flex items-end justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-[10px] font-extrabold uppercase tracking-[0.13em] text-brand">
+                        {rows.length > 1 ? row.title : "Complete your offer"}
+                      </p>
+                      <p className="mt-0.5 text-sm font-bold text-ink">
+                        {row.rewardTargetPending ? "Choose your reward item" : (rows.length > 1 ? row.progressText : "Add an eligible item")}
+                      </p>
+                    </div>
+                    {items.length > 2 && <span className="shrink-0 text-[10px] font-semibold text-muted">Swipe <i className="fa-solid fa-arrow-right ml-1" aria-hidden="true" /></span>}
+                  </div>
+                  <div className={`flex gap-3 pb-1 ${items.length > 1 ? "-mx-5 snap-x snap-mandatory overflow-x-auto overscroll-x-contain px-5 scrollbar-hide sm:-mx-7 sm:px-7" : ""}`} aria-label="Eligible products">
+                    {items.map((product) => (
+                      <div key={`${row.id}-${product.productId}-${product.sku || ""}`} className={items.length > 1 ? "shrink-0 snap-start" : "w-full"}>
+                        <RecommendationCard
+                          product={product}
+                          onAdd={handleAdd}
+                          isAdding={addingProductId === `${product.productId}:${product.sku || ""}`}
+                          isBusy={Boolean(addingProductId)}
+                          isSingle={items.length === 1}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
             {addError && <p className="mt-3 border border-brand/20 bg-brand/5 px-3 py-2 text-xs font-semibold text-brand" role="alert">{addError}</p>}
             <p className={`mt-4 text-center text-[11px] leading-relaxed text-muted ${festive ? "px-8" : ""}`}>Offer applies after eligible items are in your cart. Final total is confirmed at checkout.</p>
           </div>

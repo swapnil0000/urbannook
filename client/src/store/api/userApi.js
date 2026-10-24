@@ -372,10 +372,10 @@ export const userApi = apiSlice.injectEndpoints({
       keepUnusedDataFor: 0,
     }),
     getCartPromotions: builder.query({
-      query: ({ items, placement = "cart", subtotal, couponCode, addedItem } = {}) => ({
+      query: ({ items, placement = "cart", subtotal, couponCode, addedItem, previewPromotionIds } = {}) => ({
         url: "promotions/display/cart",
         method: "POST",
-        body: { items: items || [], placement, subtotal, couponCode, addedItem },
+        body: { items: items || [], placement, subtotal, couponCode, addedItem, previewPromotionIds },
       }),
       keepUnusedDataFor: 0,
     }),
