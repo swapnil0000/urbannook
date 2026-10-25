@@ -412,7 +412,10 @@ const CheckoutPage = () => {
   // gated promotions can evaluate for real.
   const { currentData: checkoutPromotionsData } = useGetCheckoutPromotionsQuery(
     { items: buildPromotionCartItems(cartItems), subtotal: cartItems.reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0), customerType: isGuest ? 'guest' : 'registered', deliveryAddress: pinCode ? { pincode: pinCode } : undefined, couponCode: appliedCoupon || undefined },
-    { skip: currentStep !== reviewStep || cartItems.length === 0 },
+    // Fetched on every step (not only Review & Pay): the order summary beside the
+    // address/contact steps must already show the offer discount, or the customer sees
+    // the full price until the last step.
+    { skip: cartItems.length === 0 },
   );
   const checkoutPromotions = checkoutPromotionsData?.data?.promotions || [];
   // Same server-evaluated item discount preview shown in the cart. It is
@@ -641,6 +644,8 @@ const CheckoutPage = () => {
         const shipArgs = {
           deliveryPinCode: parseInt(pinCode, 10),
           cartItems: formattedCartItems,
+          // delivery is a static ₹99 / ₹149 by what the customer pays for the products (after offers)
+          cartValue: cartItems.reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0) - ruleDiscountSavings,
         };
         const [prepaidRes, codRes] = await Promise.all([
           calculateShippingRef.current({ ...shipArgs, paymentType: "PREPAID" }).unwrap(),

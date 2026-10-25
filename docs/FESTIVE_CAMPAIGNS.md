@@ -127,3 +127,20 @@ not both." (display model field `group`).
   pricing independent of claims, 5000-case garbage-claim fuzz — all pass.
 - Rule: exactly 2 katanas → Dual, exactly 3 → Triple, 1 → Mystery; 4+ gives no stand (exact-count rule).
 - Not verified: browser UI and the Razorpay payment path.
+
+## Offer pricing checklist (run for EVERY new/changed offer)
+
+Cart, checkout page and the Razorpay charge must show the same discounted amount.
+
+1. Cart drawer shows the offer discount (client preview, `promotions/display/cart`).
+2. Checkout page order summary shows it on **every step** (address, contact, review) — `useGetCheckoutPromotionsQuery` is not step-gated.
+3. Server charge: `razorpayCreateOrderController` (logged-in) and `guestCreateOrderController` re-evaluate the engine themselves
+   and bake the discount into `priceAtPurchase`; client totals are never trusted.
+4. Prepaid, COD (2× shipping advance), and Magic (line_items already discounted) — all go through `computeOrderCharge`.
+5. Automated guard: `server/src/__tests__/checkoutPromoCharge.test.js` (flat / discounted-price / percent product offers,
+   prepaid + Magic). Add a case when a new reward shape is introduced.
+
+## Delivery charge (static)
+
+Cart (after offers) under ₹1000 → ₹99, ₹1000 and above → ₹149, regardless of weight/size/courier. Free-shipping promotions /
+threshold still zero it as before. Details: `server/src/services/SHIPPING_FLOW.md`; test: `server/src/__tests__/unit/shipping.static.test.js`.

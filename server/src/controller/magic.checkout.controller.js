@@ -3,7 +3,7 @@ import Order from "../model/order.model.js";
 import Coupon from "../model/coupon.model.js";
 import {
   calculateShippingRate,
-  FALLBACK_SHIPPING_CHARGE,
+  staticShippingCharge,
 } from "../services/shipping.service.js";
 import { validateNewCoupon } from "../services/coupon.code.service.js";
 import { getFreeShippingConfig } from "../utils/freeShippingOffer.util.js";
@@ -175,6 +175,8 @@ export const magicShippingInfoController = asyncHandler(async (req, res) => {
     console.log(`${TAG}[shipping] free shipping carried over from order-create`);
   }
   const carriedOverFromOrderCreate = freeShipping;
+  // Static delivery charge keys off what the customer pays for the products (see staticShippingCharge).
+  const shippingCartValue = cartItems.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1), 0);
   try {
     const subtotal = cartItems.reduce(
       (s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1),
@@ -200,12 +202,13 @@ export const magicShippingInfoController = asyncHandler(async (req, res) => {
           pincode: addr.zipcode,
           paymentType: "PREPAID",
           cartItems,
+          cartValue: shippingCartValue,
         });
         // Still rate the pincode even when shipping is free — an unserviceable
         // pincode must be blocked regardless of who pays for delivery.
         return toRazorpayServiceableAddress(
           addr,
-          freeShipping ? 0 : (rate?.total_charges ?? FALLBACK_SHIPPING_CHARGE),
+          freeShipping ? 0 : (rate?.total_charges ?? staticShippingCharge(shippingCartValue)),
           true,
           { estimatedDays: rate?.estimatedDays },
         );
@@ -219,11 +222,11 @@ export const magicShippingInfoController = asyncHandler(async (req, res) => {
           return toRazorpayServiceableAddress(addr, 0, false);
         }
         console.error(
-          `${TAG}[shipping] pin ${addr.zipcode} rate failed, flat ₹${FALLBACK_SHIPPING_CHARGE}: ${err.message}`,
+          `${TAG}[shipping] pin ${addr.zipcode} rate failed, static ₹${staticShippingCharge(shippingCartValue)}: ${err.message}`,
         );
         return toRazorpayServiceableAddress(
           addr,
-          freeShipping ? 0 : FALLBACK_SHIPPING_CHARGE,
+          freeShipping ? 0 : staticShippingCharge(shippingCartValue),
           true,
         );
       }
