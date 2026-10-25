@@ -897,6 +897,27 @@
 }
 .un-offers .un-tile-strip::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;background:linear-gradient(90deg,transparent,rgb(var(--gl-star)/.55),transparent)}
 .un-offers .un-tile-benefit{color:#f2d9a0}
+/* upcoming-drop teaser tile (ComboOfferSection TeaserTile): same frame, dimmed + locked, not interactive */
+.un-offers .un-tile-locked{
+  cursor:default;
+  border:1.5px dashed rgb(var(--gl-star)/.38);
+  border-bottom:0;
+  background:linear-gradient(180deg,rgb(34 16 16) 0%,rgb(20 10 10) 100%);
+  box-shadow:0 10px 20px -16px rgb(0 0 0/.9),0 0 0 1px rgb(var(--gl-star)/.08);
+}
+.un-offers .un-tile-locked .un-tile-img{
+  background:radial-gradient(60% 55% at 50% 48%,rgb(var(--gl-star)/.16),transparent 72%);
+}
+.un-offers .un-tile-locked .un-lock-badge{
+  background:rgb(0 0 0/.45);
+  border:1px solid rgb(var(--gl-star)/.5);
+  box-shadow:0 0 18px -4px rgb(var(--gl-star)/.5);
+  animation:un-lock-pulse 2.8s ease-in-out infinite;
+}
+.un-offers .un-tile-locked .un-teaser-tag{border:1px solid rgb(var(--gl-star)/.45);background:rgb(0 0 0/.35);border-radius:2px}
+.un-offers .un-tile-locked .un-tile-strip{background:linear-gradient(180deg,#5a1624 0%,#43101b 55%,#2e0b13 100%)}
+@keyframes un-lock-pulse{0%,100%{box-shadow:0 0 14px -6px rgb(var(--gl-star)/.35)}50%{box-shadow:0 0 22px -2px rgb(var(--gl-star)/.65)}}
+@media (prefers-reduced-motion:reduce){.un-offers .un-tile-locked .un-lock-badge{animation:none}}
 /* coupon ticket: dark burgundy / charcoal with champagne-gold edge */
 .un-offers .un-coupon{
   border-radius:8px;

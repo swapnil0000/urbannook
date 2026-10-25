@@ -273,6 +273,45 @@ const OfferTile = ({ combo }) => {
   );
 };
 
+// Upcoming-drop teasers fill the grid when fewer offers are live than the grid holds, so it never looks empty.
+// Not interactive: no click, no focus, hidden from the tab order.
+const GRID_SLOTS = 6;
+const TEASERS = [
+  { head: 'Coming Soon', sub: 'Exciting Offers Ahead' },
+  { head: 'Unlocking Soon', sub: 'New Deals on the Way' },
+  { head: 'Next Drop', sub: 'Launching Soon' },
+  { head: 'Coming Soon', sub: 'New Deals Unlocking' },
+  { head: 'Stay Tuned', sub: 'Launching in the Next Drop' },
+];
+const LockIcon = () => (
+  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="5" y="11" width="14" height="9" rx="2" />
+    <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    <circle cx="12" cy="15.5" r="1" fill="currentColor" stroke="none" />
+  </svg>
+);
+const TeaserTile = ({ index }) => {
+  const t = TEASERS[index % TEASERS.length];
+  return (
+    <div className="un-tile un-tile-locked flex h-full w-full select-none flex-col overflow-hidden text-center" aria-label={`${t.head}. ${t.sub}`} role="group">
+      <span className="un-tile-img relative flex aspect-[10/9] w-full shrink-0 items-center justify-center overflow-hidden" aria-hidden="true">
+        {/* festive silhouette: a gift box outline behind the lock */}
+        <svg viewBox="0 0 64 64" className="absolute h-[64%] w-[64%] text-star/20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round">
+          <rect x="10" y="26" width="44" height="28" rx="2" />
+          <rect x="7" y="19" width="50" height="8" rx="2" />
+          <path d="M32 19v35M32 19c-4-9-14-9-14-4s8 4 14 4zm0 0c4-9 14-9 14-4s-8 4-14 4z" />
+        </svg>
+        <span className="un-lock-badge relative flex h-11 w-11 items-center justify-center text-star" style={{ borderRadius: "50%" }}><LockIcon /></span>
+        <span className="un-teaser-tag absolute right-1.5 top-1.5 px-1.5 py-[2px] text-[8px] font-bold uppercase tracking-[0.14em] text-star">Locked</span>
+      </span>
+      <span className="un-tile-strip flex h-[48px] shrink-0 flex-col items-center justify-center gap-[3px] px-2 text-center">
+        <span className="w-full truncate text-[11.5px] font-semibold leading-none text-white/90 sm:text-[12.5px]">{t.head}</span>
+        <span className="un-tile-benefit w-full truncate text-[10px] font-medium leading-none tracking-tight sm:text-[11px]">{t.sub}</span>
+      </span>
+    </div>
+  );
+};
+
 const ComboOfferSection = ({ title, subtitle }) => {
   const { data, isLoading } = useGetHomeComboOffersQuery();
   const { active, can, themeKey } = useSiteCampaign();
@@ -281,6 +320,7 @@ const ComboOfferSection = ({ title, subtitle }) => {
   const festive = active && can('sectionAccents');
   const copy = THEME_COPY[themeKey] || {};
   const n = combos.length;
+  const teasers = n > 0 && n < GRID_SLOTS ? GRID_SLOTS - n : 0;
 
   if (isLoading) return null;
   // no combo offers: coupons (if any) still show on their own
@@ -313,11 +353,19 @@ const ComboOfferSection = ({ title, subtitle }) => {
           </div>
         </div>
 
-        {/* offer tiles */}
-        <div className="relative z-10 mx-auto mt-5 flex max-w-[1100px] flex-wrap justify-center gap-x-3.5 gap-y-4 px-4 sm:mt-6 sm:gap-x-4 sm:gap-y-5 sm:px-6 lg:gap-x-5">
+        {/* offer tiles: with teasers the grid is a fixed 3-wide (6 on desktop) so rows are always full;
+            with a full set of live offers the original centred wrap stays */}
+        <div className={`relative z-10 mx-auto mt-5 max-w-[1100px] px-4 sm:mt-6 sm:px-6 ${teasers > 0
+          ? 'grid grid-cols-3 gap-x-3.5 gap-y-4 sm:gap-x-4 sm:gap-y-5 lg:grid-cols-6 lg:gap-x-5'
+          : 'flex flex-wrap justify-center gap-x-3.5 gap-y-4 sm:gap-x-4 sm:gap-y-5 lg:gap-x-5'}`}>
           {combos.map((c) => (
-            <div key={c.id} className="shrink-0 grow-0 basis-[calc((100%_-_1.75rem)/3)] sm:basis-[calc((100%_-_3rem)/4)] lg:basis-[calc((100%_-_6.25rem)/6)]">
+            <div key={c.id} className={teasers > 0 ? 'min-w-0' : 'shrink-0 grow-0 basis-[calc((100%_-_1.75rem)/3)] sm:basis-[calc((100%_-_3rem)/4)] lg:basis-[calc((100%_-_6.25rem)/6)]'}>
               <OfferTile combo={c} />
+            </div>
+          ))}
+          {Array.from({ length: teasers }, (_, i) => (
+            <div key={`teaser-${i}`} className="min-w-0">
+              <TeaserTile index={i} />
             </div>
           ))}
         </div>
