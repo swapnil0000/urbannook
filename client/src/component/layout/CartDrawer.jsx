@@ -10,8 +10,10 @@ import { updateQuantity, removeItem } from '../../store/slices/cartSlice';
 import { resolveVariantTitle } from '../../utils/variantTitle';
 import { trackViewCart, trackRemoveFromCart, track } from '../../utils/analytics';
 import FreeShippingStrip from '../FreeShippingStrip';
+import OfferProgress from '../festive/OfferProgress';
 import GiftWrapOffer, { GiftWrapLineItem } from '../GiftWrapOffer';
 import PromotionBannerList from '../promotions/PromotionBannerList';
+import GiftClaimList from '../promotions/GiftClaimList';
 import { useCartPromotions } from '../../hooks/useCartPromotions';
 // The old combo-banner/cart-rule discount preview (FreeShippingBanner,
 // useEvaluateCartRulesQuery, useGetAllFreeShippingBannersQuery) was removed
@@ -241,9 +243,11 @@ const CartDrawer = ({ isOpen, onClose }) => {
           ) : (
             <>
               {/* Free-shipping threshold nudge — hidden unless admin's promotion is on */}
-              <FreeShippingStrip cartTotal={subtotal} variant="compact" className="mb-3" />
+              <OfferProgress location="cart" className="mb-3" fallback={<FreeShippingStrip cartTotal={subtotal} variant="compact" className="mb-3" />} />
               {/* Other active Promotion V2 offers — renders nothing when none apply */}
               <PromotionBannerList promotions={cartPromotions} pricing={promotionPricing} className="mb-3" />
+              {/* free gifts: claim card, then a FREE GIFT line once claimed — never added automatically */}
+              <GiftClaimList className="mb-3" />
               <div className="divide-y divide-hair">
                 {cartItems.map((item) => {
                   const itemQty = typeof item.quantity === 'object' ? Number(item.quantity?.quantity || 0) : Number(item.quantity || 0);

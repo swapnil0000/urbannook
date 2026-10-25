@@ -24,6 +24,7 @@ import { addItem, updateQuantity, removeItem, updateSelection } from '../../stor
 import { useUI } from '../../hooks/useRedux';
 import { useCartData } from '../../hooks/useCartSync';
 import FreeShippingStrip from '../../component/FreeShippingStrip';
+import OfferProgress from '../../component/festive/OfferProgress';
 
 const MotionDiv = motion.div;
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
@@ -750,7 +751,7 @@ const ProductDetailPage = () => {
 
               {/* Free-shipping threshold, right under the CTA where the buy
                   decision happens — hidden unless admin's promotion is on. */}
-              {!isOutOfStock && <FreeShippingStrip cartTotal={cartTotal} variant="compact" className="mt-3" />}
+              {!isOutOfStock && <OfferProgress location="product" className="mt-3" fallback={<FreeShippingStrip cartTotal={cartTotal} variant="compact" className="mt-3" />} />}
 
               {/* Customization — admin opt-in per product (product.isCustomizable),
                   not every product is customisable. Carries the product (and the

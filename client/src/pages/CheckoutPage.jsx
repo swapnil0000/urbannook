@@ -19,7 +19,7 @@ import {
 } from "../store/api/userApi";
 import { setShowLoginModal, setLoginCallback } from "../store/slices/uiSlice";
 import { useUI } from "../hooks/useRedux";
-import { clearCart, removeItem } from "../store/slices/cartSlice";
+import { clearCart, removeItem, pruneGiftClaims } from "../store/slices/cartSlice";
 import { resolveVariantTitle } from "../utils/variantTitle";
 import { fetchCsrfToken } from "../store/api/apiSlice";
 import { getApiUrl } from "../config/appUrls";
@@ -29,7 +29,9 @@ import { ComponentLoader } from "../component/layout/LoadingSpinner";
 import { getClaimedMobile, getClaimedCode, isOfferLive } from "../config/siteOffer";
 import SiteOfferBanner from "../component/SiteOfferBanner";
 import FreeShippingStrip from "../component/FreeShippingStrip";
+import OfferCheckoutReminder from "../component/offers/OfferCheckoutReminder";
 import PromotionBannerList from "../component/promotions/PromotionBannerList";
+import GiftClaimList from "../component/promotions/GiftClaimList";
 import SealBadgeCard, { UnderlineAmount } from "../component/promotions/SealBadgeCard";
 import { useGetCheckoutPromotionsQuery } from "../store/api/userApi";
 import { buildPromotionCartItems } from "../utils/promotionCartItems";
@@ -272,7 +274,7 @@ const CheckoutPage = () => {
   const showNotificationRef = useRef(showNotification);
   useEffect(() => { showNotificationRef.current = showNotification; }, [showNotification]);
 
-  const { items: cartItems, selections: cartSelections, giftWrap: giftWrapSelected, giftWrapNoteOptions } = useSelector((s) => s.cart);
+  const { items: cartItems, selections: cartSelections, giftWrap: giftWrapSelected, giftWrapNoteOptions, claimedGifts } = useSelector((s) => s.cart);
   const { isAuthenticated } = useSelector((s) => s.auth);
   const shippingDelayMessage = useShippingDelayNotice();
   const isGuest = !isAuthenticated && !localStorage.getItem("authToken");
@@ -1203,6 +1205,7 @@ const CheckoutPage = () => {
           },
           paymentMethod,
           magic: useMagic, // server skips address/shipping and sends line_items
+        claimedGifts, // free gifts the shopper explicitly claimed; the server re-validates each one
           ...(appliedCoupon ? { couponCode: appliedCoupon } : {}),
           // Guests have no server-side cart to read this from — the boolean
           // intent has to come from the request. Price is still never
@@ -1259,6 +1262,7 @@ const CheckoutPage = () => {
         });
         rp.open();
       } catch (e) {
+        if (handleGiftClaimError(e)) return;
         const msg = e?.data?.message || e?.message || "Failed to initialize payment.";
         showNotification(msg, "error"); setPaymentError(msg); setShowRetry(true);
         // Express skipped our forms on the promise that Magic would collect
@@ -1303,6 +1307,7 @@ const CheckoutPage = () => {
         },
         paymentMethod,
         magic: useMagic, // server skips address/shipping and sends line_items
+        claimedGifts, // free gifts the shopper explicitly claimed; the server re-validates each one
         ...getFbCookies(), // _fbp / _fbc → stored on order for CAPI match quality
         ...getGaIds(), // GA4 client/session id → webhook fallback purchase joins the same GA4 session
       }).unwrap();
@@ -1351,6 +1356,7 @@ const CheckoutPage = () => {
       });
       rp.open();
     } catch (e) {
+      if (handleGiftClaimError(e)) return;
       const msg = e?.data?.message || e?.message || "Failed to initialize payment.";
       showNotification(msg, "error"); setPaymentError(msg); setShowRetry(true);
       // Express skipped the forms expecting Magic to collect everything. If the
@@ -1381,6 +1387,17 @@ const CheckoutPage = () => {
     giftWrapSelected && giftWrapOffer?.isActive
       ? (Number(giftWrapOffer.price) || 0) * giftWrapEligibleCount
       : 0;
+  // The server refuses an order whose claimed free gift is no longer valid (offer ended, cart changed,
+  // out of stock). Drop exactly those claims and tell the shopper — nothing is silently charged or dropped.
+  const handleGiftClaimError = (e) => {
+    const data = e?.data?.data;
+    if (data?.code !== "GIFT_CLAIM_INVALID") return false;
+    dispatch(pruneGiftClaims((data.rejected || []).map((r) => r.key)));
+    showNotification(e?.data?.message || "A free gift you claimed is no longer available. Please review your cart.", "error");
+    setShowRetry(false);
+    return true;
+  };
+
   const totalToPay = pricingDetails.subtotal + giftWrapAmount + shippingAmount - pricingDetails.discount;
 
   // ── Payment-action helpers (money-critical: never charge a stale amount) ──
@@ -1655,6 +1672,8 @@ const CheckoutPage = () => {
 
   return (
     <div className="bg-[#f5f7f5]">
+      {/* Offer reminder: only if the shopper opened an offer and added part of it; "No thanks" never blocks checkout */}
+      <OfferCheckoutReminder />
       {/* ── Step wizard ────────────────────────────────────────────────── */}
       <div className="bg-white border-b border-gray-100 pt-8 lg:pt-10">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 pb-6">
@@ -1766,6 +1785,10 @@ const CheckoutPage = () => {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4">
           <PromotionBannerList promotions={checkoutPromotions} pricing={checkoutPromotionsData?.data?.pricing} />
         </div>
+      )}
+      {/* Claimed free gifts that will be in the parcel (claiming itself happens in the cart) */}
+      {currentStep === reviewStep && (
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4"><GiftClaimList readOnly /></div>
       )}
       {/* ── Main ───────────────────────────────────────────────────────── */}
       <div className={`max-w-5xl mx-auto px-4 sm:px-6 pt-8 lg:pb-14 lg:grid lg:grid-cols-[1fr_360px] lg:gap-10 lg:items-start ${(isGuest && currentStep === 1) ? "pb-8" : "pb-32 lg:pb-14"}`}>

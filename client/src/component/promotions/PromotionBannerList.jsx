@@ -13,7 +13,8 @@ import PromotionBanner from "./PromotionBanner";
  *   useGetCheckoutPromotionsQuery (already sanitized server-side).
  */
 const PromotionBannerList = ({ promotions = [], pricing, className = "" }) => {
-  const visible = promotions.filter((p) => p.displayType !== "free_shipping" && !p.rewardTargetPending && p.applied);
+  // free gifts are claimed explicitly (GiftClaimList), so they are not shown here as an automatic "applied" offer
+  const visible = promotions.filter((p) => p.displayType !== "free_shipping" && p.displayType !== "free_gift" && !p.rewardTargetPending && p.applied);
   if (visible.length === 0) return null;
 
   return (

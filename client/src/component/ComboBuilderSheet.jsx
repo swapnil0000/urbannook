@@ -6,6 +6,7 @@ import { useAddToCartMutation, useGetCartPromotionsQuery } from '../store/api/us
 import { useSiteCampaign } from '../hooks/useSiteCampaign';
 import { trackAddToCart } from '../utils/analytics';
 import { Garland, HangingDiya } from './festive/FestiveLights';
+import { buildPromotionCartItems } from '../utils/promotionCartItems';
 
 const inr = (n) => `₹${Math.round(Number(n) || 0).toLocaleString('en-IN')}`;
 const keyOf = (c) => `${c.productId}:${c.sku || ''}`;
@@ -15,7 +16,7 @@ const Check = () => (
   <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10" /></svg>
 );
 
-/** One compact variant tile: 1:1 thumb, variant-specific name, MRP + price + % off. */
+/** One compact variant tile (glass): 1:1 thumb, variant-specific name, MRP + price + % off. */
 const VariantTile = ({ card, selected, onPick }) => {
   const off = pctOff(card);
   const name = card.variantName || card.productName;
@@ -26,21 +27,21 @@ const VariantTile = ({ card, selected, onPick }) => {
       disabled={card.outOfStock}
       aria-pressed={selected}
       title={name}
-      className={`relative flex min-w-0 items-center gap-2 border bg-white p-1.5 text-left transition-colors ${selected ? 'border-ink shadow-[inset_0_0_0_1px_rgb(var(--gl-ink))]' : 'border-hair hover:border-ink/40'} ${card.outOfStock ? 'cursor-not-allowed opacity-50' : ''}`}
+      className={`un-bs-glass relative flex min-w-0 items-center gap-2.5 p-2 text-left transition-all duration-200 ${selected ? 'un-bs-on' : ''} ${card.outOfStock ? 'cursor-not-allowed opacity-45' : 'hover:-translate-y-px'}`}
     >
-      <span className="relative h-[52px] w-[52px] shrink-0 overflow-hidden bg-surface">
-        {card.image && <img src={card.image} alt="" loading="lazy" className="h-full w-full object-cover" />}
+      <span className="relative h-[54px] w-[54px] shrink-0 overflow-hidden bg-white/10 ring-1 ring-white/15">
+        {card.image && <img src={card.image} alt="" loading="lazy" className={`h-full w-full object-cover ${card.outOfStock ? 'grayscale' : ''}`} />}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="line-clamp-2 block text-[11.5px] font-semibold leading-[1.25] text-ink">{name}</span>
-        <span className="mt-0.5 flex flex-wrap items-baseline gap-x-1.5">
-          <span className="text-[13px] font-bold tabular-nums text-ink">{inr(card.price)}</span>
-          {off > 0 && <span className="text-[10.5px] tabular-nums text-faint line-through">{inr(card.mrp)}</span>}
-          {off > 0 && <span className="text-[10.5px] font-bold text-save">{off}% off</span>}
+        <span className="line-clamp-2 block text-[11.5px] font-medium leading-[1.25] text-paper">{name}</span>
+        <span className="mt-1 flex flex-wrap items-baseline gap-x-1.5">
+          <span className="text-[13.5px] font-bold tabular-nums text-star">{inr(card.price)}</span>
+          {off > 0 && <span className="text-[10.5px] tabular-nums text-paper/45 line-through">{inr(card.mrp)}</span>}
+          {off > 0 && <span className="un-bs-save text-[10.5px] font-bold">{off}% off</span>}
         </span>
       </span>
-      {card.outOfStock && <span className="absolute right-1 top-1 bg-ink px-1 py-px text-[9px] font-bold uppercase tracking-wide text-paper">Sold out</span>}
-      {selected && <span className="absolute right-1 top-1 grid h-4 w-4 place-items-center bg-ink text-paper"><Check /></span>}
+      {card.outOfStock && <span className="absolute right-1 top-1 bg-white/15 px-1 py-px text-[9px] font-bold uppercase tracking-wide text-paper">Sold out</span>}
+      {selected && <span className="absolute right-1 top-1 grid h-4 w-4 place-items-center bg-star text-ink"><Check /></span>}
     </button>
   );
 };
@@ -51,18 +52,48 @@ const VariantTile = ({ card, selected, onPick }) => {
  * (`combo.builder`). Pricing and validity of the exact selection come from the
  * existing cart promotion endpoint, so the sheet never invents a discount.
  */
-const ComboBuilderSheet = ({ combo, onClose }) => {
+const ComboBuilderSheet = ({ combo, onClose, mode = 'builder', cartItems = [], onDismiss }) => {
   const dispatch = useDispatch();
   const { isAuthenticated } = useSelector((s) => s.auth);
   const [addToCartAPI] = useAddToCartMutation();
   const { active: festive, can } = useSiteCampaign();
   const combos = combo.builder?.combos || [];
-  const [comboIdx, setComboIdx] = useState(0);
+  const reminder = mode === 'reminder';
+
+  // Reminder mode: what is already in the cart fills the slots it can (those slots are
+  // locked and never added twice), so the sheet only asks for what is still missing.
+  const fitCart = (c) => {
+    const pool = [];
+    buildPromotionCartItems(cartItems).forEach((i) => { for (let k = 0; k < i.quantity; k += 1) pool.push(i); });
+    const picks = {};
+    const locks = {};
+    c.slots.forEach((slot, si) => {
+      const ui = pool.findIndex((u) => slot.options.some((o) => String(o.productId) === String(u.productId)));
+      if (ui < 0) return;
+      const u = pool.splice(ui, 1)[0];
+      const opt = slot.options.find((o) => String(o.productId) === String(u.productId));
+      picks[si] = opt.cards.find((x) => x.variantName === u.selectedVariant) || opt.cards[0];
+      locks[si] = true;
+    });
+    return { picks, locks, score: Object.keys(locks).length };
+  };
+  const [init] = useState(() => {
+    if (!reminder) return { idx: 0, picks: {}, locks: {} };
+    let best = { idx: 0, picks: {}, locks: {}, score: -1 };
+    combos.forEach((c, idx) => { const f = fitCart(c); if (f.score > best.score) best = { idx, ...f }; });
+    return best;
+  });
+
+  const [comboIdx, setComboIdx] = useState(init.idx);
   const current = combos[comboIdx];
   const slots = current?.slots || [];
 
-  const [picked, setPicked] = useState({}); // slot index -> card
-  const [activeSlot, setActiveSlot] = useState(0);
+  const [picked, setPicked] = useState(init.picks); // slot index -> card
+  const [locked, setLocked] = useState(init.locks); // slot index -> already in the cart
+  const [activeSlot, setActiveSlot] = useState(() => {
+    const free = (combos[init.idx]?.slots || []).findIndex((_, i) => !init.locks[i]);
+    return free < 0 ? 0 : free;
+  });
   const [filter, setFilter] = useState({}); // slot index -> productId (for slots accepting several products)
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -73,12 +104,18 @@ const ComboBuilderSheet = ({ combo, onClose }) => {
     setVisible(false);
     setTimeout(onClose, 250);
   };
+  // closing a reminder is a "no thanks" — never forced
+  const dismiss = () => {
+    setVisible(false);
+    setTimeout(() => (onDismiss ? onDismiss() : onClose()), 250);
+  };
+  const closeAction = reminder ? dismiss : close;
 
   useEffect(() => {
     const raf = requestAnimationFrame(() => setVisible(true));
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    const onKey = (e) => e.key === 'Escape' && close();
+    const onKey = (e) => e.key === 'Escape' && closeAction();
     document.addEventListener('keydown', onKey);
     return () => {
       cancelAnimationFrame(raf);
@@ -94,6 +131,15 @@ const ComboBuilderSheet = ({ combo, onClose }) => {
   // Switching combination keeps every selection that is still allowed in its slot.
   const switchCombo = (idx) => {
     const next = combos[idx];
+    if (reminder) {
+      const f = fitCart(next);
+      setPicked(f.picks);
+      setLocked(f.locks);
+      setComboIdx(idx);
+      setActiveSlot(Math.max(0, next.slots.findIndex((_, i) => !f.locks[i])));
+      setFilter({});
+      return;
+    }
     setPicked((prev) => {
       const kept = {};
       next.slots.forEach((slot, i) => {
@@ -108,10 +154,11 @@ const ComboBuilderSheet = ({ combo, onClose }) => {
   };
 
   const pick = (card) => {
+    if (locked[activeSlot]) return;
     setPicked((prev) => {
       const next = { ...prev, [activeSlot]: card };
       // move on to the next empty slot
-      const nextEmpty = slots.findIndex((_, i) => !next[i]);
+      const nextEmpty = slots.findIndex((_, i) => !next[i] && !locked[i]);
       if (nextEmpty >= 0) setActiveSlot(nextEmpty);
       return next;
     });
@@ -146,8 +193,22 @@ const ComboBuilderSheet = ({ combo, onClose }) => {
   const comboSavings = unlocked ? Math.max(0, Number(pricing?.savings) || 0) : 0;
   const finalPrice = pricing?.discountedSubtotal ?? sellingTotal;
   const reward = current?.reward;
+  // only a FREE product gets a tile in the preview; discounts / shipping stay in the summary
+  const showRewardTile = reward?.kind === 'free';
   const rewardWorth = unlocked && reward?.kind === 'free' && typeof reward.worth === 'number' ? reward.worth : 0;
   const totalSaved = markdown + comboSavings + rewardWorth;
+
+  // units actually added: in reminder mode the ones already in the cart are skipped
+  const addLines = (() => {
+    const m = new Map();
+    slots.forEach((_, i) => {
+      const c = picked[i];
+      if (!c || locked[i]) return;
+      const k = keyOf(c);
+      m.set(k, { card: c, quantity: (m.get(k)?.quantity || 0) + 1 });
+    });
+    return [...m.values()];
+  })();
 
   const addCombo = async () => {
     if (!unlocked || busyRef.current) return;
@@ -156,7 +217,7 @@ const ComboBuilderSheet = ({ combo, onClose }) => {
     setError('');
     try {
       const loggedIn = isAuthenticated || !!localStorage.getItem('authToken');
-      for (const { card, quantity } of lines) {
+      for (const { card, quantity } of addLines) {
         if (loggedIn) {
           // sequential so the cart never races itself
           // eslint-disable-next-line no-await-in-loop
@@ -189,8 +250,16 @@ const ComboBuilderSheet = ({ combo, onClose }) => {
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-label={combo.title}>
-      <button type="button" aria-label="Close" onClick={close} className={`absolute inset-0 bg-ink/60 backdrop-blur-[3px] transition-opacity duration-300 ${visible ? 'opacity-100' : 'opacity-0'}`} />
-      <div className={`relative flex max-h-[92dvh] w-full flex-col overflow-hidden bg-paper shadow-2xl transition-transform duration-300 ease-out sm:max-w-[600px] ${visible ? 'translate-y-0' : 'translate-y-full sm:translate-y-8'}`}>
+      <button
+        type="button"
+        aria-label="Close"
+        onClick={closeAction}
+        className={`absolute inset-0 cursor-default backdrop-blur-md transition-opacity duration-300 ${visible ? 'opacity-100' : 'opacity-0'}`}
+        style={{ background: 'radial-gradient(90% 60% at 50% 100%, rgb(var(--gl-brand-hi) / 0.35), transparent 70%), rgb(var(--gl-ink) / 0.72)' }}
+      />
+      <div className={`un-bs relative flex max-h-[92dvh] w-full flex-col overflow-hidden text-paper transition-transform duration-300 ease-out sm:max-w-[600px] ${visible ? 'translate-y-0' : 'translate-y-full sm:translate-y-8'}`}>
+        {/* warm light across the top edge */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-star to-transparent" aria-hidden="true" />
         {/* minimal festive edge: a thin string of lights + two small hanging diyas */}
         {festive && can('lights') && <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-[22px] overflow-hidden" aria-hidden="true"><Garland arcs={4} /></div>}
         {festive && can('diyas') && (
@@ -201,20 +270,27 @@ const ComboBuilderSheet = ({ combo, onClose }) => {
         )}
 
         {/* A. compact header */}
-        <header className={`shrink-0 border-b border-hair px-4 pb-3 sm:px-5 ${festive && can('lights') ? 'pt-7' : 'pt-4'}`}>
+        <header className={`shrink-0 border-b border-white/10 px-4 pb-3 sm:px-5 ${festive && can('lights') ? 'pt-7' : 'pt-4'}`}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="inline-flex items-center gap-1.5 border border-star/60 bg-star/15 px-2 py-0.5 text-[9.5px] font-extrabold uppercase tracking-[0.1em] text-ink"><span aria-hidden="true">✦</span> {festive ? 'Festive offer' : 'Combo offer'}</p>
-              <h3 className="mt-1.5 truncate font-archivo text-[19px] font-bold leading-tight text-ink">{combo.title}</h3>
-              {current?.description && <p className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-muted">{current.description}</p>}
+              <p className="un-bs-glass inline-flex items-center gap-1.5 px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.16em] text-star"><span aria-hidden="true">✦</span> {reminder ? 'Offer reminder' : festive ? 'Festive offer' : 'Combo offer'}</p>
+              <h3 className={`mt-1.5 font-archivo font-bold leading-tight tracking-tight text-paper ${reminder ? 'text-[18px]' : 'truncate text-[20px]'}`}>{reminder ? 'Add these products to unlock your offer' : combo.title}</h3>
+              {(reminder || current?.description) && <p className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-paper/65">{reminder ? `${combo.title}${current?.description ? ` — ${current.description}` : ''}` : current?.description}</p>}
             </div>
-            <button type="button" onClick={close} aria-label="Close" className="grid h-9 w-9 shrink-0 place-items-center border border-hair text-xl leading-none text-ink hover:bg-surface">×</button>
+            <button type="button" onClick={closeAction} aria-label="Close" className="un-bs-glass grid h-9 w-9 shrink-0 place-items-center text-xl leading-none text-paper/80 transition-colors hover:text-star">×</button>
           </div>
 
           {combos.length > 1 && (
-            <div className="-mx-4 mt-2.5 flex gap-1.5 overflow-x-auto px-4 pb-0.5 gl-hscroll sm:-mx-5 sm:px-5" role="tablist" aria-label="Combination">
+            <div className="-mx-4 mt-3 flex gap-1.5 overflow-x-auto px-4 pb-0.5 gl-hscroll sm:-mx-5 sm:px-5" role="tablist" aria-label="Combination">
               {combos.map((c, i) => (
-                <button key={c.promotionId} type="button" role="tab" aria-selected={i === comboIdx} onClick={() => switchCombo(i)} className={`shrink-0 border px-3 py-1.5 text-[12px] font-semibold transition-colors ${i === comboIdx ? 'border-ink bg-ink text-paper' : 'border-hair bg-white text-ink hover:border-ink/40'}`}>
+                <button
+                  key={c.promotionId}
+                  type="button"
+                  role="tab"
+                  aria-selected={i === comboIdx}
+                  onClick={() => switchCombo(i)}
+                  className={`shrink-0 px-3 py-1.5 text-[12px] font-semibold transition-all ${i === comboIdx ? 'bg-gradient-to-r from-star to-[#f0a52a] text-ink shadow-[0_6px_18px_-8px_rgb(var(--gl-star))]' : 'un-bs-glass text-paper/80 hover:text-paper'}`}
+                >
                   {c.label}
                 </button>
               ))}
@@ -223,86 +299,127 @@ const ComboBuilderSheet = ({ combo, onClose }) => {
         </header>
 
         {!current ? (
-          <p className="px-5 py-10 text-center text-sm text-muted">This offer is not available right now.</p>
+          <p className="px-5 py-10 text-center text-sm text-paper/60">This offer is not available right now.</p>
         ) : (
           <>
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-5">
-              {/* B. selected combo preview — one slot per required product */}
-              <div className={`grid gap-2 ${slots.length >= 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
-                {slots.map((slot, i) => {
-                  const c = picked[i];
-                  const on = i === activeSlot;
-                  return (
-                    <button key={i} type="button" onClick={() => setActiveSlot(i)} aria-pressed={on} className={`relative flex min-w-0 items-center gap-2 border-2 bg-white p-1.5 text-left transition-colors ${on ? 'border-brand' : 'border-hair'}`}>
-                      <span className="grid h-[46px] w-[46px] shrink-0 place-items-center overflow-hidden bg-surface">
-                        {c?.image ? <img src={c.image} alt="" className="h-full w-full object-cover" /> : <span className="text-[18px] font-light text-faint" aria-hidden="true">+</span>}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className={`block text-[9.5px] font-extrabold uppercase tracking-wider ${on ? 'text-brand' : 'text-faint'}`}>{on ? `Choosing item ${i + 1}` : `Item ${i + 1}`}</span>
-                        {c ? (
-                          <>
-                            <span className="block truncate text-[11.5px] font-semibold leading-tight text-ink" title={c.variantName || c.productName}>{c.variantName || c.productName}</span>
-                            <span className="block text-[11.5px] font-bold tabular-nums text-ink">{inr(c.price)}</span>
-                          </>
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3.5 sm:px-5">
+              {/* B. image-only combo preview: what you add  →  what you unlock */}
+              <div className="un-bs-glass p-2.5">
+                <div className="flex items-end gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="gl-lbl mb-1.5 text-[9px] text-paper/55" style={{ letterSpacing: '0.18em' }}>Adding to cart</p>
+                    <div className="flex gap-1.5">
+                      {slots.map((slot, i) => {
+                        const c = picked[i];
+                        const on = i === activeSlot;
+                        return (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => !locked[i] && setActiveSlot(i)}
+                            aria-pressed={on}
+                            aria-label={c ? `Item ${i + 1}: ${c.variantName || c.productName}` : `Choose item ${i + 1}`}
+                            className={`relative aspect-square w-full max-w-[64px] overflow-hidden transition-all duration-200 ${c ? 'bg-white/10' : 'border border-dashed border-white/25 bg-white/[0.04]'} ${on ? 'ring-2 ring-star shadow-[0_0_16px_-4px_rgb(var(--gl-star))]' : 'ring-1 ring-white/15'}`}
+                          >
+                            {c?.image
+                              ? <img src={c.image} alt="" className="h-full w-full object-cover" />
+                              : <span className="grid h-full w-full place-items-center text-[22px] font-light text-paper/40" aria-hidden="true">+</span>}
+                            {locked[i] && <span className="absolute inset-x-0 bottom-0 bg-ink/85 py-px text-center text-[8px] font-bold uppercase tracking-wide text-star">In cart</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {showRewardTile && <span className="pb-[18px] text-lg leading-none text-star" aria-hidden="true">→</span>}
+
+                  {showRewardTile && (
+                    <div className="shrink-0">
+                      <p className="gl-lbl mb-1.5 text-[9px] text-paper/55" style={{ letterSpacing: '0.18em' }}>You&apos;ll unlock</p>
+                      <div
+                        className={`relative h-[64px] w-[64px] overflow-hidden transition-all duration-300 ${unlocked ? 'ring-2 ring-star shadow-[0_0_22px_-3px_rgb(var(--gl-star))]' : 'ring-1 ring-white/15'}`}
+                        title={reward.name}
+                      >
+                        {reward.image ? (
+                          <img src={reward.image} alt="" className={`h-full w-full object-cover transition-all duration-300 ${unlocked ? '' : 'opacity-50 grayscale'}`} />
                         ) : (
-                          <span className="block truncate text-[11.5px] text-muted">{slot.options.length === 1 ? slot.options[0].label : 'Select a variant'}</span>
+                          <span className={`grid h-full w-full place-items-center bg-white/10 text-[26px] transition-opacity duration-300 ${unlocked ? 'text-star' : 'text-paper/45'}`} aria-hidden="true">
+                            {reward.kind === 'shipping' ? <i className="fa-solid fa-truck-fast" /> : <i className="fa-solid fa-gift" />}
+                          </span>
                         )}
-                      </span>
-                    </button>
-                  );
-                })}
+                        {reward.badge && (
+                          <span className={`absolute inset-x-0 bottom-0 py-[3px] text-center text-[10px] font-extrabold uppercase tracking-wide ${unlocked ? 'bg-gradient-to-r from-star to-[#f0a52a] text-ink' : 'bg-ink/80 text-paper/80'}`}>{reward.badge}</span>
+                        )}
+                        {!unlocked && <span className="absolute right-0.5 top-0.5 grid h-4 w-4 place-items-center bg-ink/80 text-[8px] text-paper/80"><i className="fa-solid fa-lock" aria-hidden="true" /></span>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {showRewardTile && (
+                  <p className="mt-2 text-center text-[10.5px] text-paper/55" aria-live="polite">
+                    {unlocked ? 'Unlocked — added with your combo' : complete ? 'Checking this combination…' : 'Complete your picks to unlock'}
+                  </p>
+                )}
               </div>
 
               {/* C. eligible variants of the slot being edited */}
-              <div className="mt-3 flex items-center justify-between gap-2">
-                <p className="text-[11px] font-extrabold uppercase tracking-wider text-ink">Choose item {activeSlot + 1}</p>
+              <div className="mb-2 mt-4 flex items-center justify-between gap-2">
+                <p className="gl-lbl text-[10px] text-star/90" style={{ letterSpacing: '0.2em' }}>Choose item {activeSlot + 1}</p>
                 {slotDef && slotDef.options.length > 1 && (
                   <div className="flex gap-1" role="group" aria-label="Product">
                     {slotDef.options.map((o) => (
-                      <button key={o.productId} type="button" onClick={() => setFilter((f) => ({ ...f, [activeSlot]: o.productId }))} aria-pressed={o.productId === activeProduct} className={`border px-2 py-0.5 text-[11px] font-semibold ${o.productId === activeProduct ? 'border-ink bg-ink text-paper' : 'border-hair bg-white text-ink'}`}>{o.label}</button>
+                      <button key={o.productId} type="button" onClick={() => setFilter((f) => ({ ...f, [activeSlot]: o.productId }))} aria-pressed={o.productId === activeProduct} className={`px-2 py-0.5 text-[11px] font-semibold transition-colors ${o.productId === activeProduct ? 'bg-star text-ink' : 'un-bs-glass text-paper/75'}`}>{o.label}</button>
                     ))}
                   </div>
                 )}
               </div>
-              <div className={`mt-2 grid gap-1.5 ${gridCols}`}>
+              <div className={`grid gap-2 ${gridCols}`}>
                 {gridCards.map((card) => (
                   <VariantTile key={keyOf(card)} card={card} selected={picked[activeSlot] && keyOf(picked[activeSlot]) === keyOf(card)} onPick={pick} />
                 ))}
               </div>
-              {error && <p className="mt-3 border border-brand/20 bg-brand/5 px-3 py-2 text-xs font-semibold text-brand" role="alert">{error}</p>}
+              {error && <p className="mt-3 border border-brand/40 bg-brand/15 px-3 py-2 text-xs font-semibold text-paper" role="alert">{error}</p>}
             </div>
 
             {/* D. sticky combo price summary + action */}
-            <footer className="shrink-0 border-t border-hair bg-paper px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-2.5 sm:px-5">
+            <footer className="shrink-0 border-t border-white/10 bg-ink/55 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md sm:px-5">
               {complete ? (
-                <dl className="mb-2 space-y-0.5 text-[12.5px]" aria-live="polite">
-                  <div className="flex justify-between text-muted"><dt>Items (MRP)</dt><dd className={`tabular-nums ${markdown > 0 ? 'line-through' : ''}`}>{inr(mrpTotal)}</dd></div>
-                  {markdown > 0 && <div className="flex justify-between text-muted"><dt>Product discount</dt><dd className="tabular-nums text-save">− {inr(markdown)}</dd></div>}
-                  {comboSavings > 0 && <div className="flex justify-between text-muted"><dt>Combo discount</dt><dd className="tabular-nums text-save">− {inr(comboSavings)}</dd></div>}
+                <dl className="mb-2.5 space-y-0.5 text-[12.5px]" aria-live="polite">
+                  <div className="flex justify-between text-paper/60"><dt>Items (MRP)</dt><dd className={`tabular-nums ${markdown > 0 ? 'line-through' : ''}`}>{inr(mrpTotal)}</dd></div>
+                  {markdown > 0 && <div className="flex justify-between text-paper/60"><dt>Product discount</dt><dd className="un-bs-save tabular-nums font-semibold">− {inr(markdown)}</dd></div>}
+                  {comboSavings > 0 && <div className="flex justify-between text-paper/60"><dt>Combo discount</dt><dd className="un-bs-save tabular-nums font-semibold">− {inr(comboSavings)}</dd></div>}
                   {reward && reward.kind === 'free' && (
-                    <div className="flex justify-between text-muted">
+                    <div className="flex justify-between text-paper/60">
                       <dt className="truncate pr-2">{reward.name}</dt>
-                      <dd className="shrink-0 font-bold text-save">{unlocked ? <>FREE {typeof reward.worth === 'number' ? <span className="font-normal text-faint line-through">{inr(reward.worth)}</span> : reward.worth ? <span className="font-normal">({reward.worth})</span> : null}</> : '—'}</dd>
+                      <dd className="shrink-0 font-bold text-star">{unlocked ? <>FREE {typeof reward.worth === 'number' ? <span className="font-normal text-paper/45 line-through">{inr(reward.worth)}</span> : reward.worth ? <span className="font-normal text-paper/70">({reward.worth})</span> : null}</> : '—'}</dd>
                     </div>
                   )}
-                  {reward && reward.kind === 'shipping' && unlocked && <div className="flex justify-between text-muted"><dt>Shipping</dt><dd className="font-bold text-save">FREE</dd></div>}
-                  <div className="flex items-baseline justify-between border-t border-hair pt-1.5 text-ink">
-                    <dt className="font-bold">You pay</dt>
-                    <dd className="flex items-baseline gap-2">
-                      {unlocked && totalSaved > 0 && <span className="bg-save px-1.5 py-0.5 text-[10.5px] font-semibold text-white">You save {inr(totalSaved)}</span>}
-                      <span className="font-archivo text-[20px] font-extrabold tabular-nums">{isFetching && !pricing ? '…' : inr(finalPrice)}</span>
+                  {reward && reward.kind === 'shipping' && unlocked && <div className="flex justify-between text-paper/60"><dt>Shipping</dt><dd className="font-bold text-star">FREE</dd></div>}
+                  <div className="flex items-baseline justify-between border-t border-white/10 pt-2 text-paper">
+                    <dt className="font-semibold">You pay</dt>
+                    <dd className="flex items-baseline gap-2.5">
+                      {unlocked && totalSaved > 0 && <span className="bg-gradient-to-r from-star to-[#f0a52a] px-2 py-0.5 text-[10.5px] font-bold text-ink">You save {inr(totalSaved)}</span>}
+                      <span className="font-archivo text-[22px] font-bold tabular-nums text-star">{isFetching && !pricing ? '…' : inr(finalPrice)}</span>
                     </dd>
                   </div>
-                  {!unlocked && !isFetching && <p className="pt-1 text-[11.5px] text-brand">This selection does not unlock the offer. Try another combination.</p>}
+                  {!unlocked && !isFetching && <p className="pt-1 text-[11.5px] text-paper/80">This selection does not unlock the offer. Try another combination.</p>}
                 </dl>
               ) : (
-                <p className="mb-2 text-center text-[12px] text-muted">
+                <p className="mb-2.5 text-center text-[12px] text-paper/65">
                   Pick {slots.length - selection.length} more {slots.length - selection.length === 1 ? 'item' : 'items'} to unlock{reward?.name ? ` ${reward.kind === 'free' ? `your free ${reward.name}` : reward.name}` : ' this offer'}.
                 </p>
               )}
-              <button type="button" onClick={addCombo} disabled={!unlocked || busy} className="flex h-12 w-full items-center justify-center bg-ink text-[15px] font-semibold text-paper transition-colors hover:bg-black disabled:opacity-45">
-                {busy ? 'Adding…' : 'Add Selected Combo to Cart'}
+              <button
+                type="button"
+                onClick={addCombo}
+                disabled={!unlocked || busy}
+                className="flex h-12 w-full items-center justify-center bg-gradient-to-r from-star via-[#f7b733] to-[#f0a52a] text-[15px] font-bold tracking-tight text-ink shadow-[0_10px_28px_-10px_rgb(var(--gl-star)/0.8)] transition-all hover:brightness-105 disabled:bg-none disabled:bg-white/10 disabled:text-paper/40 disabled:shadow-none"
+              >
+                {busy ? 'Adding…' : reminder ? 'Add & Unlock Offer' : 'Add Selected Combo to Cart'}
               </button>
+              {reminder && (
+                <button type="button" onClick={dismiss} className="mt-2 block w-full py-1 text-center text-[12.5px] text-paper/70 underline underline-offset-2 hover:text-paper">No thanks — continue without offer</button>
+              )}
             </footer>
           </>
         )}

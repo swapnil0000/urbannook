@@ -4,6 +4,8 @@ import { useGetProductByIdQuery } from "../../store/api/productsApi";
 import SEOHead from "../../component/SEOHead";
 import RevealCard from "../../component/RevealCard";
 import VariantCard from "../../component/VariantCard";
+import OfferMiniBanner from "../../component/offers/OfferMiniBanner";
+import { useSiteCampaign } from "../../hooks/useSiteCampaign";
 import { trackViewItemList } from "../../utils/analytics";
 
 /**
@@ -17,6 +19,10 @@ const ProductVariantsPage = () => {
   const { productId } = useParams();
   const navigate = useNavigate();
   const { data: productResponse, isLoading, error } = useGetProductByIdQuery(productId);
+
+  // subtle Diwali accents while a festive campaign is live
+  const { active: festiveActive, can } = useSiteCampaign();
+  const festive = festiveActive && can('sectionAccents');
 
   const product = productResponse?.data;
   const variants = product?.variantDetails || [];
@@ -47,6 +53,7 @@ const ProductVariantsPage = () => {
       />
 
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-brand/5 rounded-full blur-[120px] pointer-events-none"></div>
+      {festive && <div className="pointer-events-none absolute inset-x-0 top-0 h-[360px]" style={{ background: 'radial-gradient(60% 100% at 50% 0%, rgb(var(--gl-star) / 0.16), transparent 70%)' }} aria-hidden="true" />}
 
       <section className="pt-[1rem] pb-6 md:pt-[1rem] md:pb-5 px-6 relative z-10">
         <div className="max-w-7xl mx-auto">
@@ -62,6 +69,7 @@ const ProductVariantsPage = () => {
               <h1 className="font-archivo text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-ink leading-[0.95] mb-2">
                 {product.productName}
               </h1>
+              {festive && <span className="mt-3 block h-[3px] w-16 bg-gradient-to-r from-brand via-star to-transparent" aria-hidden="true" />}
               {/* <p className="text-sm md:text-base text-green-50/70 font-light">
                 Choose a variant below.
               </p> */}
@@ -94,7 +102,9 @@ const ProductVariantsPage = () => {
               <h2 className="font-archivo text-2xl font-extrabold text-ink mb-2">No variants available</h2>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+            <>
+            <OfferMiniBanner productId={productId} />
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-8">
               {variants.map((variant, index) => (
                 <RevealCard key={variant._id || variant.sku || index} index={index}>
                   <VariantCard
@@ -106,6 +116,7 @@ const ProductVariantsPage = () => {
                 </RevealCard>
               ))}
             </div>
+            </>
           )}
         </div>
       </section>

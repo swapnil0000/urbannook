@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, useId } from 'react';
+import { useState, useId } from 'react';
 import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { addItem } from '../store/slices/cartSlice';
@@ -7,6 +7,7 @@ import { useSiteCampaign, THEME_COPY } from '../hooks/useSiteCampaign';
 import FestiveCountdown from './festive/FestiveCountdown';
 import SectionDecor from './festive/SectionDecor';
 import ComboBuilderSheet from './ComboBuilderSheet';
+import { recordOfferInterest } from '../utils/offerInterest';
 import CouponOffersSection from './offers/CouponOffersSection';
 
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
@@ -95,7 +96,8 @@ const OrnateDiya = ({ className = '', length = 10, size = 30, delay = 0 }) => {
   );
 };
 
-const OfferCard = ({ combo, festive, priceLabel }) => {
+// Kept for the next phase (what a tile does on click): the full card with its combo builder sheet.
+export const OfferCard = ({ combo, festive, priceLabel }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [added, setAdded] = useState(false);
@@ -233,44 +235,52 @@ const OfferCard = ({ combo, festive, priceLabel }) => {
   );
 };
 
+/**
+ * Compact image-tile grid for the homepage offers (replaces the old large
+ * carousel cards). Each tile = admin-uploaded image + title + a dark-red strip
+ * with the real benefit. Tiles are equal size and fully clickable; what a click
+ * does: opens the offer's primary product's variants page (only that product's variants). Adding it to the cart makes the existing offer bottom sheet open with the eligible products.
+ */
+const OfferTile = ({ combo }) => {
+  const navigate = useNavigate();
+  const reward = combo.builder?.combos?.[0]?.reward;
+  const img = combo.bannerImage || combo.items?.[0]?.image || combo.productImage || reward?.image || '/assets/logo.webp';
+  // both lines come from Admin: the display title (homeCard subtitle, else the promotion name) and the benefit label
+  // (homeCard savings label; "{save}" is resolved server-side from the real engine savings)
+  const tagline = combo.tagline || combo.title;
+  const benefit = combo.benefit || '';
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        if (!combo.primaryProductId) return;
+        // remember the interest (the checkout reminder uses it), then open the plain variants page
+        recordOfferInterest(combo.id, combo.primaryProductId);
+        navigate(`/products/${combo.primaryProductId}`);
+      }}
+      className="un-tile group flex h-full w-full flex-col overflow-hidden text-center transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+      aria-label={benefit ? `${tagline}. ${benefit}` : tagline}
+    >
+      {/* the artwork fills the media area; its edges fade softly into the card instead of a hard frame */}
+      <span className="un-tile-img relative block aspect-[10/9] w-full shrink-0 overflow-hidden">
+        <img src={img} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]" onError={(e) => { e.currentTarget.src = '/assets/logo.webp'; }} />
+      </span>
+      <span className="un-tile-strip flex h-[48px] shrink-0 flex-col items-center justify-center gap-[3px] px-2 text-center">
+        <span className="w-full truncate text-[11.5px] font-semibold leading-none text-white sm:text-[12.5px]">{tagline}</span>
+        {benefit && <span className="un-tile-benefit w-full truncate text-[10px] font-medium leading-none tracking-tight sm:text-[11px]">{benefit}</span>}
+      </span>
+    </button>
+  );
+};
+
 const ComboOfferSection = ({ title, subtitle }) => {
   const { data, isLoading } = useGetHomeComboOffersQuery();
   const { active, can, themeKey } = useSiteCampaign();
   const combos = data?.data?.combos || [];
-  const trackRef = useRef(null);
-  const [idx, setIdx] = useState(0);
-  const [scrollable, setScrollable] = useState(false);
 
   const festive = active && can('sectionAccents');
   const copy = THEME_COPY[themeKey] || {};
   const n = combos.length;
-
-  const stepOf = (el) => (el.children[1] ? el.children[1].offsetLeft - el.children[0].offsetLeft : el.clientWidth);
-
-  const measure = useCallback(() => {
-    const el = trackRef.current;
-    if (!el || !el.firstChild) return;
-    setScrollable(el.scrollWidth > el.clientWidth + 4);
-    const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 4;
-    setIdx(atEnd ? el.children.length - 1 : Math.min(el.children.length - 1, Math.round(el.scrollLeft / stepOf(el))));
-  }, []);
-
-  const go = (i) => {
-    const el = trackRef.current;
-    const target = el?.children[Math.max(0, Math.min(n - 1, i))];
-    if (!el || !target) return;
-    el.scrollTo({ left: target.offsetLeft - el.children[0].offsetLeft, behavior: 'smooth' });
-  };
-
-  useEffect(() => {
-    const el = trackRef.current;
-    if (!el) return undefined;
-    measure();
-    el.addEventListener('scroll', measure, { passive: true });
-    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
-    ro?.observe(el);
-    return () => { el.removeEventListener('scroll', measure); ro?.disconnect(); };
-  }, [measure, n]);
 
   if (isLoading) return null;
   // no combo offers: coupons (if any) still show on their own
@@ -279,56 +289,42 @@ const ComboOfferSection = ({ title, subtitle }) => {
   const eyebrow = festive ? copy.eyebrow || 'Festive Offers' : 'Limited Time';
   const heading = title || (festive ? copy.offersTitle || 'Festive Offers' : 'Combo Offers');
   const sub = subtitle || (festive ? copy.offersSubtitle : '');
-  const priceDefault = festive ? copy.priceLabel || 'Festive Price' : 'Combo Price';
 
   return (
-    <section className="un-offers relative overflow-hidden bg-ink pt-12 pb-10 sm:pt-14 sm:pb-12" aria-label={heading}>
-      {festive && (
-        <>
-          <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(60% 55% at 50% 0%, rgb(var(--gl-brand) / 0.22), transparent 70%)' }} aria-hidden="true" />
-          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-star/60 to-transparent" aria-hidden="true" />
-          <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-star/40 to-transparent" aria-hidden="true" />
-          <SectionDecor />
-        </>
-      )}
+    <div className="relative">
+      <section className="un-offers relative overflow-hidden bg-ink pb-9 pt-12 sm:pb-12 sm:pt-14" aria-label={heading}>
+        {festive && (
+          <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+            <div className="absolute inset-0" style={{ background: 'radial-gradient(60% 55% at 50% 0%, rgb(var(--gl-brand) / 0.22), transparent 70%)' }} />
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-star/60 to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-star/40 to-transparent" />
+            <SectionDecor />
+          </div>
+        )}
 
-      <div className="relative z-10 max-w-[1100px] mx-auto px-4 lg:px-8">
-        <div className="mb-5 text-center sm:mb-7">
-          <span className="inline-flex items-center gap-2 gl-lbl text-[11px] text-star tracking-[0.18em]">
-            <span aria-hidden="true">✦</span> {eyebrow} <span aria-hidden="true">✦</span>
-          </span>
-          <h2 className="font-archivo font-extrabold text-[26px] sm:text-4xl leading-tight text-paper mt-1.5">{heading}</h2>
-          {sub && <p className="text-paper/70 text-sm sm:text-base mt-2 max-w-xl mx-auto">{sub}</p>}
-          {festive && <div className="mt-3 flex justify-center"><FestiveCountdown tone="light" /></div>}
+        <div className="relative z-10 px-4 text-center sm:px-6">
+          <div className="mb-1 sm:mb-2">
+            <span className="inline-flex items-center gap-2 gl-lbl text-[11px] text-star tracking-[0.18em]">
+              <span aria-hidden="true">✦</span> {eyebrow} <span aria-hidden="true">✦</span>
+            </span>
+            <h2 className="mt-1.5 font-archivo text-[26px] font-extrabold leading-tight text-paper sm:text-4xl">{heading}</h2>
+            {sub && <p className="mx-auto mt-2 max-w-xl text-sm text-paper/70 sm:text-base">{sub}</p>}
+            {festive && <div className="mt-3 flex justify-center"><FestiveCountdown tone="light" /></div>}
+          </div>
         </div>
 
-        <div ref={trackRef} className="un-track gl-hscroll mx-auto flex w-fit max-w-full snap-x snap-mandatory items-stretch gap-3 overflow-x-auto px-4 pb-4 pt-1 sm:gap-4 sm:px-6">
-          {combos.map((combo) => (
-            <div key={combo.id} className="w-[66vw] max-w-[296px] shrink-0 snap-start sm:w-[292px]">
-              <OfferCard combo={combo} festive={festive} priceLabel={combo.priceLabel || priceDefault} />
+        {/* offer tiles */}
+        <div className="relative z-10 mx-auto mt-5 flex max-w-[1100px] flex-wrap justify-center gap-x-3.5 gap-y-4 px-4 sm:mt-6 sm:gap-x-4 sm:gap-y-5 sm:px-6 lg:gap-x-5">
+          {combos.map((c) => (
+            <div key={c.id} className="shrink-0 grow-0 basis-[calc((100%_-_1.75rem)/3)] sm:basis-[calc((100%_-_3rem)/4)] lg:basis-[calc((100%_-_6.25rem)/6)]">
+              <OfferTile combo={c} />
             </div>
           ))}
         </div>
 
-        {scrollable && (
-          <div className="mt-1 flex items-center justify-center gap-4">
-            <button type="button" onClick={() => go(idx - 1)} disabled={idx <= 0} className="un-nav grid h-11 w-11 place-items-center rounded-full disabled:opacity-35" aria-label="Previous offer">
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
-            </button>
-            <div className="flex items-center gap-2">
-              {combos.map((c, i) => (
-                <button key={c.id} type="button" onClick={() => go(i)} aria-label={`Go to offer ${i + 1}`} aria-current={i === idx} className={`h-2.5 w-2.5 rounded-full transition-colors ${i === idx ? 'bg-star' : 'bg-paper/30 hover:bg-paper/60'}`} />
-              ))}
-            </div>
-            <button type="button" onClick={() => go(idx + 1)} disabled={idx >= n - 1} className="un-nav grid h-11 w-11 place-items-center rounded-full disabled:opacity-35" aria-label="Next offer">
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
-            </button>
-          </div>
-        )}
-
         <CouponOffersSection variant="strip" />
-      </div>
-    </section>
+      </section>
+    </div>
   );
 };
 

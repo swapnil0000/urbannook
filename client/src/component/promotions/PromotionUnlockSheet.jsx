@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { addItem } from "../../store/slices/cartSlice";
+import { addItem, claimGift } from "../../store/slices/cartSlice";
 import { useAddToCartMutation } from "../../store/api/userApi";
 import { useCartPromotions } from "../../hooks/useCartPromotions";
 import { track, trackAddToCart, trackViewPromotion, trackSelectPromotion } from "../../utils/analytics";
@@ -107,7 +107,7 @@ const PromotionUnlockSheet = () => {
   const [activePromoId, setActivePromoId] = useState(null);
   // Home offer cards open this same sheet for specific promotions (before anything is in the cart).
   const [externalIds, setExternalIds] = useState(null);
-  const { promotions, pricing, isFetching } = useCartPromotions("cart", null, pendingAdd, Boolean(pendingAdd || activePromoId), externalIds);
+  const { promotions, pricing, isFetching, gifts } = useCartPromotions("cart", null, pendingAdd, Boolean(pendingAdd || activePromoId), externalIds);
   const [addToCartAPI] = useAddToCartMutation();
 
   const [visible, setVisible] = useState(false);
@@ -171,6 +171,7 @@ const PromotionUnlockSheet = () => {
     if (prevQty > 0 && totalQuantity === 0) {
       lastAutoOpenRef.current = 0;
       clearDismissed();
+      celebratedIdsRef.current = new Set(); // an emptied cart starts the offers over
     }
   }, [totalQuantity]);
 
@@ -196,15 +197,21 @@ const PromotionUnlockSheet = () => {
     if (!pendingAdd) return;
     if (showCartModal) return; // never fight the cart drawer
     if (activePromoId) return; // already showing one
-    if (!bestActionable) return;
-    if (getDismissedSet().has(bestActionable.id)) return;
     if (Date.now() - lastAutoOpenRef.current < REOPEN_COOLDOWN_MS) return;
+
+    // This add just COMPLETED an offer (e.g. the 2nd katana → free stand): confirm it with the
+    // "Offer unlocked" moment. It wins over suggesting the next offer, so the shopper always
+    // sees that the offer was availed.
+    const unlockedNow = promotions.find((p) => p.actionableForAdd && p.applied && !p.rewardTargetPending
+      && p.displayType !== "free_shipping" && !celebratedIdsRef.current.has(p.id));
+    const target = unlockedNow || (bestActionable && !getDismissedSet().has(bestActionable.id) ? bestActionable : null);
+    if (!target) return;
 
     clearTimeout(pendingAddTimerRef.current);
     // Open immediately — no artificial delay between "add" and the sheet showing up.
-    setActivePromoId(bestActionable.id);
+    setActivePromoId(target.id);
     lastAutoOpenRef.current = Date.now();
-  }, [bestActionable, showCartModal, activePromoId, pendingAdd]);
+  }, [bestActionable, promotions, showCartModal, activePromoId, pendingAdd]);
 
   // The live, re-evaluated version of whichever promotion the sheet is
   // currently anchored to — so progress/recommendations update in place as
@@ -287,8 +294,9 @@ const PromotionUnlockSheet = () => {
           disableForReducedMotion: true, zIndex: 10000 });
       }).catch(() => {});
     }
-    const timer = setTimeout(() => close(false), 2500);
-    return () => { cancelled = true; clearTimeout(timer); };
+    // a free gift stays open until the shopper claims it (or closes the sheet); other offers confirm and close
+    const timer = livePromo.displayType === "free_gift" ? null : setTimeout(() => close(false), 2500);
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, livePromo?.applied, livePromo?.rewardTargetPending]);
 
@@ -412,8 +420,27 @@ const PromotionUnlockSheet = () => {
             </span>
             <h3 id="promotion-sheet-title" className="truncate text-xl font-black tracking-tight text-ink">Offer unlocked</h3>
             <p id="promotion-sheet-description" className="mt-1 text-sm text-muted">
-              {appliedSavings > 0 ? `You saved ${inr(appliedSavings)} on this offer.` : `${promo?.title} is now applied to your cart.`}
+              {promo?.displayType === "free_gift"
+                ? `${(promo.rewardLabel || "").replace(/\s*[—-]\s*free\s*$/i, "") || "Your free gift"} is ready — claim it to add it to your order.`
+                : appliedSavings > 0 ? `You saved ${inr(appliedSavings)} on this offer.` : `${promo?.title} is now applied to your cart.`}
             </p>
+            {promo?.displayType === "free_gift" && (() => {
+              // free gifts are never added automatically: the shopper claims them
+              const entitlement = gifts?.find((g) => g.promotionId === promo.id);
+              if (!entitlement) return null;
+              return entitlement.status === "claimed" ? (
+                <p className="mt-3 text-sm font-bold text-save">✓ Claimed — it is in your cart</p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => dispatch(claimGift({ promotionId: entitlement.promotionId, productId: entitlement.productId, variantSku: entitlement.variantSku, quantity: entitlement.quantity }))}
+                  disabled={!entitlement.available}
+                  className="mt-4 h-11 w-full bg-ink text-sm font-semibold text-paper transition-colors hover:bg-brand disabled:opacity-50"
+                >
+                  {entitlement.available ? "Claim Free Gift" : "Currently out of stock"}
+                </button>
+              );
+            })()}
           </div>
         ) : (
           <div className="min-h-0 overflow-y-auto bg-paper px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-4 sm:px-7">
@@ -491,6 +518,15 @@ const PromotionUnlockSheet = () => {
                       <p className="mt-0.5 text-sm font-bold text-ink">
                         {row.rewardTargetPending ? "Choose your reward item" : (rows.length > 1 ? row.progressText : "Add an eligible item")}
                       </p>
+                      {(() => {
+                        // an offer in the same group replaces the one already applied (never both)
+                        const current = row.group && !row.applied ? promotions.find((p) => p.applied && p.id !== row.id && p.group === row.group) : null;
+                        return current ? (
+                          <p className="mt-0.5 text-[11.5px] font-semibold text-brand">
+                            This replaces your current free {(current.rewardLabel || "reward").replace(/\s*[—-]\s*free\s*$/i, "")} — you get one, not both.
+                          </p>
+                        ) : null;
+                      })()}
                     </div>
                     {items.length > 2 && <span className="shrink-0 text-[10px] font-semibold text-muted">Swipe <i className="fa-solid fa-arrow-right ml-1" aria-hidden="true" /></span>}
                   </div>

@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { trackSelectItem } from "../utils/analytics";
 import { isVariantOutOfStock } from "../utils/variantStock";
+import { useSiteCampaign } from "../hooks/useSiteCampaign";
 
 /**
  * Shared variant-level card — one product's single variant (own title,
@@ -10,6 +11,9 @@ import { isVariantOutOfStock } from "../utils/variantStock";
  * pre-rendered HTML to the product page.
  */
 const VariantCard = ({ productId, productName, variant, index, listId = "product_variants", listName }) => {
+  // Diwali touches while a festive campaign is live (admin's section-accents switch)
+  const { active, can } = useSiteCampaign();
+  const festive = active && can("sectionAccents");
   const price = Number(variant?.variantPrice || 0);
   const mrp = Number(variant?.variantMrp || 0);
   const thumbnail = variant?.variantImage?.[0] || "/placeholder.jpg";
@@ -33,8 +37,9 @@ const VariantCard = ({ productId, productName, variant, index, listId = "product
     <Link
       to={href}
       onClick={trackClick}
-      className="gl-pcard group relative rounded-none overflow-hidden bg-white border border-hair flex flex-col h-full cursor-pointer"
+      className={`gl-pcard group relative rounded-none overflow-hidden bg-white border flex flex-col h-full cursor-pointer ${festive ? "border-star/70 shadow-[0_12px_28px_-16px_rgb(var(--gl-star))] hover:border-star" : "border-hair"}`}
     >
+      {festive && <span className="absolute inset-x-0 top-0 z-10 h-[3px] bg-gradient-to-r from-brand via-star to-brand" aria-hidden="true" />}
       <div className="relative w-full aspect-square bg-surface overflow-hidden">
         <img
           src={thumbnail}
@@ -48,7 +53,7 @@ const VariantCard = ({ productId, productName, variant, index, listId = "product
         )}
       </div>
 
-      <div className="p-3.5 flex flex-col flex-grow bg-white border-t border-hair">
+      <div className={`p-3.5 flex flex-col flex-grow border-t ${festive ? "bg-gradient-to-b from-white to-star/15 border-star/40" : "bg-white border-hair"}`}>
         {/* Two lines max, ellipsis after; min-h reserves both lines so a
             row of these cards never ends up with mismatched heights. */}
         <h3 title={variant?.variantName || ""} className="font-archivo font-bold text-ink leading-snug text-left w-full text-[14px] md:text-[16px] line-clamp-2 min-h-[2.75em] break-words mb-1">

@@ -759,6 +759,8 @@ const HomePage = () => {
       {/* ══ SOCIAL PROOF + PAYMENT — editorial stat tiles ══ */}
     
       {/* ══ PRODUCTS — adaptive to catalog size ══ */}
+      {/* Diwali offers sit above Bestsellers (only with a catalog big enough to have them) */}
+      {!isFewProducts && bestsellers.length >= MIN_TAGGED && <FestiveSections />}
       <RangoliDivider />
       {isFewProducts ? (
         /* Small, curated catalog: ONE collection, no repeated grids. */
@@ -785,7 +787,6 @@ const HomePage = () => {
         </section>
       ) : null}
 
-      {!isFewProducts && bestsellers.length >= MIN_TAGGED && <FestiveSections />}
 
 
 

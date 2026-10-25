@@ -103,6 +103,30 @@ function applyCheapestItemAdjustment(oi, mode, value) {
   };
 }
 
+// Free products a promotion granted on this order (the synthetic ₹0 lines), listed with the exact
+// product id + SKU so fulfilment knows what to pack and ship. Built from the order's own lines, so
+// a gift that was skipped (out of stock) is never listed.
+function buildPromotionalGiftSummary(orderItems, promotionResult) {
+  const out = [];
+  for (const g of promotionResult?.freeGifts || []) {
+    if (!g.targetProductId) continue;
+    const line = orderItems.find((oi) => oi.productId === g.targetProductId
+      && oi.productSnapshot?.isPromotionalGift && oi.productSnapshot.priceAtPurchase === 0
+      && (!g.targetVariantSku || oi.variantSku === g.targetVariantSku));
+    if (!line) continue;
+    out.push({
+      productId: line.productId,
+      variantSku: line.variantSku || "",
+      productName: line.productSnapshot.productName,
+      selectedVariant: line.productSnapshot.selectedVariant,
+      quantity: line.productSnapshot.quantity,
+      promotionId: String(g.promotionId),
+      promotionName: g.name || "",
+    });
+  }
+  return out;
+}
+
 // Phase 5 — picks the single winning cheapestItemAdjustments entry (same
 // priority/stackable/createdAt tiebreak as resolveProductWinners elsewhere
 // in this engine, reused via isBetterPromoForProduct) and applies it to
@@ -331,6 +355,7 @@ import { getPublicOfferConfig } from "../utils/offer.util.js";
 import { sendMetaCapiEvent } from "../services/meta.capi.service.js";
 import { recordServerPurchase } from "../services/purchaseEvent.service.js";
 import { sendGa4ServerPurchase } from "../services/ga4.mp.service.js";
+import { validateGiftClaims, buildGiftOrderLines, GIFT_CLAIM_ERROR } from "../services/giftClaims.service.js";
 
 // Collect Meta CAPI match-quality signals from the order-creation request.
 // The webhook (Razorpay → server) has no browser context, so we persist these on
@@ -798,42 +823,35 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   // check as a real line (reused, not reimplemented) — if the gift target is
   // OOS/deleted, it's silently skipped (order still proceeds), matching the
   // existing "[Stock] insufficient stock" precedent for real items.
-  for (const gift of promotionResult.freeGifts) {
-    if (!gift.targetProductId) continue; // gift_choice (pick-1-of-N) needs a cart-side choice step — not wired here yet
-    try {
-      const giftProduct = products.find((p) => p.productId === gift.targetProductId) || (await Product.findOne({ productId: gift.targetProductId, productStatus: "in_stock" }));
-      if (!giftProduct) { console.error(`[PromotionV2] free_product target not found/inactive: ${gift.targetProductId} (promotion ${gift.promotionId})`); continue; }
-      const giftVariant = gift.targetVariantSku
-        ? giftProduct.variantDetails?.find((v) => v.sku === gift.targetVariantSku)
-        : giftProduct.variantDetails?.[0];
-      const giftVariantName = giftVariant?.variantName || "N/A";
-      // Scales with the promotion's own repeat count (e.g. "buy 2 get 1
-      // free" crossed twice grants 2 free units) — see promotionEngine
-      // .util.js's free_product case. Defaults to 1 defensively (should
-      // never actually be missing — kept only so an old/malformed result
-      // shape degrades to the previous behavior instead of erroring).
-      const giftQty = Math.max(1, Number(gift.quantity) || 1);
-      assertVariantAvailable(giftProduct, giftVariantName, giftQty);
-      addPromoProduct(gift.promotionId, giftProduct.productId, giftProduct.productName, giftQty);
-      orderItems.push({
-        productId: giftProduct.productId,
-        variantSku: giftVariant?.sku || "",
-        productSnapshot: {
-          quantity: giftQty,
-          productImg: giftVariant?.variantImage?.[0] || giftProduct.productImg || "https://urbannook.in/assets/logo.webp",
-          productName: giftProduct.productName,
-          productCategory: giftProduct.productCategory,
-          productSubCategory: giftProduct.productSubCategory,
-          priceAtPurchase: 0,
-          shipping: "0",
-          selectedVariant: giftVariantName,
-          variantTitleTemplate: giftProduct.variantTitleTemplate || "",
-          variantSku: giftVariant?.sku || "",
-          isPromotionalGift: true,
-        },
-      });
-    } catch (err) {
-      console.error(`[PromotionV2] free_product gift skipped (${gift.targetProductId}, promotion ${gift.promotionId}):`, err.message);
+  // Explicit gift claiming: with a `claimedGifts` array, ONLY claims that the engine still grants for
+  // this exact cart become ₹0 lines (re-validated server-side, never trusted from the client). A claim
+  // that is no longer valid stops the order with a clear message instead of silently dropping or
+  // converting it. Without the array (older clients) the previous automatic behaviour is kept.
+  const claimMode = Array.isArray(req.body.claimedGifts);
+  const giftClaims = claimMode ? validateGiftClaims(req.body.claimedGifts, promotionResult.freeGifts) : null;
+  if (giftClaims?.rejected.length) {
+    throw new ValidationError("A free gift you claimed is no longer available. Please review your cart.", { code: GIFT_CLAIM_ERROR, rejected: giftClaims.rejected });
+  }
+  const giftsToIssue = claimMode ? giftClaims.valid : promotionResult.freeGifts.filter((g) => g.targetProductId);
+  orderItems.push(...(await buildGiftOrderLines({
+    gifts: giftsToIssue,
+    products,
+    orderItems,
+    claimMode,
+    loadProduct: (id) => Product.findOne({ productId: id, productStatus: "in_stock" }),
+    assertAvailable: assertVariantAvailable,
+    onIssued: (g, pr, q) => addPromoProduct(g.promotionId, pr.productId, pr.productName, q),
+  })));
+
+  // Item identity for admin / warehouse / returns: every line is explicitly PAID or FREE_GIFT, with the
+  // list price it would have cost (the same SKU can legitimately appear as both).
+  for (const oi of orderItems) {
+    const sn = oi.productSnapshot;
+    if (!sn.lineType) sn.lineType = "PAID";
+    if (sn.originalUnitPrice == null) {
+      const pr = products.find((x) => x.productId === oi.productId);
+      const v = pr?.variantDetails?.find((x) => x.sku && x.sku === oi.variantSku) || pr?.variantDetails?.find((x) => x.variantName === sn.selectedVariant) || pr?.variantDetails?.[0];
+      sn.originalUnitPrice = Number(v?.variantPrice) || 0;
     }
   }
 
@@ -1283,6 +1301,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     userName: deliveryAddressSnapshot.fullName,
     userMobile: deliveryAddressSnapshot.mobileNumber,
     items: orderItems,
+    promotionalGifts: buildPromotionalGiftSummary(orderItems, promotionResult),
     // Promotion Engine V2 — snapshot of which promotions matched at order-
     // creation time (see the wiring comment above). Empty when none matched.
     appliedPromotions: promotionResult.matchedPromotions.map((p) => ({
@@ -2255,42 +2274,35 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     promotionResult.discountCandidatesByProduct, maxDiscountAmountByPromotionId,
   );
 
-  for (const gift of promotionResult.freeGifts) {
-    if (!gift.targetProductId) continue;
-    try {
-      const giftProduct = products.find((p) => p.productId === gift.targetProductId) || (await Product.findOne({ productId: gift.targetProductId, productStatus: "in_stock" }));
-      if (!giftProduct) { console.error(`[PromotionV2] free_product target not found/inactive: ${gift.targetProductId} (promotion ${gift.promotionId})`); continue; }
-      const giftVariant = gift.targetVariantSku
-        ? giftProduct.variantDetails?.find((v) => v.sku === gift.targetVariantSku)
-        : giftProduct.variantDetails?.[0];
-      const giftVariantName = giftVariant?.variantName || "N/A";
-      // Scales with the promotion's own repeat count (e.g. "buy 2 get 1
-      // free" crossed twice grants 2 free units) — see promotionEngine
-      // .util.js's free_product case. Defaults to 1 defensively (should
-      // never actually be missing — kept only so an old/malformed result
-      // shape degrades to the previous behavior instead of erroring).
-      const giftQty = Math.max(1, Number(gift.quantity) || 1);
-      assertVariantAvailable(giftProduct, giftVariantName, giftQty);
-      addPromoProduct(gift.promotionId, giftProduct.productId, giftProduct.productName, giftQty);
-      orderItems.push({
-        productId: giftProduct.productId,
-        variantSku: giftVariant?.sku || "",
-        productSnapshot: {
-          quantity: giftQty,
-          productImg: giftVariant?.variantImage?.[0] || giftProduct.productImg || "https://urbannook.in/assets/logo.webp",
-          productName: giftProduct.productName,
-          productCategory: giftProduct.productCategory,
-          productSubCategory: giftProduct.productSubCategory,
-          priceAtPurchase: 0,
-          shipping: "0",
-          selectedVariant: giftVariantName,
-          variantTitleTemplate: giftProduct.variantTitleTemplate || "",
-          variantSku: giftVariant?.sku || "",
-          isPromotionalGift: true,
-        },
-      });
-    } catch (err) {
-      console.error(`[PromotionV2] free_product gift skipped (${gift.targetProductId}, promotion ${gift.promotionId}):`, err.message);
+  // Explicit gift claiming: with a `claimedGifts` array, ONLY claims that the engine still grants for
+  // this exact cart become ₹0 lines (re-validated server-side, never trusted from the client). A claim
+  // that is no longer valid stops the order with a clear message instead of silently dropping or
+  // converting it. Without the array (older clients) the previous automatic behaviour is kept.
+  const claimMode = Array.isArray(req.body.claimedGifts);
+  const giftClaims = claimMode ? validateGiftClaims(req.body.claimedGifts, promotionResult.freeGifts) : null;
+  if (giftClaims?.rejected.length) {
+    throw new ValidationError("A free gift you claimed is no longer available. Please review your cart.", { code: GIFT_CLAIM_ERROR, rejected: giftClaims.rejected });
+  }
+  const giftsToIssue = claimMode ? giftClaims.valid : promotionResult.freeGifts.filter((g) => g.targetProductId);
+  orderItems.push(...(await buildGiftOrderLines({
+    gifts: giftsToIssue,
+    products,
+    orderItems,
+    claimMode,
+    loadProduct: (id) => Product.findOne({ productId: id, productStatus: "in_stock" }),
+    assertAvailable: assertVariantAvailable,
+    onIssued: (g, pr, q) => addPromoProduct(g.promotionId, pr.productId, pr.productName, q),
+  })));
+
+  // Item identity for admin / warehouse / returns: every line is explicitly PAID or FREE_GIFT, with the
+  // list price it would have cost (the same SKU can legitimately appear as both).
+  for (const oi of orderItems) {
+    const sn = oi.productSnapshot;
+    if (!sn.lineType) sn.lineType = "PAID";
+    if (sn.originalUnitPrice == null) {
+      const pr = products.find((x) => x.productId === oi.productId);
+      const v = pr?.variantDetails?.find((x) => x.sku && x.sku === oi.variantSku) || pr?.variantDetails?.find((x) => x.variantName === sn.selectedVariant) || pr?.variantDetails?.[0];
+      sn.originalUnitPrice = Number(v?.variantPrice) || 0;
     }
   }
 
@@ -2556,6 +2568,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     userName: guestInfo?.name?.trim() || "",
     userMobile: cleanMobile,
     items: orderItems,
+    promotionalGifts: buildPromotionalGiftSummary(orderItems, promotionResult),
     // Promotion Engine V2 — snapshot of which promotions matched at order-
     // creation time (see the wiring comment above). Empty when none matched.
     appliedPromotions: promotionResult.matchedPromotions.map((p) => ({

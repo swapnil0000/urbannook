@@ -42,6 +42,7 @@ const PasskeyPrompt = lazy(() => import('./component/PasskeyPrompt'));
 // not just one page. See the component's own header comment for the full
 // trigger/dismissal contract.
 const PromotionUnlockSheet = lazy(() => import('./component/promotions/PromotionUnlockSheet'));
+const GiftClaimWatcher = lazy(() => import('./component/promotions/GiftClaimWatcher'));
 
 // Component to handle session restoration and token removal detection
 const SessionManager = ({ children }) => {
@@ -224,6 +225,7 @@ function App({ store = browserStore, helmetContext }) {
                 {/* Promotion V2 "add more to unlock" bottom sheet */}
                 <ErrorBoundary>
                   <PromotionUnlockSheet />
+                  <GiftClaimWatcher />
                 </ErrorBoundary>
                 <ErrorBoundary>
                   <ScrollHint />

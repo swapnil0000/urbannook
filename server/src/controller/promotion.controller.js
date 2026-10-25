@@ -16,6 +16,7 @@ import {
 } from "../utils/promotionEngine.util.js";
 import { buildPromotionDisplayList } from "../services/promotionPresentation.service.js";
 import { buildPromotionPricePreview } from "../services/promotionPricePreview.service.js";
+import { describeGiftEntitlements } from "../services/giftClaims.service.js";
 
 // Public: every currently active, in-date-range V2 promotion. Previously
 // returned the RAW Promotion documents (full conditionTree, rewards,
@@ -512,6 +513,42 @@ const getProductDisplayController = asyncHandler(async (req, res) => {
 // } where placement is "cart" (default) or "mini_cart" — same data, just a
 // different placements-field gate, since admin can choose to show a
 // promotion in one but not the other.
+// Entitlements + display info for the claim card / cart line. The customer-facing name and image are the
+// admin's own reward label and image (never the real product when the admin left the image blank, so a
+// "Mystery Gift" stays a mystery); the real product id / SKU / list price travel separately for the cart line.
+async function buildGiftPayload(freeGifts, requestedClaims, allPromotions) {
+  const { entitlements, invalidClaims } = describeGiftEntitlements(freeGifts, requestedClaims);
+  const productIds = [...new Set(entitlements.map((e) => e.targetProductId))];
+  const products = productIds.length ? await Product.find({ productId: { $in: productIds } }, { productId: 1, productName: 1, variantDetails: 1 }).lean() : [];
+  const promoById = new Map(allPromotions.map((p) => [String(p._id), p]));
+  const strip = (t) => String(t || "").replace(/\s*[—-]\s*FREE\s*$/i, "").trim();
+  return {
+    entitlements: entitlements.map((e) => {
+      const promo = promoById.get(e.promotionId);
+      const reward = (promo?.rewards || []).find((r) => r.type === "free_product" && String(r.targetProductId) === String(e.targetProductId)) || {};
+      const pr = products.find((p) => p.productId === e.targetProductId);
+      const v = pr?.variantDetails?.find((x) => x.sku === e.targetVariantSku) || pr?.variantDetails?.[0];
+      return {
+        key: e.key,
+        promotionId: e.promotionId,
+        promotionName: promo?.name || e.name || "",
+        name: strip(reward.label) || pr?.productName || "Free gift",
+        image: reward.image || null,
+        productId: e.targetProductId,
+        variantSku: e.targetVariantSku,
+        variantName: v?.variantName || null,
+        originalPrice: Number(v?.variantPrice) || 0,
+        quantity: e.quantity,
+        claimedQuantity: e.claimedQuantity,
+        status: e.status,
+        // false when the gift variant is out of stock / too few left: the UI shows it as unavailable
+        available: !!v && !(v.variantOutOfStock === true || v.isActive === false || (v.variantQuantity != null && Number(v.variantQuantity) < e.quantity)),
+      };
+    }),
+    invalidClaims: invalidClaims.map((c) => ({ ...c, promotionName: promoById.get(c.promotionId)?.name || "" })),
+  };
+}
+
 const getCartDisplayController = asyncHandler(async (req, res) => {
   const { items, placement = "cart", couponCode, addedItem } = req.body;
   // Home offer cards open the unlock sheet for specific promotions before
@@ -543,7 +580,31 @@ const getCartDisplayController = asyncHandler(async (req, res) => {
   // then the customer is mid-payment-flow, not browsing to add products).
   const promotionsById = new Map(relevant.map((p) => [String(p._id), p]));
   await attachRecommendations(display, promotionsById, ctx);
-  return res.status(200).json(new ApiRes(200, "OK", { promotions: display, pricing }, true));
+  // "2 of 3 Katanas" — the noun for promotions whose progress is shown on its own
+  // (the Phuljadi asks for them by id); one small lookup, only for those.
+  const nounIds = display.filter((e) => previewIds.has(e.id) && e.progress && e.progress.mode !== "amount").map((e) => e.id);
+  if (nounIds.length) {
+    const productIds = new Set();
+    nounIds.forEach((id) => conditionProductIds(promotionsById.get(id), true).forEach((pid) => productIds.add(pid)));
+    const named = productIds.size ? await Product.find({ productId: { $in: [...productIds] } }, { productId: 1, productName: 1 }).lean() : [];
+    const nameOf = new Map(named.map((p) => [p.productId, p.productName]));
+    for (const e of display.filter((x) => nounIds.includes(x.id))) {
+      // "Anime Kunai Collection" -> "Kunai", "Anime Wooden Katana" -> "Katana"
+      const GENERIC = new Set(["collection", "set", "pack", "combo", "series", "kit", "range"]);
+      const nounOf = (name) => {
+        const words = String(name || "").trim().split(/\s+/).filter(Boolean);
+        while (words.length > 1 && GENERIC.has(words[words.length - 1].toLowerCase())) words.pop();
+        return words.pop() || "";
+      };
+      const lastWords = [...new Set(conditionProductIds(promotionsById.get(e.id), true).map((pid) => nounOf(nameOf.get(pid))).filter(Boolean))];
+      e.progress.noun = lastWords.length === 1 ? lastWords[0] : "item";
+    }
+  }
+  // Free gifts are CLAIMED by the customer, never auto-added: these are the entitlements the cart is
+  // eligible for right now (after the admin's priority / exclusivity / group rules), which of them the
+  // customer has claimed, and any earlier claim that is no longer valid (so the UI can tell them).
+  const gifts = await buildGiftPayload(matchedResult.freeGifts, req.body.claimedGifts, all);
+  return res.status(200).json(new ApiRes(200, "OK", { promotions: display, pricing, gifts: gifts.entitlements, invalidGiftClaims: gifts.invalidClaims }, true));
 });
 
 // POST /promotions/display/checkout — Checkout. Same as cart display but
@@ -606,7 +667,7 @@ function collectConditionSkus(node) {
 // real variants. Everything comes from the admin-configured conditionTree and
 // rewards; nothing is typed here. Prices shown by the sheet come from the cart
 // pricing endpoint (the engine), these cards only carry catalog price / MRP.
-const BUILDER_PRODUCT_PROJECTION = { productId: 1, productName: 1, productImg: 1, variantDetails: 1 };
+const BUILDER_PRODUCT_PROJECTION = { productId: 1, productName: 1, productImg: 1, variantDetails: 1, productCategory: 1, productSubCategory: 1, tags: 1 };
 
 function builderVariantCard(product, v) {
   const outOfStock = v.variantOutOfStock === true || v.isActive === false
@@ -642,7 +703,7 @@ function slotsFromCondition(tree) {
   return slots.slice(0, 6);
 }
 
-function conditionProductIds(promo) {
+function conditionProductIds(promo, conditionOnly = false) {
   const ids = new Set();
   const walk = (n) => {
     if (!n || n.op === "NOT") return;
@@ -651,7 +712,7 @@ function conditionProductIds(promo) {
     if (n.field === "productList") (n.items || []).forEach((i) => ids.add(String(i.productId)));
   };
   walk(promo.conditionTree);
-  (promo.rewards || []).forEach((r) => r.targetProductId && ids.add(String(r.targetProductId)));
+  if (!conditionOnly) (promo.rewards || []).forEach((r) => r.targetProductId && ids.add(String(r.targetProductId)));
   return [...ids];
 }
 
@@ -659,7 +720,8 @@ function conditionProductIds(promo) {
 // mixed variants of one ladder step), the card's own promotion first.
 function relatedPromotionsFor(promo, all) {
   const rw = (promo.rewards || []).find((r) => r.targetProductId);
-  if (!rw) return [promo];
+  // only a free-product ladder step has sibling combinations; discounts never borrow other offers
+  if (!rw || rw.type !== "free_product") return [promo];
   const same = all.filter((p) => String(p._id) !== String(promo._id) && (p.placements || []).includes("cart")
     && (p.rewards || []).some((r) => r.targetProductId === rw.targetProductId && (r.targetVariantSku || "") === (rw.targetVariantSku || "")));
   return [promo, ...same];
@@ -694,13 +756,27 @@ function buildComboBuilder(promos, productMap, shortNameOf, hiddenRewardLabel) {
     else label = slots.map((s) => shortNameOf(s.productIds[0])).join(" + ");
 
     const rw = (promo.rewards || [])[0] || {};
-    let reward = { kind: rw.type === "free_shipping" ? "shipping" : "discount", name: rw.label || "", worth: null, image: null };
+    const tp = rw.targetProductId ? productMap.get(String(rw.targetProductId)) : null;
+    const tv = tp?.variantDetails?.find((v) => v.sku === rw.targetVariantSku) || tp?.variantDetails?.[0];
+    const tImage = tv?.variantImage?.[0] || tp?.productImg || null;
+    const strip = (t) => String(t || "").replace(/\s*[—-]\s*FREE\s*$/i, "").trim();
+    // What the customer unlocks, straight from the promotion's own reward:
+    // `badge` is the real badge text ("FREE", "₹79 OFF", "5% OFF"), `image` the reward product.
+    let reward;
     if (rw.type === "free_product" && rw.targetProductId) {
-      const tp = productMap.get(String(rw.targetProductId));
-      const tv = tp?.variantDetails?.find((v) => v.sku === rw.targetVariantSku) || tp?.variantDetails?.[0];
       reward = hiddenRewardLabel
-        ? { kind: "free", name: "Mystery Gift", worth: hiddenRewardLabel, image: null }
-        : { kind: "free", name: rw.label?.replace(/\s*[—-]\s*FREE\s*$/i, "") || tp?.productName || "Free gift", worth: tv?.variantPrice != null ? Number(tv.variantPrice) : null, image: tv?.variantImage?.[0] || tp?.productImg || null };
+        ? { kind: "free", name: "Mystery Gift", worth: hiddenRewardLabel, image: null, badge: "FREE" }
+        : { kind: "free", name: strip(rw.label) || tp?.productName || "Free gift", worth: tv?.variantPrice != null ? Number(tv.variantPrice) : null, image: tImage, badge: "FREE" };
+    } else if (rw.type === "free_shipping") {
+      reward = { kind: "shipping", name: rw.label || "Free shipping", worth: null, image: null, badge: "FREE" };
+    } else if (rw.type === "cheapest_item_free") {
+      reward = { kind: "cheapest", name: strip(rw.label) || "Lowest-priced item", worth: null, image: null, badge: "FREE" };
+    } else if (["percent_off_product", "percent_off_order"].includes(rw.type)) {
+      reward = { kind: "discount", name: strip(rw.label) || tp?.productName || "Discount", worth: null, image: tImage, badge: Number(rw.value) >= 100 ? "FREE" : `${rw.value}% OFF` };
+    } else if (["flat_off_product", "discounted_product", "flat_off_order"].includes(rw.type)) {
+      reward = { kind: "discount", name: strip(rw.label) || tp?.productName || "Discount", worth: null, image: tImage, badge: `₹${Number(rw.value).toLocaleString("en-IN")} OFF` };
+    } else {
+      reward = { kind: "discount", name: rw.label || "", worth: null, image: tImage, badge: "" };
     }
     combos.push({ promotionId: String(promo._id), label, description: rw.description || "", slots: slotOut, reward });
   }
@@ -725,7 +801,11 @@ const getHomeDisplayController = asyncHandler(async (_req, res) => {
   // to compute. They show the free item instead. The reward's own MRP is read
   // from the catalog (never typed) unless the admin chose a label (e.g. a
   // mystery gift that must not reveal which product it is).
-  const rewardPromos = all.filter((p) => (p.placements || []).includes("home") && p.homeCard?.cardKind === "reward");
+  // Every home-placed promotion gets a tile. A plain "buy A + B" combo (exactly 2 products in the
+  // condition, cardKind combo) keeps its computed combo card; anything else (ladders, single-product,
+  // category / subcategory offers ...) is shown as an offer tile driven by its admin tag line.
+  const isTwoProductCombo = (p) => p.homeCard?.cardKind !== "reward" && collectConditionProductIds(p.conditionTree).length === 2;
+  const rewardPromos = all.filter((p) => (p.placements || []).includes("home") && !isTwoProductCombo(p));
   const rewardTargetIds = [...new Set(rewardPromos.flatMap((p) => (p.rewards || []).map((r) => r.targetProductId)).filter(Boolean))];
   const rewardProducts = rewardTargetIds.length
     ? await Product.find({ productId: { $in: rewardTargetIds } }, { productId: 1, variantDetails: 1 }).lean()
@@ -739,7 +819,7 @@ const getHomeDisplayController = asyncHandler(async (_req, res) => {
     ? await Product.find({ productId: { $in: choiceIds }, productStatus: "in_stock", isPublished: { $ne: false } }, PRODUCT_RECOMMENDATION_PROJECTION).lean()
     : [];
   // Everything the combo-builder sheet needs, fetched once for all home cards.
-  const comboCandidates = all.filter((p) => (p.placements || []).includes("home") && p.homeCard?.cardKind !== "reward");
+  const comboCandidates = all.filter((p) => (p.placements || []).includes("home") && isTwoProductCombo(p));
   const builderIds = [...new Set([...rewardPromos, ...comboCandidates].flatMap((p) => relatedPromotionsFor(p, all).flatMap(conditionProductIds)))];
   const builderProducts = builderIds.length
     ? await Product.find({ productId: { $in: builderIds }, productStatus: "in_stock", isPublished: { $ne: false } }, BUILDER_PRODUCT_PROJECTION).lean()
@@ -752,6 +832,40 @@ const getHomeDisplayController = asyncHandler(async (_req, res) => {
   }));
   const shortNameOf = (id) => labelByProduct.get(id) || builderMap.get(id)?.productName || "Item";
 
+  // "Combo Savings {save}": the ₹ is the engine's own number for a typical cart of this offer
+  // (first in-stock variant of each required item): this promotion's discount plus the price of
+  // any free product it grants. Computed only when the admin's label asks for it.
+  const homeSavingsFor = (promo, combos) => {
+    const first = combos?.[0];
+    if (!first) return 0;
+    const lines = new Map();
+    for (const slot of first.slots) {
+      const card = slot.options[0]?.cards.find((c) => !c.outOfStock);
+      if (!card) return 0;
+      const k = `${card.productId}::${card.sku || ""}`;
+      lines.set(k, { productId: card.productId, quantity: (lines.get(k)?.quantity || 0) + 1, variantSku: card.sku || "", selectedVariant: card.variantName || undefined, price: card.price });
+    }
+    const items = [...lines.values()];
+    const productMeta = new Map(builderProducts.map((pr) => [pr.productId, { category: pr.productCategory, subcategory: pr.productSubCategory, tags: pr.tags || [] }]));
+    const subtotal = items.reduce((sum, i) => sum + (Number(i.price) || 0) * i.quantity, 0);
+    const ctx = buildCartContext(items, { subtotal, productMeta });
+    const result = evaluatePromotions(items, ctx, all);
+    const pricing = buildPromotionPricePreview(items, builderMap, result);
+    let save = Number(pricing.savingsByPromotion?.[String(promo._id)]) || 0;
+    for (const g of result.freeGifts.filter((x) => String(x.promotionId) === String(promo._id) && x.targetProductId)) {
+      const gp = builderMap.get(String(g.targetProductId));
+      const gv = gp?.variantDetails?.find((v) => v.sku === g.targetVariantSku) || gp?.variantDetails?.[0];
+      save += (Number(gv?.variantPrice) || 0) * (Number(g.quantity) || 1);
+    }
+    return Math.round(save);
+  };
+  const benefitFor = (promo, label, combos) => {
+    const text = String(label || "").trim();
+    if (!text.includes("{save}")) return text;
+    const save = homeSavingsFor(promo, combos);
+    return save > 0 ? text.replace("{save}", `₹${save.toLocaleString("en-IN")}`) : "";
+  };
+
   const rewardCards = rewardPromos.map((promo) => {
     const hc = promo.homeCard || {};
     const reward = (promo.rewards || []).find((r) => r.targetProductId);
@@ -763,6 +877,14 @@ const getHomeDisplayController = asyncHandler(async (_req, res) => {
       // A ladder offer is covered by several promotions (wooden / LED / mixed),
       // so the card headline is the admin's own wording, not one promo's name.
       title: hc.subtitle?.trim() || promo.name,
+      // the admin's tag line for the homepage tile (blank -> the promotion's own name); never generated here
+      tagline: hc.subtitle?.trim() || promo.name,
+      // image to use if the admin has not uploaded one: the first product the offer is about
+      productImage: (() => {
+        const id = conditionProductIds(promo)[0];
+        const pr = id && builderMap.get(id);
+        return pr?.variantDetails?.[0]?.variantImage?.[0] || pr?.productImg || null;
+      })(),
       subtitle: "",
       badgeText: hc.badgeText || "",
       ctaLabel: hc.ctaLabel?.trim() || "Shop Now",
@@ -787,7 +909,11 @@ const getHomeDisplayController = asyncHandler(async (_req, res) => {
           .map((p) => String(p._id));
         return [mine, ...same];
       })(),
+      // the product page this tile opens: admin's primary product, else the first product in the condition
+      primaryProductId: hc.primaryProductId || conditionProductIds(promo, true)[0] || null,
       builder: { combos: buildComboBuilder(relatedPromotionsFor(promo, all), builderMap, shortNameOf, hc.savingsLabel || "") },
+      // benefit line under the tile title: the admin's own label ("{save}" is replaced with the real savings)
+      benefit: benefitFor(promo, hc.savingsLabel, buildComboBuilder([promo], builderMap, shortNameOf, "")),
       ctaChoices: (hc.ctaChoices || []).map((c) => ({ label: c.label, url: c.url })),
       choices: (hc.ctaChoices || []).map((c) => {
         const product = choiceProducts.find((p) => p.productId === choiceIdOf(c.url));
@@ -799,7 +925,7 @@ const getHomeDisplayController = asyncHandler(async (_req, res) => {
   });
 
   const candidates = all
-    .filter((p) => (p.placements || []).includes("home") && p.homeCard?.cardKind !== "reward")
+    .filter((p) => (p.placements || []).includes("home") && isTwoProductCombo(p))
     .map((promo) => ({ promo, productIds: collectConditionProductIds(promo.conditionTree) }))
     .filter((c) => c.productIds.length === 2);
 
@@ -856,6 +982,8 @@ const getHomeDisplayController = asyncHandler(async (_req, res) => {
       return {
         id: promo._id,
         title: promo.name,
+        tagline: homeCard.subtitle?.trim() || promo.name,
+        benefit: benefitFor(promo, homeCard.savingsLabel, buildComboBuilder([promo], builderMap, shortNameOf, "")),
         subtitle: homeCard.subtitle?.trim() || items.map((p) => p.productName).join(" + "),
         badgeText: homeCard.badgeText || "",
         ctaLabel: homeCard.ctaLabel?.trim() || "Add to Cart",
@@ -879,6 +1007,7 @@ const getHomeDisplayController = asyncHandler(async (_req, res) => {
         ctaAction: homeCard.ctaAction === "link" && homeCard.ctaUrl ? "link" : "cart",
         ctaUrl: homeCard.ctaUrl || "",
         order: Number(homeCard.order) || 0,
+        primaryProductId: homeCard.primaryProductId || productIds[0] || null,
         builder: { combos: buildComboBuilder([promo], builderMap, shortNameOf, "") },
         // Every in-stock variant the shopper may pick for each required product
         // (restricted to the SKU the promotion pins, if it pins one) — drives the

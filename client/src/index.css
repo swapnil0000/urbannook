@@ -822,3 +822,86 @@
 .un-offers .un-nav:hover{border-color:rgb(var(--gl-star));color:rgb(var(--gl-star))}
 .un-offers .un-track{scroll-padding-inline:16px}
 @media (prefers-reduced-motion:reduce){.un-offers .un-card{transition:none}}
+
+/* ============================================================
+   PHULJADI progress (festive campaign) — sparks, burst, pop.
+   Only exists while a campaign with the Phuljadi switched on is live;
+   everything is disabled under reduced motion.
+   ============================================================ */
+@keyframes un-phj-spark{0%{transform:translate(0,0) scale(1);opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(.2);opacity:0}}
+@keyframes un-phj-burst{0%{transform:translate(50%,-50%) scale(.2);opacity:0}15%{opacity:1}100%{transform:translate(50%,-50%) scale(1.5);opacity:0}}
+@keyframes un-phj-pop{0%{transform:scale(.92);opacity:.4}60%{transform:scale(1.04);opacity:1}100%{transform:scale(1)}}
+@keyframes un-phj-flick{0%{transform:scale(.88) rotate(0deg)}100%{transform:scale(1.1) rotate(14deg)}}
+.un-phj-p{animation:un-phj-spark .75s ease-out infinite}
+.un-phj-star{animation:un-phj-flick .32s steps(2,end) infinite alternate}
+.un-phj-burst{animation:un-phj-burst 1.4s ease-out forwards}
+.un-phj-pop{animation:un-phj-pop .6s ease-out}
+@media (prefers-reduced-motion:reduce){.un-phj-p,.un-phj-burst{display:none!important}.un-phj-star,.un-phj-pop{animation:none!important}}
+
+/* ============================================================
+   COMBO BUILDER SHEET — dark festive glass (ComboBuilderSheet.jsx).
+   Warm burgundy light over ink, blurred; surfaces are translucent glass.
+   Square corners, per the site's hard-edged theme.
+   ============================================================ */
+.un-bs{
+  background:
+    radial-gradient(120% 50% at 50% 0%,rgb(var(--gl-brand-hi)/.40),transparent 70%),
+    radial-gradient(70% 38% at 92% 100%,rgb(var(--gl-star)/.12),transparent 70%),
+    linear-gradient(180deg,rgb(30 16 14/.94),rgb(var(--gl-ink)/.97));
+  -webkit-backdrop-filter:blur(24px) saturate(1.25);backdrop-filter:blur(24px) saturate(1.25);
+  border:1px solid rgb(var(--gl-star)/.32);
+  box-shadow:0 -24px 70px -12px rgb(0 0 0/.75),0 0 46px -12px rgb(var(--gl-star)/.28),inset 0 1px 0 rgb(255 255 255/.08);
+}
+.un-bs-glass{
+  background:linear-gradient(135deg,rgb(255 255 255/.10),rgb(255 255 255/.03));
+  border:1px solid rgb(255 255 255/.14);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  box-shadow:inset 0 1px 0 rgb(255 255 255/.09);
+}
+.un-bs-glass:not(:disabled):hover{border-color:rgb(var(--gl-star)/.5)}
+.un-bs-on,.un-bs-glass.un-bs-on{
+  border-color:rgb(var(--gl-star))!important;
+  background:linear-gradient(135deg,rgb(var(--gl-star)/.22),rgb(var(--gl-brand)/.14));
+  box-shadow:0 0 0 1px rgb(var(--gl-star)/.55),0 8px 22px -10px rgb(var(--gl-star)/.7),inset 0 1px 0 rgb(255 255 255/.12);
+}
+.un-bs-save{color:color-mix(in srgb,rgb(var(--gl-save)) 40%,#a7f3d6)}
+
+/* ============================================================
+   DIWALI OFFER TILES — amber section, scalloped edge, image tiles
+   with a dark-red benefit strip (ComboOfferSection.jsx).
+   Scoped to the offers section; colours derive from --gl-* tokens.
+   ============================================================ */
+.un-offers .un-tile{
+  border-radius:5px;
+  border:2px solid color-mix(in srgb,rgb(var(--gl-brand-hi)) 70%,#000);
+  border-bottom:0;
+  background:linear-gradient(180deg,rgb(44 16 16) 0%,rgb(24 10 10) 100%);
+  box-shadow:0 14px 26px -16px rgb(0 0 0/.9),0 0 0 1px rgb(var(--gl-star)/.18),0 0 24px -12px rgb(var(--gl-star)/.4);
+  transition:transform .2s ease,box-shadow .2s ease;
+  overflow:hidden;
+}
+.un-offers .un-tile:hover{box-shadow:0 18px 30px -16px rgb(0 0 0/.95),0 0 0 1px rgb(var(--gl-star)/.4),0 0 30px -10px rgb(var(--gl-star)/.55)}
+/* artwork: no frame, soft faded edges that melt into the card */
+.un-offers .un-tile-img{
+  background:transparent;
+  -webkit-mask-image:radial-gradient(ellipse 100% 96% at 50% 46%,#000 58%,transparent 100%);
+  mask-image:radial-gradient(ellipse 100% 96% at 50% 46%,#000 58%,transparent 100%);
+}
+/* offer strip: golden-yellow melting into festive red */
+.un-offers .un-tile-strip{
+  position:relative;
+  /* deep festive ruby */
+  background:linear-gradient(180deg,#a51a31 0%,#8a1429 46%,#640c1b 100%);
+  box-shadow:inset 0 1px 0 rgb(255 255 255/.2),inset 0 -1px 0 rgb(0 0 0/.35),0 -8px 16px -10px rgb(0 0 0/.6);
+  text-shadow:0 1px 1px rgb(40 4 10/.6);
+}
+.un-offers .un-tile-strip::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;background:linear-gradient(90deg,transparent,rgb(var(--gl-star)/.55),transparent)}
+.un-offers .un-tile-benefit{color:#f2d9a0}
+/* coupon ticket: dark burgundy / charcoal with champagne-gold edge */
+.un-offers .un-coupon{
+  border-radius:8px;
+  background:linear-gradient(135deg,rgb(62 18 22) 0%,rgb(36 15 16) 55%,rgb(24 14 14) 100%);
+  box-shadow:inset 0 0 0 1px rgb(var(--gl-star)/.32),inset 0 1px 0 rgb(255 255 255/.08),0 12px 22px -14px rgb(0 0 0/.9);
+  min-height:74px;
+}
+.un-offers .un-coupon-perf{border-left:1.5px dashed rgb(var(--gl-star)/.4)}

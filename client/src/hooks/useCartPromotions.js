@@ -17,12 +17,21 @@ import { buildPromotionCartItems } from "../utils/promotionCartItems";
 export function useCartPromotions(placement = "cart", couponCode = null, addedItem = null, enabled = true, previewPromotionIds = null) {
   const items = useSelector((state) => state.cart.items);
   const totalAmount = useSelector((state) => state.cart.totalAmount);
+  // claimed free gifts travel with every pricing call, so eligibility is re-evaluated server-side on each cart change
+  const claimedGifts = useSelector((state) => state.cart.claimedGifts);
   const payloadItems = buildPromotionCartItems(items);
 
   const { currentData, isFetching } = useGetCartPromotionsQuery(
-    { items: payloadItems, subtotal: Number(totalAmount) || 0, placement, couponCode: couponCode || undefined, addedItem: addedItem || undefined, previewPromotionIds: previewPromotionIds || undefined },
+    { items: payloadItems, subtotal: Number(totalAmount) || 0, placement, couponCode: couponCode || undefined, addedItem: addedItem || undefined, previewPromotionIds: previewPromotionIds || undefined, claimedGifts },
     { skip: !enabled || (payloadItems.length === 0 && !previewPromotionIds?.length) },
   );
 
-  return { promotions: currentData?.data?.promotions || [], pricing: currentData?.data?.pricing || null, isFetching };
+  return {
+    promotions: currentData?.data?.promotions || [],
+    pricing: currentData?.data?.pricing || null,
+    // explicit free-gift claiming: what the cart could claim / has claimed, and claims the server rejected
+    gifts: currentData?.data?.gifts || [],
+    invalidGiftClaims: currentData?.data?.invalidGiftClaims || [],
+    isFetching,
+  };
 }

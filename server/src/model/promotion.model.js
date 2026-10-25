@@ -219,6 +219,9 @@ const promotionSchema = new mongoose.Schema(
       // Stand free") without a fixed 2-product pair, so they show the free
       // item instead of a computed combo price. ctaAction "choose" opens a
       // small picker of these links (e.g. Wooden Katana / LED Katana).
+      // Product page a homepage offer tile opens (/products/<id>?offer=<promotion>).
+      // Blank = the first product named in the offer's condition.
+      primaryProductId: { type: String, trim: true, default: "" },
       cardKind: { type: String, enum: ["combo", "reward"], default: "combo" },
       ctaChoices: { type: [{ _id: false, label: { type: String, trim: true }, url: { type: String, trim: true } }], default: [] },
       order: { type: Number, default: 0 },                       // lower shows first

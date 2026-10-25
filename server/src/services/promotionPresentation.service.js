@@ -1,4 +1,4 @@
-import { evaluateConditionTree, promotionCouponGateOk, variantKey } from "../utils/promotionEngine.util.js";
+import { evaluateConditionTree, promotionCouponGateOk, variantKey, quantityForConditionLeaf } from "../utils/promotionEngine.util.js";
 
 /**
  * Promotion Engine V2 — Presentation Layer (Phases 2, 4, 6, 7 of the
@@ -304,6 +304,75 @@ function buildProgressText(conditionTree, ctx, rewardLabel) {
   return walk(conditionTree);
 }
 
+// ── Progress (Phuljadi / progress bars) ─────────────────────────────────────
+// A trackable view of how far the CURRENT cart is from a promotion's condition:
+// every product / product-list / taxonomy quantity leaf and every cart-value or
+// cart-quantity ">=" leaf becomes one tracked requirement. Leaves that cannot be
+// shown as "N of M" (customer type, pincode, time, NOT, etc.) are not tracked,
+// but they still gate `complete`, because completion always comes from the real
+// engine result (qualifying), never from these numbers.
+const QTY_FIELDS = ["product", "productList", "category", "subcategory", "tag"];
+
+function trackLeaf(leaf, ctx) {
+  if (QTY_FIELDS.includes(leaf.field)) {
+    if (!["gte", "eq", undefined, null].includes(leaf.operator)) return null;
+    const need = Math.max(1, Number(leaf.minQuantity ?? 1) || 1);
+    const have = Number(quantityForConditionLeaf(leaf, ctx)) || 0;
+    return { kind: "quantity", need, have };
+  }
+  if (leaf.field === "cartSubtotal" && (leaf.operator === "gte" || !leaf.operator)) {
+    return { kind: "amount", need: Number(leaf.value) || 0, have: Number(ctx.subtotal) || 0 };
+  }
+  if (leaf.field === "cartQuantity" && (leaf.operator === "gte" || !leaf.operator)) {
+    return { kind: "quantity", need: Number(leaf.value) || 0, have: Number(ctx.totalQty) || 0 };
+  }
+  return null;
+}
+
+function collectTracked(node, ctx, out) {
+  if (!node || node.op === "NOT") return;
+  if (node.op === "OR") {
+    // the branch the customer is closest to
+    let best = null;
+    for (const child of node.children || []) {
+      const sub = [];
+      collectTracked(child, ctx, sub);
+      if (!sub.length) continue;
+      const frac = sub.reduce((s, t) => s + Math.min(t.have / t.need, 1), 0) / sub.length;
+      if (!best || frac > best.frac) best = { frac, sub };
+    }
+    if (best) out.push(...best.sub);
+    return;
+  }
+  if (node.op) { (node.children || []).forEach((c) => collectTracked(c, ctx, out)); return; }
+  const t = trackLeaf(node, ctx);
+  if (t && t.need > 0) out.push(t);
+}
+
+export function buildPromotionProgress(conditionTree, ctx, qualifying) {
+  const steps = [];
+  collectTracked(conditionTree, ctx, steps);
+  if (!steps.length) return null;
+  const fractions = steps.map((t) => Math.min(t.have / t.need, 1));
+  let fraction = fractions.reduce((a, b) => a + b, 0) / steps.length;
+  // Never show 100% unless the engine says the offer is really unlocked.
+  const blocked = !qualifying && fraction >= 1;
+  if (qualifying) fraction = 1;
+  else if (blocked) fraction = 0.98;
+  const single = steps.length === 1 ? steps[0] : null;
+  return {
+    mode: single ? single.kind : "multi",
+    fraction,
+    blocked,
+    complete: Boolean(qualifying),
+    // quantity offers are drawn in N segments (only when N is small enough to read)
+    segments: single && single.kind === "quantity" && single.need <= 12 ? single.need : 0,
+    current: single ? Math.min(single.have, single.need) : steps.filter((t, i) => fractions[i] >= 1).length,
+    target: single ? single.need : steps.length,
+    steps: steps.map((t) => ({ kind: t.kind, need: t.need, have: Math.min(t.have, t.need) })),
+  };
+}
+
 function rewardLabelFor(promotion) {
   const types = new Set((promotion.rewards || []).map((r) => r.type));
   if (types.has("free_shipping")) return "Free Shipping";
@@ -379,6 +448,10 @@ export function buildPromotionDisplayModel(promotion, ctx, { placement, appliedP
     displayRank: promotion.priority || 0, // alias kept distinct in the contract in case display ordering ever needs to diverge from stacking priority
     savingsText: buildSavingsText(promotion) || null,
     progressText: qualifying ? null : buildProgressText(promotion.conditionTree, ctx, rewardLabelFor(promotion)),
+    progress: buildPromotionProgress(promotion.conditionTree, ctx, qualifying),
+    rewardLabel: (promotion.rewards || [])[0]?.label || buildSavingsText(promotion) || "",
+    // promotions in the same group never apply together (the best one wins) — lets the UI say "replaces ..."
+    group: promotion.promotionGroup || null,
     ctaText: buildCtaText(promotion, { applied, qualifying, needsCoupon }),
     // The actual code to enter, ONLY surfaced once the customer still needs
     // it (condition met but coupon not yet applied) — never shown once
