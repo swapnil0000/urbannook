@@ -52,7 +52,8 @@ const HomeProductCard = ({ p, index = 0, listId = 'grid', listName = 'Grid' }) =
           <WishlistButton productId={p.productId} />
         </div>
         <img src={productImg(p)} alt={p.productName} loading="lazy" className="gl-img w-full h-full object-cover" onError={(e) => { e.currentTarget.src = '/assets/logo.webp'; }} />
-        {img2 && <img src={img2} alt="" className="gl-img2 absolute inset-0 w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
+        {/* Hover-only image: lazy, so it isn't preloaded or fetched with the page. */}
+        {img2 && <img src={img2} alt="" loading="lazy" decoding="async" className="gl-img2 absolute inset-0 w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
       </div>
       <div className="p-3.5 flex flex-col flex-1 min-w-0">
         <span className="gl-lbl text-[10px] text-sale">{p.productCategory || 'Urban Nook'}</span>

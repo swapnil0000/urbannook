@@ -16,7 +16,7 @@ import FreeShippingBanner from '../../component/FreeShippingBanner';
 import ProductPageBanner from '../../component/ProductPageBanner';
 import ImageCarousel from '../../component/ImageCarousel';
 import { motion, AnimatePresence } from 'motion/react';
-import { ScrollColorBand } from '../../component/motion';
+import { ScrollColorBand, MotionRoot } from '../../component/motion';
 import { variantSku, trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist, trackVariantSelect, trackShare, trackDeliveryCheck } from '../../utils/analytics';
 import { productsApi, useGetProductByIdQuery, useGetProductsQuery, useGetBlogPostsQuery } from '../../store/api/productsApi';
 import { useAddToCartMutation, useUpdateCartMutation, useCalculateShippingMutation, useGetFreeShippingOfferQuery } from '../../store/api/userApi';
@@ -26,6 +26,7 @@ import { addItem, updateQuantity, removeItem, updateSelection } from '../../stor
 import { useUI } from '../../hooks/useRedux';
 import { useCartData } from '../../hooks/useCartSync';
 import FreeShippingStrip from '../../component/FreeShippingStrip';
+import { compressImage } from '../../utils/compressImage';
 
 const MotionDiv = motion.div;
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
@@ -180,7 +181,9 @@ const ProductDetailPage = () => {
       && (details.find((v) => v.sku === urlVariantSku) || details.find((v) => v.variantName === urlVariantSku));
     return matched ? matched.variantName : details[0].variantName;
   });
-  const { data: relRes } = useGetProductsQuery({ page: 1, limit: 8 });
+  // Same args as the header's list (entry-server globalQueries), so this reads
+  // that cached list instead of embedding a second copy in the page's HTML.
+  const { data: relRes } = useGetProductsQuery({ page: 1, limit: 24 });
   const related = useMemo(() => productList(relRes).filter((p) => p.productId !== productId).slice(0, 4), [relRes, productId]);
 
   // Product FAQs — use CMS-provided product.faqs if present, else generate helpful
@@ -537,9 +540,11 @@ const ProductDetailPage = () => {
     setShowReviewForm(true);
     setTimeout(() => document.getElementById('review-form-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   };
-  const handleAddReviewImage = (e) => {
-    const files = Array.from(e.target.files || []); const toAdd = files.slice(0, 3 - reviewImages.length);
-    setReviewImages((prev) => [...prev, ...toAdd]); setReviewImagePreviews((prev) => [...prev, ...toAdd.map((f) => URL.createObjectURL(f))]); e.target.value = '';
+  const handleAddReviewImage = async (e) => {
+    const files = Array.from(e.target.files || []); e.target.value = '';
+    // Phone photos are 2–4 MB; shrink to a 1200 px JPEG before upload (utils/compressImage.js).
+    const toAdd = await Promise.all(files.slice(0, 3 - reviewImages.length).map((f) => compressImage(f)));
+    setReviewImages((prev) => [...prev, ...toAdd]); setReviewImagePreviews((prev) => [...prev, ...toAdd.map((f) => URL.createObjectURL(f))]);
   };
   const handleRemoveReviewImage = (idx) => { setReviewImages((p) => p.filter((_, i) => i !== idx)); setReviewImagePreviews((p) => p.filter((_, i) => i !== idx)); };
 
@@ -1207,4 +1212,7 @@ const ProductDetailPage = () => {
   );
 };
 
-export default ProductDetailPage;
+// MotionRoot: reduced-motion setting for this page's animations (component/motion).
+const ProductDetailPageWithMotion = () => <MotionRoot><ProductDetailPage /></MotionRoot>;
+
+export default ProductDetailPageWithMotion;

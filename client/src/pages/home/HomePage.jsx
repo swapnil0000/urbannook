@@ -4,7 +4,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import SEOHead from '../../component/SEOHead';
 import { productImg, firstVariant, inr } from '../../component/UnProductCard';
 import HomeProductCard from '../../component/HomeProductCard';
-import { Reveal, Stagger, StaggerItem, Parallax, TextReveal, useInView, motion, AnimatePresence } from '../../component/motion';
+import { Reveal, Stagger, StaggerItem, Parallax, TextReveal, useInView, motion, AnimatePresence, MotionRoot } from '../../component/motion';
 import { useGetFeaturedProductsQuery, useGetProductsQuery } from '../../store/api/productsApi';
 import { useGetTestimonialsQuery } from '../../store/api/testimonialsApi';
 import { useGetAllFreeShippingBannersQuery } from '../../store/api/freeShippingApi';
@@ -532,7 +532,7 @@ const HeroCarousel = ({ products = [], onProduct, onVariant, onShop }) => {
                 className="flex gap-3 md:gap-4 overflow-x-auto gl-hscroll snap-x snap-mandatory pb-1"
                 style={{ touchAction: 'pan-x' }}
               >
-                {f.tiles.map((t) => (
+                {f.tiles.map((t, i) => (
                   /* Fixed width AND fixed aspect, so every tile is the same size
                      whatever the photo's ratio is — the shots run 0.75 to 1.0,
                      and sizing each tile to its own photo made the rail change
@@ -544,22 +544,19 @@ const HeroCarousel = ({ products = [], onProduct, onVariant, onShop }) => {
                     className="group relative shrink-0 snap-start text-left border border-white/10 overflow-hidden w-[62vw] max-w-[240px] sm:w-[clamp(190px,20vw,260px)] sm:max-w-none"
                   >
                     <div className="relative w-full aspect-[4/5] overflow-hidden bg-surface">
-                      {/* A blurred copy fills the box behind the real photo, so
-                          the tile can be a fixed shape without cropping the
-                          product or leaving a hard letterbox edge. The shots
-                          sit on soft studio gradients, so the blurred backdrop
-                          reads as a continuation of that backdrop. */}
-                      <img
-                        src={t.img}
-                        alt=""
-                        aria-hidden="true"
-                        onError={onImgErr}
-                        className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl"
-                      />
+                      {/* The photo is contained (not cropped); the tile's
+                          bg-surface fills any letterbox. A blurred full-size
+                          copy used to sit behind it — removed, its blur filter
+                          was repainted on every swipe and slowed low-end phones.
+                          Only the first tile is the LCP candidate: it alone is
+                          eager + high priority, the rest are lazy, so React
+                          doesn't emit a <link rel=preload> for them. */}
                       <img
                         src={t.img}
                         alt={t.label}
-                        loading="eager"
+                        loading={i === 0 ? 'eager' : 'lazy'}
+                        fetchPriority={i === 0 ? 'high' : undefined}
+                        decoding={i === 0 ? undefined : 'async'}
                         onError={onImgErr}
                         className="relative w-full h-full object-contain transition-transform duration-[900ms] group-hover:scale-[1.04]"
                       />
@@ -1206,4 +1203,7 @@ const HomePage = () => {
   );
 };
 
-export default HomePage;
+// MotionRoot: reduced-motion setting for this page's animations (component/motion).
+const HomePageWithMotion = () => <MotionRoot><HomePage /></MotionRoot>;
+
+export default HomePageWithMotion;

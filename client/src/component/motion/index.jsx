@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components -- shared motion primitives + tokens live together intentionally */
 import { Fragment, useRef } from "react";
-import { motion, useScroll, useTransform, useInView, AnimatePresence } from "motion/react";
+import { motion, useScroll, useTransform, useInView, AnimatePresence, MotionConfig } from "motion/react";
 
 /**
  * Shared motion primitives for Urban Nook.
@@ -182,6 +182,15 @@ export function TextReveal({
       ))}
     </Tag>
   );
+}
+
+/**
+ * <MotionRoot> — wrap a page that uses these primitives (or motion/react) in
+ * it, so its animations respect prefers-reduced-motion. Lives in the pages,
+ * not the app shell, so `motion` only loads with the pages that animate.
+ */
+export function MotionRoot({ children }) {
+  return <MotionConfig reducedMotion="user">{children}</MotionConfig>;
 }
 
 export { motion, useInView, AnimatePresence };

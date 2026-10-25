@@ -116,6 +116,9 @@ export default {
     const headers = new Headers(s3Response.headers);
     headers.set("Cache-Control", s3Response.ok ? "public, max-age=86400" : "no-store");
     headers.delete("set-cookie");
+    // Public images: let the storefront's service worker (client/public/sw.js)
+    // fetch them in CORS mode so it can cache real (non-opaque) responses.
+    headers.set("Access-Control-Allow-Origin", "*");
 
     return new Response(s3Response.body, {
       status: s3Response.status,

@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
-import { MotionConfig } from "motion/react";
 
 /**
  * Scroll + motion provider.
@@ -10,9 +9,9 @@ import { MotionConfig } from "motion/react";
  * All the scroll-triggered animations (reveals, stagger, parallax) work fine on native
  * scroll via IntersectionObserver / scroll position, so nothing visual is lost.
  *
- * This wrapper still:
- *  - resets scroll to top on route change, and
- *  - applies MotionConfig so every animation respects prefers-reduced-motion.
+ * This wrapper resets scroll to top on route change. The reduced-motion
+ * setting lives in each animated page (<MotionRoot>, component/motion), so the
+ * motion library isn't part of the main bundle.
  */
 export default function SmoothScroll({ children }) {
   const { pathname, state } = useLocation();
@@ -24,5 +23,5 @@ export default function SmoothScroll({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
-  return <MotionConfig reducedMotion="user">{children}</MotionConfig>;
+  return children;
 }

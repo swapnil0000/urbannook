@@ -174,37 +174,8 @@
       -moz-osx-font-smoothing: grayscale;
     }
     #root { min-height: 100vh; }
-    .hero-skeleton {
-      min-height: 97vh;
-      background: linear-gradient(135deg, #1a2822 0%, #2e443c 100%);
-      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-    }
 
-    @keyframes pulse {
-
-      0%,
-      100% {
-        opacity: 1;
-      }
-
-      50% {
-        opacity: 0.8;
-      }
-    }
-
-    /* Critical hero styles for immediate render */
-    .min-h-\[97vh\] {
-      min-height: 97vh;
-    }
-    
-    .bg-\[\#1a2822\] {
-      background-color: #1a2822;
-    }
-    
-    .text-white {
-      color: white;
-    }
-    
+    /* Used by several modals; Tailwind's own font-serif would start with ui-serif. */
     .font-serif {
       font-family: Georgia, 'Times New Roman', serif;
     }
