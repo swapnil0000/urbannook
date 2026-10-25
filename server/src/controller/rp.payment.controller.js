@@ -38,7 +38,7 @@ import { uploadInvoiceToS3 } from "../utils/s3.utils.js";
 import Address from "../model/address.new.model.js";
 import html_to_pdf from "html-pdf-node";
 import { generateInvoiceHtmlTemplate } from "../template/invoiceTemplate.template.js";
-import { calculateShippingRate, FALLBACK_SHIPPING_CHARGE } from "../services/shipping.service.js";
+import { calculateShippingRate, staticShippingCharge } from "../services/shipping.service.js";
 import { apiCache } from "../module/cache.manager.module.js";
 import { sortVariantsOOSLast, deriveProductStatus, syncVariantOutOfStock } from "../utils/variantSort.js";
 
@@ -316,10 +316,11 @@ const getShippingRateOrFallback = async (params) => {
     return await calculateShippingRate(params);
   } catch (error) {
     if (error.message?.includes("Pincode not serviceable")) throw error;
-    console.error(`[SHIPPING] pin ${params.pincode} | rate calc failed, using flat fallback ₹${FALLBACK_SHIPPING_CHARGE}: ${error.message}`);
+    const flat = staticShippingCharge(params.cartValue);
+    console.error(`[SHIPPING] pin ${params.pincode} | rate calc failed, using static ₹${flat}: ${error.message}`);
     return {
-      total_charges: FALLBACK_SHIPPING_CHARGE,
-      type: "fallback",
+      total_charges: flat,
+      type: "standard", // order schema enum is standard|dynamic
       totalWeight: 0,
       expectedNoOfBoxes: params.cartItems?.length || 0,
       serviceName: null,
@@ -910,11 +911,14 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   // Magic has no pincode at this point — Razorpay rates the address through the
   // /magic/shipping-info callback and adds shipping_fee to the order itself, so
   // shipping must stay OUT of the amount we create the order with.
+  // Static delivery charge by what the customer pays for the products (after offers): see staticShippingCharge.
+  const shippingCartValue = orderItems.reduce((s, oi) => s + oi.productSnapshot.priceAtPurchase * oi.productSnapshot.quantity, 0);
   const shippingResult = isMagic
     ? null
     : await getShippingRateOrFallback({
         pincode: deliveryAddressSnapshot.pinCode,
         paymentType: reqPaymentMethod === "COD" ? "COD" : "PREPAID",
+        cartValue: shippingCartValue,
         cartItems: items.map(i => ({
           productId: i.productId,
           quantity: i.quantity,
@@ -929,7 +933,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   // zeroing shipping for the customer should not also zero the COD advance.
   const realShippingAmount = isMagic
     ? 0 // added by Razorpay from the serviceability callback, not by us
-    : (shippingResult?.total_charges || summary?.shipping || 179);
+    : (shippingResult?.total_charges || staticShippingCharge(shippingCartValue));
 
   // Recompute subtotal from actual order items — authoritative, not from cart snapshot.
   // Computed AFTER the cart-rule discount loop above has already reduced any
@@ -2340,14 +2344,16 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   // Magic has no pincode yet — Razorpay rates the address through
   // /magic/shipping-info and adds shipping_fee to the order itself, so shipping
   // must stay OUT of the amount we create the order with.
+  const shippingCartValue = orderItems.reduce((s, oi) => s + oi.productSnapshot.priceAtPurchase * oi.productSnapshot.quantity, 0);
   const shippingResult = isMagic
     ? null
     : await getShippingRateOrFallback({
         pincode: deliveryAddress.pinCode,
         paymentType: reqPaymentMethod === "COD" ? "COD" : "PREPAID",
-        cartItems: rawItemsForShipping
+        cartItems: rawItemsForShipping,
+        cartValue: shippingCartValue,
       });
-  const realShippingAmount = isMagic ? 0 : (shippingResult?.total_charges || 179);
+  const realShippingAmount = isMagic ? 0 : (shippingResult?.total_charges || staticShippingCharge(shippingCartValue));
   // Free shipping unlocks via EITHER: any active Promotion whose reward is
   // free_shipping (the old combo-banner check was deleted 2026-10-09 as
   // fully redundant with promotionResult.freeShipping — see the matching

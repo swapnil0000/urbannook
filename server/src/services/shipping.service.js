@@ -6,6 +6,14 @@ import { ValidationError, NotFoundError } from "../utils/errors.js";
 // the parcel's weight decides the slab, and this order only breaks ties *within* that slab.
 const COURIER_PRIORITY = ["delhivery", "dtdc", "bluedart", "xpressbees"];
 
+// Static delivery charge (no weight / size / courier involved): cart under ₹1000 pays ₹99, ₹1000 and above
+// pays ₹149. The courier API is still called, but only to confirm the pincode is serviceable.
+const STATIC_SHIPPING_BELOW = 99;
+const STATIC_SHIPPING_FROM_THRESHOLD = 149;
+const STATIC_SHIPPING_THRESHOLD = 1000;
+const staticShippingCharge = (cartValue) =>
+  Number(cartValue) >= STATIC_SHIPPING_THRESHOLD ? STATIC_SHIPPING_FROM_THRESHOLD : STATIC_SHIPPING_BELOW;
+
 // Charged when the API answers but no allowlisted courier serves the required slab.
 const FALLBACK_SHIPPING_CHARGE = 179;
 
@@ -98,7 +106,8 @@ const selectCourierService = (allServices, chargeableWeightInKg) => {
   return { selected, targetSlab, candidates, overweight };
 };
 
-const calculateShippingRate = async ({ pincode, cartItems, paymentType = "PREPAID" }) => {
+// cartValue = what the customer pays for the products (after offers); falls back to the list-price total.
+const calculateShippingRate = async ({ pincode, cartItems, paymentType = "PREPAID", cartValue }) => {
   if (!pincode || !cartItems || !Array.isArray(cartItems)) {
     throw new ValidationError("Pincode and cart items are required");
   }
@@ -179,6 +188,7 @@ const calculateShippingRate = async ({ pincode, cartItems, paymentType = "PREPAI
       });
     }
 
+    const staticCharge = staticShippingCharge(Number.isFinite(Number(cartValue)) && cartValue !== undefined && cartValue !== null ? cartValue : totalAmount);
     const totalChargeableWeight = Math.max(totalActualWeight, totalVolumetricWeight);
     const totalChargeableWeightInKg = totalChargeableWeight / 1000;
 
@@ -231,8 +241,8 @@ const calculateShippingRate = async ({ pincode, cartItems, paymentType = "PREPAI
         if (!selected) {
           console.warn(`[SHIPPING] pin ${pincode} | ${validPaymentType} | ${wt} | ${totalBoxes} box(es) | ${candidates.length} candidates | no allowlisted courier at slab ${targetSlab ?? "-"}kg → FALLBACK ₹${FALLBACK_SHIPPING_CHARGE}`);
           return {
-            total_charges: FALLBACK_SHIPPING_CHARGE,
-            type: "fallback",
+            total_charges: staticCharge,
+            type: "standard", // order schema enum is standard|dynamic
             totalWeight: Math.ceil(totalChargeableWeight),
             expectedNoOfBoxes: totalBoxes,
             serviceName: null,
@@ -242,14 +252,14 @@ const calculateShippingRate = async ({ pincode, cartItems, paymentType = "PREPAI
           };
         }
 
-        const finalCharge = Math.ceil(selected.charges);
+        const finalCharge = staticCharge; // the courier quote (selected.charges) is only logged below; customers pay the static rate
 
         // Single detailed line per rate calculation (inputs → decision → charge).
         console.log(`[SHIPPING] pin ${pincode} | ${validPaymentType} | ${wt} | ${totalBoxes} box(es) | slab ${targetSlab}kg${overweight ? " (OVERWEIGHT→largest)" : ""} | ${candidates.length} candidates | picked ${selected.courier.toUpperCase()} "${selected.name}" ₹${selected.charges} → charge ₹${finalCharge}`);
 
         return {
           total_charges: finalCharge,
-          type: "dynamic",
+          type: "dynamic", // order schema enum is standard|dynamic; the amount itself is the static rate
           totalWeight: Math.ceil(totalChargeableWeight),
           expectedNoOfBoxes: totalBoxes,
           serviceName: selected.name,
@@ -287,4 +297,4 @@ const calculateShippingRate = async ({ pincode, cartItems, paymentType = "PREPAI
   }
 };
 
-export { calculateShippingRate, selectCourierService, FALLBACK_SHIPPING_CHARGE };
+export { calculateShippingRate, selectCourierService, staticShippingCharge, FALLBACK_SHIPPING_CHARGE };

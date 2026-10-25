@@ -40,6 +40,8 @@ const dynamicShippingCal = asyncHandler(async (req, res) => {
   const selectedService = await calculateShippingRate({ 
     pincode, 
     cartItems,
+    // display value from the checkout page (after offers); the order itself re-derives it server-side
+    cartValue: req.body.cartValue,
     paymentType: paymentType || "PREPAID"
   });
 

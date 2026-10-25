@@ -1,3 +1,9 @@
+> **Current rule (static):** customers pay ₹99 when the product total (after offers) is under ₹1000 and ₹149 from ₹1000,
+> whatever the weight, size or courier. `staticShippingCharge()` in `shipping.service.js` is the single source; the courier
+> API is still called only to confirm the pincode is serviceable (its quote is logged, not charged). Used by the checkout
+> rate endpoint, `razorpayCreateOrderController`, `guestCreateOrderController` and the Magic shipping-info callback.
+> The slab/courier description below is kept for history.
+
 # Shipping Calculation — Pura Flow (Current Logic)
 
 Yeh doc `shipping.service.js` ke current (as-is) code ko explain karta hai — jab bhi koi
