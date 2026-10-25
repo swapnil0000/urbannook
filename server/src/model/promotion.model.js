@@ -42,6 +42,37 @@ const rewardSchema = new mongoose.Schema(
     },
     targetProductId: { type: String, trim: true },
     targetVariantSku: { type: String, trim: true, default: "" },
+    // percent_off_product/flat_off_product/discounted_product ONLY, and
+    // mutually exclusive with targetProductId (admin controller enforces
+    // exactly one of the two is set) — targets a SET of products resolved
+    // against the live cart at evaluation time instead of one specific
+    // product: "all" = every product in the cart, category/subcategory/tag
+    // = every cart product matching that value (same vocabulary
+    // conditionTree leaves already use — see promotionEngine.util.js's
+    // resolveRewardTargetProductIds). This is what "X% off everything in
+    // category Y" / "X% off every product in the order" actually are —
+    // added 2026-10-10, no new reward type needed, the existing per-product
+    // discount machinery (best-price-per-product, shared rule budgets,
+    // single-winner-by-priority) already generalizes over however many
+    // productIds a reward resolves to.
+    // "productList" = an admin-picked explicit set of specific products/
+    // variants (`items`), added 2026-10-11 — mirrors the admin repo's
+    // identical schema exactly.
+    targetScope: {
+      field: { type: String, enum: ["category", "subcategory", "tag", "all", "productList"] },
+      value: { type: String, trim: true, default: "" },
+      items: {
+        type: [{ productId: { type: String, trim: true }, variantSku: { type: String, trim: true }, _id: false }],
+        default: undefined,
+      },
+      // Phase 2 (Admin Offer Control System) — reward-level exclusion:
+      // "10% off category X EXCEPT these specific products". Distinct from
+      // condition-level NOT below (gates whether the promotion matches at
+      // all); this only filters which resolved productIds actually get the
+      // discount — see resolveRewardTargetProductIds. Optional, default
+      // empty = every existing scoped reward unaffected.
+      excludeProductIds: { type: [{ type: String, trim: true }], default: undefined },
+    },
     // Optional per-reward display name — a promotion with multiple rewards
     // (e.g. one reward per stand variant: Single/Double/Triple Layer) used
     // to show the SAME promotion-level `name` for every one of them on the
@@ -61,8 +92,25 @@ const rewardSchema = new mongoose.Schema(
       default: undefined,
     },
     value: { type: Number, min: 0 }, // percent_off: 0-100; flat_off/discounted_product: rupees
+    // Phase 3 (Admin Offer Control System) — "2+ → 10% off, 4+ → 20% off"
+    // as ONE promotion. Alongside (not replacing) `value` above — optional;
+    // absent/empty behaves exactly as today. See
+    // promotionEngine.util.js's resolveTierValue for how the applied value
+    // is picked (highest qualifying tier wins, never cumulative).
+    tiers: {
+      type: [{ minQuantity: { type: Number, min: 1 }, value: { type: Number, min: 0 }, _id: false }],
+      default: undefined,
+    },
     bundlePrice: { type: Number, min: 0 },
     storeCreditAmount: { type: Number, min: 0 },
+    // percent_off_product/flat_off_product/discounted_product only. Default
+    // (false) = ORIGINAL behavior: floor(have/minQuantity) units discounted
+    // (a repeating "every Nth group" tier). true = "buy N, get M% off EVERY
+    // qualifying unit" — crossing the threshold discounts the WHOLE cart
+    // quantity of the target, not just one multiple of it. See the matching
+    // comment on `promotionRepeatCount`/the reward-building loop in
+    // promotionEngine.util.js for the cap calculation this drives.
+    discountAllUnits: { type: Boolean, default: false },
   },
   { _id: false },
 );
@@ -85,6 +133,15 @@ const promotionSchema = new mongoose.Schema(
         "free_gift",
         "coupon_promotion",
         "automatic",
+        // Not a discount — a singleton config doc for the paid gift-wrap
+        // add-on, migrated 2026-10-08 off the legacy `offers` collection
+        // (type:"gift_wrap") so nothing in this codebase reads that
+        // collection anymore (see offer.util.js's getPublicOfferConfig).
+        // Has no conditionTree/rewards (conditional `required` below) and is
+        // explicitly excluded from every discount-matching query
+        // (getActivePromotions, getActivePromotionsAsCartRules) — never
+        // evaluated as a promotion. See giftWrap field below.
+        "gift_wrap_config",
       ],
       index: true,
     },
@@ -103,8 +160,25 @@ const promotionSchema = new mongoose.Schema(
     maxPromotionsPerOrder: { type: Number, default: null },
     combinesWithCoupons: { type: Boolean, default: true },
 
-    conditionTree: { type: conditionTreeSchema, required: true },
-    rewards: { type: [rewardSchema], required: true },
+    // required for every REAL promotion; NOT required only for the
+    // gift_wrap_config singleton — every actual discount-bearing document
+    // still always has both, so the engine's assumptions are unchanged.
+    conditionTree: { type: conditionTreeSchema, required: function () { return this.promotionType !== "gift_wrap_config"; } },
+    rewards: { type: [rewardSchema], required: function () { return this.promotionType !== "gift_wrap_config"; } },
+
+    // gift_wrap_config only — a paid, customer-selectable add-on with its
+    // own fulfillment/packing note and a Razorpay line-item requirement at
+    // checkout (see rp.payment.controller.js's gift-wrap handling) — NOT a
+    // discount, deliberately never expressed as a Promotion reward (no
+    // reward type can represent "add a new priced, non-discountable
+    // service line"). `isActive` above is reused as this config's own
+    // on/off toggle, same field every other promotion already uses.
+    giftWrap: {
+      price: { type: Number, min: 0, default: 0 },
+      title: { type: String, trim: true, default: "Make it a gift" },
+      note: { type: String, trim: true, default: "" },
+      ctaLabel: { type: String, trim: true, default: "Add Gift Wrap" },
+    },
 
     // Where this promotion is allowed to surface once a display API/UI reads
     // it (promotionPresentation.service.js). Defaults to all 8 so existing
@@ -114,15 +188,58 @@ const promotionSchema = new mongoose.Schema(
     placements: {
       type: [{
         type: String,
-        enum: ["pdp", "plp", "cart", "mini_cart", "checkout", "order_confirmation", "order_details", "customer_account"],
+        enum: ["pdp", "plp", "cart", "mini_cart", "checkout", "order_confirmation", "order_details", "customer_account", "home"],
       }],
       default: ["pdp", "plp", "cart", "mini_cart", "checkout", "order_confirmation", "order_details", "customer_account"],
+    },
+
+    // Cosmetic-only, read by the "home" placement's display endpoint
+    // (getHomeDisplayController) — never touches condition/reward evaluation
+    // or checkout math. Lets an admin dress up a 2-product "buy A+B
+    // together" promotion (AND conditionTree + a discounted_product/
+    // percent_off_product/flat_off_product reward on one of the two) as a
+    // homepage combo card: a custom title already exists (`name` above);
+    // these fill in the rest. Every field optional/blank-default — a
+    // promotion that never sets this is completely unaffected.
+    homeCard: {
+      bannerImage: { type: String, trim: true, default: "" },
+      subtitle: { type: String, trim: true, default: "" },
+      badgeText: { type: String, trim: true, default: "" },
+      ctaLabel: { type: String, trim: true, default: "" },
+      // Offer-card presentation (all optional). Prices/MRP/savings are NEVER
+      // typed here — they're computed from the real promotion; these only
+      // choose how the already-computed savings are worded.
+      badgeLabel: { type: String, trim: true, default: "" },     // festive tag on the image, e.g. "Diwali Special"
+      priceLabel: { type: String, trim: true, default: "" },     // blank = "Combo Price" / themed label
+      savingsMode: { type: String, enum: ["amount", "percent", "label"], default: "amount" },
+      savingsLabel: { type: String, trim: true, default: "" },   // used for mode "label" (e.g. "Combo Deal")
+      ctaAction: { type: String, enum: ["cart", "link", "choose"], default: "cart" },
+      ctaUrl: { type: String, trim: true, default: "" },         // used when ctaAction is "link"
+      // "reward" cards advertise a ladder offer ("Buy any 2 katana, get a Dual
+      // Stand free") without a fixed 2-product pair, so they show the free
+      // item instead of a computed combo price. ctaAction "choose" opens a
+      // small picker of these links (e.g. Wooden Katana / LED Katana).
+      // Product page a homepage offer tile opens (/products/<id>?offer=<promotion>).
+      // Blank = the first product named in the offer's condition.
+      primaryProductId: { type: String, trim: true, default: "" },
+      cardKind: { type: String, enum: ["combo", "reward"], default: "combo" },
+      ctaChoices: { type: [{ _id: false, label: { type: String, trim: true }, url: { type: String, trim: true } }], default: [] },
+      order: { type: Number, default: 0 },                       // lower shows first
     },
 
     // Buy-X-Get-Y repeat cap — null = unlimited (buy 6, get 3 free for a
     // "buy 2 get 1" rule with no cap; a cap of 1 means it only ever triggers
     // once per order no matter how many complete groups qualify).
     maxApplications: { type: Number, default: null },
+
+    // Max ₹ this ONE promotion can grant across a whole order, summed over
+    // every product-level + order-level reward line it wins — null =
+    // unlimited (unchanged behavior). Mirrors Coupon.maxDiscountCap's exact
+    // naming/semantics (Admin Offer Control System, Phase 4). Enforced in
+    // promotionEngine.util.js via the SAME per-promotion running-total
+    // tracking rp.payment.controller.js already keeps for usage reporting —
+    // see promoDiscountByPromotionId / applyPromotionDiscountCaps.
+    maxDiscountAmount: { type: Number, default: null },
 
     // ── Abuse-prevention limits (mirrors Coupon's existing pattern exactly:
     // couponcodes has maxTotalUses/maxUsesPerUser) ─────────────────────────

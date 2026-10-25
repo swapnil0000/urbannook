@@ -3,7 +3,7 @@ import { useApplyCouponMutation, useGetAvailableCouponsQuery, useLookupCouponMut
 import { useUI, useAuth } from '../hooks/useRedux';
 import { calcLocalDiscount } from '../utils/couponDiscount';
 
-const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved, isGuest, cartTotal }) => {
+const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved, isGuest, cartTotal, items }) => {
   const [couponCode, setCouponCode] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -13,7 +13,7 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
   const { user } = useAuth();
 
   // For guests: RTK Query already fetched this for the coupon modal — reuses the cache, no extra request
-  const { data: availableCoupons } = useGetAvailableCouponsQuery(undefined, { skip: !isGuest });
+  const { data: availableCoupons } = useGetAvailableCouponsQuery({ items }, { skip: !isGuest });
   const [lookupCoupon, { isLoading: isLookingUp }] = useLookupCouponMutation();
 
   // Takes an optional code so the Independence Day banner can apply through

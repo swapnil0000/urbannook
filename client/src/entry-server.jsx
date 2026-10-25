@@ -16,7 +16,6 @@ import { apiSlice } from './store/api/apiSlice';
 import './store/api/productsApi';
 import './store/api/testimonialsApi';
 import './store/api/statsApi';
-import './store/api/freeShippingApi';
 import './store/api/userApi';
 import { normalizeSeoPath } from './utils/seoMerge';
 import { SsrContext } from './utils/ssrContext';
@@ -25,7 +24,7 @@ import { SsrContext } from './utils/ssrContext';
 // args must match what the page's hooks pass, so the hooks find this data in
 // the cache and the browser doesn't fetch it again.
 const PREFETCH = [
-  { path: '/', load: () => [['getFeaturedProducts', { limit: 1 }], ['getAllFreeShippingBanners', undefined], ['getTestimonials', undefined]] },
+  { path: '/', load: () => [['getFeaturedProducts', { limit: 1 }], ['getTestimonials', undefined]] },
   { path: '/products', load: () => [] },
   { path: '/category/:slug', load: ({ slug }) => [['getCategoryBySlug', slug], ['getCategories', undefined], ['getBlogPosts', { series: slug, limit: 6 }]] },
   { path: '/product/:productId', load: ({ productId }) => productPage(productId) },
@@ -43,7 +42,6 @@ function productPage(productId, variantSku) {
     ['getProductById', productId],
     ['getProductReviews', productId],
     ['getProducts', { page: 1, limit: 8 }],
-    ['getAllFreeShippingBanners', undefined],
     // Free-shipping threshold: the Offer schema's shipping details depend on it.
     ['getFreeShippingOffer', undefined],
     // Linked blog post ("Know the story"): the one for this variant (SKU), else a

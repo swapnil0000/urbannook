@@ -1,5 +1,29 @@
 import { apiSlice } from "./apiSlice";
 import { getApiUrl } from "../../config/appUrls";
+import { recordSuccessfulAdd } from "../slices/cartSlice";
+
+const cartAddSnapshot = (state, productId, variant) => ({
+  previousSubtotal: state.cart.totalAmount,
+  previousQuantity: state.cart.items
+    .filter((item) => String(item.productId || item.mongoId || item.id) === String(productId)
+      && (item.selectedVariant || "N/A") === (variant || "N/A"))
+    .reduce((sum, item) => sum + (Number(item.quantity) || 0), 0),
+});
+
+async function recordCartMutationAdd(data, { dispatch, getState, queryFulfilled }) {
+  const before = cartAddSnapshot(getState(), data.productId, data.variant);
+  try {
+    await queryFulfilled;
+    dispatch(recordSuccessfulAdd({
+      productId: data.productId,
+      selectedVariant: data.variant || "N/A",
+      quantity: Number(data.quantity) || 1,
+      ...before,
+    }));
+  } catch {
+    // A failed add must never open the promotion sheet.
+  }
+}
 
 export const userApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
@@ -25,6 +49,7 @@ export const userApi = apiSlice.injectEndpoints({
         body: data,
       }),
       invalidatesTags: ["Cart"],
+      onQueryStarted: recordCartMutationAdd,
     }),
     updateCart: builder.mutation({
       query: (data) => ({
@@ -33,6 +58,7 @@ export const userApi = apiSlice.injectEndpoints({
         body: data,
       }),
       invalidatesTags: ["Cart"],
+      onQueryStarted: (data, api) => data.action === "add" ? recordCartMutationAdd(data, api) : undefined,
     }),
     mergeGuestCart: builder.mutation({
       query: (data) => ({
@@ -119,13 +145,35 @@ export const userApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ["User"],
     }),
+    // `items` (cart productIds) only matters for guests — a logged-in
+    // user's cart is read server-side instead, so it's safe to pass
+    // undefined/omit for that case. Needed so a product-gated coupon
+    // (Coupon.eligibleProductIds) is filtered out of this list until the
+    // required product is actually in the (guest) cart.
     getAvailableCoupons: builder.query({
-      query: (userId) => ({
-        url: "coupon/list",
-        method: "POST",
-        body: { userId },
-      }),
+      query: (arg) => {
+        const { userId, items } = typeof arg === "object" && arg !== null ? arg : { userId: arg };
+        return {
+          url: "coupon/list",
+          method: "POST",
+          body: { userId, items },
+        };
+      },
       providesTags: ["Coupon"],
+    }),
+    // "Offers & Discounts" cards — admin coupons, never including the code itself.
+    getCouponOffers: builder.query({
+      query: (arg) => ({ url: "coupon/offers", method: "POST", body: { _for: arg || "guest" } }),
+      providesTags: ["Coupon"],
+      keepUnusedDataFor: 60,
+    }),
+    // Releases a code only after the server confirms the verified mobile number.
+    revealCouponCode: builder.mutation({
+      query: ({ couponId, mobile }) => ({
+        url: "coupon/reveal",
+        method: "POST",
+        body: { couponId, mobile },
+      }),
     }),
     // Look up a single coupon by exact code (used by guests for hidden/secret codes).
     // Same endpoint as the list — returns [] if the code is unknown.
@@ -304,37 +352,50 @@ export const userApi = apiSlice.injectEndpoints({
       query: () => "offers/gift_wrap",
       keepUnusedDataFor: 0,
     }),
-    getFreeShippingBanner: builder.query({
-      query: (productId) => `free-shipping-offer/banner/${productId}`,
+    // ── Promotion Engine V2 Display API (2026-10-09) ───────────────────────
+    // The legacy combo-banner system (getFreeShippingBanner/
+    // getAllFreeShippingBanners, backed by the now-deleted cart-rule
+    // adapter/offers collection) and the generic cart-rule evaluator
+    // (evaluateCartRules, /cart-rules/evaluate) were deleted entirely —
+    // every discount/promotion signal the storefront needs now comes from
+    // these three endpoints (promotion.controller.js's display
+    // controllers), already sanitized through promotionPresentation
+    // .service.js (never raw conditionTree/rewards). `keepUnusedDataFor: 0`
+    // on all three so an admin toggling a promotion is reflected on the next
+    // fetch, not served from a stale cache.
+    //
+    // UI consuming this data is still to be (re)built — these hooks are the
+    // data-fetching layer only, deliberately shipped ahead of any component
+    // using them, same convention as the Promotion V2 hooks this replaces.
+    getProductPromotions: builder.query({
+      query: (productId) => `promotions/display/product/${productId}`,
       keepUnusedDataFor: 0,
     }),
-    // Used on checkout to find a banner matching whatever's in the cart —
-    // checkout isn't tied to one product page like the PDP is.
-    getAllFreeShippingBanners: builder.query({
-      query: () => "free-shipping-offer/banners",
+    getCartPromotions: builder.query({
+      query: ({ items, placement = "cart", subtotal, couponCode, addedItem, previewPromotionIds, claimedGifts } = {}) => ({
+        url: "promotions/display/cart",
+        method: "POST",
+        body: { items: items || [], placement, subtotal, couponCode, addedItem, previewPromotionIds, claimedGifts },
+      }),
       keepUnusedDataFor: 0,
     }),
-    // Generic, data-driven cart-promotion rules (server/src/model/cartRule.model.js)
-    // — evaluates the current cart against every active rule and returns
-    // which matched (free shipping / discounts) plus the closest incomplete
-    // one for progress display. `items` is a plain array of
-    // { productId, quantity } — RTK Query serialises it into the cache key,
-    // so this naturally re-fetches whenever cart contents actually change.
-    // Same evaluator the payment controller uses for the real order total,
-    // so this can never disagree with what actually gets charged.
-    evaluateCartRules: builder.query({
-      query: (items) => ({ url: "cart-rules/evaluate", method: "POST", body: { items: items || [] } }),
+    getCheckoutPromotions: builder.query({
+      query: ({ items, subtotal, customerType, orderCount, deliveryAddress, couponCode } = {}) => ({
+        url: "promotions/display/checkout",
+        method: "POST",
+        body: { items: items || [], subtotal, customerType, orderCount, deliveryAddress, couponCode },
+      }),
+      keepUnusedDataFor: 0,
     }),
-    // Promotion Engine V2 — separate `promotions` collection, separate
-    // evaluator (server/src/utils/promotionEngine.util.js). Not consumed by
-    // any component yet (no storefront UI built for V2 this round — see the
-    // plan this was built from); exported so a future purpose-built
-    // component can use it without any new API work.
-    getActivePromotionsForProduct: builder.query({
-      query: (productId) => `promotions/for-product/${productId}`,
-    }),
-    evaluatePromotions: builder.query({
-      query: (items) => ({ url: "promotions/evaluate", method: "POST", body: { items: items || [] } }),
+    // Homepage combo cards — promotions with placements including "home"
+    // whose conditionTree names exactly 2 products (a "buy A+B together"
+    // shape). Server resolves the 2 products, runs the SAME evaluatePromotions
+    // engine checkout uses against a hypothetical 1-each cart, and returns
+    // the real computed mrp/price/save — nothing here is a parallel pricing
+    // system. keepUnusedDataFor: 0 so an admin edit is reflected immediately.
+    getHomeComboOffers: builder.query({
+      query: () => "promotions/display/home",
+      keepUnusedDataFor: 0,
     }),
   }),
 });
@@ -356,6 +417,8 @@ export const {
   useOrderHistoryQuery,
   useApplyCouponMutation,
   useGetAvailableCouponsQuery,
+  useGetCouponOffersQuery,
+  useRevealCouponCodeMutation,
   useLookupCouponMutation,
   useGetRazorpayKeyQuery,
   useCreateOrderMutation,
@@ -373,9 +436,8 @@ export const {
   useCalculateShippingMutation,
   useGetFreeShippingOfferQuery,
   useGetGiftWrapOfferQuery,
-  useGetFreeShippingBannerQuery,
-  useGetAllFreeShippingBannersQuery,
-  useEvaluateCartRulesQuery,
-  useGetActivePromotionsForProductQuery,
-  useEvaluatePromotionsQuery,
+  useGetProductPromotionsQuery,
+  useGetCartPromotionsQuery,
+  useGetCheckoutPromotionsQuery,
+  useGetHomeComboOffersQuery,
 } = userApi;

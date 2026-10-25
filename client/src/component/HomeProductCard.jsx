@@ -23,20 +23,17 @@ const badgeOf = (p) => {
  * Products grid render — those two keep using UnProductCard, completely
  * untouched.
  *
- * Layout: category label → title (up to 2 lines, fixed min-height so it
- * never depends on how long the name is) → price + struck MRP on one line
- * → "X% OFF" on its own line below. The title's reserved min-height is
- * what keeps every card's price at the same Y across a stretched row —
- * unlike a single-line title pinned to the bottom with margin-auto, there's
- * no leftover space for a taller sibling card to push into, so a flush,
- * even-height row (items-stretch) never grows a dead gap under the title.
+ * Layout: image (with a "Starting at ₹price" corner banner over it) →
+ * category label → title (up to 2 lines, fixed min-height so it never
+ * depends on how long the name is). No price row below the title — every
+ * card in a stretched row (items-stretch) ends at the same height from
+ * the title block alone.
  */
 const HomeProductCard = ({ p, index = 0, listId = 'grid', listName = 'Grid' }) => {
   const v = firstVariant(p);
   const badge = badgeOf(p);
   const img2 = secondImg(p);
   const price = Number(p?.effectivePrice ?? v.variantPrice ?? 0);
-  const mrp = Number(p?.effectiveMrp ?? v.variantMrp ?? 0);
 
   // A real <a href> (not a div with onClick) so search engines can follow the
   // home page's links to products; the router still handles the click.
@@ -53,19 +50,16 @@ const HomeProductCard = ({ p, index = 0, listId = 'grid', listName = 'Grid' }) =
         </div>
         <img src={productImg(p)} alt={p.productName} loading="lazy" className="gl-img w-full h-full object-cover" onError={(e) => { e.currentTarget.src = '/assets/logo.webp'; }} />
         {img2 && <img src={img2} alt="" className="gl-img2 absolute inset-0 w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
+        <div className="absolute bottom-0 right-0 z-10 bg-sale text-white px-1.5 py-1 leading-tight text-right">
+          <div className="gl-lbl text-[5px] opacity-90">Starting at</div>
+          <div className="text-[10px] font-extrabold">{inr(price)}</div>
+        </div>
       </div>
       <div className="p-3.5 flex flex-col flex-1 min-w-0">
         <span className="gl-lbl text-[10px] text-sale">{p.productCategory || 'Urban Nook'}</span>
         <h3 className="font-bold text-ink text-[15px] leading-snug line-clamp-2 min-h-[2.4em] mt-0.5">
           {p.productName}
         </h3>
-        <div className="mt-1.5 flex items-baseline flex-wrap gap-x-2 gap-y-0.5">
-          <span className="text-[17px] text-ink font-extrabold">{inr(price)}</span>
-          {mrp > price && <span className="text-[13px] text-faint line-through">{inr(mrp)}</span>}
-        </div>
-        {mrp > price && (
-          <span className="gl-lbl text-[10px] text-sale mt-0.5">{Math.round(((mrp - price) / mrp) * 100)}% off</span>
-        )}
       </div>
     </Link>
   );

@@ -6,10 +6,7 @@ import {
   FALLBACK_SHIPPING_CHARGE,
 } from "../services/shipping.service.js";
 import { validateNewCoupon } from "../services/coupon.code.service.js";
-import {
-  isFreeShippingEligible,
-  getFreeShippingConfig,
-} from "../utils/freeShippingOffer.util.js";
+import { getFreeShippingConfig } from "../utils/freeShippingOffer.util.js";
 import {
   verifyMagicCallback,
   toRazorpayServiceableAddress,
@@ -165,9 +162,14 @@ export const magicShippingInfoController = asyncHandler(async (req, res) => {
     console.log(`${TAG}[shipping] internal test order — shipping ₹0`);
   }
 
-  // Free shipping decided at order-create — including the cart rules ("2+ lamps"
-  // and friends), which the re-derivation below knows nothing about. Honouring
-  // it here is what stops Magic charging for delivery the cart said was free.
+  // Free shipping decided at order-create — including any Promotion V2
+  // free_shipping reward, which the re-derivation below knows nothing about.
+  // Honouring it here is what stops Magic charging for delivery the cart
+  // said was free. (The separate per-product combo-banner check this used to
+  // also run — isFreeShippingEligible, reading the legacy cart-rule/offers
+  // system — was deleted entirely 2026-10-09, same cutover as
+  // rp.payment.controller.js's matching comment: it's fully redundant with
+  // the Promotion result already folded into freeShippingUnlocked above.)
   if (!freeShipping && order?.freeShippingUnlocked) {
     freeShipping = true;
     console.log(`${TAG}[shipping] free shipping carried over from order-create`);
@@ -180,13 +182,10 @@ export const magicShippingInfoController = asyncHandler(async (req, res) => {
     );
     const config = await getFreeShippingConfig();
     const thresholdEligible = config.isActive && subtotal >= config.thresholdAmount;
-    const productEligible = cartItems.length
-      ? await isFreeShippingEligible(cartItems.map((i) => ({ productId: i.productId, quantity: i.quantity, variantSku: i.variantSku })))
-      : false;
-    freeShipping = freeShipping || thresholdEligible || productEligible;
+    freeShipping = freeShipping || thresholdEligible;
     console.log(
       `${TAG}[shipping] items=[${cartItems.map((i) => `${i.productId}x${i.quantity}${i.variantSku ? `(${i.variantSku})` : ""}`).join(",")}] ` +
-      `signals={carriedOverFromOrderCreate:${carriedOverFromOrderCreate}, isInternalTestOrder:${!!order?.isInternalTestOrder}, thresholdEligible:${thresholdEligible}(threshold=₹${config.thresholdAmount}, subtotal=₹${subtotal}), productEligible:${productEligible}} ` +
+      `signals={carriedOverFromOrderCreate:${carriedOverFromOrderCreate}, isInternalTestOrder:${!!order?.isInternalTestOrder}, thresholdEligible:${thresholdEligible}(threshold=₹${config.thresholdAmount}, subtotal=₹${subtotal})} ` +
       `→ freeShipping=${freeShipping}`,
     );
   } catch (err) {
@@ -338,14 +337,12 @@ export const magicApplyPromotionController = asyncHandler(async (req, res) => {
   const coupon = await Coupon.findOne({ code: cleanCode, isArchived: false }).lean();
   if (!coupon) return fail("Invalid or inactive coupon.");
 
-  // Product subtotal the discount applies to. The DB order's amount is the
-  // source of truth; Razorpay's order_amount is a fallback.
-  // VERIFY: confirm the field name and whether it already includes shipping.
   const order = await orderByReceipt(receipt, {
     amount: 1,
     coupon: 1,
     userId: 1,
     isGuestOrder: 1,
+    items: 1,
   });
 
   if (order?.coupon?.isApplied) {
@@ -355,8 +352,15 @@ export const magicApplyPromotionController = asyncHandler(async (req, res) => {
     );
   }
 
-  const subtotalRupees =
-    Number(order?.amount) || Number(payload.order_amount) / 100 || 0;
+  // Product subtotal the discount applies to — summed from the order's own
+  // items (priceAtPurchase, already net of any product-level promo discount,
+  // same base rp.payment.controller.js's own coupon math uses), NEVER
+  // `order.amount`/`order.order_amount` — those are the FINAL charge
+  // (subtotal + gift wrap + shipping - discount), and silently computing a
+  // coupon's %/minCartValue off that over-counts gift wrap into the base
+  // (audit 2026-10-10, finding A9) — a coupon must only ever see products.
+  const magicOrderItems = cartItemsForOrder(order);
+  const subtotalRupees = magicOrderItems.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 0), 0);
 
   if (subtotalRupees <= 0) {
     return fail("Could not read your cart total. Please retry.", "REQUIREMENT_NOT_MET");
@@ -372,6 +376,7 @@ export const magicApplyPromotionController = asyncHandler(async (req, res) => {
     discountRupees = await validateNewCoupon({
       coupon,
       cartProductTotal: subtotalRupees,
+      cartProductIds: magicOrderItems.map((i) => i.productId),
       email,
       mobile: stripCountryCode(contact),
       // Magic carries no session of ours, but the order does: it was created

@@ -6,6 +6,7 @@ import {
   getProductDisplayController,
   getCartDisplayController,
   getCheckoutDisplayController,
+  getHomeDisplayController,
 } from "../controller/promotion.controller.js";
 
 // Public, unauthenticated — mirrors freeShippingOfferRouter/cartRuleRouter
@@ -24,5 +25,6 @@ promotionRouter.post("/promotions/evaluate", evaluatePromotionsController);
 promotionRouter.get("/promotions/display/product/:productId", getProductDisplayController);
 promotionRouter.post("/promotions/display/cart", getCartDisplayController);
 promotionRouter.post("/promotions/display/checkout", getCheckoutDisplayController);
+promotionRouter.get("/promotions/display/home", getHomeDisplayController);
 
 export default promotionRouter;

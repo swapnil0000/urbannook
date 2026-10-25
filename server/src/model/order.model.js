@@ -37,6 +37,14 @@ const orderSchema = new mongoose.Schema(
           // admin/order views can tell a granted-free item apart from a
           // paid one at a glance. Absent/false for every pre-existing order.
           isPromotionalGift: { type: Boolean, default: false },
+          // Explicit item identity: a free gift the customer CLAIMED vs a product they PAID for (the same
+          // SKU can be both, on separate lines). `originalUnitPrice` is the list price at purchase so
+          // discounts / free gifts can be audited and refunded correctly; `giftPromotionId` +
+          // `giftEntitlementKey` tie a gift to the promotion entitlement that granted it.
+          lineType: { type: String, enum: ["PAID", "FREE_GIFT"], default: "PAID" },
+          originalUnitPrice: { type: Number },
+          giftPromotionId: { type: String },
+          giftEntitlementKey: { type: String },
         },
       },
     ],
@@ -45,6 +53,23 @@ const orderSchema = new mongoose.Schema(
     // what fired without recomputing the engine against since-changed
     // promotion config. Empty array for every order that predates this or
     // that only used the legacy offers/cart_rule system.
+    // Free products granted by promotions (the exact product id + SKU to pack and ship), so
+    // fulfilment does not have to infer them from the ₹0 lines. Empty when none.
+    promotionalGifts: {
+      type: [
+        {
+          _id: false,
+          productId: String,
+          variantSku: { type: String, default: "" },
+          productName: String,
+          selectedVariant: String,
+          quantity: { type: Number, default: 1 },
+          promotionId: String,
+          promotionName: String,
+        },
+      ],
+      default: [],
+    },
     appliedPromotions: {
       type: [
         {
@@ -52,10 +77,38 @@ const orderSchema = new mongoose.Schema(
           promotionId: String,
           name: String,
           rewardTypes: [String],
+          // ₹ actually granted by THIS promotion on this order (product-line
+          // discounts it won + its own order-level discount if it won that
+          // too) — snapshotted at order-creation time so PromotionUsage's
+          // discountAmount (see rp.payment.controller.js's webhook) isn't
+          // left at its schema default of 0 forever (audit 2026-10-10,
+          // finding A10). Absent/0 on any order created before this field
+          // existed, same "doesn't predate the engine" convention as
+          // rewardTypes above.
+          discountAmount: { type: Number, default: 0 },
+          // Which products this promotion actually discounted/gifted on this
+          // order — snapshotted at creation time (additive, 2026-10-10) so
+          // the webhook can copy it straight onto PromotionUsage.discounted
+          // Products without recomputing the engine. Empty for a whole-order
+          // reward (percent_off_order/flat_off_order).
+          discountedProducts: {
+            type: [{ productId: String, productName: String, quantity: Number, _id: false }],
+            default: [],
+          },
         },
       ],
       default: [],
     },
+    // Product subtotal BEFORE any Promotion V2 discount was applied —
+    // snapshotted at order-creation time, since `items[].productSnapshot
+    // .priceAtPurchase` already holds the POST-discount price by the time
+    // the order is saved (the discount loop mutates it in place). Without
+    // this, PromotionUsage.cartValueBeforeDiscount could only ever be
+    // reconstructed from the already-discounted saved items — i.e. it would
+    // silently hold the post-discount value under the pre-discount name
+    // (audit 2026-10-10, finding A10). 0/absent for any order with no
+    // matched promotions or predating this field.
+    promotionGrossProductSubtotal: { type: Number, default: 0 },
     invoiceData: {
       isGenerated: { type: Boolean, default: false },
       s3FileKey: { type: String, default: null },

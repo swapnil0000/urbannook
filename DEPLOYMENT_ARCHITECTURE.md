@@ -17,6 +17,32 @@
 
 ## 0. Rules for anyone changing this system (humans and AI agents)
 
+### Promotion display and checkout
+
+Admin writes promotions to the shared `promotions` collection. The storefront
+display API reads the configured condition product IDs and reward target IDs;
+checkout independently evaluates the same rules when calculating the charge.
+For a product discount whose condition is met but whose configured reward
+product or variant is absent from the cart, display marks the reward target
+pending and the cart sheet may offer that exact available target. The offer is
+shown as applied only after an eligible target is in the cart. Product IDs,
+variant SKUs, and discount values come from the promotion document.
+The sheet opens only after a successful cart add signal and a display API
+check that the add advanced the saved condition. Cart restoration and unrelated
+cart changes do not open it. The display API resolves only published, in-stock
+products and eligible variants; checkout remains the charging authority.
+The recommendation sheet slides up from the bottom at all viewport widths.
+The cart and checkout display APIs also return a catalog-price preview using
+the same promotion discount candidates and shared quantity budgets as order
+creation. The storefront shows crossed-out original prices and reduced line
+totals when the preview has savings; order creation remains the final price
+authority.
+The customer-facing promotion sheet shows the saved offer's progress and
+eligible catalog variants, then celebrates only a new API-confirmed applied
+state. Applied product discounts appear as compact receipt rows in cart and
+checkout with per-promotion savings from the display price preview. The UI
+uses existing brand tokens and respects reduced-motion preferences.
+
 Read this before touching deploy scripts, CI/CD config, the prod server, `ecosystem.config.cjs`,
 env loading, or the admin "Releases" feature.
 
