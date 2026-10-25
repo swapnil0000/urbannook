@@ -220,6 +220,43 @@ const variantSize = (v) => {
   return d && d.length && d.breadth && d.height ? `${d.length} × ${d.breadth} × ${d.height} cm` : "";
 };
 
+// Google Ads policy, part 1: car makers' names are trademarks, so titles like "Brake
+// Caliper Lamp - BMW, Porsche" get Shopping ads disapproved. Remove them from the title
+// and description, and add "Car Enthusiast" so the item still matches car-gift searches.
+// The website keeps the full names; only the Google feed is changed.
+const CAR_BRANDS = ["BMW", "Mercedes-Benz", "Mercedes", "AMG", "Porsche", "Ferrari", "Lamborghini", "Audi",
+  "McLaren", "Bugatti", "Bentley", "Rolls-Royce", "Aston Martin", "Maserati", "Jaguar", "Tesla", "Ford",
+  "Mustang", "Chevrolet", "Corvette", "Toyota", "Supra", "Honda", "Nissan", "Mahindra", "Koenigsegg"];
+const CAR_BRAND_RE = new RegExp(`\\b(?:${CAR_BRANDS.map((b) => b.replace(/-/g, "[- ]?")).join("|")})(?:'s)?\\b`, "gi");
+const hasCarBrand = (s) => new RegExp(CAR_BRAND_RE.source, "i").test(s);
+// A run of names ("BMW, Porsche & Ferrari") becomes `filler`: nothing in titles,
+// "iconic cars" in descriptions so the sentence still reads.
+const scrubCarBrands = (s, filler = "") =>
+  s
+    .replace(CAR_BRAND_RE, "\u0000")
+    .replace(/\u0000(?:\s*(?:[,&/]|\band\b|\bor\b)\s*\u0000)*/gi, filler)
+    .replace(/\(\s*[,&/\s]*\)/g, "") // "()" or "(, )" left behind
+    .replace(/(?:\s*(?:[,&/]|\band\b)\s*){2,}/gi, ", ") // "BMW, Porsche & Audi" → ", "
+    .replace(/^[\s,&/\-–|]+|[\s,&/\-–|]+$/g, "") // separators at the ends
+    .replace(/\s+([,.])/g, "$1")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+const googleSafeTitle = (productName, vName) => {
+  const title = googleTitle(scrubCarBrands(productName), scrubCarBrands(vName)) || "Car Enthusiast Lamp";
+  const branded = hasCarBrand(productName) || hasCarBrand(vName);
+  return branded && !/\bcar\b/i.test(title) ? `Car Enthusiast ${title}`.slice(0, 150) : title;
+};
+
+// Google Ads policy, part 2: throwing weapons and blades (kunai, shuriken, knives) fall
+// under Google's weapons policy and risk account flags. Leave them out of the Google feed
+// (they stay in the Meta feed and on the site). Wooden / LED katanas and their display
+// stands are decorative and were already approved in Merchant Center, so they stay in;
+// watch Google Ads → Policy Manager and pull them from campaigns if ads get disapproved.
+const WEAPON_RE = /\b(kunais?|shurikens?|daggers?|knife|knives|machete)\b/i;
+const isWeapon = (p) =>
+  [p.productName, p.productCategory, p.productSubCategory, ...(p.variantDetails || []).map((v) => v.variantName)]
+    .some((s) => s && WEAPON_RE.test(String(s)));
+
 const variantInStock = (p, v) =>
   p.productStatus === "in_stock" &&
   !v.variantOutOfStock &&
@@ -234,6 +271,7 @@ const googleProductFeed = asyncHandler(async (req, res) => {
 
   const rows = [GOOGLE_HEADER.join("\t")];
   let skipped = 0;
+  let excluded = 0;
 
   for (const p of products) {
     const variants = p.variantDetails || [];
@@ -241,9 +279,13 @@ const googleProductFeed = asyncHandler(async (req, res) => {
       skipped += 1;
       continue;
     }
+    if (isWeapon(p)) {
+      excluded += 1;
+      continue;
+    }
 
     const productName = plain(p.productName);
-    const description = plain(p.productDes) || productName;
+    const description = scrubCarBrands(plain(p.productDes), "iconic cars") || scrubCarBrands(productName);
     const productType = plain(p.productSubCategory) || plain(p.productCategory);
     const fallbackImage = productFallbackImage(p);
     // Single-variant products are standalone items — no item_group_id.
@@ -265,7 +307,7 @@ const googleProductFeed = asyncHandler(async (req, res) => {
       // a real markdown (MRP above the selling price); otherwise send the plain price.
       const mrp = Number(v.variantMrp) > price ? Number(v.variantMrp) : null;
       // Variant copy first (admin variantDes), then the shared product description.
-      const variantDes = plain(v.variantDes);
+      const variantDes = scrubCarBrands(plain(v.variantDes), "iconic cars");
       const itemDescription = variantDes && variantDes !== description ? `${variantDes} ${description}` : description;
       const vName =
         v.variantName && !/^(n\/a|default)$/i.test(v.variantName.trim())
@@ -275,7 +317,7 @@ const googleProductFeed = asyncHandler(async (req, res) => {
       rows.push(
         [
           sku || `${p.productId}_${i + 1}`,
-          googleTitle(productName, vName),
+          googleSafeTitle(productName, vName),
           itemDescription.slice(0, 5000),
           sku ? `${DOMAIN}/product/${p.productId}/${sku}` : `${DOMAIN}/product/${p.productId}`,
           image,
@@ -298,7 +340,7 @@ const googleProductFeed = asyncHandler(async (req, res) => {
     });
   }
 
-  console.log(`[Catalog] google feed: ${rows.length - 1} items, ${skipped} skipped`);
+  console.log(`[Catalog] google feed: ${rows.length - 1} items, ${skipped} skipped, ${excluded} weapon products excluded`);
 
   res.setHeader("Content-Type", "text/tab-separated-values; charset=utf-8");
   res.setHeader("Cache-Control", "public, max-age=3600");

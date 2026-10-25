@@ -116,7 +116,12 @@ const shortVariantName = (variantName = '', productName = '') => {
   return kept.join(' ').trim() || variantName;
 };
 
-/* What the variant row is called, per category. */
+/* What the variant row is called, per category. A category listed here sells
+   variants that are different things (Zenitsu's vs Zoro's katana, the BMW vs
+   Ferrari lamp), not colours of one thing, so each variant URL is its own page
+   for search engines (own canonical, title, sitemap entry — see variantPage
+   below and client/scripts/ssg.mjs). Other categories (pen stands in ten
+   colours) keep every variant URL canonical to the product. */
 const VARIANT_NOUN = { Lamp: 'Marque', Anime: 'Design' };
 
 const ProductDetailPage = () => {
@@ -549,9 +554,22 @@ const ProductDetailPage = () => {
 
   const specs = displaySpecs;
   const pageDescription = displayDescription;
+  // A variant URL of a "designs" product (see VARIANT_NOUN) is a page of its own:
+  // canonical to itself, titled after the variant. The product URL stays the
+  // collection of all its designs, headed by the product name.
+  const hasDesignVariants = !!VARIANT_NOUN[product.productCategory]
+    && (product.variantDetails || []).filter((v) => v.isActive !== false).length > 1;
+  const urlVariant = urlVariantSku ? (product.variantDetails || []).find((v) => v.sku === urlVariantSku) : null;
+  const variantPage = hasDesignVariants && urlVariant ? urlVariant : null;
+  const seoTitle = variantPage
+    ? `${variantPage.variantName}${variantPage.variantSubTag ? ` (${variantPage.variantSubTag})` : ''}`
+    : urlVariantSku && selectedVariant && selectedVariant !== 'N/A' ? selectedVariant : product.productName;
+  const seoUrl = variantPage ? `/product/${product.productId}/${encodeURIComponent(variantPage.sku)}` : `/product/${product.productId}`;
+  const heading = hasDesignVariants && !urlVariantSku ? product.productName : (selectedVariant || product.productName);
   // Image alt text: the selected variant's name ("BMW Brake Caliper Lamp") when there is one.
   const imageTitle = selectedVariant && selectedVariant !== 'N/A' ? selectedVariant : product.productName;
-  // One ProductGroup with an Offer per variant (variant pages canonicalise here).
+  // One ProductGroup with an Offer per variant, on the product page and on each
+  // variant page (Google's multi-page variant pattern: offer url = variant page).
   const productUrl = `https://www.urbannook.in/product/${product.productId}`;
   const structuredData = {
     '@context': 'https://schema.org',
@@ -603,7 +621,7 @@ const ProductDetailPage = () => {
 
   return (
     <div className="font-inter bg-paper text-ink min-h-screen overflow-x-clip">
-      <SEOHead title={urlVariantSku && selectedVariant && selectedVariant !== 'N/A' ? selectedVariant : product.productName} description={pageDescription} url={`/product/${product.productId}`} image={galleryImages[0]} type="product" structuredData={[structuredData, breadcrumbData, ...(seoFaqs.length ? [faqPageJsonLd(faqs)] : [])]} />
+      <SEOHead title={seoTitle} description={pageDescription} url={seoUrl} image={galleryImages[0]} type="product" structuredData={[structuredData, breadcrumbData, ...(seoFaqs.length ? [faqPageJsonLd(faqs)] : [])]} />
 
       <div className="max-w-[1280px] mx-auto px-5 py-6 md:py-8">
         {/* breadcrumb */}
@@ -639,8 +657,11 @@ const ProductDetailPage = () => {
                     a cap, so it still keeps short titles' height consistent
                     without truncating a longer one. */}
                 <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-ink leading-tight min-h-[66px] md:min-h-[80px]">
-                  {selectedVariant || product.productName}
+                  {heading}
                 </h1>
+                {heading !== (selectedVariant || product.productName) && selectedVariant && (
+                  <p className="text-base md:text-lg font-semibold text-ink leading-snug mt-1">{selectedVariant}</p>
+                )}
                 {selectedVariantSubTag && (
                   <p className="text-base md:text-lg font-normal text-muted leading-snug mt-1">{selectedVariantSubTag}</p>
                 )}

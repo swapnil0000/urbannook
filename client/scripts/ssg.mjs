@@ -80,6 +80,10 @@ async function pool(items, fn) {
   await Promise.all(workers);
 }
 
+const DESIGN_CATEGORIES = new Set(['Lamp', 'Anime']);
+const activeVariants = (p) => (p.variantDetails || []).filter((v) => v && v.isActive !== false);
+const hasDesignVariants = (p) => DESIGN_CATEGORIES.has(p.productCategory) && activeVariants(p).length > 1;
+
 function sitemap(entries) {
   // No <lastmod>: the API listing has no reliable per-page date, and a fake
   // "today" on every URL teaches Google to ignore the field.
@@ -197,6 +201,12 @@ async function main() {
       priority: 0.8,
       images: [...new Set((p.variantDetails || []).flatMap((v) => v.variantImage || []))],
     })),
+    // Variant pages that are pages of their own (canonical to themselves): the
+    // variants of "designs" products — same rule as VARIANT_NOUN in
+    // src/pages/shop/ProductDetailPage.jsx, keep the two equal.
+    ...products.filter(hasDesignVariants).flatMap((p) => activeVariants(p)
+      .filter((v) => v.sku && rendered(`/product/${p.productId}/${encodeURIComponent(v.sku)}`))
+      .map((v) => ({ loc: `/product/${p.productId}/${encodeURIComponent(v.sku)}`, priority: 0.7, images: (v.variantImage || []).slice(0, 5) }))),
   ];
   fs.writeFileSync(path.join(DIST, 'sitemap.xml'), sitemap(entries));
   fs.writeFileSync(path.join(DIST, 'llms.txt'), llmsTxt(products, categories, posts));

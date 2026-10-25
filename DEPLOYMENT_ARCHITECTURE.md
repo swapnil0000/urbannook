@@ -161,7 +161,14 @@ There is **no server rendering at request time** and no extra process on the pro
    `/products`, `/category/<slug>`, `/product/<id>`, `/product/<id>/<sku>`, `/blog`, `/blog/<slug>` (published posts
    from Admin → Blog), static pages and `__404`.
    It also writes `sitemap.xml` (only pages that rendered; non-indexable categories left out) and
-   `llms.txt`. It never fails the build: a page that can't render, or the whole step when the API is
+   `llms.txt`. The sitemap lists product pages and, for products whose variants are different designs
+   (categories Anime and Lamp: one katana per character, one lamp per car), each variant page
+   `/product/<id>/<sku>` too — those are canonical to themselves; colour variants (Decor) stay canonical to
+   `/product/<id>` (`DESIGN_CATEGORIES` in `ssg.mjs` = `VARIANT_NOUN` in `ProductDetailPage.jsx`).
+   `/category/<slug>` covers the product categories and the collection pages the API builds from variants
+   (`server/src/utils/category.util.js` → `buildCollections`, franchise table in `series.util.js`):
+   `anime-katana` and one page per franchise (`demon-slayer`, `one-piece`, `naruto`, … `video-game-swords`);
+   under 3 items they render but are noindex and stay out of the sitemap. It never fails the build: a page that can't render, or the whole step when the API is
    down, falls back to the SPA shell.
 2. `jenkins/scripts/upload-client.sh` syncs `dist-prerender/ssg/` → `s3://urbannook-prod-frontend/ssg/`
    with `--delete`, `text/html`, `no-cache` (same rule as `index.html`). An empty folder (API down, or a
@@ -170,8 +177,9 @@ There is **no server rendering at request time** and no extra process on the pro
 3. The Worker (`infra/cloudflare/urbannook-s3-proxy-prod.js`, `resolvePage`) for a page URL (no file
    extension): `ssg/<path>/index.html` → older `product/*` page → SPA `index.html` for any known app route
    (checkout, account, a product added after the last build…) → otherwise `ssg/__404/index.html` with a
-   real **HTTP 404**. It also **301**s `/products/<id>` → `/product/<id>`, trailing slashes → no slash, and old policy
-   URLs (`/terms` → `/terms-conditions`; `/cancellation-refund[-policy]`, `/shipping-policy` → `/return-policy`).
+   real **HTTP 404**. It serves `/products/<id>` (the variant chooser, canonical to `/product/<id>`) and **301**s
+   trailing slashes → no slash, `/product` → `/products`, and old policy URLs (`/terms` → `/terms-conditions`;
+   `/cancellation-refund[-policy]`, `/shipping-policy` → `/return-policy`).
    `workers_dev = false`: the site is no longer reachable on `*.workers.dev`.
 4. The browser hydrates the HTML (`client/src/main.jsx`, `window.__SSR__` + `__PRELOADED_STATE__`), so
    it doesn't fetch that page's data again.
