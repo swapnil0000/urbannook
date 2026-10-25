@@ -3,6 +3,10 @@
 // categoryId, else by name) adds the image and display order. SEO for the
 // page comes from Admin → SEO Pages (GET /seo?path=/category/<slug>).
 // Products that were never linked to an admin Category still get a page.
+// After them come the collection pages (buildCollections below): one per
+// franchise and "Anime Katana", built from variants, not whole products.
+
+import { seriesOf } from "./series.util.js";
 
 // URL slug: lowercase words joined by "-" ("Pen Stand" → "pen-stand").
 // Admin slugs use "_" ("wall_hangings"); both normalise to the same value.
@@ -50,7 +54,46 @@ export const buildCategories = (products, categoryDocs = []) => {
     entry.itemCount += activeVariants(p).length || 1;
   }
 
+  const categories = [...out.values()]
+    .map((c) => ({ ...c, kind: "category", indexable: c.itemCount >= MIN_INDEXABLE_ITEMS }))
+    .sort((a, b) => a.displayOrder - b.displayOrder || a.name.localeCompare(b.name));
+  const taken = new Set(categories.map((c) => c.slug));
+  return [...categories, ...buildCollections(products).filter((c) => !taken.has(c.slug))];
+};
+
+// Katana variants: the wooden and LED katana products (sub-category "katana" /
+// "LED Katana"), minus the display stands that share the "katana" sub-category.
+const isKatanaVariant = (p, v) =>
+  /^(katana|led-?katana|ledkatana)$/.test(toCategorySlug(p.productSubCategory)) &&
+  /katana|sword|blade/i.test(v.variantName || "") &&
+  !/stand/i.test(v.variantName || "");
+
+/**
+ * Collection pages that cut across products at the VARIANT level: one page per
+ * franchise (Demon Slayer, One Piece, … and one for video games, see
+ * series.util.js), plus "Anime Katana" (every wooden and LED katana). Same
+ * shape as a category, plus `variantSkus`: categoryDetails returns only those
+ * variants of each product, so the Demon Slayer page lists Zenitsu's wooden AND
+ * LED katana but not Zoro's.
+ */
+export const buildCollections = (products) => {
+  const out = new Map();
+  const add = (meta, p, v) => {
+    if (!out.has(meta.slug)) out.set(meta.slug, { ...meta, image: "", displayOrder: Number.MAX_SAFE_INTEGER, productIds: [], variantSkus: [], itemCount: 0 });
+    const c = out.get(meta.slug);
+    if (!c.productIds.includes(p.productId)) c.productIds.push(p.productId);
+    c.variantSkus.push(v.sku);
+    c.itemCount += 1;
+  };
+  for (const p of products) {
+    for (const v of activeVariants(p)) {
+      if (!v.sku) continue;
+      if (isKatanaVariant(p, v)) add({ slug: "anime-katana", name: "Anime Katana", kind: "collection" }, p, v);
+      const s = seriesOf(v.variantName) || seriesOf(p.productName); // the variant's own name first: a product can name several series
+      if (s) add({ slug: s.slug, name: s.name, kind: s.kind === "game" ? "game" : "series" }, p, v);
+    }
+  }
   return [...out.values()]
     .map((c) => ({ ...c, indexable: c.itemCount >= MIN_INDEXABLE_ITEMS }))
-    .sort((a, b) => a.displayOrder - b.displayOrder || a.name.localeCompare(b.name));
+    .sort((a, b) => b.itemCount - a.itemCount || a.name.localeCompare(b.name));
 };

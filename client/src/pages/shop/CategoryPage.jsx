@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { useGetCategoryBySlugQuery, useGetCategoriesQuery } from '../../store/api/productsApi';
+import { useGetCategoryBySlugQuery, useGetCategoriesQuery, useGetBlogPostsQuery } from '../../store/api/productsApi';
 import SEOHead from '../../component/SEOHead';
 import UnProductCard from '../../component/UnProductCard';
 import RevealCard from '../../component/RevealCard';
@@ -8,6 +8,32 @@ import NotFound from '../NotFound';
 import { trackViewItemList } from '../../utils/analytics';
 
 const SITE = 'https://www.urbannook.in';
+
+// Default copy per page kind (the API's `kind`): "category" is a productCategory
+// page; "collection", "series" and "game" are variant collections built by the
+// server (server/src/utils/category.util.js → buildCollections). Shoppers search
+// "anime katana", "demon slayer katana", "vergil sword", so titles say that.
+// Admin → SEO Pages (/category/<slug>) can still override title, description,
+// intro and FAQs for any of them.
+const pageCopy = ({ kind, slug, name, itemCount }) => {
+  const tail = 'Gift wrap, partial COD and delivery across India.';
+  if (slug === 'anime-katana') return {
+    h1: 'Anime Katana: Wooden & LED Swords',
+    title: 'Anime Katana – Wooden & LED Swords, Buy Online in India',
+    description: `${itemCount} anime katanas from Demon Slayer, One Piece, Naruto, Bleach and games: 104 cm wooden and LED display swords. ${tail}`,
+  };
+  if (kind === 'series') return {
+    h1: `${name} Swords & Collectibles`,
+    title: `${name} Katana, Swords & Collectibles – Buy in India`,
+    description: `${itemCount} ${name} katanas, swords and collectibles: wooden and LED display swords and figures for fans. ${tail}`,
+  };
+  if (kind === 'game') return {
+    h1: name,
+    title: `${name} – Gaming Katana Replicas, Buy in India`,
+    description: `${itemCount} katanas from video games: wooden and LED display replicas for gamers and collectors. ${tail}`,
+  };
+  return { h1: name, title: `${name} – Buy Online in India`, description: `Shop ${itemCount} ${name} designs at UrbanNook. ${tail}` };
+};
 const PER_PAGE = 24;
 
 // One card per sellable variant, linking to that variant's own page — a
@@ -42,13 +68,18 @@ const CategoryPage = () => {
   const [searchParams] = useSearchParams();
   const { data, isLoading, error } = useGetCategoryBySlugQuery(slug);
   const { data: allRes } = useGetCategoriesQuery();
+  // A franchise page (/category/demon-slayer …) ends with that franchise's journal
+  // posts; the API returns none for other slugs. Same args as entry-server.jsx.
+  const { data: storiesRes } = useGetBlogPostsQuery({ series: slug, limit: 6 });
+  const stories = storiesRes?.data || [];
 
   const category = data?.data;
   const items = useMemo(() => toItems(category?.products), [category]);
   const totalPages = Math.max(1, Math.ceil(items.length / PER_PAGE));
   const page = Math.min(Math.max(1, parseInt(searchParams.get('page'), 10) || 1), totalPages);
   const pageItems = useMemo(() => items.slice((page - 1) * PER_PAGE, page * PER_PAGE), [items, page]);
-  const otherCategories = (allRes?.data || []).filter((c) => c.slug !== slug);
+  // Chips: every other page that is worth a visit (indexable), categories first.
+  const otherCategories = (allRes?.data || []).filter((c) => c.slug !== slug && c.indexable !== false);
 
   useEffect(() => { window.scrollTo(0, 0); }, [slug, page]);
   useEffect(() => {
@@ -77,13 +108,13 @@ const CategoryPage = () => {
   }
 
   const { name, indexable, itemCount } = category;
+  const copy = pageCopy(category);
   const basePath = `/category/${category.slug}`;
   const pagePath = (n) => (n > 1 ? `${basePath}?page=${n}` : basePath);
 
-  // Defaults; Admin → SEO Pages (/category/<slug>) can override any of these,
-  // and adds the intro text + FAQs above the footer (SeoPageContent).
-  const title = `${name} – Buy Online in India`;
-  const description = `Shop ${itemCount} ${name} designs at UrbanNook — 3D-printed and made in India. Cash on delivery and pan-India shipping.`;
+  // Defaults (pageCopy above); Admin → SEO Pages (/category/<slug>) can override
+  // them, and adds the intro text + FAQs above the footer (SeoPageContent).
+  const { title, description } = copy;
 
   const structuredData = [
     {
@@ -119,7 +150,7 @@ const CategoryPage = () => {
         <nav aria-label="Breadcrumb" className="text-sm text-faint mb-5">
           <Link to="/" className="hover:text-brand">Home</Link> / <Link to="/products" className="hover:text-brand">Shop</Link> / <span className="text-ink">{name}</span>
         </nav>
-        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">{name}</h1>
+        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">{copy.h1}</h1>
         <p className="text-muted mt-2">{itemCount} {itemCount === 1 ? 'design' : 'designs'}</p>
 
 
@@ -165,6 +196,26 @@ const CategoryPage = () => {
           </nav>
         )}
       </section>
+
+      {stories.length > 0 && (
+        <section className="max-w-[1280px] mx-auto px-5 pb-12" aria-labelledby="stories-heading">
+          <div className="flex items-end justify-between gap-4 flex-wrap">
+            <h2 id="stories-heading" className="text-2xl md:text-3xl font-extrabold tracking-tight">The stories behind the swords</h2>
+            <Link to={`/blog#${category.slug}`} className="text-sm font-bold text-brand hover:underline">All {name} stories →</Link>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 mt-5">
+            {stories.map((p) => (
+              <Link key={p.slug} to={`/blog/${p.slug}`} className="group bg-white border border-hair rounded-2xl overflow-hidden hover:border-ink transition-colors flex gap-4 p-3">
+                {p.coverImage && <img src={p.coverImage} alt={p.coverAlt || p.title} loading="lazy" className="w-24 h-24 object-cover rounded-xl shrink-0" />}
+                <span className="flex flex-col min-w-0">
+                  <span className="font-extrabold leading-snug group-hover:text-brand line-clamp-2">{p.title}</span>
+                  {p.excerpt && <span className="text-sm text-muted line-clamp-2 mt-1">{p.excerpt}</span>}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
     </div>
   );

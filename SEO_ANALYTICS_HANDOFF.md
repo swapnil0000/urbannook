@@ -202,3 +202,28 @@ L × B × H). Empty when unknown. Merchant Center reads the feed daily.
 ### Blog schema (2026-10-19)
 `BlogPosting.about` lists linked products as `Thing` (name + URL), not `Product`: Google flags a `Product` without
 `offers`/`review`/`aggregateRating` as an invalid product snippet. Full `Product`/`Offer` schema stays on the product pages.
+
+## I. Google Merchant feed made Ads-policy safe (2026-10-20, branch `feat/google-ads-feed-compliance`)
+
+`GET /api/v1/catalog/google-feed.tsv` (`server/src/controller/catalog.controller.js`) now:
+- **Removes car brand names** (BMW, Porsche, Ferrari, … — list `CAR_BRANDS`) from `title` and
+  `description`, because they are trademarks and get Shopping ads disapproved. Titles get a
+  "Car Enthusiast" prefix (e.g. "Car Enthusiast Brake Caliper Lamp"); in descriptions a list of
+  names becomes "iconic cars". `id`/SKU and `link` are unchanged, so Merchant Center history is kept.
+- **Leaves out throwing weapons and blades** (kunai, shuriken, dagger, knife — `WEAPON_RE`), which fall
+  under Google's weapons policy. Promote them through Meta, Instagram and SEO instead.
+  *2026-10-24:* wooden / LED katanas and katana display stands are back in the Google feed (they were
+  already approved in Merchant Center). Watch Google Ads → Policy Manager; if katana ads get disapproved,
+  exclude them in the campaign rather than the feed.
+- The website and the Meta feed (`meta-feed.csv`) are unchanged.
+
+## J. Home page product cards are crawlable links (2026-10-24, branch `seo/crawlable-product-links`)
+
+`HomeProductCard` was a `<div onClick>`, so the server-rendered home page had **no** links to any product
+page (checked as Googlebot: 0 `/product*` hrefs), while blogs and categories did. It is now a router `<Link>`
+(same destination `/products/<id>`, same look, same `select_item` tracking), like `UnProductCard`.
+Local SSR check: home goes from 0 to 9 product links.
+
+Also checked on 2026-10-24: the live sitemap lists only 3 categories and `/category/anime-katana` is an empty
+SPA shell, but a local `ssg.mjs` run against the live API renders all 143 pages incl. every collection/series
+(sitemap 115 URLs). The live build predates the collections; the next client build fixes it.

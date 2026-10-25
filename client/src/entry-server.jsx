@@ -26,7 +26,7 @@ import { SsrContext } from './utils/ssrContext';
 const PREFETCH = [
   { path: '/', load: () => [['getFeaturedProducts', { limit: 1 }], ['getTestimonials', undefined]] },
   { path: '/products', load: () => [] },
-  { path: '/category/:slug', load: ({ slug }) => [['getCategoryBySlug', slug], ['getCategories', undefined]] },
+  { path: '/category/:slug', load: ({ slug }) => [['getCategoryBySlug', slug], ['getCategories', undefined], ['getBlogPosts', { series: slug, limit: 6 }]] },
   { path: '/product/:productId', load: ({ productId }) => productPage(productId) },
   { path: '/product/:productId/:variantSku', load: ({ productId, variantSku }) => productPage(productId, variantSku) },
   { path: '/products/:productId', load: ({ productId }) => [['getProductById', productId]] },

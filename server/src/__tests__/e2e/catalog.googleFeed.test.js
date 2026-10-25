@@ -31,4 +31,31 @@ describe("GET /api/v1/catalog/google-feed.tsv", () => {
     expect(row("PENRBW")).toMatchObject({ color: "Multicolor", size: "" });
     expect(row("KATTAN")).toMatchObject({ color: "", material: "Wood-Core Construction", size: "104 cm" });
   });
+
+  it("leaves throwing weapons (kunai) out of the Google feed", async () => {
+    await Product.collection.insertMany([
+      { productId: "kun", uiProductId: "UN-KUN", productName: "Naruto Kunai Collection", isPublished: true, productStatus: "in_stock",
+        variantDetails: [{ sku: "KUNNAR", variantName: "Naruto Kunai", variantPrice: 499, variantImage: ["https://x/k.webp"], variantQuantity: 2 }] },
+    ]);
+    const res = await request(app).get("/api/v1/catalog/google-feed.tsv").expect(200);
+    expect(res.text).not.toMatch(/KUNNAR/);
+  });
+
+  it("removes car brand names (trademarks) from titles and descriptions", async () => {
+    await Product.collection.insertMany([
+      { productId: "cal", uiProductId: "UN-CAL", productName: "Brake Caliper Lamp", isPublished: true, productStatus: "in_stock",
+        productDes: "A lamp for fans of BMW, Porsche & Ferrari. Made to order.",
+        variantDetails: [
+          { sku: "CALBMW", variantName: "BMW", variantPrice: 1999, variantImage: ["https://x/d.webp"], variantQuantity: 3 },
+          { sku: "CALPOR", variantName: "Porsche Red Caliper Lamp", variantPrice: 1999, variantImage: ["https://x/e.webp"], variantQuantity: 3 },
+        ] },
+    ]);
+    const res = await request(app).get("/api/v1/catalog/google-feed.tsv").expect(200);
+    const [head, ...lines] = res.text.split("\n").map((l) => l.split("\t"));
+    const row = (id) => Object.fromEntries(head.map((h, i) => [h, lines.find((l) => l[0] === id)[i]]));
+    expect(row("CALBMW").title).toBe("Car Enthusiast Brake Caliper Lamp");
+    expect(row("CALPOR").title).toBe("Car Enthusiast Red Caliper Lamp");
+    expect(row("CALBMW").description).toBe("A lamp for fans of iconic cars. Made to order.");
+    for (const id of ["CALBMW", "CALPOR"]) expect(row(id).title + row(id).description).not.toMatch(/BMW|Porsche|Ferrari/);
+  });
 });
