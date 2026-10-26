@@ -128,10 +128,11 @@ export const userApi = apiSlice.injectEndpoints({
     }),
 
     orderHistory: builder.query({
-      query: (userEmail) => ({
+      // The query argument is an account-specific cache key, never authority.
+      query: () => ({
         url: "user/order/history",
         method: "POST",
-        body: { userEmail },
+        body: {},
       }),
       providesTags: ["Orders"],
     }),

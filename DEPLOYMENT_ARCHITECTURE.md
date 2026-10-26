@@ -17,6 +17,33 @@
 
 ## 0. Rules for anyone changing this system (humans and AI agents)
 
+### Account order history and verified guest claims
+
+Order history uses the authenticated `userId` only; a supplied email is ignored.
+Checkout email changes therefore cannot hide an account's own orders. The client
+keys its history cache by account ID (email fallback for older login sessions),
+skips unauthenticated fetches, and refetches when the page opens; cache TTLs do not change.
+
+When the captured-payment handler atomically marks a guest order PAID, it also
+stores normalized gateway `payment.contact` as `payment.guestClaimContact`, only
+for a captured payment with the matching Razorpay order ID. The field has a sparse
+index and is never populated from request-body or delivery-recipient phone numbers.
+On an authenticated history request, the server can claim still-unlinked `guest_`
+orders with this contact for an account with a matching WhatsApp `verifiedMobile`.
+Duplicate-phone identities, suspended/unverified accounts, already-owned orders,
+and orders without captured-payment evidence are excluded. Captured orders may
+also be confirmed, processing, shipped, delivered or cancelled by the first login.
+
+Claiming atomically changes only ownership plus timestamps/audit metadata;
+`guestAccountClaim.previousUserId` and `claimedAt` preserve its provenance.
+Order email, guest flag, prices, invoices, stock and fulfilment remain unchanged;
+no payment or notification side effects are replayed. Failed claims do not prevent
+already-owned orders from loading. Login before payment is supported by retrying
+on the next history request. Existing guest email-account creation is unchanged.
+Older orphan orders without the new gateway-contact field require individual
+support verification; there is no automatic historical backfill or account merge.
+Deploy through the existing reviewed-main/Jenkins flow; no secrets or TTL changes.
+
 ### Promotion display and checkout
 
 Admin writes promotions to the shared `promotions` collection. The storefront

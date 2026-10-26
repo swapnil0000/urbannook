@@ -9,6 +9,7 @@ import {
 } from "../services/user.cart.service.js";
 import { ApiRes } from "../utils/index.js";
 import Order from "../model/order.model.js";
+import { claimPaidGuestOrders } from "../services/guest.order.claim.service.js";
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
 import {
   AuthenticationError,
@@ -117,16 +118,20 @@ const userToggleGiftWrap = asyncHandler(async (req, res) => {
 
 const userOrderPreviousHistory = asyncHandler(async (req, res) => {
   const { userId } = req.user;
-  const { userEmail } = req.body;
   
   if (!userId) {
     throw new AuthenticationError("Unauthorized");
   }
 
+  // Ownership comes from authentication, not a mutable checkout email.
+  // Retry claiming here so login-before-payment and login-after-payment both work.
+  // A claim failure must not hide already-owned orders.
+  try {
+    await claimPaidGuestOrders(userId);
+  } catch {
+    console.error('[ORDER HISTORY] Guest order claim failed; serving owned orders');
+  }
   const query = { userId };
-  if (userEmail) {
-    query.userEmail = userEmail;
-  }  
   
   const allOrders = await Order.find(query)
     .sort({ createdAt: -1 })
