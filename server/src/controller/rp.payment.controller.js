@@ -16,6 +16,7 @@ import { couponProductGateOk } from "../services/coupon.code.service.js";
 import PromotionUsage from "../model/promotionUsage.model.js";
 import Promotion from "../model/promotion.model.js";
 import { backfillUserProfileFromCheckout, PLACEHOLDER_NAME } from "../services/user.profile.service.js";
+import { capturedGuestContact } from "../services/guest.order.claim.service.js";
 import {
   isMagicCheckoutEnabled,
   isMagicGuestsOnly,
@@ -1555,6 +1556,7 @@ const fulfilCapturedPayment = async (order, payment) => {
       // Atomic claim: the webhook and the status poll can both get here for
       // the same payment. Only the one that flips the status runs the side
       // effects below (stock, coupon, emails), so they happen exactly once.
+      const guestClaimContact = capturedGuestContact(order, payment);
       const claimed = await Order.findOneAndUpdate(
         { _id: order._id, status: { $in: UNPAID_STATUSES } },
         {
@@ -1563,6 +1565,9 @@ const fulfilCapturedPayment = async (order, payment) => {
             "payment.razorpayPaymentId": payment.id,
             "payment.errorCode": null,
             "payment.errorDescription": "",
+            ...(guestClaimContact
+              ? { "payment.guestClaimContact": guestClaimContact }
+              : {}),
           },
           $push: { statusHistory: { status: "PAID", timestamp: new Date(), note: historyNote } },
         },

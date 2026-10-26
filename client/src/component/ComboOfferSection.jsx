@@ -262,7 +262,7 @@ const OfferTile = ({ combo }) => {
       aria-label={benefit ? `${tagline}. ${benefit}` : tagline}
     >
       {/* the artwork fills the media area; its edges fade softly into the card instead of a hard frame */}
-      <span className="un-tile-img relative block aspect-[10/9] w-full shrink-0 overflow-hidden">
+      <span className="un-tile-img relative block aspect-square w-full shrink-0 overflow-hidden">
         <img src={img} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]" onError={(e) => { e.currentTarget.src = '/assets/logo.webp'; }} />
       </span>
       <span className="un-tile-strip flex h-[48px] shrink-0 flex-col items-center justify-center gap-[3px] px-2 text-center">
@@ -294,7 +294,7 @@ const TeaserTile = ({ index }) => {
   const t = TEASERS[index % TEASERS.length];
   return (
     <div className="un-tile un-tile-locked flex h-full w-full select-none flex-col overflow-hidden text-center" aria-label={`${t.head}. ${t.sub}`} role="group">
-      <span className="un-tile-img relative flex aspect-[10/9] w-full shrink-0 items-center justify-center overflow-hidden" aria-hidden="true">
+      <span className="un-tile-img relative flex aspect-square w-full shrink-0 items-center justify-center overflow-hidden" aria-hidden="true">
         {/* festive silhouette: a gift box outline behind the lock */}
         <svg viewBox="0 0 64 64" className="absolute h-[64%] w-[64%] text-star/20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round">
           <rect x="10" y="26" width="44" height="28" rx="2" />
@@ -359,7 +359,7 @@ const ComboOfferSection = ({ title, subtitle }) => {
           ? 'grid grid-cols-3 gap-x-3.5 gap-y-4 sm:gap-x-4 sm:gap-y-5 lg:grid-cols-6 lg:gap-x-5'
           : 'flex flex-wrap justify-center gap-x-3.5 gap-y-4 sm:gap-x-4 sm:gap-y-5 lg:gap-x-5'}`}>
           {combos.map((c) => (
-            <div key={c.id} className={teasers > 0 ? 'min-w-0' : 'shrink-0 grow-0 basis-[calc((100%_-_1.75rem)/3)] sm:basis-[calc((100%_-_3rem)/4)] lg:basis-[calc((100%_-_6.25rem)/6)]'}>
+            <div key={c.id} className={teasers > 0 ? 'min-w-0' : 'min-w-0 max-w-full shrink-0 grow-0 basis-[calc((100%_-_1.75rem)/3)] sm:basis-[calc((100%_-_3rem)/4)] lg:basis-[calc((100%_-_6.25rem)/6)]'}>
               <OfferTile combo={c} />
             </div>
           ))}

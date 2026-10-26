@@ -16,7 +16,11 @@ const MyOrdersPage = () => {
   const { isAuthenticated, user } = useSelector((state) => state.auth);
   const authToken = useSelector((state) => state.auth?.token);
   const { openLoginModal, showNotification } = useUI();
-  const { data: orderResponse, isLoading, error } = useOrderHistoryQuery(user?.email);
+  // Older password-login sessions contain email but no userId in Redux.
+  const { data: orderResponse, isLoading, error } = useOrderHistoryQuery(user?.userId || user?.email, {
+    skip: !isAuthenticated && !authToken,
+    refetchOnMountOrArgChange: true,
+  });
   const [generatingOrderId, setGeneratingOrderId] = useState(null);
   const [expandedOrderId, setExpandedOrderId] = useState(null);
   const [activeSubSection, setActiveSubSection] = useState(null); // 'tracking' or 'shipping'
