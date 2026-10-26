@@ -41,7 +41,7 @@ function productPage(productId, variantSku) {
   return [
     ['getProductById', productId],
     ['getProductReviews', productId],
-    ['getProducts', { page: 1, limit: 8 }],
+    // Related products read the { page: 1, limit: 24 } list from globalQueries.
     // Free-shipping threshold: the Offer schema's shipping details depend on it.
     ['getFreeShippingOffer', undefined],
     // Linked blog post ("Know the story"): the one for this variant (SKU), else a

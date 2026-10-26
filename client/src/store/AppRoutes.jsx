@@ -41,8 +41,14 @@ const MinimalLoader = () => (
 const AppRoutes = () => {
   return (
     <Routes>
-      {/* HomePage loads immediately - no Suspense needed */}
-      <Route path="/" element={<HomePage />} />
+      <Route
+        path="/"
+        element={
+          <Suspense fallback={<MinimalLoader />}>
+            <HomePage />
+          </Suspense>
+        }
+      />
       <Route
         path="/blog"
         element={

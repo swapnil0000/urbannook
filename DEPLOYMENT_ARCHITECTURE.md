@@ -215,6 +215,12 @@ Freshness: rendered pages are as fresh as the last client build (deploy or night
 stock in the page update on hydration from the live API, so shoppers always see live values; crawlers see
 the build-time values. `client/server.mjs` (runtime SSR) is for local preview only (`npm run dev:ssr`).
 
+Browser-side caching (`client/public/sw.js`, production only): hashed build files are cache-first;
+images from `assets-prod.urbannook.in` are stale-while-revalidate (last 60 kept). The image cache needs
+the CORS header the assets Worker sends (`infra/cloudflare/urbannook-assets-proxy-prod.js`,
+`Access-Control-Allow-Origin: *`); the old CloudFront image host has none and isn't cached. HTML and API
+responses are never intercepted.
+
 ---
 
 ## 3. Prod server layout
