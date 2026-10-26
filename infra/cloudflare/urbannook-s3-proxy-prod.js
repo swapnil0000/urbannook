@@ -152,6 +152,18 @@ export default {
       // Old or broken URLs still shown in Google → their current pages.
       const moved = { "/product": "/products", "/terms": "/terms-conditions", "/cancellation-refund-policy": "/return-policy", "/cancellation-refund": "/return-policy", "/shipping-policy": "/return-policy" }[pathname];
       if (moved) return redirect(url, moved);
+      // Old shop filter links (/products?category=Anime, still in Google) → the
+      // category page. The rendered /products page has canonical /products, so
+      // without this Google never connects those URLs to /category/<slug>.
+      // Same slug rule as client/src/utils/categoryUrl.js; other params (utm…) kept.
+      const cat = pathname === "/products" && url.searchParams.get("category");
+      if (cat) {
+        const slug = cat.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+        if (slug) {
+          url.searchParams.delete("category");
+          return redirect(url, `/category/${slug}`);
+        }
+      }
     }
 
     let key;

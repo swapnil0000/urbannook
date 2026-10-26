@@ -2,11 +2,10 @@
 <html lang="en">
 
 <head>
-  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-  })(window,document,'script','dataLayer','__VITE_GTM_ID__');</script>
+  <!-- Google Tag Manager removed 2026-10-27: container GTM-WHPFSBBG had no tags
+       but cost ~340 KB of script on every page. GA4 + Google Ads run on gtag.js
+       below. To bring GTM back, restore the gtm.js snippet + noscript iframe
+       (VITE_GTM_ID is still injected by vite.config.js). -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-B7NGCFCRFG"></script>
   <script type="text/javascript">
     (function(c,l,a,r,i,t,y){
@@ -174,37 +173,8 @@
       -moz-osx-font-smoothing: grayscale;
     }
     #root { min-height: 100vh; }
-    .hero-skeleton {
-      min-height: 97vh;
-      background: linear-gradient(135deg, #1a2822 0%, #2e443c 100%);
-      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-    }
 
-    @keyframes pulse {
-
-      0%,
-      100% {
-        opacity: 1;
-      }
-
-      50% {
-        opacity: 0.8;
-      }
-    }
-
-    /* Critical hero styles for immediate render */
-    .min-h-\[97vh\] {
-      min-height: 97vh;
-    }
-    
-    .bg-\[\#1a2822\] {
-      background-color: #1a2822;
-    }
-    
-    .text-white {
-      color: white;
-    }
-    
+    /* Used by several modals; Tailwind's own font-serif would start with ui-serif. */
     .font-serif {
       font-family: Georgia, 'Times New Roman', serif;
     }
@@ -218,8 +188,6 @@
 </head>
 
 <body>
-  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=__VITE_GTM_ID__"
-  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <div id="root"></div>
   <script type="module" src="/src/main.jsx"></script>
   

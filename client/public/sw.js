@@ -14,11 +14,12 @@ const IMAGE_CACHE = `urbannook-images-${CACHE_VERSION}`;
 const MAX_BUILD_ENTRIES = 120;
 const MAX_IMAGE_ENTRIES = 60;
 
-// Image caching needs the image hosts to send `Access-Control-Allow-Origin` (see note in
-// the fetch handler). They currently don't, so leave this off until S3/CloudFront CORS is
-// configured — otherwise every image would be fetched twice (failed CORS + fallback).
-const ENABLE_IMAGE_CACHE = false;
-const IMAGE_HOSTS = ['assets-prod.urbannook.in', 'd1dhs7xre1cv0d.cloudfront.net'];
+// Image caching needs the image host to send `Access-Control-Allow-Origin` (see note in
+// the fetch handler). assets-prod does (infra/cloudflare/urbannook-assets-proxy-prod.js).
+// The old CloudFront host (d1dhs7xre1cv0d.cloudfront.net) doesn't, so it is left out —
+// otherwise each of its images would be fetched twice (failed CORS + fallback).
+const ENABLE_IMAGE_CACHE = true;
+const IMAGE_HOSTS = ['assets-prod.urbannook.in'];
 
 const isHashedBuildAsset = (url) =>
   url.origin === self.location.origin &&

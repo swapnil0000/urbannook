@@ -8,6 +8,20 @@ import NotFound from '../NotFound';
 import { isVariantOutOfStock } from '../../utils/variantStock';
 import { trackSelectItem } from '../../utils/analytics';
 
+
+// The two Japanese fonts cover thousands of glyphs split into ~100 files per
+// weight; loading them in full pulled ~70 font files (1.7 MB) on every story.
+// Story text is English (no Japanese in any post), so ask Google Fonts for only
+// the glyphs we use: printable ASCII, a few symbols, and the kanji/kana in this
+// page's decorations. One small file per weight. A character outside this set
+// (a new kanji label, an accented letter) falls back to the serif stack — add
+// it to FONT_GLYPHS if it should use these fonts.
+const FONT_GLYPHS = Array.from({ length: 95 }, (_, i) => String.fromCharCode(32 + i)).join('')
+  + '×–—‘’“”…•·₹é'
+  + 'こちのる侍像刀品器巣帰庫持映武物語都間';
+const JP_FONTS_URL = 'https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Noto+Serif+JP:wght@400;600&display=swap&text='
+  + encodeURIComponent(FONT_GLYPHS);
+
 const SITE = 'https://www.urbannook.in';
 const date = (d) => (d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : '');
 
@@ -172,7 +186,7 @@ const BlogPostPage = () => {
       />
       <Helmet>
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Noto+Serif+JP:wght@400;600&display=swap" />
+        <link rel="stylesheet" href={JP_FONTS_URL} />
       </Helmet>
 
       {/* ── Hero: sumi-ink night, cover image, vertical title, hanko seal ── */}

@@ -19,7 +19,8 @@ import '@fontsource/anton/latin-400.css'
 import '@fontsource/jetbrains-mono/latin-400.css'
 import '@fontsource/jetbrains-mono/latin-600.css'
 import './index.css'
-import App from './App.jsx'
+import App, { NewHeader, Footer } from './App.jsx'
+import { preloadPageForPath } from './pages/index.js'
 import { CookiesProvider } from 'react-cookie';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import config from './config/env.js';
@@ -100,9 +101,19 @@ const rootEl = document.getElementById('root');
 if (window.__SSR__ && rootEl.hasChildNodes()) {
   // The server's copy of the page's <title>/<meta>/<link> (for crawlers).
   // React inserts its own on hydration; drop these so there is one of each.
-  document.head.querySelectorAll('[data-ssr]').forEach((el) => el.remove());
-  hydrateRoot(rootEl, app, {
-    onRecoverableError: (error) => console.warn('[SSR] hydration recovered:', error?.message || error),
+  // Load this URL's lazy chunks (page, header, footer) first: hydrating while a
+  // chunk is still downloading lets an early state update replace the server
+  // HTML with the loader (a big layout shift). The server HTML stays on screen
+  // meanwhile. A failed chunk still hydrates; the route's Suspense handles it.
+  Promise.allSettled([
+    preloadPageForPath(window.location.pathname),
+    NewHeader.preload(),
+    Footer.preload(),
+  ]).then(() => {
+    document.head.querySelectorAll('[data-ssr]').forEach((el) => el.remove());
+    hydrateRoot(rootEl, app, {
+      onRecoverableError: (error) => console.warn('[SSR] hydration recovered:', error?.message || error),
+    });
   });
 } else {
   // index.html (or the prerendered page) has default SEO tags; every page sets
