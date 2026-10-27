@@ -498,12 +498,22 @@ async function attachRecommendations(display, promotionsById, ctx) {
 // getPromotionsForProductController) + "pdp" placement gate, run through the
 // presentation layer against a 1-item hypothetical cart (qty 1) so
 // progressText/qualifying reflect "if you add just this product".
+// A condition with no product/taxonomy leaf ("cart above ₹1,999 → free gift")
+// applies whatever the shopper buys, so every product page shows it.
+const PRODUCT_LEAF_FIELDS = new Set(["product", "productList", "category", "subcategory", "tag"]);
+const isSiteWideCondition = (node) => {
+  if (!node) return false;
+  if (node.op) return (node.children || []).length > 0 && (node.children || []).every((c) => isSiteWideCondition(c) || !c);
+  return !PRODUCT_LEAF_FIELDS.has(node.field);
+};
+
 const getProductDisplayController = asyncHandler(async (req, res) => {
   const { productId } = req.params;
   const all = await getActivePromotions();
   const { ctx } = await resolveItemsAndContext([{ productId, quantity: 1 }], { subtotal: 0 });
   const relevant = all.filter(
-    (p) => promotionReferencesProduct(p, productId, ctx.productMeta.get(String(productId))) && (p.placements || []).includes("pdp"),
+    (p) => (p.placements || []).includes("pdp")
+      && (promotionReferencesProduct(p, productId, ctx.productMeta.get(String(productId))) || isSiteWideCondition(p.conditionTree)),
   );
   const display = buildPromotionDisplayList(relevant, ctx, { placement: "pdp" });
   return res.status(200).json(new ApiRes(200, "OK", { promotions: display }, true));
@@ -806,7 +816,7 @@ const getHomeDisplayController = asyncHandler(async (_req, res) => {
   // category / subcategory offers ...) is shown as an offer tile driven by its admin tag line.
   const isTwoProductCombo = (p) => p.homeCard?.cardKind !== "reward" && collectConditionProductIds(p.conditionTree).length === 2;
   const rewardPromos = all.filter((p) => (p.placements || []).includes("home") && !isTwoProductCombo(p));
-  const rewardTargetIds = [...new Set(rewardPromos.flatMap((p) => (p.rewards || []).map((r) => r.targetProductId)).filter(Boolean))];
+  const rewardTargetIds = [...new Set(rewardPromos.flatMap((p) => (p.rewards || []).flatMap((r) => [r.targetProductId, ...(r.targetScope?.items || []).map((i) => i.productId)])).filter(Boolean))];
   const rewardProducts = rewardTargetIds.length
     ? await Product.find({ productId: { $in: rewardTargetIds } }, { productId: 1, variantDetails: 1 }).lean()
     : [];
@@ -889,6 +899,19 @@ const getHomeDisplayController = asyncHandler(async (_req, res) => {
       badgeText: hc.badgeText || "",
       ctaLabel: hc.ctaLabel?.trim() || "Shop Now",
       bannerImage: hc.bannerImage || null,
+      // what the shopper gets (the stand that is 50% off, the free gift): the reward's own
+      // image, else that product's photo. A "Mystery Gift" never shows the product it really
+      // is — only an image the admin set on the reward.
+      ...(() => {
+        const rw = (promo.rewards || []).find((r) => r.image || r.targetProductId || r.targetScope?.items?.length);
+        const mystery = ["free_product", "gift_choice"].includes(rw?.type) && /mystery/i.test(`${promo.name} ${hc.subtitle || ""} ${hc.savingsLabel || ""}`);
+        const target = rw && (rw.targetProductId
+          ? { productId: rw.targetProductId, variantSku: rw.targetVariantSku }
+          : rw.targetScope?.items?.[0]);
+        const pr = target && rewardProducts.find((p) => p.productId === target.productId);
+        const v = pr?.variantDetails?.find((x) => target.variantSku && x.sku === target.variantSku) || pr?.variantDetails?.[0];
+        return { rewardImage: rw?.image || (mystery ? null : v?.variantImage?.[0] || null), mysteryGift: mystery };
+      })(),
       fallbackImages: null,
       badgeLabel: hc.badgeLabel || "",
       savingsLabel: hc.savingsLabel || "",
