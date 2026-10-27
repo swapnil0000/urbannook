@@ -13,6 +13,7 @@ import OtherVariants from '../../component/OtherVariants';
 import NotifyMeModal from '../../component/NotifyMeModal';
 import ComparisonTable from '../../component/ComparisonTable';
 import ImageCarousel from '../../component/ImageCarousel';
+import CommunityShots from '../../component/CommunityShots';
 import { motion, AnimatePresence } from 'motion/react';
 import { ScrollColorBand, MotionRoot } from '../../component/motion';
 import { variantSku, trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist, trackVariantSelect, trackShare, trackDeliveryCheck } from '../../utils/analytics';
@@ -26,6 +27,11 @@ import { useCartData } from '../../hooks/useCartSync';
 import FreeShippingStrip from '../../component/FreeShippingStrip';
 import OfferProgress from '../../component/festive/OfferProgress';
 import { compressImage } from '../../utils/compressImage';
+import ProductOffers from '../../component/offers/ProductOffers';
+import GiftWrapOffer from '../../component/GiftWrapOffer';
+import CouponOffersSection from '../../component/offers/CouponOffersSection';
+import { requestCheckout } from '../../utils/checkoutIntent';
+import { useCartPromotions } from '../../hooks/useCartPromotions';
 
 const MotionDiv = motion.div;
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
@@ -140,6 +146,7 @@ const ProductDetailPage = () => {
 
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const buyBoxRef = useRef(null);
+  const pageRef = useRef(null); // night-mode scope for the "In the wild" band
   const [buyBoxVisible, setBuyBoxVisible] = useState(true); // controls the sticky mobile CTA
   const [pinInput, setPinInput] = useState('');            // pincode delivery check
   const [pinStatus, setPinStatus] = useState(null);        // { ok, msg, charge, eta }
@@ -155,6 +162,10 @@ const ProductDetailPage = () => {
   const [checkPincode, { isLoading: isCheckingPin }] = useCalculateShippingMutation();
   const { refetch: refetchCart } = useCartData();
   const cartTotal = useSelector((state) => state.cart.totalAmount);
+
+  // Offers already working in the cart (same subscription as the cart drawer) → "Applied" on the offer rows.
+  const { promotions: cartPromotions } = useCartPromotions('cart');
+  const appliedOfferIds = useMemo(() => cartPromotions.filter((p) => p.applied && !p.rewardTargetPending).map((p) => p.id), [cartPromotions]);
 
   const { data: reviewsData } = useGetProductReviewsQuery(productId);
   const [submitProductReview, { isLoading: isSubmittingReview }] = useSubmitProductReviewMutation();
@@ -410,7 +421,7 @@ const ProductDetailPage = () => {
   // One tap to checkout: adds qty 1 (if not already in cart) and goes straight on.
   const handleBuyNow = async () => {
     if (!isInCart && !(await handleInitialAddToCart({ silent: true }))) return;
-    navigate('/checkout');
+    requestCheckout(navigate);
   };
 
   const handleUpdateQty = async (newQuantity) => {
@@ -432,7 +443,17 @@ const ProductDetailPage = () => {
     } else dispatch(updateQuantity({ id: product.productId, quantity: newQuantity, selectedVariant: selectedVariant || 'N/A' }));
   };
 
-  const handleCheckoutClick = () => navigate('/checkout');
+  const handleCheckoutClick = () => requestCheckout(navigate);
+
+  // "Apply" on an offer (ProductOffers): put this product in the cart if it
+  // isn't yet, then open the offer sheet for that promotion. When the product
+  // was just added, the sheet also adds the reward (e.g. the stand) by itself
+  // if there is exactly one to add; otherwise it shows the choice.
+  const handleApplyOffer = async (promotionId) => {
+    const wasInCart = isInCart;
+    if (!wasInCart && !(await handleInitialAddToCart({ silent: true }))) return;
+    window.dispatchEvent(new CustomEvent('un:open-offer-sheet', { detail: { promotionIds: [promotionId], autoAdd: !wasInCart } }));
+  };
 
   // ── Pincode delivery check — same ShipMozo rate API the checkout uses ──
   const handlePinCheck = async () => {
@@ -503,7 +524,7 @@ const ProductDetailPage = () => {
     const shots = [];
     reviews.forEach((r) => {
       const imgs = r.imageUrls?.length ? r.imageUrls : (r.imageUrl ? [r.imageUrl] : []);
-      imgs.forEach((u) => shots.push({ url: u, name: r.userName || 'Customer' }));
+      imgs.forEach((u) => shots.push({ url: u, name: r.userName || 'Customer', rating: r.rating, text: r.desc }));
     });
     return shots.slice(0, 8);
   }, [reviews]);
@@ -625,7 +646,7 @@ const ProductDetailPage = () => {
   };
 
   return (
-    <div className="font-inter bg-paper text-ink min-h-screen overflow-x-clip">
+    <div ref={pageRef} className="font-inter bg-paper text-ink min-h-screen overflow-x-clip">
       <SEOHead title={seoTitle} description={pageDescription} url={seoUrl} image={galleryImages[0]} type="product" structuredData={[structuredData, breadcrumbData, ...(seoFaqs.length ? [faqPageJsonLd(faqs)] : [])]} />
 
       <div className="max-w-[1280px] mx-auto px-5 py-6 md:py-8">
@@ -661,7 +682,7 @@ const ProductDetailPage = () => {
                     ellipsis after 2 lines on mobile. min-h is a MINIMUM, not
                     a cap, so it still keeps short titles' height consistent
                     without truncating a longer one. */}
-                <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-ink leading-tight min-h-[66px] md:min-h-[80px]">
+                <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-ink leading-tight min-h-[26px] md:min-h-[20px]">
                   {heading}
                 </h1>
                 {heading !== (selectedVariant || product.productName) && selectedVariant && (
@@ -696,7 +717,7 @@ const ProductDetailPage = () => {
                 Zone A's title/kicker above it, which sit with no padding of
                 their own — everything below looked shifted right instead of
                 lining up to the same left edge. Vertical spacing is kept. */}
-            <div className="mt-1  bg-paper py-4 md:py-5 md:max-w-md">
+            <div className="mt-1  bg-paper  md:max-w-md">
               {/* price hero */}
               <div className="flex items-center gap-2">
                 <span className="text-4xl md:text-5xl font-extrabold text-ink tracking-tight tabular-nums leading-none">{inr(currentPrice)}</span>
@@ -708,6 +729,11 @@ const ProductDetailPage = () => {
                 )}
               </div>
               {discountPercent > 0 && <p className="text-sm font-semibold text-save mt-1">You save {inr(maxVariantPrice - currentPrice)}</p>}
+
+              {/* Offers before add-to-cart, so shoppers know about them up front */}
+              <ProductOffers productId={productId} className="mt-4" cartTotal={cartTotal} appliedIds={appliedOfferIds} onApply={isOutOfStock ? undefined : handleApplyOffer} disabled={isAdding} />
+              {/* festive gift wrap, offered here too — "Go to Checkout" skips the cart drawer where it used to be the only place */}
+              {product?.giftWrapEligible && !isOutOfStock && <GiftWrapOffer variant="card" eligible className="mt-3" />}
 
               {/* variants */}
               {availableVariants.length > 0 && (
@@ -778,6 +804,9 @@ const ProductDetailPage = () => {
               {/* Free-shipping threshold, right under the CTA where the buy
                   decision happens — hidden unless admin's promotion is on. */}
               {!isOutOfStock && <OfferProgress location="product" className="mt-3" fallback={<FreeShippingStrip cartTotal={cartTotal} variant="compact" className="mt-3" />} />}
+
+              {/* Coupons (guest list is server-rendered; see entry-server.jsx) */}
+              <CouponOffersSection variant="pdp" />
 
               {/* Customization — admin opt-in per product (product.isCustomizable),
                   not every product is customisable. Carries the product (and the
@@ -951,26 +980,14 @@ const ProductDetailPage = () => {
 
         {/* IN THE WILD — full-bleed BLACK (ink) editorial band from customer review photos */}
         {communityShots.length > 0 && (
-          <ScrollColorBand className="w-screen ml-[calc(50%-50vw)] mt-16">
+          <ScrollColorBand nightScopeRef={pageRef} className="w-screen ml-[calc(50%-50vw)] mt-16">
             <div className="max-w-[1280px] mx-auto px-5 py-14 md:py-20">
               <p className="gl-lbl opacity-50 mb-2">— In the wild</p>
               <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight leading-[0.95] mb-1">
                 <span>Seen in</span><br /><span className="opacity-40">real setups.</span>
               </h2>
               <p className="opacity-60 text-sm mb-7">Straight from {totalReviews > 0 ? `${totalReviews} verified ` : ''}customers who bought it.</p>
-              <ImageCarousel
-                peek
-                images={communityShotUrls}
-                alt={(i) => `${imageTitle} in a customer's setup – photo ${i + 1}`}
-                onImgErr={onImgErr}
-                onItemClick={(i) => setLightbox({ list: communityShotUrls, idx: i })}
-                renderOverlay={(i) => (
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/80 via-ink/20 to-transparent p-3 pt-8">
-                    <span className="gl-lbl text-paper/70 text-[10px]">0{i + 1}</span>
-                    <p className="text-paper font-bold text-xs leading-tight line-clamp-1">{communityShots[i]?.name}</p>
-                  </div>
-                )}
-              />
+              <CommunityShots shots={communityShots} onImgErr={onImgErr} onOpen={(i) => setLightbox({ list: communityShotUrls, idx: i })} />
             </div>
           </ScrollColorBand>
         )}

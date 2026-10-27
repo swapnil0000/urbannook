@@ -10,7 +10,7 @@ import { useSiteCampaign } from "../hooks/useSiteCampaign";
  * <a href> (not a click handler) so search engines can follow it from the
  * pre-rendered HTML to the product page.
  */
-const VariantCard = ({ productId, productName, variant, index, listId = "product_variants", listName }) => {
+const VariantCard = ({ productId, productName, variant, index, listId = "product_variants", listName, offerBadge = null }) => {
   // Diwali touches while a festive campaign is live (admin's section-accents switch)
   const { active, can } = useSiteCampaign();
   const festive = active && can("sectionAccents");
@@ -49,6 +49,12 @@ const VariantCard = ({ productId, productName, variant, index, listId = "product
         {oos && (
           <span className="absolute top-3 left-3 z-10 gl-lbl text-[8px] px-2 py-0.5 rounded-none bg-ink text-white">
             Out of Stock
+          </span>
+        )}
+        {/* Product's best live offer (ProductVariantsPage → /promotions/display/product) */}
+        {offerBadge && !oos && (
+          <span title={offerBadge} className="absolute bottom-2 left-2 right-2 z-10 flex items-center gap-1.5 px-2 py-1 bg-brand text-white text-[10px] md:text-[11px] font-bold shadow">
+            <i className="fa-solid fa-tag text-[9px] shrink-0" aria-hidden="true" /> <span className="truncate">{offerBadge}</span>
           </span>
         )}
       </div>
