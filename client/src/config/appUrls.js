@@ -39,6 +39,11 @@ export const getApiUrl = () => {
   // on the same machine. Falls back to the public API.
   if (isServer) return globalThis.process?.env?.SSR_API_URL || API_URLS.production;
 
+  // Priority 0 (local testing only): point a localhost dev server at another
+  // API, e.g. VITE_FORCE_API_URL=https://api.urbannook.in/api/v1. Never set
+  // in deploy builds.
+  if (import.meta.env.VITE_FORCE_API_URL) return import.meta.env.VITE_FORCE_API_URL;
+
   // Priority 1: Always use local API when running on localhost
   const hostname = window.location.hostname;
   if (hostname === 'localhost' || hostname === '127.0.0.1') {

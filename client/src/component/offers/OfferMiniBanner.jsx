@@ -15,6 +15,17 @@ const Watermark = () => (
   </svg>
 );
 
+/** Wrapped gift box for a mystery gift — the real product stays a surprise. */
+const MysteryBox = () => (
+  <span className="grid h-full w-full place-items-center" style={{ background: 'radial-gradient(circle at 50% 40%, rgb(var(--gl-star) / 0.25), transparent 70%)' }}>
+    <svg viewBox="0 0 64 64" className="h-[62%] w-[62%] text-star motion-safe:animate-[bounce_2.4s_ease-in-out_infinite]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" aria-hidden="true">
+      <rect x="10" y="26" width="44" height="28" rx="2" fill="rgb(var(--gl-brand-hi) / 0.55)" />
+      <rect x="7" y="18" width="50" height="9" rx="1.5" fill="rgb(var(--gl-brand-hi) / 0.8)" />
+      <path d="M32 18v36" />
+      <path d="M32 18c-4-8-14-9-14-3 0 4 8 4 14 3Zm0 0c4-8 14-9 14-3 0 4-8 4-14 3Z" />    </svg>
+  </span>
+);
+
 /**
  * Festive offer slider for the variants page of a product. One banner is in
  * focus (the offer the shopper just tapped on the homepage comes first) with the
@@ -62,7 +73,10 @@ const OfferMiniBanner = ({ productId }) => {
         <div ref={trackRef} className="gl-hscroll -mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-3 pt-1">
           {offers.map((c) => {
             const desc = c.builder?.combos?.[0]?.description || c.badgeText || '';
-            const img = c.bannerImage || c.productImage || c.items?.[0]?.image;
+            // the banner sells what the shopper gets (the discounted stand, the gift), not the
+            // katana they are already looking at — the reward's photo first; the homepage
+            // banner/product photo only when there is none. A mystery gift shows a gift box.
+            const img = c.rewardImage || (c.mysteryGift ? null : c.bannerImage || c.productImage || c.items?.[0]?.image);
             return (
               <article
                 key={c.id}
@@ -76,7 +90,7 @@ const OfferMiniBanner = ({ productId }) => {
 
                 <div className={`relative flex items-center gap-4 p-4 sm:p-5 ${lights ? 'pt-6 sm:pt-7' : ''}`}>
                   <span className="relative h-[92px] w-[92px] shrink-0 overflow-hidden border border-star/50 bg-white/10 shadow-[0_0_24px_-6px_rgb(var(--gl-star))] sm:h-[108px] sm:w-[108px]">
-                    {img && <img src={img} alt="" className="h-full w-full object-cover" />}
+                    {img ? <img src={img} alt="" className="h-full w-full object-cover" /> : c.mysteryGift && <MysteryBox />}
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="gl-lbl text-[9.5px] text-star" style={{ letterSpacing: '0.22em' }}>✦ {c.badgeLabel || 'Offer'}</p>

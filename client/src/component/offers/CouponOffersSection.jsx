@@ -112,6 +112,27 @@ const CouponOffersSection = ({ variant = 'section' }) => {
   const offers = data?.data || [];
   if (!offers.length) return null;
 
+  // Product page, under the buy buttons: two light tickets, the rest on demand.
+  if (variant === 'pdp') {
+    const shown = all ? offers : offers.slice(0, 2);
+    return (
+      <div className="mt-4" aria-label="Coupons">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <p className="gl-lbl flex items-center gap-1.5 text-[11px] text-ink"><span className="text-brand" aria-hidden="true">✦</span> {offers.length === 1 ? 'Coupon available' : `${offers.length} coupons available`}</p>
+          {offers.length > 2 && (
+            <button type="button" onClick={() => setAll((v) => !v)} aria-expanded={all} className="gl-lbl text-[10px] text-brand underline-offset-4 hover:underline">
+              {all ? 'Show fewer' : 'See all'}
+            </button>
+          )}
+        </div>
+        <div className="space-y-2">
+          {shown.map((o) => <OfferCard key={o.id} offer={o} onOpen={setActive} light />)}
+        </div>
+        {active && <CouponRevealModal offer={active} onClose={() => setActive(null)} />}
+      </div>
+    );
+  }
+
   // Compact strip tucked under the Diwali offers carousel (cream tickets).
   if (variant === 'strip') {
     const visible = all ? offers : offers.slice(0, 3);

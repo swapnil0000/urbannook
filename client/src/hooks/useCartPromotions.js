@@ -21,9 +21,10 @@ export function useCartPromotions(placement = "cart", couponCode = null, addedIt
   const claimedGifts = useSelector((state) => state.cart.claimedGifts);
   const payloadItems = buildPromotionCartItems(items);
 
+  const skip = !enabled || (payloadItems.length === 0 && !previewPromotionIds?.length);
   const { currentData, isFetching } = useGetCartPromotionsQuery(
     { items: payloadItems, subtotal: Number(totalAmount) || 0, placement, couponCode: couponCode || undefined, addedItem: addedItem || undefined, previewPromotionIds: previewPromotionIds || undefined, claimedGifts },
-    { skip: !enabled || (payloadItems.length === 0 && !previewPromotionIds?.length) },
+    { skip },
   );
 
   return {
@@ -33,5 +34,7 @@ export function useCartPromotions(placement = "cart", couponCode = null, addedIt
     gifts: currentData?.data?.gifts || [],
     invalidGiftClaims: currentData?.data?.invalidGiftClaims || [],
     isFetching,
+    // true once the answer for the current cart is in (or there is nothing to ask)
+    ready: (skip && enabled) || (Boolean(currentData) && !isFetching),
   };
 }
