@@ -527,22 +527,30 @@ async function buildGiftPayload(freeGifts, requestedClaims, allPromotions) {
       const promo = promoById.get(e.promotionId);
       const reward = (promo?.rewards || []).find((r) => r.type === "free_product" && String(r.targetProductId) === String(e.targetProductId)) || {};
       const pr = products.find((p) => p.productId === e.targetProductId);
-      const v = pr?.variantDetails?.find((x) => x.sku === e.targetVariantSku) || pr?.variantDetails?.[0];
+      const sellable = (x) => !(x.variantOutOfStock === true || x.isActive === false || (x.variantQuantity != null && Number(x.variantQuantity) < e.quantity));
+      const chosenSku = e.choice ? e.claimedVariantSku : e.targetVariantSku;
+      const v = pr?.variantDetails?.find((x) => x.sku === chosenSku) || (e.choice ? null : pr?.variantDetails?.[0]);
+      const options = e.choice
+        ? (pr?.variantDetails || []).map((x) => ({ sku: x.sku || "", variantName: x.variantName || "", image: x.variantImage?.[0] || null, price: Number(x.variantPrice) || 0, available: sellable(x) }))
+        : undefined;
       return {
         key: e.key,
         promotionId: e.promotionId,
         promotionName: promo?.name || e.name || "",
         name: strip(reward.label) || pr?.productName || "Free gift",
-        image: reward.image || null,
+        image: reward.image || (e.choice ? v?.variantImage?.[0] || null : null),
         productId: e.targetProductId,
-        variantSku: e.targetVariantSku,
+        // pick-one gifts: the variant the shopper chose (blank until claimed) and the variants to choose from
+        choice: !!e.choice,
+        options,
+        variantSku: chosenSku,
         variantName: v?.variantName || null,
         originalPrice: Number(v?.variantPrice) || 0,
         quantity: e.quantity,
         claimedQuantity: e.claimedQuantity,
         status: e.status,
         // false when the gift variant is out of stock / too few left: the UI shows it as unavailable
-        available: !!v && !(v.variantOutOfStock === true || v.isActive === false || (v.variantQuantity != null && Number(v.variantQuantity) < e.quantity)),
+        available: e.choice ? options.some((o) => o.available) : !!v && !(v.variantOutOfStock === true || v.isActive === false || (v.variantQuantity != null && Number(v.variantQuantity) < e.quantity)),
       };
     }),
     invalidClaims: invalidClaims.map((c) => ({ ...c, promotionName: promoById.get(c.promotionId)?.name || "" })),
@@ -733,6 +741,14 @@ function buildComboBuilder(promos, productMap, shortNameOf, hiddenRewardLabel) {
   for (const promo of promos) {
     const slots = slotsFromCondition(promo.conditionTree);
     if (!slots.length) continue;
+    // "Buy A, get B at 50% off": the discounted product is not in the condition, so the shopper has to add it
+    // too — it becomes one more slot, pinned to the reward's own variant, and the sheet adds both together.
+    const firstReward = (promo.rewards || [])[0];
+    const discountTarget = firstReward && ["percent_off_product", "flat_off_product", "discounted_product"].includes(firstReward.type)
+      && firstReward.targetProductId ? firstReward : null;
+    if (discountTarget && !slots.some((s) => s.productIds.includes(String(discountTarget.targetProductId))) && slots.length < 6) {
+      slots.push({ productIds: [String(discountTarget.targetProductId)], rewardSku: discountTarget.targetVariantSku || "", rewardOf: discountTarget });
+    }
     const signature = slots.map((s) => [...s.productIds].sort().join("|")).join(",");
     if (used.has(signature)) continue;
     used.add(signature);
@@ -742,8 +758,16 @@ function buildComboBuilder(promos, productMap, shortNameOf, hiddenRewardLabel) {
         productId: id,
         label: shortNameOf(id),
         cards: (productMap.get(id)?.variantDetails || [])
-          .filter((v) => !pinned.get(id)?.size || pinned.get(id).has(v.sku))
-          .map((v) => builderVariantCard(productMap.get(id), v)),
+          .filter((v) => (slot.rewardOf ? !slot.rewardSku || v.sku === slot.rewardSku : !pinned.get(id)?.size || pinned.get(id).has(v.sku)))
+          .map((v) => {
+            const card = builderVariantCard(productMap.get(id), v);
+            // the reward slot shows what the shopper will actually pay for it
+            if (slot.rewardOf && card.price != null) {
+              const offerPrice = applyBestPromotionDiscount(card.price, [slot.rewardOf]);
+              if (Number.isFinite(offerPrice) && offerPrice < card.price) card.offerPrice = offerPrice;
+            }
+            return card;
+          }),
       })).filter((o) => o.cards.length),
     }));
     if (slotOut.some((s) => !s.options.length)) continue;

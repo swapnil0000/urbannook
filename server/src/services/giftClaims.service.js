@@ -16,7 +16,7 @@ import { ValidationError } from "../utils/errors.js";
 
 export const GIFT_CLAIM_ERROR = "GIFT_CLAIM_INVALID";
 
-/** Stable id of one reward entitlement: promotion + product + variant. */
+/** Stable id of one reward entitlement: promotion + product + variant (blank variant = the customer picks one). */
 export const entitlementKey = (g) =>
   `${g.promotionId}:${g.targetProductId ?? g.productId}:${g.targetVariantSku ?? g.variantSku ?? ""}`;
 
@@ -28,10 +28,12 @@ export function buildGiftEntitlements(freeGifts = []) {
   const byKey = new Map();
   for (const g of freeGifts) {
     if (!g?.targetProductId) continue; // gift_choice (pick one of N) is not claimable yet
+    const choice = g.chooseVariant === true && !g.targetVariantSku;
     const key = entitlementKey(g);
     const prev = byKey.get(key);
     byKey.set(key, {
       key,
+      choice, // pick one variant of targetProductId; any one claim uses up the whole entitlement
       promotionId: String(g.promotionId),
       name: g.name,
       targetProductId: g.targetProductId,
@@ -55,9 +57,12 @@ export function validateGiftClaims(requested, freeGifts) {
   const wanted = new Map();
   for (const r of Array.isArray(requested) ? requested : []) {
     if (!r || !r.promotionId || !r.productId) continue;
-    const key = entitlementKey({ promotionId: r.promotionId, productId: r.productId, variantSku: r.variantSku || "" });
+    const exactKey = entitlementKey({ promotionId: r.promotionId, productId: r.productId, variantSku: r.variantSku || "" });
+    // a "pick your variant" entitlement is keyed without a variant; the claim names the chosen one
+    const choiceKey = entitlementKey({ promotionId: r.promotionId, productId: r.productId, variantSku: "" });
+    const key = !entitlements.has(exactKey) && entitlements.get(choiceKey)?.choice ? choiceKey : exactKey;
     const qty = Math.max(1, Math.floor(Number(r.quantity) || 1));
-    wanted.set(key, { ...(wanted.get(key) || { promotionId: String(r.promotionId), productId: r.productId, variantSku: r.variantSku || "" }), quantity: (wanted.get(key)?.quantity || 0) + qty });
+    wanted.set(key, { ...(wanted.get(key) || {}), promotionId: String(r.promotionId), productId: r.productId, variantSku: r.variantSku || "", quantity: (wanted.get(key)?.quantity || 0) + qty });
   }
 
   const valid = [];
@@ -73,8 +78,8 @@ export function validateGiftClaims(requested, freeGifts) {
       promotionId: e.promotionId,
       name: e.name,
       targetProductId: e.targetProductId,
-      targetVariantSku: e.targetVariantSku,
-      quantity: Math.min(w.quantity, e.quantity), // never more than entitled
+      targetVariantSku: e.choice ? String(w.variantSku || "") : e.targetVariantSku,
+      quantity: Math.min(w.quantity, e.quantity), // never more than entitled (also across variants of a pick-one gift)
     });
   }
   return { valid, rejected };
@@ -84,8 +89,10 @@ export function validateGiftClaims(requested, freeGifts) {
 export function describeGiftEntitlements(freeGifts, requestedClaims) {
   const { valid, rejected } = validateGiftClaims(requestedClaims, freeGifts);
   const claimedByKey = new Map(valid.map((v) => [v.key, v.quantity]));
+  const claimedSkuByKey = new Map(valid.map((v) => [v.key, v.targetVariantSku]));
   const entitlements = buildGiftEntitlements(freeGifts).map((e) => ({
     ...e,
+    claimedVariantSku: e.choice ? claimedSkuByKey.get(e.key) || "" : e.targetVariantSku,
     claimedQuantity: claimedByKey.get(e.key) || 0,
     status: (claimedByKey.get(e.key) || 0) >= e.quantity ? "claimed" : "claimable",
   }));

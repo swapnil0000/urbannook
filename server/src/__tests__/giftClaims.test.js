@@ -199,3 +199,49 @@ describe("FREE_GIFT order lines", () => {
     expect(line2.productSnapshot.quantity).toBe(1);
   });
 });
+
+describe("pick-your-variant gifts (chooseVariant)", () => {
+  const KUNAI = "kunai";
+  const promo = {
+    _id: "p-kunai", name: "Buy 2 Kunai, get any Kunai free", promotionType: "automatic", isActive: true, startsAt: null, endsAt: null,
+    stackable: true, exclusive: false, priority: 0, promotionGroup: "",
+    conditionTree: { op: "AND", children: [{ field: "product", productId: KUNAI, minQuantity: 2, variantSku: "" }] },
+    rewards: [{ type: "free_product", targetProductId: KUNAI, targetVariantSku: "", chooseVariant: true }],
+    placements: ["cart"],
+  };
+  const gifts = () => evalCart([[KUNAI, 2, "K1"]], [promo]).freeGifts;
+
+  it("is one entitlement the customer can fill with any variant", () => {
+    const e = buildGiftEntitlements(gifts());
+    expect(e).toHaveLength(1);
+    expect(e[0]).toMatchObject({ choice: true, targetVariantSku: "", quantity: 1 });
+  });
+
+  it("a claim naming a variant is valid and keeps the chosen SKU", () => {
+    const { valid, rejected } = validateGiftClaims([claim("p-kunai", KUNAI, "K3", 1)], gifts());
+    expect(rejected).toEqual([]);
+    expect(valid[0]).toMatchObject({ targetProductId: KUNAI, targetVariantSku: "K3", quantity: 1 });
+  });
+
+  it("claiming several variants never issues more than the one entitled unit", () => {
+    const { valid } = validateGiftClaims([claim("p-kunai", KUNAI, "K1", 1), claim("p-kunai", KUNAI, "K2", 1), claim("p-kunai", KUNAI, "K3", 1)], gifts());
+    expect(valid.reduce((s, g) => s + g.quantity, 0)).toBe(1);
+  });
+
+  it("not eligible once the cart drops below 2 kunai", () => {
+    const g = evalCart([[KUNAI, 1, "K1"]], [promo]).freeGifts;
+    expect(validateGiftClaims([claim("p-kunai", KUNAI, "K2", 1)], g).rejected).toHaveLength(1);
+  });
+
+  it("describe shows the chosen variant as claimed", () => {
+    const d = describeGiftEntitlements(gifts(), [claim("p-kunai", KUNAI, "K2", 1)]);
+    expect(d.entitlements[0]).toMatchObject({ status: "claimed", claimedVariantSku: "K2" });
+  });
+
+  it("a gift without chooseVariant still needs its exact variant", () => {
+    const fixed = { ...promo, rewards: [{ type: "free_product", targetProductId: KUNAI, targetVariantSku: "K1" }] };
+    const g = evalCart([[KUNAI, 2, "K1"]], [fixed]).freeGifts;
+    expect(validateGiftClaims([claim("p-kunai", KUNAI, "K2", 1)], g).valid).toEqual([]);
+    expect(validateGiftClaims([claim("p-kunai", KUNAI, "K1", 1)], g).valid).toHaveLength(1);
+  });
+});

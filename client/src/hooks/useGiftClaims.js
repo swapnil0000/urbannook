@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { claimGift, unclaimGift } from '../store/slices/cartSlice';
+import { claimGift, unclaimGift, giftClaimKey } from '../store/slices/cartSlice';
 import { useCartPromotions } from './useCartPromotions';
 
 /**
@@ -13,7 +13,16 @@ export function useGiftClaims() {
   const { gifts, isFetching } = useCartPromotions('cart');
   const claimedGifts = useSelector((s) => s.cart.claimedGifts);
 
-  const claim = useCallback((g) => dispatch(claimGift({ promotionId: g.promotionId, productId: g.productId, variantSku: g.variantSku, quantity: g.quantity })), [dispatch]);
+  // `variantSku` is only passed for a "pick your variant" gift; choosing another variant replaces the earlier choice
+  const claim = useCallback((g, variantSku) => {
+    const sku = variantSku ?? g.variantSku;
+    if (g.choice) {
+      claimedGifts
+        .filter((c) => String(c.promotionId) === String(g.promotionId) && c.productId === g.productId && (c.variantSku || '') !== (sku || ''))
+        .forEach((c) => dispatch(unclaimGift(giftClaimKey(c))));
+    }
+    dispatch(claimGift({ promotionId: g.promotionId, productId: g.productId, variantSku: sku, quantity: g.quantity }));
+  }, [dispatch, claimedGifts]);
   const unclaim = useCallback((g) => dispatch(unclaimGift(`${g.promotionId}:${g.productId}:${g.variantSku || ''}`)), [dispatch]);
 
   return {

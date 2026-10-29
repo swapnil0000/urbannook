@@ -144,3 +144,11 @@ Cart, checkout page and the Razorpay charge must show the same discounted amount
 
 Cart (after offers) under ₹1000 → ₹99, ₹1000 and above → ₹149, regardless of weight/size/courier. Free-shipping promotions /
 threshold still zero it as before. Details: `server/src/services/SHIPPING_FLOW.md`; test: `server/src/__tests__/unit/shipping.static.test.js`.
+
+## Free gift: customer picks the variant
+
+A `free_product` reward with no variant SKU and **"Customer picks the variant"** ticked (`reward.chooseVariant`, Admin → Promotions → reward row)
+is one entitlement the shopper fills with any in-stock variant of the target product (e.g. "Buy 2 Kunai, get any Kunai free").
+Cart shows the variants as tiles; the claim carries the chosen SKU, the server validates it like any other claim (never more than the
+entitled quantity across variants, re-checked against stock at order time). Without the tick, a blank SKU still means the product's first variant.
+Tests: `server/src/__tests__/giftClaims.test.js` ("pick-your-variant gifts"). Needs the admin repo's model + RewardRow change deployed too.
