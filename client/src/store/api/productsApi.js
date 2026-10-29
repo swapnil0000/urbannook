@@ -1,5 +1,34 @@
 import { apiSlice } from './apiSlice';
 
+// Fields only the product page (getProductById) shows. Dropped from list
+// queries; the first variant keeps its full gallery (home hero carousel of a
+// single-variant product), other variants keep their first image.
+const LIST_DROP = ['productDes', 'productSubDes', 'specifications', 'materialAndCare', 'disclaimer', 'packagingDimensions'];
+const VARIANT_DROP = ['variantDes', 'specifications'];
+
+function slimProduct(p) {
+  if (!p || typeof p !== 'object') return p;
+  const out = { ...p };
+  for (const k of LIST_DROP) delete out[k];
+  if (Array.isArray(p.variantDetails)) {
+    out.variantDetails = p.variantDetails.map((v, i) => {
+      const nv = { ...v };
+      for (const k of VARIANT_DROP) delete nv[k];
+      if (i > 0 && Array.isArray(v.variantImage)) nv.variantImage = v.variantImage.slice(0, 1);
+      return nv;
+    });
+  }
+  return out;
+}
+
+export function slimProductList(res) {
+  const d = res?.data;
+  if (!d) return res;
+  const key = Array.isArray(d.products) ? 'products' : Array.isArray(d.listofPublishedProducts) ? 'listofPublishedProducts' : null;
+  if (!key) return res;
+  return { ...res, data: { ...d, [key]: d[key].map(slimProduct) } };
+}
+
 export const productsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     // Get all products with pagination and filters
@@ -15,6 +44,10 @@ export const productsApi = apiSlice.injectEndpoints({
         
         return `products?${params}`;
       },
+      // List cards need name, price, SKU and one image per variant — not every
+      // description and gallery image. Trimming here keeps the server-rendered
+      // page's preloaded state small (it was ~230 KB of the HTML on a product page).
+      transformResponse: slimProductList,
       providesTags: ['Product'],
     }),
     

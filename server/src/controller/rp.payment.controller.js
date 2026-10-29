@@ -2388,7 +2388,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   }, 0);
   const giftWrapSelected = !!reqGiftWrap && giftWrapConfig.isActive && giftWrapQty > 0;
   const giftWrapAmount = giftWrapSelected ? giftWrapConfig.price * giftWrapQty : 0;
-  const GIFT_NOTE_OPTIONS = ["birthday", "rakhi", "none"];
+  const GIFT_NOTE_OPTIONS = ["diwali", "bhai_dooj", "birthday", "rakhi", "none"];
   const validReqNotes = Array.isArray(reqGiftWrapNoteOptions)
     ? reqGiftWrapNoteOptions.filter((n) => GIFT_NOTE_OPTIONS.includes(n))
     : [];

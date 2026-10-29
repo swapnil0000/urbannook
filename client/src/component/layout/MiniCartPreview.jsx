@@ -10,6 +10,7 @@ import FreeShippingStrip from '../FreeShippingStrip';
 import OfferProgress from '../festive/OfferProgress';
 import PromotionBannerList from '../promotions/PromotionBannerList';
 import GiftClaimList from '../promotions/GiftClaimList';
+import { CartGiftProgress } from '../offers/CartValueGift';
 import { useCartPromotions } from '../../hooks/useCartPromotions';
 // The old combo-banner/cart-rule discount preview (FreeShippingBanner,
 // useEvaluateCartRulesQuery, useGetAllFreeShippingBannersQuery) was removed
@@ -110,6 +111,7 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
             <div className="flex flex-col gap-3">
               {/* Free-shipping threshold nudge — hidden unless admin's promotion is on */}
               <OfferProgress location="miniCart" fallback={<FreeShippingStrip cartTotal={subtotal} variant="compact" />} />
+              <CartGiftProgress promotions={cartPromotions} />
               <PromotionBannerList promotions={cartPromotions} />
               <GiftClaimList />
               {cartItems.map((item, idx) => {

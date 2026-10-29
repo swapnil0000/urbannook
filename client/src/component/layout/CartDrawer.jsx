@@ -13,7 +13,9 @@ import FreeShippingStrip from '../FreeShippingStrip';
 import OfferProgress from '../festive/OfferProgress';
 import GiftWrapOffer, { GiftWrapLineItem } from '../GiftWrapOffer';
 import PromotionBannerList from '../promotions/PromotionBannerList';
+import { requestCheckout } from '../../utils/checkoutIntent';
 import GiftClaimList from '../promotions/GiftClaimList';
+import { CartGiftProgress } from '../offers/CartValueGift';
 import { useCartPromotions } from '../../hooks/useCartPromotions';
 // The old combo-banner/cart-rule discount preview (FreeShippingBanner,
 // useEvaluateCartRulesQuery, useGetAllFreeShippingBannersQuery) was removed
@@ -139,7 +141,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
 
   const handleCheckout = () => {
     onClose();
-    navigate('/checkout');
+    requestCheckout(navigate);
   };
 
   if (!mounted && !isOpen) return null;
@@ -150,8 +152,9 @@ const CartDrawer = ({ isOpen, onClose }) => {
   // Qty auto-scales with total ELIGIBLE UNITS in the cart — 2x the same
   // eligible product is 2 gift wraps, not 1 — same rule the server applies
   // at checkout.
+  const giftWrapIds = giftWrapOffer?.eligibleProductIds;
   const giftWrapEligibleCount = cartItems.reduce((sum, i) => {
-    if (!i.giftWrapEligible) return sum;
+    if (!i.giftWrapEligible && !giftWrapIds?.includes(String(i.mongoId || i.id))) return sum;
     const qty = typeof i.quantity === 'object' ? Number(i.quantity?.quantity || 0) : Number(i.quantity || 0);
     return sum + qty;
   }, 0);
@@ -245,6 +248,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
               {/* Free-shipping threshold nudge — hidden unless admin's promotion is on */}
               <OfferProgress location="cart" className="mb-3" fallback={<FreeShippingStrip cartTotal={subtotal} variant="compact" className="mb-3" />} />
               {/* Other active Promotion V2 offers — renders nothing when none apply */}
+              <CartGiftProgress promotions={cartPromotions} className="mb-3" />
               <PromotionBannerList promotions={cartPromotions} pricing={promotionPricing} className="mb-3" />
               {/* free gifts: claim card, then a FREE GIFT line once claimed — never added automatically */}
               <GiftClaimList className="mb-3" />

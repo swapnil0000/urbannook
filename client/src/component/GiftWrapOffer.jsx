@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { useGetGiftWrapOfferQuery, useToggleGiftWrapMutation } from "../store/api/userApi";
 import { setGiftWrap } from "../store/slices/cartSlice";
 import { useCartData } from "../hooks/useCartSync";
+import { useGiftWrapQuantity } from "../hooks/useGiftWrapQuantity";
 
 // Wikimedia Commons, CC0/public domain (Open Clip Art Library) — no
 // attribution required: https://commons.wikimedia.org/wiki/File:Valentines_Day_-_Gift_Box.svg
@@ -10,30 +11,16 @@ const DEFAULT_GIFT_IMAGE =
   "https://assets-staging.urbannook.online/staging/products/b36adc42-b08a-4273-bc8e-c670429ca1ed/product-images/01a029ee-f70f-798f-8e9d-37a68e24daca.webp";
 
 const DEFAULT_TAGLINE =
-  "Add our Rakhi-exclusive gift wrap to your lamp, packed in our easy-to-carry gift box.";
+  "Celebrate Diwali & Bhai Dooj with our festive gift wrap, packed in an easy-to-carry gift box.";
 
 // Fixed 3-option note choice — kept simple/hardcoded on purpose (the offer
 // itself — on/off, price, title, tagline — is admin-controlled; these 3
 // labels are just how the customer wants the wrap packed).
 const NOTE_OPTIONS = [
-  { value: "birthday", label: "Birthday Note" },
-  { value: "rakhi", label: "Rakhi Note" },
+  { value: "diwali", label: "Diwali Note" },
+  { value: "bhai_dooj", label: "Bhai Dooj Note" },
   { value: "none", label: "Gift Wrap" },
 ];
-
-// One gift wrap per ELIGIBLE UNIT in the cart (admin opt-in per product —
-// see AddProductForm/EditProductForm's "Allow gift wrap" checkbox) — sums
-// quantity across every eligible line, so 2x the same eligible product is
-// 2 gift wraps, not 1. Server enforces this identically and authoritatively
-// at checkout — see rp.payment.controller.js — this is just the matching
-// display count/visibility.
-const useGiftWrapQuantity = () =>
-  useSelector((state) =>
-    state.cart.items.reduce(
-      (sum, i) => (i.giftWrapEligible ? sum + (Number(i.quantity) || 0) : sum),
-      0,
-    ),
-  );
 
 /**
  * The "GIFT WRAP ₹149 x1" row in the cart's items list, shown once selected —
@@ -85,8 +72,13 @@ export const GiftWrapLineItem = ({ image }) => {
  *
  * @param {string} image  optional override for the popup image (placeholder
  *                        gift-box graphic until a real photo is set)
+ * @param {'row'|'card'} variant  "row" = the cart drawer's compact line;
+ *   "card" = a visible card for the product page and checkout (no drawer
+ *   there, so the popup is fixed to the screen instead of the panel)
+ * @param {boolean} eligible  product page: this product can be wrapped even
+ *   before it is in the cart (the wrap then applies once it is added)
  */
-const GiftWrapOffer = ({ image }) => {
+const GiftWrapOffer = ({ image, variant = "row", eligible = false, className = "" }) => {
   const dispatch = useDispatch();
   const { isAuthenticated } = useSelector((state) => state.auth);
   const selected = useSelector((state) => state.cart.giftWrap);
@@ -110,7 +102,7 @@ const GiftWrapOffer = ({ image }) => {
 
   // Nothing to wrap — either the offer is off, or none of the products
   // currently in the cart are gift-wrap eligible (admin opt-in per product).
-  if (!offer?.isActive || eligibleCount < 1) return null;
+  if (!offer?.isActive || (eligibleCount < 1 && !eligible)) return null;
 
   const hasToken = !!localStorage.getItem("authToken");
   const isLoggedIn = isAuthenticated || hasToken;
@@ -140,9 +132,32 @@ const GiftWrapOffer = ({ image }) => {
     setShowModal(false);
   };
 
+  const price = Number(offer.price) || 0;
   return (
     <>
-      {/* Trigger row */}
+      {variant === "card" ? (
+        <div className={`flex items-center gap-3 border p-3 transition-colors ${selected ? "border-save/40 bg-save/5" : "border-hair bg-white"} ${className}`} style={{ borderRadius: 4 }}>
+          <span className={`grid h-11 w-11 shrink-0 place-items-center ${selected ? "bg-save text-white" : "bg-brand/10 text-brand"}`} style={{ borderRadius: 4 }} aria-hidden="true">
+            <i className={`fa-solid ${selected ? "fa-check" : "fa-gift"} text-base`} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[14px] font-bold leading-tight text-ink">{offer.title || "Make it a gift"}</p>
+            <p className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-muted">
+              {selected ? "Added — packed in a festive gift box" : `Festive gift box + note · ₹${price}${eligibleCount > 1 ? " each" : ""}`}
+            </p>
+          </div>
+          {selected ? (
+            <button type="button" onClick={handleRemove} className="shrink-0 text-[11px] font-bold uppercase tracking-wider text-muted underline underline-offset-2 hover:text-brand">
+              Remove
+            </button>
+          ) : (
+            <button type="button" onClick={openPopup} className="shrink-0 border border-ink px-3.5 py-2 text-[11px] font-bold uppercase tracking-wider text-ink transition-colors hover:bg-ink hover:text-paper" style={{ borderRadius: 4 }}>
+              Add ₹{price}
+            </button>
+          )}
+        </div>
+      ) : (
+      /* Trigger row */
       <div className="flex items-center justify-between gap-3 py-3 px-1 select-none">
         <div className="flex items-center gap-2 min-w-0">
           <i className="fa-solid fa-gift text-sm text-save" />
@@ -185,12 +200,13 @@ const GiftWrapOffer = ({ image }) => {
           </button>
         )}
       </div>
+      )}
 
-      {/* Popup — absolute (not fixed), so it's positioned/centered within the
-          cart drawer panel (the nearest `relative` ancestor), never covering
-          the rest of the page. */}
+      {/* Popup — in the drawer it is absolute (centered within the cart panel,
+          the nearest `relative` ancestor, never covering the rest of the
+          page); as a card on a full page it is fixed to the screen. */}
       {showModal && (
-        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div className={`${variant === "card" ? "fixed" : "absolute"} inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm`}>
           <div className="w-[86%] max-w-xs bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col">
             <div className="flex justify-end pt-2 pr-2">
               <button

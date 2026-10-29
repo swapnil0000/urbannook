@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import { addItem, claimGift } from "../../store/slices/cartSlice";
 import { useAddToCartMutation } from "../../store/api/userApi";
 import { useCartPromotions } from "../../hooks/useCartPromotions";
@@ -98,6 +99,7 @@ const PromotionUnlockSheet = () => {
   const { can } = useSiteCampaign();
   const festive = can('sectionAccents');
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { isAuthenticated } = useSelector((s) => s.auth);
   const showCartModal = useSelector((s) => s.ui.showCartModal);
   const totalQuantity = useSelector((s) => s.cart.totalQuantity);
@@ -107,7 +109,11 @@ const PromotionUnlockSheet = () => {
   const [activePromoId, setActivePromoId] = useState(null);
   // Home offer cards open this same sheet for specific promotions (before anything is in the cart).
   const [externalIds, setExternalIds] = useState(null);
-  const { promotions, pricing, isFetching, gifts } = useCartPromotions("cart", null, pendingAdd, Boolean(pendingAdd || activePromoId), externalIds);
+  // "Checkout" tapped (utils/checkoutIntent.js): look at the cart once, show
+  // what's left to unlock, then continue to checkout.
+  const [checkoutIntent, setCheckoutIntent] = useState(false);
+  const [checkoutMode, setCheckoutMode] = useState(false);
+  const { promotions, pricing, isFetching, gifts, ready } = useCartPromotions("cart", null, pendingAdd, Boolean(pendingAdd || activePromoId || checkoutIntent), externalIds);
   const [addToCartAPI] = useAddToCartMutation();
 
   const [visible, setVisible] = useState(false);
@@ -123,18 +129,55 @@ const PromotionUnlockSheet = () => {
   const closeTimerRef = useRef(null);
   const touchStartRef = useRef(null);
   const addingRef = useRef(false);
+  // Set by the product page's "Apply" on an offer: add the reward product
+  // straight away when the offer recommends exactly one (no choice to make).
+  const autoAddRef = useRef(false);
 
   useEffect(() => {
     const onOpen = (e) => {
       const ids = (e.detail?.promotionIds || []).map(String).filter(Boolean).slice(0, 4);
       if (!ids.length) return;
+      autoAddRef.current = Boolean(e.detail?.autoAdd);
       clearTimeout(closeTimerRef.current);
       setExternalIds(ids);
       setActivePromoId(ids[0]);
     };
     window.addEventListener("un:open-offer-sheet", onOpen);
-    return () => window.removeEventListener("un:open-offer-sheet", onOpen);
+    const onCheckout = () => setCheckoutIntent(true);
+    window.addEventListener("un:checkout-intent", onCheckout);
+    window.__unOfferSheetReady = true;
+    return () => {
+      window.removeEventListener("un:open-offer-sheet", onOpen);
+      window.removeEventListener("un:checkout-intent", onCheckout);
+      window.__unOfferSheetReady = false;
+    };
   }, []);
+
+  // Never hold the shopper back: if the offers don't answer in time, go on.
+  useEffect(() => {
+    if (!checkoutIntent) return undefined;
+    const t = setTimeout(() => { setCheckoutIntent(false); navigate("/checkout"); }, 3000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkoutIntent]);
+
+  useEffect(() => {
+    if (!checkoutIntent || !ready) return;
+    setCheckoutIntent(false);
+    // dismissals don't count here: checkout is the one moment we always show what's left
+    const unclaimedGift = promotions.find((p) => p.applied && p.displayType === "free_gift"
+      && gifts.some((g) => g.promotionId === p.id && g.status !== "claimed" && g.available));
+    // `actionableForAdd` is about the item just added — at checkout nothing was, so it's not required
+    // closest offer first ("1 more" before "2 more")
+    const byProgress = [...promotions].sort((x, y) => (y.progress?.fraction ?? 0) - (x.progress?.fraction ?? 0));
+    const target = unclaimedGift || byProgress.find((p) => ((p.qualifying && p.rewardTargetPending) || (!p.qualifying && p.progressText))
+      && p.recommendedProducts?.length > 0);
+    if (!target) { navigate("/checkout"); return; }
+    setCheckoutMode(true);
+    if (target === unclaimedGift) setJustUnlocked(true);
+    setActivePromoId(target.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkoutIntent, ready, promotions, gifts]);
 
   const seenAddSequenceRef = useRef(lastSuccessfulAdd?.sequence || 0);
   const prevQtyRef = useRef(totalQuantity);
@@ -204,7 +247,9 @@ const PromotionUnlockSheet = () => {
     // sees that the offer was availed.
     const unlockedNow = promotions.find((p) => p.actionableForAdd && p.applied && !p.rewardTargetPending
       && p.displayType !== "free_shipping" && !celebratedIdsRef.current.has(p.id));
-    const target = unlockedNow || (bestActionable && !getDismissedSet().has(bestActionable.id) ? bestActionable : null);
+    // Suggestions ("add one more…") now wait for Checkout (see checkout intent
+    // above) instead of interrupting every add; only a just-completed offer opens here.
+    const target = unlockedNow;
     if (!target) return;
 
     clearTimeout(pendingAddTimerRef.current);
@@ -295,7 +340,7 @@ const PromotionUnlockSheet = () => {
       }).catch(() => {});
     }
     // a free gift stays open until the shopper claims it (or closes the sheet); other offers confirm and close
-    const timer = livePromo.displayType === "free_gift" ? null : setTimeout(() => close(false), 2500);
+    const timer = livePromo.displayType === "free_gift" ? null : setTimeout(() => close(false), 5000);
     return () => { cancelled = true; if (timer) clearTimeout(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, livePromo?.applied, livePromo?.rewardTargetPending]);
@@ -308,9 +353,20 @@ const PromotionUnlockSheet = () => {
     setVisible(false);
     setJustUnlocked(false);
     setPendingAdd(null);
+    setCheckoutMode(false);
+    autoAddRef.current = false;
     clearTimeout(closeTimerRef.current);
     closeTimerRef.current = setTimeout(() => { setActivePromoId(null); setExternalIds(null); }, 300);
   };
+
+  useEffect(() => {
+    if (!autoAddRef.current || !visible || isFetching || !livePromo) return;
+    const recs = livePromo.recommendedProducts || [];
+    if (livePromo.applied || recs.length !== 1) { autoAddRef.current = false; return; }
+    autoAddRef.current = false;
+    handleAdd(recs[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, isFetching, livePromo]);
 
   const handleAdd = async (product) => {
     if (addingRef.current) return;
@@ -364,16 +420,18 @@ const PromotionUnlockSheet = () => {
   const appliedSavings = pricing?.savingsByPromotion?.[promo?.id] || 0;
   // Every other offer the same add put within reach (e.g. "2 wooden" AND
   // "wooden + LED" both want one more katana), capped at 3, anchored promo first.
-  const stillActionable = (p) => p.actionableForAdd && ((p.qualifying && p.rewardTargetPending) || (!p.qualifying && p.progressText))
-    && p.recommendedProducts?.length > 0 && !dismissedIds.has(p.id);
+  const stillActionable = (p) => (checkoutMode || p.actionableForAdd) && ((p.qualifying && p.rewardTargetPending) || (!p.qualifying && p.progressText))
+    && p.recommendedProducts?.length > 0 && (checkoutMode || !dismissedIds.has(p.id));
   const rows = externalIds
     ? externalIds.map((id) => promotions.find((p) => p.id === id)).filter((p) => p && (p.recommendedProducts?.length || p.applied)).slice(0, 4)
     : promo
-      ? [promo, ...promotions.filter((p) => p.id !== promo.id && stillActionable(p))].slice(0, 3)
+      ? [promo, ...[...promotions].sort((x, y) => (y.progress?.fraction ?? 0) - (x.progress?.fraction ?? 0)).filter((p) => p.id !== promo.id && stillActionable(p))].slice(0, 3)
       : [];
 
   return (
-    <div className="fixed inset-0 z-[9998] flex items-end justify-start sm:justify-center" data-promotion-sheet>
+    // Phones: bottom sheet. Desktop (md+): centred dialog — a sheet pinned to
+    // the bottom of a wide screen got cut off and looked out of place.
+    <div className="fixed inset-0 z-[9998] flex items-end justify-start sm:justify-center md:items-center md:p-6" data-promotion-sheet>
       <div
         className={`absolute inset-0 bg-ink/60 backdrop-blur-[3px] transition-opacity duration-300 motion-reduce:transition-none ${visible ? "opacity-100" : "opacity-0"}`}
         onClick={() => close(true)}
@@ -385,18 +443,18 @@ const PromotionUnlockSheet = () => {
         aria-modal="true"
         aria-labelledby="promotion-sheet-title"
         aria-describedby="promotion-sheet-description"
-        className={`relative flex max-h-[88dvh] min-w-0 w-[100dvw] flex-col overflow-hidden border shadow-2xl sm:w-full sm:max-w-[540px] transition-transform duration-300 ease-out motion-reduce:transition-none ${
-          festive ? "border-star/60 bg-ink" : "border-hair bg-paper"
-        } ${visible ? "translate-y-0" : "translate-y-full"}`}
+        className={`relative flex max-h-[88dvh] min-w-0 w-[100dvw] flex-col overflow-hidden border shadow-2xl sm:w-full sm:max-w-[540px] md:max-w-[480px] md:max-h-[80vh] transition-[transform,opacity] duration-300 ease-out motion-reduce:transition-none ${
+          festive && !justUnlocked ? "border-star/60 bg-ink" : festive ? "border-star/60 bg-paper" : "border-hair bg-paper"
+        } ${visible ? "translate-y-0 md:opacity-100" : "translate-y-full md:translate-y-4 md:opacity-0"}`}
       >
         {festive && (
           <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-[22px] overflow-hidden" aria-hidden="true">
             <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-star/70 to-transparent" />
-            <Garland arcs={4} />
+            <Garland arcs={4} tone={justUnlocked ? "onLight" : undefined} />
           </div>
         )}
         <div
-          className={`mx-auto h-1 w-11 shrink-0 ${festive ? "mt-7 bg-paper/30 sm:mt-7" : "mt-3 bg-ink/15 sm:mt-2.5"}`}
+          className={`mx-auto h-1 w-11 shrink-0 md:invisible ${festive && justUnlocked ? "mt-7 bg-ink/15" : festive ? "mt-7 bg-paper/30 sm:mt-7" : "mt-3 bg-ink/15 sm:mt-2.5"}`}
           onTouchStart={(event) => { touchStartRef.current = event.touches[0]?.clientY ?? null; }}
           onTouchEnd={(event) => {
             if (touchStartRef.current != null && event.changedTouches[0]?.clientY - touchStartRef.current > 80) close(true);
@@ -408,21 +466,30 @@ const PromotionUnlockSheet = () => {
           type="button"
           onClick={() => close(true)}
           aria-label="Dismiss offer"
-          className={`absolute right-4 z-20 grid h-9 w-9 place-items-center border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${festive ? "top-7 border-paper/35 text-paper hover:bg-white/10" : "top-4 border-hair text-ink hover:bg-surface"}`}
+          className={`absolute right-4 z-20 grid h-9 w-9 place-items-center border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${festive && !justUnlocked ? "top-7 border-paper/35 text-paper hover:bg-white/10" : festive ? "top-7 border-hair text-ink hover:bg-surface" : "top-4 border-hair text-ink hover:bg-surface"}`}
         >
           <i className="fa-solid fa-xmark text-sm" aria-hidden="true" />
         </button>
 
         {justUnlocked ? (
-          <div className="bg-paper px-5 py-8 text-center sm:px-7" role="status" aria-live="polite">
-            <span className="mx-auto mb-3 grid h-12 w-12 place-items-center border-2 border-save bg-save/10 text-save">
-              <i className="fa-solid fa-check text-lg" aria-hidden="true" />
-            </span>
-            <h3 id="promotion-sheet-title" className="truncate text-xl font-black tracking-tight text-ink">Offer unlocked</h3>
+          // Same paper/ink/brand look as the cart's applied-offer receipt — a
+          // plain confirmation, not a splash screen.
+          <div className="bg-paper px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-3 text-ink sm:px-7" role="status" aria-live="polite">
+            <div className="flex items-center gap-2 pr-10">
+              <span className="grid h-6 w-6 shrink-0 place-items-center bg-save text-paper" aria-hidden="true">
+                <i className={`fa-solid ${promo?.displayType === "free_gift" ? "fa-gift" : "fa-check"} text-[11px]`} />
+              </span>
+              <p className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-save">
+                {promo?.displayType === "free_gift" ? "Free gift unlocked" : "Offer applied"}
+              </p>
+            </div>
+            <h3 id="promotion-sheet-title" className="mt-3 text-2xl font-black leading-tight tracking-tight">
+              {appliedSavings > 0 ? <>You saved <span className="text-brand">{inr(appliedSavings)}</span></> : promo?.displayType === "free_gift" ? "Your free gift is ready" : "Offer applied"}
+            </h3>
             <p id="promotion-sheet-description" className="mt-1 text-sm text-muted">
               {promo?.displayType === "free_gift"
-                ? `${(promo.rewardLabel || "").replace(/\s*[—-]\s*free\s*$/i, "") || "Your free gift"} is ready — claim it to add it to your order.`
-                : appliedSavings > 0 ? `You saved ${inr(appliedSavings)} on this offer.` : `${promo?.title} is now applied to your cart.`}
+                ? `${(promo.rewardLabel || "").replace(/\s*[—-]\s*free\s*$/i, "") || "Your free gift"} — claim it to add it to your order.`
+                : `${promo?.rewardLabel || promo?.title} — applied to your cart.`}
             </p>
             {promo?.displayType === "free_gift" && (() => {
               // free gifts are never added automatically: the shopper claims them
@@ -435,12 +502,20 @@ const PromotionUnlockSheet = () => {
                   type="button"
                   onClick={() => dispatch(claimGift({ promotionId: entitlement.promotionId, productId: entitlement.productId, variantSku: entitlement.variantSku, quantity: entitlement.quantity }))}
                   disabled={!entitlement.available}
-                  className="mt-4 h-11 w-full bg-ink text-sm font-semibold text-paper transition-colors hover:bg-brand disabled:opacity-50"
+                  className="mt-4 h-12 w-full bg-ink text-sm font-bold text-paper transition-colors hover:bg-brand disabled:opacity-50"
                 >
                   {entitlement.available ? "Claim Free Gift" : "Currently out of stock"}
                 </button>
               );
             })()}
+            <div className="mt-5 grid grid-cols-2 gap-2 border-t border-dashed border-hair pt-4">
+              <button type="button" onClick={() => close(false)} className="h-11 border border-ink text-sm font-semibold text-ink transition-colors hover:bg-ink hover:text-paper">
+                Keep shopping
+              </button>
+              <button type="button" onClick={() => { close(false); navigate("/checkout"); }} className="h-11 bg-brand text-sm font-bold text-paper transition-colors hover:bg-brandHi">
+                Checkout →
+              </button>
+            </div>
           </div>
         ) : (
           <div className="min-h-0 overflow-y-auto bg-paper px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-4 sm:px-7">
@@ -547,6 +622,13 @@ const PromotionUnlockSheet = () => {
               );
             })}
             {addError && <p className="mt-3 border border-brand/20 bg-brand/5 px-3 py-2 text-xs font-semibold text-brand" role="alert">{addError}</p>}
+            {checkoutMode && (
+              <div className="sticky bottom-0 z-20 -mx-5 mt-4 border-t border-hair bg-paper px-5 pt-3 sm:-mx-7 sm:px-7">
+                <button type="button" onClick={() => { close(false); navigate("/checkout"); }} className="h-12 w-full bg-brand text-sm font-bold text-paper transition-colors hover:bg-brandHi">
+                  Continue to checkout →
+                </button>
+              </div>
+            )}
             <p className={`mt-4 text-center text-[11px] leading-relaxed text-muted ${festive ? "px-8" : ""}`}>Offer applies after eligible items are in your cart. Final total is confirmed at checkout.</p>
           </div>
         )}

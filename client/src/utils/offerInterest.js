@@ -22,7 +22,11 @@ export const recordOfferInterest = (promotionId, productId) => {
 
 export const getOfferInterests = () => {
   const now = Date.now();
-  return readJson(localStorage, KEY, []).filter((e) => e?.promotionId && now - e.at < TTL_MS);
+  // Called during render (OfferMiniBanner), so it also runs on the SSR server
+  // where `localStorage` doesn't exist.
+  try {
+    return readJson(localStorage, KEY, []).filter((e) => e?.promotionId && now - e.at < TTL_MS);
+  } catch { return []; }
 };
 
 export const forgetOfferInterest = (promotionId) => {
@@ -39,7 +43,9 @@ export const dismissOfferReminder = (promotionId) => {
   } catch { /* storage unavailable */ }
 };
 
-export const isOfferReminderDismissed = (promotionId) => readJson(sessionStorage, DISMISSED, []).includes(String(promotionId));
+export const isOfferReminderDismissed = (promotionId) => {
+  try { return readJson(sessionStorage, DISMISSED, []).includes(String(promotionId)); } catch { return false; }
+};
 
 export const clearOfferReminderDismissals = () => {
   try { sessionStorage.removeItem(DISMISSED); } catch { /* storage unavailable */ }

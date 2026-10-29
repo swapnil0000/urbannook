@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useGetProductByIdQuery } from "../../store/api/productsApi";
+import { useGetProductPromotionsQuery } from "../../store/api/userApi";
+import { bestOfferBadge } from "../../utils/offerBadge";
 import SEOHead from "../../component/SEOHead";
 import RevealCard from "../../component/RevealCard";
 import VariantCard from "../../component/VariantCard";
@@ -19,6 +21,9 @@ const ProductVariantsPage = () => {
   const { productId } = useParams();
   const navigate = useNavigate();
   const { data: productResponse, isLoading, error } = useGetProductByIdQuery(productId);
+  // Offer badge on every card (server-rendered too, see entry-server.jsx)
+  const { data: promoRes } = useGetProductPromotionsQuery(productId);
+  const offerBadge = bestOfferBadge(promoRes?.data?.promotions);
 
   // subtle Diwali accents while a festive campaign is live
   const { active: festiveActive, can } = useSiteCampaign();
@@ -112,6 +117,7 @@ const ProductVariantsPage = () => {
                     productName={product.productName}
                     variant={variant}
                     index={index}
+                    offerBadge={offerBadge}
                   />
                 </RevealCard>
               ))}

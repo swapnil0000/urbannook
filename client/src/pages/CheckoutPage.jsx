@@ -32,6 +32,8 @@ import FreeShippingStrip from "../component/FreeShippingStrip";
 import OfferCheckoutReminder from "../component/offers/OfferCheckoutReminder";
 import PromotionBannerList from "../component/promotions/PromotionBannerList";
 import GiftClaimList from "../component/promotions/GiftClaimList";
+import { CartGiftProgress } from "../component/offers/CartValueGift";
+import GiftWrapOffer from "../component/GiftWrapOffer";
 import SealBadgeCard, { UnderlineAmount } from "../component/promotions/SealBadgeCard";
 import { useGetCheckoutPromotionsQuery } from "../store/api/userApi";
 import { buildPromotionCartItems } from "../utils/promotionCartItems";
@@ -1384,8 +1386,9 @@ const CheckoutPage = () => {
   // total ELIGIBLE UNITS in the cart — 2x the same eligible product is 2
   // gift wraps, not 1 — mirroring rp.payment.controller.js exactly.
   const giftWrapOffer = giftWrapOfferData?.data;
+  const giftWrapIds = giftWrapOffer?.eligibleProductIds;
   const giftWrapEligibleCount = cartItems.reduce(
-    (sum, i) => (i.giftWrapEligible ? sum + (Number(i.quantity) || 0) : sum),
+    (sum, i) => (i.giftWrapEligible || giftWrapIds?.includes(String(i.mongoId || i.id)) ? sum + (Number(i.quantity) || 0) : sum),
     0,
   );
   const giftWrapAmount =
@@ -1607,6 +1610,10 @@ const CheckoutPage = () => {
             </p>
           </div>
 
+          {/* the first checkout screen — the gift wrap and the cart-value gift nudge belong here too */}
+          <div className="mt-4 empty:hidden"><CartGiftProgress promotions={checkoutPromotions} /></div>
+          <div className="mt-4 empty:hidden"><GiftWrapOffer variant="card" /></div>
+
           {/* ── Something went wrong on the last attempt ───────────────── */}
           {paymentError && (
             <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-red-100 bg-red-50 px-4 py-3">
@@ -1791,6 +1798,10 @@ const CheckoutPage = () => {
           <PromotionBannerList promotions={checkoutPromotions} pricing={checkoutPromotionsData?.data?.pricing} />
         </div>
       )}
+      {/* Cart-value free gift still locked ("add ₹X more") — every step, it's the nudge that grows the order */}
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4 empty:hidden"><CartGiftProgress promotions={checkoutPromotions} /></div>
+      {/* festive gift wrap — shoppers who tap "Go to Checkout" on the product page never see the cart drawer */}
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4 empty:hidden"><GiftWrapOffer variant="card" /></div>
       {/* Claimed free gifts that will be in the parcel (claiming itself happens in the cart) */}
       {currentStep === reviewStep && (
         <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4"><GiftClaimList readOnly /></div>
