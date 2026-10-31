@@ -437,22 +437,27 @@ export function buildPromotionDisplayModel(promotion, ctx, { placement, appliedP
   const applied = !rewardTargetPending && fullyFunctional && (appliedPromotionIds ? appliedPromotionIds.has(id) : qualifying);
   const displayType = buildDisplayType(promotion);
 
+  // Admin's per-surface wording (promotion.placementCards[placement]); blank fields keep the standard text.
+  const card = (placement && promotion.placementCards?.[placement]) || {};
+  // {save} only means something on the homepage card (real combo savings), so a label using it is ignored elsewhere.
+  const customLabel = card.savingsLabel && !card.savingsLabel.includes("{save}") ? card.savingsLabel : null;
+
   return {
     id,
     displayType,
-    title: promotion.name,
-    subtitle: buildSavingsText(promotion) || null,
-    badge: buildBadge(promotion),
+    title: card.subtitle || promotion.name,
+    subtitle: customLabel || buildSavingsText(promotion) || null,
+    badge: card.badgeLabel || buildBadge(promotion),
     icon: buildIcon(displayType),
     priority: promotion.priority || 0,
     displayRank: promotion.priority || 0, // alias kept distinct in the contract in case display ordering ever needs to diverge from stacking priority
     savingsText: buildSavingsText(promotion) || null,
     progressText: qualifying ? null : buildProgressText(promotion.conditionTree, ctx, rewardLabelFor(promotion)),
     progress: buildPromotionProgress(promotion.conditionTree, ctx, qualifying),
-    rewardLabel: (promotion.rewards || [])[0]?.label || buildSavingsText(promotion) || "",
+    rewardLabel: card.subtitle || (promotion.rewards || [])[0]?.label || buildSavingsText(promotion) || "",
     // promotions in the same group never apply together (the best one wins) — lets the UI say "replaces ..."
     group: promotion.promotionGroup || null,
-    ctaText: buildCtaText(promotion, { applied, qualifying, needsCoupon }),
+    ctaText: card.ctaLabel || buildCtaText(promotion, { applied, qualifying, needsCoupon }),
     // The actual code to enter, ONLY surfaced once the customer still needs
     // it (condition met but coupon not yet applied) — never shown once
     // applied/not-yet-qualifying-on-conditions, so this isn't a blanket
@@ -462,6 +467,11 @@ export function buildPromotionDisplayModel(promotion, ctx, { placement, appliedP
     qualifying,
     rewardTargetPending,
     placement: placement || null,
+    // admin's picture for this surface; null = text-only card
+    image: card.bannerImage || null,
+    cardNote: card.badgeText || customLabel || null,
+    priceLabel: card.priceLabel || null,
+    cta: card.ctaAction && card.ctaAction !== "cart" ? { action: card.ctaAction, url: card.ctaUrl || null, choices: card.ctaChoices || [] } : null,
     explanation: explainConditionTree(promotion.conditionTree, ctx),
     // Not part of the Phase 2 shape, but necessary honesty: a promotion
     // using a reward type checkout doesn't apply yet must never be shown

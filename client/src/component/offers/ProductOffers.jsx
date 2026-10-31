@@ -35,12 +35,17 @@ const ProductOffers = ({ productId, className = '', onApply, disabled = false, c
       <ul className="space-y-2">
         {offers.map((p) => (
           <li key={p.id} className="flex min-w-0 items-center gap-3 rounded-lg bg-paper px-3 py-2.5">
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand/10 text-brand" aria-hidden="true">
-              <i className={`fa-solid ${iconFor(p)} text-xs`} />
-            </span>
+            {/* admin's picture for this surface (promotion.placementImages.pdp); text-only + icon when none */}
+            {p.image ? (
+              <img src={p.image} alt="" loading="lazy" className="h-12 w-12 shrink-0 rounded-lg object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+            ) : (
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand/10 text-brand" aria-hidden="true">
+                <i className={`fa-solid ${iconFor(p)} text-xs`} />
+              </span>
+            )}
             <div className="min-w-0 flex-1">
               <p className="text-sm font-bold leading-snug text-ink">{p.rewardLabel || p.title}</p>
-              {p.rewardLabel && p.title && p.title !== p.rewardLabel && <p className="truncate text-[11px] text-muted" title={p.title}>{p.title}</p>}
+              {p.cardNote ? <p className="text-[11px] text-muted">{p.cardNote}</p> : p.rewardLabel && p.title && p.title !== p.rewardLabel && <p className="truncate text-[11px] text-muted" title={p.title}>{p.title}</p>}
             </div>
             {/* No "Applied" state here: the endpoint evaluates as if one of this
                 product were in the cart, so `applied` is true before anything is added. */}

@@ -817,6 +817,14 @@ function buildComboBuilder(promos, productMap, shortNameOf, hiddenRewardLabel) {
   return combos;
 }
 
+// What the admin set for the product page (promotion.placementCards.pdp) — sent along with each home
+// combo so the product page's offer banner can show the admin's own picture / wording. null when untouched.
+const pdpCardOf = (promo) => {
+  const c = promo.placementCards?.pdp;
+  if (!c || !(c.bannerImage || c.subtitle || c.badgeLabel || c.badgeText || c.savingsLabel)) return null;
+  return { bannerImage: c.bannerImage || null, tagline: c.subtitle || "", badgeLabel: c.badgeLabel || "", badgeText: c.badgeText || "", savingsLabel: c.savingsLabel || "" };
+};
+
 // Public: GET /promotions/display/home — homepage combo cards. Only
 // promotions with placements including "home" AND whose conditionTree names
 // exactly 2 distinct products (the "buy A+B together" shape — see
@@ -923,6 +931,7 @@ const getHomeDisplayController = asyncHandler(async (_req, res) => {
       badgeText: hc.badgeText || "",
       ctaLabel: hc.ctaLabel?.trim() || "Shop Now",
       bannerImage: hc.bannerImage || null,
+      pdpCard: pdpCardOf(promo),
       // what the shopper gets (the stand that is 50% off, the free gift): the reward's own
       // image, else that product's photo. A "Mystery Gift" never shows the product it really
       // is — only an image the admin set on the reward.
@@ -1035,6 +1044,7 @@ const getHomeDisplayController = asyncHandler(async (_req, res) => {
         badgeText: homeCard.badgeText || "",
         ctaLabel: homeCard.ctaLabel?.trim() || "Add to Cart",
         bannerImage: homeCard.bannerImage || null,
+        pdpCard: pdpCardOf(promo),
         // null when no bannerImage — storefront renders a 50/50 split of
         // these two images itself, never a hardcoded placeholder.
         fallbackImages: homeCard.bannerImage ? null : variants.map((v) => v.variantImage?.[0] || ""),
