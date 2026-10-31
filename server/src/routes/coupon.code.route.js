@@ -13,7 +13,6 @@ couponCodeRouter.post(
   authGuardService("USER"),
   applyCouponCodeController,
 );
-couponCodeRouter.post("/coupon/list", getAllCouponCodeController);
 
 
 // Never cached: the list changes as coupons expire, and a code must never be
@@ -30,6 +29,9 @@ const revealLimiter = rateLimit({
   max: 30,
   message: "Too many reveal attempts, please try again later",
 });
+// optionalAuthGuard: guests get the public list, a signed-in customer also gets members-only
+// and personally assigned coupons. Per-user data, so never cached.
+couponCodeRouter.post("/coupon/list", noStore, optionalAuthGuard("USER"), getAllCouponCodeController);
 couponCodeRouter.post("/coupon/offers", noStore, optionalAuthGuard("USER"), getCouponOffersController);
 couponCodeRouter.post(
   "/coupon/reveal",

@@ -2,7 +2,7 @@ import Coupon from "../model/coupon.model.js";
 import CouponUsage from "../model/couponUsage.model.js";
 import Product from "../model/product.model.js";
 import User from "../model/user.model.js";
-import { validateNewCoupon } from "./coupon.code.service.js";
+import { validateNewCoupon, usedByUser } from "./coupon.code.service.js";
 import {
   ValidationError,
   NotFoundError,
@@ -95,21 +95,6 @@ const productNamesFor = async (cs) => {
   if (!ids.length) return new Map();
   const rows = await Product.find({ productId: { $in: ids } }, { productId: 1, productName: 1 }).lean();
   return new Map(rows.map((p) => [p.productId, p.productName]));
-};
-
-/** How many times this customer has already used each coupon. */
-const usedByUser = async (userId, couponIds) => {
-  if (!userId || !couponIds.length) return new Map();
-  const user = await User.findOne({ userId }, { email: 1, mobileNumber: 1, verifiedMobile: 1 }).lean();
-  if (!user) return new Map();
-  const or = [{ userId }];
-  if (user.email) or.push({ email: String(user.email).toLowerCase() });
-  for (const m of [user.mobileNumber, user.verifiedMobile]) if (m) or.push({ mobile: String(m) });
-  const rows = await CouponUsage.aggregate([
-    { $match: { couponId: { $in: couponIds }, reversed: { $ne: true }, $or: or } },
-    { $group: { _id: "$couponId", n: { $sum: 1 } } },
-  ]);
-  return new Map(rows.map((r) => [r._id, r.n]));
 };
 
 const getCouponOffersService = async ({ userId } = {}) => {

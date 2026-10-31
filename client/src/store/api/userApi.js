@@ -137,6 +137,27 @@ export const userApi = apiSlice.injectEndpoints({
       providesTags: ["Orders"],
     }),
 
+    // Customer order experience: one consolidated read per order (payment, items, pricing, shipments),
+    // light rows for the archive, and the admin-linked "complete your collection" products. Money and
+    // tracking state — refetched on every mount, never served stale.
+    getOrderView: builder.query({
+      query: (orderId) => ({ url: `user/order/view/${encodeURIComponent(orderId)}`, method: "GET" }),
+      keepUnusedDataFor: 0,
+      providesTags: ["Orders"],
+    }),
+    getOrderSummaries: builder.query({
+      query: () => ({ url: "user/orders/summaries", method: "GET" }),
+      keepUnusedDataFor: 0,
+      providesTags: ["Orders"],
+    }),
+    getOrderRecommendations: builder.query({
+      query: (orderId) => ({ url: `user/order/recommendations/${encodeURIComponent(orderId)}`, method: "GET" }),
+    }),
+    // Presigned link to an invoice that already exists (the page only offers it when one does).
+    getInvoiceLink: builder.mutation({
+      query: (razorpayOrderId) => ({ url: "user/order/generate-invoice", method: "POST", body: { razorpayOrderId } }),
+    }),
+
     // Coupon APIs
     applyCoupon: builder.mutation({
       query: ({ couponCode, email }) => ({
@@ -178,11 +199,13 @@ export const userApi = apiSlice.injectEndpoints({
     }),
     // Look up a single coupon by exact code (used by guests for hidden/secret codes).
     // Same endpoint as the list — returns [] if the code is unknown.
+    // Accepts a bare code, or { code, email, mobile } — a guest's email/mobile only
+    // ever unlock a coupon the admin assigned to that email/mobile.
     lookupCoupon: builder.mutation({
-      query: (code) => ({
+      query: (arg) => ({
         url: "coupon/list",
         method: "POST",
-        body: { code },
+        body: typeof arg === "string" ? { code: arg } : arg,
       }),
     }),
 
@@ -416,6 +439,10 @@ export const {
   useGetWishlistQuery,
   useRemoveFromWishlistMutation,
   useOrderHistoryQuery,
+  useGetOrderViewQuery,
+  useGetOrderSummariesQuery,
+  useGetOrderRecommendationsQuery,
+  useGetInvoiceLinkMutation,
   useApplyCouponMutation,
   useGetAvailableCouponsQuery,
   useGetCouponOffersQuery,

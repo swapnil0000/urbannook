@@ -547,8 +547,13 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   }
 
   // Check if pricing has been calculated (appliedCoupon.summary must exist with a valid grandTotal)
+  // "Calculated" means the apply step has run and stored a subtotal. A grand total
+  // of 0 is legitimate — a coupon worth the whole product total — and must not be
+  // mistaken for "never calculated": the real amount (delivery still owed) is
+  // recomputed from the live order below, this only gates a stale cart.
   const grandTotal = cart?.appliedCoupon?.summary?.grandTotal;
-  if (grandTotal == null || grandTotal <= 0) {
+  const quotedSubtotal = cart?.appliedCoupon?.summary?.subtotal;
+  if (grandTotal == null || !(quotedSubtotal > 0)) {
     throw new ValidationError(
       "Cart pricing not calculated. Please refresh the page.",
     );
@@ -1065,8 +1070,12 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     // an actual re-check.
     if (liveCoupon.scope === "TARGETED") {
       const normEmailForScope  = user?.email?.toLowerCase().trim() || null;
-      const normMobileForScope = user?.mobileNumber?.toString().replace(/\D/g, "").slice(-10) || finalSenderMobile || null;
-      const scopeIdentifiers   = [normEmailForScope, normMobileForScope].filter(Boolean);
+      // Same identity set the apply step uses (coupon.code.service.js getUserCouponIdentity):
+      // profile number AND the WhatsApp-verified one, so a coupon assigned to either works.
+      const scopeMobiles = [user?.verifiedMobile, user?.mobileNumber, finalSenderMobile]
+        .map((m) => (m ? String(m).replace(/\D/g, "").slice(-10) : null))
+        .filter((m) => m && m.length === 10);
+      const scopeIdentifiers   = [normEmailForScope, ...new Set(scopeMobiles)].filter(Boolean);
       const assignment = (liveCoupon.assignedTo || []).find((a) => scopeIdentifiers.includes(a.identifier));
 
       console.log(
@@ -1155,8 +1164,10 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     // is enforced the same way; only the single-use usedAt gate is skipped for them elsewhere.
     if (isApplied) {
       const normEmailCheck  = user?.email?.toLowerCase().trim() || null;
-      const normMobileCheck = user?.mobileNumber?.toString().replace(/\D/g, "").slice(-10) || finalSenderMobile || null;
-      const identifiers     = [normEmailCheck, normMobileCheck].filter(Boolean);
+      const checkMobiles = [user?.verifiedMobile, user?.mobileNumber, finalSenderMobile]
+        .map((m) => (m ? String(m).replace(/\D/g, "").slice(-10) : null))
+        .filter((m) => m && m.length === 10);
+      const identifiers     = [normEmailCheck, ...new Set(checkMobiles)].filter(Boolean);
 
       if (identifiers.length > 0 && liveCoupon.maxUsesPerUser) {
         const priorUses = await CouponUsage.countDocuments({
@@ -1164,7 +1175,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
           reversed: { $ne: true },
           $or: [
             ...(normEmailCheck  ? [{ email:  normEmailCheck  }] : []),
-            ...(normMobileCheck ? [{ mobile: normMobileCheck }] : []),
+            ...(checkMobiles.length ? [{ mobile: { $in: [...new Set(checkMobiles)] } }] : []),
           ],
         });
         console.log(`[Coupon:PaymentRecheck] Per-user check: identifiers=${identifiers.join("/")} priorUses=${priorUses} limit=${liveCoupon.maxUsesPerUser}`);
@@ -1773,13 +1784,25 @@ const fulfilCapturedPayment = async (order, payment) => {
               });
 
               // Mark TARGETED assignment as used (embedded in coupon document)
-              if (updatedCoupon.scope === "TARGETED" && (normEmail || normMobile)) {
+              if (updatedCoupon.scope === "TARGETED" && (normEmail || normMobile || order.userId)) {
+                // The assignment may be on the customer's profile or WhatsApp-verified
+                // number, which can differ from the delivery number on the order —
+                // include them or the coupon would never be marked used and could be reused.
+                const accountMobiles = [];
+                if (order.userId) {
+                  const acct = await User.findOne({ userId: order.userId }, { email: 1, mobileNumber: 1, verifiedMobile: 1 }).lean();
+                  for (const m of [acct?.verifiedMobile, acct?.mobileNumber]) {
+                    const n = m ? String(m).replace(/\D/g, "").slice(-10) : null;
+                    if (n && n.length === 10) accountMobiles.push(n);
+                  }
+                  if (acct?.email) accountMobiles.push(String(acct.email).toLowerCase().trim());
+                }
                 await Coupon.updateOne(
                   {
                     couponId,
                     assignedTo: {
                       $elemMatch: {
-                        identifier: { $in: [normEmail, normMobile].filter(Boolean) },
+                        identifier: { $in: [normEmail, normMobile, ...accountMobiles].filter(Boolean) },
                         usedAt: null,
                       },
                     },
