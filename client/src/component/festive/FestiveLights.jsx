@@ -1,4 +1,5 @@
 import { useSiteCampaign } from '../../hooks/useSiteCampaign';
+import { useGetHeroBannerQuery } from '../../store/api/productsApi';
 
 const SAG = 12;    // px a string sags between two anchor points
 const HEIGHT = 22; // px, fixed — the layer is absolutely positioned, so it adds no layout height
@@ -11,7 +12,8 @@ const HEIGHT = 22; // px, fixed — the layer is absolutely positioned, so it ad
 /**
  * `tone`: "onDark" (default) = golden lights for dark backgrounds; "onLight" =
  * ink wire + brand-red/gold bulbs with a dark ring so they stay visible on the
- * light (paper/surface) panels.
+ * light (paper/surface) panels; "onGold" = for a yellow/gold banner, where gold
+ * vanishes: ink wire, deep-red and paper bulbs, deep-red marigolds, teal leaves.
  */
 export const Garland = ({ arcs, className = '', tone = 'onDark' }) => {
   const total = arcs * 100;
@@ -31,7 +33,7 @@ export const Garland = ({ arcs, className = '', tone = 'onDark' }) => {
   return (
     <div className={`relative w-full ${className}`} style={{ height: HEIGHT }}>
       <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${total} ${HEIGHT}`} preserveAspectRatio="none" fill="none" aria-hidden="true">
-        <path d={d} stroke={tone === 'onLight' ? 'rgb(var(--gl-ink) / 0.55)' : 'rgb(var(--gl-star) / 0.45)'} strokeWidth="1" vectorEffect="non-scaling-stroke" />
+        <path d={d} stroke={tone === 'onGold' ? 'rgb(var(--gl-ink) / 0.8)' : tone === 'onLight' ? 'rgb(var(--gl-ink) / 0.55)' : 'rgb(var(--gl-star) / 0.45)'} strokeWidth="1" vectorEffect="non-scaling-stroke" />
       </svg>
       {bulbs.map((b, i) => (
         <span
@@ -41,7 +43,12 @@ export const Garland = ({ arcs, className = '', tone = 'onDark' }) => {
             left: `${b.left}%`,
             top: b.top + 1,
             animationDelay: `${b.delay}s`,
-            ...(tone === 'onLight'
+            ...(tone === 'onGold'
+              ? {
+                  background: b.dim ? 'rgb(var(--gl-paper))' : 'rgb(var(--gl-brand-hi))',
+                  boxShadow: '0 0 0 1px rgb(var(--gl-ink) / 0.8), 0 0 8px 2px rgb(var(--gl-brand) / 0.55)',
+                }
+              : tone === 'onLight'
               ? {
                   background: b.dim ? 'rgb(var(--gl-brand))' : 'rgb(var(--gl-star))',
                   boxShadow: '0 0 0 1px rgb(var(--gl-ink) / 0.55), 0 0 7px 1px rgb(var(--gl-brand) / 0.45)',
@@ -58,7 +65,7 @@ export const Garland = ({ arcs, className = '', tone = 'onDark' }) => {
 };
 
 export const Diya = ({ className = '', tone = 'onDark' }) => {
-  const light = tone === 'onLight';
+  const light = tone !== 'onDark';
   return (
     <svg viewBox="0 0 24 20" width="22" height="18" className={className} aria-hidden="true">
       <path
@@ -88,7 +95,7 @@ export const HangingDiya = ({ tone = 'onDark', length = 14, className = '', diya
   <div className={`un-sway absolute ${className}`} style={{ transformOrigin: 'top center', ...style }} aria-hidden="true">
     <span
       className="mx-auto block w-px"
-      style={{ height: length, background: tone === 'onLight' ? 'rgb(var(--gl-ink) / 0.55)' : 'rgb(var(--gl-star) / 0.65)' }}
+      style={{ height: length, background: tone !== 'onDark' ? 'rgb(var(--gl-ink) / 0.7)' : 'rgb(var(--gl-star) / 0.65)' }}
     />
     <Diya tone={tone} className={`mx-auto ${diyaClass}`} />
   </div>
@@ -99,7 +106,8 @@ export const HangingDiya = ({ tone = 'onDark', length = 14, className = '', diya
  * gently. 160×34 viewBox, ≤34px tall so it clears the hero's first line.
  */
 export const Toran = ({ className = '', mirror = false, tone = 'onDark' }) => {
-  const light = tone === 'onLight';
+  const light = tone !== 'onDark';
+  const gold = tone === 'onGold';
   const pendants = [0.12, 0.31, 0.5, 0.69, 0.88].map((t, i) => {
     const x = 160 * t;
     const y = 2 + 20 * t * (1 - t);
@@ -107,22 +115,53 @@ export const Toran = ({ className = '', mirror = false, tone = 'onDark' }) => {
   });
   return (
     <svg viewBox="0 0 160 34" className={className} style={mirror ? { transform: 'scaleX(-1)' } : undefined} fill="none" aria-hidden="true">
-      <path d="M0 2Q80 22 160 2" stroke={light ? 'rgb(var(--gl-ink) / 0.6)' : 'rgb(var(--gl-star) / 0.7)'} strokeWidth="1.2" />
+      <path d="M0 2Q80 22 160 2" stroke={gold ? 'rgb(var(--gl-ink) / 0.85)' : light ? 'rgb(var(--gl-ink) / 0.6)' : 'rgb(var(--gl-star) / 0.7)'} strokeWidth="1.2" />
       {pendants.map((p, i) => (
         <g key={i} className="un-sway" style={{ transformOrigin: `${p.x}px ${p.y}px`, animationDelay: `${p.delay}s` }}>
           <line x1={p.x} y1={p.y} x2={p.x} y2={p.y + p.len} stroke={light ? 'rgb(var(--gl-ink) / 0.55)' : 'rgb(var(--gl-star) / 0.6)'} strokeWidth="0.8" />
           {p.leaf ? (
-            <path d={`M${p.x} ${p.y + p.len}c-3.2 1.4-3.6 5-0 7.6 3.6-2.6 3.2-6.2 0-7.6Z`} fill="rgb(var(--gl-brand))" stroke={light ? 'rgb(var(--gl-ink) / 0.7)' : 'rgb(var(--gl-star) / 0.8)'} strokeWidth="0.7" />
+            <path d={`M${p.x} ${p.y + p.len}c-3.2 1.4-3.6 5-0 7.6 3.6-2.6 3.2-6.2 0-7.6Z`} fill={gold ? 'rgb(var(--gl-save))' : 'rgb(var(--gl-brand))'} stroke={light ? 'rgb(var(--gl-ink) / 0.7)' : 'rgb(var(--gl-star) / 0.8)'} strokeWidth="0.7" />
           ) : (
             <g>
-              <circle cx={p.x} cy={p.y + p.len + 3} r="3.4" fill="rgb(var(--gl-star))" stroke={light ? 'rgb(var(--gl-ink) / 0.7)' : undefined} strokeWidth={light ? 0.8 : undefined} style={{ filter: light ? 'drop-shadow(0 0 2px rgb(var(--gl-brand) / 0.6))' : 'drop-shadow(0 0 3px rgb(var(--gl-star) / 0.7))' }} />
-              <circle cx={p.x} cy={p.y + p.len + 3} r="1.3" fill="rgb(var(--gl-brand))" />
+              <circle cx={p.x} cy={p.y + p.len + 3} r="3.4" fill={gold ? 'rgb(var(--gl-brand-hi))' : 'rgb(var(--gl-star))'} stroke={light ? 'rgb(var(--gl-ink) / 0.7)' : undefined} strokeWidth={light ? 0.8 : undefined} style={{ filter: light ? 'drop-shadow(0 0 2px rgb(var(--gl-brand) / 0.6))' : 'drop-shadow(0 0 3px rgb(var(--gl-star) / 0.7))' }} />
+              <circle cx={p.x} cy={p.y + p.len + 3} r="1.3" fill={gold ? 'rgb(var(--gl-paper))' : 'rgb(var(--gl-brand))'} />
             </g>
           )}
         </g>
       ))}
     </svg>
   );
+};
+
+/**
+ * A full-width marigold-and-mango-leaf toran (the door garland): a swag of ink
+ * string per 56px with a deep-red marigold and a teal leaf hanging from it.
+ * Drawn with an SVG <pattern> so it tiles to any width without stretching.
+ * Made for a yellow/gold hero, where the gold corner torans disappear.
+ */
+export const MarigoldToran = ({ className = '' }) => (
+  <svg className={className} width="100%" height="40" fill="none" aria-hidden="true">
+    <defs>
+      <pattern id="un-mtoran" width="56" height="40" patternUnits="userSpaceOnUse">
+        <path d="M0 3Q28 15 56 3" stroke="rgb(var(--gl-ink) / 0.85)" strokeWidth="1.4" />
+        <line x1="14" y1="8.2" x2="14" y2="14" stroke="rgb(var(--gl-ink) / 0.8)" strokeWidth="1" />
+        <circle cx="14" cy="18" r="5" fill="rgb(var(--gl-brand-hi))" stroke="rgb(var(--gl-ink) / 0.8)" strokeWidth="0.9" />
+        <circle cx="14" cy="18" r="2" fill="rgb(var(--gl-paper))" />
+        <line x1="28" y1="9.6" x2="28" y2="13" stroke="rgb(var(--gl-ink) / 0.8)" strokeWidth="1" />
+        <path d="M28 13c-5 2-5.6 8.4 0 13.6 5.6-5.2 5-11.6 0-13.6Z" fill="rgb(var(--gl-save))" stroke="rgb(var(--gl-ink) / 0.8)" strokeWidth="0.9" />
+        <line x1="42" y1="8.2" x2="42" y2="14" stroke="rgb(var(--gl-ink) / 0.8)" strokeWidth="1" />
+        <circle cx="42" cy="18" r="5" fill="rgb(var(--gl-brand))" stroke="rgb(var(--gl-ink) / 0.8)" strokeWidth="0.9" />
+        <circle cx="42" cy="18" r="2" fill="rgb(var(--gl-paper))" />
+      </pattern>
+    </defs>
+    <rect width="100%" height="40" fill="url(#un-mtoran)" />
+  </svg>
+);
+
+// Perceived brightness (0 dark … 1 light) of a #rrggbb colour.
+const luma = (hex) => {
+  const n = parseInt(String(hex).slice(1), 16);
+  return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
 };
 
 /**
@@ -140,7 +179,13 @@ const FestiveLights = () => {
   const { can, page } = useSiteCampaign();
   // The home page's hero is dark (golden lights read well); every other page
   // is light, where gold washes out — so those get the dark-toned variants.
-  const tone = page === 'home' ? 'onDark' : 'onLight';
+  // …unless the admin's hero banner is showing and its artwork is light (yellow/gold Diwali creative):
+  // gold lights vanish on it, so they switch to the "onGold" tone. The banner's edge colours come
+  // with the slide (the same cached request HomePage makes), so no extra call.
+  const { data: heroRes } = useGetHeroBannerQuery();
+  const heroBg = heroRes?.data?.slides?.[0]?.bg;
+  const onGold = page === 'home' && !!heroBg && luma(heroBg[0]) > 0.55;
+  const tone = onGold ? 'onGold' : page === 'home' ? 'onDark' : 'onLight';
 
   const lights = can('lights');
   const diyas = can('diyas');
@@ -151,16 +196,17 @@ const FestiveLights = () => {
 
   return (
     <div className="relative h-0 z-40 pointer-events-none select-none" aria-hidden="true">
-      <div className="absolute top-0 inset-x-0 overflow-hidden" style={{ height: 44 }}>
-        {accent && <div className={`absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent ${tone === 'onLight' ? 'via-ink/40' : 'via-star/60'} to-transparent`} />}
+      <div className="absolute top-0 inset-x-0 overflow-hidden" style={{ height: onGold ? 66 : 44 }}>
+        {accent && <div className={`absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent ${tone !== 'onDark' ? 'via-ink/40' : 'via-star/60'} to-transparent`} />}
         {/* Torans first so the light string paints on top of them. */}
-        {torans && (
+        {torans && onGold && <MarigoldToran className="absolute left-0 top-0 z-0" />}
+        {torans && !onGold && (
           <>
             <Toran tone={tone} className="absolute left-0 top-0 z-0 w-[76px] sm:w-[120px]" />
             <Toran tone={tone} className="absolute right-0 top-0 z-0 w-[76px] sm:w-[120px]" mirror />
           </>
         )}
-        {lights && (
+        {lights && !(torans && onGold) && (
           <>
             <Garland arcs={8} tone={tone} className="relative z-10 hidden sm:block" />
             <Garland arcs={4} tone={tone} className="relative z-10 sm:hidden" />
@@ -168,10 +214,10 @@ const FestiveLights = () => {
         )}
         {diyas && (
           <>
-            <HangingDiya tone={tone} className="hidden sm:block left-[27%] top-[9px] z-20" />
-            <HangingDiya tone={tone} className="hidden sm:block right-[27%] top-[9px] z-20" />
-            <HangingDiya tone={tone} className="sm:hidden left-[14%] top-[9px] z-20" length={20} />
-            <HangingDiya tone={tone} className="sm:hidden right-[14%] top-[9px] z-20" length={20} />
+            <HangingDiya tone={tone} className={`hidden sm:block left-[27%] ${onGold ? 'top-[24px]' : 'top-[9px]'} z-20`} />
+            <HangingDiya tone={tone} className={`hidden sm:block right-[27%] ${onGold ? 'top-[24px]' : 'top-[9px]'} z-20`} />
+            <HangingDiya tone={tone} className={`sm:hidden left-[14%] ${onGold ? 'top-[24px]' : 'top-[9px]'} z-20`} length={20} />
+            <HangingDiya tone={tone} className={`sm:hidden right-[14%] ${onGold ? 'top-[24px]' : 'top-[9px]'} z-20`} length={20} />
           </>
         )}
       </div>

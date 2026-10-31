@@ -92,6 +92,13 @@ export const productsApi = apiSlice.injectEndpoints({
       providesTags: ['Category'],
     }),
 
+    // Homepage hero slides that are live now (Admin → Operations Hub → Hero banner).
+    // { slides: [] } = admin has none live, the page keeps its built-in hero.
+    getHeroBanner: builder.query({
+      query: () => 'hero-banner/active',
+      keepUnusedDataFor: 300,
+    }),
+
     // Admin → SEO Pages overrides for one URL path; data is null when none.
     getSeoData: builder.query({
       query: (path) => `seo?path=${encodeURIComponent(path)}`,
@@ -148,6 +155,7 @@ export const {
   useGetCategoriesQuery,
   useGetCategoryBySlugQuery,
   useGetSeoDataQuery,
+  useGetHeroBannerQuery,
   useGetBlogPostsQuery,
   useGetBlogPostQuery,
   useSearchProductsQuery,

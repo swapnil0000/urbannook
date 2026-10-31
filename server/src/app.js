@@ -31,6 +31,7 @@ import {
   promotionRouter,
   paymentFeedbackRouter,
   siteCampaignRouter,
+  heroBannerRouter,
 } from "./routes/index.js";
 import cookieParser from "cookie-parser";
 import healthRouter from "./routes/health.route.js";
@@ -246,6 +247,7 @@ app.use(
   promotionRouter,
   paymentFeedbackRouter,
   siteCampaignRouter,
+  heroBannerRouter,
 );
 
 // TEMP deploy-verification log — remove once cart-rules deploy is confirmed
