@@ -36,6 +36,8 @@ const GoogleOneTap = lazy(() => import('./component/GoogleOneTap'));
 // import and the <SiteOfferPopup /> mount below to bring it back.
 // Free-shipping announcement in the same slot and style; admin-controlled.
 const FreeShippingPopup = lazy(() => import('./component/FreeShippingPopup'));
+// Live-offers carousel (centered on desktop, bottom sheet on mobile), once per session.
+const OffersPopup = lazy(() => import('./component/offers/OffersPopup'));
 const ScrollHint = lazy(() => import('./component/ScrollHint'));
 const PasskeyPrompt = lazy(() => import('./component/PasskeyPrompt'));
 // Smart combo/upsell bottom sheet (Promotion V2) — watches the cart from the
@@ -233,6 +235,10 @@ function App({ store = browserStore, helmetContext }) {
                 {/* Free-shipping popup — shows once, everywhere except checkout */}
                 <ErrorBoundary>
                   <FreeShippingPopup />
+                </ErrorBoundary>
+                {/* Live offers carousel — waits while the free-shipping popup is due */}
+                <ErrorBoundary>
+                  <OffersPopup />
                 </ErrorBoundary>
                 {/* Promotion V2 "add more to unlock" bottom sheet */}
                 <ErrorBoundary>

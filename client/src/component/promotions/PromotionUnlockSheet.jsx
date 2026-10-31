@@ -59,9 +59,21 @@ function clearDismissed() {
 
 const inr = (n) => `₹${Math.round(Number(n) || 0).toLocaleString("en-IN")}`;
 
-const RecommendationCard = ({ product, onAdd, isAdding, isBusy, isSingle }) => (
-  <article className={`h-full min-w-0 shrink-0 border border-hair bg-paper p-2 ${isSingle ? "w-full flex gap-3" : "w-[calc((100vw-52px)/2.1)] min-w-[124px] max-w-[152px] sm:w-[148px] flex flex-col gap-2"}`}>
+// What this pick costs under the offer: "FREE" / "50% OFF" (null when it is not discounted)
+const offerBadge = (product) => {
+  const price = Number(product.price);
+  const offer = product.offerPrice == null ? null : Number(product.offerPrice);
+  if (offer == null || !(price > 0) || offer >= price) return null;
+  return offer === 0 ? "FREE" : `${Math.round((1 - offer / price) * 100)}% OFF`;
+};
+
+// `fill`: the card takes its grid cell (3 options shown side by side, no swiping)
+const RecommendationCard = ({ product, onAdd, isAdding, isBusy, isSingle, fill = false }) => (
+  <article className={`h-full min-w-0 shrink-0 border border-hair bg-paper p-2 ${isSingle ? "w-full flex gap-3" : fill ? "w-full flex flex-col gap-2" : "w-[calc((100vw-52px)/2.1)] min-w-[124px] max-w-[152px] sm:w-[148px] flex flex-col gap-2"}`}>
     <div className={`relative shrink-0 overflow-hidden bg-surface ${isSingle ? "h-24 w-24 sm:h-28 sm:w-28" : "aspect-square w-full"}`}>
+      {offerBadge(product) && (
+        <span className="absolute left-1 top-1 z-10 bg-brand px-1.5 py-0.5 text-[9.5px] font-extrabold leading-none text-white">{offerBadge(product)}</span>
+      )}
       {product.image ? (
         <img src={product.image} alt={product.productName} className="w-full h-full object-contain" loading="lazy" />
       ) : (
@@ -80,7 +92,8 @@ const RecommendationCard = ({ product, onAdd, isAdding, isBusy, isSingle }) => (
       </button>
     </div>
     <div className="flex min-w-0 flex-1 flex-col justify-center">
-      <h4 className="truncate text-xs font-extrabold leading-snug text-ink" title={product.productName}>{product.productName}</h4>
+      {/* the variant tells the options apart (Single / Double / Triple stand all share one product name) */}
+      <h4 className="truncate text-xs font-extrabold leading-snug text-ink" title={product.variantName || product.productName}>{product.variantName || product.productName}</h4>
       <div className="mt-1 flex flex-wrap items-baseline gap-x-2">
         {product.offerPrice != null ? (
           <>
@@ -603,17 +616,19 @@ const PromotionUnlockSheet = () => {
                         ) : null;
                       })()}
                     </div>
-                    {items.length > 2 && <span className="shrink-0 text-[10px] font-semibold text-muted">Swipe <i className="fa-solid fa-arrow-right ml-1" aria-hidden="true" /></span>}
+                    {items.length > 3 && <span className="shrink-0 text-[10px] font-semibold text-muted">Swipe <i className="fa-solid fa-arrow-right ml-1" aria-hidden="true" /></span>}
                   </div>
-                  <div className={`flex gap-3 pb-1 ${items.length > 1 ? "-mx-5 snap-x snap-mandatory overflow-x-auto overscroll-x-contain px-5 scrollbar-hide sm:-mx-7 sm:px-7" : ""}`} aria-label="Eligible products">
+                  {/* up to 3 options sit side by side (Single / Double / Triple stand all visible, none hidden off-screen) */}
+                  <div className={`pb-1 ${items.length === 1 ? "flex" : items.length <= 3 ? `grid gap-2 ${items.length === 2 ? "grid-cols-2" : "grid-cols-3"}` : "flex gap-3 -mx-5 snap-x snap-mandatory overflow-x-auto overscroll-x-contain px-5 scrollbar-hide sm:-mx-7 sm:px-7"}`} aria-label="Eligible products">
                     {items.map((product) => (
-                      <div key={`${row.id}-${product.productId}-${product.sku || ""}`} className={items.length > 1 ? "shrink-0 snap-start" : "w-full"}>
+                      <div key={`${row.id}-${product.productId}-${product.sku || ""}`} className={items.length > 3 ? "shrink-0 snap-start" : "w-full min-w-0"}>
                         <RecommendationCard
                           product={product}
                           onAdd={handleAdd}
                           isAdding={addingProductId === `${product.productId}:${product.sku || ""}`}
                           isBusy={Boolean(addingProductId)}
                           isSingle={items.length === 1}
+                          fill={items.length > 1 && items.length <= 3}
                         />
                       </div>
                     ))}

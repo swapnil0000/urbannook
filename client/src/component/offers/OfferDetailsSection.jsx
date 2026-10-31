@@ -6,6 +6,7 @@ import { useCartPromotions } from '../../hooks/useCartPromotions';
 import { recordOfferInterest } from '../../utils/offerInterest';
 import { trackAddToCart } from '../../utils/analytics';
 import Phuljadi from '../festive/Phuljadi';
+import MysteryGiftArt from './MysteryGiftArt';
 
 const inr = (n) => `₹${Math.round(Number(n) || 0).toLocaleString('en-IN')}`;
 const pctOff = (c) => (c.mrp != null && c.price != null && c.mrp > c.price ? Math.round(((c.mrp - c.price) / c.mrp) * 100) : 0);
@@ -142,7 +143,10 @@ const OfferDetailsSection = ({ promotionId, currentProductId }) => {
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-star to-transparent" aria-hidden="true" />
         <div className="grid gap-4 p-4 sm:p-6 md:grid-cols-[220px_1fr] md:gap-7">
           <div className="relative mx-auto aspect-square w-full max-w-[220px] overflow-hidden border border-star/40 bg-white/5 md:mx-0">
-            <img src={combo.bannerImage || reward?.image || first?.slots?.[0]?.options?.[0]?.cards?.[0]?.image || '/assets/logo.webp'} alt="" className="h-full w-full object-cover" onError={(e) => { e.currentTarget.src = '/assets/logo.webp'; }} />
+            {/* a mystery gift shows the wrapped box (or the admin's own reward image), never the katana that unlocks it */}
+            {combo.mysteryGift && !combo.rewardImage
+              ? <MysteryGiftArt />
+              : <img src={(combo.mysteryGift && combo.rewardImage) || combo.bannerImage || reward?.image || first?.slots?.[0]?.options?.[0]?.cards?.[0]?.image || '/assets/logo.webp'} alt="" className="h-full w-full object-cover" onError={(e) => { e.currentTarget.src = '/assets/logo.webp'; }} />}
             <span className="absolute left-0 top-0 bg-gradient-to-r from-star to-[#f0a52a] px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-ink">{benefitOf(combo)}</span>
           </div>
 

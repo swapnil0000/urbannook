@@ -9,6 +9,7 @@ import SectionDecor from './festive/SectionDecor';
 import ComboBuilderSheet from './ComboBuilderSheet';
 import { recordOfferInterest } from '../utils/offerInterest';
 import CouponOffersSection from './offers/CouponOffersSection';
+import MysteryGiftArt from './offers/MysteryGiftArt';
 
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
 
@@ -244,7 +245,8 @@ export const OfferCard = ({ combo, festive, priceLabel }) => {
 const OfferTile = ({ combo }) => {
   const navigate = useNavigate();
   const reward = combo.builder?.combos?.[0]?.reward;
-  const img = combo.bannerImage || combo.items?.[0]?.image || combo.productImage || reward?.image || '/assets/logo.webp';
+  // a mystery gift shows the wrapped box (or the admin's own reward image), never the katana that unlocks it
+  const img = combo.mysteryGift ? combo.rewardImage : combo.bannerImage || combo.items?.[0]?.image || combo.productImage || reward?.image || '/assets/logo.webp';
   // both lines come from Admin: the display title (homeCard subtitle, else the promotion name) and the benefit label
   // (homeCard savings label; "{save}" is resolved server-side from the real engine savings)
   const tagline = combo.tagline || combo.title;
@@ -263,7 +265,9 @@ const OfferTile = ({ combo }) => {
     >
       {/* the artwork fills the media area; its edges fade softly into the card instead of a hard frame */}
       <span className="un-tile-img relative block aspect-square w-full shrink-0 overflow-hidden">
-        <img src={img} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]" onError={(e) => { e.currentTarget.src = '/assets/logo.webp'; }} />
+        {img
+          ? <img src={img} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]" onError={(e) => { e.currentTarget.src = '/assets/logo.webp'; }} />
+          : <MysteryGiftArt className="absolute inset-0" />}
       </span>
       <span className="un-tile-strip flex h-[48px] shrink-0 flex-col items-center justify-center gap-[3px] px-2 text-center">
         <span className="w-full truncate text-[11.5px] font-semibold leading-none text-white sm:text-[12.5px]">{tagline}</span>
