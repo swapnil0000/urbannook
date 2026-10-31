@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useGetProductPromotionsQuery } from '../../store/api/userApi';
 import CartValueGift from './CartValueGift';
 import { cartValueTarget } from '../../utils/offerBadge';
@@ -11,6 +12,9 @@ import { cartValueTarget } from '../../utils/offerBadge';
 // Server-side presentation text: "progressText" talks about the cart ("Add 1
 // more of this item…"), which reads wrong on a page where the trigger is a
 // different product, so it is not shown here.
+// Offers shown before "+N more offers" — keeps the box short under the buy buttons.
+const COLLAPSED = 2;
+
 const iconFor = (p) => (p.displayType === 'free_gift' ? 'fa-gift' : p.displayType === 'free_shipping' ? 'fa-truck-fast' : 'fa-tag');
 
 // `onApply(promotionId)`: the product page adds this product if needed and
@@ -39,9 +43,14 @@ const ProductOffers = ({ productId, className = '', onApply, disabled = false, c
     .filter((p) => p.fullyFunctional !== false)
     .sort((a, b) => (a.displayRank ?? 99) - (b.displayRank ?? 99));
   const gifts = all.filter((p) => p.displayType === 'free_gift' && cartValueTarget(p) != null).slice(0, 1);
-  // 4 = a gift plus a full 3-step ladder (Buy 1 / 2 / 3 katanas) — a 3 cap hid the top step
-  const offers = all.filter((p) => !gifts.includes(p)).slice(0, 4);
+  const [expanded, setExpanded] = useState(false);
+  // 4 = a gift plus a full 3-step ladder (Buy 1 / 2 / 3 katanas) — a 3 cap hid the top step.
+  // Offers the cart can still use first; ones a bigger offer replaced ("Upgraded"/"Covered") last.
+  const offers = all.filter((p) => !gifts.includes(p)).slice(0, 4)
+    .map((p) => ({ p, instead: offerInstead(p, cartPromotions) }))
+    .sort((a, b) => Boolean(a.instead) - Boolean(b.instead));
   if (!offers.length && !gifts.length) return null;
+  const hidden = expanded ? 0 : Math.max(0, offers.length - COLLAPSED);
 
   return (
     <div className={`space-y-3 ${className}`}>
@@ -52,8 +61,7 @@ const ProductOffers = ({ productId, className = '', onApply, disabled = false, c
         <span className="text-brand" aria-hidden="true">✦</span> {offers.length === 1 ? 'Offer on this product' : `${offers.length} offers on this product`}
       </p>
       <ul className="space-y-2">
-        {offers.map((p) => {
-          const instead = offerInstead(p, cartPromotions);
+        {offers.slice(0, offers.length - hidden).map(({ p, instead }) => {
           return (
           <li key={p.id} className={`flex min-w-0 items-center gap-3 rounded-lg bg-paper px-3 py-2.5 ${instead ? 'opacity-70' : ''}`}>
             {/* admin's picture for this surface (promotion.placementImages.pdp); text-only + icon when none */}
@@ -100,6 +108,17 @@ const ProductOffers = ({ productId, className = '', onApply, disabled = false, c
           );
         })}
       </ul>
+      {offers.length > COLLAPSED && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-star/60 bg-paper py-2 text-[12.5px] font-bold text-ink transition-colors hover:border-ink"
+        >
+          {expanded ? 'Show less' : `+${hidden} more ${hidden === 1 ? 'offer' : 'offers'}`}
+          <i className={`fa-solid fa-chevron-down text-[10px] transition-transform ${expanded ? 'rotate-180' : ''}`} aria-hidden="true" />
+        </button>
+      )}
     </section>
     )}
     </div>

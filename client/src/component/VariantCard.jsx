@@ -68,18 +68,18 @@ const VariantCard = ({ productId, productName, variant, index, listId = "product
         )}
       </div>
 
-      <div className={`p-3.5 flex flex-col flex-grow border-t ${festive ? "bg-gradient-to-b from-white to-star/15 border-star/40" : "bg-white border-hair"}`}>
+      <div className={`p-3 md:p-3.5 flex flex-col flex-grow border-t ${festive ? "bg-gradient-to-b from-white to-star/15 border-star/40" : "bg-white border-hair"}`}>
         <SaleTag className="mb-1.5 self-start" />
         {/* Two lines max, ellipsis after; min-h reserves both lines so a
             row of these cards never ends up with mismatched heights. */}
-        <h3 title={variant?.variantName || ""} className="font-archivo font-bold text-ink leading-snug text-left w-full text-[14px] md:text-[16px] line-clamp-2 min-h-[2.75em] break-words mb-1">
+        <h3 title={variant?.variantName || ""} className="font-archivo font-bold text-ink leading-snug text-left w-full text-[13px] md:text-[15px] line-clamp-2 min-h-[2.75em] break-words mb-1">
           {variant?.variantName || ""}
         </h3>
 
         <div className="flex justify-between items-end pt-2 border-t border-hair mt-auto">
           <div className="min-w-0">
             <div className="flex flex-wrap items-baseline gap-x-1.5">
-              <span className="text-base md:text-xl font-extrabold text-ink whitespace-nowrap">
+              <span className="text-[15px] md:text-[17px] font-extrabold text-ink whitespace-nowrap">
                 ₹{price?.toLocaleString()}
               </span>
               {mrp > price && (
@@ -92,8 +92,8 @@ const VariantCard = ({ productId, productName, variant, index, listId = "product
             <StockStatus outOfStock={oos} left={variant?.variantQuantity} className="mt-1" />
           </div>
 
-          <div className="hidden md:flex w-11 h-11 rounded-full border border-hair text-muted items-center justify-center group-hover:bg-ink group-hover:text-paper group-hover:border-ink transition-colors">
-            <i className="fa-solid fa-arrow-right -rotate-45 group-hover:rotate-0 transition-transform duration-500"></i>
+          <div className="hidden md:flex w-9 h-9 shrink-0 rounded-full border border-hair text-muted items-center justify-center group-hover:bg-ink group-hover:text-paper group-hover:border-ink transition-colors">
+            <i className="fa-solid fa-arrow-right text-xs -rotate-45 group-hover:rotate-0 transition-transform duration-500"></i>
           </div>
         </div>
       </div>

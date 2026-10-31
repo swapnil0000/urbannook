@@ -269,6 +269,7 @@ const StickyAddBar = ({ product, onAdd }) => {
         <motion.div
           initial={{ y: 90, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 90, opacity: 0 }}
           transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+          data-sticky-buybar // the floating Help button lifts above this bar while it is shown
           className="md:hidden fixed left-0 right-0 z-30 px-3"
           style={{ bottom: 'calc(env(safe-area-inset-bottom) + 58px)' }}
         >
@@ -276,7 +277,13 @@ const StickyAddBar = ({ product, onAdd }) => {
             <img src={productImg(product)} alt="" className="w-12 h-12 object-cover shrink-0 bg-white/10" onError={onImgErr} />
             <div className="min-w-0 flex-1">
               <p className="text-[12px] font-bold truncate leading-tight">{product.productName}</p>
-              <p className="text-[11px] text-paper/60 leading-tight"><b className="text-paper">{inr(v.variantPrice)}</b> · Free shipping on the pair</p>
+              {/* price + real struck MRP / % off from the variant — no shipping claim (that depends on the live offer) */}
+              <p className="text-[11px] text-paper/60 leading-tight">
+                <b className="text-paper">{inr(v.variantPrice)}</b>
+                {Number(v.variantMrp) > Number(v.variantPrice) && (
+                  <> <s>{inr(v.variantMrp)}</s> · <span className="font-bold text-star">{Math.round((1 - v.variantPrice / v.variantMrp) * 100)}% OFF</span></>
+                )}
+              </p>
             </div>
             <button onClick={handle} className={`un-btn gl-press shrink-0 font-bold text-xs px-5 py-3 ${added ? 'bg-save text-white' : 'bg-brand text-white'}`}>
               {!added && <span className="un-fill bg-brandHi"></span>}

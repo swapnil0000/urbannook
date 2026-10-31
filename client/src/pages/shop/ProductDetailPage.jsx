@@ -35,6 +35,7 @@ import { useCartPromotions } from '../../hooks/useCartPromotions';
 import SaleTag from '../../component/festive/SaleTag';
 import SaleDealBox from '../../component/festive/SaleDealBox';
 import StockStatus from '../../component/StockStatus';
+import ProductQuestions from '../../component/support/ProductQuestions';
 
 const MotionDiv = motion.div;
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
@@ -809,6 +810,9 @@ const ProductDetailPage = () => {
                   decision happens — hidden unless admin's promotion is on. */}
               {!isOutOfStock && <OfferProgress location="product" className="mt-3" fallback={<FreeShippingStrip cartTotal={cartTotal} variant="compact" className="mt-3" />} />}
 
+              {/* questions right by the buy buttons — straight to our WhatsApp, with this product's link */}
+              <ProductQuestions productName={product.productName} variantName={selectedVariant} url={shareUrl} className="mt-3" />
+
               {/* Offers right under the buy buttons — price and variants stay clean
                   up top; the offers popup (OffersPopup) announces them on arrival. */}
               {/* live sale countdown right above the offers it belongs to */}
@@ -1168,6 +1172,7 @@ const ProductDetailPage = () => {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 90, opacity: 0 }}
             transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            data-sticky-buybar // the floating Help button lifts above this bar while it is shown
             className="md:hidden fixed inset-x-0 z-30 bg-paper/95 backdrop-blur border-t border-hair px-4 py-3 flex items-center gap-3"
             style={{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom))' }}
           >
