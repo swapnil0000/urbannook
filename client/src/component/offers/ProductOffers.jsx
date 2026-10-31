@@ -15,13 +15,32 @@ const iconFor = (p) => (p.displayType === 'free_gift' ? 'fa-gift' : p.displayTyp
 
 // `onApply(promotionId)`: the product page adds this product if needed and
 // opens the offer sheet (PromotionUnlockSheet) to add the reward.
-const ProductOffers = ({ productId, className = '', onApply, disabled = false, cartTotal = 0, appliedIds = [] }) => {
+/**
+ * The offer that gives this offer's reward instead, for the current cart: the
+ * cart already qualifies for `p` but has nothing to add for it, because a
+ * bigger step of the same ladder took over (2 LED: "Buy 2" replaces "Buy 1"),
+ * or another ladder's offer already owns the stand (2 wooden + 1 LED — one
+ * offer per product). Only grouped offers count, so an unrelated live offer
+ * (the mystery gift) is never named as the holder. null = nothing in the way.
+ */
+const offerInstead = (p, cartPromotions) => {
+  const live = cartPromotions.find((c) => c.id === p.id);
+  if (!live || !live.qualifying || live.applied || live.rewardTargetPending) return null;
+  const holds = (c) => c.id !== p.id && c.group && c.qualifying && (c.applied || c.rewardTargetPending);
+  const sameLadder = cartPromotions.find((c) => holds(c) && c.group === live.group);
+  if (sameLadder) return { promo: sameLadder, upgrade: true };
+  const other = cartPromotions.find((c) => holds(c) && c.group !== live.group);
+  return other ? { promo: other, upgrade: false } : null;
+};
+
+const ProductOffers = ({ productId, className = '', onApply, disabled = false, cartTotal = 0, appliedIds = [], cartPromotions = [] }) => {
   const { data } = useGetProductPromotionsQuery(productId, { skip: !productId });
   const all = (data?.data?.promotions || [])
     .filter((p) => p.fullyFunctional !== false)
     .sort((a, b) => (a.displayRank ?? 99) - (b.displayRank ?? 99));
   const gifts = all.filter((p) => p.displayType === 'free_gift' && cartValueTarget(p) != null).slice(0, 1);
-  const offers = all.filter((p) => !gifts.includes(p)).slice(0, 3);
+  // 4 = a gift plus a full 3-step ladder (Buy 1 / 2 / 3 katanas) — a 3 cap hid the top step
+  const offers = all.filter((p) => !gifts.includes(p)).slice(0, 4);
   if (!offers.length && !gifts.length) return null;
 
   return (
@@ -33,8 +52,10 @@ const ProductOffers = ({ productId, className = '', onApply, disabled = false, c
         <span className="text-brand" aria-hidden="true">✦</span> {offers.length === 1 ? 'Offer on this product' : `${offers.length} offers on this product`}
       </p>
       <ul className="space-y-2">
-        {offers.map((p) => (
-          <li key={p.id} className="flex min-w-0 items-center gap-3 rounded-lg bg-paper px-3 py-2.5">
+        {offers.map((p) => {
+          const instead = offerInstead(p, cartPromotions);
+          return (
+          <li key={p.id} className={`flex min-w-0 items-center gap-3 rounded-lg bg-paper px-3 py-2.5 ${instead ? 'opacity-70' : ''}`}>
             {/* admin's picture for this surface (promotion.placementImages.pdp); text-only + icon when none */}
             {p.image ? (
               <img src={p.image} alt="" loading="lazy" className="h-12 w-12 shrink-0 rounded-lg object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
@@ -46,15 +67,24 @@ const ProductOffers = ({ productId, className = '', onApply, disabled = false, c
             <div className="min-w-0 flex-1">
               <p className="text-sm font-bold leading-snug text-ink">{p.rewardLabel || p.title}</p>
               {p.cardNote ? <p className="text-[11px] text-muted">{p.cardNote}</p> : p.rewardLabel && p.title && p.title !== p.rewardLabel && <p className="truncate text-[11px] text-muted" title={p.title}>{p.title}</p>}
+              {instead && (
+                <p className="mt-0.5 text-[11px] font-semibold text-brand">
+                  {instead.upgrade
+                    ? <>Your cart unlocked a bigger offer: {instead.promo.title}</>
+                    : <>Your free stand comes from &ldquo;{instead.promo.title}&rdquo; — one stand offer per order</>}
+                </p>
+              )}
             </div>
             {/* No "Applied" state here: the endpoint evaluates as if one of this
                 product were in the cart, so `applied` is true before anything is added. */}
             <div className="flex shrink-0 flex-col items-end gap-1.5">
-              {p.badge && <span className="rounded-md bg-sale/10 px-2 py-0.5 text-[10px] font-extrabold text-sale">{p.badge}</span>}
+              {p.badge && <span className="rounded-md bg-sale/10 px-2 py-0.5 text-[10px] font-extrabold text-sale">{p.badge === '100% OFF' ? 'FREE' : p.badge}</span>}
               {appliedIds.includes(p.id) ? (
                 <span className="inline-flex h-8 items-center gap-1 rounded-lg bg-save/10 px-3 text-xs font-extrabold text-save">
                   <i className="fa-solid fa-check text-[10px]" aria-hidden="true" /> Applied
                 </span>
+              ) : instead ? (
+                <span className="inline-flex h-8 items-center rounded-lg bg-ink/5 px-3 text-xs font-bold text-muted">{instead.upgrade ? 'Upgraded' : 'Covered'}</span>
               ) : onApply && (
                 <button
                   type="button"
@@ -67,7 +97,8 @@ const ProductOffers = ({ productId, className = '', onApply, disabled = false, c
               )}
             </div>
           </li>
-        ))}
+          );
+        })}
       </ul>
     </section>
     )}

@@ -730,8 +730,6 @@ const ProductDetailPage = () => {
               </div>
               {discountPercent > 0 && <p className="text-sm font-semibold text-save mt-1">You save {inr(maxVariantPrice - currentPrice)}</p>}
 
-              {/* Offers before add-to-cart, so shoppers know about them up front */}
-              <ProductOffers productId={productId} className="mt-4" cartTotal={cartTotal} appliedIds={appliedOfferIds} onApply={isOutOfStock ? undefined : handleApplyOffer} disabled={isAdding} />
               {/* festive gift wrap, offered here too — "Go to Checkout" skips the cart drawer where it used to be the only place */}
               {product?.giftWrapEligible && !isOutOfStock && <GiftWrapOffer variant="card" eligible className="mt-3" />}
 
@@ -804,6 +802,10 @@ const ProductDetailPage = () => {
               {/* Free-shipping threshold, right under the CTA where the buy
                   decision happens — hidden unless admin's promotion is on. */}
               {!isOutOfStock && <OfferProgress location="product" className="mt-3" fallback={<FreeShippingStrip cartTotal={cartTotal} variant="compact" className="mt-3" />} />}
+
+              {/* Offers right under the buy buttons — price and variants stay clean
+                  up top; the offers popup (OffersPopup) announces them on arrival. */}
+              <ProductOffers productId={productId} className="mt-4" cartTotal={cartTotal} appliedIds={appliedOfferIds} cartPromotions={cartPromotions} onApply={isOutOfStock ? undefined : handleApplyOffer} disabled={isAdding} />
 
               {/* Coupons (guest list is server-rendered; see entry-server.jsx) */}
               <CouponOffersSection variant="pdp" />

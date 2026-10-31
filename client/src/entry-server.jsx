@@ -41,7 +41,7 @@ function productPage(productId, variantSku) {
   return [
     ['getProductById', productId],
     ['getProductReviews', productId],
-    // Offers block under the price (ProductOffers) — in the HTML, so it doesn't shift the page in.
+    // Offers block under the buy buttons (ProductOffers) — in the HTML, so it doesn't shift the page in.
     ['getProductPromotions', productId],
     // Coupons under the buy buttons (CouponOffersSection variant="pdp"); guest list.
     ['getCouponOffers', 'guest'],

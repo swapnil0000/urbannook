@@ -10,6 +10,8 @@ import RangoliDivider from '../../component/festive/RangoliDivider';
 import { Reveal, Stagger, StaggerItem, Parallax, TextReveal, useInView, motion, AnimatePresence, MotionRoot } from '../../component/motion';
 import { useGetFeaturedProductsQuery, useGetProductsQuery } from '../../store/api/productsApi';
 import { useGetTestimonialsQuery } from '../../store/api/testimonialsApi';
+import { useGetHomeComboOffersQuery } from '../../store/api/userApi';
+import { recordOfferInterest } from '../../utils/offerInterest';
 import { trackViewItemList, trackAddToCart } from '../../utils/analytics';
 
 const onImgErr = (e) => { e.currentTarget.src = '/assets/logo.webp'; };
@@ -385,13 +387,20 @@ const toFeature = (p) => {
   };
 };
 
-const HeroCarousel = ({ products = [], onProduct, onVariant, onShop }) => {
+const HeroCarousel = ({ products = [], offers = [], onProduct, onVariant, onShop }) => {
   // The first few products take turns in the featured slot; the rail below
-  // carries the whole catalogue regardless.
-  const features = useMemo(
-    () => products.slice(0, 4).filter((p) => p?.productId).map(toFeature),
-    [products],
-  );
+  // carries the whole catalogue regardless. Products with a live offer
+  // (GET /promotions/display/home) lead the rotation and carry that offer,
+  // so the first screen sells the deal, not just the product.
+  const features = useMemo(() => {
+    const offerFor = new Map();
+    for (const o of offers) if (o?.primaryProductId && !offerFor.has(o.primaryProductId)) offerFor.set(o.primaryProductId, o);
+    const valid = products.filter((p) => p?.productId);
+    const withOffer = valid.filter((p) => offerFor.has(p.productId));
+    const rest = valid.filter((p) => !offerFor.has(p.productId));
+    return [...withOffer, ...rest].slice(0, Math.max(4, withOffer.length))
+      .map((p) => ({ ...toFeature(p), offer: offerFor.get(p.productId) || null }));
+  }, [products, offers]);
 
   /* The rotation above already covers the first few products, so the strip
      below carries the remainder. On a catalogue too small to have a remainder
@@ -458,9 +467,16 @@ const HeroCarousel = ({ products = [], onProduct, onVariant, onShop }) => {
         <div className="flex-1 flex flex-col md:flex-row items-center gap-7 md:gap-10 px-5 md:px-10 pt-7 md:pt-10">
           {/* copy */}
           <div key={`t-${f.id}`} className="un-in order-2 md:order-1 w-full md:w-[27rem] lg:w-[30rem] md:shrink-0">
-            <p className="gl-lbl text-brand mb-3">
-              Drop {String(idx + 1).padStart(2, '0')} · Made to order
-            </p>
+            {f.offer ? (
+              <p className="mb-3 inline-flex max-w-full items-center gap-2 bg-brand px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-white">
+                <i className={`fa-solid ${f.offer.mysteryGift || f.offer.freeGift ? 'fa-gift' : 'fa-tag'} text-[10px]`} aria-hidden="true" />
+                <span className="truncate">Diwali offer · {f.offer.benefit || f.offer.title}</span>
+              </p>
+            ) : (
+              <p className="gl-lbl text-brand mb-3">
+                Drop {String(idx + 1).padStart(2, '0')} · Made to order
+              </p>
+            )}
             {/* The rotating featured product is a heading of its own, not the page's H1:
                 the H1 (below, visually hidden) says what the whole store is. */}
             <h2 className="font-archivo text-[2.2rem] sm:text-5xl lg:text-6xl font-extrabold leading-[0.95] tracking-tight break-words">
@@ -483,8 +499,11 @@ const HeroCarousel = ({ products = [], onProduct, onVariant, onShop }) => {
             </div>
 
             <div className="mt-6 flex flex-wrap gap-3">
-              <button onClick={() => onProduct(f.id)} className="un-btn gl-press bg-brand text-white font-bold text-sm px-7 py-3.5">
-                <span className="un-fill bg-brandHi"></span>Shop this drop
+              <button
+                onClick={() => { if (f.offer) recordOfferInterest(f.offer.id, f.id); onProduct(f.id); }}
+                className="un-btn gl-press bg-brand text-white font-bold text-sm px-7 py-3.5"
+              >
+                <span className="un-fill bg-brandHi"></span>{f.offer ? 'Get the offer' : 'Shop this drop'}
               </button>
               <button onClick={onShop} className="un-btn gl-press border border-white/35 text-white font-bold text-sm px-7 py-3.5">
                 <span className="un-fill bg-white/10"></span>Shop all
@@ -649,6 +668,8 @@ const HomePage = () => {
   const { data: featRes } = useGetFeaturedProductsQuery({ limit: 1 }, { refetchOnMountOrArgChange: false, refetchOnFocus: false, refetchOnReconnect: false });
   const { data: prodRes, isLoading } = useGetProductsQuery({ page: 1, limit: 24 });
   const products = useMemo(() => productList(prodRes), [prodRes]);
+  const { data: homeOffersRes } = useGetHomeComboOffersQuery();
+  const homeOffers = homeOffersRes?.data?.combos || [];
 
   /* products?featured=true currently answers "No Published Product found"
      even though a product does carry the tag, so this cannot be the only
@@ -741,6 +762,7 @@ const HomePage = () => {
       {/* ══ HERO — the drop ══ */}
       <HeroCarousel
         products={products}
+        offers={homeOffers}
         onProduct={(id) => navigate(`/products/${id}`)}
         /* a variant tile goes straight to that variant's page, not the list */
         onVariant={(id, sku) => navigate(sku ? `/product/${id}/${sku}` : `/products/${id}`)}

@@ -51,10 +51,11 @@ const VariantCard = ({ productId, productName, variant, index, listId = "product
             Out of Stock
           </span>
         )}
-        {/* Product's best live offer (ProductVariantsPage → /promotions/display/product) */}
+        {/* Product's best live offer as a small corner chip — the full wording
+            is in the offer strip above the grid (ProductVariantsPage). */}
         {offerBadge && !oos && (
-          <span title={offerBadge} className="absolute bottom-2 left-2 right-2 z-10 flex items-center gap-1.5 px-2 py-1 bg-brand text-white text-[10px] md:text-[11px] font-bold shadow">
-            <i className="fa-solid fa-tag text-[9px] shrink-0" aria-hidden="true" /> <span className="truncate">{offerBadge}</span>
+          <span title={offerBadge.label} className="absolute top-2 left-2 z-10 inline-flex items-center gap-1 px-1.5 py-1 bg-brand text-white text-[9.5px] md:text-[10.5px] font-extrabold uppercase leading-none tracking-wide shadow">
+            <i className={`fa-solid ${offerBadge.gift ? "fa-gift" : "fa-tag"} text-[9px]`} aria-hidden="true" /> {offerBadge.chip}
           </span>
         )}
       </div>
