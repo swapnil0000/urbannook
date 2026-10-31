@@ -5,17 +5,19 @@ const pad = (n) => String(n).padStart(2, '0');
 
 // Time left until the campaign's configured end, on the SERVER's clock
 // (the provider's skew-corrected nowMs). Ticks every 30s, every second only
-// in the final hour — no needless re-renders.
-export function useCountdown() {
+// in the final hour — no needless re-renders. `seconds: true` ticks every
+// second throughout, for a timer that shows a seconds digit (the sale bar).
+export function useCountdown({ seconds = false } = {}) {
   const { endsAtMs, nowMs, isPreview } = useSiteCampaign();
   const [, force] = useState(0);
   const left = endsAtMs ? Math.max(0, endsAtMs - nowMs()) : 0;
+  const everySecond = seconds || left < 3600e3;
 
   useEffect(() => {
     if (!endsAtMs || left <= 0) return undefined;
-    const t = setInterval(() => force((n) => n + 1), left < 3600e3 ? 1000 : 30000);
+    const t = setInterval(() => force((n) => n + 1), everySecond ? 1000 : 30000);
     return () => clearInterval(t);
-  }, [endsAtMs, left <= 0, left < 3600e3]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [endsAtMs, left <= 0, everySecond]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const s = Math.floor(left / 1000);
   return {

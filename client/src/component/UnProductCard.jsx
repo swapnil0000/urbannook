@@ -1,5 +1,8 @@
 import { Link } from 'react-router-dom';
 import WishlistButton from './WishlistButton';
+import SaleTag from './festive/SaleTag';
+import StockStatus from './StockStatus';
+import { allActiveVariantsOOS } from '../utils/variantStock';
 import { trackSelectItem } from '../utils/analytics';
 
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
@@ -71,26 +74,27 @@ const UnProductCard = ({
         )}
         <img src={productImg(p)} alt={p.productName} loading="lazy" className="gl-img w-full h-full object-cover" onError={(e) => { e.currentTarget.src = '/assets/logo.webp'; }} />
         {img2 && <img src={img2} alt="" loading="lazy" decoding="async" className="gl-img2 absolute inset-0 w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
+        {/* % off as a pill on the photo — the first thing the eye lands on */}
+        {mrp > price && (
+          <span className="absolute bottom-2 left-2 z-10 rounded-full bg-sale px-2 py-0.5 text-[10.5px] font-extrabold text-white shadow-sm md:text-[11.5px]">
+            {Math.round(((mrp - price) / mrp) * 100)}% OFF
+          </span>
+        )}
       </div>
       <div className="p-3.5 flex flex-col flex-1 min-w-0">
+        <SaleTag className="mb-1.5 self-start" />
         {/* Two lines, then an ellipsis; min-h reserves both lines so a
             one-line name keeps the price at the same Y as its neighbours. */}
         <h3 title={p.productName} className="font-bold text-ink text-[13px] md:text-[14px] leading-snug line-clamp-2 min-h-[2.75em] break-words">{p.productName}</h3>
-        {/* Price, then the % off / struck-MRP stack sitting right next to it
-            (gap-1.5, no space-between spread) — smaller text on the stack.
-            Sits right under the title (mt-1.5, not mt-auto) so it never gets
-            stretched away from it when a taller sibling card in the same
-            row forces this card to grow — that used to leave a big dead
-            gap between title and price on shorter cards. */}
-        <div className="mt-1.5 flex items-center gap-1.5">
-          <span className="text-[15px] text-ink font-extrabold">{inr(price)}</span>
-          {mrp > price && (
-            <div className="flex flex-col leading-tight">
-              <span className="gl-lbl text-[8px] text-sale">{Math.round(((mrp - price) / mrp) * 100)}% off</span>
-              <span className="text-[10px] text-sale line-through">{inr(mrp)}</span>
-            </div>
-          )}
+        {/* Price with the struck MRP right next to it. Sits right under the
+            title (mt-1.5, not mt-auto) so it never gets stretched away from
+            it when a taller sibling card in the same row forces this card to
+            grow — that used to leave a big dead gap between title and price. */}
+        <div className="mt-1.5 flex flex-wrap items-baseline gap-x-1.5">
+          <span className="text-[15px] md:text-[17px] text-ink font-extrabold">{inr(price)}</span>
+          {mrp > price && <span className="text-[11px] md:text-xs text-faint line-through">{inr(mrp)}</span>}
         </div>
+        <StockStatus outOfStock={allActiveVariantsOOS(p)} className="mt-1.5" />
       </div>
     </Link>
   );
