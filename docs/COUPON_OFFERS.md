@@ -32,3 +32,24 @@ The cart's existing `POST /coupon/list` (the "available coupons" picker) still r
 public, non-hidden coupons, so those codes are discoverable there. Hiding them behind verification
 would change checkout behaviour and needs a product decision (alternatively mark a coupon "hidden"
 in admin).
+
+---
+
+# Katana ladder offers (staging seed)
+
+| Katana in cart | Free reward | Promotions (all `free_product`, exact counts, disjoint) |
+|---|---|---|
+| exactly 1 (wooden or LED) | Mystery Gift worth ₹300 (backed by Friends Monica's Door Key Holder — stand-in, swap later) | `Mystery Gift Worth ₹300 — Single Katana` |
+| exactly 2 | Dual Layer Katana Display Stand (`ANIKSTDBLS`) | 2 Wooden / 2 LED / Wooden + LED |
+| exactly 3 | Triple Layer Katana Display Stand (`ANIKSTTRIS`) | 3 Wooden / 3 LED / 3 Mixed |
+
+* 4+ katanas, or lamp/pen-stand-only carts, get none of these. Other products are not affected.
+* "Twin Blades Bonus" and "Samurai Starter Perk" were deactivated on staging so they never stack with the ladder.
+* The gift/stand lines are ₹0 order items created at payment (existing `free_product` behaviour); the cart
+  shows a "Free gift added" banner (`PromotionBanner`).
+* Home: three `homeCard.cardKind = "reward"` cards (new field, both repos). `ctaAction: "choose"` opens a small
+  picker from `homeCard.ctaChoices` (Wooden / LED katana pages). The admin offer-card editor has no inputs for
+  these two new fields yet — they are seeded; editing them needs a small admin UI addition.
+* The add-to-cart bottom sheet (`PromotionUnlockSheet`) now lists up to 3 offers the add put within reach, one
+  scrollable row each (e.g. 1 wooden → "add a wooden" and "add an LED").
+* Re-seed / roll back: scratchpad `seed-ladder.mjs` (dry-run default, staging-only guard, backup written first).

@@ -1,15 +1,22 @@
-import { useEffect, lazy, Suspense, useState } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-
 import { useSelector } from "react-redux";
+<<<<<<< HEAD
 import { useOrderHistoryQuery, useGetLoyaltySummaryQuery } from "../../store/api/userApi";
 import { ComponentLoader } from "../../component/layout/LoadingSpinner";
+=======
+import { useGetOrderSummariesQuery } from "../../store/api/userApi";
+>>>>>>> c57fe1da45e05a24ed3279151ad6b57ecee8f4ac
 import { useUI } from "../../hooks/useRedux";
-import { getApiUrl } from "../../config/appUrls";
-import { resolveVariantTitle } from "../../utils/variantTitle";
+import { OrderSummaryCard } from "../../component/orders/OrderPage";
 
-// Lazy load heavy components
-const OrderTracker = lazy(() => import("../../component/OrderTracker"));
+const ListSkeleton = () => (
+  <div className="space-y-3 animate-pulse" role="status" aria-label="Loading your orders">
+    {[0, 1, 2].map((i) => (
+      <div key={i} className="uo-card h-40" />
+    ))}
+  </div>
+);
 
 // Per-order UnCash summary: balance before, used, earned (or pending until
 // delivery), taken back / returned after a return, and the balance this order
@@ -68,200 +75,54 @@ const MyOrdersPage = () => {
   const loyaltyEnabled = !!loyaltyData?.data?.isEnabled;
   const loyaltyEarnPercent = Number(loyaltyData?.data?.earnPercent) || 0;
   const navigate = useNavigate();
-  const { isAuthenticated, user } = useSelector((state) => state.auth);
+  const { isAuthenticated } = useSelector((state) => state.auth);
   const authToken = useSelector((state) => state.auth?.token);
   const { openLoginModal, showNotification } = useUI();
-  const { data: orderResponse, isLoading, error } = useOrderHistoryQuery(user?.email);
-  const [generatingOrderId, setGeneratingOrderId] = useState(null);
-  const [expandedOrderId, setExpandedOrderId] = useState(null);
-  const [activeSubSection, setActiveSubSection] = useState(null); // 'tracking' or 'shipping'
+  const loggedIn = isAuthenticated || !!authToken || !!localStorage.getItem("authToken");
 
-  const orders = orderResponse?.data?.orders || [];
+  // Light rows only (no tracking history); each order's full picture loads on its own details page.
+  const { data, isLoading, isError, refetch } = useGetOrderSummariesQuery(undefined, {
+    skip: !loggedIn,
+    refetchOnMountOrArgChange: true,
+  });
+  const orders = data?.data?.orders || [];
 
   useEffect(() => {
     window.scrollTo(0, 0);
-
-    const hasToken = !!localStorage.getItem("authToken");
-    const isLoggedIn = isAuthenticated || hasToken;
-
-    if (!isLoggedIn) {
+    if (!loggedIn) {
       showNotification("Please login to view your orders", "error");
       openLoginModal();
       navigate("/");
     }
-  }, [isAuthenticated, navigate, openLoginModal, showNotification]);
-  useEffect(() => {
-    setActiveSubSection(null);
-  }, [expandedOrderId]);
-
-  const toggleOrder = (orderId) => {
-    setExpandedOrderId(prev => prev === orderId ? null : orderId);
-  };
-
-  const toggleSubSection = (section) => {
-    setActiveSubSection(prev => prev === section ? null : section);
-  };
-
-  const copyToClipboard = (text, message = "Order ID copied to clipboard") => {
-    navigator.clipboard.writeText(text);
-    showNotification(message, "info");
-  };
-
-  const copyAWB = (awb) => {
-    navigator.clipboard.writeText(awb);
-    showNotification("AWB number copied", "info");
-  };
-
-  const handleGenerateInvoice = async (orderId, razorpayOrderId) => {
-    try {
-      setGeneratingOrderId(orderId);
-      
-      let token = authToken || localStorage.getItem('authToken');
-
-      const response = await fetch(
-        `${getApiUrl()}/user/order/generate-invoice`,
-        {
-          method: 'POST',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token && { 'Authorization': `Bearer ${token}` }),
-          },
-          body: JSON.stringify({ razorpayOrderId }),
-        }
-      );
-
-      const responseData = await response.json();
-
-      if (!response.ok || !responseData.success) {
-        throw new Error(responseData.message || 'Failed to generate invoice');
-      }
-
-      const s3Url = responseData.data.url;
-      window.open(s3Url, '_blank');
-
-      showNotification("Invoice downloaded successfully", "success");
-    } catch (error) {
-      console.error("Invoice generation error:", error);
-      const errorMsg = error?.message || "Failed to generate invoice";
-      showNotification(errorMsg, "error");
-    } finally {
-      setGeneratingOrderId(null);
-    }
-  };
-
-  const getStatusConfig = (status) => {
-    const s = status?.toUpperCase();
-    switch (s) {
-      case "DELIVERED":
-        return {
-          text: "text-emerald-600",
-          bg: "bg-emerald-100",
-          border: "border-emerald-200",
-          icon: "fa-check-circle",
-          label: "Delivered",
-        };
-      case "SHIPPED":
-        return {
-          text: "text-blue-600",
-          bg: "bg-blue-100",
-          border: "border-blue-200",
-          icon: "fa-truck-fast",
-          label: "In Transit",
-        };
-      case "CREATED":
-      case "PROCESSING":
-        return {
-          text: "text-brand",
-          bg: "bg-brand/10",
-          border: "border-brand/20",
-          icon: "fa-box-open",
-          label: "Processing",
-        };
-      case "CANCELLED":
-        return {
-          text: "text-red-600",
-          bg: "bg-red-100",
-          border: "border-red-200",
-          icon: "fa-ban",
-          label: "Cancelled",
-        };
-      default:
-        return {
-          text: "text-gray-600",
-          bg: "bg-gray-100",
-          border: "border-gray-200",
-          icon: "fa-circle-info",
-          label: status,
-        };
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="bg-paper min-h-screen flex items-center justify-center">
-        <div className="w-12 h-12 border-2 border-brand border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-paper min-h-screen flex items-center justify-center text-ink">
-        <div className="text-center">
-          <h2 className="text-2xl mb-4 font-archivo font-extrabold">Failed to load orders</h2>
-          <p className="text-muted text-sm">Please try again later</p>
-        </div>
-      </div>
-    );
-  }
+  }, [loggedIn, navigate, openLoginModal, showNotification]);
 
   return (
-    <div className="bg-paper min-h-screen font-inter text-ink selection:bg-brand selection:text-white">
-      {/* --- AMBIENT BACKGROUND --- */}
-      <div className="fixed top-0 left-0 w-full h-[600px] bg-gradient-to-b from-surface to-paper pointer-events-none opacity-60"></div>
-      <div className="fixed -bottom-40 -left-40 w-[600px] h-[600px] bg-brand rounded-full blur-[200px] opacity-[0.04] pointer-events-none"></div>
-
-      <main className="max-w-5xl mx-auto pt-28 pb-20 px-4 md:px-8 relative z-10">
-        {/* --- HEADER --- */}
-        <div className="mb-10 md:mb-16 flex flex-col md:flex-row md:items-end justify-between gap-4">
+    <main className="uo min-h-screen font-inter">
+      <div className="max-w-3xl mx-auto px-3 sm:px-6 pt-5 sm:pt-8 pb-28 md:pb-16">
+        <div className="mb-5 flex items-end justify-between gap-3">
           <div>
-            <div className="flex items-center gap-3 mb-2">
-              <span className="h-[1px] w-8 bg-brand"></span>
-              <span className="gl-lbl text-brand text-[10px]">
-                History
-              </span>
-            </div>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-archivo font-extrabold text-ink leading-[1.05] tracking-tight">
-              Order <span className="text-brand">Archive.</span>
-            </h1>
+            <p className="gl-lbl text-brand mb-1">History</p>
+            <h1 className="font-archivo font-extrabold text-3xl sm:text-4xl text-ink leading-tight">Your orders</h1>
           </div>
-
-          <div className="px-5 py-2 rounded-full border border-hair bg-surface flex items-center gap-3">
-            <span className="text-muted text-xs uppercase tracking-wider">
-              Total Orders
-            </span>
-            <span className="text-brand font-bold font-archivo text-xl">
-              {orderResponse?.data?.totalOrders || orders.length}
-            </span>
-          </div>
+          {orders.length > 0 && <p className="text-sm text-muted pb-1">{orders.length} {orders.length === 1 ? "order" : "orders"}</p>}
         </div>
 
-        {/* --- ORDERS LIST --- */}
-        {orders.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 bg-surface rounded-[3rem] border border-hair shadow-sm">
-            <div className="w-24 h-24 bg-brand/10 rounded-full flex items-center justify-center mb-6 border border-brand/20">
-              <i className="fa-solid fa-box-open text-brand text-3xl"></i>
-            </div>
-            <h3 className="text-2xl font-archivo text-ink mb-2">Your collection is empty.</h3>
-            <button
-              onClick={() => navigate("/products")}
-              className="px-8 py-3 bg-brand text-white rounded-full font-bold uppercase tracking-widest text-[10px] hover:bg-brandHi hover:scale-105 transition-all duration-300 shadow-lg"
-            >
-              Browse Collection
-            </button>
+        {isLoading ? (
+          <ListSkeleton />
+        ) : isError ? (
+          <div className="uo-card text-center" style={{ padding: 32 }}>
+            <h2 className="font-archivo font-extrabold text-xl">We couldn&apos;t load your orders</h2>
+            <p className="mt-2 text-sm text-muted">Please try again. Your orders are safe.</p>
+            <button type="button" onClick={refetch} className="uo-btn uo-btn-primary mt-5">Try again</button>
+          </div>
+        ) : orders.length === 0 ? (
+          <div className="uo-card text-center" style={{ padding: 40 }}>
+            <h2 className="font-archivo font-extrabold text-xl">No orders yet</h2>
+            <p className="mt-2 text-sm text-muted">When you place an order, you&apos;ll track it here.</p>
+            <button type="button" onClick={() => navigate("/products")} className="uo-btn uo-btn-primary mt-5">Browse products</button>
           </div>
         ) : (
+<<<<<<< HEAD
           <div className="space-y-4">
             {orders.map((order) => {
               const statusConfig = getStatusConfig(order.status);
@@ -468,10 +329,16 @@ const MyOrdersPage = () => {
                 </div>
               );
             })}
+=======
+          <div className="space-y-3">
+            {orders.map((o) => (
+              <OrderSummaryCard key={o.orderId} order={o} />
+            ))}
+>>>>>>> c57fe1da45e05a24ed3279151ad6b57ecee8f4ac
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </main>
   );
 };
 

@@ -392,7 +392,7 @@ const getCartService = async ({ userId }) => {
 // server-side if the offer isn't currently active — the toggle can only ever
 // reflect real, currently-chargeable state, never a stale/guessed one.
 // Turning it OFF is always allowed regardless of offer state.
-const GIFT_NOTE_OPTIONS = ["birthday", "rakhi", "none"];
+const GIFT_NOTE_OPTIONS = ["diwali", "bhai_dooj", "birthday", "rakhi", "none"];
 
 const toggleGiftWrapService = async ({ userId, selected, noteOptions }) => {
   if (!userId) throw new AuthenticationError("Unauthorized");

@@ -37,6 +37,14 @@ const orderSchema = new mongoose.Schema(
           // admin/order views can tell a granted-free item apart from a
           // paid one at a glance. Absent/false for every pre-existing order.
           isPromotionalGift: { type: Boolean, default: false },
+          // Explicit item identity: a free gift the customer CLAIMED vs a product they PAID for (the same
+          // SKU can be both, on separate lines). `originalUnitPrice` is the list price at purchase so
+          // discounts / free gifts can be audited and refunded correctly; `giftPromotionId` +
+          // `giftEntitlementKey` tie a gift to the promotion entitlement that granted it.
+          lineType: { type: String, enum: ["PAID", "FREE_GIFT"], default: "PAID" },
+          originalUnitPrice: { type: Number },
+          giftPromotionId: { type: String },
+          giftEntitlementKey: { type: String },
         },
       },
     ],
@@ -45,6 +53,23 @@ const orderSchema = new mongoose.Schema(
     // what fired without recomputing the engine against since-changed
     // promotion config. Empty array for every order that predates this or
     // that only used the legacy offers/cart_rule system.
+    // Free products granted by promotions (the exact product id + SKU to pack and ship), so
+    // fulfilment does not have to infer them from the ₹0 lines. Empty when none.
+    promotionalGifts: {
+      type: [
+        {
+          _id: false,
+          productId: String,
+          variantSku: { type: String, default: "" },
+          productName: String,
+          selectedVariant: String,
+          quantity: { type: Number, default: 1 },
+          promotionId: String,
+          promotionName: String,
+        },
+      ],
+      default: [],
+    },
     appliedPromotions: {
       type: [
         {
@@ -178,6 +203,8 @@ const orderSchema = new mongoose.Schema(
     payment: {
       razorpayOrderId: String,
       razorpayPaymentId: String,
+      // Set only from a captured gateway payment; never client/shipping input.
+      guestClaimContact: { type: String },
       razorpaySignature: String,
       errorCode: String,
       errorDescription: String,
@@ -253,6 +280,10 @@ const orderSchema = new mongoose.Schema(
       email: { type: String, default: null },
       mobile: { type: String, default: null },
     },
+    guestAccountClaim: {
+      previousUserId: String,
+      claimedAt: Date,
+    },
     metaTracking: {
       fbp: { type: String, default: null },
       fbc: { type: String, default: null },
@@ -281,6 +312,7 @@ orderSchema.index({ status: 1 });
 orderSchema.index({ userId: 1, createdAt: -1 }); // Compound index for user order history
 orderSchema.index({ "payment.razorpayOrderId": 1 });
 orderSchema.index({ "payment.razorpayPaymentId": 1 });
+orderSchema.index({ "payment.guestClaimContact": 1 }, { sparse: true });
 orderSchema.index({ createdAt: -1 });
 
 const Order = mongoose.model("Order", orderSchema);

@@ -71,6 +71,7 @@ async function buildPublicCampaign(campaign, now, { preview = false } = {}) {
     ...(campaign.messages || []).map((m) => m.linkedPromotionId),
     ...(campaign.sections || []).map((s) => s.linkedPromotionId),
     campaign.strip?.linkedPromotionId,
+    campaign.phuljadi?.enabled ? campaign.phuljadi.promotionId : "",
   ].filter((id) => id && mongoose.isValidObjectId(id)))];
 
   const liveLinked = linkedIds.length
@@ -114,6 +115,17 @@ async function buildPublicCampaign(campaign, now, { preview = false } = {}) {
     }
   }
 
+  // Phuljadi: only while its own promotion is live; otherwise the normal bar returns.
+  const ph = campaign.phuljadi;
+  const phuljadi = ph?.enabled === true && ph.promotionId && promoOk(ph.promotionId)
+    ? {
+        promotionId: String(ph.promotionId),
+        intensity: ["low", "medium", "high"].includes(ph.intensity) ? ph.intensity : "medium",
+        showOnMobile: ph.showOnMobile !== false,
+        locations: { cart: ph.locations?.cart !== false, miniCart: ph.locations?.miniCart !== false, product: ph.locations?.product !== false },
+      }
+    : null;
+
   const stripText = campaign.strip?.text && promoOk(campaign.strip.linkedPromotionId) ? campaign.strip.text : "";
 
   return {
@@ -127,6 +139,7 @@ async function buildPublicCampaign(campaign, now, { preview = false } = {}) {
     mobileEffects: campaign.mobileEffects === true,
     countdownLabel: campaign.countdownLabel || "Festive offers end in",
     stripText,
+    phuljadi,
     sections,
     messages,
     preview,

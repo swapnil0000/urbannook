@@ -192,6 +192,8 @@ export function useSiteCampaign() {
     nowMs,
     endsAtMs,
     countdownLabel: campaign?.countdownLabel || 'Festive offers end in',
+    // Phuljadi progress animation config (null unless enabled, live and not on a money page)
+    phuljadi: active && !suppressed ? campaign.phuljadi || null : null,
     stripText: campaign?.stripText || '',
     sections: active ? campaign.sections || [] : [],
     // Festive ticker messages never appear on checkout/payment pages.

@@ -17,6 +17,33 @@
 
 ## 0. Rules for anyone changing this system (humans and AI agents)
 
+### Account order history and verified guest claims
+
+Order history uses the authenticated `userId` only; a supplied email is ignored.
+Checkout email changes therefore cannot hide an account's own orders. The client
+keys its history cache by account ID (email fallback for older login sessions),
+skips unauthenticated fetches, and refetches when the page opens; cache TTLs do not change.
+
+When the captured-payment handler atomically marks a guest order PAID, it also
+stores normalized gateway `payment.contact` as `payment.guestClaimContact`, only
+for a captured payment with the matching Razorpay order ID. The field has a sparse
+index and is never populated from request-body or delivery-recipient phone numbers.
+On an authenticated history request, the server can claim still-unlinked `guest_`
+orders with this contact for an account with a matching WhatsApp `verifiedMobile`.
+Duplicate-phone identities, suspended/unverified accounts, already-owned orders,
+and orders without captured-payment evidence are excluded. Captured orders may
+also be confirmed, processing, shipped, delivered or cancelled by the first login.
+
+Claiming atomically changes only ownership plus timestamps/audit metadata;
+`guestAccountClaim.previousUserId` and `claimedAt` preserve its provenance.
+Order email, guest flag, prices, invoices, stock and fulfilment remain unchanged;
+no payment or notification side effects are replayed. Failed claims do not prevent
+already-owned orders from loading. Login before payment is supported by retrying
+on the next history request. Existing guest email-account creation is unchanged.
+Older orphan orders without the new gateway-contact field require individual
+support verification; there is no automatic historical backfill or account merge.
+Deploy through the existing reviewed-main/Jenkins flow; no secrets or TTL changes.
+
 ### Promotion display and checkout
 
 Admin writes promotions to the shared `promotions` collection. The storefront
@@ -161,7 +188,14 @@ There is **no server rendering at request time** and no extra process on the pro
    `/products`, `/category/<slug>`, `/product/<id>`, `/product/<id>/<sku>`, `/blog`, `/blog/<slug>` (published posts
    from Admin → Blog), static pages and `__404`.
    It also writes `sitemap.xml` (only pages that rendered; non-indexable categories left out) and
-   `llms.txt`. It never fails the build: a page that can't render, or the whole step when the API is
+   `llms.txt`. The sitemap lists product pages and, for products whose variants are different designs
+   (categories Anime and Lamp: one katana per character, one lamp per car), each variant page
+   `/product/<id>/<sku>` too — those are canonical to themselves; colour variants (Decor) stay canonical to
+   `/product/<id>` (`DESIGN_CATEGORIES` in `ssg.mjs` = `VARIANT_NOUN` in `ProductDetailPage.jsx`).
+   `/category/<slug>` covers the product categories and the collection pages the API builds from variants
+   (`server/src/utils/category.util.js` → `buildCollections`, franchise table in `series.util.js`):
+   `anime-katana` and one page per franchise (`demon-slayer`, `one-piece`, `naruto`, … `video-game-swords`);
+   under 3 items they render but are noindex and stay out of the sitemap. It never fails the build: a page that can't render, or the whole step when the API is
    down, falls back to the SPA shell.
 2. `jenkins/scripts/upload-client.sh` syncs `dist-prerender/ssg/` → `s3://urbannook-prod-frontend/ssg/`
    with `--delete`, `text/html`, `no-cache` (same rule as `index.html`). An empty folder (API down, or a
@@ -170,8 +204,9 @@ There is **no server rendering at request time** and no extra process on the pro
 3. The Worker (`infra/cloudflare/urbannook-s3-proxy-prod.js`, `resolvePage`) for a page URL (no file
    extension): `ssg/<path>/index.html` → older `product/*` page → SPA `index.html` for any known app route
    (checkout, account, a product added after the last build…) → otherwise `ssg/__404/index.html` with a
-   real **HTTP 404**. It also **301**s `/products/<id>` → `/product/<id>`, trailing slashes → no slash, and old policy
-   URLs (`/terms` → `/terms-conditions`; `/cancellation-refund[-policy]`, `/shipping-policy` → `/return-policy`).
+   real **HTTP 404**. It serves `/products/<id>` (the variant chooser, canonical to `/product/<id>`) and **301**s
+   trailing slashes → no slash, `/product` → `/products`, and old policy URLs (`/terms` → `/terms-conditions`;
+   `/cancellation-refund[-policy]`, `/shipping-policy` → `/return-policy`).
    `workers_dev = false`: the site is no longer reachable on `*.workers.dev`.
 4. The browser hydrates the HTML (`client/src/main.jsx`, `window.__SSR__` + `__PRELOADED_STATE__`), so
    it doesn't fetch that page's data again.
@@ -179,6 +214,12 @@ There is **no server rendering at request time** and no extra process on the pro
 Freshness: rendered pages are as fresh as the last client build (deploy or nightly 21:30 IST). Prices and
 stock in the page update on hydration from the live API, so shoppers always see live values; crawlers see
 the build-time values. `client/server.mjs` (runtime SSR) is for local preview only (`npm run dev:ssr`).
+
+Browser-side caching (`client/public/sw.js`, production only): hashed build files are cache-first;
+images from `assets-prod.urbannook.in` are stale-while-revalidate (last 60 kept). The image cache needs
+the CORS header the assets Worker sends (`infra/cloudflare/urbannook-assets-proxy-prod.js`,
+`Access-Control-Allow-Origin: *`); the old CloudFront image host has none and isn't cached. HTML and API
+responses are never intercepted.
 
 ---
 

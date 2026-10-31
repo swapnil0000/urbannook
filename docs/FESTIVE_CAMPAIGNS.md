@@ -25,3 +25,161 @@ sparkles, fireworks canvas, rangoli, countdown, section decor, gifting section),
 `component/ComboOfferSection.jsx` (offers zone, 4:5 media).
 Colors are site tokens only (`--gl-*`); there is no festive-only palette.
 Checkout/payment pages never get decorations.
+
+## Phuljadi progress animation
+
+A sparkler-style progress bar that replaces the plain progress bar (`FreeShippingStrip`) in the cart drawer,
+mini cart and product page **while a campaign is live**. Admin → Operations Hub → Festive → campaign →
+*Phuljadi progress animation*: enable, pick the **promotion** it represents, intensity (low/medium/high),
+locations (cart drawer / mini cart / product pages) and phone visibility. Opt-in (off by default).
+
+* **Data:** `POST /promotions/display/cart` now returns `progress` and `rewardLabel` on every promotion entry
+  (`promotionPresentation.service.js → buildPromotionProgress`). The Phuljadi asks for its promotion via
+  `previewPromotionIds`, so it also works with an empty cart. `progress.complete` is the real engine result
+  (`qualifying`); the numbers never unlock anything by themselves.
+  * amount (`cartSubtotal >=`) → continuous fill; quantity (product / product list / category / cart quantity)
+    → one segment per required item (≤ 12); several conditions → one segment per tracked condition.
+  * Only matching products count. If the quantities are met but another condition fails (e.g. "exactly 2"
+    with 3 in the cart) it caps at 98% and shows "adjust your cart" instead of falsely completing.
+  * `noun` ("Katana") is looked up from the condition's product names for the promotion the Phuljadi asks for.
+* **Celebration:** one SVG starburst + "Free … Unlocked!" only on an incomplete → complete change while the
+  component is mounted (not on load/refresh). Reduced-motion users get no sparks or burst.
+* **Expiry / disable:** the public campaign payload has `phuljadi: null` when the campaign is off or expired,
+  the switch is off, or the chosen promotion is no longer live — the original bar is shown again automatically.
+  Checkout/payment pages keep the original bar.
+* Files: `client/src/component/festive/{Phuljadi,OfferProgress}.jsx`, `siteCampaign` model/controller in both repos,
+  admin `FestiveCampaigns.jsx`.
+
+## Offer tile → variants page → offer sheet → checkout reminder
+
+* **Tile click:** a homepage offer tile opens the plain variants page `/products/<primaryProductId>` (only that
+  product's variants — no offer banner, no other products) and records the shopper's interest in `localStorage`
+  (7 days). `primaryProductId` = admin's *Primary product* (Admin → Promotions → home card), else the first product
+  in the offer's condition (both come from `GET /promotions/display/home`).
+* **After adding to the cart:** the existing offer bottom sheet (`PromotionUnlockSheet`) opens by itself when the add
+  puts the shopper one step from an offer, showing the offer and the eligible products to add.
+* **Checkout reminder:** on `/checkout` (`OfferCheckoutReminder`), only if the shopper opened that offer **and added
+  at least one of its products**, the offer is still live, and no combination of it is complete yet, the combo sheet
+  opens in *reminder* mode: items already in the cart fill their slots (locked, never added twice) and only the
+  missing ones are asked for. "No thanks — continue without offer" (or ×, Esc, backdrop) dismisses it for the session;
+  it never blocks or changes payment. Dismissals reset when the cart is emptied (order done).
+* Completion uses the engine for every combination of the offer, not just the tile's own promotion.
+* `OfferDetailsSection` (banner + all eligible products with Add to Cart) still exists but is not routed anywhere now.
+
+## Free gifts: confirmation, fulfilment data
+
+* **Confirmation:** when an add completes an offer (e.g. the 2nd katana → free stand) the unlock sheet opens once with
+  the "Offer unlocked" moment ("<gift> is added to your order — free!"). Once per offer per cart (an emptied cart resets).
+  The cart still shows the "Free gift added" banner.
+* **Exact counts keep the ladder exclusive:** "Any 2 / Any 3 / Any 1" katana offers use *exactly* N, so a cart gets one
+  stand only — 3 katanas = Triple only (Dual stops applying), 4 = none.
+* **Shipping the gift:** a free product is a synthetic ₹0 order line (`isPromotionalGift`). Each order now also stores
+  `promotionalGifts[]` = `{productId, variantSku, productName, selectedVariant, quantity, promotionId, promotionName}`
+  (both order models). Admin → Orders → order detail shows a "FREE GIFTS TO SHIP" box with product id + SKU above the
+  items. For a Mystery Gift the *real* product is listed here for fulfilment; the customer only ever sees "Mystery Gift".
+
+### One free stand only (Dual → Triple switch)
+The free stand is never a cart line: it is recomputed from the cart at checkout/payment, so 2 katanas → Dual, and the
+moment a 3rd katana is added → Triple replaces it (the order gets one gift line). Guarded three ways: exact-count
+conditions, the engine's same-product gift conflict resolution, and `promotionGroup = "katana-stand-ladder"` on the
+Dual / Triple / Mystery promotions (priority Triple 7 > Dual 6 > Mystery 5), which makes them mutually exclusive even if
+an admin later loosens a condition. The unlock sheet tells the shopper "This replaces your current free … — you get one,
+not both." (display model field `group`).
+
+## Explicit free-gift claiming — Phase 1 (backend)
+
+* `server/src/services/giftClaims.service.js`: a `free_product` reward only creates an *entitlement*
+  (`promotionId:productId:sku`, derived from the engine's own `freeGifts`, so admin priority / exclusivity /
+  `promotionGroup` rules already apply). A claim is valid only if the CURRENT cart still has that entitlement;
+  duplicates merge and are capped at the entitled quantity; tampered, expired, or no-longer-eligible claims are rejected.
+* `POST /promotions/display/cart` accepts `claimedGifts` and returns `gifts` (claimable / claimed, with the admin's
+  reward label + image — never the real product when the image is blank, so a Mystery Gift stays a mystery — plus the real
+  product id / SKU / list price) and `invalidGiftClaims` (so the UI can tell the shopper a claimed gift is gone).
+* Order creation (logged-in and guest): when the request has a `claimedGifts` array only validated claims become ₹0 lines;
+  an invalid claim stops the order with `GIFT_CLAIM_INVALID` (never silently dropped or charged). Without the array
+  (older clients) the previous automatic behaviour is kept until Phase 2 ships the claim UI.
+* Order item snapshot: `lineType` (`PAID` | `FREE_GIFT`), `originalUnitPrice`, `giftPromotionId`, `giftEntitlementKey`
+  on every line; the same SKU can be both a paid line and a gift line. Order-level `promotionalGifts[]` is unchanged.
+* Tests: `server/src/__tests__/giftClaims.test.js` (`npm test -- src/__tests__/giftClaims.test.js`).
+* Phase 2 (cart claim card, FREE GIFT line, persistence, ineligible notice) and Phase 3 (admin packing checklist) follow.
+
+## Explicit free-gift claiming — Phase 2 (storefront)
+
+- Free products are never auto-added. The cart/offer sheet shows **Claim Free Gift** (`GiftClaimList`);
+  claims live in Redux (`cartSlice`, keyed by entitlement `promotionId:productId:variantSku`) and persist
+  in localStorage, so they survive refresh and guest → login.
+- `useGiftClaims` / `useCartPromotions` send `claimedGifts` with every cart evaluation; the server answers with
+  `gifts[]` (claimable / claimed) and `invalidGiftClaims[]`.
+- `GiftClaimWatcher` removes a claim the server no longer honours and shows a notice (never converts it to a paid
+  line). It also lowers a stored claim quantity when the cart shrinks, so it cannot silently re-claim the larger amount.
+- Claimed gift renders in cart/mini-cart/checkout with list price struck, ₹0 and a FREE GIFT badge. A full-price
+  purchase of the same SKU stays a separate PAID line.
+- Checkout sends `claimedGifts`; a `GIFT_CLAIM_*` error from the server refreshes claims and tells the customer.
+
+## Explicit free-gift claiming — Phase 3 (orders, admin, tests)
+
+- Orders store `lineType` (PAID | FREE_GIFT), `originalUnitPrice`, `giftPromotionId`, `giftEntitlementKey`,
+  `isPromotionalGift` per item, plus order-level `promotionalGifts[]` (immutable snapshot).
+- Admin (Manage Orders): FREE GIFT badge on rows, packing checklist separates FREE gifts from PAID products;
+  Shipmozo gets the list value and a " (FREE GIFT)" name suffix.
+- Tests: `server/src/__tests__/giftClaims.test.js` (`npm test -- src/__tests__/giftClaims.test.js`).
+- Verified against staging promotions (script, no server): katana ladder 0–4 × mixes, claim/stale-claim sequences,
+  pricing independent of claims, 5000-case garbage-claim fuzz — all pass.
+- Rule: exactly 2 katanas → Dual, exactly 3 → Triple, 1 → Mystery; 4+ gives no stand (exact-count rule).
+- Not verified: browser UI and the Razorpay payment path.
+
+## Offer pricing checklist (run for EVERY new/changed offer)
+
+Cart, checkout page and the Razorpay charge must show the same discounted amount.
+
+1. Cart drawer shows the offer discount (client preview, `promotions/display/cart`).
+2. Checkout page order summary shows it on **every step** (address, contact, review) — `useGetCheckoutPromotionsQuery` is not step-gated.
+3. Server charge: `razorpayCreateOrderController` (logged-in) and `guestCreateOrderController` re-evaluate the engine themselves
+   and bake the discount into `priceAtPurchase`; client totals are never trusted.
+4. Prepaid, COD (2× shipping advance), and Magic (line_items already discounted) — all go through `computeOrderCharge`.
+5. Automated guard: `server/src/__tests__/checkoutPromoCharge.test.js` (flat / discounted-price / percent product offers,
+   prepaid + Magic). Add a case when a new reward shape is introduced.
+
+## Delivery charge (static)
+
+Cart (after offers) under ₹1000 → ₹99, ₹1000 and above → ₹149, regardless of weight/size/courier. Free-shipping promotions /
+threshold still zero it as before. Details: `server/src/services/SHIPPING_FLOW.md`; test: `server/src/__tests__/unit/shipping.static.test.js`.
+
+## Free gift: customer picks the variant
+
+A `free_product` reward with no variant SKU and **"Customer picks the variant"** ticked (`reward.chooseVariant`, Admin → Promotions → reward row)
+is one entitlement the shopper fills with any in-stock variant of the target product (e.g. "Buy 2 Kunai, get any Kunai free").
+Cart shows the variants as tiles; the claim carries the chosen SKU, the server validates it like any other claim (never more than the
+entitled quantity across variants, re-checked against stock at order time). Without the tick, a blank SKU still means the product's first variant.
+Tests: `server/src/__tests__/giftClaims.test.js` ("pick-your-variant gifts"). Needs the admin repo's model + RewardRow change deployed too.
+
+## Razorpay Magic coupon sheet (who sees which coupon)
+
+Magic cannot grey a coupon out, so `POST /magic/promotions` lists only coupons this customer can redeem on this order: the order's own cart
+(min cart, product gate), the contact/email Razorpay sends (TARGETED assignment, per-customer limit) and login state (MEMBERS_ONLY) all go through
+`validateNewCoupon`, the same check Apply Promotions uses. **Hidden** coupons are never listed but still work when the code is typed; test/internal
+never. If Razorpay sends no contact/email, TARGETED coupons stay off the sheet (typing the code still works). Logic: `server/src/utils/magicPromotions.util.js`;
+test: the SHEET / MAPPLY columns of `server/src/__tests__/couponMatrix.test.js`. Server restart only.
+
+## Coupons: who sees what, who can use what
+
+| Coupon | Cart / pay-page list | Typed in | Razorpay Magic sheet |
+|---|---|---|---|
+| Public | everyone | works | listed if redeemable on this order |
+| Hidden (`isHidden`) | never | works | never listed, still works typed |
+| Members only | signed-in only | signed-in works; a guest is told to sign in | listed for a signed-in order |
+| Targeted (email/mobile) | only the assigned customer (profile mobile, WhatsApp-verified mobile or email) | guest must give the assigned email/mobile; signed-in is recognised automatically | only to the assigned customer |
+| Testing / internal / paused / archived / expired / sold-out | never | refused | never |
+
+The signed-in customer is identified from the user record, never from the request body (`/coupon/list` and `/coupon/apply` use the
+session). The discount is always taken off the **product total after offers** — never off delivery or gift wrap — in every flow
+(guest, signed-in, prepaid, COD, Magic). A coupon worth the whole product total still leaves delivery to pay.
+Tests: `server/src/__tests__/couponFlows.test.js` (who sees / applies / pays what), `server/src/__tests__/couponMatrix.test.js` (every coupon kind × customer × place). Server restart + client rebuild.
+
+### Which number the coupon rules use (Razorpay Magic)
+
+Checkout prefills Razorpay with the customer's contact (guest form / signed-in profile); they can change it in the modal. For Get/Apply Promotions the
+number Razorpay sends wins; if it sends none, the contact already captured on the order is used (signed-in: the account's own email, mobile and
+WhatsApp-verified mobile as well). If no number exists anywhere it stays blank — identity-bound (targeted) coupons then simply do not show and cannot be applied; nothing is guessed.
+Typing a code as a guest also tells them up front if it is members-only, already used by their email/mobile, or needs a product that is not in the cart.
+`server/src/utils/magicPromotions.util.js`; matrix of every coupon kind × customer × surface: `server/src/__tests__/couponMatrix.test.js`.

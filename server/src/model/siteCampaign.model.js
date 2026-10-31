@@ -42,6 +42,20 @@ const siteCampaignSchema = new mongoose.Schema(
       countdown: { type: Boolean, default: true },
       sectionAccents: { type: Boolean, default: true },
     },
+    // Phuljadi (sparkler) progress animation that replaces the plain progress bar
+    // while the campaign is live. It represents ONE promotion, picked here; its
+    // steps/segments come from that promotion's own conditions. Opt-in.
+    phuljadi: {
+      enabled: { type: Boolean, default: false },
+      promotionId: { type: String, trim: true, default: "" },
+      intensity: { type: String, enum: ["low", "medium", "high"], default: "medium" },
+      showOnMobile: { type: Boolean, default: true },
+      locations: {
+        cart: { type: Boolean, default: true },
+        miniCart: { type: Boolean, default: true },
+        product: { type: Boolean, default: true },
+      },
+    },
     // Where decorations render. (`pages` is the legacy home/all switch — kept
     // so existing documents still resolve; the storefront prefers `locations`.)
     pages: { type: String, enum: ["home", "all"], default: "home" },

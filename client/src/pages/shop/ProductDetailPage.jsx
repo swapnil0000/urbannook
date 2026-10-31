@@ -13,8 +13,9 @@ import OtherVariants from '../../component/OtherVariants';
 import NotifyMeModal from '../../component/NotifyMeModal';
 import ComparisonTable from '../../component/ComparisonTable';
 import ImageCarousel from '../../component/ImageCarousel';
+import CommunityShots from '../../component/CommunityShots';
 import { motion, AnimatePresence } from 'motion/react';
-import { ScrollColorBand } from '../../component/motion';
+import { ScrollColorBand, MotionRoot } from '../../component/motion';
 import { variantSku, trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist, trackVariantSelect, trackShare, trackDeliveryCheck } from '../../utils/analytics';
 import { productsApi, useGetProductByIdQuery, useGetProductsQuery, useGetBlogPostsQuery } from '../../store/api/productsApi';
 import { useAddToCartMutation, useUpdateCartMutation, useCalculateShippingMutation, useGetFreeShippingOfferQuery } from '../../store/api/userApi';
@@ -24,6 +25,17 @@ import { addItem, updateQuantity, removeItem, updateSelection } from '../../stor
 import { useUI } from '../../hooks/useRedux';
 import { useCartData } from '../../hooks/useCartSync';
 import FreeShippingStrip from '../../component/FreeShippingStrip';
+import OfferProgress from '../../component/festive/OfferProgress';
+import { compressImage } from '../../utils/compressImage';
+import ProductOffers from '../../component/offers/ProductOffers';
+import GiftWrapOffer from '../../component/GiftWrapOffer';
+import CouponOffersSection from '../../component/offers/CouponOffersSection';
+import { requestCheckout } from '../../utils/checkoutIntent';
+import { useCartPromotions } from '../../hooks/useCartPromotions';
+import SaleTag from '../../component/festive/SaleTag';
+import SaleDealBox from '../../component/festive/SaleDealBox';
+import StockStatus from '../../component/StockStatus';
+import ProductQuestions from '../../component/support/ProductQuestions';
 
 const MotionDiv = motion.div;
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
@@ -115,7 +127,12 @@ const shortVariantName = (variantName = '', productName = '') => {
   return kept.join(' ').trim() || variantName;
 };
 
-/* What the variant row is called, per category. */
+/* What the variant row is called, per category. A category listed here sells
+   variants that are different things (Zenitsu's vs Zoro's katana, the BMW vs
+   Ferrari lamp), not colours of one thing, so each variant URL is its own page
+   for search engines (own canonical, title, sitemap entry — see variantPage
+   below and client/scripts/ssg.mjs). Other categories (pen stands in ten
+   colours) keep every variant URL canonical to the product. */
 const VARIANT_NOUN = { Lamp: 'Marque', Anime: 'Design' };
 
 const ProductDetailPage = () => {
@@ -133,6 +150,7 @@ const ProductDetailPage = () => {
 
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const buyBoxRef = useRef(null);
+  const pageRef = useRef(null); // night-mode scope for the "In the wild" band
   const [buyBoxVisible, setBuyBoxVisible] = useState(true); // controls the sticky mobile CTA
   const [pinInput, setPinInput] = useState('');            // pincode delivery check
   const [pinStatus, setPinStatus] = useState(null);        // { ok, msg, charge, eta }
@@ -148,6 +166,10 @@ const ProductDetailPage = () => {
   const [checkPincode, { isLoading: isCheckingPin }] = useCalculateShippingMutation();
   const { refetch: refetchCart } = useCartData();
   const cartTotal = useSelector((state) => state.cart.totalAmount);
+
+  // Offers already working in the cart (same subscription as the cart drawer) → "Applied" on the offer rows.
+  const { promotions: cartPromotions } = useCartPromotions('cart');
+  const appliedOfferIds = useMemo(() => cartPromotions.filter((p) => p.applied && !p.rewardTargetPending).map((p) => p.id), [cartPromotions]);
 
   const { data: reviewsData } = useGetProductReviewsQuery(productId);
   const [submitProductReview, { isLoading: isSubmittingReview }] = useSubmitProductReviewMutation();
@@ -173,7 +195,9 @@ const ProductDetailPage = () => {
       && (details.find((v) => v.sku === urlVariantSku) || details.find((v) => v.variantName === urlVariantSku));
     return matched ? matched.variantName : details[0].variantName;
   });
-  const { data: relRes } = useGetProductsQuery({ page: 1, limit: 8 });
+  // Same args as the header's list (entry-server globalQueries), so this reads
+  // that cached list instead of embedding a second copy in the page's HTML.
+  const { data: relRes } = useGetProductsQuery({ page: 1, limit: 24 });
   const related = useMemo(() => productList(relRes).filter((p) => p.productId !== productId).slice(0, 4), [relRes, productId]);
 
   // Product FAQs — use CMS-provided product.faqs if present, else generate helpful
@@ -401,7 +425,7 @@ const ProductDetailPage = () => {
   // One tap to checkout: adds qty 1 (if not already in cart) and goes straight on.
   const handleBuyNow = async () => {
     if (!isInCart && !(await handleInitialAddToCart({ silent: true }))) return;
-    navigate('/checkout');
+    requestCheckout(navigate);
   };
 
   const handleUpdateQty = async (newQuantity) => {
@@ -423,7 +447,17 @@ const ProductDetailPage = () => {
     } else dispatch(updateQuantity({ id: product.productId, quantity: newQuantity, selectedVariant: selectedVariant || 'N/A' }));
   };
 
-  const handleCheckoutClick = () => navigate('/checkout');
+  const handleCheckoutClick = () => requestCheckout(navigate);
+
+  // "Apply" on an offer (ProductOffers): put this product in the cart if it
+  // isn't yet, then open the offer sheet for that promotion. When the product
+  // was just added, the sheet also adds the reward (e.g. the stand) by itself
+  // if there is exactly one to add; otherwise it shows the choice.
+  const handleApplyOffer = async (promotionId) => {
+    const wasInCart = isInCart;
+    if (!wasInCart && !(await handleInitialAddToCart({ silent: true }))) return;
+    window.dispatchEvent(new CustomEvent('un:open-offer-sheet', { detail: { promotionIds: [promotionId], autoAdd: !wasInCart } }));
+  };
 
   // ── Pincode delivery check — same ShipMozo rate API the checkout uses ──
   const handlePinCheck = async () => {
@@ -494,7 +528,7 @@ const ProductDetailPage = () => {
     const shots = [];
     reviews.forEach((r) => {
       const imgs = r.imageUrls?.length ? r.imageUrls : (r.imageUrl ? [r.imageUrl] : []);
-      imgs.forEach((u) => shots.push({ url: u, name: r.userName || 'Customer' }));
+      imgs.forEach((u) => shots.push({ url: u, name: r.userName || 'Customer', rating: r.rating, text: r.desc }));
     });
     return shots.slice(0, 8);
   }, [reviews]);
@@ -531,9 +565,11 @@ const ProductDetailPage = () => {
     setShowReviewForm(true);
     setTimeout(() => document.getElementById('review-form-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   };
-  const handleAddReviewImage = (e) => {
-    const files = Array.from(e.target.files || []); const toAdd = files.slice(0, 3 - reviewImages.length);
-    setReviewImages((prev) => [...prev, ...toAdd]); setReviewImagePreviews((prev) => [...prev, ...toAdd.map((f) => URL.createObjectURL(f))]); e.target.value = '';
+  const handleAddReviewImage = async (e) => {
+    const files = Array.from(e.target.files || []); e.target.value = '';
+    // Phone photos are 2–4 MB; shrink to a 1200 px JPEG before upload (utils/compressImage.js).
+    const toAdd = await Promise.all(files.slice(0, 3 - reviewImages.length).map((f) => compressImage(f)));
+    setReviewImages((prev) => [...prev, ...toAdd]); setReviewImagePreviews((prev) => [...prev, ...toAdd.map((f) => URL.createObjectURL(f))]);
   };
   const handleRemoveReviewImage = (idx) => { setReviewImages((p) => p.filter((_, i) => i !== idx)); setReviewImagePreviews((p) => p.filter((_, i) => i !== idx)); };
 
@@ -548,9 +584,22 @@ const ProductDetailPage = () => {
 
   const specs = displaySpecs;
   const pageDescription = displayDescription;
+  // A variant URL of a "designs" product (see VARIANT_NOUN) is a page of its own:
+  // canonical to itself, titled after the variant. The product URL stays the
+  // collection of all its designs, headed by the product name.
+  const hasDesignVariants = !!VARIANT_NOUN[product.productCategory]
+    && (product.variantDetails || []).filter((v) => v.isActive !== false).length > 1;
+  const urlVariant = urlVariantSku ? (product.variantDetails || []).find((v) => v.sku === urlVariantSku) : null;
+  const variantPage = hasDesignVariants && urlVariant ? urlVariant : null;
+  const seoTitle = variantPage
+    ? `${variantPage.variantName}${variantPage.variantSubTag ? ` (${variantPage.variantSubTag})` : ''}`
+    : urlVariantSku && selectedVariant && selectedVariant !== 'N/A' ? selectedVariant : product.productName;
+  const seoUrl = variantPage ? `/product/${product.productId}/${encodeURIComponent(variantPage.sku)}` : `/product/${product.productId}`;
+  const heading = hasDesignVariants && !urlVariantSku ? product.productName : (selectedVariant || product.productName);
   // Image alt text: the selected variant's name ("BMW Brake Caliper Lamp") when there is one.
   const imageTitle = selectedVariant && selectedVariant !== 'N/A' ? selectedVariant : product.productName;
-  // One ProductGroup with an Offer per variant (variant pages canonicalise here).
+  // One ProductGroup with an Offer per variant, on the product page and on each
+  // variant page (Google's multi-page variant pattern: offer url = variant page).
   const productUrl = `https://www.urbannook.in/product/${product.productId}`;
   const structuredData = {
     '@context': 'https://schema.org',
@@ -601,8 +650,8 @@ const ProductDetailPage = () => {
   };
 
   return (
-    <div className="font-inter bg-paper text-ink min-h-screen overflow-x-clip">
-      <SEOHead title={urlVariantSku && selectedVariant && selectedVariant !== 'N/A' ? selectedVariant : product.productName} description={pageDescription} url={`/product/${product.productId}`} image={galleryImages[0]} type="product" structuredData={[structuredData, breadcrumbData, ...(seoFaqs.length ? [faqPageJsonLd(faqs)] : [])]} />
+    <div ref={pageRef} className="font-inter bg-paper text-ink min-h-screen overflow-x-clip">
+      <SEOHead title={seoTitle} description={pageDescription} url={seoUrl} image={galleryImages[0]} type="product" structuredData={[structuredData, breadcrumbData, ...(seoFaqs.length ? [faqPageJsonLd(faqs)] : [])]} />
 
       <div className="max-w-[1280px] mx-auto px-5 py-6 md:py-8">
         {/* breadcrumb */}
@@ -637,9 +686,12 @@ const ProductDetailPage = () => {
                     ellipsis after 2 lines on mobile. min-h is a MINIMUM, not
                     a cap, so it still keeps short titles' height consistent
                     without truncating a longer one. */}
-                <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-ink leading-tight min-h-[66px] md:min-h-[80px]">
-                  {selectedVariant || product.productName}
+                <h1 className="text-[26px] md:text-4xl font-extrabold tracking-tight text-ink leading-tight min-h-[26px] md:min-h-[20px]">
+                  {heading}
                 </h1>
+                {heading !== (selectedVariant || product.productName) && selectedVariant && (
+                  <p className="text-base md:text-lg font-semibold text-ink leading-snug mt-1">{selectedVariant}</p>
+                )}
                 {selectedVariantSubTag && (
                   <p className="text-base md:text-lg font-normal text-muted leading-snug mt-1">{selectedVariantSubTag}</p>
                 )}
@@ -669,18 +721,24 @@ const ProductDetailPage = () => {
                 Zone A's title/kicker above it, which sit with no padding of
                 their own — everything below looked shifted right instead of
                 lining up to the same left edge. Vertical spacing is kept. */}
-            <div className="mt-1  bg-paper py-4 md:py-5 md:max-w-md">
+            <div className="mt-1  bg-paper  md:max-w-md">
               {/* price hero */}
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
                 <span className="text-4xl md:text-5xl font-extrabold text-ink tracking-tight tabular-nums leading-none">{inr(currentPrice)}</span>
-                {discountPercent > 0 && (
-                  <div className="flex flex-col items-start gap-0.5">
-                    <span className="gl-lbl text-[11px] text-sale bg-sale/10 px-2 py-0.5 rounded-md">{discountPercent}% OFF</span>
-                    <span className="text-xs text-faint line-through tabular-nums">{inr(maxVariantPrice)}</span>
-                  </div>
-                )}
+                {discountPercent > 0 && <span className="text-base md:text-lg text-faint line-through tabular-nums">{inr(maxVariantPrice)}</span>}
+                {discountPercent > 0 && <span className="rounded-full bg-sale px-2.5 py-1 text-[12px] font-extrabold leading-none text-white">{discountPercent}% OFF</span>}
+                <SaleTag />
               </div>
-              {discountPercent > 0 && <p className="text-sm font-semibold text-save mt-1">You save {inr(maxVariantPrice - currentPrice)}</p>}
+              {discountPercent > 0 && <p className="text-sm font-semibold text-save mt-1.5">You save {inr(maxVariantPrice - currentPrice)}</p>}
+
+              {/* real stock for the selected variant ("Only 2 left" at 5 or fewer) + dispatch time */}
+              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-hair bg-white/60 px-3 py-2">
+                <StockStatus outOfStock={isOutOfStock} left={selectedVariantObj?.variantQuantity} lowAt={5} />
+                {!isOutOfStock && <span className="text-[12px] text-muted"><i className="fa-solid fa-truck-fast mr-1 text-brand" aria-hidden="true" />Ships in 24-48 hrs</span>}
+              </div>
+
+              {/* festive gift wrap, offered here too — "Go to Checkout" skips the cart drawer where it used to be the only place */}
+              {product?.giftWrapEligible && !isOutOfStock && <GiftWrapOffer variant="card" eligible className="mt-3" />}
 
               {/* variants */}
               {availableVariants.length > 0 && (
@@ -750,7 +808,19 @@ const ProductDetailPage = () => {
 
               {/* Free-shipping threshold, right under the CTA where the buy
                   decision happens — hidden unless admin's promotion is on. */}
-              {!isOutOfStock && <FreeShippingStrip cartTotal={cartTotal} variant="compact" className="mt-3" />}
+              {!isOutOfStock && <OfferProgress location="product" className="mt-3" fallback={<FreeShippingStrip cartTotal={cartTotal} variant="compact" className="mt-3" />} />}
+
+              {/* questions right by the buy buttons — straight to our WhatsApp, with this product's link */}
+              <ProductQuestions productName={product.productName} variantName={selectedVariant} url={shareUrl} className="mt-3" />
+
+              {/* Offers right under the buy buttons — price and variants stay clean
+                  up top; the offers popup (OffersPopup) announces them on arrival. */}
+              {/* live sale countdown right above the offers it belongs to */}
+              <SaleDealBox className="mt-4" />
+              <ProductOffers productId={productId} className="mt-3" cartTotal={cartTotal} appliedIds={appliedOfferIds} cartPromotions={cartPromotions} onApply={isOutOfStock ? undefined : handleApplyOffer} disabled={isAdding} />
+
+              {/* Coupons (guest list is server-rendered; see entry-server.jsx) */}
+              <CouponOffersSection variant="pdp" />
 
               {/* Customization — admin opt-in per product (product.isCustomizable),
                   not every product is customisable. Carries the product (and the
@@ -815,10 +885,20 @@ const ProductDetailPage = () => {
               </div> */}
 
               {/* trust strip inside the card */}
-              <div className="mt-4 pt-4 border-t border-hair grid grid-cols-3 divide-x divide-hair text-center text-[11px] text-muted">
-                <div className="px-1 flex flex-col items-center gap-1"><i className="fa-solid fa-truck-fast text-brand text-base" aria-hidden="true" />24-48 hrs</div>
-                <div className="px-1 flex flex-col items-center gap-1"><i className="fa-solid fa-money-bill-wave text-brand text-base" aria-hidden="true" />{product.isCodAvailable ? 'Partial COD' : 'Secure pay'}</div>
-                <div className="px-1 flex flex-col items-center gap-1"><i className="fa-solid fa-rotate-left text-brand text-base" aria-hidden="true" />Free replacement if damaged*</div>
+              <p className="mt-5 text-sm font-bold text-ink">Shop with peace of mind</p>
+              <div className="mt-2.5 grid grid-cols-4 gap-1 text-center">
+                {[
+                  ['fa-truck-fast', 'Dispatch', '24-48 hrs'],
+                  ['fa-money-bill-wave', 'Payment', product.isCodAvailable ? 'Partial COD' : 'Secure pay'],
+                  ['fa-rotate-left', 'Replacement', 'Free if damaged*'],
+                  ['fa-location-dot', 'Delivery', 'Pan-India'],
+                ].map(([icon, title, sub]) => (
+                  <div key={title} className="flex flex-col items-center gap-1">
+                    <span className="grid h-11 w-11 place-items-center rounded-full border border-hair bg-white text-ink"><i className={`fa-solid ${icon} text-[15px]`} aria-hidden="true" /></span>
+                    <span className="text-[11.5px] font-bold text-ink">{title}</span>
+                    <span className="text-[10.5px] leading-tight text-muted">{sub}</span>
+                  </div>
+                ))}
               </div>
               <p className="mt-1.5 text-[8px] text-faint text-center">
                 *Applicable only with an unboxing video showing the damaged product and its shipping label.
@@ -924,26 +1004,14 @@ const ProductDetailPage = () => {
 
         {/* IN THE WILD — full-bleed BLACK (ink) editorial band from customer review photos */}
         {communityShots.length > 0 && (
-          <ScrollColorBand className="w-screen ml-[calc(50%-50vw)] mt-16">
+          <ScrollColorBand nightScopeRef={pageRef} className="w-screen ml-[calc(50%-50vw)] mt-16">
             <div className="max-w-[1280px] mx-auto px-5 py-14 md:py-20">
               <p className="gl-lbl opacity-50 mb-2">— In the wild</p>
               <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight leading-[0.95] mb-1">
                 <span>Seen in</span><br /><span className="opacity-40">real setups.</span>
               </h2>
               <p className="opacity-60 text-sm mb-7">Straight from {totalReviews > 0 ? `${totalReviews} verified ` : ''}customers who bought it.</p>
-              <ImageCarousel
-                peek
-                images={communityShotUrls}
-                alt={(i) => `${imageTitle} in a customer's setup – photo ${i + 1}`}
-                onImgErr={onImgErr}
-                onItemClick={(i) => setLightbox({ list: communityShotUrls, idx: i })}
-                renderOverlay={(i) => (
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/80 via-ink/20 to-transparent p-3 pt-8">
-                    <span className="gl-lbl text-paper/70 text-[10px]">0{i + 1}</span>
-                    <p className="text-paper font-bold text-xs leading-tight line-clamp-1">{communityShots[i]?.name}</p>
-                  </div>
-                )}
-              />
+              <CommunityShots shots={communityShots} onImgErr={onImgErr} onOpen={(i) => setLightbox({ list: communityShotUrls, idx: i })} />
             </div>
           </ScrollColorBand>
         )}
@@ -1104,6 +1172,7 @@ const ProductDetailPage = () => {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 90, opacity: 0 }}
             transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            data-sticky-buybar // the floating Help button lifts above this bar while it is shown
             className="md:hidden fixed inset-x-0 z-30 bg-paper/95 backdrop-blur border-t border-hair px-4 py-3 flex items-center gap-3"
             style={{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom))' }}
           >
@@ -1174,4 +1243,7 @@ const ProductDetailPage = () => {
   );
 };
 
-export default ProductDetailPage;
+// MotionRoot: reduced-motion setting for this page's animations (component/motion).
+const ProductDetailPageWithMotion = () => <MotionRoot><ProductDetailPage /></MotionRoot>;
+
+export default ProductDetailPageWithMotion;

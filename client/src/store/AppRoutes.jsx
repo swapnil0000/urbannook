@@ -12,6 +12,7 @@ import {
   CheckoutPage,
   MyProfilePage,
   MyOrdersPage,
+  OrderDetailsPage,
   WishlistPage,
   CustomerSupportPage,
   RewardsPage,
@@ -42,8 +43,14 @@ const MinimalLoader = () => (
 const AppRoutes = () => {
   return (
     <Routes>
-      {/* HomePage loads immediately - no Suspense needed */}
-      <Route path="/" element={<HomePage />} />
+      <Route
+        path="/"
+        element={
+          <Suspense fallback={<MinimalLoader />}>
+            <HomePage />
+          </Suspense>
+        }
+      />
       <Route
         path="/blog"
         element={
@@ -147,6 +154,17 @@ const AppRoutes = () => {
       <Route path="/payment-processing/:orderId" element={<><SEOHead noIndex /><PaymentProcessing /></>} />
       <Route path="/order-confirm/:orderId" element={<><SEOHead noIndex /><OrderConfirm /></>} />
       <Route path="/payment-failed" element={<><SEOHead noIndex /><PaymentFailed /></>} />
+      <Route
+        path="/orders/:orderId"
+        element={
+          <ProtectedRoute>
+            <SEOHead noIndex />
+            <Suspense fallback={<MinimalLoader />}>
+              <OrderDetailsPage />
+            </Suspense>
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/orders"
         element={

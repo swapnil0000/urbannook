@@ -20,17 +20,22 @@ import {
 } from "../store/api/userApi";
 import { setShowLoginModal, setLoginCallback } from "../store/slices/uiSlice";
 import { useUI } from "../hooks/useRedux";
-import { clearCart, removeItem } from "../store/slices/cartSlice";
+import { clearCart, removeItem, pruneGiftClaims } from "../store/slices/cartSlice";
 import { resolveVariantTitle } from "../utils/variantTitle";
 import { fetchCsrfToken } from "../store/api/apiSlice";
 import { getApiUrl } from "../config/appUrls";
 import config from "../config/env";
 import CouponInput from "../component/CouponInput";
+import CheckoutCouponTickets from "../component/CheckoutCouponTickets";
 import { ComponentLoader } from "../component/layout/LoadingSpinner";
-import { getClaimedMobile, getClaimedCode, isOfferLive } from "../config/siteOffer";
+import { getClaimedMobile, isOfferLive } from "../config/siteOffer";
 import SiteOfferBanner from "../component/SiteOfferBanner";
 import FreeShippingStrip from "../component/FreeShippingStrip";
+import OfferCheckoutReminder from "../component/offers/OfferCheckoutReminder";
 import PromotionBannerList from "../component/promotions/PromotionBannerList";
+import GiftClaimList from "../component/promotions/GiftClaimList";
+import { CartGiftProgress } from "../component/offers/CartValueGift";
+import GiftWrapOffer from "../component/GiftWrapOffer";
 import SealBadgeCard, { UnderlineAmount } from "../component/promotions/SealBadgeCard";
 import { useGetCheckoutPromotionsQuery } from "../store/api/userApi";
 import { buildPromotionCartItems } from "../utils/promotionCartItems";
@@ -121,56 +126,7 @@ const AmountPlaceholder = () => (
   <span className="inline-block h-3.5 w-14 animate-pulse rounded bg-gray-200" aria-label="Calculating" />
 );
 
-// UnCash box under the total, logged-in users only, while loyalty is on
-// (admin → Loyalty Points). "Use UnCash" toggle (hidden on Magic Checkout —
-// redeem is normal checkout only) + the points this order will earn, which
-// mirrors the admin earn sweep: floor(amount paid × earnPercent / 100), after
-// delivery. The (i) opens the full calculation page.
-const UnCashBox = ({ uncash, totalToPay }) => {
-  if (!uncash?.enabled) return null;
-  const earn = Math.floor(((Number(totalToPay) || 0) * (uncash.earnPercent || 0)) / 100);
-  return (
-    <div className="rounded-lg bg-amber-50/70 border border-amber-100 px-3 py-2.5 text-xs space-y-2">
-      {uncash.canRedeem && (
-        <label className="flex items-center gap-2.5 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={uncash.on}
-            onChange={(e) => uncash.setOn(e.target.checked)}
-            className="w-4 h-4 accent-[#a89068] shrink-0"
-          />
-          <span className="min-w-0 flex-1 leading-snug text-gray-700">
-            Use <b className="text-ink">{uncash.maxPoints} UnCash</b> and save <b className="text-emerald-700">₹{uncash.maxDiscount.toLocaleString()}</b>
-            <span className="block text-[10px] text-gray-400">
-              Balance {uncash.balance} · up to {uncash.maxRedeemPercent}% of the order
-            </span>
-          </span>
-        </label>
-      )}
-      <div className="flex items-center gap-2.5">
-        <i className="fa-solid fa-coins shrink-0 text-[#a89068] text-sm" />
-        <p className="min-w-0 flex-1 leading-snug text-gray-600">
-          You'll earn <b className="text-ink">{earn} UnCash</b> after delivery
-          {!uncash.canRedeem && (
-            <span className="block text-[10px] text-gray-400">Current balance: {uncash.balance} UnCash</span>
-          )}
-        </p>
-        <a
-          href="/uncash-calculation"
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="How UnCash is calculated"
-          title="How UnCash is calculated"
-          className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-gray-400 hover:text-ink hover:bg-amber-100"
-        >
-          <i className="fa-solid fa-circle-info text-sm" />
-        </a>
-      </div>
-    </div>
-  );
-};
-
-const PriceRows = ({ subtotal, promotionSavings = 0, shipping, discount, giftWrapAmount = 0, uncash = null, appliedCoupon, totalToPay, itemCount, isLoadingShipping, paymentMethod, onApplyCoupon, onRemoveCoupon }) => {
+const PriceRows = ({ subtotal, promotionSavings = 0, shipping, discount, giftWrapAmount = 0, appliedCoupon, totalToPay, itemCount, isLoadingShipping, onApplyCoupon, onRemoveCoupon, paymentMethod }) => {
   const shippingAmount = typeof shipping === "object" ? shipping?.amount : shipping;
   // COD advance must be based on the REAL carrier rate, not the (possibly
   // free-shipping-zeroed) charged amount — same real/charged split as the
@@ -285,6 +241,9 @@ const PriceRows = ({ subtotal, promotionSavings = 0, shipping, discount, giftWra
             <p className="text-[10px] text-gray-400 mt-0.5">Incl. GST</p>
           </div>
         </div>
+        {paymentMethod === "COD" && (
+          <p className="mt-1 text-right text-[8px] leading-tight text-gray-400">COD advance amount is non-refundable</p>
+        )}
       </div>
 
       {totalSavings > 0 && <SavingsBanner amount={totalSavings} freeShipping={isShippingFree} />}
@@ -333,7 +292,7 @@ const CheckoutPage = () => {
   const showNotificationRef = useRef(showNotification);
   useEffect(() => { showNotificationRef.current = showNotification; }, [showNotification]);
 
-  const { items: cartItems, selections: cartSelections, giftWrap: giftWrapSelected, giftWrapNoteOptions } = useSelector((s) => s.cart);
+  const { items: cartItems, selections: cartSelections, giftWrap: giftWrapSelected, giftWrapNoteOptions, claimedGifts } = useSelector((s) => s.cart);
   const { isAuthenticated } = useSelector((s) => s.auth);
   const shippingDelayMessage = useShippingDelayNotice();
   const isGuest = !isAuthenticated && !localStorage.getItem("authToken");
@@ -430,7 +389,7 @@ const CheckoutPage = () => {
   const [isApplyingOffer, setIsApplyingOffer] = useState(false);
   // Live campaign terms, so the block's own numbers and this page's discount
   // maths come from the same source as the coupon the server will validate.
-  const { terms: offerTerms, loaded: offerTermsLoaded } = useOfferTerms();
+  const { terms: offerTerms } = useOfferTerms();
   const [showMobileModal, setShowMobileModal] = useState(false);
 
   const [guestName, setGuestName] = useState(savedCheckout.current.guestName || "");
@@ -471,7 +430,10 @@ const CheckoutPage = () => {
   // gated promotions can evaluate for real.
   const { currentData: checkoutPromotionsData } = useGetCheckoutPromotionsQuery(
     { items: buildPromotionCartItems(cartItems), subtotal: cartItems.reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0), customerType: isGuest ? 'guest' : 'registered', deliveryAddress: pinCode ? { pincode: pinCode } : undefined, couponCode: appliedCoupon || undefined },
-    { skip: currentStep !== reviewStep || cartItems.length === 0 },
+    // Fetched on every step (not only Review & Pay): the order summary beside the
+    // address/contact steps must already show the offer discount, or the customer sees
+    // the full price until the last step.
+    { skip: cartItems.length === 0 },
   );
   const checkoutPromotions = checkoutPromotionsData?.data?.promotions || [];
   // Same server-evaluated item discount preview shown in the cart. It is
@@ -700,6 +662,8 @@ const CheckoutPage = () => {
         const shipArgs = {
           deliveryPinCode: parseInt(pinCode, 10),
           cartItems: formattedCartItems,
+          // delivery is a static ₹99 / ₹149 by what the customer pays for the products (after offers)
+          cartValue: cartItems.reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0) - ruleDiscountSavings,
         };
         const [prepaidRes, codRes] = await Promise.all([
           calculateShippingRef.current({ ...shipArgs, paymentType: "PREPAID" }).unwrap(),
@@ -824,18 +788,19 @@ const CheckoutPage = () => {
       if (!cartItemsLength) return;
       try {
         const r = await applyCouponMutation({ couponCode: appliedCoupon || null, email: userEmail }).unwrap();
-        // r.data.summary.subtotal comes from the coupon endpoint, which
-        // doesn't know about cart-rule discounts — subtract ruleDiscountSavings
-        // so this matches what the real order total will charge.
+        // r.data.summary.subtotal is the server's own cart quote, which is already
+        // net of product-level offers (getCartService evaluates them), and the coupon
+        // discount is taken off that same figure — so it is used as is. Subtracting
+        // ruleDiscountSavings again would take the offer off twice.
         if (r.success && r.data?.summary)
-          setPricingDetails(prev => ({ ...prev, subtotal: (r.data.summary.subtotal || 0) - ruleDiscountSavings, discount: r.data.summary.discount || 0 }));
+          setPricingDetails(prev => ({ ...prev, subtotal: r.data.summary.subtotal || 0, discount: r.data.summary.discount || 0 }));
       } catch (err) {
         if (err?.data?.statusCode === 400 && appliedCoupon) {
           setAppliedCoupon(null);
           try {
             const r2 = await applyCouponMutation({ couponCode: null, email: userEmail }).unwrap();
             if (r2.success && r2.data?.summary)
-              setPricingDetails(prev => ({ ...prev, subtotal: (r2.data.summary.subtotal || 0) - ruleDiscountSavings, discount: r2.data.summary.discount || 0 }));
+              setPricingDetails(prev => ({ ...prev, subtotal: r2.data.summary.subtotal || 0, discount: r2.data.summary.discount || 0 }));
           } catch {
             // Keep the cart's last known quote until the next successful sync.
           }
@@ -843,7 +808,7 @@ const CheckoutPage = () => {
       }
     };
     fetchPricing();
-  }, [cartItemsLength, cartTotalAmount, applyCouponMutation, appliedCoupon, userEmail, isGuest, ruleDiscountSavings]);
+  }, [cartItemsLength, cartTotalAmount, applyCouponMutation, appliedCoupon, userEmail, isGuest]);
 
   // Fire begin_checkout ONCE per checkout. React Router remounts this page on
   // navigate-away-and-back, and the Redux cart hydrates asynchronously AFTER mount,
@@ -1102,25 +1067,7 @@ const CheckoutPage = () => {
     }
   };
 
-  // ── Popup offer: apply the claimed code for them ─────────────────────────
-  // Someone who claimed the code in the popup should not have to find and type
-  // it again. Runs on every step (not just Review) so the express/Magic order,
-  // which is built before Review, carries the discount too. Once per session:
-  // if they remove it, it stays removed.
-  const OFFER_AUTO_KEY = "un_offer_autoapplied";
-  useEffect(() => {
-    if (!offerTermsLoaded || appliedCoupon || isApplyingOffer || paymentCompletedRef.current) return;
-    if (!cartItems.length || !isOfferLive() || offerTerms.available === false) return;
-    if (!getClaimedCode()) return;
-    if (!isGuest && profileLoading) return;
-    try { if (sessionStorage.getItem(OFFER_AUTO_KEY)) return; } catch { /* ignore */ }
-    // Below the minimum there is nothing to apply yet; try again when the cart grows
-    if (cartTotalAmount < (offerTerms.minCartValue || 0)) return;
-    try { sessionStorage.setItem(OFFER_AUTO_KEY, "1"); } catch { /* ignore */ }
-    // The live code, not the stored one: the admin may have renamed it since
-    handleApplyOfferCode(offerTerms.couponCode);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [offerTermsLoaded, appliedCoupon, cartTotalAmount, cartItems.length, isGuest, profileLoading, offerTerms]);
+  // A coupon is applied only when the shopper taps Apply (cart, coupon sheet or the pay screen) — never automatically.
 
   // Guests' discounts are worked out on this page, so a cart that shrinks below
   // the minimum would keep showing a discount the server then refuses — and the
@@ -1135,8 +1082,6 @@ const CheckoutPage = () => {
     }
     setAppliedCoupon(null);
     setPricingDetails((prev) => ({ ...prev, discount: 0 }));
-    // Let it re-apply automatically once they are back over the minimum
-    try { sessionStorage.removeItem(OFFER_AUTO_KEY); } catch { /* ignore */ }
     showNotification(
       `${appliedCoupon} removed — add ₹${Math.max(0, minCart - cartTotalAmount).toLocaleString()} more to use it (min order ₹${minCart.toLocaleString()})`,
       "error",
@@ -1264,6 +1209,7 @@ const CheckoutPage = () => {
           },
           paymentMethod,
           magic: useMagic, // server skips address/shipping and sends line_items
+        claimedGifts, // free gifts the shopper explicitly claimed; the server re-validates each one
           ...(appliedCoupon ? { couponCode: appliedCoupon } : {}),
           // Guests have no server-side cart to read this from — the boolean
           // intent has to come from the request. Price is still never
@@ -1320,6 +1266,7 @@ const CheckoutPage = () => {
         });
         rp.open();
       } catch (e) {
+        if (handleGiftClaimError(e)) return;
         const msg = e?.data?.message || e?.message || "Failed to initialize payment.";
         showNotification(msg, "error"); setPaymentError(msg); setShowRetry(true);
         // Express skipped our forms on the promise that Magic would collect
@@ -1364,8 +1311,7 @@ const CheckoutPage = () => {
         },
         paymentMethod,
         magic: useMagic, // server skips address/shipping and sends line_items
-        // UnCash — server re-validates against balance + cap and prices it itself.
-        ...(!useMagic && uncashPoints > 0 ? { redeemPoints: uncashPoints } : {}),
+        claimedGifts, // free gifts the shopper explicitly claimed; the server re-validates each one
         ...getFbCookies(), // _fbp / _fbc → stored on order for CAPI match quality
         ...getGaIds(), // GA4 client/session id → webhook fallback purchase joins the same GA4 session
       }).unwrap();
@@ -1414,6 +1360,7 @@ const CheckoutPage = () => {
       });
       rp.open();
     } catch (e) {
+      if (handleGiftClaimError(e)) return;
       const msg = e?.data?.message || e?.message || "Failed to initialize payment.";
       showNotification(msg, "error"); setPaymentError(msg); setShowRetry(true);
       // Express skipped the forms expecting Magic to collect everything. If the
@@ -1436,47 +1383,27 @@ const CheckoutPage = () => {
   // total ELIGIBLE UNITS in the cart — 2x the same eligible product is 2
   // gift wraps, not 1 — mirroring rp.payment.controller.js exactly.
   const giftWrapOffer = giftWrapOfferData?.data;
+  const giftWrapIds = giftWrapOffer?.eligibleProductIds;
   const giftWrapEligibleCount = cartItems.reduce(
-    (sum, i) => (i.giftWrapEligible ? sum + (Number(i.quantity) || 0) : sum),
+    (sum, i) => (i.giftWrapEligible || giftWrapIds?.includes(String(i.mongoId || i.id)) ? sum + (Number(i.quantity) || 0) : sum),
     0,
   );
   const giftWrapAmount =
     giftWrapSelected && giftWrapOffer?.isActive
       ? (Number(giftWrapOffer.price) || 0) * giftWrapEligibleCount
       : 0;
-  // UnCash redeem — mirrors validateAndPriceRedeem on the server: cap is
-  // maxRedeemPercentOfCart% of the product value after the coupon, converted
-  // to points, never more than the balance. Not offered on Magic Checkout.
-  const { data: loyaltyData } = useGetLoyaltySummaryQuery(undefined, { skip: isGuest });
-  const loyalty = !isGuest ? loyaltyData?.data : null;
-  const [useUnCash, setUseUnCash] = useState(false);
-  const uncashBase = Math.max(0, pricingDetails.subtotal - pricingDetails.discount);
-  const uncashRatio = Number(loyalty?.pointToRupeeRatio) || 1;
-  const uncashMaxPoints = loyalty?.isEnabled
-    ? Math.max(0, Math.min(loyalty.balance || 0, Math.floor((uncashBase * (loyalty.maxRedeemPercentOfCart || 0)) / 100 / uncashRatio)))
-    : 0;
-  const uncashMaxDiscount = Math.min(uncashMaxPoints * uncashRatio, uncashBase);
-  const uncashCanRedeem = !!loyalty?.isEnabled && !magicEnabled && uncashMaxPoints > 0;
-  const uncashPoints = uncashCanRedeem && useUnCash ? uncashMaxPoints : 0;
-  const uncashDiscount = uncashCanRedeem && useUnCash ? uncashMaxDiscount : 0;
-  const uncash = loyalty?.isEnabled
-    ? {
-        enabled: true,
-        balance: loyalty.balance || 0,
-        earnPercent: loyalty.earnPercent || 0,
-        maxRedeemPercent: loyalty.maxRedeemPercentOfCart || 0,
-        canRedeem: uncashCanRedeem,
-        maxPoints: uncashMaxPoints,
-        maxDiscount: uncashMaxDiscount,
-        on: useUnCash && uncashCanRedeem,
-        setOn: setUseUnCash,
-        points: uncashPoints,
-        discount: uncashDiscount,
-      }
-    : null;
-  const totalToPay = pricingDetails.subtotal + giftWrapAmount + shippingAmount - pricingDetails.discount - uncashDiscount;
-  const userName = isGuest ? guestName : profileName;
-  const userInitials = userName ? userName.split(" ").filter(Boolean).map((w) => w[0]).join("").toUpperCase().slice(0, 2) : "?";
+  // The server refuses an order whose claimed free gift is no longer valid (offer ended, cart changed,
+  // out of stock). Drop exactly those claims and tell the shopper — nothing is silently charged or dropped.
+  const handleGiftClaimError = (e) => {
+    const data = e?.data?.data;
+    if (data?.code !== "GIFT_CLAIM_INVALID") return false;
+    dispatch(pruneGiftClaims((data.rejected || []).map((r) => r.key)));
+    showNotification(e?.data?.message || "A free gift you claimed is no longer available. Please review your cart.", "error");
+    setShowRetry(false);
+    return true;
+  };
+
+  const totalToPay = pricingDetails.subtotal + giftWrapAmount + shippingAmount - pricingDetails.discount;
 
   // ── Payment-action helpers (money-critical: never charge a stale amount) ──
   const COD_HANDLING_FEE = 35; // portion of the advance that is the non-refundable COD fee (label only, no math change)
@@ -1680,6 +1607,22 @@ const CheckoutPage = () => {
             </p>
           </div>
 
+          {/* the first checkout screen — the gift wrap and the cart-value gift nudge belong here too */}
+          <div className="mt-4 empty:hidden"><CartGiftProgress promotions={checkoutPromotions} /></div>
+          <div className="mt-4 empty:hidden"><GiftWrapOffer variant="card" /></div>
+
+          {/* Prepaid opens Razorpay Magic straight away, so coupons are picked here. Applied only on tap. */}
+          <CheckoutCouponTickets
+            appliedCoupon={appliedCoupon}
+            discount={pricingDetails.discount}
+            cartTotal={cartTotalAmount}
+            isGuest={isGuest}
+            userId={userProfile?.userId}
+            items={cartItems.map((i) => ({ productId: i.mongoId || i.id.split(":")[0] }))}
+            onApplied={isGuest ? handleGuestCouponApplied : handleCouponApplied}
+            onRemove={isGuest ? handleGuestCouponRemoved : handleCouponRemoved}
+          />
+
           {/* ── Something went wrong on the last attempt ───────────────── */}
           {paymentError && (
             <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-red-100 bg-red-50 px-4 py-3">
@@ -1750,6 +1693,8 @@ const CheckoutPage = () => {
 
   return (
     <div className="bg-[#f5f7f5]">
+      {/* Offer reminder: only if the shopper opened an offer and added part of it; "No thanks" never blocks checkout */}
+      <OfferCheckoutReminder />
       {/* ── Step wizard ────────────────────────────────────────────────── */}
       <div className="bg-white border-b border-gray-100 pt-8 lg:pt-10">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 pb-6">
@@ -1861,6 +1806,14 @@ const CheckoutPage = () => {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4">
           <PromotionBannerList promotions={checkoutPromotions} pricing={checkoutPromotionsData?.data?.pricing} />
         </div>
+      )}
+      {/* Cart-value free gift still locked ("add ₹X more") — every step, it's the nudge that grows the order */}
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4 empty:hidden"><CartGiftProgress promotions={checkoutPromotions} /></div>
+      {/* festive gift wrap — shoppers who tap "Go to Checkout" on the product page never see the cart drawer */}
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4 empty:hidden"><GiftWrapOffer variant="card" /></div>
+      {/* Claimed free gifts that will be in the parcel (claiming itself happens in the cart) */}
+      {currentStep === reviewStep && (
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4"><GiftClaimList readOnly /></div>
       )}
       {/* ── Main ───────────────────────────────────────────────────────── */}
       <div className={`max-w-5xl mx-auto px-4 sm:px-6 pt-8 lg:pb-14 lg:grid lg:grid-cols-[1fr_360px] lg:gap-10 lg:items-start ${(isGuest && currentStep === 1) ? "pb-8" : "pb-32 lg:pb-14"}`}>
@@ -2799,6 +2752,9 @@ const CheckoutPage = () => {
                     : totalToPay
                   ).toLocaleString()}
                 </p>
+                {currentStep === reviewStep && paymentMethod === "COD" && (
+                  <p className="text-[8px] leading-tight text-gray-400">COD advance amount is non-refundable</p>
+                )}
               </button>
 
               {currentStep === contactStep && (
@@ -3092,6 +3048,8 @@ const CheckoutPage = () => {
                   discount={pricingDetails.discount}
                   isGuest={isGuest}
                   cartTotal={cartTotalAmount}
+                  guestEmail={guestEmail.trim()}
+                  guestMobile={guestMobile.trim()}
                   items={cartItems.map((i) => ({ productId: i.mongoId || i.id.split(":")[0] }))}
                   onCouponApplied={
                     isGuest ? handleGuestCouponApplied : handleCouponApplied

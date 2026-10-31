@@ -111,9 +111,30 @@ const rewardSchema = new mongoose.Schema(
     // comment on `promotionRepeatCount`/the reward-building loop in
     // promotionEngine.util.js for the cap calculation this drives.
     discountAllUnits: { type: Boolean, default: false },
+    // free_product only: the customer picks which variant of targetProductId they get (every in-stock variant is offered)
+    chooseVariant: { type: Boolean, default: false },
   },
   { _id: false },
 );
+
+// Per-surface card: the same fields the homepage card has (blank = standard text).
+const PLACEMENT_CARD_KEYS = ["pdp", "plp", "cart", "mini_cart", "checkout", "order_confirmation", "order_details", "customer_account"];
+const PLACEMENT_CARD_FIELDS = {
+  bannerImage: { type: String, trim: true, default: "" },
+  subtitle: { type: String, trim: true, default: "" },     // display title
+  badgeText: { type: String, trim: true, default: "" },    // small note under the price
+  ctaLabel: { type: String, trim: true, default: "" },
+  badgeLabel: { type: String, trim: true, default: "" },
+  priceLabel: { type: String, trim: true, default: "" },
+  savingsMode: { type: String, enum: ["amount", "percent", "label"], default: "amount" },
+  savingsLabel: { type: String, trim: true, default: "" },
+  ctaAction: { type: String, enum: ["cart", "link", "choose"], default: "cart" },
+  ctaUrl: { type: String, trim: true, default: "" },
+  primaryProductId: { type: String, trim: true, default: "" },
+  cardKind: { type: String, enum: ["combo", "reward"], default: "combo" },
+  ctaChoices: { type: [{ _id: false, label: { type: String, trim: true }, url: { type: String, trim: true } }], default: [] },
+  order: { type: Number, default: 0 },
+};
 
 const promotionSchema = new mongoose.Schema(
   {
@@ -193,6 +214,11 @@ const promotionSchema = new mongoose.Schema(
       default: ["pdp", "plp", "cart", "mini_cart", "checkout", "order_confirmation", "order_details", "customer_account"],
     },
 
+    // Optional wording + picture per surface (all blank = the standard card).
+    // Cosmetic only — never read by the discount engine; amounts always come
+    // from the real reward. "home" keeps its own card in homeCard.
+    placementCards: Object.fromEntries(PLACEMENT_CARD_KEYS.map((k) => [k, PLACEMENT_CARD_FIELDS])),
+
     // Cosmetic-only, read by the "home" placement's display endpoint
     // (getHomeDisplayController) — never touches condition/reward evaluation
     // or checkout math. Lets an admin dress up a 2-product "buy A+B
@@ -213,8 +239,17 @@ const promotionSchema = new mongoose.Schema(
       priceLabel: { type: String, trim: true, default: "" },     // blank = "Combo Price" / themed label
       savingsMode: { type: String, enum: ["amount", "percent", "label"], default: "amount" },
       savingsLabel: { type: String, trim: true, default: "" },   // used for mode "label" (e.g. "Combo Deal")
-      ctaAction: { type: String, enum: ["cart", "link"], default: "cart" },
+      ctaAction: { type: String, enum: ["cart", "link", "choose"], default: "cart" },
       ctaUrl: { type: String, trim: true, default: "" },         // used when ctaAction is "link"
+      // "reward" cards advertise a ladder offer ("Buy any 2 katana, get a Dual
+      // Stand free") without a fixed 2-product pair, so they show the free
+      // item instead of a computed combo price. ctaAction "choose" opens a
+      // small picker of these links (e.g. Wooden Katana / LED Katana).
+      // Product page a homepage offer tile opens (/products/<id>?offer=<promotion>).
+      // Blank = the first product named in the offer's condition.
+      primaryProductId: { type: String, trim: true, default: "" },
+      cardKind: { type: String, enum: ["combo", "reward"], default: "combo" },
+      ctaChoices: { type: [{ _id: false, label: { type: String, trim: true }, url: { type: String, trim: true } }], default: [] },
       order: { type: Number, default: 0 },                       // lower shows first
     },
 
