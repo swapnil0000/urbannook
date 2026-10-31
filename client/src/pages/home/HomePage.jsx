@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
+import { addItem } from '../../store/slices/cartSlice';
 import SEOHead from '../../component/SEOHead';
 import { productImg, firstVariant, inr } from '../../component/UnProductCard';
 import HomeProductCard from '../../component/HomeProductCard';
 import FestiveSections from '../../component/festive/FestiveSections';
-import CouponOffersSection from '../../component/offers/CouponOffersSection';
 import RangoliDivider from '../../component/festive/RangoliDivider';
-import { Reveal, Stagger, StaggerItem, Parallax, TextReveal, useInView, motion, AnimatePresence } from '../../component/motion';
+import { Reveal, Stagger, StaggerItem, Parallax, TextReveal, useInView, motion, AnimatePresence, MotionRoot } from '../../component/motion';
 import { useGetFeaturedProductsQuery, useGetProductsQuery } from '../../store/api/productsApi';
 import { useGetTestimonialsQuery } from '../../store/api/testimonialsApi';
-import { trackViewItemList } from '../../utils/analytics';
+import { useGetHomeComboOffersQuery } from '../../store/api/userApi';
+import { recordOfferInterest } from '../../utils/offerInterest';
+import { trackViewItemList, trackAddToCart } from '../../utils/analytics';
 
 const onImgErr = (e) => { e.currentTarget.src = '/assets/logo.webp'; };
 
@@ -266,6 +269,7 @@ const StickyAddBar = ({ product, onAdd }) => {
         <motion.div
           initial={{ y: 90, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 90, opacity: 0 }}
           transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+          data-sticky-buybar // the floating Help button lifts above this bar while it is shown
           className="md:hidden fixed left-0 right-0 z-30 px-3"
           style={{ bottom: 'calc(env(safe-area-inset-bottom) + 58px)' }}
         >
@@ -273,7 +277,13 @@ const StickyAddBar = ({ product, onAdd }) => {
             <img src={productImg(product)} alt="" className="w-12 h-12 object-cover shrink-0 bg-white/10" onError={onImgErr} />
             <div className="min-w-0 flex-1">
               <p className="text-[12px] font-bold truncate leading-tight">{product.productName}</p>
-              <p className="text-[11px] text-paper/60 leading-tight"><b className="text-paper">{inr(v.variantPrice)}</b> · Free shipping on the pair</p>
+              {/* price + real struck MRP / % off from the variant — no shipping claim (that depends on the live offer) */}
+              <p className="text-[11px] text-paper/60 leading-tight">
+                <b className="text-paper">{inr(v.variantPrice)}</b>
+                {Number(v.variantMrp) > Number(v.variantPrice) && (
+                  <> <s>{inr(v.variantMrp)}</s> · <span className="font-bold text-star">{Math.round((1 - v.variantPrice / v.variantMrp) * 100)}% OFF</span></>
+                )}
+              </p>
             </div>
             <button onClick={handle} className={`un-btn gl-press shrink-0 font-bold text-xs px-5 py-3 ${added ? 'bg-save text-white' : 'bg-brand text-white'}`}>
               {!added && <span className="un-fill bg-brandHi"></span>}
@@ -384,13 +394,20 @@ const toFeature = (p) => {
   };
 };
 
-const HeroCarousel = ({ products = [], onProduct, onVariant, onShop }) => {
+const HeroCarousel = ({ products = [], offers = [], onProduct, onVariant, onShop }) => {
   // The first few products take turns in the featured slot; the rail below
-  // carries the whole catalogue regardless.
-  const features = useMemo(
-    () => products.slice(0, 4).filter((p) => p?.productId).map(toFeature),
-    [products],
-  );
+  // carries the whole catalogue regardless. Products with a live offer
+  // (GET /promotions/display/home) lead the rotation and carry that offer,
+  // so the first screen sells the deal, not just the product.
+  const features = useMemo(() => {
+    const offerFor = new Map();
+    for (const o of offers) if (o?.primaryProductId && !offerFor.has(o.primaryProductId)) offerFor.set(o.primaryProductId, o);
+    const valid = products.filter((p) => p?.productId);
+    const withOffer = valid.filter((p) => offerFor.has(p.productId));
+    const rest = valid.filter((p) => !offerFor.has(p.productId));
+    return [...withOffer, ...rest].slice(0, Math.max(4, withOffer.length))
+      .map((p) => ({ ...toFeature(p), offer: offerFor.get(p.productId) || null }));
+  }, [products, offers]);
 
   /* The rotation above already covers the first few products, so the strip
      below carries the remainder. On a catalogue too small to have a remainder
@@ -457,9 +474,16 @@ const HeroCarousel = ({ products = [], onProduct, onVariant, onShop }) => {
         <div className="flex-1 flex flex-col md:flex-row items-center gap-7 md:gap-10 px-5 md:px-10 pt-7 md:pt-10">
           {/* copy */}
           <div key={`t-${f.id}`} className="un-in order-2 md:order-1 w-full md:w-[27rem] lg:w-[30rem] md:shrink-0">
-            <p className="gl-lbl text-brand mb-3">
-              Drop {String(idx + 1).padStart(2, '0')} · Made to order
-            </p>
+            {f.offer ? (
+              <p className="mb-3 inline-flex max-w-full items-center gap-2 bg-brand px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-white">
+                <i className={`fa-solid ${f.offer.mysteryGift || f.offer.freeGift ? 'fa-gift' : 'fa-tag'} text-[10px]`} aria-hidden="true" />
+                <span className="truncate">Diwali offer · {f.offer.benefit || f.offer.title}</span>
+              </p>
+            ) : (
+              <p className="gl-lbl text-brand mb-3">
+                Drop {String(idx + 1).padStart(2, '0')} · Made to order
+              </p>
+            )}
             {/* The rotating featured product is a heading of its own, not the page's H1:
                 the H1 (below, visually hidden) says what the whole store is. */}
             <h2 className="font-archivo text-[2.2rem] sm:text-5xl lg:text-6xl font-extrabold leading-[0.95] tracking-tight break-words">
@@ -482,8 +506,11 @@ const HeroCarousel = ({ products = [], onProduct, onVariant, onShop }) => {
             </div>
 
             <div className="mt-6 flex flex-wrap gap-3">
-              <button onClick={() => onProduct(f.id)} className="un-btn gl-press bg-brand text-white font-bold text-sm px-7 py-3.5">
-                <span className="un-fill bg-brandHi"></span>Shop this drop
+              <button
+                onClick={() => { if (f.offer) recordOfferInterest(f.offer.id, f.id); onProduct(f.id); }}
+                className="un-btn gl-press bg-brand text-white font-bold text-sm px-7 py-3.5"
+              >
+                <span className="un-fill bg-brandHi"></span>{f.offer ? 'Get the offer' : 'Shop this drop'}
               </button>
               <button onClick={onShop} className="un-btn gl-press border border-white/35 text-white font-bold text-sm px-7 py-3.5">
                 <span className="un-fill bg-white/10"></span>Shop all
@@ -531,7 +558,7 @@ const HeroCarousel = ({ products = [], onProduct, onVariant, onShop }) => {
                 className="flex gap-3 md:gap-4 overflow-x-auto gl-hscroll snap-x snap-mandatory pb-1"
                 style={{ touchAction: 'pan-x' }}
               >
-                {f.tiles.map((t) => (
+                {f.tiles.map((t, i) => (
                   /* Fixed width AND fixed aspect, so every tile is the same size
                      whatever the photo's ratio is — the shots run 0.75 to 1.0,
                      and sizing each tile to its own photo made the rail change
@@ -543,22 +570,19 @@ const HeroCarousel = ({ products = [], onProduct, onVariant, onShop }) => {
                     className="group relative shrink-0 snap-start text-left border border-white/10 overflow-hidden w-[62vw] max-w-[240px] sm:w-[clamp(190px,20vw,260px)] sm:max-w-none"
                   >
                     <div className="relative w-full aspect-[4/5] overflow-hidden bg-surface">
-                      {/* A blurred copy fills the box behind the real photo, so
-                          the tile can be a fixed shape without cropping the
-                          product or leaving a hard letterbox edge. The shots
-                          sit on soft studio gradients, so the blurred backdrop
-                          reads as a continuation of that backdrop. */}
-                      <img
-                        src={t.img}
-                        alt=""
-                        aria-hidden="true"
-                        onError={onImgErr}
-                        className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl"
-                      />
+                      {/* The photo is contained (not cropped); the tile's
+                          bg-surface fills any letterbox. A blurred full-size
+                          copy used to sit behind it — removed, its blur filter
+                          was repainted on every swipe and slowed low-end phones.
+                          Only the first tile is the LCP candidate: it alone is
+                          eager + high priority, the rest are lazy, so React
+                          doesn't emit a <link rel=preload> for them. */}
                       <img
                         src={t.img}
                         alt={t.label}
-                        loading="eager"
+                        loading={i === 0 ? 'eager' : 'lazy'}
+                        fetchPriority={i === 0 ? 'high' : undefined}
+                        decoding={i === 0 ? undefined : 'async'}
                         onError={onImgErr}
                         className="relative w-full h-full object-contain transition-transform duration-[900ms] group-hover:scale-[1.04]"
                       />
@@ -651,6 +675,8 @@ const HomePage = () => {
   const { data: featRes } = useGetFeaturedProductsQuery({ limit: 1 }, { refetchOnMountOrArgChange: false, refetchOnFocus: false, refetchOnReconnect: false });
   const { data: prodRes, isLoading } = useGetProductsQuery({ page: 1, limit: 24 });
   const products = useMemo(() => productList(prodRes), [prodRes]);
+  const { data: homeOffersRes } = useGetHomeComboOffersQuery();
+  const homeOffers = homeOffersRes?.data?.combos || [];
 
   /* products?featured=true currently answers "No Published Product found"
      even though a product does carry the tag, so this cannot be the only
@@ -658,6 +684,14 @@ const HomePage = () => {
      already loaded rather than to productImg(undefined), which resolves to
      the logo placeholder. That fallback is what put the logo on the page. */
   const featured = useMemo(() => productList(featRes)[0] || products[0], [featRes, products]);
+  // Mobile sticky bar's "Add" (StickyAddBar below). Restored: it was removed with
+  // the free-shipping bundle section but the sticky bar still calls it.
+  const dispatch = useDispatch();
+  const addOne = (p) => {
+    const v = firstVariant(p);
+    dispatch(addItem({ id: p.productId, mongoId: p.productId, name: p.productName, price: v.variantPrice, image: v.variantImage?.[0], quantity: 1, selectedVariant: v.variantName }));
+    trackAddToCart?.({ itemId: p.productId, itemName: p.productName, itemVariant: v.variantName || '', price: v.variantPrice || 0, quantity: 1 });
+  };
   const heroImg = productImg(featured);
 
   // Auto-carousel of the featured product's own shots (different images, one product)
@@ -735,6 +769,7 @@ const HomePage = () => {
       {/* ══ HERO — the drop ══ */}
       <HeroCarousel
         products={products}
+        offers={homeOffers}
         onProduct={(id) => navigate(`/products/${id}`)}
         /* a variant tile goes straight to that variant's page, not the list */
         onVariant={(id, sku) => navigate(sku ? `/product/${id}/${sku}` : `/products/${id}`)}
@@ -760,6 +795,8 @@ const HomePage = () => {
       {/* ══ SOCIAL PROOF + PAYMENT — editorial stat tiles ══ */}
     
       {/* ══ PRODUCTS — adaptive to catalog size ══ */}
+      {/* Diwali offers sit above Bestsellers (only with a catalog big enough to have them) */}
+      {!isFewProducts && bestsellers.length >= MIN_TAGGED && <FestiveSections />}
       <RangoliDivider />
       {isFewProducts ? (
         /* Small, curated catalog: ONE collection, no repeated grids. */
@@ -786,9 +823,7 @@ const HomePage = () => {
         </section>
       ) : null}
 
-      {!isFewProducts && bestsellers.length >= MIN_TAGGED && <FestiveSections />}
 
-      <CouponOffersSection />
 
 
         <Reveal className="max-w-[1280px] mx-auto px-5 py-5 md:py-7" y={18}>
@@ -1005,4 +1040,7 @@ const HomePage = () => {
   );
 };
 
-export default HomePage;
+// MotionRoot: reduced-motion setting for this page's animations (component/motion).
+const HomePageWithMotion = () => <MotionRoot><HomePage /></MotionRoot>;
+
+export default HomePageWithMotion;

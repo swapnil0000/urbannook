@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components -- shared motion primitives + tokens live together intentionally */
-import { Fragment, useRef } from "react";
-import { motion, useScroll, useTransform, useInView, AnimatePresence } from "motion/react";
+import { Fragment, useEffect, useRef } from "react";
+import { motion, useScroll, useTransform, useInView, AnimatePresence, MotionConfig } from "motion/react";
 
 /**
  * Shared motion primitives for Urban Nook.
@@ -123,15 +123,67 @@ export function ScrollColorBand({
   textTo = "#EFEAE0",
   range = [0.05, 0.35],
   as = "div",
+  // Page-wide night mode: pass a ref to the page wrapper. While the band fills a
+  // good part of the visible screen the wrapper gets `un-night` (index.css swaps the page
+  // tokens to dark, with a short colour transition), and the band itself is
+  // plain ink — so above, the band and below all read as one dark page.
+  nightScopeRef = null,
   ...rest
 }) {
   const ref = useRef(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
   const backgroundColor = useTransform(scrollYProgress, range, [from, to]);
   const color = useTransform(scrollYProgress, range, [textFrom, textTo]);
+
+  useEffect(() => {
+    const band = ref.current;
+    const scope = nightScopeRef?.current;
+    if (!band || !scope) return undefined;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    let timer;
+    let frame = 0;
+    // Only the part of the band the shopper can actually see counts: not what's
+    // under the sticky header, nor under the bottom bars (mobile buy bar + nav).
+    const visibleShare = () => {
+      const header = document.querySelector("header")?.getBoundingClientRect().bottom || 0;
+      const bottomBars = [...document.querySelectorAll(".fixed.inset-x-0, nav.fixed")]
+        .map((el) => el.getBoundingClientRect())
+        .filter((r) => r.height > 0 && r.height < window.innerHeight / 2 && r.bottom >= window.innerHeight - 2)
+        .reduce((top, r) => Math.min(top, r.top), window.innerHeight);
+      const r = band.getBoundingClientRect();
+      const seen = Math.max(0, Math.min(r.bottom, bottomBars) - Math.max(r.top, header));
+      return seen / Math.max(1, bottomBars - header);
+    };
+    const update = () => {
+      frame = 0;
+      const share = visibleShare();
+      const isOn = scope.classList.contains("un-night");
+      // hysteresis: on at 25 % of the visible screen, off below 12 % — no flicker at the edge
+      const on = isOn ? share > 0.12 : share > 0.25;
+      if (on === isOn) return;
+      if (!reduce) {
+        scope.classList.add("un-theme-anim");
+        clearTimeout(timer);
+        timer = setTimeout(() => scope.classList.remove("un-theme-anim"), 700);
+      }
+      scope.classList.toggle("un-night", on);
+    };
+    const onScroll = () => { if (!frame) frame = requestAnimationFrame(update); };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    update();
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      cancelAnimationFrame(frame);
+      clearTimeout(timer);
+      scope.classList.remove("un-night", "un-theme-anim");
+    };
+  }, [nightScopeRef]);
+
   const Tag = motion[as] || motion.div;
   return (
-    <Tag ref={ref} className={className} style={{ backgroundColor, color }} {...rest}>
+    <Tag ref={ref} className={className} style={nightScopeRef ? { backgroundColor: to, color: textTo } : { backgroundColor, color }} {...rest}>
       {children}
     </Tag>
   );
@@ -182,6 +234,15 @@ export function TextReveal({
       ))}
     </Tag>
   );
+}
+
+/**
+ * <MotionRoot> — wrap a page that uses these primitives (or motion/react) in
+ * it, so its animations respect prefers-reduced-motion. Lives in the pages,
+ * not the app shell, so `motion` only loads with the pages that animate.
+ */
+export function MotionRoot({ children }) {
+  return <MotionConfig reducedMotion="user">{children}</MotionConfig>;
 }
 
 export { motion, useInView, AnimatePresence };

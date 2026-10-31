@@ -27,6 +27,8 @@ const couponSchema = new mongoose.Schema(
     isArchived:     { type: Boolean, default: false },
     isTest:         { type: Boolean, default: false },
     isInternal:     { type: Boolean, default: false },
+    // Hidden from lists (cart, pay page, Magic sheet) but valid when typed — written by the admin panel, declared here so it is never stripped.
+    isHidden:       { type: Boolean, default: false },
 
     // Embedded assignments — same structure as admin model (replaces CouponAssignment collection).
     assignedTo: [

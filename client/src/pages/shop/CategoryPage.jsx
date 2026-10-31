@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { useGetCategoryBySlugQuery, useGetCategoriesQuery } from '../../store/api/productsApi';
+import { useGetCategoryBySlugQuery, useGetCategoriesQuery, useGetBlogPostsQuery } from '../../store/api/productsApi';
 import SEOHead from '../../component/SEOHead';
 import UnProductCard from '../../component/UnProductCard';
 import RevealCard from '../../component/RevealCard';
@@ -68,6 +68,10 @@ const CategoryPage = () => {
   const [searchParams] = useSearchParams();
   const { data, isLoading, error } = useGetCategoryBySlugQuery(slug);
   const { data: allRes } = useGetCategoriesQuery();
+  // A franchise page (/category/demon-slayer …) ends with that franchise's journal
+  // posts; the API returns none for other slugs. Same args as entry-server.jsx.
+  const { data: storiesRes } = useGetBlogPostsQuery({ series: slug, limit: 6 });
+  const stories = storiesRes?.data || [];
 
   const category = data?.data;
   const items = useMemo(() => toItems(category?.products), [category]);
@@ -192,6 +196,26 @@ const CategoryPage = () => {
           </nav>
         )}
       </section>
+
+      {stories.length > 0 && (
+        <section className="max-w-[1280px] mx-auto px-5 pb-12" aria-labelledby="stories-heading">
+          <div className="flex items-end justify-between gap-4 flex-wrap">
+            <h2 id="stories-heading" className="text-2xl md:text-3xl font-extrabold tracking-tight">The stories behind the swords</h2>
+            <Link to={`/blog#${category.slug}`} className="text-sm font-bold text-brand hover:underline">All {name} stories →</Link>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 mt-5">
+            {stories.map((p) => (
+              <Link key={p.slug} to={`/blog/${p.slug}`} className="group bg-white border border-hair rounded-2xl overflow-hidden hover:border-ink transition-colors flex gap-4 p-3">
+                {p.coverImage && <img src={p.coverImage} alt={p.coverAlt || p.title} loading="lazy" className="w-24 h-24 object-cover rounded-xl shrink-0" />}
+                <span className="flex flex-col min-w-0">
+                  <span className="font-extrabold leading-snug group-hover:text-brand line-clamp-2">{p.title}</span>
+                  {p.excerpt && <span className="text-sm text-muted line-clamp-2 mt-1">{p.excerpt}</span>}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
     </div>
   );

@@ -26,10 +26,10 @@ import { SsrContext } from './utils/ssrContext';
 const PREFETCH = [
   { path: '/', load: () => [['getFeaturedProducts', { limit: 1 }], ['getTestimonials', undefined]] },
   { path: '/products', load: () => [] },
-  { path: '/category/:slug', load: ({ slug }) => [['getCategoryBySlug', slug], ['getCategories', undefined]] },
+  { path: '/category/:slug', load: ({ slug }) => [['getCategoryBySlug', slug], ['getCategories', undefined], ['getBlogPosts', { series: slug, limit: 6 }]] },
   { path: '/product/:productId', load: ({ productId }) => productPage(productId) },
   { path: '/product/:productId/:variantSku', load: ({ productId, variantSku }) => productPage(productId, variantSku) },
-  { path: '/products/:productId', load: ({ productId }) => [['getProductById', productId]] },
+  { path: '/products/:productId', load: ({ productId }) => [['getProductById', productId], ['getProductPromotions', productId]] },
   { path: '/about-us', load: () => [['getPublicStats', undefined]] },
   { path: '/blog', load: () => [['getBlogPosts', { limit: 100 }]] },
   { path: '/blog/:slug', load: ({ slug }) => [['getBlogPost', slug]] },
@@ -41,7 +41,11 @@ function productPage(productId, variantSku) {
   return [
     ['getProductById', productId],
     ['getProductReviews', productId],
-    ['getProducts', { page: 1, limit: 8 }],
+    // Offers block under the buy buttons (ProductOffers) — in the HTML, so it doesn't shift the page in.
+    ['getProductPromotions', productId],
+    // Coupons under the buy buttons (CouponOffersSection variant="pdp"); guest list.
+    ['getCouponOffers', 'guest'],
+    // Related products read the { page: 1, limit: 24 } list from globalQueries.
     // Free-shipping threshold: the Offer schema's shipping details depend on it.
     ['getFreeShippingOffer', undefined],
     // Linked blog post ("Know the story"): the one for this variant (SKU), else a

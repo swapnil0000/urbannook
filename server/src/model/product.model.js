@@ -28,6 +28,14 @@ const productSchema = mongoose.Schema(
         sku: { type: String, default: "", uppercase: true, trim: true },
         variantImage: [String], // Specific images for this variant
         variantPrice: Number,
+        // Admin-written variant fields. They MUST be declared here: any write that goes through this schema (Mongoose
+        // casting) drops undeclared keys from the variant, and a non-.lean() read hides them. Keep in sync with
+        // server/models/product.model.js in the admin repo.
+        variantMrp: Number, // list price shown struck-through next to the selling price
+        variantDes: { type: String, default: "" },
+        variantSwatchType: { type: String, enum: ["image", "color"], default: "image" },
+        variantSwatchValue: { type: String, default: "" },
+        isActive: { type: Boolean, default: true }, // soft-delete: false = retired variant
         // Short optional line shown on the PDP under the product title when
         // this variant is selected (e.g. "BMW Inspired, 104cm"). Set from
         // the admin panel; blank shows nothing.

@@ -3,10 +3,11 @@ import Order from "../model/order.model.js";
 import Coupon from "../model/coupon.model.js";
 import {
   calculateShippingRate,
-  FALLBACK_SHIPPING_CHARGE,
+  staticShippingCharge,
 } from "../services/shipping.service.js";
-import { validateNewCoupon } from "../services/coupon.code.service.js";
+import { validateNewCoupon, getUserCouponIdentity } from "../services/coupon.code.service.js";
 import { getFreeShippingConfig } from "../utils/freeShippingOffer.util.js";
+import { selectMagicSheetCoupons, resolveMagicCouponIdentity } from "../utils/magicPromotions.util.js";
 import {
   verifyMagicCallback,
   toRazorpayServiceableAddress,
@@ -119,6 +120,17 @@ const cartItemsForOrder = (order) =>
     variantSku: i.variantSku,
   }));
 
+// Who the coupon rules are evaluated for — see resolveMagicCouponIdentity.
+const couponIdentityForOrder = async (order, payload) => {
+  const signedIn = !!order?.userId && !order?.isGuestOrder;
+  return resolveMagicCouponIdentity({
+    order,
+    payloadEmail: payload.email,
+    payloadMobile: stripCountryCode(payload.contact) || null,
+    account: signedIn ? await getUserCouponIdentity(order.userId) : null,
+  });
+};
+
 /* ===============================================================
    1. SERVICEABILITY / SHIPPING
    ---------------------------------------------------------------
@@ -175,6 +187,8 @@ export const magicShippingInfoController = asyncHandler(async (req, res) => {
     console.log(`${TAG}[shipping] free shipping carried over from order-create`);
   }
   const carriedOverFromOrderCreate = freeShipping;
+  // Static delivery charge keys off what the customer pays for the products (see staticShippingCharge).
+  const shippingCartValue = cartItems.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1), 0);
   try {
     const subtotal = cartItems.reduce(
       (s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1),
@@ -200,12 +214,13 @@ export const magicShippingInfoController = asyncHandler(async (req, res) => {
           pincode: addr.zipcode,
           paymentType: "PREPAID",
           cartItems,
+          cartValue: shippingCartValue,
         });
         // Still rate the pincode even when shipping is free — an unserviceable
         // pincode must be blocked regardless of who pays for delivery.
         return toRazorpayServiceableAddress(
           addr,
-          freeShipping ? 0 : (rate?.total_charges ?? FALLBACK_SHIPPING_CHARGE),
+          freeShipping ? 0 : (rate?.total_charges ?? staticShippingCharge(shippingCartValue)),
           true,
           { estimatedDays: rate?.estimatedDays },
         );
@@ -219,11 +234,11 @@ export const magicShippingInfoController = asyncHandler(async (req, res) => {
           return toRazorpayServiceableAddress(addr, 0, false);
         }
         console.error(
-          `${TAG}[shipping] pin ${addr.zipcode} rate failed, flat ₹${FALLBACK_SHIPPING_CHARGE}: ${err.message}`,
+          `${TAG}[shipping] pin ${addr.zipcode} rate failed, static ₹${staticShippingCharge(shippingCartValue)}: ${err.message}`,
         );
         return toRazorpayServiceableAddress(
           addr,
-          freeShipping ? 0 : FALLBACK_SHIPPING_CHARGE,
+          freeShipping ? 0 : staticShippingCharge(shippingCartValue),
           true,
         );
       }
@@ -253,28 +268,58 @@ export const magicGetPromotionsController = asyncHandler(async (req, res) => {
     // A coupon applied in our cart is already discounted into the order's line
     // items, so the reduction is in the amount Razorpay will charge. Offering
     // the coupon sheet on top of that invites a second discount on one order.
-    const existing = await orderByReceipt(payload.order_id, { coupon: 1 });
+    const existing = await orderByReceipt(payload.order_id, { coupon: 1, userId: 1, isGuestOrder: 1, items: 1, guestInfo: 1, senderMobile: 1 });
     if (existing?.coupon?.isApplied) {
       console.log(`${TAG}[getPromotions] coupon "${existing.coupon.couponCodeName}" already applied — no list`);
       return res.status(200).json({ promotions: [] });
     }
 
+    // The sheet shows only what THIS customer can redeem on THIS order (same
+    // rules as Apply Promotions), so the order's own cart is needed. Without
+    // it nothing can be vouched for — fail closed.
+    const magicOrderItems = cartItemsForOrder(existing);
+    const subtotalRupees = magicOrderItems.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 0), 0);
+    if (!existing || subtotalRupees <= 99) {
+      console.log(`${TAG}[getPromotions] no usable order cart (found=${!!existing}, subtotal=₹${subtotalRupees}) — no list`);
+      return res.status(200).json({ promotions: [] });
+    }
+
     const now = new Date();
-    const coupons = await Coupon.find({
+    // Scope and audience are NOT filtered here: TARGETED (assigned to this
+    // email/mobile) and MEMBERS_ONLY coupons belong on the sheet for exactly
+    // the people they are for, and validateNewCoupon decides who that is.
+    const candidates = await Coupon.find({
       isActive: true,
       isArchived: false,
       isTest: false,
       isInternal: false,
-      scope: "PUBLIC",
-      audience: "EVERYONE",
+      isHidden: { $ne: true },
       $and: [
         { $or: [{ validFrom: null }, { validFrom: { $exists: false } }, { validFrom: { $lte: now } }] },
         { $or: [{ validUntil: null }, { validUntil: { $exists: false } }, { validUntil: { $gte: now } }] },
         { $or: [{ maxTotalUses: null }, { maxTotalUses: { $exists: false } }, { $expr: { $lt: ["$usageCount", "$maxTotalUses"] } }] },
       ],
     })
-      .select({ code: 1, title: 1, discountType: 1, discountValue: 1, minCartValue: 1, maxDiscountCap: 1 })
       .lean();
+
+    // Razorpay's modal has no "greyed out" state, so a coupon this customer
+    // cannot redeem must not be on the sheet at all. The contact/email Razorpay
+    // sends decide TARGETED assignment and the per-customer limit; when they
+    // are missing, TARGETED coupons stay off the sheet (still redeemable by
+    // typing the code, where Apply Promotions receives them).
+    const isLoggedIn = !!existing.userId && !existing.isGuestOrder;
+    const identity = await couponIdentityForOrder(existing, payload);
+    const coupons = await selectMagicSheetCoupons(candidates, (coupon) =>
+      validateNewCoupon({
+        coupon,
+        cartProductTotal: subtotalRupees,
+        cartProductIds: magicOrderItems.map((i) => i.productId),
+        email: identity.email,
+        mobile: identity.mobile,
+        isLoggedIn,
+        userId: isLoggedIn ? existing.userId : undefined,
+      }),
+    );
 
     const describe = (c) => {
       const cap = c.maxDiscountCap ? ` up to ₹${c.maxDiscountCap}` : "";
@@ -284,15 +329,13 @@ export const magicGetPromotionsController = asyncHandler(async (req, res) => {
         : `₹${c.discountValue} off${min}`;
     };
 
-    const promotions = coupons
-      .filter((c) => c.code && c.discountType !== "INTERNAL_TEST")
-      .map((c) => ({
-        code: c.code,
-        summary: c.title || describe(c),
-        description: describe(c),
-      }));
+    const promotions = coupons.map((c) => ({
+      code: c.code,
+      summary: c.title || describe(c),
+      description: describe(c),
+    }));
 
-    console.log(`${TAG}[getPromotions] returning ${promotions.length} coupon(s)`);
+    console.log(`${TAG}[getPromotions] ${promotions.length} of ${candidates.length} candidate coupon(s) eligible for this order`);
     return res.status(200).json({ promotions });
   } catch (err) {
     // Auto-fetch calls this on every checkout open. An error must not stall the
@@ -319,7 +362,7 @@ export const magicApplyPromotionController = asyncHandler(async (req, res) => {
   const payload = authedPayload("applyPromotion", req, res);
   if (!payload) return;
 
-  const { code, contact, email } = payload;
+  const { code } = payload;
   // Not resolveRazorpayOrderId — Apply Promotions only ever sends `order_id`,
   // and per Razorpay's docs that's the receipt, not a Razorpay order id.
   const receipt = payload.order_id;
@@ -343,6 +386,8 @@ export const magicApplyPromotionController = asyncHandler(async (req, res) => {
     userId: 1,
     isGuestOrder: 1,
     items: 1,
+    guestInfo: 1,
+    senderMobile: 1,
   });
 
   if (order?.coupon?.isApplied) {
@@ -371,14 +416,16 @@ export const magicApplyPromotionController = asyncHandler(async (req, res) => {
     return fail("Coupons are not applicable on cart values of ₹99 or less.", "REQUIREMENT_NOT_MET");
   }
 
+  const identity = await couponIdentityForOrder(order, payload);
+
   let discountRupees;
   try {
     discountRupees = await validateNewCoupon({
       coupon,
       cartProductTotal: subtotalRupees,
       cartProductIds: magicOrderItems.map((i) => i.productId),
-      email,
-      mobile: stripCountryCode(contact),
+      email: identity.email,
+      mobile: identity.mobile,
       // Magic carries no session of ours, but the order does: it was created
       // by either the logged-in or the guest checkout. Hardcoding false here
       // refused every MEMBERS_ONLY coupon to signed-in customers, who are

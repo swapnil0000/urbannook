@@ -72,6 +72,30 @@ const saveGuestGiftNote = (noteOptions) => {
   }
 };
 
+// Free gifts the shopper CLAIMED (explicit claiming — nothing is ever added automatically).
+// Only {promotionId, productId, variantSku, quantity}: the server re-validates every claim against the
+// live cart on each pricing call and at order time, so this list can never grant anything by itself.
+// Kept in its own key so it survives refreshes and the guest → login switch.
+const CLAIMED_GIFTS_KEY = 'claimedGifts';
+export const giftClaimKey = (g) => `${g.promotionId}:${g.productId}:${g.variantSku || ''}`;
+const loadClaimedGifts = () => {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return [];
+    const parsed = JSON.parse(localStorage.getItem(CLAIMED_GIFTS_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed.filter((g) => g && g.promotionId && g.productId) : [];
+  } catch {
+    return [];
+  }
+};
+const saveClaimedGifts = (claims) => {
+  try {
+    if (claims.length) localStorage.setItem(CLAIMED_GIFTS_KEY, JSON.stringify(claims));
+    else localStorage.removeItem(CLAIMED_GIFTS_KEY);
+  } catch (e) {
+    console.error('[saveClaimedGifts] Failed to save:', e);
+  }
+};
+
 const isGuest = () => !localStorage.getItem('authToken');
 
 // The guest cart as stored in this browser. On the SSR server (no
@@ -89,6 +113,7 @@ const guestCartState = () => {
     // Boolean only — see GUEST_GIFT_WRAP_KEY comment above for why no price lives here.
     giftWrap: hasStorage && !loggedIn ? loadGuestGiftWrap() : false,
     giftWrapNoteOptions: hasStorage && !loggedIn ? loadGuestGiftNote() : ['none'],
+    claimedGifts: loadClaimedGifts(),
   };
 };
 
@@ -104,6 +129,27 @@ const cartSlice = createSlice({
   name: 'cart',
   initialState,
   reducers: {
+    // Explicit free-gift claiming (see giftClaimKey above).
+    claimGift: (state, action) => {
+      const g = action.payload;
+      if (!g?.promotionId || !g?.productId) return;
+      const key = giftClaimKey(g);
+      const existing = state.claimedGifts.find((c) => giftClaimKey(c) === key);
+      if (existing) existing.quantity = Math.max(1, Number(g.quantity) || 1);
+      else state.claimedGifts.push({ promotionId: String(g.promotionId), productId: g.productId, variantSku: g.variantSku || '', quantity: Math.max(1, Number(g.quantity) || 1) });
+      saveClaimedGifts(state.claimedGifts);
+    },
+    unclaimGift: (state, action) => {
+      state.claimedGifts = state.claimedGifts.filter((c) => giftClaimKey(c) !== action.payload);
+      saveClaimedGifts(state.claimedGifts);
+    },
+    // Drops claims the server said are no longer valid (keys), so they are never re-sent.
+    pruneGiftClaims: (state, action) => {
+      const drop = new Set(action.payload || []);
+      if (!drop.size) return;
+      state.claimedGifts = state.claimedGifts.filter((c) => !drop.has(giftClaimKey(c)));
+      saveClaimedGifts(state.claimedGifts);
+    },
     recordSuccessfulAdd: (state, action) => {
       state.addSequence += 1;
       state.lastSuccessfulAdd = { ...action.payload, sequence: state.addSequence };
@@ -234,6 +280,8 @@ const cartSlice = createSlice({
       state.selections = {};
       state.giftWrap = false;
       state.giftWrapNoteOptions = ['none'];
+      state.claimedGifts = []; // an emptied cart (e.g. after an order) forgets its gift claims
+      saveClaimedGifts([]);
     },
 
     // Sets the gift-wrap boolean intent + which note option(s) were picked
@@ -358,6 +406,6 @@ const cartSlice = createSlice({
   },
 });
 
-export const { recordSuccessfulAdd, restoreGuestCart, addItem, removeItem, updateQuantity, clearCart, syncCartFromProfile, setCartItems, updateSelection, setGiftWrap } = cartSlice.actions;
+export const { claimGift, unclaimGift, pruneGiftClaims, recordSuccessfulAdd, restoreGuestCart, addItem, removeItem, updateQuantity, clearCart, syncCartFromProfile, setCartItems, updateSelection, setGiftWrap } = cartSlice.actions;
 
 export default cartSlice.reducer;

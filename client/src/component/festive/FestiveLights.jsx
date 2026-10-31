@@ -84,13 +84,13 @@ export const Diya = ({ className = '', tone = 'onDark' }) => {
  * A diya hanging from a fine string, swaying gently. Used sparingly (a couple
  * of spots) instead of diyas standing everywhere.
  */
-export const HangingDiya = ({ tone = 'onDark', length = 14, className = '', style }) => (
+export const HangingDiya = ({ tone = 'onDark', length = 14, className = '', diyaClass = '', style }) => (
   <div className={`un-sway absolute ${className}`} style={{ transformOrigin: 'top center', ...style }} aria-hidden="true">
     <span
       className="mx-auto block w-px"
       style={{ height: length, background: tone === 'onLight' ? 'rgb(var(--gl-ink) / 0.55)' : 'rgb(var(--gl-star) / 0.65)' }}
     />
-    <Diya tone={tone} />
+    <Diya tone={tone} className={`mx-auto ${diyaClass}`} />
   </div>
 );
 

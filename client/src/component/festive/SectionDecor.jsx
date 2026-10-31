@@ -25,7 +25,7 @@ const CornerRangoli = ({ className = '', flip = false }) => {
 };
 
 /** A small firecracker starburst: rays + dots, pulsing. */
-const CrackerBurst = ({ className = '', delay = 0 }) => (
+export const CrackerBurst = ({ className = '', delay = 0 }) => (
   <svg viewBox="-20 -20 40 40" className={`un-burst ${className}`} style={{ animationDelay: `${delay}s` }} fill="none" aria-hidden="true">
     {Array.from({ length: 10 }, (_, i) => (
       <g key={i} transform={`rotate(${i * 36})`}>

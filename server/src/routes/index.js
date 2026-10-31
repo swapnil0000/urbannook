@@ -20,8 +20,6 @@ import adminAnalyticsRouter from "./admin.analytics.route.js";
 import freeShippingOfferRouter from "./freeShippingOffer.route.js";
 import passkeyRouter from "./passkey.route.js";
 import offerLeadRouter from "./offerLead.route.js";
-import themeRouter from "./theme.route.js";
-import siteBannerRouter from "./siteBanner.route.js";
 import offerRouter from "./offer.route.js";
 import guestCartRouter from "./guestCart.route.js";
 import webhookRouter from "./webhook.route.js";
@@ -51,8 +49,6 @@ export {
   freeShippingOfferRouter,
   passkeyRouter,
   offerLeadRouter,
-  themeRouter,
-  siteBannerRouter,
   offerRouter,
   guestCartRouter,
   webhookRouter,

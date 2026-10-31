@@ -16,18 +16,18 @@ import SeoPageContent from './component/SeoPageContent';
 import NewsTicker from './pages/home/NewsTicker';
 import FestiveEffects from './component/festive/FestiveEffects';
 import { SiteCampaignProvider } from './hooks/useSiteCampaign';
-import WhatsAppLoginWatcher from './component/layout/auth/WhatsAppLoginWatcher';
-import WhatsAppOneTap from './component/layout/auth/WhatsAppOneTap';
 import { trackPageView, setUserId, captureAttribution, setMetaAdvancedMatching } from './utils/analytics';
 import MotionLayer from './component/MotionLayer';
 import SmoothScroll from './component/motion/SmoothScroll';
+import { lazyWithPreload } from './utils/lazyWithPreload';
 
 // Only lazy load non-critical components
-const NewHeader = lazy(() => import('./component/layout/NewHeader'));
-const Footer = lazy(() => import('./component/layout/Footer'));
+// Header and footer are in every server-rendered page: preloaded before
+// hydration (main.jsx) so they never drop back to their fallback.
+export const NewHeader = lazyWithPreload(() => import('./component/layout/NewHeader'));
+export const Footer = lazyWithPreload(() => import('./component/layout/Footer'));
 const Notification = lazy(() => import('./component/Notification'));
 const GlMobileNav = lazy(() => import('./component/layout/GlMobileNav'));
-const SocialMediaFAB = lazy(() => import('./component/layout/WhatsAppButton'));
 const OpenInBrowserBanner = lazy(() => import('./component/OpenInBrowserBanner'));
 const GoogleOneTap = lazy(() => import('./component/GoogleOneTap'));
 // SiteOfferPopup (₹100 off + lead capture) is retired — the store now runs free
@@ -35,13 +35,19 @@ const GoogleOneTap = lazy(() => import('./component/GoogleOneTap'));
 // import and the <SiteOfferPopup /> mount below to bring it back.
 // Free-shipping announcement in the same slot and style; admin-controlled.
 const FreeShippingPopup = lazy(() => import('./component/FreeShippingPopup'));
-const ScrollHint = lazy(() => import('./component/ScrollHint'));
+// Live-offers carousel (centered on desktop, bottom sheet on mobile), once per session.
+const OffersPopup = lazy(() => import('./component/offers/OffersPopup'));
+// Floating "Help" button → Help & Support panel (WhatsApp + FAQs).
+const HelpWidget = lazy(() => import('./component/support/HelpWidget'));
 const PasskeyPrompt = lazy(() => import('./component/PasskeyPrompt'));
 // Smart combo/upsell bottom sheet (Promotion V2) — watches the cart from the
 // app root so it fires on an add from ANY surface (PDP, cart drawer, etc.),
 // not just one page. See the component's own header comment for the full
 // trigger/dismissal contract.
 const PromotionUnlockSheet = lazy(() => import('./component/promotions/PromotionUnlockSheet'));
+const GiftClaimWatcher = lazy(() => import('./component/promotions/GiftClaimWatcher'));
+const WhatsAppLoginWatcher = lazy(() => import('./component/layout/auth/WhatsAppLoginWatcher'));
+const WhatsAppOneTap = lazy(() => import('./component/layout/auth/WhatsAppOneTap'));
 
 // Component to handle session restoration and token removal detection
 const SessionManager = ({ children }) => {
@@ -98,24 +104,31 @@ const SessionManager = ({ children }) => {
       }
     };
 
-    // Periodic check for token removal (catches manual deletion in same tab)
-    const checkAuthInterval = setInterval(() => {
+    // Catches the token being deleted by hand in this tab (DevTools). Every
+    // logout path in the code dispatches logout() itself, and other tabs fire
+    // 'storage', so checking when the tab regains focus is enough — it used to
+    // poll localStorage every second, which ran during taps and scrolls.
+    const checkAuth = () => {
+      if (document.visibilityState === 'hidden') return;
       const currentToken = localStorage.getItem('authToken');
       const currentUser = localStorage.getItem('user');
       const reduxState = store.getState().auth;
-      
+
       // If Redux thinks we're authenticated but tokens are missing, force logout
       if (reduxState.isAuthenticated && (!currentToken || !currentUser)) {
         console.log('[Auth] Token mismatch detected - forcing logout');
         dispatch(logout());
       }
-    }, 1000); // Check every second
+    };
 
     window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('focus', checkAuth);
+    document.addEventListener('visibilitychange', checkAuth);
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
-      clearInterval(checkAuthInterval);
+      window.removeEventListener('focus', checkAuth);
+      document.removeEventListener('visibilitychange', checkAuth);
     };
   }, [dispatch, store]);
 
@@ -194,14 +207,15 @@ function App({ store = browserStore, helmetContext }) {
               {/* Polls a pending WhatsApp login at the app level, so the login
                   completes even if the modal closes or the page reloads */}
               <ErrorBoundary>
-                <WhatsAppLoginWatcher />
+                <Suspense fallback={null}>
+                  <WhatsAppLoginWatcher />
+                </Suspense>
               </ErrorBoundary>
               {/* Only non-critical components are lazy loaded */}
               <Suspense fallback={null}>
                 <ErrorBoundary>
                   <Footer />
                 </ErrorBoundary>
-                <SocialMediaFAB />
                 <Notification />
                 <GlMobileNav />
                 {/* Global Google One Tap for logged-out visitors (boosts Meta EMQ) */}
@@ -221,12 +235,17 @@ function App({ store = browserStore, helmetContext }) {
                 <ErrorBoundary>
                   <FreeShippingPopup />
                 </ErrorBoundary>
+                {/* Live offers carousel — waits while the free-shipping popup is due */}
+                <ErrorBoundary>
+                  <OffersPopup />
+                </ErrorBoundary>
                 {/* Promotion V2 "add more to unlock" bottom sheet */}
                 <ErrorBoundary>
                   <PromotionUnlockSheet />
+                  <GiftClaimWatcher />
                 </ErrorBoundary>
                 <ErrorBoundary>
-                  <ScrollHint />
+                  <HelpWidget />
                 </ErrorBoundary>
               </Suspense>
             </SyncProvider>
@@ -241,4 +260,4 @@ function App({ store = browserStore, helmetContext }) {
 
 export default App;
 
-// trigre buil
+// // trigger build again

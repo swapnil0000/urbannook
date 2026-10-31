@@ -2,6 +2,7 @@ import Coupon from "../model/coupon.model.js";
 import CouponUsage from "../model/couponUsage.model.js";
 import { getCartService } from "../services/user.cart.service.js";
 import Cart from "../model/user.cart.model.js";
+import User from "../model/user.model.js";
 import {
   ValidationError,
   NotFoundError,
@@ -21,6 +22,42 @@ function normalizeEmail(raw) {
   const clean = String(raw).toLowerCase().trim();
   return clean.includes("@") ? clean : null;
 }
+
+// Who a signed-in customer is, read from OUR user record — never from the
+// request body, which the client controls. A TARGETED coupon can be assigned
+// to either an email or a mobile, so both (and the WhatsApp-verified number,
+// which can differ from the typed profile one) must count as "this customer".
+async function getUserCouponIdentity(userId) {
+  if (!userId) return { email: null, mobiles: [] };
+  const user = await User.findOne({ userId }, { email: 1, mobileNumber: 1, verifiedMobile: 1 }).lean();
+  if (!user) return { email: null, mobiles: [] };
+  const mobiles = [user.verifiedMobile, user.mobileNumber].map(normalizeMobile).filter(Boolean);
+  return { email: normalizeEmail(user.email), mobiles: [...new Set(mobiles)] };
+}
+
+/** How many times this customer has already used each coupon. */
+const usedByUser = async (userId, couponIds) => {
+  if (!userId || !couponIds.length) return new Map();
+  const user = await User.findOne({ userId }, { email: 1, mobileNumber: 1, verifiedMobile: 1 }).lean();
+  if (!user) return new Map();
+  const or = [{ userId }];
+  if (user.email) or.push({ email: String(user.email).toLowerCase() });
+  for (const m of [user.mobileNumber, user.verifiedMobile]) if (m) or.push({ mobile: String(m) });
+  const rows = await CouponUsage.aggregate([
+    { $match: { couponId: { $in: couponIds }, reversed: { $ne: true }, $or: or } },
+    { $group: { _id: "$couponId", n: { $sum: 1 } } },
+  ]);
+  return new Map(rows.map((r) => [r._id, r.n]));
+};
+
+// Live-now, not used up: the same gate the "Offers" cards already apply.
+const liveWindowFilter = (now = new Date()) => ({
+  $and: [
+    { $or: [{ validFrom: null }, { validFrom: { $exists: false } }, { validFrom: { $lte: now } }] },
+    { $or: [{ validUntil: null }, { validUntil: { $exists: false } }, { validUntil: { $gt: now } }] },
+    { $or: [{ maxTotalUses: null }, { maxTotalUses: { $exists: false } }, { $expr: { $lt: ["$usageCount", "$maxTotalUses"] } }] },
+  ],
+});
 
 function calculateDiscount(coupon, cartProductTotal) {
   if (coupon.discountType === "INTERNAL_TEST") return 0; // caller overrides grand total to ₹1
@@ -52,13 +89,13 @@ function couponProductGateOk(coupon, cartProductIds) {
 // cartProductIds: distinct productIds currently in the cart/order — only
 // needed for coupons with eligibleProductIds set; omit/empty is fine for
 // every other coupon (couponProductGateOk is a no-op when the field is unset).
-async function validateNewCoupon({ coupon, cartProductTotal, cartProductIds, email, mobile, isLoggedIn }) {
+async function validateNewCoupon({ coupon, cartProductTotal, cartProductIds, email, mobile, isLoggedIn, userId }) {
   const tag = "[Coupon:Storefront]";
   const now = new Date();
 
   console.log(
     `${tag} ELIGIBILITY CHECK "${coupon.code}" — scope=${coupon.scope} audience=${coupon.audience} ` +
-    `isLoggedIn=${isLoggedIn} email=${email || "-"} mobile=${mobile || "-"} assignedToCount=${coupon.assignedTo?.length ?? 0} ` +
+    `isLoggedIn=${isLoggedIn} email=${email || "-"} mobile=${[].concat(mobile ?? []).join("/") || "-"} assignedToCount=${coupon.assignedTo?.length ?? 0} ` +
     `cartProductTotal=₹${cartProductTotal}`
   );
 
@@ -117,9 +154,11 @@ async function validateNewCoupon({ coupon, cartProductTotal, cartProductIds, ema
     throw new ValidationError("This coupon has reached its maximum number of uses.");
   }
 
+  // `mobile` may be one number or several (a signed-in customer can have both a
+  // profile and a WhatsApp-verified number) — any of them counts as this customer.
   const normEmail  = normalizeEmail(email);
-  const normMobile = normalizeMobile(mobile);
-  const identifiers = [normEmail, normMobile].filter(Boolean);
+  const normMobiles = [].concat(mobile ?? []).map(normalizeMobile).filter(Boolean);
+  const identifiers = [normEmail, ...normMobiles].filter(Boolean);
 
   // Internal test coupons skip only the TARGETED single-use (usedAt) gate, so an assigned
   // team member can redeem repeatedly. Their per-user limit is still enforced below via
@@ -127,13 +166,16 @@ async function validateNewCoupon({ coupon, cartProductTotal, cartProductIds, ema
   const skipSingleUseGate = isValidInternal;
 
   // Per-user cap — enforced whenever a maxUsesPerUser limit is set (null = unlimited).
-  if (identifiers.length > 0 && coupon.maxUsesPerUser) {
+  // The account itself counts too (userId), not just the typed email/mobile: otherwise a member who orders to a
+  // different delivery number could use a once-per-customer coupon again.
+  if ((identifiers.length > 0 || userId) && coupon.maxUsesPerUser) {
     const priorCount = await CouponUsage.countDocuments({
       couponId: coupon.couponId,
       reversed: { $ne: true }, // a cancelled/refunded order's usage must not count against the limit
       $or: [
+        ...(userId ? [{ userId }] : []),
         ...(normEmail  ? [{ email:  normEmail  }] : []),
-        ...(normMobile ? [{ mobile: normMobile }] : []),
+        ...(normMobiles.length ? [{ mobile: { $in: normMobiles } }] : []),
       ],
     });
     console.log(`${tag} Prior uses by this user for "${coupon.code}": ${priorCount} (limit: ${coupon.maxUsesPerUser})`);
@@ -213,14 +255,22 @@ const applyCouponCodeService = async ({ userId, couponCodeName, email, mobile })
   if (newCoupon) {
     console.log(`${tag} Found in new model: couponId=${newCoupon.couponId} isActive=${newCoupon.isActive} isTest=${newCoupon.isTest} type=${newCoupon.discountType}`);
 
+    // The customer is identified from our own user record, not from `email` /
+    // `mobile` in the request body: that is what lets a coupon assigned to a
+    // MOBILE work for a signed-in customer, and stops anyone claiming another
+    // person's assigned coupon by sending their email. Same identifiers the
+    // payment step re-checks with (rp.payment.controller.js).
+    const identity = await getUserCouponIdentity(userId);
+
     // throws ValidationError/NotFoundError on any failure
     const discountAmount = await validateNewCoupon({
       coupon: newCoupon,
       cartProductTotal: cartSubtotal,
       cartProductIds: availableItems.map((i) => i.productId),
-      email,
-      mobile,
+      email: identity.email,
+      mobile: identity.mobiles,
       isLoggedIn: !!userId,
+      userId,
     });
 
     // Discount applies to product subtotal only. INTERNAL_TEST is handled at payment time
@@ -263,79 +313,120 @@ const applyCouponCodeService = async ({ userId, couponCodeName, email, mobile })
 // Returns a unified array of coupons in a normalised shape that CouponList can
 // render without knowing which model a coupon came from.
 
+// Can THIS customer see / use this coupon at all, audience-wise? Pure.
+//   TARGETED     → only someone it is assigned to (email or mobile) who has not used it
+//   MEMBERS_ONLY → only a signed-in customer
+// Everything else (min cart, product gate, per-user limit…) is validateNewCoupon's job.
+function couponAudienceOk(coupon, { isLoggedIn, identifiers = [] }) {
+  if (coupon.scope === "TARGETED") {
+    return (coupon.assignedTo || []).some((a) => !a.usedAt && identifiers.includes(a.identifier));
+  }
+  if (coupon.audience === "MEMBERS_ONLY") return !!isLoggedIn;
+  return true;
+}
+
+const LIST_FIELDS = { couponId: 1, code: 1, title: 1, notes: 1, discountType: 1, discountValue: 1, maxDiscountCap: 1, minCartValue: 1, validUntil: 1, eligibleProductIds: 1, scope: 1, audience: 1, assignedTo: 1, maxUsesPerUser: 1 };
+
+const toListItem = (c, extra = {}) => ({
+  id:            c.couponId,
+  code:          c.code,
+  title:         c.title || c.code,
+  description:   c.notes || null,
+  discountType:  c.discountType,   // "PERCENTAGE" | "FLAT"
+  discountValue: c.discountValue || 0,
+  maxDiscountCap: c.maxDiscountCap || null,
+  minCartValue:  c.minCartValue || 0,
+  validUntil:    c.validUntil || null,
+  ...extra,
+});
+
+// userId MUST come from the verified session (the controller passes req.user),
+// never from the request body — it decides which coupons are shown.
+//
 // cartProductIds: only meaningful for GUESTS, whose cart lives client-side
 // (there's nothing server-side to look up) — the caller must pass the
 // guest's current cart productIds. For a logged-in user, the server's own
 // stored cart (getCartService) is the trusted source instead; anything a
 // logged-in client might pass here is ignored, same trust boundary
 // applyCouponCodeService already uses.
-const getAllCouponCodeService = async ({ userId, code, cartProductIds }) => {
+//
+// email / mobile: only used for GUESTS, to recognise a TARGETED coupon assigned
+// to them. A signed-in customer is identified from the user record instead.
+const getAllCouponCodeService = async ({ userId, code, cartProductIds, email, mobile }) => {
   const tag = "[Coupon:List]";
   console.log(`${tag} getAllCouponCodeService called: userId=${userId || "-"} code="${code || "-"}"`);
 
   let effectiveCartProductIds = cartProductIds;
+  let identity;
   if (userId) {
-    const cartRes = await getCartService({ userId });
+    const [cartRes, userIdentity] = await Promise.all([getCartService({ userId }), getUserCouponIdentity(userId)]);
     effectiveCartProductIds = cartRes.success ? cartRes.data.availableItems.map((i) => i.productId) : [];
+    identity = userIdentity;
+  } else {
+    identity = { email: normalizeEmail(email), mobiles: [].concat(mobile ?? []).map(normalizeMobile).filter(Boolean) };
   }
+  const identifiers = [identity.email, ...identity.mobiles].filter(Boolean);
+  const isLoggedIn = !!userId;
 
-  // ── Single-coupon lookup by exact code (used by guests typing a code manually) ──
+  // Live now and not used up — an expired or sold-out coupon is not an offer.
+  // Testing / internal coupons are never exposed here.
+  const baseFilter = { isActive: true, isArchived: false, isTest: false, isInternal: { $ne: true }, ...liveWindowFilter() };
+
+  // ── Single-coupon lookup by exact code (a guest typing a code manually) ──
   // Lets the storefront show the correct discount for HIDDEN coupons without listing them.
-  // Only returns a coupon if the exact code is known — hidden coupons never appear in the
-  // general list below. Server still fully re-validates at order creation.
+  // Server still fully re-validates at order creation.
+  //   · PUBLIC / hidden → returned
+  //   · MEMBERS_ONLY    → returned flagged `membersOnly` for a guest, so the UI can ask them
+  //                       to sign in instead of claiming the code does not exist
+  //   · TARGETED        → returned only if the email/mobile given is assigned to it and unused
   if (code) {
     const cleanCode = String(code).trim().toUpperCase();
-    const one = await Coupon.findOne(
-      {
-        code: cleanCode,
-        scope: "PUBLIC",
-        audience: { $ne: "MEMBERS_ONLY" },
-        isActive: true,
-        isArchived: false,
-        isTest: false, // testing/internal coupons stay invisible; isHidden is intentionally NOT filtered
-      },
-      { couponId: 1, code: 1, title: 1, notes: 1, discountType: 1, discountValue: 1, maxDiscountCap: 1, minCartValue: 1, validUntil: 1 },
-    ).lean();
+    const one = await Coupon.findOne({ code: cleanCode, ...baseFilter }, LIST_FIELDS).lean();
 
+    let data = [];
     if (!one) {
-      // Debug-only lookup to explain WHY it didn't match (this query result is never returned to the client).
-      const raw = await Coupon.findOne({ code: cleanCode }, { scope: 1, audience: 1, isActive: 1, isArchived: 1, isTest: 1 }).lean();
-      console.log(
-        `${tag} Code "${cleanCode}" NOT returned by public lookup. ` +
-        (raw
-          ? `Found in DB but filtered out: scope=${raw.scope} audience=${raw.audience} isActive=${raw.isActive} isArchived=${raw.isArchived} isTest=${raw.isTest} ` +
-            `(scope must be PUBLIC, audience must not be MEMBERS_ONLY, isActive=true, isArchived=false, isTest=false — this is by design for TARGETED/MEMBERS_ONLY coupons, they're never returned by this code-lookup endpoint either)`
-          : `No coupon with this code exists at all.`)
-      );
+      console.log(`${tag} Code "${cleanCode}" NOT returned by lookup (missing, paused, archived, testing, internal, expired or used up).`);
+    } else if (one.scope === "TARGETED") {
+      if (couponAudienceOk(one, { isLoggedIn, identifiers })) data = [toListItem(one)];
+      else console.log(`${tag} Code "${cleanCode}" is TARGETED and not assigned to the caller — not returned.`);
+    } else if (one.audience === "MEMBERS_ONLY" && !isLoggedIn) {
+      data = [toListItem(one, { membersOnly: true })];
     } else {
-      console.log(`${tag} Code "${cleanCode}" matched and returned.`);
+      data = [toListItem(one)];
     }
 
-    const data = one
-      ? [{
-          id:            one.couponId,
-          code:          one.code,
-          title:         one.title || one.code,
-          description:   one.notes || null,
-          discountType:  one.discountType,
-          discountValue: one.discountValue || 0,
-          maxDiscountCap: one.maxDiscountCap || null,
-          minCartValue:  one.minCartValue || 0,
-          validUntil:    one.validUntil || null,
-        }]
-      : [];
+    // A product-gated coupon typed without its product in the cart: say so now,
+    // instead of letting it "apply" and be refused at payment.
+    if (data.length && !data[0].membersOnly && effectiveCartProductIds?.length && !couponProductGateOk(one, effectiveCartProductIds)) {
+      data = [toListItem(one, { productGateFailed: true })];
+    }
+
+    // Already used up by this customer? Say so now instead of letting the guest
+    // "apply" it and be refused at payment. Only possible once they have given us
+    // an email/mobile (a signed-in customer is told by /coupon/apply instead).
+    if (data.length && !data[0].membersOnly && !data[0].productGateFailed && identifiers.length && one.maxUsesPerUser) {
+      const used = await CouponUsage.countDocuments({
+        couponId: one.couponId,
+        reversed: { $ne: true },
+        $or: [
+          ...(identity.email ? [{ email: identity.email }] : []),
+          ...(identity.mobiles.length ? [{ mobile: { $in: identity.mobiles } }] : []),
+        ],
+      });
+      if (used >= one.maxUsesPerUser) data = [toListItem(one, { alreadyUsed: true })];
+    }
+    if (data.length) console.log(`${tag} Code "${cleanCode}" matched and returned.`);
 
     return { statusCode: 200, message: "couponLookup", data, success: true };
   }
 
-  const results = [];
-
-  // 1. New-model PUBLIC + EVERYONE coupons — always visible, no login required.
-  // Match audience:"EVERYONE" OR no audience field at all (coupons created before the field was added).
-  // Exclude audience:"MEMBERS_ONLY" which requires a logged-in account.
-  const newCoupons = await Coupon.find(
-    { scope: "PUBLIC", audience: { $ne: "MEMBERS_ONLY" }, isActive: true, isArchived: false, isTest: false, isHidden: { $ne: true } },
-    { couponId: 1, code: 1, title: 1, notes: 1, discountType: 1, discountValue: 1, maxDiscountCap: 1, minCartValue: 1, validUntil: 1, eligibleProductIds: 1 },
+  // ── The list ──
+  // Shown: PUBLIC coupons (members-only ones to signed-in customers), plus
+  // TARGETED coupons to the person they are assigned to. Hidden coupons never
+  // appear here (they work only when typed).
+  const candidates = await Coupon.find(
+    { ...baseFilter, isHidden: { $ne: true } },
+    LIST_FIELDS,
   ).lean();
 
   // Product-gated coupons only appear once their required product is
@@ -343,28 +434,25 @@ const getAllCouponCodeService = async ({ userId, code, cartProductIds }) => {
   // invisible before, newly listed after. Real re-validation still happens
   // at apply/charge time regardless (validateNewCoupon), this is purely the
   // discovery/listing surface.
-  const visibleCoupons = newCoupons.filter((c) => couponProductGateOk(c, effectiveCartProductIds));
+  // A guest's typed email/mobile is unverified: it may unlock a personal coupon only through an exact code lookup,
+  // never through this list (that would let anyone enumerate other people's coupons by guessing an email).
+  const listIdentifiers = userId ? identifiers : [];
+  let visible = candidates.filter(
+    (c) => couponAudienceOk(c, { isLoggedIn, identifiers: listIdentifiers }) && couponProductGateOk(c, effectiveCartProductIds),
+  );
 
-  for (const c of visibleCoupons) {
-    results.push({
-      id:            c.couponId,
-      code:          c.code,
-      title:         c.title || c.code,
-      description:   c.notes || null,
-      discountType:  c.discountType,   // "PERCENTAGE" | "FLAT"
-      discountValue: c.discountValue || 0,
-      maxDiscountCap: c.maxDiscountCap || null,
-      minCartValue:  c.minCartValue || 0,
-      validUntil:    c.validUntil || null,
-    });
+  // A signed-in customer who has used a coupon up to its per-customer limit
+  // should not be offered it again.
+  if (userId && visible.length) {
+    const used = await usedByUser(userId, visible.map((c) => c.couponId));
+    visible = visible.filter((c) => !(c.maxUsesPerUser && (used.get(c.couponId) || 0) >= c.maxUsesPerUser));
   }
 
   // Legacy waitlist-only coupons retired — all coupons now come from the new model above.
-
-  return { statusCode: 200, message: "activeCouponCodeList", data: results, success: true };
+  return { statusCode: 200, message: "activeCouponCodeList", data: visible.map((c) => toListItem(c)), success: true };
 };
 
 // validateNewCoupon is exported so the Magic Checkout apply-coupon callback can reuse
 // the exact same eligibility rules (per-user caps, TARGETED assignment, MEMBERS_ONLY,
 // validity window, min-cart) without going through the cart-mutating apply service.
-export { applyCouponCodeService, getAllCouponCodeService, validateNewCoupon, couponProductGateOk };
+export { usedByUser, getUserCouponIdentity, applyCouponCodeService, getAllCouponCodeService, validateNewCoupon, couponProductGateOk, couponAudienceOk };

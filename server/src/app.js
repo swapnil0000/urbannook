@@ -24,8 +24,6 @@ import {
   adminAnalyticsRouter,
   freeShippingOfferRouter,
   passkeyRouter,
-  themeRouter,
-  siteBannerRouter,
   offerLeadRouter,
   offerRouter,
   guestCartRouter,
@@ -259,5 +257,4 @@ app.use(errorHandler);
 
 export default app;
 
-
-// trigre buil
+// trigger build

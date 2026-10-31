@@ -56,3 +56,12 @@ compliant alternative instead.
 - Deploy code: `jenkins/` (prod, rollback, staging, `scripts/`), `infra/cloudflare/`
 - Backend: `server/` (Express, Mongoose) · Website: `client/` (React, Vite, RTK Query)
 - Admin panel & Time Machine: separate repo `urbannook-admin`
+
+## Code navigation: graphify knowledge graph (all AI assistants and developers)
+
+Use the graph first, then read only the lines it points to. Do not explore the repo cold: that costs many tokens and is where tracing mistakes come from.
+
+- One-time setup per machine: `pip install graphifyy` (official package: two y's, repo github.com/Graphify-Labs/graphify, no forks), then `graphify install` (add `--platform cursor|codex|copilot|...` for other assistants). Per clone: `graphify hook install`, then `graphify update .`, and add `graphify-out/` and `.gitattributes` to `.git/info/exclude`
+- The graph lives in `graphify-out/` (local, not committed). Git hooks rebuild it in the background after every commit, checkout, merge and rebase (code only, no API cost), so nobody has to run anything.
+- Before the first search or file read, use `graphify explain "<file or symbol>"`, `graphify path "<A>" "<B>"` or `graphify query "<question>"`, and put this rule in every subagent prompt. Prefer `explain` / `path` with exact file or function names: free-text `query` is fuzzy. If the graph has no node for a name (constants, query-param keys), grep for it.
+- Evidence in reviews and PRs still cites real `file:line` read from the code. The graph is for finding things, not proof.

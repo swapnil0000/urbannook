@@ -3,7 +3,7 @@ import { useApplyCouponMutation, useGetAvailableCouponsQuery, useLookupCouponMut
 import { useUI, useAuth } from '../hooks/useRedux';
 import { calcLocalDiscount } from '../utils/couponDiscount';
 
-const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved, isGuest, cartTotal, items }) => {
+const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved, isGuest, cartTotal, items, guestEmail, guestMobile }) => {
   const [couponCode, setCouponCode] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -39,7 +39,8 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
       // 2. Not in the list? It may be a hidden/secret code — ask the server for its details.
       if (!coupon) {
         try {
-          const res = await lookupCoupon(cleanCode).unwrap();
+          // The guest's own email/mobile let the server recognise a coupon assigned to them.
+          const res = await lookupCoupon({ code: cleanCode, email: guestEmail || undefined, mobile: guestMobile || undefined, items }).unwrap();
           coupon = (res?.data || [])[0];
         } catch {
           coupon = null;
@@ -51,6 +52,33 @@ const CouponInput = ({ appliedCoupon, discount, onCouponApplied, onCouponRemoved
         setError(msg);
         showNotification(msg, 'error');
         setTimeout(() => setError(''), 3000);
+        return;
+      }
+
+      // Members-only coupon typed by a guest: it exists, they just need to sign in.
+      if (coupon.membersOnly) {
+        const msg = 'This coupon is only for registered members. Please sign in to use it.';
+        setError(msg);
+        showNotification(msg, 'error');
+        setTimeout(() => setError(''), 4000);
+        return;
+      }
+
+      // Needs a product that is not in the cart.
+      if (coupon.productGateFailed) {
+        const msg = 'This coupon requires a specific product in your cart.';
+        setError(msg);
+        showNotification(msg, 'error');
+        setTimeout(() => setError(''), 4000);
+        return;
+      }
+
+      // Already redeemed by this email/mobile: refuse now rather than at payment.
+      if (coupon.alreadyUsed) {
+        const msg = 'You have already used this coupon.';
+        setError(msg);
+        showNotification(msg, 'error');
+        setTimeout(() => setError(''), 4000);
         return;
       }
 

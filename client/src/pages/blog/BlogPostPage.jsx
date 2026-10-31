@@ -8,6 +8,20 @@ import NotFound from '../NotFound';
 import { isVariantOutOfStock } from '../../utils/variantStock';
 import { trackSelectItem } from '../../utils/analytics';
 
+
+// The two Japanese fonts cover thousands of glyphs split into ~100 files per
+// weight; loading them in full pulled ~70 font files (1.7 MB) on every story.
+// Story text is English (no Japanese in any post), so ask Google Fonts for only
+// the glyphs we use: printable ASCII, a few symbols, and the kanji/kana in this
+// page's decorations. One small file per weight. A character outside this set
+// (a new kanji label, an accented letter) falls back to the serif stack — add
+// it to FONT_GLYPHS if it should use these fonts.
+const FONT_GLYPHS = Array.from({ length: 95 }, (_, i) => String.fromCharCode(32 + i)).join('')
+  + '×–—‘’“”…•·₹é'
+  + 'こちのる侍像刀品器巣帰庫持映武物語都間';
+const JP_FONTS_URL = 'https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Noto+Serif+JP:wght@400;600&display=swap&text='
+  + encodeURIComponent(FONT_GLYPHS);
+
 const SITE = 'https://www.urbannook.in';
 const date = (d) => (d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : '');
 
@@ -172,7 +186,7 @@ const BlogPostPage = () => {
       />
       <Helmet>
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Noto+Serif+JP:wght@400;600&display=swap" />
+        <link rel="stylesheet" href={JP_FONTS_URL} />
       </Helmet>
 
       {/* ── Hero: sumi-ink night, cover image, vertical title, hanko seal ── */}
@@ -228,6 +242,16 @@ const BlogPostPage = () => {
                 <Link to={firstPick.href} onClick={() => trackSelectItem({ itemId: firstPick.productId, sku: firstPick.sku, itemName: firstPick.productName, itemVariant: firstPick.name, price: firstPick.price, listId, listName, index: 0 })} className="jp-btn mt-4">{firstPick.oos ? 'View this piece' : 'Shop now'}</Link>
               </div>
             </aside>
+          )}
+
+          {/* Franchise links: the collection page and the rest of this series' stories. */}
+          {post.series && (
+            <p className="jp-series" data-anim="series">
+              More {post.series.name}:{' '}
+              <Link to={`/category/${post.series.slug}`}>shop every {post.series.name} piece</Link>
+              {' · '}
+              <Link to={`/blog#${post.series.slug}`}>read more {post.series.name} stories</Link>
+            </p>
           )}
         </article>
 
@@ -349,6 +373,8 @@ const BlogPostPage = () => {
         .jp-pick-cta { margin-top: .35rem; font-size: .78rem; font-weight: 700; color: var(--shu); letter-spacing: .02em; }
         .jp-btn { display: inline-block; background: var(--shu); color: #fff; font-family: Inter, system-ui, sans-serif; font-weight: 700; padding: .8rem 1.6rem; letter-spacing: .03em; transition: background .2s; }
         .jp-btn:hover { background: #8f1d22; }
+        .jp-series { margin-top: 2rem; padding-top: 1.25rem; border-top: 1px solid rgba(28,26,23,.15); font-family: Inter, system-ui, sans-serif; font-size: .95rem; }
+        .jp-series a { color: var(--shu); font-weight: 700; text-decoration: underline; text-underline-offset: 4px; }
         .jp-endcard { margin-top: 3rem; display: grid; grid-template-columns: 140px 1fr; gap: 1.25rem; align-items: center; padding: 1.25rem; background: var(--washi-2); border-top: 3px solid var(--shu); }
         .jp-endcard img { width: 140px; height: 140px; object-fit: cover; background: #fff; border: 6px solid #fff; }
         @media (max-width: 480px) { .jp-endcard { grid-template-columns: 1fr; } .jp-endcard img { width: 100%; height: auto; aspect-ratio: 1; } }

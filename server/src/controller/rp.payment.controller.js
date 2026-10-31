@@ -16,6 +16,7 @@ import { couponProductGateOk } from "../services/coupon.code.service.js";
 import PromotionUsage from "../model/promotionUsage.model.js";
 import Promotion from "../model/promotion.model.js";
 import { backfillUserProfileFromCheckout, PLACEHOLDER_NAME } from "../services/user.profile.service.js";
+import { capturedGuestContact } from "../services/guest.order.claim.service.js";
 import {
   isMagicCheckoutEnabled,
   isMagicGuestsOnly,
@@ -33,13 +34,12 @@ import {
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
 import { ValidationError, NotFoundError } from "../utils/errors.js";
 import { computeOrderCharge } from "../utils/orderAmount.util.js";
-import { validateAndPriceRedeem, writeLedgerEntry, getLoyaltyConfig, getUserBalance } from "../services/loyalty.service.js";
 import { buildPlaceholderEmail, isPlaceholderEmail } from "../utils/placeholderEmail.js";
 import { uploadInvoiceToS3 } from "../utils/s3.utils.js";
 import Address from "../model/address.new.model.js";
 import html_to_pdf from "html-pdf-node";
 import { generateInvoiceHtmlTemplate } from "../template/invoiceTemplate.template.js";
-import { calculateShippingRate, FALLBACK_SHIPPING_CHARGE } from "../services/shipping.service.js";
+import { calculateShippingRate, staticShippingCharge } from "../services/shipping.service.js";
 import { apiCache } from "../module/cache.manager.module.js";
 import { sortVariantsOOSLast, deriveProductStatus, syncVariantOutOfStock } from "../utils/variantSort.js";
 
@@ -102,6 +102,30 @@ function applyCheapestItemAdjustment(oi, mode, value) {
       productSnapshot: { ...oi.productSnapshot, quantity: remainder, priceAtPurchase: fullPrice, isPromotionalGift: false },
     },
   };
+}
+
+// Free products a promotion granted on this order (the synthetic ₹0 lines), listed with the exact
+// product id + SKU so fulfilment knows what to pack and ship. Built from the order's own lines, so
+// a gift that was skipped (out of stock) is never listed.
+function buildPromotionalGiftSummary(orderItems, promotionResult) {
+  const out = [];
+  for (const g of promotionResult?.freeGifts || []) {
+    if (!g.targetProductId) continue;
+    const line = orderItems.find((oi) => oi.productId === g.targetProductId
+      && oi.productSnapshot?.isPromotionalGift && oi.productSnapshot.priceAtPurchase === 0
+      && (!g.targetVariantSku || oi.variantSku === g.targetVariantSku));
+    if (!line) continue;
+    out.push({
+      productId: line.productId,
+      variantSku: line.variantSku || "",
+      productName: line.productSnapshot.productName,
+      selectedVariant: line.productSnapshot.selectedVariant,
+      quantity: line.productSnapshot.quantity,
+      promotionId: String(g.promotionId),
+      promotionName: g.name || "",
+    });
+  }
+  return out;
 }
 
 // Phase 5 — picks the single winning cheapestItemAdjustments entry (same
@@ -252,7 +276,11 @@ const resortVariantsIfNeeded = async (productId) => {
     const derivedStatus = deriveProductStatus(synced, doc.productQuantity, doc.productStatus);
     if (derivedStatus !== doc.productStatus) update.productStatus = derivedStatus;
     if (Object.keys(update).length) {
-      await Product.updateOne({ productId }, { $set: update });
+      // RAW write on purpose. `sorted` is the plain stored array (from .lean()), but Product.updateOne would cast it
+      // through THIS repo's variant schema, which does not declare admin-only fields — and Mongoose silently drops
+      // every undeclared key (variantMrp, variantDes, variantSwatch*, isActive …) from every variant. That is what
+      // made MRP / "% off" vanish from a product the first time one of its variants sold out.
+      await Product.collection.updateOne({ productId }, { $set: update });
     }
   } catch (err) {
     console.error(`[Stock] OOS resort/status update failed product=${productId}:`, err.message);
@@ -293,10 +321,11 @@ const getShippingRateOrFallback = async (params) => {
     return await calculateShippingRate(params);
   } catch (error) {
     if (error.message?.includes("Pincode not serviceable")) throw error;
-    console.error(`[SHIPPING] pin ${params.pincode} | rate calc failed, using flat fallback ₹${FALLBACK_SHIPPING_CHARGE}: ${error.message}`);
+    const flat = staticShippingCharge(params.cartValue);
+    console.error(`[SHIPPING] pin ${params.pincode} | rate calc failed, using static ₹${flat}: ${error.message}`);
     return {
-      total_charges: FALLBACK_SHIPPING_CHARGE,
-      type: "fallback",
+      total_charges: flat,
+      type: "standard", // order schema enum is standard|dynamic
       totalWeight: 0,
       expectedNoOfBoxes: params.cartItems?.length || 0,
       serviceName: null,
@@ -332,6 +361,7 @@ import { getPublicOfferConfig } from "../utils/offer.util.js";
 import { sendMetaCapiEvent } from "../services/meta.capi.service.js";
 import { recordServerPurchase } from "../services/purchaseEvent.service.js";
 import { sendGa4ServerPurchase } from "../services/ga4.mp.service.js";
+import { validateGiftClaims, buildGiftOrderLines, GIFT_CLAIM_ERROR } from "../services/giftClaims.service.js";
 
 // Collect Meta CAPI match-quality signals from the order-creation request.
 // The webhook (Razorpay → server) has no browser context, so we persist these on
@@ -521,8 +551,13 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   }
 
   // Check if pricing has been calculated (appliedCoupon.summary must exist with a valid grandTotal)
+  // "Calculated" means the apply step has run and stored a subtotal. A grand total
+  // of 0 is legitimate — a coupon worth the whole product total — and must not be
+  // mistaken for "never calculated": the real amount (delivery still owed) is
+  // recomputed from the live order below, this only gates a stale cart.
   const grandTotal = cart?.appliedCoupon?.summary?.grandTotal;
-  if (grandTotal == null || grandTotal <= 0) {
+  const quotedSubtotal = cart?.appliedCoupon?.summary?.subtotal;
+  if (grandTotal == null || !(quotedSubtotal > 0)) {
     throw new ValidationError(
       "Cart pricing not calculated. Please refresh the page.",
     );
@@ -799,42 +834,35 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   // check as a real line (reused, not reimplemented) — if the gift target is
   // OOS/deleted, it's silently skipped (order still proceeds), matching the
   // existing "[Stock] insufficient stock" precedent for real items.
-  for (const gift of promotionResult.freeGifts) {
-    if (!gift.targetProductId) continue; // gift_choice (pick-1-of-N) needs a cart-side choice step — not wired here yet
-    try {
-      const giftProduct = products.find((p) => p.productId === gift.targetProductId) || (await Product.findOne({ productId: gift.targetProductId, productStatus: "in_stock" }));
-      if (!giftProduct) { console.error(`[PromotionV2] free_product target not found/inactive: ${gift.targetProductId} (promotion ${gift.promotionId})`); continue; }
-      const giftVariant = gift.targetVariantSku
-        ? giftProduct.variantDetails?.find((v) => v.sku === gift.targetVariantSku)
-        : giftProduct.variantDetails?.[0];
-      const giftVariantName = giftVariant?.variantName || "N/A";
-      // Scales with the promotion's own repeat count (e.g. "buy 2 get 1
-      // free" crossed twice grants 2 free units) — see promotionEngine
-      // .util.js's free_product case. Defaults to 1 defensively (should
-      // never actually be missing — kept only so an old/malformed result
-      // shape degrades to the previous behavior instead of erroring).
-      const giftQty = Math.max(1, Number(gift.quantity) || 1);
-      assertVariantAvailable(giftProduct, giftVariantName, giftQty);
-      addPromoProduct(gift.promotionId, giftProduct.productId, giftProduct.productName, giftQty);
-      orderItems.push({
-        productId: giftProduct.productId,
-        variantSku: giftVariant?.sku || "",
-        productSnapshot: {
-          quantity: giftQty,
-          productImg: giftVariant?.variantImage?.[0] || giftProduct.productImg || "https://urbannook.in/assets/logo.webp",
-          productName: giftProduct.productName,
-          productCategory: giftProduct.productCategory,
-          productSubCategory: giftProduct.productSubCategory,
-          priceAtPurchase: 0,
-          shipping: "0",
-          selectedVariant: giftVariantName,
-          variantTitleTemplate: giftProduct.variantTitleTemplate || "",
-          variantSku: giftVariant?.sku || "",
-          isPromotionalGift: true,
-        },
-      });
-    } catch (err) {
-      console.error(`[PromotionV2] free_product gift skipped (${gift.targetProductId}, promotion ${gift.promotionId}):`, err.message);
+  // Explicit gift claiming: with a `claimedGifts` array, ONLY claims that the engine still grants for
+  // this exact cart become ₹0 lines (re-validated server-side, never trusted from the client). A claim
+  // that is no longer valid stops the order with a clear message instead of silently dropping or
+  // converting it. Without the array (older clients) the previous automatic behaviour is kept.
+  const claimMode = Array.isArray(req.body.claimedGifts);
+  const giftClaims = claimMode ? validateGiftClaims(req.body.claimedGifts, promotionResult.freeGifts) : null;
+  if (giftClaims?.rejected.length) {
+    throw new ValidationError("A free gift you claimed is no longer available. Please review your cart.", { code: GIFT_CLAIM_ERROR, rejected: giftClaims.rejected });
+  }
+  const giftsToIssue = claimMode ? giftClaims.valid : promotionResult.freeGifts.filter((g) => g.targetProductId);
+  orderItems.push(...(await buildGiftOrderLines({
+    gifts: giftsToIssue,
+    products,
+    orderItems,
+    claimMode,
+    loadProduct: (id) => Product.findOne({ productId: id, productStatus: "in_stock" }),
+    assertAvailable: assertVariantAvailable,
+    onIssued: (g, pr, q) => addPromoProduct(g.promotionId, pr.productId, pr.productName, q),
+  })));
+
+  // Item identity for admin / warehouse / returns: every line is explicitly PAID or FREE_GIFT, with the
+  // list price it would have cost (the same SKU can legitimately appear as both).
+  for (const oi of orderItems) {
+    const sn = oi.productSnapshot;
+    if (!sn.lineType) sn.lineType = "PAID";
+    if (sn.originalUnitPrice == null) {
+      const pr = products.find((x) => x.productId === oi.productId);
+      const v = pr?.variantDetails?.find((x) => x.sku && x.sku === oi.variantSku) || pr?.variantDetails?.find((x) => x.variantName === sn.selectedVariant) || pr?.variantDetails?.[0];
+      sn.originalUnitPrice = Number(v?.variantPrice) || 0;
     }
   }
 
@@ -893,11 +921,14 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   // Magic has no pincode at this point — Razorpay rates the address through the
   // /magic/shipping-info callback and adds shipping_fee to the order itself, so
   // shipping must stay OUT of the amount we create the order with.
+  // Static delivery charge by what the customer pays for the products (after offers): see staticShippingCharge.
+  const shippingCartValue = orderItems.reduce((s, oi) => s + oi.productSnapshot.priceAtPurchase * oi.productSnapshot.quantity, 0);
   const shippingResult = isMagic
     ? null
     : await getShippingRateOrFallback({
         pincode: deliveryAddressSnapshot.pinCode,
         paymentType: reqPaymentMethod === "COD" ? "COD" : "PREPAID",
+        cartValue: shippingCartValue,
         cartItems: items.map(i => ({
           productId: i.productId,
           quantity: i.quantity,
@@ -912,7 +943,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   // zeroing shipping for the customer should not also zero the COD advance.
   const realShippingAmount = isMagic
     ? 0 // added by Razorpay from the serviceability callback, not by us
-    : (shippingResult?.total_charges || summary?.shipping || 179);
+    : (shippingResult?.total_charges || staticShippingCharge(shippingCartValue));
 
   // Recompute subtotal from actual order items — authoritative, not from cart snapshot.
   // Computed AFTER the cart-rule discount loop above has already reduced any
@@ -1028,6 +1059,9 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       );
     }
     // isInternal=true without INTERNAL_TEST type is DB corruption — reject clearly, don't silently zero-out
+    if (isValidInternal && liveCoupon.scope !== "TARGETED") {
+      throw new ValidationError("This coupon is restricted. Please remove it from your cart and try again.");
+    }
     if (liveCoupon.isInternal && !isValidInternal) {
       console.error(`[Coupon:Security] Coupon ${couponCodeId} has isInternal=true but discountType=${liveCoupon.discountType}`);
       throw new ValidationError(
@@ -1043,8 +1077,12 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     // an actual re-check.
     if (liveCoupon.scope === "TARGETED") {
       const normEmailForScope  = user?.email?.toLowerCase().trim() || null;
-      const normMobileForScope = user?.mobileNumber?.toString().replace(/\D/g, "").slice(-10) || finalSenderMobile || null;
-      const scopeIdentifiers   = [normEmailForScope, normMobileForScope].filter(Boolean);
+      // Same identity set the apply step uses (coupon.code.service.js getUserCouponIdentity):
+      // profile number AND the WhatsApp-verified one, so a coupon assigned to either works.
+      const scopeMobiles = [user?.verifiedMobile, user?.mobileNumber, finalSenderMobile]
+        .map((m) => (m ? String(m).replace(/\D/g, "").slice(-10) : null))
+        .filter((m) => m && m.length === 10);
+      const scopeIdentifiers   = [normEmailForScope, ...new Set(scopeMobiles)].filter(Boolean);
       const assignment = (liveCoupon.assignedTo || []).find((a) => scopeIdentifiers.includes(a.identifier));
 
       console.log(
@@ -1133,16 +1171,19 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     // is enforced the same way; only the single-use usedAt gate is skipped for them elsewhere.
     if (isApplied) {
       const normEmailCheck  = user?.email?.toLowerCase().trim() || null;
-      const normMobileCheck = user?.mobileNumber?.toString().replace(/\D/g, "").slice(-10) || finalSenderMobile || null;
-      const identifiers     = [normEmailCheck, normMobileCheck].filter(Boolean);
+      const checkMobiles = [user?.verifiedMobile, user?.mobileNumber, finalSenderMobile]
+        .map((m) => (m ? String(m).replace(/\D/g, "").slice(-10) : null))
+        .filter((m) => m && m.length === 10);
+      const identifiers     = [normEmailCheck, ...new Set(checkMobiles)].filter(Boolean);
 
-      if (identifiers.length > 0 && liveCoupon.maxUsesPerUser) {
+      if ((identifiers.length > 0 || userId) && liveCoupon.maxUsesPerUser) {
         const priorUses = await CouponUsage.countDocuments({
           couponId: couponCodeId,
           reversed: { $ne: true },
           $or: [
+            ...(userId ? [{ userId }] : []),
             ...(normEmailCheck  ? [{ email:  normEmailCheck  }] : []),
-            ...(normMobileCheck ? [{ mobile: normMobileCheck }] : []),
+            ...(checkMobiles.length ? [{ mobile: { $in: [...new Set(checkMobiles)] } }] : []),
           ],
         });
         console.log(`[Coupon:PaymentRecheck] Per-user check: identifiers=${identifiers.join("/")} priorUses=${priorUses} limit=${liveCoupon.maxUsesPerUser}`);
@@ -1163,33 +1204,18 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   // computeOrderCharge so the guest checkout below cannot drift from this one.
   // A cart-applied coupon now stays in the amount on Magic too; it reaches
   // Razorpay as a `promotion` a few lines down.
-  // UnCash (loyalty points) — normal checkout only (not Magic, not the ₹1
-  // internal test order). Validated here against the live balance and the
-  // admin cap, which applies to the product value after the coupon. Points are
-  // only debited from the ledger once the order is PAID (fulfilCapturedPayment).
-  const requestedPoints = Math.max(0, Math.floor(Number(req.body?.redeemPoints) || 0));
-  const redeem = !isMagic && !isInternalTestOrder && requestedPoints > 0
-    ? await validateAndPriceRedeem({ userId, cartValue: Math.max(0, subtotal - discountAmount), requestedPoints })
-    : { pointsRedeemed: 0, discountFromPoints: 0, balanceBeforeOrder: null };
-  // Snapshot the balance on every order while loyalty is on, so order history
-  // can show "balance before this order" even when no points were used.
-  if (redeem.balanceBeforeOrder == null) {
-    const loyaltyCfg = await getLoyaltyConfig();
-    redeem.balanceBeforeOrder = loyaltyCfg.isEnabled ? await getUserBalance(userId) : null;
-  }
-  const pointsDiscount = Math.min(redeem.discountFromPoints, Math.max(0, subtotal - discountAmount));
-
   const charge = computeOrderCharge({
     subtotal,
     giftWrapAmount,
     chargedShippingAmount,
     realShippingAmount,
     discountAmount,
-    pointsDiscount,
     isInternalTestOrder,
     isMagic,
     paymentMethod: reqPaymentMethod,
   });
+  // A coupon may take the whole product total, but the order still has delivery / gift wrap to pay; a ₹0 Razorpay order is never valid.
+  if (!isInternalTestOrder && !(charge.finalAmount > 0)) throw new ValidationError("This order has nothing to pay. Please contact support.");
   finalAmount = charge.finalAmount;
   const { isCOD, codPartialAmount, codRemainingAmount, razorpayChargeAmount, razorpayChargeAmountPaise } = charge;
 
@@ -1301,6 +1327,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     userName: deliveryAddressSnapshot.fullName,
     userMobile: deliveryAddressSnapshot.mobileNumber,
     items: orderItems,
+    promotionalGifts: buildPromotionalGiftSummary(orderItems, promotionResult),
     // Promotion Engine V2 — snapshot of which promotions matched at order-
     // creation time (see the wiring comment above). Empty when none matched.
     appliedPromotions: promotionResult.matchedPromotions.map((p) => ({
@@ -1345,15 +1372,6 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       discountAmount,
       isApplied,
     },
-    ...(redeem.balanceBeforeOrder != null
-      ? {
-          loyalty: {
-            balanceBeforeOrder: redeem.balanceBeforeOrder,
-            pointsRedeemed: redeem.pointsRedeemed,
-            discountFromPoints: pointsDiscount,
-          },
-        }
-      : {}),
     metaTracking: collectMetaTracking(req),
     note: "Amount is the final amount paid by the user",
   });
@@ -1374,8 +1392,6 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
         magic: isMagic,
         paymentMethod: isCOD ? "COD" : "PREPAID",
         codDetails: isCOD ? { partialAmountPaid: codPartialAmount, remainingAmount: codRemainingAmount } : null,
-        pointsRedeemed: redeem.pointsRedeemed,
-        discountFromPoints: pointsDiscount,
         senderMobile: finalSenderMobile,
         receiverMobile: finalReceiverMobile,
       },
@@ -1561,6 +1577,7 @@ const fulfilCapturedPayment = async (order, payment) => {
       // Atomic claim: the webhook and the status poll can both get here for
       // the same payment. Only the one that flips the status runs the side
       // effects below (stock, coupon, emails), so they happen exactly once.
+      const guestClaimContact = capturedGuestContact(order, payment);
       const claimed = await Order.findOneAndUpdate(
         { _id: order._id, status: { $in: UNPAID_STATUSES } },
         {
@@ -1569,6 +1586,9 @@ const fulfilCapturedPayment = async (order, payment) => {
             "payment.razorpayPaymentId": payment.id,
             "payment.errorCode": null,
             "payment.errorDescription": "",
+            ...(guestClaimContact
+              ? { "payment.guestClaimContact": guestClaimContact }
+              : {}),
           },
           $push: { statusHistory: { status: "PAID", timestamp: new Date(), note: historyNote } },
         },
@@ -1582,31 +1602,6 @@ const fulfilCapturedPayment = async (order, payment) => {
       // Decrement per-variant stock now that the order is confirmed PAID.
       // Guarded by the `order.status !== "PAID"` block above → runs once.
       await decrementStockForOrder(order);
-
-      // UnCash: debit the points this order redeemed — only now that it is
-      // paid, so an abandoned/failed checkout never costs the customer points.
-      // Deduped on `${orderId}:REDEEM_ORDER`. Never blocks fulfilment.
-      if (claimed.loyalty?.pointsRedeemed > 0) {
-        try {
-          const entry = await writeLedgerEntry({
-            userId: claimed.userId,
-            orderId: claimed.orderId,
-            orderType: "WEBSITE",
-            type: "REDEEM_ORDER",
-            points: -claimed.loyalty.pointsRedeemed,
-            reason: `Used on order ${claimed.orderId}`,
-            createdBy: "system",
-          });
-          if (entry) {
-            if (entry.balanceAfter < 0) {
-              console.warn(`[Loyalty] ${claimed.orderId}: balance went negative (${entry.balanceAfter}) — points spent elsewhere between checkout and payment`);
-            }
-            await Order.updateOne({ _id: claimed._id }, { $set: { "loyalty.balanceAfterRedeem": entry.balanceAfter } });
-          }
-        } catch (err) {
-          console.error(`[Loyalty] REDEEM_ORDER debit failed for ${claimed.orderId}:`, err.message);
-        }
-      }
 
       // Promotion Engine V2 — permanent usage audit trail, same
       // never-deleted invariant as CouponUsage, recorded here (once,
@@ -1799,13 +1794,25 @@ const fulfilCapturedPayment = async (order, payment) => {
               });
 
               // Mark TARGETED assignment as used (embedded in coupon document)
-              if (updatedCoupon.scope === "TARGETED" && (normEmail || normMobile)) {
+              if (updatedCoupon.scope === "TARGETED" && (normEmail || normMobile || order.userId)) {
+                // The assignment may be on the customer's profile or WhatsApp-verified
+                // number, which can differ from the delivery number on the order —
+                // include them or the coupon would never be marked used and could be reused.
+                const accountMobiles = [];
+                if (order.userId) {
+                  const acct = await User.findOne({ userId: order.userId }, { email: 1, mobileNumber: 1, verifiedMobile: 1 }).lean();
+                  for (const m of [acct?.verifiedMobile, acct?.mobileNumber]) {
+                    const n = m ? String(m).replace(/\D/g, "").slice(-10) : null;
+                    if (n && n.length === 10) accountMobiles.push(n);
+                  }
+                  if (acct?.email) accountMobiles.push(String(acct.email).toLowerCase().trim());
+                }
                 await Coupon.updateOne(
                   {
                     couponId,
                     assignedTo: {
                       $elemMatch: {
-                        identifier: { $in: [normEmail, normMobile].filter(Boolean) },
+                        identifier: { $in: [normEmail, normMobile, ...accountMobiles].filter(Boolean) },
                         usedAt: null,
                       },
                     },
@@ -2309,42 +2316,35 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     promotionResult.discountCandidatesByProduct, maxDiscountAmountByPromotionId,
   );
 
-  for (const gift of promotionResult.freeGifts) {
-    if (!gift.targetProductId) continue;
-    try {
-      const giftProduct = products.find((p) => p.productId === gift.targetProductId) || (await Product.findOne({ productId: gift.targetProductId, productStatus: "in_stock" }));
-      if (!giftProduct) { console.error(`[PromotionV2] free_product target not found/inactive: ${gift.targetProductId} (promotion ${gift.promotionId})`); continue; }
-      const giftVariant = gift.targetVariantSku
-        ? giftProduct.variantDetails?.find((v) => v.sku === gift.targetVariantSku)
-        : giftProduct.variantDetails?.[0];
-      const giftVariantName = giftVariant?.variantName || "N/A";
-      // Scales with the promotion's own repeat count (e.g. "buy 2 get 1
-      // free" crossed twice grants 2 free units) — see promotionEngine
-      // .util.js's free_product case. Defaults to 1 defensively (should
-      // never actually be missing — kept only so an old/malformed result
-      // shape degrades to the previous behavior instead of erroring).
-      const giftQty = Math.max(1, Number(gift.quantity) || 1);
-      assertVariantAvailable(giftProduct, giftVariantName, giftQty);
-      addPromoProduct(gift.promotionId, giftProduct.productId, giftProduct.productName, giftQty);
-      orderItems.push({
-        productId: giftProduct.productId,
-        variantSku: giftVariant?.sku || "",
-        productSnapshot: {
-          quantity: giftQty,
-          productImg: giftVariant?.variantImage?.[0] || giftProduct.productImg || "https://urbannook.in/assets/logo.webp",
-          productName: giftProduct.productName,
-          productCategory: giftProduct.productCategory,
-          productSubCategory: giftProduct.productSubCategory,
-          priceAtPurchase: 0,
-          shipping: "0",
-          selectedVariant: giftVariantName,
-          variantTitleTemplate: giftProduct.variantTitleTemplate || "",
-          variantSku: giftVariant?.sku || "",
-          isPromotionalGift: true,
-        },
-      });
-    } catch (err) {
-      console.error(`[PromotionV2] free_product gift skipped (${gift.targetProductId}, promotion ${gift.promotionId}):`, err.message);
+  // Explicit gift claiming: with a `claimedGifts` array, ONLY claims that the engine still grants for
+  // this exact cart become ₹0 lines (re-validated server-side, never trusted from the client). A claim
+  // that is no longer valid stops the order with a clear message instead of silently dropping or
+  // converting it. Without the array (older clients) the previous automatic behaviour is kept.
+  const claimMode = Array.isArray(req.body.claimedGifts);
+  const giftClaims = claimMode ? validateGiftClaims(req.body.claimedGifts, promotionResult.freeGifts) : null;
+  if (giftClaims?.rejected.length) {
+    throw new ValidationError("A free gift you claimed is no longer available. Please review your cart.", { code: GIFT_CLAIM_ERROR, rejected: giftClaims.rejected });
+  }
+  const giftsToIssue = claimMode ? giftClaims.valid : promotionResult.freeGifts.filter((g) => g.targetProductId);
+  orderItems.push(...(await buildGiftOrderLines({
+    gifts: giftsToIssue,
+    products,
+    orderItems,
+    claimMode,
+    loadProduct: (id) => Product.findOne({ productId: id, productStatus: "in_stock" }),
+    assertAvailable: assertVariantAvailable,
+    onIssued: (g, pr, q) => addPromoProduct(g.promotionId, pr.productId, pr.productName, q),
+  })));
+
+  // Item identity for admin / warehouse / returns: every line is explicitly PAID or FREE_GIFT, with the
+  // list price it would have cost (the same SKU can legitimately appear as both).
+  for (const oi of orderItems) {
+    const sn = oi.productSnapshot;
+    if (!sn.lineType) sn.lineType = "PAID";
+    if (sn.originalUnitPrice == null) {
+      const pr = products.find((x) => x.productId === oi.productId);
+      const v = pr?.variantDetails?.find((x) => x.sku && x.sku === oi.variantSku) || pr?.variantDetails?.find((x) => x.variantName === sn.selectedVariant) || pr?.variantDetails?.[0];
+      sn.originalUnitPrice = Number(v?.variantPrice) || 0;
     }
   }
 
@@ -2382,14 +2382,16 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   // Magic has no pincode yet — Razorpay rates the address through
   // /magic/shipping-info and adds shipping_fee to the order itself, so shipping
   // must stay OUT of the amount we create the order with.
+  const shippingCartValue = orderItems.reduce((s, oi) => s + oi.productSnapshot.priceAtPurchase * oi.productSnapshot.quantity, 0);
   const shippingResult = isMagic
     ? null
     : await getShippingRateOrFallback({
         pincode: deliveryAddress.pinCode,
         paymentType: reqPaymentMethod === "COD" ? "COD" : "PREPAID",
-        cartItems: rawItemsForShipping
+        cartItems: rawItemsForShipping,
+        cartValue: shippingCartValue,
       });
-  const realShippingAmount = isMagic ? 0 : (shippingResult?.total_charges || 179);
+  const realShippingAmount = isMagic ? 0 : (shippingResult?.total_charges || staticShippingCharge(shippingCartValue));
   // Free shipping unlocks via EITHER: any active Promotion whose reward is
   // free_shipping (the old combo-banner check was deleted 2026-10-09 as
   // fully redundant with promotionResult.freeShipping — see the matching
@@ -2419,7 +2421,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   }, 0);
   const giftWrapSelected = !!reqGiftWrap && giftWrapConfig.isActive && giftWrapQty > 0;
   const giftWrapAmount = giftWrapSelected ? giftWrapConfig.price * giftWrapQty : 0;
-  const GIFT_NOTE_OPTIONS = ["birthday", "rakhi", "none"];
+  const GIFT_NOTE_OPTIONS = ["diwali", "bhai_dooj", "birthday", "rakhi", "none"];
   const validReqNotes = Array.isArray(reqGiftWrapNoteOptions)
     ? reqGiftWrapNoteOptions.filter((n) => GIFT_NOTE_OPTIONS.includes(n))
     : [];
@@ -2460,6 +2462,10 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     }
     if (liveCoupon.validUntil && now > new Date(liveCoupon.validUntil)) {
       throw new ValidationError("This coupon has expired.");
+    }
+    // Same global floor as the signed-in apply and Magic: no coupons on carts of ₹99 or less.
+    if (subtotal <= 99) {
+      throw new ValidationError("Coupons are not applicable on cart values of ₹99 or less.");
     }
     if (subtotal < (liveCoupon.minCartValue || 0)) {
       throw new ValidationError(`Minimum order of ₹${liveCoupon.minCartValue} required for this coupon.`);
@@ -2534,6 +2540,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     isMagic,
     paymentMethod: reqPaymentMethod,
   });
+  if (!isInternalTestOrder && !(charge.finalAmount > 0)) throw new ValidationError("This order has nothing to pay. Please contact support.");
   const { finalAmount, isCOD, codPartialAmount, codRemainingAmount, razorpayChargeAmount, razorpayChargeAmountPaise } = charge;
 
   // Update orderItems with shipping value now that it's calculated — customer-facing amount
@@ -2610,6 +2617,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     userName: guestInfo?.name?.trim() || "",
     userMobile: cleanMobile,
     items: orderItems,
+    promotionalGifts: buildPromotionalGiftSummary(orderItems, promotionResult),
     // Promotion Engine V2 — snapshot of which promotions matched at order-
     // creation time (see the wiring comment above). Empty when none matched.
     appliedPromotions: promotionResult.matchedPromotions.map((p) => ({
@@ -2684,6 +2692,8 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
 
 export {
   fulfilCapturedPayment,
+  // exported so the stock-decrement / re-sort write can be tested against the real DB
+  decrementStockForOrder,
   UNPAID_STATUSES,
   razorpayCreateOrderController,
   razorpayKeyGetController,

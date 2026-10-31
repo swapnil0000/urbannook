@@ -3,6 +3,10 @@ import { useSubmitContactMutation } from '../../store/api/userApi';
 import { useUI } from '../../hooks/useRedux';
 import CustomSelect from '../../component/CustomSelect';
 import { supportFaqs, subjectOptions } from '../../data/constant';
+import { getSupportWhatsAppUrl, onSupportWhatsAppClick } from '../../utils/contactHelper';
+
+// Opens our support chat directly (app on phones, WhatsApp Web on desktop) — no wa.me landing page.
+const SUPPORT_CHAT_TEXT = 'Hi Urban Nook! I need help.';
 import useFormValidation from '../../hooks/useFormValidation';
 
 const CustomerSupportPage = () => {
@@ -230,7 +234,7 @@ const CustomerSupportPage = () => {
                             </a>
 
                             {/* WhatsApp */}
-                            <a href="https://wa.me/919124081005" target="_blank" rel="noreferrer" className="block p-6 rounded-2xl bg-surface border border-transparent hover:border-brand/50 hover:shadow-lg transition-all group cursor-pointer shadow-md">
+                            <a href={getSupportWhatsAppUrl(SUPPORT_CHAT_TEXT)} onClick={onSupportWhatsAppClick(SUPPORT_CHAT_TEXT)} rel="noreferrer" className="block p-6 rounded-2xl bg-surface border border-transparent hover:border-brand/50 hover:shadow-lg transition-all group cursor-pointer shadow-md">
                                 <div className="flex items-start gap-4">
                                     <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center text-brand group-hover:bg-brand group-hover:text-white transition-all">
                                         <i className="fa-brands fa-whatsapp text-xl"></i>
