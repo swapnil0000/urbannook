@@ -34,6 +34,10 @@ const iso = (d) => {
 const cleanText = (s, max = 200) =>
   typeof s === "string" ? s.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, max) : "";
 
+// Support's "Cancel Order" in the admin panel does NOT change `status` (a paid order stays PAID); it sets resolutionStatus.
+// To the customer both mean the same thing: this order is cancelled.
+const isCancelled = (order) => order.status === "CANCELLED" || order.resolutionStatus === "CANCELLED";
+
 const statusTime = (order, status) => {
   const hit = (order.statusHistory || []).find((h) => h?.status === status && h.timestamp);
   return hit ? iso(hit.timestamp) : null;
@@ -70,7 +74,7 @@ const buildRefunds = (order, cases) => {
 const buildPayment = (order, cases) => {
   const total = rupees(order.amount);
   const paid = isOrderPaid(order);
-  const cancelled = order.status === "CANCELLED";
+  const cancelled = isCancelled(order);
   const method = order.paymentMethod === "COD" ? (num(order.codDetails?.partialAmountPaid) > 0 ? "PARTIAL_COD" : "COD") : "PREPAID";
   const advance = rupees(order.codDetails?.partialAmountPaid);
 
@@ -96,6 +100,7 @@ const buildPayment = (order, cases) => {
   if (!paid) state = order.status === "FAILED" ? "FAILED" : cancelled ? "CANCELLED" : "PENDING";
   else if (refund.refunded > 0) state = refund.refunded >= amountPaid - 0.5 ? "REFUNDED" : "PARTIALLY_REFUNDED";
   else if (refund.inProgress > 0) state = "REFUND_PROCESSING";
+  else if (cancelled) state = "CANCELLED";
   else if (method === "PREPAID") state = "PAID";
   else if (amountPaid > 0) state = "ADVANCE_PAID";
   else state = "COD_DUE";
@@ -358,7 +363,7 @@ const buildShipments = (order, records, now, trackUrlTemplate) => {
 
 // One line of copy + a tone for the page header.
 const buildStage = (order, payment, shipments) => {
-  if (order.status === "CANCELLED") return { code: "CANCELLED", label: "Cancelled", headline: "This order was cancelled", message: payment.refundedAmount > 0 || payment.refundInProgressAmount > 0 ? "Your refund details are below." : "It will not be delivered.", tone: "danger" };
+  if (isCancelled(order)) return { code: "CANCELLED", label: "Cancelled", headline: "This order was cancelled", message: payment.refundedAmount > 0 || payment.refundInProgressAmount > 0 ? "Your refund details are below." : "It will not be delivered.", tone: "danger" };
   if (payment.state === "FAILED") return { code: "PAYMENT_FAILED", label: "Payment failed", headline: "Your payment didn't go through", message: "No order was placed. If any amount was debited, your bank reverses it automatically.", tone: "danger" };
   if (payment.state === "PENDING") return { code: "PAYMENT_PENDING", label: "Payment pending", headline: "We're confirming your payment", message: "This page updates once your bank confirms. Please don't pay again.", tone: "warning" };
 
@@ -460,7 +465,7 @@ export const buildOrderView = ({ order, shipments: records = [], cases = [], now
   const shipments = buildShipments(order, records, now, trackUrlTemplate);
   const stage = buildStage(order, payment, shipments);
   const timeline = buildTimeline(order, payment, shipments, stage);
-  const invoiceReady = isOrderPaid(order) && order.status !== "CANCELLED" && !!order.invoiceData?.isGenerated && !!order.invoiceData?.s3FileKey;
+  const invoiceReady = isOrderPaid(order) && !isCancelled(order) && !!order.invoiceData?.isGenerated && !!order.invoiceData?.s3FileKey;
 
   return {
     orderId: order.orderId,
@@ -480,7 +485,7 @@ export const buildOrderView = ({ order, shipments: records = [], cases = [], now
     })),
     timeline,
     delivery: buildDelivery(order),
-    cancelledAt: order.status === "CANCELLED" ? iso(order.cancelledAt) : null,
+    cancelledAt: isCancelled(order) ? iso(order.cancelledAt) : null,
     resolutions: buildResolutions(cases),
     invoice: { available: invoiceReady },
     actions: {

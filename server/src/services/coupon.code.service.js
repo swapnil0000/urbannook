@@ -89,7 +89,7 @@ function couponProductGateOk(coupon, cartProductIds) {
 // cartProductIds: distinct productIds currently in the cart/order — only
 // needed for coupons with eligibleProductIds set; omit/empty is fine for
 // every other coupon (couponProductGateOk is a no-op when the field is unset).
-async function validateNewCoupon({ coupon, cartProductTotal, cartProductIds, email, mobile, isLoggedIn }) {
+async function validateNewCoupon({ coupon, cartProductTotal, cartProductIds, email, mobile, isLoggedIn, userId }) {
   const tag = "[Coupon:Storefront]";
   const now = new Date();
 
@@ -166,11 +166,14 @@ async function validateNewCoupon({ coupon, cartProductTotal, cartProductIds, ema
   const skipSingleUseGate = isValidInternal;
 
   // Per-user cap — enforced whenever a maxUsesPerUser limit is set (null = unlimited).
-  if (identifiers.length > 0 && coupon.maxUsesPerUser) {
+  // The account itself counts too (userId), not just the typed email/mobile: otherwise a member who orders to a
+  // different delivery number could use a once-per-customer coupon again.
+  if ((identifiers.length > 0 || userId) && coupon.maxUsesPerUser) {
     const priorCount = await CouponUsage.countDocuments({
       couponId: coupon.couponId,
       reversed: { $ne: true }, // a cancelled/refunded order's usage must not count against the limit
       $or: [
+        ...(userId ? [{ userId }] : []),
         ...(normEmail  ? [{ email:  normEmail  }] : []),
         ...(normMobiles.length ? [{ mobile: { $in: normMobiles } }] : []),
       ],
@@ -267,6 +270,7 @@ const applyCouponCodeService = async ({ userId, couponCodeName, email, mobile })
       email: identity.email,
       mobile: identity.mobiles,
       isLoggedIn: !!userId,
+      userId,
     });
 
     // Discount applies to product subtotal only. INTERNAL_TEST is handled at payment time
@@ -430,8 +434,11 @@ const getAllCouponCodeService = async ({ userId, code, cartProductIds, email, mo
   // invisible before, newly listed after. Real re-validation still happens
   // at apply/charge time regardless (validateNewCoupon), this is purely the
   // discovery/listing surface.
+  // A guest's typed email/mobile is unverified: it may unlock a personal coupon only through an exact code lookup,
+  // never through this list (that would let anyone enumerate other people's coupons by guessing an email).
+  const listIdentifiers = userId ? identifiers : [];
   let visible = candidates.filter(
-    (c) => couponAudienceOk(c, { isLoggedIn, identifiers }) && couponProductGateOk(c, effectiveCartProductIds),
+    (c) => couponAudienceOk(c, { isLoggedIn, identifiers: listIdentifiers }) && couponProductGateOk(c, effectiveCartProductIds),
   );
 
   // A signed-in customer who has used a coupon up to its per-customer limit

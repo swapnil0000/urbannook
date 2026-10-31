@@ -157,6 +157,7 @@ const revealCouponCodeService = async ({ userId, couponId, mobile }) => {
     email: user.email,
     mobile: String(user.verifiedMobile),
     isLoggedIn: true,
+    userId,
   });
 
   return { statusCode: 200, message: "Coupon revealed", data: { id: coupon.couponId, code: coupon.code }, success: true };

@@ -36,10 +36,8 @@ export const selectMagicSheetCoupons = async (coupons, validate) => {
  * already hold on the order, so a customer is never treated as anonymous just
  * because a callback carried no contact.
  *
- *  · signed-in order → the account's own identity (profile + WhatsApp-verified
- *    number + email, read from the user record) PLUS the number typed in the
- *    modal, so a coupon assigned to their account keeps working if they change
- *    the delivery number.
+ *  · signed-in order → the account's own identity ONLY (profile + WhatsApp-verified number + email, read from the
+ *    user record). A number typed in the modal is unverified, so it never unlocks a coupon for a signed-in customer.
  *  · guest order     → typed-in contact, else the contact captured on the order.
  *
  * @param {object} p
@@ -51,8 +49,7 @@ export const selectMagicSheetCoupons = async (coupons, validate) => {
  */
 export const resolveMagicCouponIdentity = ({ order, payloadEmail, payloadMobile, account }) => {
   if (order?.userId && !order?.isGuestOrder && account) {
-    const mobiles = [...new Set([...(account.mobiles || []), payloadMobile].filter(Boolean))];
-    return { email: account.email || payloadEmail || null, mobile: mobiles };
+    return { email: account.email || null, mobile: [...new Set(account.mobiles || [])] };
   }
   return {
     email: payloadEmail || order?.guestInfo?.email || null,

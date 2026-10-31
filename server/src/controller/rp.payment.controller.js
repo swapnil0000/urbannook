@@ -276,7 +276,11 @@ const resortVariantsIfNeeded = async (productId) => {
     const derivedStatus = deriveProductStatus(synced, doc.productQuantity, doc.productStatus);
     if (derivedStatus !== doc.productStatus) update.productStatus = derivedStatus;
     if (Object.keys(update).length) {
-      await Product.updateOne({ productId }, { $set: update });
+      // RAW write on purpose. `sorted` is the plain stored array (from .lean()), but Product.updateOne would cast it
+      // through THIS repo's variant schema, which does not declare admin-only fields — and Mongoose silently drops
+      // every undeclared key (variantMrp, variantDes, variantSwatch*, isActive …) from every variant. That is what
+      // made MRP / "% off" vanish from a product the first time one of its variants sold out.
+      await Product.collection.updateOne({ productId }, { $set: update });
     }
   } catch (err) {
     console.error(`[Stock] OOS resort/status update failed product=${productId}:`, err.message);
@@ -1055,6 +1059,9 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       );
     }
     // isInternal=true without INTERNAL_TEST type is DB corruption — reject clearly, don't silently zero-out
+    if (isValidInternal && liveCoupon.scope !== "TARGETED") {
+      throw new ValidationError("This coupon is restricted. Please remove it from your cart and try again.");
+    }
     if (liveCoupon.isInternal && !isValidInternal) {
       console.error(`[Coupon:Security] Coupon ${couponCodeId} has isInternal=true but discountType=${liveCoupon.discountType}`);
       throw new ValidationError(
@@ -1169,11 +1176,12 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
         .filter((m) => m && m.length === 10);
       const identifiers     = [normEmailCheck, ...new Set(checkMobiles)].filter(Boolean);
 
-      if (identifiers.length > 0 && liveCoupon.maxUsesPerUser) {
+      if ((identifiers.length > 0 || userId) && liveCoupon.maxUsesPerUser) {
         const priorUses = await CouponUsage.countDocuments({
           couponId: couponCodeId,
           reversed: { $ne: true },
           $or: [
+            ...(userId ? [{ userId }] : []),
             ...(normEmailCheck  ? [{ email:  normEmailCheck  }] : []),
             ...(checkMobiles.length ? [{ mobile: { $in: [...new Set(checkMobiles)] } }] : []),
           ],
@@ -1206,6 +1214,8 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     isMagic,
     paymentMethod: reqPaymentMethod,
   });
+  // A coupon may take the whole product total, but the order still has delivery / gift wrap to pay; a ₹0 Razorpay order is never valid.
+  if (!isInternalTestOrder && !(charge.finalAmount > 0)) throw new ValidationError("This order has nothing to pay. Please contact support.");
   finalAmount = charge.finalAmount;
   const { isCOD, codPartialAmount, codRemainingAmount, razorpayChargeAmount, razorpayChargeAmountPaise } = charge;
 
@@ -2453,6 +2463,10 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     if (liveCoupon.validUntil && now > new Date(liveCoupon.validUntil)) {
       throw new ValidationError("This coupon has expired.");
     }
+    // Same global floor as the signed-in apply and Magic: no coupons on carts of ₹99 or less.
+    if (subtotal <= 99) {
+      throw new ValidationError("Coupons are not applicable on cart values of ₹99 or less.");
+    }
     if (subtotal < (liveCoupon.minCartValue || 0)) {
       throw new ValidationError(`Minimum order of ₹${liveCoupon.minCartValue} required for this coupon.`);
     }
@@ -2526,6 +2540,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     isMagic,
     paymentMethod: reqPaymentMethod,
   });
+  if (!isInternalTestOrder && !(charge.finalAmount > 0)) throw new ValidationError("This order has nothing to pay. Please contact support.");
   const { finalAmount, isCOD, codPartialAmount, codRemainingAmount, razorpayChargeAmount, razorpayChargeAmountPaise } = charge;
 
   // Update orderItems with shipping value now that it's calculated — customer-facing amount
@@ -2677,6 +2692,8 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
 
 export {
   fulfilCapturedPayment,
+  // exported so the stock-decrement / re-sort write can be tested against the real DB
+  decrementStockForOrder,
   UNPAID_STATUSES,
   razorpayCreateOrderController,
   razorpayKeyGetController,

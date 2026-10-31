@@ -317,6 +317,7 @@ export const magicGetPromotionsController = asyncHandler(async (req, res) => {
         email: identity.email,
         mobile: identity.mobile,
         isLoggedIn,
+        userId: isLoggedIn ? existing.userId : undefined,
       }),
     );
 

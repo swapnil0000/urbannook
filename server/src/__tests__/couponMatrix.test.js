@@ -211,6 +211,13 @@ describe("Razorpay Magic: whose number is used for coupons", () => {
     expect(await mapply(ids.T, "TGTMOBILE", { contact: "9000000009" })).toBe(false);
   });
 
+  it("a signed-in customer can NOT unlock someone else's number by typing it in the Razorpay modal", async () => {
+    await seedWorld();
+    const ids = await openMagicOrders();
+    expect(await sheet(ids.M, { contact: "9369463494" })).not.toContain("TGTMOBILE");
+    expect(await mapply(ids.M, "TGTMOBILE", { contact: "9369463494" })).toBe(false);
+  });
+
   it("a signed-in customer keeps their account's coupons even if the modal shows another number", async () => {
     await seedWorld();
     const ids = await openMagicOrders();

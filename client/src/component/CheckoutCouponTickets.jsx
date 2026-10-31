@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useGetAvailableCouponsQuery, useApplyCouponMutation } from '../store/api/userApi';
+import { useGetAvailableCouponsQuery } from '../store/api/userApi';
 import { useUI } from '../hooks/useRedux';
 import { calcLocalDiscount } from '../utils/couponDiscount';
 
@@ -14,9 +14,8 @@ const ticketMask = { WebkitMask: NOTCH, mask: NOTCH };
  * the only place to pick a coupon before paying. Nothing here applies by itself: a coupon is applied only
  * when the shopper taps Apply, and only coupons that work on this cart are listed.
  */
-const CheckoutCouponTickets = ({ appliedCoupon, discount = 0, cartTotal = 0, isGuest, userId, userEmail, items, onApplied, onRemove }) => {
+const CheckoutCouponTickets = ({ appliedCoupon, discount = 0, cartTotal = 0, isGuest, userId, items, onApplied, onRemove }) => {
   const { data, isLoading } = useGetAvailableCouponsQuery({ userId, items });
-  const [applyCoupon] = useApplyCouponMutation();
   const { showNotification } = useUI();
   const [applying, setApplying] = useState(null);
 

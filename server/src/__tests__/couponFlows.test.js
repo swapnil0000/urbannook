@@ -253,3 +253,27 @@ describe("coupon on top of an offer (product-level promotion)", () => {
     expect(d.amount).toBe((1750 - 175 + 149) * 100);
   });
 });
+
+describe("review findings (pre-prod)", () => {
+  it("a guest's typed email never lists personal coupons — only an exact code lookup can unlock them", async () => {
+    await seedCatalog();
+    await coupon("MYMAIL", { scope: "TARGETED", assignedTo: [assigned("member@example.com", "EMAIL")] });
+    expect(await listCodes({ email: "member@example.com", mobile: "9876543210", cartProductIds: [LAMP, PEN] })).toEqual([]);
+    expect((await lookup({ code: "MYMAIL", email: "member@example.com" })).map((c) => c.code)).toEqual(["MYMAIL"]);
+  });
+
+  it("once-per-customer is counted by ACCOUNT too: a member can't reuse a coupon by ordering to another number", async () => {
+    await seedCatalog(); await seedMember();
+    await coupon("ONCE", { maxUsesPerUser: 1 });
+    const c = await Coupon.collection.findOne({ code: "ONCE" });
+    // the earlier order was delivered to a different number and the account has no email on that usage row
+    await Coupon.db.collection("couponusages").insertOne({ couponId: c.couponId, couponCode: "ONCE", userId: MEMBER.userId, mobile: "9000000009", usedAt: new Date() });
+    await expect(applyCouponCodeService({ userId: MEMBER.userId, couponCodeName: "ONCE" })).rejects.toThrow(/already used/i);
+  });
+
+  it("no coupons on a guest cart of ₹99 or less, like every other path", async () => {
+    await Product.collection.insertOne({ productId: "cheap-1", uiProductId: "u-cheap", productName: "Cheap", productStatus: "in_stock", productCategory: "c", productSubCategory: "s", variantDetails: [variant("CHP1", "Cheap", 50)] });
+    await coupon("OFFER", { discountType: "FLAT", discountValue: 10 });
+    await expect(runGuest({ couponCode: "OFFER", items: [{ productId: "cheap-1", quantity: 1, variant: "Cheap" }] })).rejects.toThrow(/₹99 or less/);
+  });
+});

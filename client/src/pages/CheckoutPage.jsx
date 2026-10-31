@@ -1606,7 +1606,6 @@ const CheckoutPage = () => {
             cartTotal={cartTotalAmount}
             isGuest={isGuest}
             userId={userProfile?.userId}
-            userEmail={userEmail}
             items={cartItems.map((i) => ({ productId: i.mongoId || i.id.split(":")[0] }))}
             onApplied={isGuest ? handleGuestCouponApplied : handleCouponApplied}
             onRemove={isGuest ? handleGuestCouponRemoved : handleCouponRemoved}

@@ -112,6 +112,37 @@ describe("refunds", () => {
   });
 });
 
+describe("an order cancelled by support (status stays PAID, resolutionStatus = CANCELLED)", () => {
+  const cancelled = (over = {}) => base({ resolutionStatus: "CANCELLED", cancelledAt: T("30"), ...over });
+
+  it("is a cancelled order to the customer — not 'confirmed'", () => {
+    const v = view(cancelled(), [], [{ caseType: "REFUND", status: "RESOLVED", refunds: [{ amount: 1448, status: "SUCCESS", processedAt: T("31") }] }]);
+    expect(v.stage.code).toBe("CANCELLED");
+    expect(v.timeline).toBeNull();
+    expect(v.payment).toMatchObject({ state: "REFUNDED", refundedAmount: 1448, netPaid: 0, amountDue: 0 });
+    expect(v.cancelledAt).toBe(T("30").toISOString());
+    expect(v.actions.invoice).toBe(false);
+  });
+
+  it("cancelled before any refund is logged: cancelled, nothing owed, no false 'payment successful'", () => {
+    const v = view(cancelled());
+    expect(v.payment).toMatchObject({ state: "CANCELLED", amountDue: 0 });
+    expect(v.stage.message).toMatch(/will not be delivered/i);
+  });
+
+  it("a cancelled COD order owes nothing on delivery", () => {
+    const v = view(cancelled({ amount: 2500, paymentMethod: "COD", codDetails: { partialAmountPaid: 500, remainingAmount: 2000 } }));
+    expect(v.payment).toMatchObject({ amountDue: 0, balanceOnDelivery: 0 });
+  });
+
+  it("the real cancelled order from production data", () => {
+    const v = view(cancelled({ amount: 5574, financialSummary: { totalRefunds: -5574 }, cancellationReason: "refund" }));
+    expect(v.stage.code).toBe("CANCELLED");
+    expect(v.payment).toMatchObject({ state: "REFUNDED", refundedAmount: 5574 });
+    expect(JSON.stringify(v)).not.toMatch(/refund"|cancellationReason/); // the admin's internal reason never reaches the customer
+  });
+});
+
 describe("shipping and tracking", () => {
   it("paid, no shipment: being prepared, no tracking, no invented dates", () => {
     const v = view(base());
