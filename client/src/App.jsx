@@ -28,7 +28,6 @@ export const NewHeader = lazyWithPreload(() => import('./component/layout/NewHea
 export const Footer = lazyWithPreload(() => import('./component/layout/Footer'));
 const Notification = lazy(() => import('./component/Notification'));
 const GlMobileNav = lazy(() => import('./component/layout/GlMobileNav'));
-const SocialMediaFAB = lazy(() => import('./component/layout/WhatsAppButton'));
 const OpenInBrowserBanner = lazy(() => import('./component/OpenInBrowserBanner'));
 const GoogleOneTap = lazy(() => import('./component/GoogleOneTap'));
 // SiteOfferPopup (₹100 off + lead capture) is retired — the store now runs free
@@ -38,7 +37,8 @@ const GoogleOneTap = lazy(() => import('./component/GoogleOneTap'));
 const FreeShippingPopup = lazy(() => import('./component/FreeShippingPopup'));
 // Live-offers carousel (centered on desktop, bottom sheet on mobile), once per session.
 const OffersPopup = lazy(() => import('./component/offers/OffersPopup'));
-const ScrollHint = lazy(() => import('./component/ScrollHint'));
+// Floating "Help" button → Help & Support panel (WhatsApp + FAQs).
+const HelpWidget = lazy(() => import('./component/support/HelpWidget'));
 const PasskeyPrompt = lazy(() => import('./component/PasskeyPrompt'));
 // Smart combo/upsell bottom sheet (Promotion V2) — watches the cart from the
 // app root so it fires on an add from ANY surface (PDP, cart drawer, etc.),
@@ -216,7 +216,6 @@ function App({ store = browserStore, helmetContext }) {
                 <ErrorBoundary>
                   <Footer />
                 </ErrorBoundary>
-                <SocialMediaFAB />
                 <Notification />
                 <GlMobileNav />
                 {/* Global Google One Tap for logged-out visitors (boosts Meta EMQ) */}
@@ -246,7 +245,7 @@ function App({ store = browserStore, helmetContext }) {
                   <GiftClaimWatcher />
                 </ErrorBoundary>
                 <ErrorBoundary>
-                  <ScrollHint />
+                  <HelpWidget />
                 </ErrorBoundary>
               </Suspense>
             </SyncProvider>

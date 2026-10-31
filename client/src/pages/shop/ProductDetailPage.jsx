@@ -32,6 +32,10 @@ import GiftWrapOffer from '../../component/GiftWrapOffer';
 import CouponOffersSection from '../../component/offers/CouponOffersSection';
 import { requestCheckout } from '../../utils/checkoutIntent';
 import { useCartPromotions } from '../../hooks/useCartPromotions';
+import SaleTag from '../../component/festive/SaleTag';
+import SaleDealBox from '../../component/festive/SaleDealBox';
+import StockStatus from '../../component/StockStatus';
+import ProductQuestions from '../../component/support/ProductQuestions';
 
 const MotionDiv = motion.div;
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
@@ -682,7 +686,7 @@ const ProductDetailPage = () => {
                     ellipsis after 2 lines on mobile. min-h is a MINIMUM, not
                     a cap, so it still keeps short titles' height consistent
                     without truncating a longer one. */}
-                <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-ink leading-tight min-h-[26px] md:min-h-[20px]">
+                <h1 className="text-[26px] md:text-4xl font-extrabold tracking-tight text-ink leading-tight min-h-[26px] md:min-h-[20px]">
                   {heading}
                 </h1>
                 {heading !== (selectedVariant || product.productName) && selectedVariant && (
@@ -719,16 +723,19 @@ const ProductDetailPage = () => {
                 lining up to the same left edge. Vertical spacing is kept. */}
             <div className="mt-1  bg-paper  md:max-w-md">
               {/* price hero */}
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
                 <span className="text-4xl md:text-5xl font-extrabold text-ink tracking-tight tabular-nums leading-none">{inr(currentPrice)}</span>
-                {discountPercent > 0 && (
-                  <div className="flex flex-col items-start gap-0.5">
-                    <span className="gl-lbl text-[11px] text-sale bg-sale/10 px-2 py-0.5 rounded-md">{discountPercent}% OFF</span>
-                    <span className="text-xs text-faint line-through tabular-nums">{inr(maxVariantPrice)}</span>
-                  </div>
-                )}
+                {discountPercent > 0 && <span className="text-base md:text-lg text-faint line-through tabular-nums">{inr(maxVariantPrice)}</span>}
+                {discountPercent > 0 && <span className="rounded-full bg-sale px-2.5 py-1 text-[12px] font-extrabold leading-none text-white">{discountPercent}% OFF</span>}
+                <SaleTag />
               </div>
-              {discountPercent > 0 && <p className="text-sm font-semibold text-save mt-1">You save {inr(maxVariantPrice - currentPrice)}</p>}
+              {discountPercent > 0 && <p className="text-sm font-semibold text-save mt-1.5">You save {inr(maxVariantPrice - currentPrice)}</p>}
+
+              {/* real stock for the selected variant ("Only 2 left" at 5 or fewer) + dispatch time */}
+              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-hair bg-white/60 px-3 py-2">
+                <StockStatus outOfStock={isOutOfStock} left={selectedVariantObj?.variantQuantity} lowAt={5} />
+                {!isOutOfStock && <span className="text-[12px] text-muted"><i className="fa-solid fa-truck-fast mr-1 text-brand" aria-hidden="true" />Ships in 24-48 hrs</span>}
+              </div>
 
               {/* festive gift wrap, offered here too — "Go to Checkout" skips the cart drawer where it used to be the only place */}
               {product?.giftWrapEligible && !isOutOfStock && <GiftWrapOffer variant="card" eligible className="mt-3" />}
@@ -803,9 +810,14 @@ const ProductDetailPage = () => {
                   decision happens — hidden unless admin's promotion is on. */}
               {!isOutOfStock && <OfferProgress location="product" className="mt-3" fallback={<FreeShippingStrip cartTotal={cartTotal} variant="compact" className="mt-3" />} />}
 
+              {/* questions right by the buy buttons — straight to our WhatsApp, with this product's link */}
+              <ProductQuestions productName={product.productName} variantName={selectedVariant} url={shareUrl} className="mt-3" />
+
               {/* Offers right under the buy buttons — price and variants stay clean
                   up top; the offers popup (OffersPopup) announces them on arrival. */}
-              <ProductOffers productId={productId} className="mt-4" cartTotal={cartTotal} appliedIds={appliedOfferIds} cartPromotions={cartPromotions} onApply={isOutOfStock ? undefined : handleApplyOffer} disabled={isAdding} />
+              {/* live sale countdown right above the offers it belongs to */}
+              <SaleDealBox className="mt-4" />
+              <ProductOffers productId={productId} className="mt-3" cartTotal={cartTotal} appliedIds={appliedOfferIds} cartPromotions={cartPromotions} onApply={isOutOfStock ? undefined : handleApplyOffer} disabled={isAdding} />
 
               {/* Coupons (guest list is server-rendered; see entry-server.jsx) */}
               <CouponOffersSection variant="pdp" />
@@ -873,10 +885,20 @@ const ProductDetailPage = () => {
               </div> */}
 
               {/* trust strip inside the card */}
-              <div className="mt-4 pt-4 border-t border-hair grid grid-cols-3 divide-x divide-hair text-center text-[11px] text-muted">
-                <div className="px-1 flex flex-col items-center gap-1"><i className="fa-solid fa-truck-fast text-brand text-base" aria-hidden="true" />24-48 hrs</div>
-                <div className="px-1 flex flex-col items-center gap-1"><i className="fa-solid fa-money-bill-wave text-brand text-base" aria-hidden="true" />{product.isCodAvailable ? 'Partial COD' : 'Secure pay'}</div>
-                <div className="px-1 flex flex-col items-center gap-1"><i className="fa-solid fa-rotate-left text-brand text-base" aria-hidden="true" />Free replacement if damaged*</div>
+              <p className="mt-5 text-sm font-bold text-ink">Shop with peace of mind</p>
+              <div className="mt-2.5 grid grid-cols-4 gap-1 text-center">
+                {[
+                  ['fa-truck-fast', 'Dispatch', '24-48 hrs'],
+                  ['fa-money-bill-wave', 'Payment', product.isCodAvailable ? 'Partial COD' : 'Secure pay'],
+                  ['fa-rotate-left', 'Replacement', 'Free if damaged*'],
+                  ['fa-location-dot', 'Delivery', 'Pan-India'],
+                ].map(([icon, title, sub]) => (
+                  <div key={title} className="flex flex-col items-center gap-1">
+                    <span className="grid h-11 w-11 place-items-center rounded-full border border-hair bg-white text-ink"><i className={`fa-solid ${icon} text-[15px]`} aria-hidden="true" /></span>
+                    <span className="text-[11.5px] font-bold text-ink">{title}</span>
+                    <span className="text-[10.5px] leading-tight text-muted">{sub}</span>
+                  </div>
+                ))}
               </div>
               <p className="mt-1.5 text-[8px] text-faint text-center">
                 *Applicable only with an unboxing video showing the damaged product and its shipping label.
@@ -1150,6 +1172,7 @@ const ProductDetailPage = () => {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 90, opacity: 0 }}
             transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            data-sticky-buybar // the floating Help button lifts above this bar while it is shown
             className="md:hidden fixed inset-x-0 z-30 bg-paper/95 backdrop-blur border-t border-hair px-4 py-3 flex items-center gap-3"
             style={{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom))' }}
           >
