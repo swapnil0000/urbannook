@@ -24,8 +24,6 @@ import {
   adminAnalyticsRouter,
   freeShippingOfferRouter,
   passkeyRouter,
-  themeRouter,
-  siteBannerRouter,
   offerLeadRouter,
   offerRouter,
   guestCartRouter,

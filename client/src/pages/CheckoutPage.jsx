@@ -16,7 +16,6 @@ import {
   useGetFreeShippingOfferQuery,
   useGetGiftWrapOfferQuery,
   useSyncGuestCartMutation,
-  useGetLoyaltySummaryQuery,
 } from "../store/api/userApi";
 import { setShowLoginModal, setLoginCallback } from "../store/slices/uiSlice";
 import { useUI } from "../hooks/useRedux";
@@ -222,15 +221,6 @@ const PriceRows = ({ subtotal, promotionSavings = 0, shipping, discount, giftWra
         </div>
       )}
 
-      {uncash?.discount > 0 && (
-        <div className="flex justify-between items-center text-sm">
-          <span className="text-gray-500 flex items-center gap-1.5">
-            <i className="fa-solid fa-coins text-[#a89068] text-[11px]" /> UnCash ({uncash.points} used)
-          </span>
-          <span className="font-bold text-emerald-600">−₹{uncash.discount.toLocaleString()}</span>
-        </div>
-      )}
-
       <div className="border-t border-gray-100 pt-3">
         <div className="flex justify-between items-center">
           <span className="font-bold text-gray-900">Total</span>
@@ -247,8 +237,6 @@ const PriceRows = ({ subtotal, promotionSavings = 0, shipping, discount, giftWra
       </div>
 
       {totalSavings > 0 && <SavingsBanner amount={totalSavings} freeShipping={isShippingFree} />}
-
-      <UnCashBox uncash={uncash} totalToPay={totalToPay} />
 
       {/* {isCOD && realShippingAmount > 0 && (
         <div className="border-t border-dashed border-amber-200 pt-3 space-y-0 rounded-xl bg-amber-50/60 -mx-1 px-3 pb-3 mt-1">
@@ -2418,7 +2406,6 @@ const CheckoutPage = () => {
                       itemCount={cartItems.length}
                       isLoadingShipping={isCalculatingShipping}
                       paymentMethod={paymentMethod}
-                      uncash={uncash}
                       onApplyCoupon={() => setShowCouponModal(true)}
                       onRemoveCoupon={
                         isGuest ? handleGuestCouponRemoved : handleCouponRemoved
@@ -2644,7 +2631,6 @@ const CheckoutPage = () => {
                 itemCount={cartItems.length}
                 isLoadingShipping={isCalculatingShipping}
                 paymentMethod={paymentMethod}
-                uncash={uncash}
                 onApplyCoupon={() => setShowCouponModal(true)}
                 onRemoveCoupon={
                   isGuest ? handleGuestCouponRemoved : handleCouponRemoved
@@ -2735,7 +2721,7 @@ const CheckoutPage = () => {
           {mobileSummaryOpen && (
             <div className="bg-white border-t border-gray-100 px-4 pt-3 pb-2 max-h-[45vh] overflow-y-auto shadow-[0_-12px_40px_rgba(0,0,0,0.12)] animate-in fade-in duration-200">
               <div className="max-w-sm mx-auto">
-                <PriceRows subtotal={pricingDetails.subtotal} promotionSavings={ruleDiscountSavings} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} isLoadingShipping={isCalculatingShipping} paymentMethod={paymentMethod} uncash={uncash} />
+                <PriceRows subtotal={pricingDetails.subtotal} promotionSavings={ruleDiscountSavings} shipping={pricingDetails.shipping} discount={pricingDetails.discount} appliedCoupon={appliedCoupon} totalToPay={totalToPay} itemCount={cartItems.length} isLoadingShipping={isCalculatingShipping} paymentMethod={paymentMethod} />
               </div>
             </div>
           )}
@@ -2902,13 +2888,6 @@ const CheckoutPage = () => {
                   </span>
                 )}
               </div>
-
-              {uncashDiscount > 0 && (
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-500">UnCash ({uncashPoints} used)</span>
-                  <span className="font-semibold text-emerald-600">−₹{uncashDiscount.toLocaleString()}</span>
-                </div>
-              )}
 
               <div className="border-t border-dashed border-gray-200 my-1" />
 
