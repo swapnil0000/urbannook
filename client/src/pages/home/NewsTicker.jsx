@@ -1,26 +1,134 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useShippingDelayNotice } from '../../hooks/useShippingDelayNotice';
 import { useSiteCampaign } from '../../hooks/useSiteCampaign';
-import FestiveCountdown from '../../component/festive/FestiveCountdown';
+import FestiveCountdown, { useCountdown } from '../../component/festive/FestiveCountdown';
+
+const pad = (n) => String(n).padStart(2, '0');
+const ROTATE_MS = 4000;
+
+/** In-site path → <Link>, https URL → new tab; nothing → plain span. */
+const MessageLink = ({ to, className, children, tabIndex }) => {
+  if (!to) return <span className={className}>{children}</span>;
+  return /^https:\/\//i.test(to)
+    ? <a href={to} target="_blank" rel="noopener noreferrer" className={className} tabIndex={tabIndex}>{children}</a>
+    : <Link to={to} className={className} tabIndex={tabIndex}>{children}</Link>;
+};
+
+/** "12d : 23h : 15m : 08s" — the campaign end on the server's clock. */
+const SaleTimer = ({ label }) => {
+  const t = useCountdown({ seconds: true });
+  if (!t.visible) return null;
+  const unit = (v, l) => (
+    <span className="inline-flex items-baseline gap-px">
+      <b className="font-archivo text-[13px] font-extrabold tabular-nums text-paper sm:text-[15px]">{pad(v)}</b>
+      <span className="text-[9px] font-semibold text-paper/60">{l}</span>
+    </span>
+  );
+  const sep = <span className="text-paper/40" aria-hidden="true">:</span>;
+  return (
+    <span
+      className="inline-flex shrink-0 items-center gap-2 rounded-md border border-paper/20 px-2 py-1 sm:gap-2.5 sm:px-2.5"
+      role="timer"
+      aria-label={`${label} ${t.d} days ${t.h} hours ${t.m} minutes`}
+    >
+      <span className="gl-lbl hidden text-[9px] tracking-[0.16em] text-paper/70 md:inline">{label}</span>
+      <span className="hidden h-3.5 w-px bg-paper/20 md:inline-block" aria-hidden="true" />
+      <span className="inline-flex items-baseline gap-1">
+        {t.d > 0 && <>{unit(t.d, 'd')}{sep}</>}
+        {unit(t.h, 'h')}{sep}{unit(t.m, 'm')}
+        {/* seconds only where there is room — on phones the offer message needs the width */}
+        <span className="hidden items-baseline gap-1 sm:inline-flex">{sep}{unit(t.s, 's')}</span>
+      </span>
+    </span>
+  );
+};
+
+/**
+ * Sale bar while a festive campaign is live: one admin message at a time
+ * (admin → Operations Hub → Festive → ticker messages, each tied to its
+ * promotion so it disappears the moment that offer ends), the campaign
+ * countdown and a "Shop now" link to the message's own page. Every word and
+ * date comes from the campaign — nothing about the offers is written here.
+ */
+const SaleBar = ({ messages, countdownLabel, showCountdown }) => {
+  const [i, setI] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const n = messages.length;
+  useEffect(() => {
+    if (n < 2 || paused) return undefined;
+    const t = setInterval(() => setI((x) => (x + 1) % n), ROTATE_MS);
+    return () => clearInterval(t);
+  }, [n, paused]);
+  const m = messages[i % n];
+  const shopTo = m.to || '/products';
+
+  return (
+    <div
+      className="flex items-center justify-center gap-3 px-3 py-2 sm:gap-4 sm:px-6"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={() => setPaused(false)}
+    >
+      <span className="hidden shrink-0 items-center gap-1.5 rounded-full border border-paper/40 px-2.5 py-0.5 sm:inline-flex">
+        <span className="h-1.5 w-1.5 rounded-full bg-star motion-safe:animate-pulse" aria-hidden="true" />
+        <span className="gl-lbl text-[9px] tracking-[0.18em] text-paper">Sale</span>
+      </span>
+      <div className="min-w-0 flex-1 sm:flex-none" aria-live="polite">
+        <MessageLink
+          key={m.key}
+          to={m.to}
+          className="un-salebar-msg line-clamp-2 block text-[12.5px] font-semibold leading-snug text-paper hover:underline focus-visible:underline focus-visible:outline-none sm:truncate sm:text-[15px]"
+        >
+          {m.text}
+        </MessageLink>
+      </div>
+      {showCountdown && <SaleTimer label={countdownLabel} />}
+      <Link
+        to={shopTo}
+        className="hidden shrink-0 items-center gap-1 rounded-full bg-paper px-3.5 py-1 text-[13px] font-bold text-ink transition-colors hover:bg-star md:inline-flex"
+      >
+        Shop now <i className="fa-solid fa-chevron-right text-[10px]" aria-hidden="true" />
+      </Link>
+    </div>
+  );
+};
 
 /**
  * Site-wide announcement bar — editorial "2040" styling (ink band, mono
  * labels, red asterisk separators) carrying the operational headlines from
  * main: the conditional shipping-delay notice plus the evergreen ones.
  *
- * Festive messages (admin → Operations Hub → Festive) are prepended while a
- * campaign is live: gold accent + ✦ separator, each optionally linked. They
- * come from the server, which already dropped anything expired, disabled, or
- * tied to a promotion that isn't live — when the campaign ends this list is
- * simply empty and the bar is exactly the original one.
+ * While a festive campaign is live and has messages (admin → Operations Hub →
+ * Festive), the bar becomes the sale bar above instead: one offer message at
+ * a time, the countdown and "Shop now". The server already dropped anything
+ * expired, disabled, or tied to a promotion that isn't live — when the
+ * campaign ends the list is simply empty and the bar is exactly the original one.
  */
 const NewsTicker = () => {
   const [isPaused, setIsPaused] = useState(false);
   const shippingDelayMessage = useShippingDelayNotice();
-  const { active: festive, messages: festiveMessages, can, page, stripText } = useSiteCampaign();
+  const { active: festive, messages: festiveMessages, can, page, stripText, countdownLabel } = useSiteCampaign();
   const showCountdown = can('countdown');
   const showStrip = Boolean(stripText) && page !== 'home' && can('sectionAccents');
+
+  if (festive && festiveMessages.length) {
+    return (
+      <div className="relative block border-b border-star/30 bg-ink text-paper" role="region" aria-label="Sale announcements">
+        <style>{`
+          @keyframes unSaleMsg { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }
+          .un-salebar-msg { animation: unSaleMsg .35s ease-out both }
+          @media (prefers-reduced-motion: reduce) { .un-salebar-msg { animation: none } }
+        `}</style>
+        <SaleBar
+          messages={festiveMessages.map((msg) => ({ key: msg.id, text: msg.text, to: msg.linkUrl }))}
+          countdownLabel={countdownLabel}
+          showCountdown={showCountdown}
+        />
+      </div>
+    );
+  }
 
   const items = [
     ...festiveMessages.map((m) => ({ key: `f-${m.id}`, text: m.text, to: m.linkUrl, festive: true })),
@@ -31,15 +139,11 @@ const NewsTicker = () => {
 
   const renderText = (item, hidden) => {
     const cls = `gl-lbl text-[9px] sm:text-[10px] tracking-[0.18em] ${item.festive ? 'text-star' : 'text-paper'}`;
-    if (!item.to) return <span className={cls}>{item.text}</span>;
-    const external = /^https:\/\//i.test(item.to);
-    const common = {
-      className: `${cls} hover:underline underline-offset-4 focus-visible:underline focus-visible:outline-none`,
-      tabIndex: hidden ? -1 : undefined,
-    };
-    return external
-      ? <a href={item.to} target="_blank" rel="noopener noreferrer" {...common}>{item.text}</a>
-      : <Link to={item.to} {...common}>{item.text}</Link>;
+    return (
+      <MessageLink to={item.to} tabIndex={hidden ? -1 : undefined} className={item.to ? `${cls} hover:underline underline-offset-4 focus-visible:underline focus-visible:outline-none` : cls}>
+        {item.text}
+      </MessageLink>
+    );
   };
 
   return (

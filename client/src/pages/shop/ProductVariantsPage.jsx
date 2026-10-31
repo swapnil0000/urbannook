@@ -6,7 +6,6 @@ import { bestOfferBadge } from "../../utils/offerBadge";
 import SEOHead from "../../component/SEOHead";
 import RevealCard from "../../component/RevealCard";
 import VariantCard from "../../component/VariantCard";
-import OfferMiniBanner from "../../component/offers/OfferMiniBanner";
 import { useSiteCampaign } from "../../hooks/useSiteCampaign";
 import { trackViewItemList } from "../../utils/analytics";
 
@@ -23,8 +22,7 @@ const ProductVariantsPage = () => {
   const { data: productResponse, isLoading, error } = useGetProductByIdQuery(productId);
   // Offer badge on every card (server-rendered too, see entry-server.jsx)
   const { data: promoRes } = useGetProductPromotionsQuery(productId);
-  const promotions = promoRes?.data?.promotions;
-  const offerBadge = bestOfferBadge(promotions);
+  const offerBadge = bestOfferBadge(promoRes?.data?.promotions);
 
   // subtle Diwali accents while a festive campaign is live
   const { active: festiveActive, can } = useSiteCampaign();
@@ -116,8 +114,8 @@ const ProductVariantsPage = () => {
             </div>
           ) : (
             <>
-            <OfferMiniBanner productId={productId} promotions={promotions} />
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-8">
+            {/* same density as the shop grid: 2 per row on phones, 4 on desktop */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-5">
               {variants.map((variant, index) => (
                 <RevealCard key={variant._id || variant.sku || index} index={index}>
                   <VariantCard

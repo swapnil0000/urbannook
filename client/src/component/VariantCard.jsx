@@ -2,6 +2,8 @@ import { Link } from "react-router-dom";
 import { trackSelectItem } from "../utils/analytics";
 import { isVariantOutOfStock } from "../utils/variantStock";
 import { useSiteCampaign } from "../hooks/useSiteCampaign";
+import SaleTag from "./festive/SaleTag";
+import StockStatus from "./StockStatus";
 
 /**
  * Shared variant-level card — one product's single variant (own title,
@@ -58,34 +60,40 @@ const VariantCard = ({ productId, productName, variant, index, listId = "product
             <i className={`fa-solid ${offerBadge.gift ? "fa-gift" : "fa-tag"} text-[9px]`} aria-hidden="true" /> {offerBadge.chip}
           </span>
         )}
+        {/* % off as a pill on the photo — the first thing the eye lands on */}
+        {mrp > price && !oos && (
+          <span className="absolute bottom-2 left-2 z-10 rounded-full bg-sale px-2 py-0.5 text-[10.5px] font-extrabold text-white shadow-sm md:text-[11.5px]">
+            {Math.round(((mrp - price) / mrp) * 100)}% OFF
+          </span>
+        )}
       </div>
 
-      <div className={`p-3.5 flex flex-col flex-grow border-t ${festive ? "bg-gradient-to-b from-white to-star/15 border-star/40" : "bg-white border-hair"}`}>
+      <div className={`p-3 md:p-3.5 flex flex-col flex-grow border-t ${festive ? "bg-gradient-to-b from-white to-star/15 border-star/40" : "bg-white border-hair"}`}>
+        <SaleTag className="mb-1.5 self-start" />
         {/* Two lines max, ellipsis after; min-h reserves both lines so a
             row of these cards never ends up with mismatched heights. */}
-        <h3 title={variant?.variantName || ""} className="font-archivo font-bold text-ink leading-snug text-left w-full text-[14px] md:text-[16px] line-clamp-2 min-h-[2.75em] break-words mb-1">
+        <h3 title={variant?.variantName || ""} className="font-archivo font-bold text-ink leading-snug text-left w-full text-[13px] md:text-[15px] line-clamp-2 min-h-[2.75em] break-words mb-1">
           {variant?.variantName || ""}
         </h3>
 
         <div className="flex justify-between items-end pt-2 border-t border-hair mt-auto">
-          <div className="flex items-center flex-nowrap gap-1 md:gap-1.5 min-w-0">
-            <span className="text-base md:text-xl font-extrabold text-ink whitespace-nowrap">
-              ₹{price?.toLocaleString()}
-            </span>
-            {mrp > price && (
-              <span className="flex flex-col items-start leading-none whitespace-nowrap">
-                <span className="gl-lbl text-[8px] md:text-[9px] text-sale">
-                  {Math.round(((mrp - price) / mrp) * 100)}% OFF
-                </span>
-                <span className="text-[9px] md:text-xs text-faint line-through mt-0.5">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-baseline gap-x-1.5">
+              <span className="text-[15px] md:text-[17px] font-extrabold text-ink whitespace-nowrap">
+                ₹{price?.toLocaleString()}
+              </span>
+              {mrp > price && (
+                <span className="text-[11px] md:text-xs text-faint line-through whitespace-nowrap">
                   ₹{mrp?.toLocaleString()}
                 </span>
-              </span>
-            )}
+              )}
+            </div>
+            {/* real stock: "Only 2 left" from the variant's tracked quantity */}
+            <StockStatus outOfStock={oos} left={variant?.variantQuantity} className="mt-1" />
           </div>
 
-          <div className="hidden md:flex w-11 h-11 rounded-full border border-hair text-muted items-center justify-center group-hover:bg-ink group-hover:text-paper group-hover:border-ink transition-colors">
-            <i className="fa-solid fa-arrow-right -rotate-45 group-hover:rotate-0 transition-transform duration-500"></i>
+          <div className="hidden md:flex w-9 h-9 shrink-0 rounded-full border border-hair text-muted items-center justify-center group-hover:bg-ink group-hover:text-paper group-hover:border-ink transition-colors">
+            <i className="fa-solid fa-arrow-right text-xs -rotate-45 group-hover:rotate-0 transition-transform duration-500"></i>
           </div>
         </div>
       </div>
