@@ -8,9 +8,13 @@ const PromotionBanner = ({ promo, savings = 0 }) => {
   const title = isGift ? String(promo.title).split(' — ')[0] : promo.title;
   return (
   <div className="flex min-w-0 items-center gap-3 rounded-xl border border-save/25 bg-save/5 px-3 py-2.5 text-ink">
-    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-save/10 text-save" aria-hidden="true">
-      <i className={`fa-solid ${isGift ? 'fa-gift' : 'fa-check'} text-xs`} />
-    </span>
+    {promo.image ? (
+      <img src={promo.image} alt="" loading="lazy" className="h-10 w-10 shrink-0 rounded-lg object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+    ) : (
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-save/10 text-save" aria-hidden="true">
+        <i className={`fa-solid ${isGift ? 'fa-gift' : 'fa-check'} text-xs`} />
+      </span>
+    )}
     <div className="min-w-0 flex-1">
       <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-save">{isGift ? 'Free gift added' : 'Offer applied'}</p>
       <p className="truncate text-xs font-bold" title={title}>{title}</p>

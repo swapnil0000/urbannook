@@ -117,6 +117,25 @@ const rewardSchema = new mongoose.Schema(
   { _id: false },
 );
 
+// Per-surface card: the same fields the homepage card has (blank = standard text).
+const PLACEMENT_CARD_KEYS = ["pdp", "plp", "cart", "mini_cart", "checkout", "order_confirmation", "order_details", "customer_account"];
+const PLACEMENT_CARD_FIELDS = {
+  bannerImage: { type: String, trim: true, default: "" },
+  subtitle: { type: String, trim: true, default: "" },     // display title
+  badgeText: { type: String, trim: true, default: "" },    // small note under the price
+  ctaLabel: { type: String, trim: true, default: "" },
+  badgeLabel: { type: String, trim: true, default: "" },
+  priceLabel: { type: String, trim: true, default: "" },
+  savingsMode: { type: String, enum: ["amount", "percent", "label"], default: "amount" },
+  savingsLabel: { type: String, trim: true, default: "" },
+  ctaAction: { type: String, enum: ["cart", "link", "choose"], default: "cart" },
+  ctaUrl: { type: String, trim: true, default: "" },
+  primaryProductId: { type: String, trim: true, default: "" },
+  cardKind: { type: String, enum: ["combo", "reward"], default: "combo" },
+  ctaChoices: { type: [{ _id: false, label: { type: String, trim: true }, url: { type: String, trim: true } }], default: [] },
+  order: { type: Number, default: 0 },
+};
+
 const promotionSchema = new mongoose.Schema(
   {
     // Mostly a UI/admin-form convenience (which fields the editor shows) —
@@ -194,6 +213,11 @@ const promotionSchema = new mongoose.Schema(
       }],
       default: ["pdp", "plp", "cart", "mini_cart", "checkout", "order_confirmation", "order_details", "customer_account"],
     },
+
+    // Optional wording + picture per surface (all blank = the standard card).
+    // Cosmetic only — never read by the discount engine; amounts always come
+    // from the real reward. "home" keeps its own card in homeCard.
+    placementCards: Object.fromEntries(PLACEMENT_CARD_KEYS.map((k) => [k, PLACEMENT_CARD_FIELDS])),
 
     // Cosmetic-only, read by the "home" placement's display endpoint
     // (getHomeDisplayController) — never touches condition/reward evaluation

@@ -72,7 +72,21 @@ const OfferMiniBanner = ({ productId }) => {
       <div className="relative">
         <div ref={trackRef} className="gl-hscroll -mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-3 pt-1">
           {offers.map((c) => {
-            const desc = c.builder?.combos?.[0]?.description || c.badgeText || '';
+            // the admin's product-page card (Promotions → Where it shows → Product page): a picture
+            // replaces the designed banner entirely; wording alone just replaces the matching text
+            const pc = c.pdpCard || {};
+            const title = pc.tagline || c.tagline || c.title;
+            const benefit = (pc.savingsLabel && !pc.savingsLabel.includes('{save}') ? pc.savingsLabel : '') || c.benefit;
+            const desc = pc.badgeText || c.builder?.combos?.[0]?.description || c.badgeText || '';
+            const width = n > 1 ? 'w-[88%] sm:w-[78%] lg:w-[62%]' : 'w-full';
+            if (pc.bannerImage) {
+              return (
+                <article key={c.id} className={`relative shrink-0 snap-start overflow-hidden ${width}`}>
+                  <img src={pc.bannerImage} alt={title} loading="lazy" className="block h-auto w-full object-cover" />
+                  {pc.badgeLabel && <span className="gl-lbl absolute left-2 top-2 bg-star px-2 py-1 text-[9.5px] text-ink">{pc.badgeLabel}</span>}
+                </article>
+              );
+            }
             // the banner sells what the shopper gets (the discounted stand, the gift), not the
             // katana they are already looking at — the reward's photo first; the homepage
             // banner/product photo only when there is none. A mystery gift shows a gift box.
@@ -80,7 +94,7 @@ const OfferMiniBanner = ({ productId }) => {
             return (
               <article
                 key={c.id}
-                className={`relative min-h-[132px] shrink-0 snap-start overflow-hidden border border-star/50 text-paper shadow-[0_18px_36px_-20px_rgb(var(--gl-brand-hi))] ${n > 1 ? 'w-[88%] sm:w-[78%] lg:w-[62%]' : 'w-full'}`}
+                className={`relative min-h-[132px] shrink-0 snap-start overflow-hidden border border-star/50 text-paper shadow-[0_18px_36px_-20px_rgb(var(--gl-brand-hi))] ${width}`}
                 style={{ background: 'radial-gradient(90% 150% at 0% 0%, rgb(var(--gl-brand-hi) / 0.6), transparent 68%), radial-gradient(60% 120% at 100% 100%, rgb(var(--gl-star) / 0.14), transparent 70%), linear-gradient(135deg, rgb(34 12 14), rgb(var(--gl-ink)))' }}
               >
                 <span className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-star to-transparent" aria-hidden="true" />
@@ -93,10 +107,10 @@ const OfferMiniBanner = ({ productId }) => {
                     {img ? <img src={img} alt="" className="h-full w-full object-cover" /> : c.mysteryGift && <MysteryBox />}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="gl-lbl text-[9.5px] text-star" style={{ letterSpacing: '0.22em' }}>✦ {c.badgeLabel || 'Offer'}</p>
-                    <h2 className="mt-1 font-archivo text-[19px] font-bold leading-tight tracking-tight sm:text-[22px]" title={c.tagline || c.title}>{c.tagline || c.title}</h2>
-                    {c.benefit && (
-                      <span className="mt-1.5 inline-block bg-gradient-to-r from-star to-[#f0a52a] px-2.5 py-1 text-[11px] font-bold leading-none text-ink">{c.benefit}</span>
+                    <p className="gl-lbl text-[9.5px] text-star" style={{ letterSpacing: '0.22em' }}>✦ {pc.badgeLabel || c.badgeLabel || 'Offer'}</p>
+                    <h2 className="mt-1 font-archivo text-[19px] font-bold leading-tight tracking-tight sm:text-[22px]" title={title}>{title}</h2>
+                    {benefit && (
+                      <span className="mt-1.5 inline-block bg-gradient-to-r from-star to-[#f0a52a] px-2.5 py-1 text-[11px] font-bold leading-none text-ink">{benefit}</span>
                     )}
                     {desc && <p className="mt-2 line-clamp-2 text-[12px] leading-snug text-paper/70">{desc}</p>}
                   </div>
