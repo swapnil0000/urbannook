@@ -111,6 +111,8 @@ const rewardSchema = new mongoose.Schema(
     // comment on `promotionRepeatCount`/the reward-building loop in
     // promotionEngine.util.js for the cap calculation this drives.
     discountAllUnits: { type: Boolean, default: false },
+    // free_product only: the customer picks which variant of targetProductId they get (every in-stock variant is offered)
+    chooseVariant: { type: Boolean, default: false },
   },
   { _id: false },
 );

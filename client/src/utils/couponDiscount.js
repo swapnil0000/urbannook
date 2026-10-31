@@ -11,7 +11,8 @@
  * @returns {number} discount in rupees, 0 when the cart does not qualify
  */
 export function calcLocalDiscount(coupon, subtotal) {
-  if (!coupon || !subtotal || subtotal < (coupon.minCartValue || 0)) return 0;
+  // Same floor the server enforces everywhere: no coupons on carts of ₹99 or less.
+  if (!coupon || !subtotal || subtotal <= 99 || subtotal < (coupon.minCartValue || 0)) return 0;
 
   if (coupon.discountType === 'PERCENTAGE') {
     let amount = Math.floor((subtotal * coupon.discountValue) / 100);

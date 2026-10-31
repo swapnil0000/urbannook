@@ -5,6 +5,9 @@ import {
   userUpdateCartQuantity,
   userClearCart,
   getOrderStatus,
+  getOrderView,
+  getOrderSummaries,
+  getOrderRecommendations,
   userMergeGuestCart,
   userToggleGiftWrap,
 } from "../controller/user.cart.controller.js";
@@ -42,6 +45,11 @@ userCartRouter.post(
   csrfProtection,
   userToggleGiftWrap,
 );
+
+// Customer order experience — owner only (the order is looked up by the signed-in user's id; anything else is a 404).
+userCartRouter.get("/user/orders/summaries", authGuardService("USER"), getOrderSummaries);
+userCartRouter.get("/user/order/view/:orderId", authGuardService("USER"), getOrderView);
+userCartRouter.get("/user/order/recommendations/:orderId", authGuardService("USER"), getOrderRecommendations);
 
 // Public — orderId (razorpay order id) is the implicit secret; no sensitive data exposed
 userCartRouter.get("/user/order/status/:orderId", getOrderStatus);

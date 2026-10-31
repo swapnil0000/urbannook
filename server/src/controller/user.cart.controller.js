@@ -9,6 +9,11 @@ import {
 } from "../services/user.cart.service.js";
 import { ApiRes } from "../utils/index.js";
 import Order from "../model/order.model.js";
+import Product from "../model/product.model.js";
+import ShipmentRecord, { CUSTOMER_SHIPMENT_FIELDS } from "../model/shipment.record.model.js";
+import ResolutionCase, { CUSTOMER_CASE_FIELDS } from "../model/resolution.case.model.js";
+import { buildOrderView, buildOrderSummary } from "../services/orderView.service.js";
+import env from "../config/envConfigSetup.js";
 import { claimPaidGuestOrders } from "../services/guest.order.claim.service.js";
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
 import {
@@ -116,13 +121,8 @@ const userToggleGiftWrap = asyncHandler(async (req, res) => {
     .json(new ApiRes(result.statusCode, result.message, null, result.success));
 });
 
-const userOrderPreviousHistory = asyncHandler(async (req, res) => {
-  const { userId } = req.user;
-  
-  if (!userId) {
-    throw new AuthenticationError("Unauthorized");
-  }
-
+// The customer's orders, with the unpaid ones reconciled against Razorpay. Shared by the history and summary endpoints.
+const loadUserOrderHistory = async (userId) => {
   // Ownership comes from authentication, not a mutable checkout email.
   // Retry claiming here so login-before-payment and login-after-payment both work.
   // A claim failure must not hide already-owned orders.
@@ -131,9 +131,7 @@ const userOrderPreviousHistory = asyncHandler(async (req, res) => {
   } catch {
     console.error('[ORDER HISTORY] Guest order claim failed; serving owned orders');
   }
-  const query = { userId };
-  
-  const allOrders = await Order.find(query)
+  const allOrders = await Order.find({ userId })
     .sort({ createdAt: -1 })
     .lean()
     .select("-_id");
@@ -165,6 +163,16 @@ const userOrderPreviousHistory = asyncHandler(async (req, res) => {
       orders.push({ ...o, status: "PROCESSING" });
     }
   }
+  return orders;
+};
+
+const userOrderPreviousHistory = asyncHandler(async (req, res) => {
+  const { userId } = req.user;
+
+  if (!userId) {
+    throw new AuthenticationError("Unauthorized");
+  }
+  const orders = await loadUserOrderHistory(userId);
 
   return res.status(200).json(
     new ApiRes(
@@ -179,6 +187,102 @@ const userOrderPreviousHistory = asyncHandler(async (req, res) => {
       true,
     ),
   );
+});
+
+// ── Customer order view (confirmation page, details page, archive) ───────────
+// One read per order: the frozen order, its shipment records and any refund /
+// replacement cases, folded into the customer-safe contract of orderView.service.js.
+// Financial and shipment data: never cached.
+const noStore = (res) => {
+  res.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+  res.set("Pragma", "no-cache");
+};
+
+const findOwnedOrder = async (userId, idOrRazorpayId) => {
+  const key = String(idOrRazorpayId || "");
+  if (!key || key.length > 80) return null;
+  // The same order is linked to from checkout (Razorpay order id) and from history (our order id).
+  return Order.findOne({ userId, $or: [{ orderId: key }, { "payment.razorpayOrderId": key }] }).lean();
+};
+
+const getOrderView = asyncHandler(async (req, res) => {
+  const { userId } = req.user;
+  noStore(res);
+
+  let order = await findOwnedOrder(userId, req.params.orderId);
+  // Not found and not yours look identical — never confirm an order exists to someone who doesn't own it.
+  if (!order) throw new NotFoundError("Order not found");
+
+  // Same rule as the status poll: for an unpaid order ask Razorpay before saying "pending" or "failed".
+  if (UNPAID_STATUSES.includes(order.status) && order.payment?.razorpayOrderId) {
+    try {
+      const payments = await razorpayFetchOrderPaymentsService(order.payment.razorpayOrderId);
+      const captured = payments?.find((p) => p.status === "captured");
+      if (captured) {
+        const doc = await Order.findOne({ orderId: order.orderId });
+        await fulfilCapturedPayment(doc, captured);
+        order = await Order.findOne({ orderId: order.orderId }).lean();
+      }
+    } catch {
+      console.error("[ORDER VIEW] Razorpay check failed; showing the stored state");
+    }
+  }
+
+  // Tracking and refund data are optional enrichments: if either read fails the order still renders.
+  const [shipments, cases] = await Promise.all([
+    ShipmentRecord.find({ sourceOrderId: order.orderId }).select(CUSTOMER_SHIPMENT_FIELDS).lean().catch(() => []),
+    ResolutionCase.find({ orderId: order.orderId }).select(CUSTOMER_CASE_FIELDS).lean().catch(() => []),
+  ]);
+
+  return res.status(200).json(new ApiRes(200, "Order", buildOrderView({ order, shipments, cases, trackUrlTemplate: env.SHIPMOZO_TRACK_URL }), true));
+});
+
+const getOrderSummaries = asyncHandler(async (req, res) => {
+  const { userId } = req.user;
+  noStore(res);
+  const orders = await loadUserOrderHistory(userId);
+  const ids = orders.map((o) => o.orderId);
+
+  // Two batched reads for the whole list; the full tracking history is left out on purpose.
+  const [shipments, cases] = ids.length
+    ? await Promise.all([
+        ShipmentRecord.find({ sourceOrderId: { $in: ids } })
+          .select("sourceOrderId cloneSeq itemIndexes shipmentStatus awbNumber isCancelled shipmentDirection expectedDeliveryDate lastTrackedAt dispatchConfirmedAt")
+          .lean()
+          .catch(() => []),
+        ResolutionCase.find({ orderId: { $in: ids } }).select(CUSTOMER_CASE_FIELDS).lean().catch(() => []),
+      ])
+    : [[], []];
+
+  const group = (rows, key) => rows.reduce((m, r) => ((m[r[key]] ||= []).push(r), m), {});
+  const shipmentsByOrder = group(shipments, "sourceOrderId");
+  const casesByOrder = group(cases, "orderId");
+
+  const summaries = orders.map((order) =>
+    buildOrderSummary(buildOrderView({ order, shipments: shipmentsByOrder[order.orderId] || [], cases: casesByOrder[order.orderId] || [], trackUrlTemplate: env.SHIPMOZO_TRACK_URL })),
+  );
+  return res.status(200).json(new ApiRes(200, "Orders", { totalOrders: summaries.length, orders: summaries }, true));
+});
+
+// "Complete your collection": what the shop owner linked to the products in this order, minus what was already bought.
+const getOrderRecommendations = asyncHandler(async (req, res) => {
+  const { userId } = req.user;
+  noStore(res);
+  const order = await findOwnedOrder(userId, req.params.orderId);
+  if (!order) throw new NotFoundError("Order not found");
+
+  const bought = [...new Set((order.items || []).map((i) => String(i.productId)))];
+  const owned = await Product.find({ productId: { $in: bought } }).select("recommendedProducts").lean();
+  const recIds = [];
+  for (const p of owned) for (const id of p.recommendedProducts || []) if (id && !bought.includes(String(id)) && !recIds.includes(String(id))) recIds.push(String(id));
+  if (!recIds.length) return res.status(200).json(new ApiRes(200, "Recommendations", { products: [] }, true));
+
+  const recs = await Product.find({ productId: { $in: recIds.slice(0, 24) }, isPublished: true, productStatus: { $ne: "out_of_stock" } })
+    .select("-_id -createdAt -updatedAt -__v")
+    .lean();
+  const byId = new Map(recs.map((p) => [String(p.productId), p]));
+  const products = recIds.map((id) => byId.get(id)).filter(Boolean).slice(0, 8);
+  return res.status(200).json(new ApiRes(200, "Recommendations", { products }, true));
 });
 
 const getOrderStatus = asyncHandler(async (req, res) => {
@@ -322,6 +426,9 @@ export {
   userClearCart,
   userOrderPreviousHistory,
   getOrderStatus,
+  getOrderView,
+  getOrderSummaries,
+  getOrderRecommendations,
   generateOrderInvoice,
   userMergeGuestCart,
   userToggleGiftWrap,

@@ -12,6 +12,7 @@ import {
   CheckoutPage,
   MyProfilePage,
   MyOrdersPage,
+  OrderDetailsPage,
   WishlistPage,
   CustomerSupportPage,
   RewardsPage,
@@ -152,6 +153,17 @@ const AppRoutes = () => {
       <Route path="/payment-processing/:orderId" element={<><SEOHead noIndex /><PaymentProcessing /></>} />
       <Route path="/order-confirm/:orderId" element={<><SEOHead noIndex /><OrderConfirm /></>} />
       <Route path="/payment-failed" element={<><SEOHead noIndex /><PaymentFailed /></>} />
+      <Route
+        path="/orders/:orderId"
+        element={
+          <ProtectedRoute>
+            <SEOHead noIndex />
+            <Suspense fallback={<MinimalLoader />}>
+              <OrderDetailsPage />
+            </Suspense>
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/orders"
         element={

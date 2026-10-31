@@ -5,6 +5,11 @@ import { useUI } from "../hooks/useRedux";
 import { getApiUrl } from "../config/appUrls";
 import { setShowLoginModal, setLoginCallback, setLoginPrefillEmail } from "../store/slices/uiSlice";
 import GoogleLoginButton from "../component/layout/auth/GoogleLoginButton";
+import { OrderDetailsView } from "../component/orders/OrderPage";
+
+// What the server's order status means for this page.
+const PAID_STATUSES = ["PAID", "CONFIRMED", "SHIPPED", "DELIVERED"];
+const PENDING_STATUSES = ["CREATED", "PROCESSING"];
 
 const OrderConfirm = () => {
   const { orderId } = useParams();
@@ -33,15 +38,34 @@ const OrderConfirm = () => {
         );
 
         const data = await res.json();
+        const status = data?.data?.status;
 
-        if (data?.data) {
-          setOrderData(data.data);
-          if (data.data.isGuestOrder) {
-            dispatch(setLoginCallback("navigate:/orders"));
-          }
+        // "Order Confirmed" is only ever for a paid order. This page is reachable
+        // by URL, back button and bookmark, so it must check — not assume — what
+        // the payment ended up as.
+        if (!data?.data || !status) {
+          navigate("/payment-failed", { replace: true, state: { reason: "notfound", orderId } });
+          return;
         }
-      } catch (err) {
+        if (PENDING_STATUSES.includes(status)) {
+          // Not paid (yet): the processing page waits for the bank and sends the
+          // customer back here only once the status is PAID.
+          navigate(`/payment-processing/${orderId}`, { replace: true });
+          return;
+        }
+        if (!PAID_STATUSES.includes(status)) {
+          navigate("/payment-failed", { replace: true, state: { reason: status === "CANCELLED" ? "cancelled" : "failed", orderId } });
+          return;
+        }
+
+        setOrderData(data.data);
+        if (data.data.isGuestOrder) {
+          dispatch(setLoginCallback("navigate:/orders"));
+        }
+      } catch {
         showNotification("Could not load order details.", "error");
+        navigate("/payment-failed", { replace: true, state: { reason: "notfound", orderId } });
+        return;
       } finally {
         setLoading(false);
       }
@@ -65,42 +89,10 @@ const OrderConfirm = () => {
   const guestEmail = orderData?.guestEmail ?? null;
   const isNewGuestAccount = orderData?.isNewGuestAccount ?? true;
 
-  // Authenticated user flow
+  // Signed-in customer: the full order page (payment, tracking, items, pricing). Its data comes from one
+  // owner-checked read, and it only ever shows what the order's recorded state supports.
   if (!isGuestOrder) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-4 bg-surface">
-        <div className="bg-white shadow-xl rounded-2xl overflow-hidden w-full max-w-md text-center">
-          <div className="bg-ink px-8 pt-10 pb-8 flex flex-col items-center">
-            <div className="w-16 h-16 rounded-full bg-white/15 flex items-center justify-center mb-4">
-              <i className="fa-solid fa-circle-check text-3xl text-white"></i>
-            </div>
-            <h2 className="text-2xl font-semibold text-white mb-1">Order Confirmed!</h2>
-            <p className="text-brand text-sm">Thank you for shopping with Urban Nook.</p>
-          </div>
-
-          <div className="px-8 py-6 space-y-4">
-            <p className="text-sm text-gray-600">
-              Your order has been placed successfully. You can track it from your orders page.
-            </p>
-
-            <button
-              onClick={() => navigate("/orders")}
-              className="w-full py-3 bg-ink text-white rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-ink/90 transition-all"
-            >
-              <i className="fa-solid fa-box mr-2 opacity-70" />
-              Go to My Orders
-            </button>
-
-            <button
-              onClick={() => navigate("/products")}
-              className="w-full py-3 border border-gray-200 text-gray-500 rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-gray-50 transition-all"
-            >
-              Continue Shopping
-            </button>
-          </div>
-        </div>
-      </div>
-    );
+    return <OrderDetailsView orderId={orderId} mode="confirmation" />;
   }
 
   // Guest user flow

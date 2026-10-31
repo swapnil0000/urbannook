@@ -8,6 +8,7 @@ export const HomePage = lazyWithPreload(() => import("./home/HomePage.jsx"));
 // Keep other pages lazy loaded
 export const CheckoutPage = lazyWithPreload(() => import("../pages/CheckoutPage"));
 export const MyOrdersPage = lazyWithPreload(() => import("./account/MyOrdersPage.jsx"));
+export const OrderDetailsPage = lazyWithPreload(() => import("../component/orders/OrderPage.jsx"));
 export const WishlistPage = lazyWithPreload(() => import("./account/WishlistPage.jsx"));
 export const RewardsPage = lazyWithPreload(() => import("./info/RewardsPage.jsx"));
 export const SettingsPage = lazyWithPreload(() => import("./account/SettingsPage.jsx"));

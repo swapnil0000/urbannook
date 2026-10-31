@@ -35,9 +35,16 @@ const VariantTile = ({ card, selected, onPick }) => {
       <span className="min-w-0 flex-1">
         <span className="line-clamp-2 block text-[11.5px] font-medium leading-[1.25] text-paper">{name}</span>
         <span className="mt-1 flex flex-wrap items-baseline gap-x-1.5">
-          <span className="text-[13.5px] font-bold tabular-nums text-star">{inr(card.price)}</span>
-          {off > 0 && <span className="text-[10.5px] tabular-nums text-paper/45 line-through">{inr(card.mrp)}</span>}
-          {off > 0 && <span className="un-bs-save text-[10.5px] font-bold">{off}% off</span>}
+          <span className="text-[13.5px] font-bold tabular-nums text-star">{inr(card.offerPrice ?? card.price)}</span>
+          {card.offerPrice != null
+            ? <>
+                <span className="text-[10.5px] tabular-nums text-paper/45 line-through">{inr(card.price)}</span>
+                <span className="un-bs-save text-[10.5px] font-bold">{Math.round(((card.price - card.offerPrice) / card.price) * 100)}% off</span>
+              </>
+            : <>
+                {off > 0 && <span className="text-[10.5px] tabular-nums text-paper/45 line-through">{inr(card.mrp)}</span>}
+                {off > 0 && <span className="un-bs-save text-[10.5px] font-bold">{off}% off</span>}
+              </>}
         </span>
       </span>
       {card.outOfStock && <span className="absolute right-1 top-1 bg-white/15 px-1 py-px text-[9px] font-bold uppercase tracking-wide text-paper">Sold out</span>}

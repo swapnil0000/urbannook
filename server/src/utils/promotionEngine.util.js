@@ -873,7 +873,7 @@ export const evaluatePromotions = (cartItems, ctx, activePromotions) => {
           // (grant it once) whenever nothing actually bounds the repeat
           // count.
           const freeGiftQuantity = cap === Number.MAX_SAFE_INTEGER ? 1 : cap;
-          freeGifts.push({ promotionId: String(promo._id), name: promo.name, targetProductId: reward.targetProductId, targetVariantSku: reward.targetVariantSku, quantity: freeGiftQuantity });
+          freeGifts.push({ promotionId: String(promo._id), name: promo.name, targetProductId: reward.targetProductId, targetVariantSku: reward.targetVariantSku, quantity: freeGiftQuantity, chooseVariant: reward.chooseVariant === true && !reward.targetVariantSku });
           break;
         }
         case "gift_choice":

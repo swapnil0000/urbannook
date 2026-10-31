@@ -144,3 +144,42 @@ Cart, checkout page and the Razorpay charge must show the same discounted amount
 
 Cart (after offers) under ₹1000 → ₹99, ₹1000 and above → ₹149, regardless of weight/size/courier. Free-shipping promotions /
 threshold still zero it as before. Details: `server/src/services/SHIPPING_FLOW.md`; test: `server/src/__tests__/unit/shipping.static.test.js`.
+
+## Free gift: customer picks the variant
+
+A `free_product` reward with no variant SKU and **"Customer picks the variant"** ticked (`reward.chooseVariant`, Admin → Promotions → reward row)
+is one entitlement the shopper fills with any in-stock variant of the target product (e.g. "Buy 2 Kunai, get any Kunai free").
+Cart shows the variants as tiles; the claim carries the chosen SKU, the server validates it like any other claim (never more than the
+entitled quantity across variants, re-checked against stock at order time). Without the tick, a blank SKU still means the product's first variant.
+Tests: `server/src/__tests__/giftClaims.test.js` ("pick-your-variant gifts"). Needs the admin repo's model + RewardRow change deployed too.
+
+## Razorpay Magic coupon sheet (who sees which coupon)
+
+Magic cannot grey a coupon out, so `POST /magic/promotions` lists only coupons this customer can redeem on this order: the order's own cart
+(min cart, product gate), the contact/email Razorpay sends (TARGETED assignment, per-customer limit) and login state (MEMBERS_ONLY) all go through
+`validateNewCoupon`, the same check Apply Promotions uses. **Hidden** coupons are never listed but still work when the code is typed; test/internal
+never. If Razorpay sends no contact/email, TARGETED coupons stay off the sheet (typing the code still works). Logic: `server/src/utils/magicPromotions.util.js`;
+test: the SHEET / MAPPLY columns of `server/src/__tests__/couponMatrix.test.js`. Server restart only.
+
+## Coupons: who sees what, who can use what
+
+| Coupon | Cart / pay-page list | Typed in | Razorpay Magic sheet |
+|---|---|---|---|
+| Public | everyone | works | listed if redeemable on this order |
+| Hidden (`isHidden`) | never | works | never listed, still works typed |
+| Members only | signed-in only | signed-in works; a guest is told to sign in | listed for a signed-in order |
+| Targeted (email/mobile) | only the assigned customer (profile mobile, WhatsApp-verified mobile or email) | guest must give the assigned email/mobile; signed-in is recognised automatically | only to the assigned customer |
+| Testing / internal / paused / archived / expired / sold-out | never | refused | never |
+
+The signed-in customer is identified from the user record, never from the request body (`/coupon/list` and `/coupon/apply` use the
+session). The discount is always taken off the **product total after offers** — never off delivery or gift wrap — in every flow
+(guest, signed-in, prepaid, COD, Magic). A coupon worth the whole product total still leaves delivery to pay.
+Tests: `server/src/__tests__/couponFlows.test.js` (who sees / applies / pays what), `server/src/__tests__/couponMatrix.test.js` (every coupon kind × customer × place). Server restart + client rebuild.
+
+### Which number the coupon rules use (Razorpay Magic)
+
+Checkout prefills Razorpay with the customer's contact (guest form / signed-in profile); they can change it in the modal. For Get/Apply Promotions the
+number Razorpay sends wins; if it sends none, the contact already captured on the order is used (signed-in: the account's own email, mobile and
+WhatsApp-verified mobile as well). If no number exists anywhere it stays blank — identity-bound (targeted) coupons then simply do not show and cannot be applied; nothing is guessed.
+Typing a code as a guest also tells them up front if it is members-only, already used by their email/mobile, or needs a product that is not in the cart.
+`server/src/utils/magicPromotions.util.js`; matrix of every coupon kind × customer × surface: `server/src/__tests__/couponMatrix.test.js`.

@@ -79,12 +79,19 @@ const PaymentProcessing = () => {
           return;
         }
 
+        if (status === "CANCELLED") {
+          cancelled = true;
+          clearInterval(interval);
+          navigate("/payment-failed", { replace: true, state: { reason: "cancelled", orderId } });
+          return;
+        }
+
         failedStreak = status === "FAILED" ? failedStreak + 1 : 0;
         if (status === "FAILED" && failedStreak >= 3) {
           cancelled = true;
           clearInterval(interval);
           showNotificationRef.current("Payment failed. Please try again or contact support.", "error");
-          setTimeout(() => navigate("/payment-failed"), 2000);
+          setTimeout(() => navigate("/payment-failed", { replace: true, state: { reason: "failed", orderId } }), 2000);
           return;
         }
 
