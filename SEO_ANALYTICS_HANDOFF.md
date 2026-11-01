@@ -228,14 +228,51 @@ Also checked on 2026-10-24: the live sitemap lists only 3 categories and `/categ
 SPA shell, but a local `ssg.mjs` run against the live API renders all 143 pages incl. every collection/series
 (sitemap 115 URLs). The live build predates the collections; the next client build fixes it.
 
-## Suggestion for the SEO owner (2026-11-01, branch feat/ui-revamp-gyaan-patterns)
-- New page **`/offers`** (all live combo offers + coupons, `SEOHead` title "Offers & Combos", canonical `/offers`).
-  It is not in `client/scripts/ssg.mjs` → static routes (line ~46), so it is not pre-rendered or in the sitemap.
-  Suggest adding `['/offers', 0.7]` there if it should be indexed.
-- Shop sort/filter state (Availability, Category, Price, Sort) is client state only, never URL params, on purpose:
-  no duplicate indexable URLs.
-- Header dropdown menus, Shop pills and PDP swatches are real `<Link>`s to category / collection / variant pages,
-  so they add crawlable internal links.
+## UI revamp: what changes for SEO (2026-11-01, branch feat/ui-revamp-clean → main)
+
+Everything below is already in the branch. Items marked **ACTION** need the SEO owner.
+
+**New pages / URLs**
+- **ACTION:** new page **`/offers`** (all live combos + coupons). `SEOHead` title "Offers & Combos", canonical `/offers`,
+  one H1. It is not in `client/scripts/ssg.mjs` static routes (~line 46), so it is not pre-rendered and not in the sitemap.
+  Suggest adding `['/offers', 0.7]`, or keep it out of the index on purpose (it is a time-limited sale page).
+- No URLs were removed or renamed. Category, collection, series and variant URLs (`/category/*`, `/products/:id`,
+  `/product/:id/:sku`) are unchanged.
+
+**Internal links (crawlable `<Link>`s, added)**
+- Header: desktop dropdowns and mobile accordion link to category/collection/series pages and, for single-product
+  categories (Lamps), to each variant URL.
+- Shop pills come from `GET /categories` (indexable pages only) and link to `/category/<slug>`. The Shop All page now has
+  a "Home / Shop" breadcrumb (visible text and links only; the existing structured data was not changed).
+- PDP "Lamp / Katana / Colour" picker: each option is a real `<Link>` to `/product/:id/:sku`. A click swaps in place
+  (`replace` + keepScroll), so no extra history entries.
+- Shop grids list one card per variant, each linking to its variant URL.
+- The home page's 4 small "shop by category" tiles were added and then removed again; the net change is nothing.
+
+**Not indexable on purpose**
+- Filters (Availability, Category, Type, Price) and Sort are client state plus `sessionStorage` (they persist on back),
+  **never URL params**, so no duplicate/thin filtered URLs. The existing `?category=` / `?tag=` on `/products` is unchanged.
+
+**On-page text that changed (prerendered HTML will differ)**
+- Shop All subtitle: "Katanas, lamps & décor. Made in India." (was "3D-printed desk lamps, pen stands & décor.").
+- Shop/category pages show a "Diwali Sale is live" banner (no heading tag) while the campaign is on.
+- Product cards: badges moved under the photo ("Most bought", "N sold/7d", "N sold/30d"), plus "Offer available" /
+  "Comes with N offers". The product name stays as `<h3>`. The sale tag was removed from every card.
+- PDP: the variant label is product-based ("Katana: Zoro Enma", "Lamp: BMW", "Colour: …") instead of a fixed word.
+  There is one offers block under the countdown, and the H1 is unchanged.
+- Offer names are standardised ("Buy 2 Katanas, get a Display Stand FREE") in shop cards, `/offers`, sale bar and cart.
+  These are generated in the client from the offer data (`utils/offerName.js`); admin titles are unchanged.
+
+**Headings:** each page still has one H1 (category/PDP have a second one only on their error / not-found branch).
+
+**Structured data:** `SEOHead`, Product / ItemList / Breadcrumb JSON-LD and canonicals were not changed. Category ItemList
+order now follows the grouped variant order (same URLs).
+
+**Performance / CWV (for ranking)**
+- Cards no longer hide and re-show on scroll on touch screens. Festive canvas effects start after load/idle, the checkout
+  chunk is preloaded on `/offers`, and the PDP warms the variant images.
+- CLS: the badge and offer rows on cards always reserve space, so titles line up (measured 0px difference between cards).
+  Design picks keep the scroll position (CLS 0).
 - Performance (measured 2026-11-01, prod build, phone at 4x CPU): on `/products` the analytics tags
   (GA `gtag`, Meta `fbevents.js`, Clarity) are the biggest third-party main-thread cost (~400 ms of self time
   during load). Suggest loading them after `load`/idle (e.g. `requestIdleCallback`) in `client/index.html` /

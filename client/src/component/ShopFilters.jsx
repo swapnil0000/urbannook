@@ -167,7 +167,7 @@ export const ActiveFilterChips = ({ filters, setFilters }) => {
     <div className="mb-3 flex flex-wrap items-center gap-2">
       {chips.map((c) => (
         <button key={c.key} type="button" onClick={() => setFilters({ ...filters, ...c.drop })} aria-label={`Remove filter ${c.label}`}
-          className="inline-flex items-center gap-1.5 rounded-full border border-ink bg-white px-3 py-1 text-[12px] font-semibold text-ink hover:bg-ink hover:text-paper">
+          className="inline-flex items-center gap-1.5 rounded-full bg-brand/10 px-3 py-1 text-[12px] font-semibold text-saleDeep hover:bg-brand/20">
           {c.label} <span aria-hidden="true">×</span>
         </button>
       ))}

@@ -66,7 +66,7 @@ const ProductVariantsPage = () => {
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-brand/5 rounded-full blur-[120px] pointer-events-none"></div>
       {festive && <div className="pointer-events-none absolute inset-x-0 top-0 h-[360px]" style={{ background: 'radial-gradient(60% 100% at 50% 0%, rgb(var(--gl-star) / 0.16), transparent 70%)' }} aria-hidden="true" />}
 
-      <section className="pt-8 pb-4 md:pt-6 md:pb-5 px-4 md:px-6 relative z-10">
+      <section className="pt-12 pb-4 md:pt-10 md:pb-5 px-4 md:px-6 relative z-10">
         <div className="max-w-7xl mx-auto">
           <button
             onClick={() => navigate("/products")}
