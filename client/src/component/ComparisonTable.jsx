@@ -169,7 +169,7 @@ const ComparisonTable = ({ productName }) => {
         </div>
 
         {/*
-          Three independent boxes with a visible gap between them — no
+          Three independent boxes with a visible gap between them - no
           shared outer card, no overlap/covering trickery. Real CSS Grid
           still used underneath so row heights stay in sync across columns
           (a multi-line label in col 1 keeps col 2/3 rows aligned), with an
@@ -232,12 +232,12 @@ const ComparisonTable = ({ productName }) => {
           </div>
 
           {/*
-            Column 1 box — spans its own track PLUS the accent column
+            Column 1 box - spans its own track PLUS the accent column
             ("1 / 3") instead of a fixed pixel margin, so it always reaches
             all the way to column 3's edge and the two side boxes meet
             (fully overlap) under the accent column regardless of screen
             width. Accent sits at zIndex:2 on top, so only its own rounded
-            corners are visible in that region — this is just the fill
+            corners are visible in that region - this is just the fill
             showing through the accent's corner notch, same as before, just
             no longer a fragile fixed-px guess.
           */}

@@ -128,7 +128,7 @@ const NotifyMeModal = ({ productName, productId, variantName, variants = [], onC
                     </option>
                     {variants.map((v) => (
                       <option key={v.name} value={v.name} className="bg-ink text-paper">
-                        {v.name}{v.outOfStock ? " — Out of stock" : ""}
+                        {v.name}{v.outOfStock ? " - Out of stock" : ""}
                       </option>
                     ))}
                   </select>

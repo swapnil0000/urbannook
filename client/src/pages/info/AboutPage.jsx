@@ -13,13 +13,13 @@ const AboutPage = () => {
 
   return (
     <div className="font-inter bg-paper text-ink min-h-screen">
-      <SEOHead title="About Us" url="/about-us" description="Learn about UrbanNook — a proudly Indian brand designing premium 3D-printed desk lamps, pen stands & décor. Our story, values, and commitment to quality." />
+      <SEOHead title="About Us" url="/about-us" description="Learn about UrbanNook - a proudly Indian brand designing premium 3D-printed desk lamps, pen stands & décor. Our story, values, and commitment to quality." />
 
       {/* HERO */}
       <section className="max-w-[1280px] mx-auto px-5 pt-14 md:pt-20 pb-10">
         <p className="gl-lbl text-brand mb-4">Our Story</p>
         <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight leading-[1.05] max-w-3xl">Designing calm corners for <span className="text-brand">chaotic lives.</span></h1>
-        <p className="text-lg text-muted mt-5 max-w-xl">Your desk should tell the story of who you are — a collection of what you love. We 3D-print that, one piece at a time, in India.</p>
+        <p className="text-lg text-muted mt-5 max-w-xl">Your desk should tell the story of who you are - a collection of what you love. We 3D-print that, one piece at a time, in India.</p>
         <div className="mt-8 grid grid-cols-3 gap-4 max-w-lg">
           {[[`${totalOrders + 350}+`, 'Orders shipped'], ['100%', 'Made in India'], ['In-house', 'Design & print']].map(([n, l]) => (
             <div key={l} className="border border-hair rounded-2xl p-4 text-center"><div className="text-2xl md:text-3xl font-extrabold">{n}</div><div className="text-[11px] text-muted mt-1">{l}</div></div>
@@ -32,7 +32,7 @@ const AboutPage = () => {
         <div>
           <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight">Beyond the ordinary.</h2>
           <div className="space-y-5 text-muted mt-6 leading-relaxed">
-            <p className="text-ink font-semibold border-l-4 border-brand pl-4">When you buy from Urban Nook you aren't just buying an object — you're investing in a meticulously engineered piece of functional art.</p>
+            <p className="text-ink font-semibold border-l-4 border-brand pl-4">When you buy from Urban Nook you aren't just buying an object - you're investing in a meticulously engineered piece of functional art.</p>
             <p>Founded by design & engineering enthusiasts, we started with one frustration: why should everyday desk objects lack aesthetic integrity? To guarantee quality, we control the entire process.</p>
             <p>Every piece is prototyped, tested and made to order. Secure payments via Razorpay and reliable logistics keep your order protected from checkout to unboxing.</p>
           </div>

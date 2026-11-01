@@ -312,7 +312,7 @@ const ComboBuilderSheet = ({ combo, onClose, mode = 'builder', cartItems = [], o
           <p className="px-5 py-10 text-center text-sm text-paper/60">This offer is not available right now.</p>
         ) : (
           <>
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3.5 sm:px-5">
+            <div className="un-scroll min-h-0 flex-1 overflow-y-auto px-4 py-3.5 sm:px-5">
               {/* B. image-only combo preview: what you add  →  what you unlock */}
               <div className="un-bs-glass p-2.5">
                 <div className="flex items-end gap-2">

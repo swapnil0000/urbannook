@@ -7,7 +7,7 @@ const SITE_NAME = 'UrbanNook';
 const SITE_URL = 'https://www.urbannook.in';
 const DEFAULT_IMAGE = `${SITE_URL}/assets/logo_with_text.webp`;
 const DEFAULT_DESCRIPTION =
-  'UrbanNook — Premium 3D printed home decor, lighting & lifestyle products. Proudly made in India. Shop modern, minimal designs delivered pan-India.';
+  'UrbanNook - Premium 3D printed home decor, lighting & lifestyle products. Proudly made in India. Shop modern, minimal designs delivered pan-India.';
 
 const SEOHead = ({
   title,
@@ -24,7 +24,7 @@ const SEOHead = ({
   // or if it fails, the page's own values are used.
   const { data: seoRes } = useGetSeoDataQuery(normalizeSeoPath(pathname));
 
-  const fullTitle = rawTitle || (title ? `${title} | ${SITE_NAME}` : `${SITE_NAME} — Modern Lifestyle Store`);
+  const fullTitle = rawTitle || (title ? `${title} | ${SITE_NAME}` : `${SITE_NAME} - Modern Lifestyle Store`);
   // No url → no canonical. Defaulting to the homepage told Google every such page was a duplicate of it.
   const canonicalUrl = url ? `${SITE_URL}${url}` : null;
 

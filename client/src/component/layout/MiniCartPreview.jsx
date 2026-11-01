@@ -104,7 +104,7 @@ const MiniCartPreview = ({ onClose, onViewCart }) => {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-3">
+        <div className="un-scroll flex-1 overflow-y-auto px-5 py-3">
           {cartItems.length === 0 ? (
             <p className="text-center text-sm text-black/50 py-8">Your cart is empty</p>
           ) : (

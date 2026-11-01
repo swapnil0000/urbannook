@@ -55,7 +55,7 @@ const ContactPage = () => {
       <section className="max-w-[1280px] mx-auto px-5 pt-14 md:pt-20 pb-8">
         <p className="gl-lbl text-brand mb-3">Support & Inquiries</p>
         <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight">Get in touch.</h1>
-        <p className="text-lg text-muted mt-4 max-w-xl">Questions, custom requests or order help — we reply within 2–4 business hours.</p>
+        <p className="text-lg text-muted mt-4 max-w-xl">Questions, custom requests or order help - we reply within 2-4 business hours.</p>
       </section>
 
       {/* contact info */}
@@ -120,7 +120,7 @@ const ContactPage = () => {
         <div className="lg:col-span-5">
           <div className="border border-hair rounded-2xl p-6 mb-8 bg-surface">
             <div className="flex items-center gap-3 mb-2"><span className="w-10 h-10 rounded-full bg-brand/10 text-brand grid place-items-center">⏱</span><div><p className="font-bold">Fast response guarantee</p><p className="gl-lbl text-[10px] text-brand">Standard SLA</p></div></div>
-            <p className="text-sm text-muted">We aim to respond within <b className="text-ink">2–4 business hours</b> on working days.</p>
+            <p className="text-sm text-muted">We aim to respond within <b className="text-ink">2-4 business hours</b> on working days.</p>
           </div>
           <h3 className="gl-lbl text-muted mb-3">Frequently asked</h3>
           <div className="border-t border-hair">

@@ -98,7 +98,7 @@ const NewLaunchPopup = memo(() => {
                 onClick={handleNavigate}
                 className="px-5 py-2.5 md:px-6 md:py-3 bg-brand text-white rounded-lg font-bold uppercase tracking-widest text-[9px] md:text-[10px] transition-all hover:scale-105 hover:bg-brandHi w-full"
              >
-               Shop Now — Offer Ending Soon
+               Shop Now - Offer Ending Soon
              </button>
           </div>
           

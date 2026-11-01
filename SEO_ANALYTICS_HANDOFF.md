@@ -277,3 +277,17 @@ order now follows the grouped variant order (same URLs).
   (GA `gtag`, Meta `fbevents.js`, Clarity) are the biggest third-party main-thread cost (~400 ms of self time
   during load). Suggest loading them after `load`/idle (e.g. `requestIdleCallback`) in `client/index.html` /
   `utils/analytics.js`, keeping the first `page_view`. Owner's call; not changed here.
+
+## Follow-up changes (2026-11-01 evening, branch resolve/ui-revamp-staging)
+
+**Visible text: long dashes replaced by plain hyphens.** In user-facing strings, "—" and "–" are now "-", for example
+"UrbanNook - Desk Lamps…". Prerendered HTML and `<title>` text on these pages will differ slightly:
+- `component/SEOHead.jsx`: the **default meta description** ("UrbanNook - Premium 3D printed…") and the **fallback
+  title** used when a page passes no title ("UrbanNook - Modern Lifestyle Store", which is what the home page uses) now
+  use " - " instead of " — ". Page titles in the "X | UrbanNook" form are unchanged. Please confirm, or ask us to
+  restore " — " in SEOHead only.
+- Footer, About, Contact, Customize, FAQs, Blog list and Blog post: copy only, wording unchanged.
+- No URLs, canonicals, structured data, H1s or links changed.
+
+**Cart / offers popup / checkout:** UI only (offer cards, free-gift claim, scrollbars). These are not crawled pages,
+so there is no SEO impact.

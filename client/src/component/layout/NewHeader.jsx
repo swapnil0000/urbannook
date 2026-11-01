@@ -215,7 +215,7 @@ const NewHeader = () => {
 
         {/* mobile dropdown */}
         {isMenuOpen && (
-          <div className="md:hidden border-t border-white/10 bg-ink text-paper px-5 py-3 max-h-[calc(100svh-7rem)] overflow-y-auto overscroll-contain">
+          <div className="un-scroll md:hidden border-t border-white/10 bg-ink text-paper px-5 py-3 max-h-[calc(100svh-7rem)] overflow-y-auto overscroll-contain">
             <nav className="flex flex-col">
               {mobileNavLinks.map((item) => (item.menu ? (
                 <MobileNavAccordion key={item.key} label={item.name} active={location.pathname === item.path} menu={item.menu} onNavigate={handleMobileNav} open={openMobileMenu === item.key} onToggle={() => setOpenMobileMenu((k) => (k === item.key ? null : item.key))} />
