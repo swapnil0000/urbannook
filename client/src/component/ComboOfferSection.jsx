@@ -14,7 +14,7 @@ import MysteryGiftArt from './offers/MysteryGiftArt';
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
 
 /**
- * Admin-driven homepage offers, sourced from GET /promotions/display/home —
+ * Admin-driven homepage offers, sourced from GET /promotions/display/home -
  * ordinary Promotion V2 documents (placement "home") plus the optional
  * `homeCard` presentation fields.
  *
@@ -32,16 +32,17 @@ const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
  * because the global hard-edged rule zeroes any class containing "rounded-".
  */
 
-// What the headline savings tag says — derived from the computed numbers.
+// What the headline savings tag says - derived from the computed numbers.
 const headlineSavings = (c) => {
   if (c.save > 0) {
     if (c.savingsMode === 'percent' && c.percentOff > 0) return `${c.percentOff}% OFF`;
-    if (c.savingsMode === 'label' && c.savingsLabel) return c.savingsLabel;
+    // a label with an unfilled template slot ("Save {save}") falls back to the server-resolved benefit
+    if (c.savingsMode === 'label' && c.savingsLabel) return /[{}]/.test(c.savingsLabel) ? (c.benefit || `Save ${inr(c.save)}`) : c.savingsLabel;
     return `Save ${inr(c.save)}`;
   }
   if (c.freeShipping) return 'Free Shipping';
   if (c.freeGift) return 'Free Gift';
-  return c.savingsLabel || 'Combo Deal';
+  return (c.savingsLabel && !/[{}]/.test(c.savingsLabel) ? c.savingsLabel : c.benefit) || 'Combo Deal';
 };
 
 const GiftIcon = () => (
@@ -98,7 +99,9 @@ const OrnateDiya = ({ className = '', length = 10, size = 30, delay = 0 }) => {
 };
 
 // Kept for the next phase (what a tile does on click): the full card with its combo builder sheet.
-export const OfferCard = ({ combo, festive, priceLabel }) => {
+// `onAdded` (optional): called once the offer's items are in the cart; the
+// /offers page uses it to go straight on to checkout.
+export const OfferCard = ({ combo, festive, priceLabel, onAdded }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [added, setAdded] = useState(false);
@@ -109,7 +112,10 @@ export const OfferCard = ({ combo, festive, priceLabel }) => {
   const first = combo.items[0];
   const second = combo.items[1];
   const tag = headlineSavings(combo);
-  const cta = combo.ctaLabel || (combo.ctaAction === 'link' ? 'View Offer' : 'Add to Cart');
+  // "Save {save}" is a per-cart template; the server-resolved `benefit` is the shown text
+  const savingsPill = combo.savingsLabel && !/[{}]/.test(combo.savingsLabel) ? combo.savingsLabel : combo.benefit;
+  // every offer opens the chooser first (pick designs), so one consistent label
+  const cta = combo.ctaAction === 'link' ? 'View Offer' : 'Shop Now';
   const badge = combo.badgeLabel || (isReward ? 'Free Reward' : 'Combo Offer');
   const caption = combo.badgeText || (isReward ? 'Free with your purchase' : 'Buy together & save');
 
@@ -128,6 +134,7 @@ export const OfferCard = ({ combo, festive, priceLabel }) => {
     });
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
+    onAdded?.();
   };
 
   const openSheet = () => setBuilderOpen(true);
@@ -152,13 +159,13 @@ export const OfferCard = ({ combo, festive, priceLabel }) => {
 
   return (
     <article className="un-card un-r-card un-shine group relative flex h-full flex-col p-[5px]">
-      {/* image — one fixed 4:3 frame for every card, centre-cropped, never distorted */}
+      {/* image - one fixed 4:3 frame for every card, centre-cropped, never distorted */}
       <button type="button" onClick={viewOffer} className="un-r-media relative block aspect-[4/3] w-full shrink-0 cursor-pointer overflow-hidden bg-surface text-left focus-visible:outline-none" aria-label={`View ${combo.title}`}>
         {combo.bannerImage ? (
           <img src={combo.bannerImage} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
         ) : (
           <>
-            <img src={first?.image || '/assets/logo.webp'} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" onError={(e) => { e.currentTarget.src = '/assets/logo.webp'; }} />
+            <img src={first?.image || (combo.mysteryGift ? combo.rewardImage : null) || combo.productImage || combo.choices?.[0]?.cards?.[0]?.image || combo.builder?.combos?.[0]?.reward?.image || '/assets/logo.webp'} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" onError={(e) => { e.currentTarget.src = '/assets/logo.webp'; }} />
             {second && (
               <span className="un-r-12 absolute bottom-2 right-2 aspect-square w-[34%] overflow-hidden border-[3px] border-paper bg-white shadow-lg">
                 <img src={second.image || '/assets/logo.webp'} alt="" loading="lazy" className="h-full w-full object-cover" onError={(e) => { e.currentTarget.src = '/assets/logo.webp'; }} />
@@ -180,7 +187,7 @@ export const OfferCard = ({ combo, festive, priceLabel }) => {
       <div className="flex min-h-0 flex-1 flex-col px-2.5 pb-2.5 pt-3">
         {/* fixed-height title block: titles of any length keep the price panel aligned */}
         <div className="shrink-0 pb-2.5">
-          <h3 className="line-clamp-1 font-archivo text-[19px] font-bold leading-[1.25] tracking-tight text-ink" title={combo.title}>{combo.title}</h3>
+          <h3 className="font-archivo text-[18px] font-bold leading-[1.25] tracking-tight text-ink" title={combo.title}>{combo.title}</h3>
           {/* subtitle hidden for now (re-enable by restoring this line):
           {subtitle && <p className="mt-1 line-clamp-1 text-[12.5px] font-normal leading-snug text-muted">{subtitle}</p>} */}
         </div>
@@ -197,8 +204,8 @@ export const OfferCard = ({ combo, festive, priceLabel }) => {
                       <span className="text-[12.5px] font-medium text-sale">Reward</span>
                       <span className="font-archivo text-[21px] font-bold leading-none text-sale">FREE</span>
                     </p>
-                    {(combo.savingsLabel || combo.rewardValue) && (
-                      <span className="un-r-save max-w-[50%] shrink-0 truncate bg-save px-2.5 py-1.5 text-[11.5px] font-semibold leading-none text-white">{combo.savingsLabel || `Worth ${inr(combo.rewardValue)}`}</span>
+                    {(savingsPill || combo.rewardValue) && (
+                      <span className="un-r-save max-w-[50%] shrink-0 truncate bg-save px-2.5 py-1.5 text-[11.5px] font-semibold leading-none text-white">{savingsPill || `Worth ${inr(combo.rewardValue)}`}</span>
                     )}
                   </div>
                 </>
@@ -231,7 +238,7 @@ export const OfferCard = ({ combo, festive, priceLabel }) => {
         </div>
       </div>
 
-      {builderOpen && <ComboBuilderSheet combo={combo} onClose={() => setBuilderOpen(false)} />}
+      {builderOpen && <ComboBuilderSheet combo={combo} onClose={() => setBuilderOpen(false)} onAdded={onAdded} />}
     </article>
   );
 };
@@ -316,7 +323,9 @@ const TeaserTile = ({ index }) => {
   );
 };
 
-const ComboOfferSection = ({ title, subtitle }) => {
+// `lead` (optional): replaces the default heading block - the home page passes
+// the sale header (FestiveOfferBand) so sale + price drops + combos are one section.
+const ComboOfferSection = ({ title, subtitle, lead }) => {
   const { data, isLoading } = useGetHomeComboOffersQuery();
   const { active, can, themeKey } = useSiteCampaign();
   const combos = data?.data?.combos || [];
@@ -346,6 +355,7 @@ const ComboOfferSection = ({ title, subtitle }) => {
           </div>
         )}
 
+        {lead && festive ? <div className="relative z-10">{lead}</div> : (
         <div className="relative z-10 px-4 text-center sm:px-6">
           <div className="mb-1 sm:mb-2">
             <span className="inline-flex items-center gap-2 gl-lbl text-[11px] text-star tracking-[0.18em]">
@@ -356,6 +366,7 @@ const ComboOfferSection = ({ title, subtitle }) => {
             {festive && <div className="mt-3 flex justify-center"><FestiveCountdown tone="light" /></div>}
           </div>
         </div>
+        )}
 
         {/* offer tiles: with teasers the grid is a fixed 3-wide (6 on desktop) so rows are always full;
             with a full set of live offers the original centred wrap stays */}
