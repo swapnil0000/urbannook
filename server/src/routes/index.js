@@ -26,6 +26,7 @@ import webhookRouter from "./webhook.route.js";
 import promotionRouter from "./promotion.route.js";
 import paymentFeedbackRouter from "./paymentFeedback.route.js";
 import siteCampaignRouter from "./siteCampaign.route.js";
+import heroBannerRouter from "./heroBanner.route.js";
 export {
   userRouter,
   productRouter,
@@ -55,4 +56,5 @@ export {
   promotionRouter,
   paymentFeedbackRouter,
   siteCampaignRouter,
+  heroBannerRouter,
 };

@@ -8,7 +8,8 @@ import HomeProductCard from '../../component/HomeProductCard';
 import FestiveSections from '../../component/festive/FestiveSections';
 import RangoliDivider from '../../component/festive/RangoliDivider';
 import { Reveal, Stagger, StaggerItem, Parallax, TextReveal, useInView, motion, AnimatePresence, MotionRoot } from '../../component/motion';
-import { useGetFeaturedProductsQuery, useGetProductsQuery } from '../../store/api/productsApi';
+import { useGetFeaturedProductsQuery, useGetProductsQuery, useGetHeroBannerQuery } from '../../store/api/productsApi';
+import HeroBanner from '../../component/HeroBanner';
 import { useGetTestimonialsQuery } from '../../store/api/testimonialsApi';
 import { useGetHomeComboOffersQuery } from '../../store/api/userApi';
 import { recordOfferInterest } from '../../utils/offerInterest';
@@ -677,6 +678,10 @@ const HomePage = () => {
   const products = useMemo(() => productList(prodRes), [prodRes]);
   const { data: homeOffersRes } = useGetHomeComboOffersQuery();
   const homeOffers = homeOffersRes?.data?.combos || [];
+  // Admin-managed hero (Operations Hub → Hero banner). No live slide, or every image broken → the built-in hero below.
+  const { data: heroRes } = useGetHeroBannerQuery();
+  const [heroBroken, setHeroBroken] = useState(false);
+  const heroSlides = heroBroken ? [] : (heroRes?.data?.slides || []);
 
   /* products?featured=true currently answers "No Published Product found"
      even though a product does carry the tag, so this cannot be the only
@@ -766,7 +771,10 @@ const HomePage = () => {
       {/* The page's one H1: what the store is (the hero's rotating product names are H2s). */}
       <h1 className="sr-only">UrbanNook – 3D printed desk lamps, anime katanas and home decor, made in India</h1>
 
-      {/* ══ HERO — the drop ══ */}
+      {/* ══ HERO — admin banner slides when any are live, else the drop ══ */}
+      {heroSlides.length ? (
+        <HeroBanner slides={heroSlides} autoplay={heroRes?.data?.autoplay} onEmpty={() => setHeroBroken(true)} />
+      ) : (
       <HeroCarousel
         products={products}
         offers={homeOffers}
@@ -775,6 +783,7 @@ const HomePage = () => {
         onVariant={(id, sku) => navigate(sku ? `/product/${id}/${sku}` : `/products/${id}`)}
         onShop={() => navigate('/products')}
       />
+      )}
 
       {/* ══ MARQUEE ══ — butted straight against the plate, no gutter: both
           are ink, so the hero runs into the band with no visible seam. */}
