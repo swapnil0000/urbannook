@@ -13,7 +13,7 @@
 6. Use the up/down arrows to set the order, tick **Enabled**, then **Save hero banner**. It is live within about a minute.
 
 What shoppers see: no live slide → the usual hero; one live slide → a static banner; two or more → a slideshow
-(swipe on phones, arrows on desktop, dots). Autoplay and seconds per slide (3–10) are set at the top of the page.
+(swipe on phones, arrows on desktop). Autoplay and seconds per slide (3–10) are set at the top of the page.
 
 Tips: use the same shape for every slide in one slideshow (the tallest slide sets the height). Keep the headline and the "Shop Now" button in the middle of the picture; convert to WebP before uploading
 (e.g. squoosh.app, quality 75–80, sRGB). To replace an image, remove it in the slide and upload the new one.
