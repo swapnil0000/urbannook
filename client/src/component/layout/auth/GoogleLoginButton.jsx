@@ -18,7 +18,7 @@ export default function GoogleLoginButton({
 }) {
   /* Google renders this button inside an iframe it lays out itself, at the
      width IT is told. Stretching that iframe with CSS does not widen the
-     button — it widens the box around a button that is still laid out for the
+     button - it widens the box around a button that is still laid out for the
      old width, which is what tore the logo away from the label. The supported
      way is to hand Google a pixel width, so the wrapper is measured and the
      number passed down; 400 is the widest Google accepts. */

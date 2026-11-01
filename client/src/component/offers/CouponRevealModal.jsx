@@ -119,7 +119,7 @@ const CouponRevealModal = ({ offer, onClose }) => {
   const onSubmit = (e) => {
     e.preventDefault();
     if (!MOBILE_RE.test(mobile)) {
-      setError('Enter a valid 10-digit Indian mobile number (starts with 6–9).');
+      setError('Enter a valid 10-digit Indian mobile number (starts with 6-9).');
       return;
     }
     if (!isAuthenticated) {
@@ -133,7 +133,7 @@ const CouponRevealModal = ({ offer, onClose }) => {
   const onCopy = async () => {
     const ok = await copyText(code);
     setCopied(ok);
-    if (ok) showNotification(`Code ${code} copied — apply it in your cart`);
+    if (ok) showNotification(`Code ${code} copied - apply it in your cart`);
     else setError('Could not copy automatically. Select the code and copy it.');
     if (ok) setTimeout(() => setCopied(false), 2500);
   };
@@ -149,7 +149,7 @@ const CouponRevealModal = ({ offer, onClose }) => {
   return (
     <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center" role="dialog" aria-modal="true" aria-label="Coupon details">
       <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 bg-black/60 backdrop-blur-[2px] cursor-default" />
-      <div className="relative w-full sm:max-w-[460px] max-h-[92dvh] overflow-y-auto bg-paper text-ink border border-hair sm:border-star/40 shadow-2xl">
+      <div className="un-scroll relative w-full sm:max-w-[460px] max-h-[92dvh] overflow-y-auto bg-paper text-ink border border-hair sm:border-star/40 shadow-2xl">
         {/* ticket head */}
         <div className="relative bg-ink text-paper px-5 pt-5 pb-5 border-b border-dashed border-star/50">
           <button type="button" onClick={onClose} aria-label="Close" className="absolute right-3 top-3 w-8 h-8 grid place-items-center text-paper/70 hover:text-star text-xl leading-none">×</button>
@@ -208,7 +208,7 @@ const CouponRevealModal = ({ offer, onClose }) => {
                 {busy ? 'Please wait…' : 'Verify & reveal code'}
               </button>
               <p className="mt-2.5 text-[11.5px] text-muted leading-snug">
-                We confirm your number with a one-tap WhatsApp message — typing a number alone does not unlock the code. Your number is used only for verification and this coupon.
+                We confirm your number with a one-tap WhatsApp message - typing a number alone does not unlock the code. Your number is used only for verification and this coupon.
               </p>
             </form>
           )}

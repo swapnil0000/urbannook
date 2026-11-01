@@ -120,7 +120,7 @@ const OffersSheet = ({ offers, productId, festive, onClose }) => {
               <i className="fa-solid fa-xmark text-base" aria-hidden="true" />
             </button>
           </div>
-          <ul className="space-y-2.5 overflow-y-auto overscroll-contain px-4 pb-3">
+          <ul className="un-scroll space-y-2.5 overflow-y-auto overscroll-contain px-4 pb-3">
             {offers.map(({ promo, combo }) => (
               <li key={promo.id}><OfferTile promo={promo} combo={combo} productId={productId} festive={festive} full /></li>
             ))}

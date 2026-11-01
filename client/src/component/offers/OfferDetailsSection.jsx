@@ -175,7 +175,7 @@ const OfferDetailsSection = ({ promotionId, currentProductId }) => {
                 : <p className="text-[12.5px] text-paper/70">Add the products below to start unlocking this offer.</p>}
               {unlocked && (
                 <p className="mt-2 text-[12.5px] font-semibold text-star">
-                  Offer applied in your cart{savings > 0 ? ` — you save ${inr(savings)}` : ''}.
+                  Offer applied in your cart{savings > 0 ? ` - you save ${inr(savings)}` : ''}.
                 </p>
               )}
             </div>
@@ -183,7 +183,7 @@ const OfferDetailsSection = ({ promotionId, currentProductId }) => {
             <ul className="mt-3 space-y-1 text-[11.5px] leading-snug text-paper/55">
               <li>• The offer applies automatically in your cart once the requirements are met.</li>
               <li>• Only the products listed below count towards this offer.</li>
-              <li>• Remove items any time — the offer updates with your cart.</li>
+              <li>• Remove items any time - the offer updates with your cart.</li>
             </ul>
           </div>
         </div>
@@ -192,7 +192,7 @@ const OfferDetailsSection = ({ promotionId, currentProductId }) => {
       {/* ── eligible products ────────────────────────────────── */}
       <div className="mt-6">
         <h3 className="font-archivo text-xl font-bold text-ink sm:text-2xl">Eligible products</h3>
-        <p className="mt-0.5 text-[13px] text-muted">Pick your variants and add them — prices below are before the offer.</p>
+        <p className="mt-0.5 text-[13px] text-muted">Pick your variants and add them - prices below are before the offer.</p>
         {error && <p className="mt-3 border border-brand/20 bg-brand/5 px-3 py-2 text-xs font-semibold text-brand" role="alert">{error}</p>}
 
         {products.map((product) => (
