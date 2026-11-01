@@ -41,7 +41,7 @@ const compactSelection = (values, labelFor = (value) => value) => {
 const priceSelection = ({ min, max }) => {
   if (min === '' && max === '') return '';
   const money = (value) => `₹${Number(value).toLocaleString('en-IN')}`;
-  if (min !== '' && max !== '') return `${money(min)}–${money(max)}`;
+  if (min !== '' && max !== '') return `${money(min)}-${money(max)}`;
   return min !== '' ? `${money(min)}+` : `Up to ${money(max)}`;
 };
 
@@ -57,7 +57,7 @@ const Panel = ({ items, filters, setFilters }) => {
   const catCounts = items.reduce((m, x) => { const c = x.p?.productCategory; if (c) m.set(c, (m.get(c) || 0) + 1); return m; }, new Map());
   const chosen = filters.categories || [];
   const toggleCat = (c, on) => set({ categories: on ? [...chosen, c] : chosen.filter((x) => x !== c) });
-  // Type = the product a variant belongs to (Wooden Katana, LED Katana, …) — the
+  // Type = the product a variant belongs to (Wooden Katana, LED Katana, …) - the
   // same groups as the header dropdown's "Products" list.
   const typeCounts = items.reduce((m, x) => { if (x.group) m.set(x.group, (m.get(x.group) || 0) + 1); return m; }, new Map());
   const types = filters.types || [];
@@ -152,3 +152,26 @@ export const ShopFilterButton = ({ items, filters, setFilters, resultCount }) =>
 
 /** Shop grid sort control. */
 export const ShopSort = ({ value, onChange }) => <SortMenu value={value} options={SORT_OPTIONS} onChange={onChange} />;
+
+/** Applied filters as removable chips above the grid (tap × to drop one). */
+export const ActiveFilterChips = ({ filters, setFilters }) => {
+  const chips = [
+    ...(filters.categories || []).map((c) => ({ key: `c-${c}`, label: CATEGORY_LABEL[c] || c, drop: { categories: filters.categories.filter((x) => x !== c) } })),
+    ...(filters.types || []).map((t) => ({ key: `t-${t}`, label: t, drop: { types: filters.types.filter((x) => x !== t) } })),
+    filters.inStock && { key: 'in', label: 'In stock', drop: { inStock: false } },
+    filters.outOfStock && { key: 'out', label: 'Out of stock', drop: { outOfStock: false } },
+    (filters.min !== '' || filters.max !== '') && { key: 'price', label: filters.min && filters.max ? `₹${filters.min} - ₹${filters.max}` : filters.max ? `Up to ₹${filters.max}` : `From ₹${filters.min}`, drop: { min: '', max: '' } },
+  ].filter(Boolean);
+  if (!chips.length) return null;
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-2">
+      {chips.map((c) => (
+        <button key={c.key} type="button" onClick={() => setFilters({ ...filters, ...c.drop })} aria-label={`Remove filter ${c.label}`}
+          className="inline-flex items-center gap-1.5 rounded-full border border-ink bg-white px-3 py-1 text-[12px] font-semibold text-ink hover:bg-ink hover:text-paper">
+          {c.label} <span aria-hidden="true">×</span>
+        </button>
+      ))}
+      <button type="button" onClick={() => setFilters(EMPTY_FILTERS)} className="text-[12px] font-bold text-brand underline underline-offset-2">Clear all</button>
+    </div>
+  );
+};

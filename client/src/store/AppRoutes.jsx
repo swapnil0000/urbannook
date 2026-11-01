@@ -228,7 +228,7 @@ const AppRoutes = () => {
         path="/terms-conditions"
         element={
           <Suspense fallback={<MinimalLoader />}>
-            <SEOHead title="Terms & Conditions" description="Terms and conditions for shopping at UrbanNook — orders, payments, shipping and use of the website." url="/terms-conditions" />
+            <SEOHead title="Terms & Conditions" description="Terms and conditions for shopping at UrbanNook - orders, payments, shipping and use of the website." url="/terms-conditions" />
             <TermsConditions />
           </Suspense>
         }
@@ -262,13 +262,13 @@ const AppRoutes = () => {
         path="/return-policy"
         element={
           <Suspense fallback={<MinimalLoader />}>
-            <SEOHead title="Return & Replacement Policy" description="UrbanNook return and replacement policy — eligibility, timelines and how to raise a request." url="/return-policy" />
+            <SEOHead title="Return & Replacement Policy" description="UrbanNook return and replacement policy - eligibility, timelines and how to raise a request." url="/return-policy" />
             <Return />
           </Suspense>
         }
       />
       {/* Legacy NFC tag links: the NFC page was removed but printed tags may still
-          point here — keep sending them to home rather than the 404 page. */}
+          point here - keep sending them to home rather than the 404 page. */}
       <Route path="/nfc/*" element={<Navigate to="/" replace />} />
       {/* Catch-all: real not-found page (noindex) instead of a soft-404 redirect to home */}
       <Route path="*" element={<NotFound />} />

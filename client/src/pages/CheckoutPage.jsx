@@ -48,16 +48,16 @@ const MobileNumberModal = lazy(() => import("../component/MobileNumberModal"));
 const GoogleAddressFormModal = lazy(() => import("../component/GoogleAddressFormModal"));
 const PaymentCancelFeedbackModal = lazy(() => import("../component/PaymentCancelFeedbackModal"));
 
-// What the courier charges to collect/remit cash at the door — the reason a
+// What the courier charges to collect/remit cash at the door - the reason a
 // COD order costs more than the same order paid online. Display-only: the real
 // difference is already baked into the carrier rate returned for paymentType
 // "COD" (see the shipping-rate call below), this range just lets the notice
 // name the figure. A range (not one number) because the courier's exact COD
-// fee varies per order — keep it in step with what they actually charge.
-const COD_HANDLING_FEE = "30–40";
+// fee varies per order - keep it in step with what they actually charge.
+const COD_HANDLING_FEE = "30-40";
 
 // Guests used to pick "guest or sign in" on a step of its own. That screen
-// only ever cost a tap — the same choice now sits on the Contact step, where
+// only ever cost a tap - the same choice now sits on the Contact step, where
 // they are already typing their details.
 const GUEST_STEPS = [
   { number: 1, label: "Contact" },
@@ -71,7 +71,7 @@ const AUTH_STEPS = [
   { number: 3, label: "Review & Pay" },
 ];
 
-/* Bumped when the step layout changes — a state saved against the old
+/* Bumped when the step layout changes - a state saved against the old
    four-step guest flow would drop the customer on the wrong screen. */
 const CHECKOUT_STATE_KEY = "checkoutState_v2";
 
@@ -89,7 +89,7 @@ const Field = ({ label, required, error, children }) => (
   </div>
 );
 
-// h-11 is 44px — the smallest comfortable touch target, so this stays tappable
+// h-11 is 44px - the smallest comfortable touch target, so this stays tappable
 // on a phone while taking a row less vertical space than the old h-12.
 const inputCls = (err) =>
   `w-full h-11 bg-white border rounded-xl px-3.5 text-sm text-gray-800 placeholder:text-gray-300 outline-none transition-all ${
@@ -108,10 +108,10 @@ const iconInput = (icon, children) => (
 );
 
 // Green "You're saving ₹X" banner. Savings = (subtotal + real shipping) −
-// what they're actually paying — i.e. every rupee shaved off, whether from
+// what they're actually paying - i.e. every rupee shaved off, whether from
 // a coupon or from the free-shipping offer, in one honest number. Shares
 // the same premium seal-badge card shell as every other promotion surface
-// (see SealBadgeCard.jsx) — previously built inline just for this one line.
+// (see SealBadgeCard.jsx) - previously built inline just for this one line.
 const SavingsBanner = ({ amount, freeShipping = false }) => (
   <SealBadgeCard eyebrowIcon={freeShipping ? "fa-truck-fast" : null} eyebrowText={freeShipping ? "Free Shipping Unlocked" : null}>
     <span>You're saving</span>
@@ -128,7 +128,7 @@ const AmountPlaceholder = () => (
 const PriceRows = ({ subtotal, promotionSavings = 0, shipping, discount, giftWrapAmount = 0, appliedCoupon, totalToPay, itemCount, isLoadingShipping, onApplyCoupon, onRemoveCoupon, paymentMethod }) => {
   const shippingAmount = typeof shipping === "object" ? shipping?.amount : shipping;
   // COD advance must be based on the REAL carrier rate, not the (possibly
-  // free-shipping-zeroed) charged amount — same real/charged split as the
+  // free-shipping-zeroed) charged amount - same real/charged split as the
   // server. realAmount is only present on the object form; the plain-number
   // form of `shipping` is legacy/display-only and never feeds COD math.
   const realShippingAmount = typeof shipping === "object" ? (shipping?.realAmount ?? shipping?.amount) : shipping;
@@ -136,7 +136,7 @@ const PriceRows = ({ subtotal, promotionSavings = 0, shipping, discount, giftWra
   const isShippingFree = shippingAmount === 0 && realShippingAmount > 0;
   const hasDiscount = appliedCoupon && discount > 0;
   // (lamp + stand + ... + real shipping) − what they're actually paying = savings.
-  // giftWrapAmount is added to both sides — it's a real add-on charge, not a
+  // giftWrapAmount is added to both sides - it's a real add-on charge, not a
   // discount opportunity, so opting into it must never change this number.
   const totalSavings = Math.max(0, subtotal + promotionSavings + giftWrapAmount + (realShippingAmount || 0) - totalToPay);
 
@@ -180,7 +180,7 @@ const PriceRows = ({ subtotal, promotionSavings = 0, shipping, discount, giftWra
               Enter address
             </span>
           ) : isShippingFree ? (
-            // Free shipping applied — show the real carrier amount struck
+            // Free shipping applied - show the real carrier amount struck
             // through with a green FREE beside it, instead of a separate
             // "shipping discount" line.
             <span className="flex items-center gap-2">
@@ -197,7 +197,7 @@ const PriceRows = ({ subtotal, promotionSavings = 0, shipping, discount, giftWra
         </span>
       </div>
 
-      {/* Coupon row — Flipkart-style, sits just above Total */}
+      {/* Coupon row - Flipkart-style, sits just above Total */}
       {(onApplyCoupon || hasDiscount) && (
         <div className="flex justify-between items-center text-sm">
           <span className="text-gray-500 flex items-center gap-1.5">
@@ -344,8 +344,8 @@ const CheckoutPage = () => {
   const [shippingError, setShippingError] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("PREPAID"); // "PREPAID" | "COD"
   // A guest picks HOW to pay before filling anything in. Paying online hands
-  // the whole job to Razorpay Magic — it collects contact and address in its
-  // own modal — so the Contact and Address steps are skipped outright; asking
+  // the whole job to Razorpay Magic - it collects contact and address in its
+  // own modal - so the Contact and Address steps are skipped outright; asking
   // for the same details first and then again inside the modal is the worst of
   // both. COD has no such shortcut: its advance is 2x the live carrier rate,
   // which Magic cannot express, so it drops into the usual three steps.
@@ -354,13 +354,13 @@ const CheckoutPage = () => {
   //   FORM    → the ordinary stepped flow
   // Deliberately NOT persisted. The choice belongs to one visit to checkout:
   // moving between steps keeps it (this component stays mounted), while
-  // leaving for a product page and coming back asks again — that is a fresh
+  // leaving for a product page and coming back asks again - that is a fresh
   // attempt, and someone who picked COD once must not be stuck with it for the
   // rest of the session with no way back to paying online.
   const [payChoice, setPayChoice] = useState(null);
   const [showCodSheet, setShowCodSheet] = useState(false); // COD breakdown popup
   // When the user taps "Pay Online" while still on COD, we must first flip to
-  // PREPAID and let shipping re-calc settle BEFORE charging — otherwise the
+  // PREPAID and let shipping re-calc settle BEFORE charging - otherwise the
   // amount could be stale (customer pays less → our loss). This queues the pay
   // and an effect fires it only once the amount is settled.
   const [pendingPay, setPendingPay] = useState(null); // null | "ONLINE"
@@ -409,10 +409,10 @@ const CheckoutPage = () => {
   const [calculateShipping, { isLoading: isCalculatingShipping }] = useCalculateShippingMutation();
   const { data: freeShippingOfferData } = useGetFreeShippingOfferQuery();
   const { data: giftWrapOfferData } = useGetGiftWrapOfferQuery();
-  // Promotion V2 — checkout-placement display (applied/qualifying offers
+  // Promotion V2 - checkout-placement display (applied/qualifying offers
   // shown via PromotionBannerList below; also the source of truth for
   // "is free shipping REALLY eligible for these exact cart items", used by
-  // the shipping-rate effect further down — see its own comment). Declared
+  // the shipping-rate effect further down - see its own comment). Declared
   // early (before that effect) so it's already initialized wherever it's
   // referenced. Fetched only once address/pincode is in so pincode/state-
   // gated promotions can evaluate for real.
@@ -467,7 +467,7 @@ const CheckoutPage = () => {
   }, [currentStep, address, pinCode, preciseDetails, addressForm, currentAddressId, senderMobile, appliedCoupon, guestName, guestEmail, guestMobile]);
 
   // Holds a "fire this right now" function for whichever capture below has a
-  // debounce timer pending — set right before the timer starts, cleared once
+  // debounce timer pending - set right before the timer starts, cleared once
   // it actually fires. The unmount-effect and pagehide listener further down
   // use these to flush immediately if the user navigates away or closes the
   // tab BEFORE the debounce would have fired on its own, using `keepalive`
@@ -476,12 +476,12 @@ const CheckoutPage = () => {
   const pendingMobileFlushRef = useRef(null);
 
   // Guest abandoned-cart capture: as soon as a guest's Contact-step details
-  // look valid (not on every keystroke — debounced ~1s after typing stops),
+  // look valid (not on every keystroke - debounced ~1s after typing stops),
   // persist name/email/mobile + current cart to the server so this guest
   // shows up in the admin's abandoned-cart dashboard even if they never
   // reach Address/payment. Fires again on every relevant change so the row
   // stays current; harmless/no-op if nothing changed meaningfully. Never
-  // blocks or surfaces errors — this is best-effort capture, not part of the
+  // blocks or surfaces errors - this is best-effort capture, not part of the
   // actual checkout flow.
   useEffect(() => {
     if (!isGuest || paymentCompletedRef.current) return;
@@ -526,7 +526,7 @@ const CheckoutPage = () => {
 
   // Same capture gap for LOGGED-IN users: their typed mobile number only
   // ever saved to the profile inside handleStep1Next, i.e. only if they
-  // clicked "Next" — someone who types it and abandons before that lost the
+  // clicked "Next" - someone who types it and abandons before that lost the
   // number entirely, which is exactly why some abandoned-cart rows for
   // members show an email but no phone. Debounced (~1s) so this doesn't
   // fire on every keystroke, and skipped entirely if it hasn't actually
@@ -569,7 +569,7 @@ const CheckoutPage = () => {
   // Safety net for BOTH captures above: if the user navigates to a different
   // route (unmounting this page) or closes/backgrounds the tab BEFORE a
   // pending debounce timer got to fire on its own, send it right now via
-  // `keepalive` fetch instead of losing it — that's the whole point of the
+  // `keepalive` fetch instead of losing it - that's the whole point of the
   // refs above. `pagehide` covers tab close/refresh/backgrounding (a hard
   // teardown React never gets an unmount callback for); the empty-deps
   // cleanup covers an in-app route change away from /checkout.
@@ -602,7 +602,7 @@ const CheckoutPage = () => {
 
   // Clear old shipping immediately when cart changes on review page (item added/removed/quantity changed).
   // Without this, Pay stays enabled briefly with stale shipping calculated for the old cart.
-  // The shipping recalculation effect already reruns on cart changes — this just ensures
+  // The shipping recalculation effect already reruns on cart changes - this just ensures
   // the Pay button is blocked during that async window.
   useEffect(() => {
     if (currentStep === reviewStep && pinCode && pinCode.toString().length === 6) {
@@ -614,12 +614,12 @@ const CheckoutPage = () => {
 
   useEffect(() => {
     // Run shipping calculation on Review page when address/pincode is available.
-    // Also wait for the free-shipping config to finish loading first — without
+    // Also wait for the free-shipping config to finish loading first - without
     // this, the calc can run while freeShippingOfferData is still undefined,
     // compute eligibility as false, and never re-run once the config arrives
     // (it wasn't a dependency), leaving the wrong shipping amount stuck in the
-    // UI even though the backend — which recomputes fresh at order-submission
-    // time — applies free shipping correctly. Symptom: frontend shows a
+    // UI even though the backend - which recomputes fresh at order-submission
+    // time - applies free shipping correctly. Symptom: frontend shows a
     // charge, Razorpay/backend charges the correct (free) amount.
     if (
       currentStep !== reviewStep ||
@@ -663,17 +663,17 @@ const CheckoutPage = () => {
         const result = paymentMethod === "COD" ? codRes : prepaidRes;
 
         if (result.success && result.data) {
-          // Free shipping is a single admin-configured field — cart subtotal
-          // vs a ₹ threshold, nothing product-specific — so a plain
+          // Free shipping is a single admin-configured field - cart subtotal
+          // vs a ₹ threshold, nothing product-specific - so a plain
           // comparison is the correct (and only) eligibility check.
           const offerConfig = freeShippingOfferData?.data;
           const cartSubtotal =
             cartItems.reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0) - ruleDiscountSavings;
           const isFreeShippingEligible =
             !!offerConfig?.isActive && (offerConfig?.thresholdAmount || 0) > 0 && cartSubtotal >= offerConfig.thresholdAmount;
-          // realAmount = actual carrier rate, always — this is what the COD
+          // realAmount = actual carrier rate, always - this is what the COD
           // 2x-advance must be based on (matches the server's realShippingAmount).
-          // amount = what the customer's total/display reflects — 0 when free
+          // amount = what the customer's total/display reflects - 0 when free
           // shipping applies. Keeping both on the object prevents the COD math
           // from silently inheriting the free-shipping zero.
           const realAmount = parseFloat(result.data.total_charges);
@@ -723,7 +723,7 @@ const CheckoutPage = () => {
   useEffect(() => {
     if (cartItems.length > 0) cartLoadedRef.current = true;
     if (isGuest) {
-      // For guests, cart is loaded from localStorage synchronously — if empty, redirect
+      // For guests, cart is loaded from localStorage synchronously - if empty, redirect
       if (cartItems.length === 0 && cartLoadedRef.current && !paymentCompletedRef.current) navigate("/products");
       setIsLoading(false);
       return;
@@ -773,7 +773,7 @@ const CheckoutPage = () => {
 
   useEffect(() => {
     if (isGuest) {
-      // Only sync subtotal — discount is managed by handleGuestCouponApplied/Removed
+      // Only sync subtotal - discount is managed by handleGuestCouponApplied/Removed
       // Do NOT reset discount here: this effect re-runs when appliedCoupon changes,
       // which would wipe the discount set by handleGuestCouponApplied.
       setPricingDetails(prev => ({ ...prev, subtotal: cartTotalAmount }));
@@ -785,7 +785,7 @@ const CheckoutPage = () => {
         const r = await applyCouponMutation({ couponCode: appliedCoupon || null, email: userEmail }).unwrap();
         // r.data.summary.subtotal is the server's own cart quote, which is already
         // net of product-level offers (getCartService evaluates them), and the coupon
-        // discount is taken off that same figure — so it is used as is. Subtracting
+        // discount is taken off that same figure - so it is used as is. Subtracting
         // ruleDiscountSavings again would take the offer off twice.
         if (r.success && r.data?.summary)
           setPricingDetails(prev => ({ ...prev, subtotal: r.data.summary.subtotal || 0, discount: r.data.summary.discount || 0 }));
@@ -852,13 +852,13 @@ const CheckoutPage = () => {
      own modal, so on this path our address step is skipped and the address
      comes back on the order via the webhook.
 
-     PREPAID only — COD keeps the existing flow with its 2x-shipping advance,
+     PREPAID only - COD keeps the existing flow with its 2x-shipping advance,
      which Magic's dashboard-configured COD advance cannot reproduce.
 
      The server must agree: it only treats an order as Magic when
      MAGIC_CHECKOUT_ENABLED is on AND the request carries `magic: true`.
 
-     Magic runs on the EXPRESS path only — the one where the customer chose to
+     Magic runs on the EXPRESS path only - the one where the customer chose to
      pay online before any form, so nothing has been collected yet. Anyone who
      has already given us contact and address goes through the ordinary flow:
      Magic's whole value is collecting those itself, and opening it on top of a
@@ -871,7 +871,7 @@ const CheckoutPage = () => {
 
   // Razorpay sometimes closes its modal without calling `handler` even though
   // the money went through (UPI intent / app switch on mobile). Before telling
-  // the customer "cancelled", ask the server — it checks Razorpay directly.
+  // the customer "cancelled", ask the server - it checks Razorpay directly.
   const handleModalDismiss = async (rpOrderId, value) => {
     if (paymentCompletedRef.current) return;
     try {
@@ -894,7 +894,7 @@ const CheckoutPage = () => {
   };
 
   // Extra checkout.js options that switch the modal into Magic. Note this is a
-  // CHECKOUT option — the order itself is made a Magic order by its line_items.
+  // CHECKOUT option - the order itself is made a Magic order by its line_items.
   //
   // Driven by what the SERVER says it built, not by our own flag: the server
   // has its own MAGIC_CHECKOUT_ENABLED and a guests-only rollout switch, so it
@@ -1062,10 +1062,10 @@ const CheckoutPage = () => {
     }
   };
 
-  // A coupon is applied only when the shopper taps Apply (cart, coupon sheet or the pay screen) — never automatically.
+  // A coupon is applied only when the shopper taps Apply (cart, coupon sheet or the pay screen) - never automatically.
 
   // Guests' discounts are worked out on this page, so a cart that shrinks below
-  // the minimum would keep showing a discount the server then refuses — and the
+  // the minimum would keep showing a discount the server then refuses - and the
   // order would fail at "Pay". Keep the offer code honest as the cart changes.
   useEffect(() => {
     if (!isGuest || !appliedCoupon || appliedCoupon !== offerTerms.couponCode) return;
@@ -1078,7 +1078,7 @@ const CheckoutPage = () => {
     setAppliedCoupon(null);
     setPricingDetails((prev) => ({ ...prev, discount: 0 }));
     showNotification(
-      `${appliedCoupon} removed — add ₹${Math.max(0, minCart - cartTotalAmount).toLocaleString()} more to use it (min order ₹${minCart.toLocaleString()})`,
+      `${appliedCoupon} removed - add ₹${Math.max(0, minCart - cartTotalAmount).toLocaleString()} more to use it (min order ₹${minCart.toLocaleString()})`,
       "error",
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1108,7 +1108,7 @@ const CheckoutPage = () => {
       const errors = {};
       if (!guestName.trim()) errors.name = "Full name is required";
       if (!guestEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail.trim())) errors.email = "Valid email is required";
-      if (!/^[6-9][0-9]{9}$/.test(guestMobile.trim())) errors.mobile = "Enter a valid 10-digit mobile number (must start with 6–9)";
+      if (!/^[6-9][0-9]{9}$/.test(guestMobile.trim())) errors.mobile = "Enter a valid 10-digit mobile number (must start with 6-9)";
       if (Object.keys(errors).length) { setGuestErrors(errors); return; }
       setGuestErrors({});
     } else {
@@ -1167,8 +1167,8 @@ const CheckoutPage = () => {
    *   the same tick: React has not re-rendered yet, so `magicEnabled` below is
    *   still computed from the OLD payChoice and the order goes out as a plain
    *   one. The server then demands the name and address the express path never
-   *   collected, and the first tap fails while the second — after the state has
-   *   landed — succeeds. The caller knows what it chose, so it says so.
+   *   collected, and the first tap fails while the second - after the state has
+   *   landed - succeeds. The caller knows what it chose, so it says so.
    */
   const handlePayment = async (opts = {}) => {
     const useMagic = opts.forceMagic ?? magicEnabled;
@@ -1206,7 +1206,7 @@ const CheckoutPage = () => {
           magic: useMagic, // server skips address/shipping and sends line_items
         claimedGifts, // free gifts the shopper explicitly claimed; the server re-validates each one
           ...(appliedCoupon ? { couponCode: appliedCoupon } : {}),
-          // Guests have no server-side cart to read this from — the boolean
+          // Guests have no server-side cart to read this from - the boolean
           // intent has to come from the request. Price is still never
           // trusted from here; the server re-prices from the live offer
           // config (see rp.payment.controller.js).
@@ -1236,7 +1236,7 @@ const CheckoutPage = () => {
             paymentCompletedRef.current = true;
             trackPurchase({
               transactionId: response.razorpay_order_id,
-              eventId: orderResult.data?.orderId, // dedup key — matches server CAPI event_id
+              eventId: orderResult.data?.orderId, // dedup key - matches server CAPI event_id
               value: totalToPay, shipping: pricingDetails.shipping, tax: 0,
               paymentMethod,
               // Feed buyer PII to the browser Purchase pixel (guest = no prior login → boosts web EMQ)
@@ -1266,7 +1266,7 @@ const CheckoutPage = () => {
         showNotification(msg, "error"); setPaymentError(msg); setShowRetry(true);
         // Express skipped our forms on the promise that Magic would collect
         // everything. If the server declined it, the order has no address and
-        // this rejection is the only signal we get — put the steps back rather
+        // this rejection is the only signal we get - put the steps back rather
         // than leaving the customer on a screen that cannot succeed.
         if (payChoice === "EXPRESS") { setPayChoice("FORM"); goToStep(1); }
       }
@@ -1274,7 +1274,7 @@ const CheckoutPage = () => {
     }
 
     const senderMobileStr = stripCC(String(senderMobile || ""));
-    // Express skipped these screens on purpose — Magic collects the number and
+    // Express skipped these screens on purpose - Magic collects the number and
     // the address in its own modal, and the server skips the same checks for a
     // Magic order. Demanding them here would block the very path that exists
     // to avoid asking.
@@ -1331,7 +1331,7 @@ const CheckoutPage = () => {
           try {
             trackPurchase({
               transactionId: response.razorpay_order_id,
-              eventId: orderResult.data?.orderId, // dedup key — matches server CAPI event_id
+              eventId: orderResult.data?.orderId, // dedup key - matches server CAPI event_id
               value: totalToPay, shipping: pricingDetails.shipping, tax: 0,
               paymentMethod,
               // Feed buyer PII to the browser Purchase pixel → boosts web EMQ (phone esp.)
@@ -1360,7 +1360,7 @@ const CheckoutPage = () => {
       showNotification(msg, "error"); setPaymentError(msg); setShowRetry(true);
       // Express skipped the forms expecting Magic to collect everything. If the
       // server declined it, the order has no address and this is the only
-      // signal we get — put the steps back.
+      // signal we get - put the steps back.
       if (payChoice === "EXPRESS") { setPayChoice("FORM"); goToStep(1); }
     }
   };
@@ -1368,15 +1368,15 @@ const CheckoutPage = () => {
   const shippingAmount = typeof pricingDetails.shipping === "number"
     ? pricingDetails.shipping
     : (pricingDetails.shipping?.amount ?? 0);
-  // Real carrier rate — COD's 2x advance must be based on this, never on
+  // Real carrier rate - COD's 2x advance must be based on this, never on
   // `shippingAmount` above (which is 0 when free shipping applies).
   const realShippingAmount = typeof pricingDetails.shipping === "number"
     ? pricingDetails.shipping
     : (pricingDetails.shipping?.realAmount ?? pricingDetails.shipping?.amount ?? 0);
-  // Gift wrap — added on top of subtotal, same as the server's finalAmount
+  // Gift wrap - added on top of subtotal, same as the server's finalAmount
   // formula (subtotal + giftWrap + shipping − discount). Qty auto-scales with
-  // total ELIGIBLE UNITS in the cart — 2x the same eligible product is 2
-  // gift wraps, not 1 — mirroring rp.payment.controller.js exactly.
+  // total ELIGIBLE UNITS in the cart - 2x the same eligible product is 2
+  // gift wraps, not 1 - mirroring rp.payment.controller.js exactly.
   const giftWrapOffer = giftWrapOfferData?.data;
   const giftWrapIds = giftWrapOffer?.eligibleProductIds;
   const giftWrapEligibleCount = cartItems.reduce(
@@ -1388,7 +1388,7 @@ const CheckoutPage = () => {
       ? (Number(giftWrapOffer.price) || 0) * giftWrapEligibleCount
       : 0;
   // The server refuses an order whose claimed free gift is no longer valid (offer ended, cart changed,
-  // out of stock). Drop exactly those claims and tell the shopper — nothing is silently charged or dropped.
+  // out of stock). Drop exactly those claims and tell the shopper - nothing is silently charged or dropped.
   const handleGiftClaimError = (e) => {
     const data = e?.data?.data;
     if (data?.code !== "GIFT_CLAIM_INVALID") return false;
@@ -1410,7 +1410,7 @@ const CheckoutPage = () => {
   const payBusy = isOrdering || !!pendingPay;
 
   // Fire the queued online payment only after the toggle to PREPAID has
-  // settled the amount — guarantees full amount, never a stale/lower one.
+  // settled the amount - guarantees full amount, never a stale/lower one.
   useEffect(() => {
     if (pendingPay !== "ONLINE") return;
     if (shippingError) { setPendingPay(null); return; }
@@ -1455,7 +1455,7 @@ const CheckoutPage = () => {
   // ── Express (guest + Magic): no forms at all ───────────────────────────────
   // Offered only when the build flag is on. The SERVER has the final say and
   // may still decline Magic (its own flag, or a guests-only rollout), in which
-  // case the order it builds needs an address we never collected — that lands
+  // case the order it builds needs an address we never collected - that lands
   // in the guest error path above, which puts the steps back.
   const expressAvailable = config.features.enableMagicCheckout;
   const showPayChoice =
@@ -1467,7 +1467,7 @@ const CheckoutPage = () => {
     trackSelectPaymentMethod({ paymentMethod: "PREPAID" });
     // paymentMethod is still PREPAID here: this screen is the first thing the
     // customer sees, so nothing has had the chance to switch it to COD. No
-    // need to wait for shipping either — a Magic order's amount never includes
+    // need to wait for shipping either - a Magic order's amount never includes
     // it. forceMagic: the payChoice set above has not rendered yet.
     handlePayment({ forceMagic: true });
   };
@@ -1481,12 +1481,12 @@ const CheckoutPage = () => {
   };
 
   // Having already chosen COD on the way in, the Review step shows one action,
-  // not two — offering "Pay Online" again just re-asks a settled question.
+  // not two - offering "Pay Online" again just re-asks a settled question.
   const codOnly = payChoice === "COD";
 
   // No second "pay online instead" control is needed here: tapping the COD
   // button opens the advance breakdown, and that sheet already carries a
-  // "Save ₹X — pay online" action. Two ways back would just crowd the footer.
+  // "Save ₹X - pay online" action. Two ways back would just crowd the footer.
 
   const handleLeaveExpress = () => {
     setPayChoice("FORM");
@@ -1499,7 +1499,7 @@ const CheckoutPage = () => {
   // These used to switch method on the first tap and return, so a customer on
   // COD tapping "Pay Online" only re-triggered the shipping calculation and had
   // to tap a second time to actually pay. Nothing on screen said so, so the
-  // common reading was that the button was broken — a straight drop at the last
+  // common reading was that the button was broken - a straight drop at the last
   // step of checkout.
   //
   // The amount is still never charged stale: handlePayOnline queues the payment
@@ -1514,7 +1514,7 @@ const CheckoutPage = () => {
     handleChooseCod();
   };
 
-  // Rendered by both the pay-choice screen and the full checkout — the
+  // Rendered by both the pay-choice screen and the full checkout - the
   // pay-choice screen returns early, so it needs its own copy.
   const cancelFeedbackModal = cancelFeedback?.razorpayOrderId ? (
     <Suspense fallback={null}>
@@ -1539,7 +1539,7 @@ const CheckoutPage = () => {
 
   /* ── How would you like to pay? ─────────────────────────────────────────
      The whole point of this screen is that it comes BEFORE any field. Paying
-     online needs nothing from us — Magic collects it. COD needs the address
+     online needs nothing from us - Magic collects it. COD needs the address
      first, because the advance is priced off the live carrier rate for that
      pincode. Shipping is deliberately not shown as a number here: on the
      online path Razorpay rates it against the address it is about to collect,
@@ -1548,7 +1548,7 @@ const CheckoutPage = () => {
     const unitCount = cartItems.reduce((n, i) => n + (Number(i.quantity) || 0), 0);
     const itemsTotal = pricingDetails.subtotal + giftWrapAmount - pricingDetails.discount;
     // Locked while the order is being built and the modal opened. A dismissal
-    // or a failed payment records an error, and that unlocks it again —
+    // or a failed payment records an error, and that unlocks it again -
     // otherwise the customer is left staring at a dead "Opening…" button.
     const busy = isOrdering || (payChoice === "EXPRESS" && !paymentError);
 
@@ -1568,6 +1568,8 @@ const CheckoutPage = () => {
           <p className="text-sm text-gray-500 mt-2">
             {unitCount} {unitCount === 1 ? "item" : "items"} ready to go.
           </p>
+          {/* unclaimed free gift: claim it right here before paying */}
+          <div className="mt-4 empty:hidden"><GiftClaimList /></div>
 
           {/* ── What it costs so far ───────────────────────────────────── */}
           <div className="mt-6 bg-white rounded-2xl border border-gray-100 p-5">
@@ -1598,11 +1600,11 @@ const CheckoutPage = () => {
               <span className="text-xl font-bold text-ink tabular-nums">₹{Math.round(itemsTotal).toLocaleString("en-IN")}</span>
             </div>
             <p className="text-[11px] text-gray-400 mt-2 leading-relaxed">
-              Delivery is priced once we have your pincode — free on eligible orders.
+              Delivery is priced once we have your pincode - free on eligible orders.
             </p>
           </div>
 
-          {/* the first checkout screen — the gift wrap and the cart-value gift nudge belong here too */}
+          {/* the first checkout screen - the gift wrap and the cart-value gift nudge belong here too */}
           <div className="mt-4 empty:hidden"><CartGiftProgress promotions={checkoutPromotions} /></div>
           <div className="mt-4 empty:hidden"><GiftWrapOffer variant="card" /></div>
 
@@ -1664,7 +1666,7 @@ const CheckoutPage = () => {
             </button>
           </div>
 
-          {/* Only offered to someone who HAS a saved address — for a guest
+          {/* Only offered to someone who HAS a saved address - for a guest
               there is nothing on file to go back to. */}
           {!isGuest && (
             <button
@@ -1756,7 +1758,7 @@ const CheckoutPage = () => {
         </div>
       </div>
 
-      {/* ── Shipping delay notice — Review & Pay step only, while the
+      {/* ── Shipping delay notice - Review & Pay step only, while the
           affected product is in cart, auto-hides past its configured expiry
           (see hooks/useShippingDelayNotice.js). */}
       {shippingDelayMessage && currentStep === reviewStep && (
@@ -1771,7 +1773,7 @@ const CheckoutPage = () => {
       {/* ── Site offer ──────────────────────────────────────────────────────
           Review & Pay only. Account, Contact and Address are all the same
           /checkout route, so without the step check this rode along on every
-          one of them — and a coupon is noise until there is a total to apply it
+          one of them - and a coupon is noise until there is a total to apply it
           to. Also takes itself away when the campaign window closes. */}
       {isOfferLive() && currentStep === reviewStep && (
         <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-6">
@@ -1783,9 +1785,9 @@ const CheckoutPage = () => {
           />
         </div>
       )}
-      {/* Free-shipping threshold — admin-controlled (free_shipping Promotion);
+      {/* Free-shipping threshold - admin-controlled (free_shipping Promotion);
           renders nothing while that promotion is off. Only shown here while
-          NOT YET unlocked (the "add ₹X more" progress nudge) — once it IS
+          NOT YET unlocked (the "add ₹X more" progress nudge) - once it IS
           unlocked, the order summary's own SavingsBanner below is the single
           place that confirms it, so the two don't show the same "FREE
           SHIPPING UNLOCKED" seal card twice on one page. */}
@@ -1796,25 +1798,24 @@ const CheckoutPage = () => {
         </div>
       )}
       {/* Once unlocked, PromotionBannerList (other active offers) still needs
-          to render somewhere — same spot, standalone. */}
+          to render somewhere - same spot, standalone. */}
       {currentStep === reviewStep && cartTotalAmount >= (Number(freeShippingOfferData?.data?.thresholdAmount) || Infinity) && checkoutPromotions.length > 0 && (
         <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4">
           <PromotionBannerList promotions={checkoutPromotions} pricing={checkoutPromotionsData?.data?.pricing} />
         </div>
       )}
-      {/* Cart-value free gift still locked ("add ₹X more") — every step, it's the nudge that grows the order */}
+      {/* Cart-value free gift still locked ("add ₹X more") - every step, it's the nudge that grows the order */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4 empty:hidden"><CartGiftProgress promotions={checkoutPromotions} /></div>
-      {/* festive gift wrap — shoppers who tap "Go to Checkout" on the product page never see the cart drawer */}
+      {/* festive gift wrap - shoppers who tap "Go to Checkout" on the product page never see the cart drawer */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4 empty:hidden"><GiftWrapOffer variant="card" /></div>
       {/* Claimed free gifts that will be in the parcel (claiming itself happens in the cart) */}
-      {currentStep === reviewStep && (
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4"><GiftClaimList readOnly /></div>
-      )}
+      {/* free gifts: claim right here too (not only in the cart) */}
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4 empty:hidden"><GiftClaimList /></div>
       {/* ── Main ───────────────────────────────────────────────────────── */}
       <div className={`max-w-5xl mx-auto px-4 sm:px-6 pt-8 lg:pb-14 lg:grid lg:grid-cols-[1fr_360px] lg:gap-10 lg:items-start ${(isGuest && currentStep === 1) ? "pb-8" : "pb-32 lg:pb-14"}`}>
         {/* ── Left: form ───────────────────────────────────────────────── */}
         <div className="min-w-0">
-          {/* ══════════ STEP — CONTACT ════════════════════════════════ */}
+          {/* ══════════ STEP - CONTACT ════════════════════════════════ */}
           {currentStep === contactStep && (
             <div className="space-y-4 step-fade checkout-sheet">
               {/* mobile sheet grab handle */}
@@ -1901,7 +1902,7 @@ const CheckoutPage = () => {
                           <div
                             className={`${inputCls(false)} pl-10 flex items-center bg-gray-50 cursor-default text-gray-500`}
                           >
-                            {userProfile?.userName || userProfile?.name || "—"}
+                            {userProfile?.userName || userProfile?.name || "-"}
                           </div>,
                         )}
                   </Field>
@@ -1945,7 +1946,7 @@ const CheckoutPage = () => {
                           <div
                             className={`${inputCls(false)} pl-10 flex items-center bg-gray-50 cursor-default text-gray-500`}
                           >
-                            {userProfile?.email || "—"}
+                            {userProfile?.email || "-"}
                           </div>,
                         )}
                   </Field>
@@ -2055,7 +2056,7 @@ const CheckoutPage = () => {
                                     !validateMobile(deliveryMobile)
                                   )
                                     setDeliveryMobileErrors(
-                                      "Enter a valid 10-digit mobile number (must start with 6–9)",
+                                      "Enter a valid 10-digit mobile number (must start with 6-9)",
                                     );
                                   else setDeliveryMobileErrors("");
                                 }}
@@ -2081,7 +2082,7 @@ const CheckoutPage = () => {
             </div>
           )}
 
-          {/* ══════════ STEP — ADDRESS ═════════════════════════════════ */}
+          {/* ══════════ STEP - ADDRESS ═════════════════════════════════ */}
           {currentStep === addressStep && (
             <div className="space-y-5 step-fade">
 
@@ -2118,7 +2119,7 @@ const CheckoutPage = () => {
                         </p>
                         {pinCode && (
                           <p className="text-xs text-gray-400 mt-1.5 font-mono font-medium">
-                            PIN — {pinCode}
+                            PIN - {pinCode}
                           </p>
                         )}
                         {preciseDetails.flatNo && (
@@ -2176,7 +2177,7 @@ const CheckoutPage = () => {
                         </p>
                         {pinCode && (
                           <p className="text-xs text-gray-400 mt-1.5 font-mono font-medium">
-                            PIN — {pinCode}
+                            PIN - {pinCode}
                           </p>
                         )}
                         {preciseDetails.flatNo && (
@@ -2279,13 +2280,13 @@ const CheckoutPage = () => {
             </div>
           )}
 
-          {/* ══════════ STEP — REVIEW & PAY ═══════════════════════════ */}
+          {/* ══════════ STEP - REVIEW & PAY ═══════════════════════════ */}
           {currentStep === reviewStep && (
             <div className="space-y-5 step-fade">
 
               <div>
                 <h1 className="text-2xl sm:text-3xl font-inter text-gray-900 leading-tight">Review Your Order</h1>
-                <p className="text-sm text-gray-400 mt-1.5">Almost there — confirm everything looks right</p>
+                <p className="text-sm text-gray-400 mt-1.5">Almost there - confirm everything looks right</p>
               </div>
 
               {/* Shipping error banner */}
@@ -2426,7 +2427,7 @@ const CheckoutPage = () => {
                   Total); the input + available-coupons list now live in the
                   showCouponModal popup below. */}
 
-              {/* Contact + Address combined card — kept last (name, address, details) */}
+              {/* Contact + Address combined card - kept last (name, address, details) */}
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 {/* Header */}
                 <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-50">
@@ -2498,7 +2499,7 @@ const CheckoutPage = () => {
               </div>
 
 
-              {/* Coupon — available to all (guests + members) */}
+              {/* Coupon - available to all (guests + members) */}
              
 
               
@@ -2716,7 +2717,7 @@ const CheckoutPage = () => {
           Contact step, which left them stranded: the inline "Continue to
           Address" button is lg-only, so on a phone there was no way forward. */}
       <div className="fixed bottom-0 left-0 right-0 z-50 lg:hidden">
-          {/* "more content below" hint on the review step — floats just above the bar */}
+          {/* "more content below" hint on the review step - floats just above the bar */}
           {currentStep === reviewStep && !mobileSummaryOpen && (
             <div className="pointer-events-none absolute -top-9 inset-x-0 flex justify-center">
               <span className="w-7 h-7 rounded-full bg-white shadow-md border border-gray-100 grid place-items-center text-gray-400 animate-bounce">
@@ -2724,7 +2725,7 @@ const CheckoutPage = () => {
               </span>
             </div>
           )}
-          {/* Collapsible order summary — tap the total to expand */}
+          {/* Collapsible order summary - tap the total to expand */}
           {mobileSummaryOpen && (
             <div className="bg-white border-t border-gray-100 px-4 pt-3 pb-2 max-h-[45vh] overflow-y-auto shadow-[0_-12px_40px_rgba(0,0,0,0.12)] animate-in fade-in duration-200">
               <div className="max-w-sm mx-auto">
@@ -2781,7 +2782,7 @@ const CheckoutPage = () => {
 
               {currentStep === reviewStep && !codOnly && (
                 <>
-                  {/* Pay on Delivery — outline until selected */}
+                  {/* Pay on Delivery - outline until selected */}
                   <button
                     onClick={handleCodButton}
                     disabled={payBusy || !amountsSettled}
@@ -2794,7 +2795,7 @@ const CheckoutPage = () => {
                     <i className="fa-solid fa-hand-holding-dollar text-[11px] opacity-80" /> Pay on Delivery
                   </button>
 
-                  {/* Pay Online — keeps the prepaid savings tooltip */}
+                  {/* Pay Online - keeps the prepaid savings tooltip */}
                   <div className="relative flex-1 basis-0 min-w-0">
                     {!payBusy && amountsSettled && codSaving > 0 && (
                       <div className="pointer-events-none absolute -top-[26px] left-1/2 -translate-x-1/2 z-10">
@@ -3023,7 +3024,7 @@ const CheckoutPage = () => {
               </button>
             </div>
             <div className="p-5 overflow-y-auto max-h-[calc(88vh-72px)] space-y-5">
-              {/* Manual code entry — moved here from the checkout page */}
+              {/* Manual code entry - moved here from the checkout page */}
               <div>
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
                   Have a coupon code?

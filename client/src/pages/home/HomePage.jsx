@@ -64,8 +64,8 @@ const SecHead = ({ index, kicker, title, onView }) => (
 //   </div>
 // );
 
-/* The middle figure is maintained by hand — bump it when the milestone moves.
-   It used to read "0 — Mass produced", which was meant as a boast about not
+/* The middle figure is maintained by hand - bump it when the milestone moves.
+   It used to read "0 - Mass produced", which was meant as a boast about not
    mass producing but rendered as a large animated zero and simply looked like
    a number that had failed to load. A "+" is deliberate: the claim stays true
    as the count grows, so a stale value is never a false one. */
@@ -120,7 +120,7 @@ const ReviewCard = ({ t, img, tag, onClick }) => (
   </figure>
 );
 
-/** Slowly rotating circular-text stamp — an editorial accent to fill space. */
+/** Slowly rotating circular-text stamp - an editorial accent to fill space. */
 const RotatingSeal = ({ text = '· MADE TO ORDER · 3D-PRINTED IN INDIA ' }) => (
   <div className="w-full h-full animate-[spin_16s_linear_infinite]">
     <svg viewBox="0 0 120 120" className="w-full h-full">
@@ -136,7 +136,7 @@ const RotatingSeal = ({ text = '· MADE TO ORDER · 3D-PRINTED IN INDIA ' }) => 
   </div>
 );
 
-/** 3D curved coverflow carousel — ported from the reference: cards on a curved
+/** 3D curved coverflow carousel - ported from the reference: cards on a curved
  *  plane, center flat & forward, sides angled/blurred, auto-scrolls right→left,
  *  pauses on hover, click a card to focus it. Responsive (sizes scale to width). */
 const CoverflowCarousel = ({ images }) => {
@@ -201,14 +201,14 @@ const CoverflowCarousel = ({ images }) => {
 
 const FAQS = [
   { q: 'Can I customise my piece?', a: "Yes! Every product is 3D-printed to order, so we can tweak the colour or finish, add your initials or a logo, or tailor it to your setup. Just message us before you order and we'll make it yours." },
-  { q: 'Do you offer Cash on Delivery (COD)?', a: 'We offer partial COD — pay a small advance online at checkout to confirm the order, and the rest in cash when it arrives. Full COD (no advance) is not available.' },
-  { q: 'How long will my order take?', a: 'Each piece is printed after you order, so it dispatches within ~48 hours and reaches you in 2–7 days depending on your pincode. Pan-India delivery on every order.' },
+  { q: 'Do you offer Cash on Delivery (COD)?', a: 'We offer partial COD - pay a small advance online at checkout to confirm the order, and the rest in cash when it arrives. Full COD (no advance) is not available.' },
+  { q: 'How long will my order take?', a: 'Each piece is printed after you order, so it dispatches within ~48 hours and reaches you in 2-7 days depending on your pincode. Pan-India delivery on every order.' },
   { q: 'Can I return it?', a: "We don't accept returns or exchanges for change of mind, colour or preference. If your item arrives damaged, defective or wrong, report it within 3 days with an unboxing video and we'll replace it free." },
-  { q: 'What are the products made of?', a: 'Premium PLA + PETG with a signature 3D-printed layer texture and glossy resin detailing — sturdy, lightweight, and built to live on your desk for years.' },
-  { q: 'Do you do bulk orders or corporate gifting?', a: "Yes — we love custom bulk and corporate gifting with your branding. Reach out via Contact Us and we'll sort a quote for you." },
+  { q: 'What are the products made of?', a: 'Premium PLA + PETG with a signature 3D-printed layer texture and glossy resin detailing - sturdy, lightweight, and built to live on your desk for years.' },
+  { q: 'Do you do bulk orders or corporate gifting?', a: "Yes - we love custom bulk and corporate gifting with your branding. Reach out via Contact Us and we'll sort a quote for you." },
 ];
 
-/** Accordion FAQ — one item open at a time, smooth height animation. */
+/** Accordion FAQ - one item open at a time, smooth height animation. */
 const FaqSection = ({ onContact }) => {
   const [open, setOpen] = useState(0);
   return (
@@ -250,7 +250,7 @@ const FaqSection = ({ onContact }) => {
   );
 };
 
-/** Mobile-only sticky "add to cart" bar — slides up once you scroll past the hero,
+/** Mobile-only sticky "add to cart" bar - slides up once you scroll past the hero,
  *  sits just above the bottom nav, hides near the footer. */
 const StickyAddBar = ({ product, onAdd }) => {
   const [show, setShow] = useState(false);
@@ -278,7 +278,7 @@ const StickyAddBar = ({ product, onAdd }) => {
             <img src={productImg(product)} alt="" className="w-12 h-12 object-cover shrink-0 bg-white/10" onError={onImgErr} />
             <div className="min-w-0 flex-1">
               <p className="text-[12px] font-bold truncate leading-tight">{product.productName}</p>
-              {/* price + real struck MRP / % off from the variant — no shipping claim (that depends on the live offer) */}
+              {/* price + real struck MRP / % off from the variant - no shipping claim (that depends on the live offer) */}
               <p className="text-[11px] text-paper/60 leading-tight">
                 <b className="text-paper">{inr(v.variantPrice)}</b>
                 {Number(v.variantMrp) > Number(v.variantPrice) && (
@@ -297,12 +297,12 @@ const StickyAddBar = ({ product, onAdd }) => {
   );
 };
 
-/** Refer & Save teaser — shares the brand (Web Share API, falls back to copy link). */
+/** Refer & Save teaser - shares the brand (Web Share API, falls back to copy link). */
 const ReferSave = () => {
   const [copied, setCopied] = useState(false);
   const share = async () => {
     const url = 'https://www.urbannook.in';
-    const text = 'Check out UrbanNook — 3D-printed desk lamps & décor, made to order in India.';
+    const text = 'Check out UrbanNook - 3D-printed desk lamps & décor, made to order in India.';
     try {
       if (navigator.share) await navigator.share({ title: 'UrbanNook', text, url });
       else { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000); }
@@ -316,7 +316,7 @@ const ReferSave = () => {
           <div className="max-w-xl md:mx-0 mx-auto">
             <p className="gl-lbl text-brand mb-3">Refer &amp; Save</p>
             <h3 className="font-archivo text-3xl md:text-5xl font-extrabold tracking-tight leading-[0.95]">Know someone whose<br className="hidden md:block" /> desk needs this?</h3>
-            <p className="text-paper/70 mt-4 max-w-md md:mx-0 mx-auto">Share UrbanNook with a friend. Our referral rewards are launching soon — share now and you&apos;ll be first in line to earn.</p>
+            <p className="text-paper/70 mt-4 max-w-md md:mx-0 mx-auto">Share UrbanNook with a friend. Our referral rewards are launching soon - share now and you&apos;ll be first in line to earn.</p>
           </div>
           <button onClick={share} className="un-btn gl-press mt-6 md:mt-0 shrink-0 bg-brand text-white font-bold text-sm px-8 py-4 inline-flex items-center gap-2">
             <span className="un-fill bg-brandHi"></span>
@@ -328,21 +328,21 @@ const ReferSave = () => {
   );
 };
 
-/* ══ HERO — "THE DROP" ══════════════════════════════════════════════════
+/* ══ HERO - "THE DROP" ══════════════════════════════════════════════════
    Catalogue-forward on a dark stage. Two things share the first screen:
    a featured piece with its headline, and a rail of the ENTIRE catalogue
-   underneath it — so nothing above the fold is empty, which was the whole
+   underneath it - so nothing above the fold is empty, which was the whole
    problem with a tall editorial banner on this shop.
 
    Why the pieces sit in light tiles rather than floating on the dark:
    every product here is photographed as a cut-out on a light studio grey.
-   On a dark page there is no blend mode that removes that grey — screen
+   On a dark page there is no blend mode that removes that grey - screen
    and lighten make it glow, multiply crushes it to black. So the frame is
    made deliberate: a lit tile on a dark wall, which is how drop stores
    present product anyway, and multiply inside the tile then dissolves the
    grey into it completely.
 
-   The featured tile still scan-prints on each rotation — the one motion
+   The featured tile still scan-prints on each rotation - the one motion
    carried over from the build-plate idea, now at tile scale where it costs
    no empty space.
    ═══════════════════════════════════════════════════════════════════ */
@@ -365,7 +365,7 @@ const toFeature = (p) => {
   const price = Number(cheapest?.variantPrice) || Number(firstVariant(p)?.variantPrice) || 0;
   const mrp = Number(cheapest?.variantMrp) || 0;
   /* What the carousel rides on. With several variants it is one tile per
-     variant — BMW / Porsche / Lamborghini / Ferrari, or the eleven katana
+     variant - BMW / Porsche / Lamborghini / Ferrari, or the eleven katana
      designs. With a single variant there is nothing to compare, so it falls
      back to that variant's own gallery: either way the rail is never one
      lone tile sitting in a wide gap. */
@@ -442,7 +442,7 @@ const HeroCarousel = ({ products = [], offers = [], onProduct, onVariant, onShop
     el.scrollBy({ left: d * (step + 16), behavior: 'smooth' });
   };
 
-  // A new featured product means a new set of variants — start at the front.
+  // A new featured product means a new set of variants - start at the front.
   useEffect(() => { railRef.current?.scrollTo({ left: 0 }); }, [idx]);
 
   if (!f) return <section className="bg-ink min-h-[calc(100svh-6.25rem)] animate-pulse" />;
@@ -561,7 +561,7 @@ const HeroCarousel = ({ products = [], offers = [], onProduct, onVariant, onShop
               >
                 {f.tiles.map((t, i) => (
                   /* Fixed width AND fixed aspect, so every tile is the same size
-                     whatever the photo's ratio is — the shots run 0.75 to 1.0,
+                     whatever the photo's ratio is - the shots run 0.75 to 1.0,
                      and sizing each tile to its own photo made the rail change
                      size every time the banner rotated. */
                   <button
@@ -573,7 +573,7 @@ const HeroCarousel = ({ products = [], offers = [], onProduct, onVariant, onShop
                     <div className="relative w-full aspect-[4/5] overflow-hidden">
                       {/* The photo is contained (not cropped); the tile's
                           bg-surface fills any letterbox. A blurred full-size
-                          copy used to sit behind it — removed, its blur filter
+                          copy used to sit behind it - removed, its blur filter
                           was repainted on every swipe and slowed low-end phones.
                           Only the first tile is the LCP candidate: it alone is
                           eager + high priority, the rest are lazy, so React
@@ -600,7 +600,7 @@ const HeroCarousel = ({ products = [], offers = [], onProduct, onVariant, onShop
                 ))}
               </div>
 
-              {/* desktop scrub — mobile just swipes */}
+              {/* desktop scrub - mobile just swipes */}
               {f.tiles.length > 1 && (
                 <div className="hidden md:flex items-center gap-2 mt-3">
                   <button onClick={() => scrollRail(-1)} aria-label="Scroll variants left"
@@ -624,7 +624,7 @@ const HeroCarousel = ({ products = [], offers = [], onProduct, onVariant, onShop
              Only what the featured rotation above has NOT already shown, so
              the same piece is not on screen twice. The row ends on a Shop-all
              tile rather than trailing off into dead space, and the tiles
-             stretch to share whatever width is left — a short catalogue fills
+             stretch to share whatever width is left - a short catalogue fills
              the row instead of leaving a gap, a long one just scrolls. */}
         <div className="shrink-0 px-4 sm:px-5 md:px-10 pt-6 pb-6 md:pt-7 md:pb-7">
           <div className="flex items-baseline justify-between gap-4 mb-3">
@@ -645,7 +645,7 @@ const HeroCarousel = ({ products = [], offers = [], onProduct, onVariant, onShop
           {/* shrink-0, NOT grow: every card gets the exact same fixed
               width. grow let flex distribute leftover row space unevenly
               across cards (down to small natural-size differences between
-              them), so the square image — sized off its own card's width —
+              them), so the square image - sized off its own card's width -
               came out visibly bigger on some cards than others. A short
               catalogue just leaves blank space at the row's end now, which
               reads fine on a horizontal scroller. */}
@@ -699,7 +699,7 @@ const HomePage = () => {
 
   /* products?featured=true currently answers "No Published Product found"
      even though a product does carry the tag, so this cannot be the only
-     source — when it comes back empty, fall back to the catalogue we have
+     source - when it comes back empty, fall back to the catalogue we have
      already loaded rather than to productImg(undefined), which resolves to
      the logo placeholder. That fallback is what put the logo on the page. */
   const featured = useMemo(() => productList(featRes)[0] || products[0], [featRes, products]);
@@ -723,7 +723,7 @@ const HomePage = () => {
     const own = real([...gallery, ...(featured?.secondaryImages || []), featured?.productImg]);
     if (own.length > 1) return own;
 
-    /* Still thin — build the reel from the catalogue instead, so the coverflow
+    /* Still thin - build the reel from the catalogue instead, so the coverflow
        always has something to rotate. A single-image "carousel" reads as a
        broken carousel, and a single LOGO image reads as a broken page. */
     const across = real(products.map(productImg)).slice(0, 8);
@@ -745,14 +745,14 @@ const HomePage = () => {
 
   /* A tagged section shows ONLY what carries the tag. It used to fall back to
      the whole catalogue whenever fewer than four products were tagged, which
-     is why untagged pieces were appearing under "Bestsellers" — a shopper
+     is why untagged pieces were appearing under "Bestsellers" - a shopper
      reading that row was being told something untrue about them. Too few to
      be a row now hides the row instead. */
   const MIN_TAGGED = 2;
   const bestsellers = byTag('best_seller').slice(0, 8);
   const arrivals = byTag('new_arrival').slice(0, 8);
 
-  // Sizing for the single "Collection" grid so 2–7 products never look stranded.
+  // Sizing for the single "Collection" grid so 2-7 products never look stranded.
   const colsFor = (k) => (k <= 2 ? 'grid-cols-2 max-w-[720px]'
     : k === 3 ? 'grid-cols-2 lg:grid-cols-3 max-w-[1040px]'
     : 'grid-cols-2 lg:grid-cols-4');
@@ -770,7 +770,7 @@ const HomePage = () => {
   const testimonials = (testRes?.data?.testimonials || []).slice(0, 3);
   const fallbackReviews = [
     { userName: 'Aryan', content: "The red glow is unreal on a late-night setup. Way cooler in person.", rating: 5 },
-    { userName: 'Simran', content: "Gifted the Porsche caliper — my brother hasn't turned it off since.", rating: 5 },
+    { userName: 'Simran', content: "Gifted the Porsche caliper - my brother hasn't turned it off since.", rating: 5 },
     { userName: 'Kabir', content: "Pen stand is tiny but adorable. Desk finally looks intentional.", rating: 4 },
   ];
   const reviews = testimonials.length ? testimonials : fallbackReviews;
@@ -783,9 +783,9 @@ const HomePage = () => {
     <div className="font-inter bg-paper text-ink">
       <SEOHead url="/" />
       {/* The page's one H1: what the store is (the hero's rotating product names are H2s). */}
-      <h1 className="sr-only">UrbanNook – 3D printed desk lamps, anime katanas and home decor, made in India</h1>
+      <h1 className="sr-only">UrbanNook - 3D printed desk lamps, anime katanas and home decor, made in India</h1>
 
-      {/* ══ HERO — the drop ══ */}
+      {/* ══ HERO - the drop ══ */}
       <HeroCarousel
         products={products}
         offers={homeOffers}
@@ -797,7 +797,7 @@ const HomePage = () => {
 
 
 
-      {/* ══ MARQUEE ══ — butted straight against the plate, no gutter: both
+      {/* ══ MARQUEE ══ - butted straight against the plate, no gutter: both
           are ink, so the hero runs into the band with no visible seam. */}
       {/* <MarqueeBand /> */}
 
@@ -813,9 +813,9 @@ const HomePage = () => {
         </div>
       </Reveal> */}
 
-      {/* ══ SOCIAL PROOF + PAYMENT — editorial stat tiles ══ */}
+      {/* ══ SOCIAL PROOF + PAYMENT - editorial stat tiles ══ */}
     
-      {/* ══ PRODUCTS — adaptive to catalog size ══ */}
+      {/* ══ PRODUCTS - adaptive to catalog size ══ */}
       {/* Diwali offers sit above Bestsellers (only with a catalog big enough to have them) */}
       {/* sale header (price drops) + combo offers as one section */}
       {!isFewProducts && bestsellers.length >= MIN_TAGGED && <FestiveSections lead={<FestiveOfferBand products={products} />} />}
@@ -829,7 +829,7 @@ const HomePage = () => {
               ? <div className={`grid ${collectionCols} mx-auto gap-3 md:gap-6`}>{[...Array(Math.max(n, 2))].map((_, i) => <div key={i} className="aspect-[4/5] bg-hair animate-pulse rounded-none border border-hair" />)}</div>
               : <Stagger className={`grid ${collectionCols} mx-auto gap-3 md:gap-6`} stagger={0.08}>{products.map((p, i) => <StaggerItem key={p.productId || i}><HomeProductCard p={p} index={i} listId="home_collection" listName="Collection" /></StaggerItem>)}</Stagger>}
             <Reveal className="text-center mt-4 md:mt-6">
-              <p className="text-muted text-sm max-w-md mx-auto">A tight, made-to-order range — no filler, no warehouse leftovers. <b className="text-ink">More drops on the way.</b></p>
+              <p className="text-muted text-sm max-w-md mx-auto">A tight, made-to-order range - no filler, no warehouse leftovers. <b className="text-ink">More drops on the way.</b></p>
             </Reveal>
           </div>
         </section>
@@ -890,14 +890,14 @@ const HomePage = () => {
       </Reveal>
 
 
-      {/* The combo-banner "Bundle — free-shipping cross-sell" section (and
+      {/* The combo-banner "Bundle - free-shipping cross-sell" section (and
           the useGetAllFreeShippingBannersQuery it read from) was removed
           entirely 2026-10-09, same sweep as FreeShippingBanner/
-          ProductPageBanner — see MiniCartPreview.jsx's file-header note. A
+          ProductPageBanner - see MiniCartPreview.jsx's file-header note. A
           Promotion V2-based replacement is a deliberate follow-up, not yet
           built. */}
 
-      {/* ══ NEW ARRIVALS — rail; only what actually carries the tag ══ */}
+      {/* ══ NEW ARRIVALS - rail; only what actually carries the tag ══ */}
       {/* {!isFewProducts && arrivals.length >= MIN_TAGGED && (
         <section className="max-w-[1280px] mx-auto px-5 pb-4">
           <SecHead index="02" kicker="Fresh Drop" title="New Arrivals" onView={() => navigate('/products')} />
@@ -911,23 +911,23 @@ const HomePage = () => {
         </section>
       )} */}
 
-      {/* ══ STATEMENT — hero carousel on top, manifesto below ══ */}
+      {/* ══ STATEMENT - hero carousel on top, manifesto below ══ */}
       <section className="my-6 bg-ink text-paper border-y border-white/10 overflow-hidden">
         <div className="max-w-[1100px] mx-auto px-7 md:px-12 py-12 md:py-24 flex flex-col items-center text-center">
-          {/* CAROUSEL — 3D curved coverflow of the product's shots */}
+          {/* CAROUSEL - 3D curved coverflow of the product's shots */}
           <div className="relative w-full max-w-[1000px]">
             {/* warm ambient glow behind the stage */}
             <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl" style={{ width: '460px', height: '460px', background: 'radial-gradient(circle, rgba(232,93,39,0.38) 0%, rgba(230,51,41,0.12) 42%, transparent 70%)' }} />
-            {/* Nothing to rotate before the catalogue lands — an empty stage
+            {/* Nothing to rotate before the catalogue lands - an empty stage
                 is better than a stage of placeholders. */}
             {carouselImages.length > 0 && <CoverflowCarousel images={carouselImages} />}
           </div>
 
-          {/* MANIFESTO — below the carousel */}
+          {/* MANIFESTO - below the carousel */}
           <div className="mt-10 md:mt-14 max-w-2xl">
             <p className="gl-lbl mb-4 text-brand">The UrbanNook Way</p>
             <TextReveal as="h2" text="Built to order. Not to sit in a warehouse." delay={0.1} className="font-archivo text-4xl md:text-6xl font-extrabold tracking-tight leading-[0.95] text-paper" />
-            <Reveal delay={0.2} className="mt-6 text-paper/70 text-base md:text-lg mx-auto max-w-md">Every piece is 3D-printed the moment you order it — less waste, sharper detail, and a finish you won't find on a shelf.</Reveal>
+            <Reveal delay={0.2} className="mt-6 text-paper/70 text-base md:text-lg mx-auto max-w-md">Every piece is 3D-printed the moment you order it - less waste, sharper detail, and a finish you won't find on a shelf.</Reveal>
             <motion.div className="mt-8 h-px w-24 bg-white/30 mx-auto origin-center" initial={{ scaleX: 0 }} whileInView={{ scaleX: 1 }} viewport={{ once: true }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.2 }} />
             <div className="mt-8 grid grid-cols-3 gap-4 max-w-md mx-auto">
               {STATS.map((s) => (
@@ -941,7 +941,7 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* ══ SHOP BY COLLECTION — only when there are real categories to browse ══ */}
+      {/* ══ SHOP BY COLLECTION - only when there are real categories to browse ══ */}
       {!isFewProducts && hasRealCollections && (
         <section className="max-w-[1280px] mx-auto px-5 py-9 md:py-14">
           <SecHead index="03" kicker="Find Your Corner" title="Shop by Collection" />
@@ -961,7 +961,7 @@ const HomePage = () => {
         </section>
       )}
 
-      {/* ══ SHOP THE FEED — needs enough distinct products to avoid repeats ══ */}
+      {/* ══ SHOP THE FEED - needs enough distinct products to avoid repeats ══ */}
       {/* {!isFewProducts && (
         <section className="bg-surface border-y border-hair">
           <div className="max-w-[1280px] mx-auto px-5 py-9 md:py-14">
@@ -981,7 +981,7 @@ const HomePage = () => {
         </section>
       )} */}
 
-      {/* ══ TESTIMONIALS — two-row review wall (opposite directions, hover to pause + zoom, tap to shop) ══ */}
+      {/* ══ TESTIMONIALS - two-row review wall (opposite directions, hover to pause + zoom, tap to shop) ══ */}
       <section className="bg-paper py-4 md:py-20 overflow-hidden">
         <Reveal className="max-w-[1280px] mx-auto px-5 flex items-end justify-between gap-4 mb-8">
           <div>
@@ -1016,7 +1016,7 @@ const HomePage = () => {
       {/* ══ REFER & SAVE ══ */}
       <ReferSave />
 
-      {/* ══ NEWSLETTER — doubles as the "we're just getting started" beat ══ */}
+      {/* ══ NEWSLETTER - doubles as the "we're just getting started" beat ══ */}
       <section className="max-w-[820px] mx-auto px-5 py-5 md:py-20 text-center">
         <Kicker className="justify-center mb-3">{isFewProducts ? 'The next drop' : 'Join the list'}</Kicker>
         <TextReveal as="h2" text={isFewProducts ? 'Be first to the next piece' : 'Get first access to drops'} className="font-archivo text-3xl md:text-5xl font-extrabold tracking-tight" />
@@ -1028,8 +1028,8 @@ const HomePage = () => {
         <p className="gl-lbl text-[9px] text-faint mt-4">No spam · Unsubscribe anytime</p>
       </section>
 
-      {/* ══ ABOUT — compact brand intro, kept at the bottom above the footer ══ */}
-      {/* ══ CUSTOMIZE — every piece is printed to order, so this is a normal
+      {/* ══ ABOUT - compact brand intro, kept at the bottom above the footer ══ */}
+      {/* ══ CUSTOMIZE - every piece is printed to order, so this is a normal
              ask rather than an exception. Replaces the old "About" panel:
              that told people who we are, this gives them something to do. ══ */}
       <section className="max-w-[1280px] mx-auto px-5 py-5 md:py-16">
@@ -1039,7 +1039,7 @@ const HomePage = () => {
             <p className="gl-lbl text-brand mb-4">Customization · Made to order</p>
             <TextReveal as="h2" text="Make it yours." className="font-archivo text-4xl md:text-6xl font-extrabold tracking-tight leading-[0.95]" />
             <p className="mt-5 text-muted text-base md:text-lg max-w-xl">
-              Nothing here sits in a warehouse — every piece is 3D-printed once you order it.
+              Nothing here sits in a warehouse - every piece is 3D-printed once you order it.
               So a different colour, your name on the side, or a livery we don&apos;t stock is a
               normal ask. Tell us what you want and we&apos;ll come back with what&apos;s
               possible and <span className="text-ink font-semibold">what it costs</span>.
@@ -1056,7 +1056,7 @@ const HomePage = () => {
         </Reveal>
       </section>
 
-      {/* mobile sticky add-to-cart — featured product */}
+      {/* mobile sticky add-to-cart - featured product */}
       <StickyAddBar product={featured} onAdd={() => featured && addOne(featured)} />
     </div>
   );

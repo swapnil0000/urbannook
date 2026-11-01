@@ -18,7 +18,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ScrollColorBand, MotionRoot } from '../../component/motion';
 import { variantSku, trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist, trackVariantSelect, trackShare, trackDeliveryCheck } from '../../utils/analytics';
 import { productsApi, useGetProductByIdQuery, useGetProductsQuery, useGetBlogPostsQuery } from '../../store/api/productsApi';
-import { useAddToCartMutation, useUpdateCartMutation, useCalculateShippingMutation, useGetFreeShippingOfferQuery, useGetHomeComboOffersQuery } from '../../store/api/userApi';
+import { useAddToCartMutation, useUpdateCartMutation, useCalculateShippingMutation, useGetFreeShippingOfferQuery, useGetHomeComboOffersQuery, useGetProductPromotionsQuery } from '../../store/api/userApi';
 import { buildOfferLines } from '../../utils/productOfferLines';
 import { shippingDetails, RETURN_POLICY } from '../../utils/productSchema';
 import { useGetProductReviewsQuery, useSubmitProductReviewMutation, useUpdateProductReviewMutation } from '../../store/api/testimonialsApi';
@@ -37,6 +37,11 @@ import SaleTag from '../../component/festive/SaleTag';
 import SaleDealBox from '../../component/festive/SaleDealBox';
 import StockStatus from '../../component/StockStatus';
 import { shortVariantNames } from '../../utils/variantShortName';
+import ScrollRow from '../../component/ScrollRow';
+import { nounOf } from '../../utils/offerName';
+
+// "Choose …" label from the product itself: Katana (LED and Wooden share designs), Lamp, Figure, Kunai…
+const variantLabel = (name = '') => (/figure|statue/i.test(name) ? 'Figure' : nounOf(name).replace(/^LED\s+/i, ''));
 import ProductQuestions from '../../component/support/ProductQuestions';
 
 const MotionDiv = motion.div;
@@ -48,7 +53,7 @@ const Stars = ({ n = 5, className = '' }) => {
   return <span className={`text-star ${className}`}>{'★'.repeat(Math.max(0, Math.min(5, r)))}{'☆'.repeat(Math.max(0, 5 - r))}</span>;
 };
 
-// Effective per-variant out-of-stock — mirrors the server rule: a manual admin
+// Effective per-variant out-of-stock - mirrors the server rule: a manual admin
 // flag, or a tracked quantity (variantQuantity != null) that has reached 0.
 // A null/undefined quantity means "not stock-tracked" → never OOS by quantity.
 const isVariantOutOfStock = (v) =>
@@ -60,9 +65,9 @@ const isVariantOutOfStock = (v) =>
    the other published variants in its variantGroup as `versions`. No type →
    nothing shown. The open version is selected; another type opens its own PDP
    (a separate product). A type with no linked variant is shown greyed out; an
-   out-of-stock one still opens — the existing OOS logic there blocks purchase. */
+   out-of-stock one still opens - the existing OOS logic there blocks purchase. */
 const VERSION_TYPE_ORDER = ['Non-LED', 'LED'];
-// "Wooden" was the old name for the Non-LED edition — show it as Non-LED.
+// "Wooden" was the old name for the Non-LED edition - show it as Non-LED.
 const lc = (s) => {
   const k = String(s || '').trim().toLowerCase();
   return k === 'wooden' ? 'non-led' : k;
@@ -118,7 +123,7 @@ const VersionPicker = ({ variant, onOpen }) => {
 // badge to nudge the buyer. Tweak freely.
 const LOW_STOCK_THRESHOLD = 5;
 
-/* Every variant name repeats the product name in full — "Zoro Enma Wooden
+/* Every variant name repeats the product name in full - "Zoro Enma Wooden
    Katana (Black & Red)" sitting under a product called "Anime Wooden Katana".
    Dropping the words the product already says leaves "Zoro Enma (Black &
    Red)": the part that actually tells one variant from the next, and short
@@ -134,7 +139,7 @@ const shortVariantName = (variantName = '', productName = '') => {
 /* What the variant row is called, per category. A category listed here sells
    variants that are different things (Zenitsu's vs Zoro's katana, the BMW vs
    Ferrari lamp), not colours of one thing, so each variant URL is its own page
-   for search engines (own canonical, title, sitemap entry — see variantPage
+   for search engines (own canonical, title, sitemap entry - see variantPage
    below and client/scripts/ssg.mjs). Other categories (pen stands in ten
    colours) keep every variant URL canonical to the product. */
 const VARIANT_NOUN = { Lamp: 'Marque', Anime: 'Design' };
@@ -209,9 +214,15 @@ const ProductDetailPage = () => {
     const names = new Map(productList(relRes).map((x) => [String(x.productId), x.productName]));
     return buildOfferLines(comboRes?.data?.combos || [], names).get(String(productId)) || [];
   }, [comboRes, relRes, productId]);
+  // What this product unlocks, shown right above Add to Cart so the shopper
+  // knows BEFORE adding (not only after opening the cart).
+  const { data: pdpPromoRes } = useGetProductPromotionsQuery(productId, { skip: !productId });
+  const pdpPromos = pdpPromoRes?.data?.promotions || [];
+  const pdpGift = pdpPromos.find((p) => p.displayType === 'free_gift');
+  const pdpDeals = pdpPromos.filter((p) => p.displayType !== 'free_gift' && p.displayType !== 'free_shipping');
   const related = useMemo(() => productList(relRes).filter((p) => p.productId !== productId).slice(0, 4), [relRes, productId]);
 
-  // Product FAQs — use CMS-provided product.faqs if present, else generate helpful
+  // Product FAQs - use CMS-provided product.faqs if present, else generate helpful
   // defaults from the product's own data so buyers understand it before purchase.
   const productFaqs = useMemo(() => {
     if (Array.isArray(product?.faqs) && product.faqs.length) {
@@ -223,14 +234,14 @@ const ProductDetailPage = () => {
     const list = [
       { q: 'How long does delivery take?', a: 'Every piece is 3D-printed to order and ships pan-India within 24-48 hours, with tracking.' },
     ];
-    // Answer from the admin "Power Source" spec when set — never guess (not every lamp is USB).
+    // Answer from the admin "Power Source" spec when set - never guess (not every lamp is USB).
     const powerSpec = [...(product.specifications || []), ...((product.variantDetails || []).flatMap((v) => v.specifications || []))]
       .find((sp) => /power/i.test(sp?.key || '') && sp?.value);
     if (powerSpec) list.push({ q: 'How is it powered?', a: `${powerSpec.value}. Just plug in and switch it on.` });
     list.push({ q: 'What is it made of?', a: `Precision 3D-printed with a durable build and a hand-finished ${isLamp ? 'glossy resin' : 'premium'} coat, so no two are exactly alike.` });
     list.push({
       q: product.isCodAvailable ? 'Is Cash on Delivery available?' : 'What payment methods do you accept?',
-      a: product.isCodAvailable ? 'Partial COD is available — pay a small advance online and the rest in cash on delivery. You can also pay fully by UPI, cards, net-banking or wallets.' : 'We accept UPI, credit/debit cards, net-banking and wallets at checkout.',
+      a: product.isCodAvailable ? 'Partial COD is available - pay a small advance online and the rest in cash on delivery. You can also pay fully by UPI, cards, net-banking or wallets.' : 'We accept UPI, credit/debit cards, net-banking and wallets at checkout.',
     });
     list.push({ q: 'Can I return or exchange it?', a: "We don't accept returns or exchanges for change of mind, colour or preference. If your item arrives damaged, defective or wrong, report it within 3 days with an unboxing video and we'll replace it free." });
     return list;
@@ -252,9 +263,9 @@ const ProductDetailPage = () => {
   }, [seoFaqs, productFaqs]);
 
   // (The "complete the set" pairing that used to live here was a guess in
-  // code — pen stand ⇒ lamp, anything else ⇒ pen stand. The admin-configured
+  // code - pen stand ⇒ lamp, anything else ⇒ pen stand. The admin-configured
   // combo-banner system that later replaced it was itself removed entirely
-  // 2026-10-09 — see MiniCartPreview.jsx's file-header note.)
+  // 2026-10-09 - see MiniCartPreview.jsx's file-header note.)
 
   const currentPrice = useMemo(() => {
     if (!product?.variantDetails?.length) return 0;
@@ -293,7 +304,7 @@ const ProductDetailPage = () => {
   // Admin-curated combo + recommendation rows (empty => sections render nothing).
   const recommendedProducts = product?.recommendedProductsDetails || [];
 
-  // Stock state for the SELECTED variant — the page-level productStatus is
+  // Stock state for the SELECTED variant - the page-level productStatus is
   // only half the answer; a single variant can be out while the product is in.
   const selectedVariantObj = useMemo(
     () => product?.variantDetails?.find((v) => v.variantName === (selectedVariant || availableVariants[0])) || null,
@@ -323,7 +334,7 @@ const ProductDetailPage = () => {
   }, [product, selectedVariant]);
 
   // Layout effect (not a plain effect) so a product switch lands on the URL's
-  // variant before paint — no one-frame flash of the product's first variant.
+  // variant before paint - no one-frame flash of the product's first variant.
   useLayoutEffect(() => {
     if (availableVariants.length > 0 && product) {
       let initial = availableVariants[0];
@@ -340,11 +351,11 @@ const ProductDetailPage = () => {
     } else if (!product) setSelectedVariant('');
   }, [product?.productId, availableVariants, cartSelections, product, urlVariantSku]);
 
-  // Reset the pincode check + share row when navigating to another product —
+  // Reset the pincode check + share row when navigating to another product -
   // the component stays mounted, and a quote computed for product A's weight/price
   // must not display under product B.
   // Admin-set, per-variant sub tag (e.g. "BMW Inspired, 104cm") shown as a
-  // small line under the main product title — blank when the selected
+  // small line under the main product title - blank when the selected
   // variant has none set.
   const selectedVariantSubTag = useMemo(() => {
     if (!product) return '';
@@ -352,7 +363,7 @@ const ProductDetailPage = () => {
     return (selectedDetail?.variantSubTag && selectedDetail.variantSubTag.trim()) || '';
   }, [product, selectedVariant]);
 
-  // Variant-first, product-level fallback — same rule as variantSubTag above,
+  // Variant-first, product-level fallback - same rule as variantSubTag above,
   // for the two other admin-editable fields a variant can now override:
   // description and specifications. Blank/absent on the variant means "use
   // the product-level value", never "show nothing" (that would hide real
@@ -405,9 +416,12 @@ const ProductDetailPage = () => {
 
   const onSelectVariant = (v) => {
     setSelectedVariant(v.variantName);
-    setPinStatus(null); // quote was priced for the previous variant — require a re-check
+    setPinStatus(null); // quote was priced for the previous variant - require a re-check
     trackVariantSelect?.({ itemId: product.productId, itemName: product.productName, itemVariant: v.variantName, price: v.variantPrice });
-    if (v.sku) navigate(`/product/${product.productId}/${v.sku}`, { replace: true });
+    // keepScroll: picking a design must not jump the page back to the top
+    if (v.sku) navigate(`/product/${product.productId}/${v.sku}`, { replace: true, state: { keepScroll: true } });
+    // glide back up so the new design's photo and price are in view
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const variantImage = (name) => {
@@ -482,7 +496,7 @@ const ProductDetailPage = () => {
     window.dispatchEvent(new CustomEvent('un:open-offer-sheet', { detail: { promotionIds: [promotionId], autoAdd: !wasInCart } }));
   };
 
-  // ── Pincode delivery check — same ShipMozo rate API the checkout uses ──
+  // ── Pincode delivery check - same ShipMozo rate API the checkout uses ──
   const handlePinCheck = async () => {
     const pin = pinInput.trim();
     if (!/^[1-9][0-9]{5}$/.test(pin)) { setPinStatus({ ok: false, msg: 'Please enter a valid 6-digit pincode' }); return; }
@@ -500,17 +514,17 @@ const ProductDetailPage = () => {
       trackDeliveryCheck({ pincode: pin, serviceable: true, shippingAmount: charge });
     } catch (err) {
       const reason = err?.data?.message || err?.message || '';
-      setPinStatus({ ok: false, msg: /serviceable/i.test(reason) ? `Sorry — ${pin} isn't serviceable yet` : 'Could not check this pincode. Please try again.' });
+      setPinStatus({ ok: false, msg: /serviceable/i.test(reason) ? `Sorry - ${pin} isn't serviceable yet` : 'Could not check this pincode. Please try again.' });
       trackDeliveryCheck({ pincode: pin, serviceable: false, errorReason: reason });
     }
   };
 
-  // ── Share — native sheet on mobile, social buttons on desktop ──
-  // Include the selected variant — without it the link opens the product's
+  // ── Share - native sheet on mobile, social buttons on desktop ──
+  // Include the selected variant - without it the link opens the product's
   // first variant (e.g. sharing Tanjiro opened Kokushibo).
   const shareVariantKey = selectedVariantObj?.sku || selectedVariantObj?.variantName;
   const shareUrl = `https://www.urbannook.in/product/${product?.productId}${shareVariantKey ? `/${encodeURIComponent(shareVariantKey)}` : ''}`;
-  const shareText = `${selectedVariant || product?.productName || 'Urban Nook'} — Urban Nook`;
+  const shareText = `${selectedVariant || product?.productName || 'Urban Nook'} - Urban Nook`;
   const openShare = (method, href) => {
     trackShare({ contentType: 'product', itemId: product.productId, method });
     window.open(href, '_blank', 'noopener,noreferrer');
@@ -590,7 +604,7 @@ const ProductDetailPage = () => {
   };
   const handleAddReviewImage = async (e) => {
     const files = Array.from(e.target.files || []); e.target.value = '';
-    // Phone photos are 2–4 MB; shrink to a 1200 px JPEG before upload (utils/compressImage.js).
+    // Phone photos are 2-4 MB; shrink to a 1200 px JPEG before upload (utils/compressImage.js).
     const toAdd = await Promise.all(files.slice(0, 3 - reviewImages.length).map((f) => compressImage(f)));
     setReviewImages((prev) => [...prev, ...toAdd]); setReviewImagePreviews((prev) => [...prev, ...toAdd.map((f) => URL.createObjectURL(f))]);
   };
@@ -678,21 +692,21 @@ const ProductDetailPage = () => {
 
       <div className="max-w-[1280px] mx-auto px-5 py-6 md:py-8">
         {/* breadcrumb */}
-        <div className="text-sm text-faint mb-5">
+        <div className="text-sm text-faint mb-5 pt-6 md:pt-4">{/* clears the hanging Diwali lights */}
           <Link to="/" className="hover:text-brand">Home</Link> / <Link to={product.productCategory ? categoryPath(product.productCategory) : '/products'} className="hover:text-brand">{product.productCategory || 'Shop'}</Link> / {variantCrumb
             ? <><Link to={`/product/${product.productId}`} className="hover:text-brand">{product.productName}</Link> / <span className="text-ink">{variantCrumb}</span></>
             : <span className="text-ink">{product.productName}</span>}
         </div>
 
         <div className="grid lg:grid-cols-2 gap-8 lg:gap-10">
-          {/* GALLERY — one big full-width framed image (swipe + dots on mobile, arrows on desktop) */}
+          {/* GALLERY - one big full-width framed image (swipe + dots on mobile, arrows on desktop) */}
           <div className="lg:sticky lg:top-24 self-start w-full min-w-0">
-            <ImageCarousel priority images={galleryImages} alt={(i) => `${imageTitle} – photo ${i + 1}`} onImgErr={onImgErr} onItemClick={(i) => setLightbox({ list: galleryImages, idx: i })} />
+            <ImageCarousel priority images={galleryImages} alt={(i) => `${imageTitle} - photo ${i + 1}`} onImgErr={onImgErr} onItemClick={(i) => setLightbox({ list: galleryImages, idx: i })} />
           </div>
 
           {/* INFO */}
           <div className="min-w-0">
-            {/* ZONE A — IDENTITY (on paper): kicker + rating chip, title + heart, lede */}
+            {/* ZONE A - IDENTITY (on paper): kicker + rating chip, title + heart, lede */}
             <div className="flex items-center justify-between gap-3">
               <p className="gl-lbl text-ink border border-ink/25 px-3 py-1.5">{product.productSubCategory || product.productCategory || '3D Printed'}</p>
               {totalReviews > 0 && avgRating > 0 && (
@@ -705,7 +719,7 @@ const ProductDetailPage = () => {
             </div>
             <div className="flex items-start justify-between gap-3 mt-2">
               <div className="min-w-0">
-                {/* No line-clamp — a long name used to get cut off with an
+                {/* No line-clamp - a long name used to get cut off with an
                     ellipsis after 2 lines on mobile. min-h is a MINIMUM, not
                     a cap, so it still keeps short titles' height consistent
                     without truncating a longer one. */}
@@ -742,11 +756,11 @@ const ProductDetailPage = () => {
             )}
             {/* {displayDescription && <p className="text-xs text-muted leading-relaxed mt-2">{displayDescription}</p>} */}
 
-            {/* ZONE B — BUY CARD: price → savings → variants → urgency → CTA → trust, one unit.
+            {/* ZONE B - BUY CARD: price → savings → variants → urgency → CTA → trust, one unit.
                 py only, no px: the horizontal p-4/p-5 used to indent this
                 whole block (price, buttons, trust strip) further right than
                 Zone A's title/kicker above it, which sit with no padding of
-                their own — everything below looked shifted right instead of
+                their own - everything below looked shifted right instead of
                 lining up to the same left edge. Vertical spacing is kept. */}
             <div className="mt-1  bg-paper  md:max-w-md">
               {/* price hero */}
@@ -757,15 +771,10 @@ const ProductDetailPage = () => {
                 <SaleTag />
               </div>
               {discountPercent > 0 && <p className="text-sm font-semibold text-save mt-1.5">You save {inr(maxVariantPrice - currentPrice)}</p>}
-              {offerLines.length > 0 && (
+              {pdpPromos.length > 0 && (
                 <button type="button" onClick={() => document.getElementById('pdp-offers')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-                  className="mt-2.5 flex w-full flex-col gap-1 text-left" aria-label={`${offerLines.length} offers on this product — see details`}>
-                  {offerLines.map((o) => (
-                    <span key={o.title} className="inline-flex max-w-full items-start gap-1.5 self-start rounded-r-sm border-l-[3px] border-brand bg-brand/[0.08] px-2.5 py-1.5 text-[12.5px] font-bold leading-tight text-saleDeep">
-                      <span aria-hidden="true">🎁</span><span>{o.text}</span>
-                    </span>
-                  ))}
-                  <span className="text-[12px] font-semibold text-brand underline underline-offset-2">{offerLines.length > 1 ? `See ${offerLines.length} offers` : 'See offer'} ↓</span>
+                  className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-bold text-brand underline underline-offset-2">
+                  {pdpPromos.length > 1 ? `${pdpPromos.length} offers on this product` : '1 offer on this product'} ↓
                 </button>
               )}
               {/* prices are GST-inclusive (the order page says "Incl. GST" too) */}
@@ -777,7 +786,7 @@ const ProductDetailPage = () => {
                 {!isOutOfStock && <span className="text-[12px] text-muted"><i className="fa-solid fa-truck-fast mr-1 text-brand" aria-hidden="true" />Ships in 24-48 hrs</span>}
               </div>
 
-              {/* festive gift wrap, offered here too — "Go to Checkout" skips the cart drawer where it used to be the only place */}
+              {/* festive gift wrap, offered here too - "Go to Checkout" skips the cart drawer where it used to be the only place */}
               {product?.giftWrapEligible && !isOutOfStock && <GiftWrapOffer variant="card" eligible className="mt-3" />}
 
               {/* variants */}
@@ -790,37 +799,28 @@ const ProductDetailPage = () => {
                       (crawlable); a normal click stays on this page and swaps
                       the variant in place via onSelectVariant. The row scrolls
                       rather than wraps, so many variants stay one line. */}
+                  {/* Designs as plain name pills: each design (Insoku, Rengoku…) is its
+                      own piece, so photo tiles labelled "Variant" misled shoppers.
+                      Real links to each design's URL; a click swaps in place. */}
                   {activeVariants.length > 1 && (
                     <div>
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="min-w-0 truncate font-archivo text-[14px] font-bold leading-5 text-ink" title={selectedVariant}>{product.productCategory === 'Lamp' ? 'Design' : 'Variant'}: <span className="font-semibold text-ink/70">{shortNames.get(selectedVariant) || selectedVariant}</span></p>
-                      </div>
-                      <div className="mt-2.5 -mx-1 px-1 py-1 flex gap-2 sm:gap-2.5 overflow-x-auto gl-hscroll">
-                        {activeVariants.map((v) => {
+                      <p className="font-archivo text-[14px] font-bold text-ink">{activeVariants.some((v) => v.variantSwatchType === 'color') ? 'Colour' : variantLabel(product.productName)}: <span className="font-semibold text-ink/70">{shortNames.get(selectedVariant) || selectedVariant}</span></p>
+                      {/* one swipeable row (in stock first, sold out after) instead of a wall of pills */}
+                      <ScrollRow className="mt-2.5" fade="from-paper" activeKey={selectedVariant}>
+                        {[...activeVariants].sort((a, b) => Number(isVariantOutOfStock(a)) - Number(isVariantOutOfStock(b))).map((v) => {
                           const on = v.variantName === selectedVariant;
                           const oos = isVariantOutOfStock(v);
-                          // real photo whenever the variant has one; a flat colour only as a last resort
-                          const isColour = !v.variantImage?.[0] && v.variantSwatchType === 'color' && v.variantSwatchValue;
                           return (
-                            <Link
-                              key={v.sku || v.variantName}
+                            <Link key={v.sku || v.variantName}
                               to={v.sku ? `/product/${product.productId}/${v.sku}` : `/product/${product.productId}`}
                               onClick={(e) => { e.preventDefault(); onSelectVariant(v); }}
-                              aria-current={on ? 'true' : undefined}
-                              title={v.variantName}
-                              className={`group shrink-0 w-[88px] sm:w-[96px] rounded-xl border-2 bg-white p-1.5 transition-all ${on ? 'border-ink shadow-md' : 'border-transparent shadow-sm hover:border-hair'}`}
-                            >
-                              <span className={`relative block aspect-square overflow-hidden rounded-lg bg-surface ${oos ? 'opacity-50' : ''}`}>
-                                {isColour
-                                  ? <span className="block w-full h-full" style={{ background: v.variantSwatchValue }} />
-                                  : <img src={v.variantImage?.[0] || variantImage(v.variantName)} alt={v.variantName} loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" onError={onImgErr} />}
-                                {on && <span className="absolute right-1 top-1 grid h-4 w-4 place-items-center rounded-full bg-ink text-[9px] text-white" aria-hidden="true">✓</span>}
-                              </span>
-                              <span className={`block h-8 overflow-hidden px-0.5 pt-1.5 pb-0.5 text-center font-archivo text-[12.5px] leading-tight line-clamp-2 ${on ? 'font-bold text-ink' : 'font-semibold text-ink/70'} ${oos ? 'line-through' : ''}`}>{shortNames.get(v.variantName) || v.variantName}</span>
+                              aria-current={on ? 'true' : undefined} title={v.variantName}
+                              className={`shrink-0 whitespace-nowrap rounded-full border px-3.5 py-2 font-archivo text-[13px] leading-none transition-colors ${on ? 'border-ink bg-ink font-bold text-paper' : 'border-hair bg-white font-semibold text-ink hover:border-ink'} ${oos ? 'text-muted line-through' : ''}`}>
+                              {shortNames.get(v.variantName) || v.variantName}
                             </Link>
                           );
                         })}
-                      </div>
+                      </ScrollRow>
                     </div>
                   )}
                 </>
@@ -836,7 +836,7 @@ const ProductDetailPage = () => {
                 {isOutOfStock ? (
                   <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-faint" /><span className="text-muted font-semibold">Out of stock</span></span>
                 ) : selectedVariantLowStock && selectedVariantQty !== 1 ? (
-                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-brand animate-pulse" /><span className="text-brand font-semibold">Few left — selling fast</span></span>
+                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-brand animate-pulse" /><span className="text-brand font-semibold">Few left - selling fast</span></span>
                 ) : (
                   <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-save" /><span className="text-ink font-semibold">In stock</span></span>
                 )}
@@ -859,7 +859,7 @@ const ProductDetailPage = () => {
                       <span className="w-8 text-center font-bold">{currentCartQty}</span>
                       <button onClick={() => handleUpdateQty(currentCartQty + 1)} className="w-10 h-full text-lg">+</button>
                     </div>
-                    <button onClick={handleCheckoutClick} className="gl-press flex-1 h-12 bg-brand text-paper font-bold text-sm rounded-xl hover:bg-brandHi">Go to Checkout</button>
+                    <button onClick={handleCheckoutClick} className="gl-press flex-1 h-12 bg-brand text-paper font-bold text-sm rounded-xl hover:bg-brandHi">View offers & checkout</button>
                   </>
                 ) : (
                   <>
@@ -874,13 +874,13 @@ const ProductDetailPage = () => {
               </div>
 
               {/* Free-shipping threshold, right under the CTA where the buy
-                  decision happens — hidden unless admin's promotion is on. */}
+                  decision happens - hidden unless admin's promotion is on. */}
               {!isOutOfStock && <OfferProgress location="product" className="mt-3" fallback={<FreeShippingStrip cartTotal={cartTotal} variant="compact" className="mt-3" />} />}
 
-              {/* questions right by the buy buttons — straight to our WhatsApp, with this product's link */}
+              {/* questions right by the buy buttons - straight to our WhatsApp, with this product's link */}
               <ProductQuestions productName={product.productName} variantName={selectedVariant} url={shareUrl} className="mt-3" />
 
-              {/* Offers right under the buy buttons — price and variants stay clean
+              {/* Offers right under the buy buttons - price and variants stay clean
                   up top; the offers popup (OffersPopup) announces them on arrival. */}
               {/* live sale countdown right above the offers it belongs to */}
               <SaleDealBox className="mt-4" />
@@ -890,7 +890,7 @@ const ProductDetailPage = () => {
               {/* Coupons (guest list is server-rendered; see entry-server.jsx) */}
               <CouponOffersSection variant="pdp" />
 
-              {/* Customization — admin opt-in per product (product.isCustomizable),
+              {/* Customization - admin opt-in per product (product.isCustomizable),
                   not every product is customisable. Carries the product (and the
                   variant they are looking at) through so the request form
                   arrives prefilled. */}
@@ -973,7 +973,7 @@ const ProductDetailPage = () => {
               </p>
             </div>
 
-            {/* OFFERS — UPI / EMI / card offers, applied via Razorpay at checkout */}
+            {/* OFFERS - UPI / EMI / card offers, applied via Razorpay at checkout */}
             {/* <div className="mt-4 rounded-2xl border border-hair bg-white p-4 md:max-w-md">
               <div className="flex items-center justify-between mb-3">
                 <p className="gl-lbl text-brand">Available offers</p>
@@ -982,7 +982,7 @@ const ProductDetailPage = () => {
               <ul className="space-y-2.5 text-sm text-ink">
                 <li className="flex items-start gap-2.5">
                   <i className="fa-solid fa-bolt text-brand text-xs mt-1 w-4 text-center shrink-0" />
-                  <span><b>UPI</b> — pay instantly with GPay, PhonePe, Paytm &amp; more</span>
+                  <span><b>UPI</b> - pay instantly with GPay, PhonePe, Paytm &amp; more</span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <i className="fa-regular fa-credit-card text-brand text-xs mt-1 w-4 text-center shrink-0" />
@@ -995,25 +995,25 @@ const ProductDetailPage = () => {
                 {product.isCodAvailable && (
                   <li className="flex items-start gap-2.5">
                     <i className="fa-solid fa-money-bill-wave text-brand text-xs mt-1 w-4 text-center shrink-0" />
-                    <span><b>Partial COD</b> — small advance online, rest on delivery</span>
+                    <span><b>Partial COD</b> - small advance online, rest on delivery</span>
                   </li>
                 )}
               </ul>
             </div> */}
 
-            {/* ZONE C — promotion banner slot. The old combo-banner system
+            {/* ZONE C - promotion banner slot. The old combo-banner system
                 (FreeShippingBanner/ProductPageBanner, reading the now-deleted
-                cart-rule/offers adapter) was removed entirely 2026-10-09 —
+                cart-rule/offers adapter) was removed entirely 2026-10-09 -
                 this surface now has no renderer yet. The data layer for a
                 replacement already exists (useGetProductPromotionsQuery,
                 src/store/api/userApi.js, hitting Promotion Engine V2's
-                sanitized Display API) — UI here is a deliberate follow-up,
+                sanitized Display API) - UI here is a deliberate follow-up,
                 not an oversight. */}
 
           </div>
         </div>
 
-        {/* PRODUCT DETAILS — full-bleed LIGHT-GREY (surface) band: description / specs / shipping */}
+        {/* PRODUCT DETAILS - full-bleed LIGHT-GREY (surface) band: description / specs / shipping */}
         <div className="w-screen ml-[calc(50%-50vw)] bg-paper mt-16">
         <section className="max-w-3xl mx-auto px-5 ">
           <p className="gl-lbl text-brand mb-2 text-center">The full rundown</p>
@@ -1039,13 +1039,13 @@ const ProductDetailPage = () => {
         </section>
         </div>
 
-        {/* LOOK CLOSER — full-bleed LIGHT-GREY (surface) band, auto-playing carousel (tap to zoom) */}
+        {/* LOOK CLOSER - full-bleed LIGHT-GREY (surface) band, auto-playing carousel (tap to zoom) */}
         {galleryImages.length > 1 && (
           <div className="w-screen ml-[calc(50%-50vw)] bg-paper text-ink mt-6">
             <div className="max-w-[1280px] mx-auto px-5 py-5 md:py-5">
               <div className="flex items-end justify-between mb-6">
                 <div>
-                  <p className="gl-lbl text-brand mb-2">— The Details</p>
+                  <p className="gl-lbl text-brand mb-2">- The Details</p>
                   <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight leading-[0.95]">
                     <span className="text-ink">Look</span> <span className="text-faint">closer.</span>
                   </h2>
@@ -1055,7 +1055,7 @@ const ProductDetailPage = () => {
               <ImageCarousel
                 peek
                 images={galleryImages}
-                alt={(i) => `${imageTitle} – ${specs[i]?.key ? `${specs[i].key.toLowerCase()} detail` : `detail ${i + 1}`}`}
+                alt={(i) => `${imageTitle} - ${specs[i]?.key ? `${specs[i].key.toLowerCase()} detail` : `detail ${i + 1}`}`}
                 onImgErr={onImgErr}
                 onItemClick={(i) => setLightbox({ list: galleryImages, idx: i })}
                 renderOverlay={(i) => (
@@ -1070,11 +1070,11 @@ const ProductDetailPage = () => {
           </div>
         )}
 
-        {/* IN THE WILD — full-bleed BLACK (ink) editorial band from customer review photos */}
+        {/* IN THE WILD - full-bleed BLACK (ink) editorial band from customer review photos */}
         {communityShots.length > 0 && (
           <ScrollColorBand nightScopeRef={pageRef} className="w-screen ml-[calc(50%-50vw)] mt-16">
             <div className="max-w-[1280px] mx-auto px-5 py-14 md:py-20">
-              <p className="gl-lbl opacity-50 mb-2">— In the wild</p>
+              <p className="gl-lbl opacity-50 mb-2">- In the wild</p>
               <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight leading-[0.95] mb-1">
                 <span>Seen in</span><br /><span className="opacity-40">real setups.</span>
               </h2>
@@ -1084,12 +1084,12 @@ const ProductDetailPage = () => {
           </ScrollColorBand>
         )}
 
-        {/* WHY URBAN NOOK — comparison table (ComparisonTable.jsx). Same
+        {/* WHY URBAN NOOK - comparison table (ComparisonTable.jsx). Same
             layout/animations as before, recoloured to the site's red/black
             theme using only the existing --gl-* tokens (see that file). */}
         <ComparisonTable productName={product.productName} />
 
-        {/* REVIEWS — full-bleed LIGHT-GREY (surface) band */}
+        {/* REVIEWS - full-bleed LIGHT-GREY (surface) band */}
         <div className="w-screen ml-[calc(50%-50vw)] bg-paper mt-16">
         <div id="reviews" className="max-w-[1280px] mx-auto px-5 scroll-mt-24">
           <div className="flex items-start justify-between gap-4 mb-6">
@@ -1146,7 +1146,7 @@ const ProductDetailPage = () => {
 
           <div className="grid sm:grid-cols-2 gap-4">
               {reviews.length === 0 ? (
-                <div className="sm:col-span-2 text-muted text-sm bg-white border border-hair rounded-2xl p-8 text-center">No reviews yet — be the first to review this product.</div>
+                <div className="sm:col-span-2 text-muted text-sm bg-white border border-hair rounded-2xl p-8 text-center">No reviews yet - be the first to review this product.</div>
               ) : reviews.slice(0, visibleReviews).map((rev) => {
                 const imgs = rev.imageUrls?.length ? rev.imageUrls : rev.imageUrl ? [rev.imageUrl] : [];
                 return (
@@ -1172,7 +1172,7 @@ const ProductDetailPage = () => {
         </div>
 
         {/* related */}
-        {/* Other variants of THIS product — after reviews, before cross-sell */}
+        {/* Other variants of THIS product - after reviews, before cross-sell */}
         <OtherVariants
           productId={product.productId}
           productName={product.productName}
@@ -1189,7 +1189,7 @@ const ProductDetailPage = () => {
           <div className="mt-16">
             <div className="flex items-end justify-between mb-6"><h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">You may also like</h2><button onClick={() => navigate('/products')} className="text-sm font-bold underline underline-offset-4 decoration-2 hover:text-brand">View all →</button></div>
             {/* Single scrollable row (matches the old site's layout) instead
-                of a multi-row grid — the card design itself is unchanged. */}
+                of a multi-row grid - the card design itself is unchanged. */}
             <div
               className="flex gap-4 md:gap-6 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               style={{ touchAction: 'pan-x' }}
@@ -1202,7 +1202,7 @@ const ProductDetailPage = () => {
             </div>
           </div>
         )}
-          {/* "Why fans love it": the short Admin → SEO Pages intro for this URL (2–3 lines)
+          {/* "Why fans love it": the short Admin → SEO Pages intro for this URL (2-3 lines)
               and, when a published blog post is linked to this product, "Know the story →".
               The full story lives in the blog, not on the product page. */}
           {(seoIntro.length > 0 || story) && (
@@ -1232,7 +1232,7 @@ const ProductDetailPage = () => {
         )}
       </div>
 
-      {/* sticky Add-to-Cart bar (mobile above the bottom nav, desktop at the very bottom) — appears after the main CTA scrolls out of view */}
+      {/* sticky Add-to-Cart bar (mobile above the bottom nav, desktop at the very bottom) - appears after the main CTA scrolls out of view */}
       <AnimatePresence>
         {!buyBoxVisible && product && !isLoading && (
           <MotionDiv
@@ -1244,7 +1244,7 @@ const ProductDetailPage = () => {
             className="fixed inset-x-0 z-30 bg-paper/95 backdrop-blur border-t border-hair px-4 py-3 flex items-center gap-3 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] md:bottom-0 md:px-[max(1.25rem,calc((100vw-1280px)/2+1.25rem))]"
           >
             {/* the thumbnail is the first thing to go once the bar also has to
-                hold a stepper — at 390px there is not room for both */}
+                hold a stepper - at 390px there is not room for both */}
             {!isInCart && (
               <img src={variantImage(selectedVariant)} alt="" className="w-11 h-11 rounded-lg object-cover border border-hair shrink-0" onError={onImgErr} />
             )}
@@ -1263,7 +1263,7 @@ const ProductDetailPage = () => {
             ) : isInCart ? (
               <>
                 {/* Same handleUpdateQty the main buy box uses, so the cart API
-                    call (and the guest-cart dispatch) stays in one place —
+                    call (and the guest-cart dispatch) stays in one place -
                     this bar only adds a second way to reach it. */}
                 <div className="flex items-center border border-ink rounded-xl h-11 shrink-0">
                   <button
@@ -1282,7 +1282,7 @@ const ProductDetailPage = () => {
                     +
                   </button>
                 </div>
-                <button onClick={handleCheckoutClick} className="gl-press bg-brand text-white font-bold text-sm px-4 h-11 rounded-xl shrink-0 hover:bg-brandHi">Checkout</button>
+                <button onClick={handleCheckoutClick} className="gl-press bg-brand text-white font-bold text-sm px-4 h-11 rounded-xl shrink-0 hover:bg-brandHi">Offers & checkout</button>
               </>
             ) : (
               <>

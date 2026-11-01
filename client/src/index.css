@@ -4,23 +4,23 @@
 
 :root {
   /* ============================================================
-     URBAN NOOK — GLOBAL DESIGN TOKENS (Urban Nook editorial palette)
+     URBAN NOOK - GLOBAL DESIGN TOKENS (Urban Nook editorial palette)
      Change the whole site's colours here. Stored as "R G B"
      channels so Tailwind opacity modifiers (bg-brand/10) work.
      4-colour system: Nook Red · Ink Black · Off-White/Paper · Stone Grey.
      ============================================================ */
-  --gl-brand:    230 51 41;   /* #E63329 Nook Red — the one accent (buttons, links, dot) */
-  --gl-brand-hi: 201 40 31;   /* #C9281F Red Deep — hover/pressed */
+  --gl-brand:    230 51 41;   /* #E63329 Nook Red - the one accent (buttons, links, dot) */
+  --gl-brand-hi: 201 40 31;   /* #C9281F Red Deep - hover/pressed */
   --gl-sale:     230 51 41;   /* #E63329 discounts / sale / hot badges */
-  --gl-sale-deep:201 40 31;   /* #C9281F Red Deep — emphasis */
-  --gl-star:     243 195 59;  /* #F3C33B ratings (functional gold — outside the 4-colour brand set) */
-  --gl-save:     16 132 116;  /* #108474 savings (functional teal — outside the 4-colour brand set) */
-  --gl-ink:      20 20 20;    /* #141414 Ink Black — text, header, image frames */
-  --gl-paper:    239 234 224; /* #EFEAE0 Off-White / Paper — page background */
-  --gl-muted:    97 92 80;    /* #615C50 Grey-Dark — muted but readable text */
-  --gl-faint:    140 135 121; /* #8C8779 Stone Grey — faint text */
-  --gl-hair:     216 210 197; /* #D8D2C5 Line — hairline borders (warm) */
-  --gl-surface:  229 223 211; /* #E5DFD3 Cream-2 — secondary panels/bands (white cards pop on it) */
+  --gl-sale-deep:201 40 31;   /* #C9281F Red Deep - emphasis */
+  --gl-star:     243 195 59;  /* #F3C33B ratings (functional gold - outside the 4-colour brand set) */
+  --gl-save:     16 132 116;  /* #108474 savings (functional teal - outside the 4-colour brand set) */
+  --gl-ink:      20 20 20;    /* #141414 Ink Black - text, header, image frames */
+  --gl-paper:    239 234 224; /* #EFEAE0 Off-White / Paper - page background */
+  --gl-muted:    97 92 80;    /* #615C50 Grey-Dark - muted but readable text */
+  --gl-faint:    140 135 121; /* #8C8779 Stone Grey - faint text */
+  --gl-hair:     216 210 197; /* #D8D2C5 Line - hairline borders (warm) */
+  --gl-surface:  229 223 211; /* #E5DFD3 Cream-2 - secondary panels/bands (white cards pop on it) */
 
   /* Colors - Modern Blue & Teal Palette (legacy) */
   --color-primary: #3B82F6;    /* Blue */
@@ -525,7 +525,7 @@
 }
 
 /* ============================================================
-   URBAN NOOK — EDITORIAL "2040" MOTION LAYER
+   URBAN NOOK - EDITORIAL "2040" MOTION LAYER
    Cream · Ink · Red. Film grain, custom cursor, tilt, reveals.
    Prefixed `un-` to avoid clashing with legacy styles.
    ============================================================ */
@@ -659,7 +659,7 @@
 }
 
 /* ============================================================
-   HARD-EDGED THEME — square corners everywhere.
+   HARD-EDGED THEME - square corners everywhere.
    Every card, box, image, panel, input and button renders with
    0 radius across the whole app (named utilities like rounded-lg
    AND arbitrary ones like rounded-[1.75rem]). Circles and pills
@@ -673,7 +673,7 @@
 }
 
 /* ============================================================
-   Auth sheet entrance — slides up from the bottom on mobile
+   Auth sheet entrance - slides up from the bottom on mobile
    (app-like bottom sheet), gentle zoom-in on desktop.
    Defined directly because the project has no tailwindcss-animate
    plugin (the old `animate-in ...` utilities were no-ops).
@@ -699,7 +699,7 @@
 }
 
 /* ============================================================
-   Animated header wordmark — "urbannook". A soft brand-red
+   Animated header wordmark - "urbannook". A soft brand-red
    highlight sweeps across the paper-coloured letters forever.
    ============================================================ */
 @keyframes unWordmarkSweep {
@@ -728,9 +728,9 @@
 /* ============================================================
    Stop iOS Safari from auto-zooming when a form field is focused.
    Mobile browsers zoom in whenever an input's font-size is < 16px
-   (and never zoom back out) — awful UX. Forcing a 16px minimum on
+   (and never zoom back out) - awful UX. Forcing a 16px minimum on
    touch widths kills the zoom trigger, WITHOUT disabling pinch-zoom
-   (we deliberately keep the viewport zoomable for accessibility —
+   (we deliberately keep the viewport zoomable for accessibility -
    no maximum-scale / user-scalable=no). Desktop keeps its designed
    sizes; this only applies on narrow/mobile screens.
    ============================================================ */
@@ -743,7 +743,7 @@
 }
 
 /* ============================================================
-   Checkout step transition — each step slides/fades in like an
+   Checkout step transition - each step slides/fades in like an
    app screen. (No tailwindcss-animate plugin, so defined directly.)
    ============================================================ */
 @keyframes stepFade {
@@ -756,7 +756,7 @@
 }
 
 /* ============================================================
-   Checkout section as a mobile bottom-sheet — the Login/Guest and
+   Checkout section as a mobile bottom-sheet - the Login/Guest and
    Contact steps slide up from the bottom (like the Address form).
    ONLY on narrow screens; desktop (lg+) keeps the inline layout.
    Defined AFTER .step-fade so its slide-up animation wins on mobile.
@@ -775,7 +775,7 @@
     /* Stop short of the sticky 4rem header instead of sliding up behind it.
        `vh` counts the area hidden behind mobile browser chrome, so a plain 85vh
        reaches past the header on short screens and the header (z-50) then paints
-       over the top of the sheet — the grab handle and first card disappear.
+       over the top of the sheet - the grab handle and first card disappear.
        `dvh` tracks the visible viewport; the vh line above is the fallback. */
     max-height: calc(100vh - 5rem);
     max-height: calc(100dvh - 5rem);
@@ -803,7 +803,7 @@
     display: none;
   }
 /* ============================================================
-   DIWALI OFFERS SECTION  (.un-offers) — scoped to ComboOfferSection.
+   DIWALI OFFERS SECTION  (.un-offers) - scoped to ComboOfferSection.
    The global HARD-EDGED THEME zeroes every class containing "rounded-"
    (except rounded-full). These components therefore use their own
    un-r-* radius classes, which that rule never matches, so nothing global
@@ -831,7 +831,7 @@
 @media (prefers-reduced-motion:reduce){.un-offers .un-card{transition:none}}
 
 /* ============================================================
-   PHULJADI progress (festive campaign) — sparks, burst, pop.
+   PHULJADI progress (festive campaign) - sparks, burst, pop.
    Only exists while a campaign with the Phuljadi switched on is live;
    everything is disabled under reduced motion.
    ============================================================ */
@@ -846,7 +846,7 @@
 @media (prefers-reduced-motion:reduce){.un-phj-p,.un-phj-burst{display:none!important}.un-phj-star,.un-phj-pop{animation:none!important}}
 
 /* ============================================================
-   COMBO BUILDER SHEET — dark festive glass (ComboBuilderSheet.jsx).
+   COMBO BUILDER SHEET - dark festive glass (ComboBuilderSheet.jsx).
    Warm burgundy light over ink, blurred; surfaces are translucent glass.
    Square corners, per the site's hard-edged theme.
    ============================================================ */
@@ -874,7 +874,7 @@
 .un-bs-save{color:color-mix(in srgb,rgb(var(--gl-save)) 40%,#a7f3d6)}
 
 /* ============================================================
-   DIWALI OFFER TILES — amber section, scalloped edge, image tiles
+   DIWALI OFFER TILES - amber section, scalloped edge, image tiles
    with a dark-red benefit strip (ComboOfferSection.jsx).
    Scoped to the offers section; colours derive from --gl-* tokens.
    ============================================================ */
@@ -934,7 +934,7 @@
 }
 .un-offers .un-coupon-perf{border-left:1.5px dashed rgb(var(--gl-star)/.4)}
 
-/* Page night mode — set on a page wrapper by <ScrollColorBand nightScopeRef>
+/* Page night mode - set on a page wrapper by <ScrollColorBand nightScopeRef>
    (component/motion) while a dark band is on screen. Swaps the page surface
    tokens to dark and flips the few literal ink/white classes, so the whole
    page reads as one dark scene. Images, gradients over images and brand red
@@ -961,7 +961,7 @@
 .un-night .bg-white .text-ink { color: rgb(20 20 20); }
 .un-night.text-ink, .un-night .text-ink { color: rgb(239 234 224); }
 .un-night .border-ink { border-color: rgb(239 234 224 / 0.8); }
-/* dark buttons/chips would vanish on the dark page — give them an edge */
+/* dark buttons/chips would vanish on the dark page - give them an edge */
 .un-night .bg-ink { box-shadow: inset 0 0 0 1px rgb(239 234 224 / 0.35); }
 .un-night .mix-blend-multiply { mix-blend-mode: normal; }
 /* Only during the switch, so hover/transform transitions stay as they are. */
@@ -969,14 +969,14 @@
   transition: background-color 0.6s ease, color 0.6s ease, border-color 0.6s ease !important;
 }
 
-/* Order confirmation: a single, quiet pop on the success mark — skipped entirely for reduced-motion users. */
+/* Order confirmation: a single, quiet pop on the success mark - skipped entirely for reduced-motion users. */
 @media (prefers-reduced-motion: no-preference){
   .un-pop{animation:un-pop .5s cubic-bezier(.2,.9,.3,1.4) both}
   @keyframes un-pop{0%{transform:scale(.6);opacity:0}100%{transform:scale(1);opacity:1}}
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   ORDER PAGES (.uo) — one visual system for the confirmation, details and
+   ORDER PAGES (.uo) - one visual system for the confirmation, details and
    archive screens. Warm-ivory page, softly bordered cards, 12px radius, red
    for brand actions, teal (--gl-save) only for paid/savings. Every colour is a
    --gl-* token. The global hard-edge rule zeroes any "rounded-*" class, so this
@@ -1049,3 +1049,10 @@
 @media(min-width:1024px){.uo-recs{grid-auto-flow:row;grid-auto-columns:auto;grid-template-columns:repeat(6,minmax(0,1fr));overflow:visible}}
 @media(min-width:640px){.uo-card{padding:20px}.uo-h{font-size:17px}.uo-h1{font-size:34px}.uo-circle{width:64px;height:64px;font-size:26px}}
 @media(min-width:1024px){.uo-card{padding:22px 24px}}
+
+/* Theme scrollbar (page + .un-scroll panels): thin, ink thumb, red on hover */
+html,.un-scroll{scrollbar-width:thin;scrollbar-color:rgb(var(--gl-ink)/.45) transparent}
+html::-webkit-scrollbar,.un-scroll::-webkit-scrollbar{width:8px;height:8px}
+html::-webkit-scrollbar-track,.un-scroll::-webkit-scrollbar-track{background:transparent}
+html::-webkit-scrollbar-thumb,.un-scroll::-webkit-scrollbar-thumb{background:rgb(var(--gl-ink)/.35);border-radius:999px;border:2px solid transparent;background-clip:padding-box}
+html::-webkit-scrollbar-thumb:hover,.un-scroll::-webkit-scrollbar-thumb:hover{background:rgb(var(--gl-brand));background-clip:padding-box}

@@ -14,7 +14,7 @@ import NavDropdown from './NavDropdown';
 import MobileNavAccordion from './MobileNavAccordion';
 
 /* Labels the team already uses. Anything new falls back to the admin's own
-   category name — better a plain "Decor" than an invented "Decors". */
+   category name - better a plain "Decor" than an invented "Decors". */
 const MAX_NAV_CATEGORIES = 4; // beyond this the bar wraps; "Shop All" covers the rest
 
 const SignupForm = lazy(() => import('./auth/SignupForm'));
@@ -48,7 +48,7 @@ const NewHeader = () => {
   const [logoutAPI, { isLoading: isLoggingOut }] = useLogoutMutation();
 
   /* The nav used to hard-code Lamps + Pen Stands, which between them cover one
-     product each — while Anime, the largest part of the catalogue, had no way
+     product each - while Anime, the largest part of the catalogue, had no way
      in at all. There is no categories endpoint (products/categories 404s), so
      the categories are read off the catalogue itself, the same way the shop
      page derives its filter chips. Same query args as the home page, so on
@@ -159,7 +159,7 @@ const NewHeader = () => {
             <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="md:hidden w-9 h-9 grid place-items-center" aria-label="Menu">
               <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">{isMenuOpen ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 6h16M4 12h16M4 18h16" />}</svg>
             </button>
-            <Link to="/" className="flex items-center shrink-0" aria-label="UrbanNook — home">
+            <Link to="/" className="flex items-center shrink-0" aria-label="UrbanNook - home">
               <span className="un-wordmark font-archivo font-extrabold text-2xl md:text-3xl tracking-tight uppercase select-none">urbannook</span>
             </Link>
           </div>

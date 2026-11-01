@@ -6,6 +6,7 @@ import {
   useGetFreeShippingOfferQuery,
   useGetGiftWrapOfferQuery,
   useGetCouponOffersQuery,
+  useGetHomeComboOffersQuery,
 } from '../../store/api/userApi';
 import { updateQuantity, removeItem } from '../../store/slices/cartSlice';
 import { resolveVariantTitle } from '../../utils/variantTitle';
@@ -15,13 +16,15 @@ import OfferProgress from '../festive/OfferProgress';
 import GiftWrapOffer, { GiftWrapLineItem } from '../GiftWrapOffer';
 import PromotionBannerList from '../promotions/PromotionBannerList';
 import { groupCartByOffer } from '../../utils/cartOfferGroups';
+import { offerName } from '../../utils/offerName';
+import { useGetProductsQuery } from '../../store/api/productsApi';
 import { requestCheckout } from '../../utils/checkoutIntent';
 import GiftClaimList from '../promotions/GiftClaimList';
 import { CartGiftProgress } from '../offers/CartValueGift';
 import { useCartPromotions } from '../../hooks/useCartPromotions';
 // The old combo-banner/cart-rule discount preview (FreeShippingBanner,
 // useEvaluateCartRulesQuery, useGetAllFreeShippingBannersQuery) was removed
-// entirely 2026-10-09. Replaced 2026-10 by the Promotion V2 Display API —
+// entirely 2026-10-09. Replaced 2026-10 by the Promotion V2 Display API -
 // PromotionBannerList (applied/qualifying offers) + the global
 // PromotionUnlockSheet (add-more-to-unlock, mounted at app root).
 
@@ -35,8 +38,11 @@ const CartDrawer = ({ isOpen, onClose }) => {
   // and then slides in. Driving the classes from isOpen directly mounted it
   // already at translate-x-0, so it popped in with no transition.
   const [shown, setShown] = useState(false);
-  // Public coupons (same cached list as the sale bar / offers page) — drives the coupon badge.
+  // Public coupons (same cached list as the sale bar / offers page) - drives the coupon badge.
   const { data: couponOffersRes } = useGetCouponOffersQuery('guest');
+  const { data: homeCombosRes } = useGetHomeComboOffersQuery();
+  const { data: cartProdRes } = useGetProductsQuery({ page: 1, limit: 24 });
+  const cartNames = new Map((cartProdRes?.data?.listofPublishedProducts || cartProdRes?.data?.products || []).map((x) => [String(x.productId), x.productName]));
   const hasLiveCoupons = (couponOffersRes?.data || []).length > 0;
 
   const { items: cartItems, totalAmount, giftWrap: giftWrapSelected } = useSelector((state) => state.cart);
@@ -53,11 +59,11 @@ const CartDrawer = ({ isOpen, onClose }) => {
 
   const [updateCart] = useUpdateCartMutation();
 
-  // Free-shipping eligibility for the "Shipping" line below — threshold-only
+  // Free-shipping eligibility for the "Shipping" line below - threshold-only
   // for now (see file-header note on the removed discount/banner preview).
   const { data: offerRes } = useGetFreeShippingOfferQuery();
 
-  // Promotion V2 — applied/qualifying offers shown as banners below; shares
+  // Promotion V2 - applied/qualifying offers shown as banners below; shares
   // its subscription with the app-root PromotionUnlockSheet (same
   // placement="cart" args), so opening the drawer never fires a second
   // promotion evaluation.
@@ -163,8 +169,8 @@ const CartDrawer = ({ isOpen, onClose }) => {
   // Promotion V2 returns a server-calculated product discount preview. Gift
   // wrap still adds the Admin-configured amount charged at checkout.
   const giftWrapOffer = giftWrapOfferRes?.data;
-  // Qty auto-scales with total ELIGIBLE UNITS in the cart — 2x the same
-  // eligible product is 2 gift wraps, not 1 — same rule the server applies
+  // Qty auto-scales with total ELIGIBLE UNITS in the cart - 2x the same
+  // eligible product is 2 gift wraps, not 1 - same rule the server applies
   // at checkout.
   const giftWrapIds = giftWrapOffer?.eligibleProductIds;
   const giftWrapEligibleCount = cartItems.reduce((sum, i) => {
@@ -180,8 +186,8 @@ const CartDrawer = ({ isOpen, onClose }) => {
   const promotionSavings = Number(promotionPricing?.savings) || 0;
   const subtotal = (promotionPricing?.discountedSubtotal ?? totalAmount) + giftWrapAmount;
 
-  // Free shipping is a single admin-configured field — cart subtotal vs a ₹
-  // threshold, nothing product-specific — so a plain comparison is the
+  // Free shipping is a single admin-configured field - cart subtotal vs a ₹
+  // threshold, nothing product-specific - so a plain comparison is the
   // correct (and only) eligibility check.
   const offerConfig = offerRes?.data;
   const isFreeShippingEligible =
@@ -275,6 +281,11 @@ const CartDrawer = ({ isOpen, onClose }) => {
                   );
   };
 
+  // Standard offer names (utils/offerName) - matched to the home combo by id.
+  const offerTitle = (promo) => {
+    const c = (homeCombosRes?.data?.combos || []).find((x) => x.id === promo.id);
+    return c ? offerName(c, cartNames) : promo.title;
+  };
   const offerGroups = groupCartByOffer(cartItems, cartPromotions, promotionPricing);
   // Applied offers now live in their groups above; the banner list keeps the
   // ones still in progress ("add 1 more…"), so nothing is shown twice.
@@ -341,7 +352,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
               </div>
               <div>
                 <h3 className="text-lg font-extrabold mb-1">Your cart is empty</h3>
-                <p className="text-sm text-muted max-w-[240px] mx-auto leading-relaxed">Add a piece you love — it'll show up here.</p>
+                <p className="text-sm text-muted max-w-[240px] mx-auto leading-relaxed">Add a piece you love - it'll show up here.</p>
               </div>
               <button
                 onClick={() => { onClose(); navigate('/products'); }}
@@ -352,29 +363,27 @@ const CartDrawer = ({ isOpen, onClose }) => {
             </div>
           ) : (
             <>
-              {/* Free-shipping threshold nudge — hidden unless admin's promotion is on */}
+              {/* Free-shipping threshold nudge - hidden unless admin's promotion is on */}
               <OfferProgress location="cart" className="mb-3" fallback={<FreeShippingStrip cartTotal={subtotal} variant="compact" className="mb-3" />} />
-              {/* Other active Promotion V2 offers — renders nothing when none apply */}
+              {/* Other active Promotion V2 offers - renders nothing when none apply */}
               <CartGiftProgress promotions={cartPromotions} className="mb-3" />
               <PromotionBannerList promotions={pendingPromotions} pricing={promotionPricing} className="mb-3" />
-              {/* free gifts: claim card, then a FREE GIFT line once claimed — never added automatically */}
+              {/* free gifts: claim card, then a FREE GIFT line once claimed - never added automatically */}
               <GiftClaimList className="mb-3" />
               <div className="divide-y divide-hair">
                 {/* Offers grouped with what unlocked them: "because you added → you get" */}
                 {offerGroups.groups.map(({ promo, savings, triggers, rewards }) => (
                   <section key={promo.id} className="mb-3 overflow-hidden rounded-xl border border-ink/15 bg-white shadow-sm" aria-label={`Offer: ${promo.title}`}>
                     {/* theme colours: ink header, red check + accent */}
-                    <header className="flex items-start gap-2.5 bg-ink px-3 py-2.5 text-paper">
-                      <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-brand text-[11px] font-bold text-white" aria-hidden="true">✓</span>
-                      <div className="min-w-0 flex-1">
-                        <p className="gl-lbl text-[9px] text-paper/70">Offer applied</p>
-                        <p className="text-[13.5px] font-extrabold leading-snug">{promo.title}</p>
-                      </div>
+                    {/* one line: label + standard offer name (wraps, never truncated) */}
+                    <header className="flex items-start gap-2 bg-ink px-3 py-2 text-paper">
+                      <span className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full bg-brand text-[9px] font-bold text-white" aria-hidden="true">✓</span>
+                      <p className="min-w-0 flex-1 text-[12.5px] leading-snug"><span className="font-semibold text-paper/70">Offer applied · </span><span className="font-extrabold">{offerTitle(promo)}</span></p>
                     </header>
                     {/* the saving on its own strip, so it reads as the payoff */}
                     {savings > 0 && (
-                      <p className="flex items-center gap-2 border-b border-brand/15 bg-brand/[0.07] px-3 py-2 text-[12.5px] font-bold text-brand">
-                        <span aria-hidden="true">🎉</span> You saved ₹{savings.toLocaleString('en-IN')} with this offer
+                      <p className="flex items-center gap-2 border-b border-brand/15 bg-brand/[0.07] px-3 py-1.5 text-[12px] font-bold text-brand">
+                        You saved ₹{savings.toLocaleString('en-IN')} with this offer
                       </p>
                     )}
                     <div className="px-3">
@@ -400,7 +409,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
         {/* --- FOOTER (CHECKOUT) --- */}
         {cartItems?.length > 0 && (
           <div className="px-4 pt-2.5 pb-3 sm:px-5 sm:pt-3 sm:pb-4 border-t border-hair shrink-0 shadow-[0_-8px_20px_-14px_rgba(0,0,0,0.25)]">
-            {/* Gift wrap — renders nothing unless the admin's turned the
+            {/* Gift wrap - renders nothing unless the admin's turned the
                 seasonal offer on (Admin -> Offers -> Gift Wrap). */}
             <div className="border-b border-hair mb-2 sm:mb-3 empty:hidden">
               <GiftWrapOffer />
@@ -408,30 +417,21 @@ const CartDrawer = ({ isOpen, onClose }) => {
 
             {/* Subtotal / shipping / total folded into one block: the total
                 is what matters, the breakdown sits on one line under it. */}
-            <div className="flex items-end justify-between gap-3 mb-3 sm:mb-4">
-              <div className="min-w-0">
-                <p className="text-sm font-bold">Total</p>
-                <p className="text-[11px] text-muted mt-0.5">
-                  Subtotal ₹{(Number(subtotal) || 0).toLocaleString('en-IN')}
-                  <span className="mx-1.5 text-faint">·</span>
-                  Shipping{' '}
-                  {isFreeShippingEligible ? (
-                    <span className="font-bold text-save">Free</span>
-                  ) : (
-                    <span>at checkout</span>
-                  )}
-                </p>
-                {promotionSavings > 0 && (
-                  <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px]">
-                    <span className="text-muted">Original <span className="line-through">₹{((promotionPricing?.subtotal ?? totalAmount) + giftWrapAmount).toLocaleString('en-IN')}</span></span>
-                    <span className="font-extrabold text-save">You save ₹{promotionSavings.toLocaleString('en-IN')}</span>
-                  </p>
-                )}
+            {/* Total, its amount right under it, then the breakdown */}
+            <div className="mb-3 sm:mb-4">
+              <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">Total</p>
+              <div className="mt-0.5 flex items-baseline justify-between gap-3">
+                <span className="text-2xl font-extrabold tabular-nums text-ink">₹{(Number(subtotal) || 0).toLocaleString('en-IN')}</span>
+                {promotionSavings > 0 && <span className="rounded-full bg-save/10 px-2.5 py-1 text-[12px] font-extrabold text-save">You save ₹{promotionSavings.toLocaleString('en-IN')}</span>}
               </div>
-              <span className="text-xl font-extrabold tabular-nums">₹{(Number(subtotal) || 0).toLocaleString('en-IN')}</span>
+              <div className="mt-1.5 space-y-0.5 text-[12px] text-muted">
+                <p className="flex justify-between"><span>Subtotal</span><span className="tabular-nums">₹{(Number(subtotal) || 0).toLocaleString('en-IN')}</span></p>
+                {promotionSavings > 0 && <p className="flex justify-between"><span>Original price</span><span className="tabular-nums line-through">₹{((promotionPricing?.subtotal ?? totalAmount) + giftWrapAmount).toLocaleString('en-IN')}</span></p>}
+                <p className="flex justify-between"><span>Shipping</span>{isFreeShippingEligible ? <span className="font-bold text-save">Free</span> : <span>Calculated at checkout</span>}</p>
+              </div>
             </div>
 
-            {/* "Avail Coupons at Checkout" badge on the button's shoulder —
+            {/* "Avail Coupons at Checkout" badge on the button's shoulder -
                 only while at least one public coupon is live (same rule as
                 checkout's coupon entry: no coupon, no promise of one). */}
             <div className="relative">
@@ -466,7 +466,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
                   <i className="fa-solid fa-arrow-right-long"></i>
               </button>
             </div>
-            {/* Trust line — secure checkout + partial COD on one row */}
+            {/* Trust line - secure checkout + partial COD on one row */}
             <div className="mt-2.5 flex flex-wrap justify-center items-center gap-x-3 gap-y-1 text-[10px] text-muted font-semibold">
               <span className="flex items-center gap-1 uppercase tracking-wider text-faint font-bold">
                 <i className="fa-solid fa-lock" /> Secure Checkout
@@ -475,7 +475,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
               <span className="flex items-center gap-1">
                 <i className="fa-solid fa-hand-holding-dollar text-brand" />
                 <span className="sm:hidden">Partial COD available</span>
-                <span className="hidden sm:inline">Partial COD — small advance, rest at your door</span>
+                <span className="hidden sm:inline">Partial COD - small advance, rest at your door</span>
               </span>
             </div>
           </div>

@@ -9,12 +9,13 @@ import { useGetHomeComboOffersQuery } from '../../store/api/userApi';
 import { useGetProductsQuery } from '../../store/api/productsApi';
 import { useSiteCampaign, THEME_COPY } from '../../hooks/useSiteCampaign';
 import { OFFER_SORTS, sortOffers } from '../../utils/offerSort';
+import { offerName } from '../../utils/offerName';
 
 /**
  * Every live offer in one place. Each card opens the same chooser the home
  * page uses (ComboBuilderSheet: pick the designs the offer allows); confirming
  * adds them to the cart through the same logic and goes straight on to
- * checkout, where the usual payment options appear. With 10–15 offers live,
+ * checkout, where the usual payment options appear. With 10-15 offers live,
  * this is where a shopper can actually compare them.
  */
 const OffersPage = () => {
@@ -37,6 +38,7 @@ const OffersPage = () => {
     const list = prodRes?.data?.listofPublishedProducts || prodRes?.data?.products || [];
     return new Map(list.map((p) => [p.productId, p]));
   }, [prodRes]);
+  const names = useMemo(() => new Map([...productsById].map(([id, p]) => [id, p.productName])), [productsById]);
   const combos = useMemo(() => sortOffers(data?.data?.combos || [], sort, productsById), [data, sort, productsById]);
 
   const festive = active && can('sectionAccents');
@@ -51,7 +53,7 @@ const OffersPage = () => {
         description="All live UrbanNook offers in one place: combo deals, free stands and gifts, and coupons on 3D-printed lamps, anime katanas and décor."
       />
 
-      <div className="max-w-[1280px] mx-auto px-5 pt-10">
+      <div className="max-w-[1280px] mx-auto px-5 pt-14 md:pt-12">
         <p className="gl-lbl text-[11px] text-brand">{festive ? copy.eyebrow || 'Festive offers' : 'Live offers'}</p>
         <h1 className="mt-1 text-4xl md:text-5xl font-extrabold tracking-tight">{festive ? copy.offersTitle || 'Offers' : 'Offers & Combos'}</h1>
         <p className="text-muted mt-2 max-w-xl">Pick an offer, choose your designs, and checkout. The discount is applied for you, no code needed.</p>
@@ -74,7 +76,7 @@ const OffersPage = () => {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
             {combos.map((c) => (
-              <OfferCard key={c.id} combo={c} festive={festive} priceLabel={copy.priceLabel} onAdded={goCheckout} />
+              <OfferCard key={c.id} combo={{ ...c, title: offerName(c, names) }} festive={festive} priceLabel={copy.priceLabel} onAdded={goCheckout} />
             ))}
           </div>
         )}

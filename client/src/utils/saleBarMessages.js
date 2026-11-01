@@ -3,6 +3,8 @@
 // (GET promotions/display/home) + the public coupon offers (POST coupon/offers).
 // Nothing is written here: every word comes from admin-configured records.
 
+import { offerName } from './offerName';
+
 const MAX_MESSAGES = 10;
 
 // A label still carrying a template slot ("Combo Savings {save}") is only
@@ -21,12 +23,11 @@ export const comboHref = (c) => {
   return null;
 };
 
-export const comboMessage = (c) => {
-  const title = clean(c?.title);
+export const comboMessage = (c, nameById) => {
+  const title = clean(offerName(c, nameById)) || clean(c?.title);
   const to = comboHref(c);
   if (!title || !to) return null;
-  const save = clean(c?.savingsLabel) || clean(c?.badgeLabel);
-  return { key: `combo-${c.id}`, text: save ? `${title} · ${save}` : title, to };
+  return { key: `combo-${c.id}`, text: title, to };
 };
 
 export const couponMessage = (o) => {
@@ -36,11 +37,11 @@ export const couponMessage = (o) => {
 
 // Offers lead (what's in it for the shopper), store promises are woven in
 // after every couple of offers (why buy here), admin messages win outright.
-export const buildSaleBarMessages = ({ adminMessages = [], saleTitle = '', combos = [], coupons = [], promises = [] }) => {
+export const buildSaleBarMessages = ({ adminMessages = [], saleTitle = '', combos = [], coupons = [], promises = [], nameById } = {}) => {
   if (adminMessages.length) return adminMessages.map((m) => ({ key: m.id, text: m.text, to: m.linkUrl }));
   const offers = [
     ...(saleTitle ? [{ key: 'theme', text: saleTitle, to: '/offers' }] : []),
-    ...combos.map(comboMessage),
+    ...combos.map((c) => comboMessage(c, nameById)),
     ...coupons.filter((o) => !o?.membersOnly).map(couponMessage),
   ].filter(Boolean);
   const out = [];

@@ -111,7 +111,7 @@ const ComboBuilderSheet = ({ combo, onClose, mode = 'builder', cartItems = [], o
     setVisible(false);
     setTimeout(onClose, 250);
   };
-  // closing a reminder is a "no thanks" — never forced
+  // closing a reminder is a "no thanks" - never forced
   const dismiss = () => {
     setVisible(false);
     setTimeout(() => (onDismiss ? onDismiss() : onClose()), 250);
@@ -284,8 +284,8 @@ const ComboBuilderSheet = ({ combo, onClose, mode = 'builder', cartItems = [], o
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="un-bs-glass inline-flex items-center gap-1.5 px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.16em] text-star"><span aria-hidden="true">✦</span> {reminder ? 'Offer reminder' : festive ? 'Festive offer' : 'Combo offer'}</p>
-              <h3 className={`mt-1.5 font-archivo font-bold leading-tight tracking-tight text-paper ${reminder ? 'text-[18px]' : 'truncate text-[20px]'}`}>{reminder ? 'Add these products to unlock your offer' : combo.title}</h3>
-              {(reminder || current?.description) && <p className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-paper/65">{reminder ? `${combo.title}${current?.description ? ` — ${current.description}` : ''}` : current?.description}</p>}
+              <h3 className={`mt-1.5 font-archivo font-bold leading-tight tracking-tight text-paper ${reminder ? 'text-[18px]' : 'text-[19px]'}`}>{reminder ? 'Add these products to unlock your offer' : combo.title}</h3>
+              {(reminder || current?.description) && <p className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-paper/65">{reminder ? `${combo.title}${current?.description ? ` - ${current.description}` : ''}` : current?.description}</p>}
             </div>
             <button type="button" onClick={closeAction} aria-label="Close" className="un-bs-glass grid h-9 w-9 shrink-0 place-items-center text-xl leading-none text-paper/80 transition-colors hover:text-star">×</button>
           </div>
@@ -367,7 +367,7 @@ const ComboBuilderSheet = ({ combo, onClose, mode = 'builder', cartItems = [], o
                 </div>
                 {showRewardTile && (
                   <p className="mt-2 text-center text-[10.5px] text-paper/55" aria-live="polite">
-                    {unlocked ? 'Unlocked — added with your combo' : complete ? 'Checking this combination…' : 'Complete your picks to unlock'}
+                    {unlocked ? 'Unlocked - added with your combo' : complete ? 'Checking this combination…' : 'Complete your picks to unlock'}
                   </p>
                 )}
               </div>
@@ -401,7 +401,7 @@ const ComboBuilderSheet = ({ combo, onClose, mode = 'builder', cartItems = [], o
                   {reward && reward.kind === 'free' && (
                     <div className="flex justify-between text-paper/60">
                       <dt className="truncate pr-2">{reward.name}</dt>
-                      <dd className="shrink-0 font-bold text-star">{unlocked ? <>FREE {typeof reward.worth === 'number' ? <span className="font-normal text-paper/45 line-through">{inr(reward.worth)}</span> : reward.worth ? <span className="font-normal text-paper/70">({reward.worth})</span> : null}</> : '—'}</dd>
+                      <dd className="shrink-0 font-bold text-star">{unlocked ? <>FREE {typeof reward.worth === 'number' ? <span className="font-normal text-paper/45 line-through">{inr(reward.worth)}</span> : reward.worth ? <span className="font-normal text-paper/70">({reward.worth})</span> : null}</> : '-'}</dd>
                     </div>
                   )}
                   {reward && reward.kind === 'shipping' && unlocked && <div className="flex justify-between text-paper/60"><dt>Shipping</dt><dd className="font-bold text-star">FREE</dd></div>}
@@ -428,7 +428,7 @@ const ComboBuilderSheet = ({ combo, onClose, mode = 'builder', cartItems = [], o
                 {busy ? 'Adding…' : reminder ? 'Add & Unlock Offer' : 'Add Selected Combo to Cart'}
               </button>
               {reminder && (
-                <button type="button" onClick={dismiss} className="mt-2 block w-full py-1 text-center text-[12.5px] text-paper/70 underline underline-offset-2 hover:text-paper">No thanks — continue without offer</button>
+                <button type="button" onClick={dismiss} className="mt-2 block w-full py-1 text-center text-[12.5px] text-paper/70 underline underline-offset-2 hover:text-paper">No thanks - continue without offer</button>
               )}
             </footer>
           </>
