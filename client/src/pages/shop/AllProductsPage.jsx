@@ -9,7 +9,7 @@ import { shopPills } from '../../utils/shopPills';
 import { trackViewItemList } from '../../utils/analytics';
 import RevealCard from '../../component/RevealCard';
 import ScrollRow from '../../component/ScrollRow';
-import SaleTag from '../../component/festive/SaleTag';
+import SaleBanner from '../../component/festive/SaleBanner';
 import { useGetHomeComboOffersQuery } from '../../store/api/userApi';
 import { buildOfferLines } from '../../utils/productOfferLines';
 import { ShopFilterSidebar, ShopFilterButton, ShopSort, ActiveFilterChips } from '../../component/ShopFilters';
@@ -81,7 +81,7 @@ const AllProductsPage = () => {
           <Link to="/" className="hover:text-brand">Home</Link> / <span className="text-ink">Shop</span>
         </nav>
         {/* the sale, announced once per page (no longer repeated on every card) */}
-        <div className="mb-3 flex justify-center"><SaleTag /></div>
+        <SaleBanner className="mb-5" />
         <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">{activeTag === 'best_seller' ? 'Bestsellers' : 'Shop All'}</h1>
         <p className="text-muted mt-2 truncate">Katanas, lamps &amp; décor. Made in India.</p>
 
