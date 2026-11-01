@@ -22,17 +22,21 @@ export function useCartPromotions(placement = "cart", couponCode = null, addedIt
   const payloadItems = buildPromotionCartItems(items);
 
   const skip = !enabled || (payloadItems.length === 0 && !previewPromotionIds?.length);
-  const { currentData, isFetching } = useGetCartPromotionsQuery(
+  const { currentData, data, isFetching } = useGetCartPromotionsQuery(
     { items: payloadItems, subtotal: Number(totalAmount) || 0, placement, couponCode: couponCode || undefined, addedItem: addedItem || undefined, previewPromotionIds: previewPromotionIds || undefined, claimedGifts },
     { skip },
   );
 
+  // While a changed cart is re-priced, keep showing the last answer (data) instead of
+  // an empty list: popups and banners no longer blink away on every +/- click.
+  // `ready` below still waits for the answer for THIS cart.
+  const shown = currentData || (skip ? null : data);
   return {
-    promotions: currentData?.data?.promotions || [],
-    pricing: currentData?.data?.pricing || null,
+    promotions: shown?.data?.promotions || [],
+    pricing: shown?.data?.pricing || null,
     // explicit free-gift claiming: what the cart could claim / has claimed, and claims the server rejected
-    gifts: currentData?.data?.gifts || [],
-    invalidGiftClaims: currentData?.data?.invalidGiftClaims || [],
+    gifts: shown?.data?.gifts || [],
+    invalidGiftClaims: shown?.data?.invalidGiftClaims || [],
     isFetching,
     // true once the answer for the current cart is in (or there is nothing to ask)
     ready: (skip && enabled) || (Boolean(currentData) && !isFetching),

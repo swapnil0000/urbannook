@@ -13,6 +13,7 @@ import {
   promotionCouponGateOk,
   applyBestPromotionDiscount,
   getDiscountCandidatesForItem,
+  resolveTierValue,
 } from "../utils/promotionEngine.util.js";
 import { buildPromotionDisplayList } from "../services/promotionPresentation.service.js";
 import { buildPromotionPricePreview } from "../services/promotionPricePreview.service.js";
@@ -338,6 +339,10 @@ function cardWithRewardPrice(card, reward) {
     ...card,
     benefitText: benefitForReward(reward),
     ...(Number.isFinite(offerPrice) && offerPrice < card.price ? { offerPrice } : {}),
+    // limits the cart needs to offer only switches that stay discounted (Triple = 3, max 2 Doubles)
+    ...(reward.unitWeight > 1 ? { unitWeight: reward.unitWeight } : {}),
+    ...(reward.maxUnits != null ? { maxUnits: reward.maxUnits } : {}),
+    ...(reward.limitWhen?.variantSku ? { limitWhen: { variantSku: reward.limitWhen.variantSku, maxUnits: reward.limitWhen.maxUnits } } : {}),
   };
 }
 
@@ -351,14 +356,29 @@ function rewardTargetIsInCart(reward, ctx) {
 // A matched condition can still need the customer to add the product that
 // receives the discount. Return only explicit admin-selected reward targets;
 // broad category/all scopes have no finite set to offer in the sheet.
-async function resolveMissingRewardTargets(promotion, ctx) {
+async function resolveMissingRewardTargets(promotion, ctx, budgetsLeft = null) {
+  const id = String(promotion._id);
+  const left = budgetsLeft?.[id];
+  const used = (sku) => budgetsLeft?.[`${id}|${sku || ""}#used`] || 0;
+  // limitWhen (with any Double, at most 1 Single): never suggest a unit that would not be discounted
+  const comboAllows = (target) => {
+    const own = target.reward.limitWhen;
+    if (own?.variantSku && used(own.variantSku) > 0 && used(target.variantSku) >= Number(own.maxUnits || 0)) return false;
+    return !(promotion.rewards || []).some((r) => r.limitWhen?.variantSku && r.limitWhen.variantSku === target.variantSku
+      && used(r.targetVariantSku) > Number(r.limitWhen.maxUnits || 0));
+  };
+  // priced at the tier this cart has reached (e.g. Triple stand free once 3 katanas are in)
   const discountRewards = (promotion.rewards || [])
-    .filter((reward) => ["percent_off_product", "flat_off_product", "discounted_product"].includes(reward.type));
+    .filter((reward) => ["percent_off_product", "flat_off_product", "discounted_product"].includes(reward.type))
+    .map((reward) => (reward.tiers?.length ? { ...reward, value: resolveTierValue(reward, promotion.conditionTree, ctx) } : reward));
   const targets = discountRewards
     .flatMap((reward) => reward.targetProductId
       ? [{ productId: reward.targetProductId, variantSku: reward.targetVariantSku || "", reward }]
       : reward.targetScope?.field === "productList" ? (reward.targetScope.items || []).map((item) => ({ ...item, reward })) : [])
-    .filter((target) => !rewardTargetIsInCart(target, ctx));
+    // with budget left, an in-cart target can take one more unit - if its own weight and limit allow it
+    .filter((target) => (left >= 1
+      ? Math.max(1, Number(target.reward.unitWeight) || 1) <= left && (budgetsLeft[`${id}|${target.variantSku || ""}`] ?? 1) >= 1 && comboAllows(target)
+      : !rewardTargetIsInCart(target, ctx)));
   const products = targets.length ? await Product.find(
     { productId: { $in: [...new Set(targets.map((target) => String(target.productId)))] }, productStatus: "in_stock", isPublished: { $ne: false } },
     PRODUCT_RECOMMENDATION_PROJECTION,
@@ -457,7 +477,7 @@ async function resolveRewardCard(promotion) {
 // that progressText already names a concrete next step) - skips everything
 // else so an already-qualifying or structurally-unreachable promotion never
 // pays for extra product lookups.
-async function attachRecommendations(display, promotionsById, ctx) {
+async function attachRecommendations(display, promotionsById, ctx, budgetsLeft = null) {
   await Promise.all(
     display.map(async (entry) => {
       if (entry.qualifying || !entry.progressText || !entry.fullyFunctional) {
@@ -466,7 +486,7 @@ async function attachRecommendations(display, promotionsById, ctx) {
         if (entry.rewardTargetPending && entry.fullyFunctional) {
           const promotion = promotionsById.get(entry.id);
           if (promotion) {
-            entry.recommendedProducts = await resolveMissingRewardTargets(promotion, ctx);
+            entry.recommendedProducts = await resolveMissingRewardTargets(promotion, ctx, budgetsLeft);
           }
         }
         return;
@@ -595,12 +615,38 @@ const getCartDisplayController = asyncHandler(async (req, res) => {
     // Which products' presence unlocks this offer (from its condition tree),
     // so the cart can show "because you added X, you get Y". Display only.
     entry.triggerProductIds = promotion ? conditionProductIds(promotion, true) : [];
+    // how many times it can repeat per order (e.g. stand offer: 3) - the cart stops saying "get one more" there
+    entry.maxApplications = promotion?.maxApplications ?? null;
+  }
+  // A qualifying discount offer whose reward units were all taken by another
+  // group's offer (e.g. the only stand in the cart went to the LED offer) gave
+  // nothing yet: show it as "pick your reward" instead of "applied".
+  for (const entry of display) {
+    const promotion = relevant.find((p) => String(p._id) === entry.id);
+    const discountOnly = promotion && (promotion.rewards || []).length > 0
+      && promotion.rewards.every((r) => ["percent_off_product", "flat_off_product", "discounted_product"].includes(r.type));
+    if (discountOnly && entry.qualifying && entry.applied && !(pricing.savingsByPromotion?.[entry.id] > 0)) {
+      entry.applied = false;
+      entry.rewardTargetPending = true;
+    } else if (discountOnly && entry.applied && (pricing.budgetsLeft?.[entry.id] || 0) >= 1) {
+      // applied, but the cart earns more rewards than it holds (2 katanas, 1 stand): offer one more
+      entry.rewardTargetPending = true;
+      entry.rewardsLeft = pricing.budgetsLeft[entry.id];
+    }
   }
   // Recommendations power the "add more to unlock" bottom sheet - only
   // meaningful for the cart surface (checkout display stays text-only; by
   // then the customer is mid-payment-flow, not browsing to add products).
   const promotionsById = new Map(relevant.map((p) => [String(p._id), p]));
-  await attachRecommendations(display, promotionsById, ctx);
+  await attachRecommendations(display, promotionsById, ctx, pricing.budgetsLeft);
+  // Applied stand-type offers also list every reward option with its offer price, so the
+  // shopper can switch what they picked (Single -> Double) from the cart or checkout.
+  await Promise.all(display.filter((e) => e.applied).map(async (entry) => {
+    const promotion = promotionsById.get(entry.id);
+    const discountOnly = promotion && (promotion.rewards || []).length > 0
+      && promotion.rewards.every((r) => ["percent_off_product", "flat_off_product", "discounted_product"].includes(r.type));
+    if (discountOnly) entry.rewardOptions = await resolveMissingRewardTargets(promotion, ctx, { [entry.id]: Number.MAX_SAFE_INTEGER });
+  }));
   // "2 of 3 Katanas" - the noun for promotions whose progress is shown on its own
   // (the Phuljadi asks for them by id); one small lookup, only for those.
   const nounIds = display.filter((e) => previewIds.has(e.id) && e.progress && e.progress.mode !== "amount").map((e) => e.id);

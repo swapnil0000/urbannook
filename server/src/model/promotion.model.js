@@ -111,6 +111,15 @@ const rewardSchema = new mongoose.Schema(
     // comment on `promotionRepeatCount`/the reward-building loop in
     // promotionEngine.util.js for the cap calculation this drives.
     discountAllUnits: { type: Boolean, default: false },
+    // How much of the promotion's shared unit budget ONE unit of this reward
+    // uses (e.g. a Triple stand = 3 katanas' worth). Default 1 = old behaviour.
+    unitWeight: { type: Number, min: 1, default: 1 },
+    // Most units this reward line may discount per order (e.g. at most 2
+    // Double stands). Absent = only the promotion's shared budget limits it.
+    maxUnits: { type: Number, min: 1 },
+    // While the promotion has discounted `variantSku`, this reward line discounts at most
+    // `maxUnits` (stand offers: with any Double, at most 1 Single). Absent = no such rule.
+    limitWhen: { variantSku: { type: String }, maxUnits: { type: Number, min: 0 } },
     // free_product only: the customer picks which variant of targetProductId they get (every in-stock variant is offered)
     chooseVariant: { type: Boolean, default: false },
   },

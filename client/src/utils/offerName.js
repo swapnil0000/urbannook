@@ -38,5 +38,6 @@ export const offerName = (c, nameById = new Map()) => {
   if (!tn || !rn) return c?.title || benefit;
   const buy = `Buy ${many(trig.length, tn)}`;
   if (free) return `${buy}, get ${many(1, rn)} FREE`;
-  return amt ? `${buy}, get ${amt} off ${many(1, rn)}` : `${buy} + ${rn}`;
+  // no amount to show: the admin title says what the reward is (never a bare "Buy X + Y")
+  return amt ? `${buy}, get ${amt} off ${many(1, rn)}` : (c?.title || `${buy} + ${rn}`);
 };

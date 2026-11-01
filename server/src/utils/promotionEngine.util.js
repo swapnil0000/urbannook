@@ -351,15 +351,22 @@ export function evaluateConditionTree(node, ctx) {
 // Same rounding convention as cartRule.util.js's applyBestDiscount — kept as
 // an independent copy (not imported) so this file never depends on the
 // legacy util. See file header.
-export const applyBestPromotionDiscount = (unitPrice, candidates = []) => {
-  if (!candidates.length) return unitPrice;
+// Best discounted unit price before rounding (e.g. 50% of 399 = 199.5).
+export const exactBestPromotionPrice = (unitPrice, candidates = []) => {
   const price = Number(unitPrice) || 0;
+  if (!candidates.length) return price;
   const results = candidates.map((c) => {
     if (c.type === "percent_off_product") return price * (1 - Number(c.value) / 100);
     if (c.type === "flat_off_product" || c.type === "discounted_product") return price - Number(c.value);
     return price;
   });
-  return Math.round(Math.max(Math.min(...results), 0));
+  return Math.max(Math.min(...results), 0);
+};
+
+export const applyBestPromotionDiscount = (unitPrice, candidates = []) => {
+  if (!candidates.length) return unitPrice;
+  // fractions round in the customer's favour: 50% of 399 = 199.5 -> 199
+  return Math.floor(exactBestPromotionPrice(unitPrice, candidates) + 1e-9);
 };
 
 // ── Shared cross-line budget tracking (moved from the now-deleted
@@ -381,11 +388,16 @@ export const applyBestPromotionDiscount = (unitPrice, candidates = []) => {
  * (double stand manually added at 50% off, single stand then auto-added
  * for free on top, same Katana "paying" for both).
  */
+// Budget key for a reward line's own maxUnits limit (rule + variant).
+const lineKey = (c) => `${c.ruleId}|${c.variantSku || ""}`;
+const weightOf = (c) => Math.max(1, Number(c.unitWeight) || 1);
+
 export function createRuleBudgetTracker(discountCandidatesByProduct) {
   const budgets = new Map();
   for (const candidates of discountCandidatesByProduct.values()) {
     for (const c of candidates) {
       if (c.ruleId && !budgets.has(c.ruleId)) budgets.set(c.ruleId, c.cap);
+      if (c.ruleId && c.maxUnits != null && !budgets.has(lineKey(c))) budgets.set(lineKey(c), c.maxUnits);
     }
   }
   return budgets;
@@ -404,7 +416,15 @@ export function withRuleBudget(candidates, budgets) {
     .map((c) => {
       if (!c.ruleId) return c;
       const remaining = budgets.has(c.ruleId) ? budgets.get(c.ruleId) : c.cap;
-      return remaining > 0 ? { ...c, cap: Math.min(c.cap, remaining) } : null;
+      // unitWeight: one unit uses that much of the shared budget (Triple = 3)
+      let cap = Math.min(c.cap, Math.floor(remaining / weightOf(c)));
+      if (c.maxUnits != null) cap = Math.min(cap, budgets.has(lineKey(c)) ? budgets.get(lineKey(c)) : c.maxUnits);
+      // limitWhen: once the rule has discounted the named variant, this one is capped
+      // (stand offers: with any Double, at most 1 Single - so 2D+1S / 1D+1S, never 1D+2S)
+      if (c.limitWhen?.variantSku && (budgets.get(`${c.ruleId}|${c.limitWhen.variantSku}#used`) || 0) > 0) {
+        cap = Math.min(cap, Number(c.limitWhen.maxUnits || 0) - (budgets.get(`${lineKey(c)}#used`) || 0));
+      }
+      return cap > 0 ? { ...c, cap } : null;
     })
     .filter(Boolean);
 }
@@ -423,7 +443,9 @@ export function withRuleBudget(candidates, budgets) {
 export function spendRuleBudget(candidates, budgets, unitsUsed) {
   for (const c of candidates) {
     if (!c.ruleId || !budgets.has(c.ruleId)) continue;
-    budgets.set(c.ruleId, Math.max(0, budgets.get(c.ruleId) - unitsUsed));
+    budgets.set(c.ruleId, Math.max(0, budgets.get(c.ruleId) - unitsUsed * weightOf(c)));
+    if (c.maxUnits != null && budgets.has(lineKey(c))) budgets.set(lineKey(c), Math.max(0, budgets.get(lineKey(c)) - unitsUsed));
+    budgets.set(`${lineKey(c)}#used`, (budgets.get(`${lineKey(c)}#used`) || 0) + unitsUsed);
   }
 }
 
@@ -435,6 +457,47 @@ export function spendRuleBudget(candidates, budgets, unitsUsed) {
  * candidates already narrowed by withRuleBudget, so this naturally reflects
  * each rule's remaining shared budget too.
  */
+/**
+ * Splits one cart line (unitPrice x quantity) across the promotions whose
+ * candidates touch it: the best-priced rule takes its units first (up to its
+ * cap, already clamped by withRuleBudget), the next rule takes from what is
+ * left, and so on. With a single rule this is exactly the old behaviour
+ * (one segment: best price, min(quantity, cap) units).
+ * Returns [{ ruleId, unitPrice, units, candidates }] - only discounting segments.
+ */
+export function allocateLineSegments(unitPrice, quantity, candidates = [], budgets = null) {
+  const price = Number(unitPrice) || 0;
+  const byRule = new Map();
+  for (const c of candidates) {
+    const k = c.ruleId || "";
+    if (!byRule.has(k)) byRule.set(k, []);
+    byRule.get(k).push(c);
+  }
+  const rules = [...byRule.entries()]
+    .map(([ruleId, cands]) => ({ ruleId: ruleId || null, candidates: cands, unitPrice: applyBestPromotionDiscount(price, cands), cap: applicableCap(cands) }))
+    .filter((r) => r.unitPrice < price)
+    .sort((a, b) => a.unitPrice - b.unitPrice);
+  let left = Number(quantity) || 0;
+  const segments = [];
+  for (const r of rules) {
+    if (left <= 0) break;
+    const units = Math.min(left, r.cap);
+    if (units <= 0) continue;
+    left -= units;
+    segments.push({ ruleId: r.ruleId, unitPrice: r.unitPrice, units, candidates: r.candidates });
+  }
+  return segments;
+}
+
+/**
+ * Order in which cart lines spend shared promotion budgets: most expensive
+ * unit first, so the customer gets the biggest saving the rules allow and
+ * the same cart always gets the same price, whatever order items were added.
+ */
+export function budgetSpendOrder(items, priceOf) {
+  return items.map((item, index) => ({ item, index })).sort((a, b) => (Number(priceOf(b.item)) || 0) - (Number(priceOf(a.item)) || 0) || a.index - b.index);
+}
+
 export function applicableCap(candidates) {
   return Math.max(1, ...candidates.map((c) => c.cap ?? 1));
 }
@@ -607,7 +670,7 @@ function promotionTriggerQuantity(node, ctx) {
  * is absent/empty/none crossed. Backward compatible by construction — a
  * reward with no `tiers` always returns its own `value` unchanged.
  */
-function resolveTierValue(reward, conditionTree, ctx) {
+export function resolveTierValue(reward, conditionTree, ctx) {
   // Admin validation always requires a real `value` even when tiers is set
   // (it's the documented fallback), so this path is normally unreachable —
   // guarded anyway so a malformed/API-written promotion degrades to "no
@@ -756,10 +819,19 @@ function resolveProductWinners(discountCandidatesByProduct, freeGifts, promoMeta
     winnerByProduct.set(productId, winnerId);
   }
 
+  // Exception (2026-11-01): promotions in DIFFERENT named groups (e.g.
+  // "led-stand" and "wooden-stand") may share a product - each discounts
+  // its own units only, up to its own cap/budget (allocateLineSegments).
+  // Ungrouped or same-group promotions keep the single-winner rule above.
   for (const [productId, candidates] of discountCandidatesByProduct.entries()) {
     const winnerId = winnerByProduct.get(productId);
     if (winnerId == null || candidates.length <= 1) continue;
-    discountCandidatesByProduct.set(productId, candidates.filter((c) => c.ruleId === winnerId));
+    const winnerGroup = (promoMetaById.get(winnerId) || fallbackMeta).group || "";
+    discountCandidatesByProduct.set(productId, candidates.filter((c) => {
+      if (c.ruleId === winnerId) return true;
+      const g = (promoMetaById.get(c.ruleId) || fallbackMeta).group || "";
+      return Boolean(winnerGroup && g && g !== winnerGroup);
+    }));
   }
 
   return freeGifts.filter((gift) => {
@@ -784,7 +856,7 @@ export const evaluatePromotions = (cartItems, ctx, activePromotions) => {
   const storeCreditGrants = [];
   let freeShipping = false;
   const promoMetaById = new Map(
-    matched.map((p) => [String(p._id), { priority: p.priority || 0, stackable: p.stackable !== false, createdAt: p.createdAt || null }]),
+    matched.map((p) => [String(p._id), { priority: p.priority || 0, stackable: p.stackable !== false, createdAt: p.createdAt || null, group: p.promotionGroup || "" }]),
   );
 
   for (const promo of matched) {
@@ -844,7 +916,7 @@ export const evaluatePromotions = (cartItems, ctx, activePromotions) => {
             // share one cap instead of each independently getting its own —
             // see createRuleBudgetTracker in rp.payment.controller.js and the
             // matching comment in cartRule.util.js's evaluateCartRules.
-            list.push({ type: reward.type, value: effectiveValue, cap: rewardCap, ruleId: String(promo._id), ...(!isScoped && reward.targetVariantSku ? { variantSku: reward.targetVariantSku } : {}) });
+            list.push({ type: reward.type, value: effectiveValue, cap: rewardCap, ruleId: String(promo._id), ...(!isScoped && reward.targetVariantSku ? { variantSku: reward.targetVariantSku } : {}), ...(reward.unitWeight > 1 ? { unitWeight: reward.unitWeight } : {}), ...(reward.maxUnits != null ? { maxUnits: reward.maxUnits } : {}), ...(reward.limitWhen?.variantSku ? { limitWhen: { variantSku: reward.limitWhen.variantSku, maxUnits: reward.limitWhen.maxUnits } } : {}) });
             discountCandidatesByProduct.set(productId, list);
           }
           break;

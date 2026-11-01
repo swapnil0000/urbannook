@@ -9,7 +9,6 @@ import {
   evaluatePromotions,
   buildCartContext,
   getDiscountCandidatesForItem as getPromotionDiscountCandidatesForItem,
-  applyBestPromotionDiscount,
   // Generic cap-tracking utilities (moved off the deleted cartRule.util.js
   // 2026-10-09 — never actually cart-rule-specific), reused here so this
   // preview shares the exact same budget-sharing machinery real checkout
@@ -17,7 +16,8 @@ import {
   createRuleBudgetTracker,
   withRuleBudget,
   spendRuleBudget,
-  applicableCap,
+  budgetSpendOrder,
+  allocateLineSegments,
 } from "../utils/promotionEngine.util.js";
 import {
   ValidationError,
@@ -367,17 +367,20 @@ const getCartService = async ({ userId }) => {
   // re-derived — and is now also clamped to the remaining SHARED budget via
   // withRuleBudget, then spent via spendRuleBudget, in the same order real
   // checkout processes lines, so the two can never disagree.
-  const discountedSubtotal = base.availableItems.reduce((sum, i) => {
+  const discountedSubtotal = budgetSpendOrder(base.availableItems, (i) => i.price).map(({ item }) => item).reduce((sum, i) => {
     const rawCandidates = getPromotionDiscountCandidatesForItem(promotionResult.discountCandidatesByProduct, i.productId, i.variantSku);
     const candidates = withRuleBudget(rawCandidates, ruleBudgets);
     if (!candidates?.length) return sum + i.price * i.quantity;
-    const discountedPrice = applyBestPromotionDiscount(i.price, candidates);
-    if (discountedPrice >= i.price) return sum + i.price * i.quantity;
-    const cap = applicableCap(candidates);
-    const discountedUnits = Math.min(i.quantity, cap);
-    const fullPriceUnits = i.quantity - discountedUnits;
-    spendRuleBudget(candidates, ruleBudgets, discountedUnits);
-    return sum + discountedPrice * discountedUnits + i.price * fullPriceUnits;
+    // same per-group split as checkout (allocateLineSegments)
+    const segments = allocateLineSegments(i.price, i.quantity, candidates, ruleBudgets);
+    let units = 0;
+    let total = 0;
+    for (const sg of segments) {
+      units += sg.units;
+      total += sg.unitPrice * sg.units;
+      spendRuleBudget(sg.candidates, ruleBudgets, sg.units);
+    }
+    return sum + total + i.price * (i.quantity - units);
   }, 0);
 
   return {

@@ -18,7 +18,8 @@ export const PendingRewardRow = ({ promo }) => {
   const [addToCartAPI] = useAddToCartMutation();
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState("");
-  const cards = promo.recommendedProducts || [];
+  // only options this offer actually discounts (a tier-gated Triple comes without a price)
+  const cards = (promo.recommendedProducts || []).filter((c) => c.offerPrice != null);
 
   const add = async (card) => {
     if (busy) return;
@@ -48,7 +49,9 @@ export const PendingRewardRow = ({ promo }) => {
         <span className="h-1.5 w-1.5 rounded-full bg-brand motion-safe:animate-pulse" aria-hidden="true" />
         Offer unlocked · {promo.title || "add it to your cart"}
       </p>
-      {cards.length > 1 && <p className="px-3 pt-2 text-[12px] font-semibold text-muted">Pick one:</p>}
+      {promo.applied && promo.rewardsLeft
+        ? <p className="px-3 pt-2 text-[12px] font-semibold text-muted">{promo.rewardsLeft > 1 ? `${promo.rewardsLeft} more rewards` : "1 more reward"} left in this offer - pick one:</p>
+        : cards.length > 1 && <p className="px-3 pt-2 text-[12px] font-semibold text-muted">Pick one:</p>}
       <div className="divide-y divide-hair">
         {cards.map((card) => {
           const label = card.variantName || card.productName;

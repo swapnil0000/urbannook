@@ -80,6 +80,34 @@ function capDiscountedQuantity(oi, fullUnitPrice, discountedUnitPrice, cap = 1) 
   };
 }
 
+// Applies a line's promotion discounts, possibly split across promotions from
+// different groups (allocateLineSegments): each segment discounts its own units
+// with its own price, ₹ budget and shared unit budget. Returns the extra lines
+// (full-price or later-segment remainders) to append to orderItems.
+function applyLineSegments(oi, candidates, ctx) {
+  const { ruleBudgets, promoDiscountByPromotionId, maxDiscountAmountByPromotionId, addPromoProduct } = ctx;
+  const fullPrice = oi.productSnapshot.priceAtPurchase;
+  const extra = [];
+  let cur = oi;
+  for (const seg of allocateLineSegments(fullPrice, oi.productSnapshot.quantity, candidates, ruleBudgets)) {
+    if (!cur) break;
+    const cap = clampCapToDiscountBudget(seg.units, fullPrice - seg.unitPrice, seg.ruleId, promoDiscountByPromotionId, maxDiscountAmountByPromotionId);
+    // cap 0 = this promotion's ₹ budget is spent: leave these units for the next segment
+    if (cap <= 0) continue;
+    const unitsUsed = Math.min(cur.productSnapshot.quantity, cap);
+    const amount = (fullPrice - seg.unitPrice) * unitsUsed;
+    if (seg.ruleId && amount > 0) promoDiscountByPromotionId.set(seg.ruleId, (promoDiscountByPromotionId.get(seg.ruleId) || 0) + amount);
+    if (seg.ruleId && unitsUsed > 0) addPromoProduct(seg.ruleId, cur.productId, cur.productSnapshot.productName, unitsUsed);
+    const remainder = capDiscountedQuantity(cur, fullPrice, seg.unitPrice, unitsUsed);
+    spendRuleBudget(seg.candidates, ruleBudgets, unitsUsed);
+    if (cur.productSnapshot.priceAtPurchase === 0) cur.productSnapshot.isPromotionalGift = true;
+    if (cur !== oi) extra.push(cur);
+    cur = remainder;
+  }
+  if (cur && cur !== oi) extra.push(cur);
+  return extra;
+}
+
 // Phase 5 — cheapest_item_free/cheapest_item_discount. Adjusts exactly ONE
 // unit of `oi` (not its whole line quantity, even if quantity > 1 — "the
 // cheapest item" is singular), same remainder-line split pattern as
@@ -345,13 +373,13 @@ import {
   getActivePromotions,
   evaluatePromotions,
   buildCartContext,
-  applyBestPromotionDiscount,
   getDiscountCandidatesForItem as getPromotionDiscountCandidatesForItem,
   excludeUsageExhaustedPromotions,
   createRuleBudgetTracker,
   withRuleBudget,
   spendRuleBudget,
-  applicableCap,
+  budgetSpendOrder,
+  allocateLineSegments,
   buildMaxDiscountAmountMap,
   isBetterPromoForProduct,
   clampCapToDiscountBudget,
@@ -777,47 +805,12 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
   };
 
   const extraPromoDiscountLines = [];
-  for (const oi of orderItems) {
+  // most expensive line spends shared budgets first: same cart, same price, whatever the order
+  for (const { item: oi } of budgetSpendOrder(orderItems, (i) => i.productSnapshot.priceAtPurchase)) {
     const rawCandidates = getPromotionDiscountCandidatesForItem(promotionResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
     const candidates = withRuleBudget(rawCandidates, ruleBudgets);
     if (candidates?.length) {
-      const fullPrice = oi.productSnapshot.priceAtPurchase;
-      const discountedPrice = applyBestPromotionDiscount(fullPrice, candidates);
-      // Every surviving candidate here shares one ruleId by construction —
-      // resolveProductWinners already dropped every OTHER
-      // promotion's candidates for this exact product before this ever ran.
-      const winningRuleId = candidates[0]?.ruleId;
-      // Cap scales with how many times the promotion's own condition is
-      // satisfied — never a flat 1 — clamped to the remaining shared budget,
-      // then further clamped (Phase 4) so this promotion's running ₹ total
-      // never crosses its own maxDiscountAmount (no-op when unset).
-      const cap = clampCapToDiscountBudget(
-        applicableCap(candidates), fullPrice - discountedPrice, winningRuleId,
-        promoDiscountByPromotionId, maxDiscountAmountByPromotionId,
-      );
-      // cap can now be 0 (budget-exhausted, Phase 4) where it previously
-      // never was (applicableCap always returns >= 1) — capDiscountedQuantity
-      // unconditionally mutates priceAtPurchase to the discounted price even
-      // when cap is 0, which would wrongly zero-rate the line. Skip the split
-      // entirely and leave the item at full price, same as "no candidate
-      // matched at all".
-      if (cap > 0) {
-        const unitsUsed = Math.min(oi.productSnapshot.quantity, cap);
-        const itemDiscountAmount = (fullPrice - discountedPrice) * unitsUsed;
-        if (winningRuleId && itemDiscountAmount > 0) {
-          promoDiscountByPromotionId.set(winningRuleId, (promoDiscountByPromotionId.get(winningRuleId) || 0) + itemDiscountAmount);
-        }
-        if (winningRuleId && unitsUsed > 0) {
-          addPromoProduct(winningRuleId, oi.productId, oi.productSnapshot.productName, unitsUsed);
-        }
-        const remainderLine = capDiscountedQuantity(oi, fullPrice, discountedPrice, cap);
-        spendRuleBudget(candidates, ruleBudgets, unitsUsed);
-        if (remainderLine) extraPromoDiscountLines.push(remainderLine);
-        // A discount that zeroes an item's price out (e.g. a percent_off 100
-        // "get this free" reward) marks it as a promotional gift for
-        // admin/order views — same field the free_product reward uses below.
-        if (oi.productSnapshot.priceAtPurchase === 0) oi.productSnapshot.isPromotionalGift = true;
-      }
+      extraPromoDiscountLines.push(...applyLineSegments(oi, candidates, { ruleBudgets, promoDiscountByPromotionId, maxDiscountAmountByPromotionId, addPromoProduct }));
     }
   }
   if (extraPromoDiscountLines.length) orderItems.push(...extraPromoDiscountLines);
@@ -2278,34 +2271,12 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
   };
 
   const extraPromoDiscountLines = [];
-  for (const oi of orderItems) {
+  // most expensive line spends shared budgets first: same cart, same price, whatever the order
+  for (const { item: oi } of budgetSpendOrder(orderItems, (i) => i.productSnapshot.priceAtPurchase)) {
     const rawCandidates = getPromotionDiscountCandidatesForItem(promotionResult.discountCandidatesByProduct, oi.productId, oi.variantSku);
     const candidates = withRuleBudget(rawCandidates, ruleBudgets);
     if (candidates?.length) {
-      const fullPrice = oi.productSnapshot.priceAtPurchase;
-      const discountedPrice = applyBestPromotionDiscount(fullPrice, candidates);
-      const winningRuleId = candidates[0]?.ruleId;
-      const cap = clampCapToDiscountBudget(
-        applicableCap(candidates), fullPrice - discountedPrice, winningRuleId,
-        promoDiscountByPromotionId, maxDiscountAmountByPromotionId,
-      );
-      // cap can be 0 here (budget-exhausted, Phase 4) — capDiscountedQuantity
-      // unconditionally mutates priceAtPurchase even at cap 0, so skip the
-      // split entirely rather than wrongly zero-rating the line.
-      if (cap > 0) {
-        const unitsUsed = Math.min(oi.productSnapshot.quantity, cap);
-        const itemDiscountAmount = (fullPrice - discountedPrice) * unitsUsed;
-        if (winningRuleId && itemDiscountAmount > 0) {
-          promoDiscountByPromotionId.set(winningRuleId, (promoDiscountByPromotionId.get(winningRuleId) || 0) + itemDiscountAmount);
-        }
-        if (winningRuleId && unitsUsed > 0) {
-          addPromoProduct(winningRuleId, oi.productId, oi.productSnapshot.productName, unitsUsed);
-        }
-        const remainderLine = capDiscountedQuantity(oi, fullPrice, discountedPrice, cap);
-        spendRuleBudget(candidates, ruleBudgets, unitsUsed);
-        if (remainderLine) extraPromoDiscountLines.push(remainderLine);
-        if (oi.productSnapshot.priceAtPurchase === 0) oi.productSnapshot.isPromotionalGift = true;
-      }
+      extraPromoDiscountLines.push(...applyLineSegments(oi, candidates, { ruleBudgets, promoDiscountByPromotionId, maxDiscountAmountByPromotionId, addPromoProduct }));
     }
   }
   if (extraPromoDiscountLines.length) orderItems.push(...extraPromoDiscountLines);

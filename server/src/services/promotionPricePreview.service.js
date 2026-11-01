@@ -4,7 +4,8 @@ import {
   createRuleBudgetTracker,
   withRuleBudget,
   spendRuleBudget,
-  applicableCap,
+  allocateLineSegments,
+  budgetSpendOrder,
 } from "../utils/promotionEngine.util.js";
 
 // Display-only quote. Catalog prices and the same discount candidates/shared
@@ -12,12 +13,20 @@ import {
 // calculates the final charge independently with its full customer context.
 export function buildPromotionPricePreview(items, productById, promotionResult) {
   const budgets = createRuleBudgetTracker(promotionResult.discountCandidatesByProduct);
-  const lines = [];
   let subtotal = 0;
   let discountedSubtotal = 0;
   const savingsByPromotion = {};
 
-  for (const item of items) {
+  const priceOfItem = (item) => {
+    const product = productById.get(String(item.productId));
+    const variant = item.selectedVariant
+      ? product?.variantDetails?.find((v) => v.variantName === item.selectedVariant)
+      : product?.variantDetails?.[0];
+    return Number(variant?.variantPrice ?? product?.price);
+  };
+  // Lines spend shared budgets most-expensive first (budgetSpendOrder); output keeps cart order.
+  const slots = [];
+  for (const { item, index } of budgetSpendOrder(items, priceOfItem)) {
     const product = productById.get(String(item.productId));
     const variant = item.selectedVariant
       ? product?.variantDetails?.find((v) => v.variantName === item.selectedVariant)
@@ -30,21 +39,22 @@ export function buildPromotionPricePreview(items, productById, promotionResult) 
       getDiscountCandidatesForItem(promotionResult.discountCandidatesByProduct, item.productId, item.variantSku),
       budgets,
     );
-    const discountedUnitPrice = candidates.length ? applyBestPromotionDiscount(price, candidates) : price;
-    const discountedUnits = candidates.length && discountedUnitPrice < price
-      ? Math.min(quantity, applicableCap(candidates)) : 0;
+    // one line may be split across promotions from different groups (allocateLineSegments)
+    const segments = candidates.length ? allocateLineSegments(price, quantity, candidates, budgets) : [];
+    const discountedUnits = segments.reduce((n, sg) => n + sg.units, 0);
+    const discountedUnitPrice = segments.length ? segments[0].unitPrice : price;
     const originalLineTotal = price * quantity;
-    const lineTotal = discountedUnitPrice * discountedUnits + price * (quantity - discountedUnits);
+    const lineTotal = segments.reduce((t, sg) => t + sg.unitPrice * sg.units, 0) + price * (quantity - discountedUnits);
     const saving = originalLineTotal - lineTotal;
-    const winningCandidate = discountedUnits && saving > 0
-      ? candidates.find((candidate) => applyBestPromotionDiscount(price, [candidate]) === discountedUnitPrice)
-      : null;
-    const promotionId = winningCandidate?.ruleId || null;
-    if (promotionId) savingsByPromotion[promotionId] = (savingsByPromotion[promotionId] || 0) + saving;
-    if (discountedUnits) spendRuleBudget(candidates, budgets, discountedUnits);
+    for (const sg of segments) {
+      const segSaving = (price - sg.unitPrice) * sg.units;
+      if (sg.ruleId && segSaving > 0) savingsByPromotion[sg.ruleId] = (savingsByPromotion[sg.ruleId] || 0) + segSaving;
+      spendRuleBudget(sg.candidates, budgets, sg.units);
+    }
+    const promotionId = segments[0]?.ruleId || null;
     subtotal += originalLineTotal;
     discountedSubtotal += lineTotal;
-    lines.push({
+    slots[index] = {
       productId: String(item.productId),
       variantSku: item.variantSku || "",
       selectedVariant: item.selectedVariant || null,
@@ -56,8 +66,13 @@ export function buildPromotionPricePreview(items, productById, promotionResult) 
       lineTotal,
       savings: saving,
       promotionId,
-    });
+      // which offer discounted how many units (a line can be split, e.g. LED + Wooden stand offers)
+      shares: segments.filter((sg) => sg.ruleId).map((sg) => ({ promotionId: sg.ruleId, units: sg.units, unitPrice: sg.unitPrice })),
+    };
   }
+  const lines = slots.filter(Boolean);
 
-  return { lines, subtotal, discountedSubtotal, savings: subtotal - discountedSubtotal, savingsByPromotion };
+  // what each promotion can still discount ("ruleId" and "ruleId|sku" keys), for "pick one more"
+  const budgetsLeft = Object.fromEntries(budgets);
+  return { lines, subtotal, discountedSubtotal, savings: subtotal - discountedSubtotal, savingsByPromotion, budgetsLeft };
 }

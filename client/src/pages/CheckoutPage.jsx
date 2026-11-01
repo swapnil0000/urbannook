@@ -33,6 +33,7 @@ import FreeShippingStrip from "../component/FreeShippingStrip";
 import OfferCheckoutReminder from "../component/offers/OfferCheckoutReminder";
 import PromotionBannerList from "../component/promotions/PromotionBannerList";
 import GiftClaimList from "../component/promotions/GiftClaimList";
+import AppliedOfferSummary from "../component/promotions/AppliedOfferSummary";
 import { CartGiftProgress } from "../component/offers/CartValueGift";
 import GiftWrapOffer from "../component/GiftWrapOffer";
 import SealBadgeCard, { UnderlineAmount } from "../component/promotions/SealBadgeCard";
@@ -1570,6 +1571,8 @@ const CheckoutPage = () => {
           </p>
           {/* unclaimed free gift: claim it right here before paying */}
           <div className="mt-4 empty:hidden"><GiftClaimList /></div>
+          {/* what each offer gave (prepaid shows no cart otherwise) + switch the picked stand */}
+          <AppliedOfferSummary className="mt-4" />
 
           {/* ── What it costs so far ───────────────────────────────────── */}
           <div className="mt-6 bg-white rounded-2xl border border-gray-100 p-5">

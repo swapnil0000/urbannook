@@ -110,7 +110,7 @@ describe("Shared rule budget — sibling reward lines of the same promotion", ()
     ];
     const result = applyDiscounts(items, [EXCITING_OFFERS_PROMO]);
     const double = result.find((i) => i.variantSku === DOUBLE_SKU);
-    expect(double.productSnapshot.priceAtPurchase).toBe(225); // 50% off 449, rounded
+    expect(double.productSnapshot.priceAtPurchase).toBe(224); // 50% off 449 = 224.5, rounded in the customer's favour
   });
 
   test("Double added FIRST (50% off), Single added SECOND → Single stays FULL PRICE (order-independent, not single-privileged)", () => {
@@ -122,7 +122,7 @@ describe("Shared rule budget — sibling reward lines of the same promotion", ()
     const result = applyDiscounts(items, [EXCITING_OFFERS_PROMO]);
     const double = result.find((i) => i.variantSku === DOUBLE_SKU);
     const single = result.find((i) => i.variantSku === SINGLE_SKU);
-    expect(double.productSnapshot.priceAtPurchase).toBe(225);
+    expect(double.productSnapshot.priceAtPurchase).toBe(224);
     expect(single.productSnapshot.priceAtPurchase).toBe(399); // full price — budget already spent
   });
 
@@ -136,7 +136,7 @@ describe("Shared rule budget — sibling reward lines of the same promotion", ()
     const single = result.find((i) => i.variantSku === SINGLE_SKU);
     const double = result.find((i) => i.variantSku === DOUBLE_SKU);
     expect(single.productSnapshot.priceAtPurchase).toBe(0);
-    expect(double.productSnapshot.priceAtPurchase).toBe(225);
+    expect(double.productSnapshot.priceAtPurchase).toBe(224);
   });
 
   test("no Katana in cart → neither stand is discounted at all", () => {

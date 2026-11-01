@@ -16,7 +16,7 @@ import OfferProgress from '../festive/OfferProgress';
 import GiftWrapOffer, { GiftWrapLineItem } from '../GiftWrapOffer';
 import PromotionBannerList from '../promotions/PromotionBannerList';
 import { groupCartByOffer } from '../../utils/cartOfferGroups';
-import { offerName } from '../../utils/offerName';
+import { offerName, nounOf } from '../../utils/offerName';
 import { useGetProductsQuery } from '../../store/api/productsApi';
 import { requestCheckout } from '../../utils/checkoutIntent';
 import GiftClaimList from '../promotions/GiftClaimList';
@@ -201,9 +201,16 @@ const CartDrawer = ({ isOpen, onClose }) => {
                   const displayName = resolveVariantTitle(item.name, item.variantTitleTemplate, item.selectedVariant);
                   const rawPrice = Number(item.price) || 0;
                   const rawLineTotal = rawPrice * itemQty;
-                  const priceLine = promotionPricing?.lines?.find((line) =>
+                  const fullLine = promotionPricing?.lines?.find((line) =>
                     line.productId === String(itemId) &&
                     (line.selectedVariant || 'N/A') === (item.selectedVariant || 'N/A'));
+                  // a line split between two offers (LED + Wooden on 2 Doubles): each offer box shows
+                  // only its own units, so the saving is never counted twice
+                  const shared = item.offerUnits != null && fullLine;
+                  const priceLine = shared
+                    ? { ...fullLine, originalLineTotal: fullLine.originalUnitPrice * item.offerUnits, lineTotal: item.offerUnitPrice * item.offerUnits,
+                        savings: (fullLine.originalUnitPrice - item.offerUnitPrice) * item.offerUnits, discountedUnits: item.offerUnits }
+                    : fullLine;
 
                   return (
                     <div key={`${itemId}-${item.selectedVariant || 'N/A'}`} className="flex gap-3 py-3 first:pt-0">
@@ -276,6 +283,25 @@ const CartDrawer = ({ isOpen, onClose }) => {
                             {priceLine?.savings > 0 && <p className="text-[10px] font-bold text-save">Save ₹{priceLine.savings.toLocaleString('en-IN')}</p>}
                           </div>
                         </div>
+                        {/* more of this reward than the offer covers (e.g. a katana was removed but its
+                            stand stayed): say plainly which units are at full price and how to fix it */}
+                        {shared && (
+                          <p className="mt-1 text-[11px] font-semibold text-muted">{item.offerUnits} of {itemQty} on this offer - the other{itemQty - item.offerUnits > 1 ? 's are' : ' is'} under your other offer</p>
+                        )}
+                        {!shared && priceLine?.discountedUnits > 0 && priceLine.discountedUnits < itemQty && (() => {
+                          const extra = itemQty - priceLine.discountedUnits;
+                          const promo = cartPromotions.find((pr) => pr.id === priceLine.promotionId);
+                          const trigIds = new Set((promo?.triggerProductIds || []).map(String));
+                          const trig = cartItems.find((ci) => trigIds.has(String(ci.mongoId || ci.productId || ci.id)));
+                          const katana = trig ? nounOf(trig.name) : 'item';
+                          const inr = (n) => `₹${Math.round(Number(n) || 0).toLocaleString('en-IN')}`;
+                          return (
+                            <p className="mt-1.5 rounded-md bg-brand/[0.06] px-2 py-1 text-[11px] font-semibold leading-snug text-ink">
+                              {priceLine.discountedUnits} at offer price {inr(priceLine.discountedUnitPrice)}, {extra} at full price {inr(priceLine.originalUnitPrice)}.
+                              <span className="block font-normal text-muted">Each {katana} gets one stand. Add another {katana} to get {extra > 1 ? 'these' : 'this one'} at offer price too.</span>
+                            </p>
+                          );
+                        })()}
                       </div>
                     </div>
                   );
@@ -283,13 +309,18 @@ const CartDrawer = ({ isOpen, onClose }) => {
 
   // Standard offer names (utils/offerName) - matched to the home combo by id.
   const offerTitle = (promo) => {
+    // pick-your-reward offers keep their own clear title ("...with every Wooden Katana")
+    if (promo.rewardOptions?.length) return promo.title;
     const c = (homeCombosRes?.data?.combos || []).find((x) => x.id === promo.id);
-    return c ? offerName(c, cartNames) : promo.title;
+    // the cart's own reward label fills in a combo with no benefit text (e.g. "50% OFF")
+    return c ? offerName({ ...c, benefit: c.benefit || promo.rewardLabel || '' }, cartNames) : promo.title;
   };
   const offerGroups = groupCartByOffer(cartItems, cartPromotions, promotionPricing);
   // Applied offers now live in their groups above; the banner list keeps the
   // ones still in progress ("add 1 more…"), so nothing is shown twice.
-  const pendingPromotions = cartPromotions.filter((pr) => !offerGroups.groups.some((g) => g.promo.id === pr.id));
+  // ...except an applied offer that still has a reward to pick (2 katanas, 1 stand): its
+  // "pick one more" row stays, so the next stand can be added for the next katana.
+  const pendingPromotions = cartPromotions.filter((pr) => pr.rewardTargetPending || !offerGroups.groups.some((g) => g.promo.id === pr.id));
 
   return (
     <div className="fixed inset-0 z-[9999] flex justify-end font-inter text-ink">
@@ -372,8 +403,8 @@ const CartDrawer = ({ isOpen, onClose }) => {
               <GiftClaimList className="mb-3" />
               <div className="divide-y divide-hair">
                 {/* Offers grouped with what unlocked them: "because you added → you get" */}
-                {offerGroups.groups.map(({ promo, savings, triggers, rewards }) => (
-                  <section key={promo.id} className="mb-3 overflow-hidden rounded-xl border border-ink/15 bg-white shadow-sm" aria-label={`Offer: ${promo.title}`}>
+                {offerGroups.groups.map(({ promo, savings, triggers, rewards, part = 0 }) => (
+                  <section key={`${promo.id}-${part}`} className="mb-3 overflow-hidden rounded-xl border border-ink/15 bg-white shadow-sm" aria-label={`Offer: ${promo.title}`}>
                     {/* theme colours: ink header, red check + accent */}
                     {/* one line: label + standard offer name (wraps, never truncated) */}
                     <header className="flex items-start gap-2 bg-ink px-3 py-2 text-paper">

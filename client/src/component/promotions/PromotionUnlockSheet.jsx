@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { addItem, claimGift } from "../../store/slices/cartSlice";
-import { useAddToCartMutation } from "../../store/api/userApi";
+import { addItem, claimGift, removeItem, updateQuantity } from "../../store/slices/cartSlice";
+import { useAddToCartMutation, useUpdateCartMutation } from "../../store/api/userApi";
+import { OfferRewardPicks, canGetOneMore } from "./AppliedOfferSummary";
+import { groupCartByOffer } from "../../utils/cartOfferGroups";
 import { useCartPromotions } from "../../hooks/useCartPromotions";
 import { track, trackAddToCart, trackViewPromotion, trackSelectPromotion } from "../../utils/analytics";
 import { useSiteCampaign } from "../../hooks/useSiteCampaign";
@@ -71,7 +73,7 @@ const offerBadge = (product) => {
 };
 
 // `fill`: the card takes its grid cell (3 options shown side by side, no swiping)
-const RecommendationCard = ({ product, onAdd, isAdding, isBusy, isSingle, fill = false }) => (
+const RecommendationCard = ({ product, onAdd, onSub, isAdding, isBusy, isSingle, fill = false, inCart = 0 }) => (
   <article className={`h-full min-w-0 shrink-0 border border-hair bg-paper p-2 ${isSingle ? "w-full flex gap-3" : fill ? "w-full flex flex-col gap-2" : "w-[calc((100vw-52px)/2.1)] min-w-[124px] max-w-[152px] sm:w-[148px] flex flex-col gap-2"}`}>
     <div className={`relative shrink-0 overflow-hidden bg-surface ${isSingle ? "h-24 w-24 sm:h-28 sm:w-28" : "aspect-square w-full"}`}>
       {offerBadge(product) && (
@@ -96,7 +98,7 @@ const RecommendationCard = ({ product, onAdd, isAdding, isBusy, isSingle, fill =
     </div>
     <div className="flex min-w-0 flex-1 flex-col justify-center">
       {/* the variant tells the options apart (Single / Double / Triple stand all share one product name) */}
-      <h4 className="truncate text-xs font-extrabold leading-snug text-ink" title={product.variantName || product.productName}>{product.variantName || product.productName}</h4>
+      <h4 className="line-clamp-2 text-xs font-extrabold leading-snug text-ink" title={product.variantName || product.productName}>{product.variantName || product.productName}</h4>
       <div className="mt-1 flex flex-wrap items-baseline gap-x-2">
         {product.offerPrice != null ? (
           <>
@@ -105,6 +107,21 @@ const RecommendationCard = ({ product, onAdd, isAdding, isBusy, isSingle, fill =
           </>
         ) : <span className="text-sm font-extrabold tabular-nums text-ink">{product.price != null ? inr(product.price) : "-"}</span>}
       </div>
+      {/* the + gives feedback: how many of this exact option are already in the cart */}
+      {inCart > 0 && (
+        <div className="mt-1.5 flex items-center gap-2">
+          <div className="flex h-7 items-center rounded-full border border-hair bg-white" aria-live="polite">
+            <button type="button" onClick={() => onSub?.(product)} disabled={isBusy} aria-label={`Remove one ${product.variantName || product.productName}`} className="grid h-full w-7 place-items-center text-muted transition-colors hover:text-brand disabled:opacity-55">
+              <i className="fa-solid fa-minus text-[10px]" aria-hidden="true" />
+            </button>
+            <span className="min-w-[18px] text-center text-xs font-bold tabular-nums text-ink">{inCart}</span>
+            <button type="button" onClick={() => onAdd(product)} disabled={isBusy} aria-label={`Add one more ${product.variantName || product.productName}`} className="grid h-full w-7 place-items-center text-muted transition-colors hover:text-brand disabled:opacity-55">
+              <i className="fa-solid fa-plus text-[10px]" aria-hidden="true" />
+            </button>
+          </div>
+          <span className="text-[10.5px] font-bold text-save">in cart</span>
+        </div>
+      )}
     </div>
   </article>
 );
@@ -120,6 +137,11 @@ const PromotionUnlockSheet = () => {
   const showCartModal = useSelector((s) => s.ui.showCartModal);
   const totalQuantity = useSelector((s) => s.cart.totalQuantity);
   const cartItems = useSelector((s) => s.cart.items);
+  // units of one product option already in the cart (shown on its card after +)
+  const inCartQty = (product) => cartItems
+    .filter((i) => String(i.productId || i.mongoId || i.id) === String(product.productId)
+      && (!product.variantName || i.selectedVariant === product.variantName))
+    .reduce((n, i) => n + (Number(i.quantity) || 0), 0);
   const lastSuccessfulAdd = useSelector((s) => s.cart.lastSuccessfulAdd);
   const [pendingAdd, setPendingAdd] = useState(null);
   const [activePromoId, setActivePromoId] = useState(null);
@@ -131,10 +153,13 @@ const PromotionUnlockSheet = () => {
   const [checkoutMode, setCheckoutMode] = useState(false);
   const { promotions, pricing, isFetching, gifts, ready } = useCartPromotions("cart", null, pendingAdd, Boolean(pendingAdd || activePromoId || checkoutIntent), externalIds);
   const [addToCartAPI] = useAddToCartMutation();
+  const [updateCartAPI] = useUpdateCartMutation();
 
   const [visible, setVisible] = useState(false);
   const [addingProductId, setAddingProductId] = useState(null);
   const [addError, setAddError] = useState("");
+  // offer id whose step 1 (add the trigger item) was just done from the 2-step card
+  const [stepTwoFor, setStepTwoFor] = useState(null);
   const [justUnlocked, setJustUnlocked] = useState(false);
   const hasTrackedViewRef = useRef(false);
   const lastPromoRef = useRef(null);
@@ -163,10 +188,21 @@ const PromotionUnlockSheet = () => {
     window.addEventListener("un:open-offer-sheet", onOpen);
     const onCheckout = () => setCheckoutIntent(true);
     window.addEventListener("un:checkout-intent", onCheckout);
+    // checkout page: "get one more stand" opens this offer's 2-step card directly
+    const onSteps = (e) => {
+      const id = String(e.detail?.promotionId || "");
+      if (!id) return;
+      clearTimeout(closeTimerRef.current);
+      setCheckoutMode(true);
+      setJustUnlocked(false);
+      setActivePromoId(id);
+    };
+    window.addEventListener("un:open-offer-steps", onSteps);
     window.__unOfferSheetReady = true;
     return () => {
       window.removeEventListener("un:open-offer-sheet", onOpen);
       window.removeEventListener("un:checkout-intent", onCheckout);
+      window.removeEventListener("un:open-offer-steps", onSteps);
       window.__unOfferSheetReady = false;
     };
   }, []);
@@ -178,6 +214,18 @@ const PromotionUnlockSheet = () => {
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkoutIntent]);
+
+  // after step 1, bring step 2 (the reward pick) into view as soon as the server shows it
+  const stepScrolledRef = useRef(null);
+  useEffect(() => {
+    if (!stepTwoFor) return;
+    const el = dialogRef.current?.querySelector("[data-step-two], [data-step-done]");
+    const key = el ? `${stepTwoFor}:${el.hasAttribute("data-step-done") ? "done" : "two"}` : null;
+    if (el && stepScrolledRef.current !== key) {
+      stepScrolledRef.current = key;
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  });
 
   useEffect(() => {
     if (!checkoutIntent || !ready) return;
@@ -192,7 +240,10 @@ const PromotionUnlockSheet = () => {
     const offerTarget = byProgress.find((p) => ((p.qualifying && p.rewardTargetPending) || (!p.qualifying && p.progressText))
       && p.recommendedProducts?.length > 0);
     // offers first; a gift alone is enough to show the sheet (it lists every row + the gift claim)
-    const target = offerTarget || unclaimedGift;
+    // an applied pick-your-reward offer (stand) also opens it: see the pick, switch it,
+    // and the next step ("add another katana") before paying
+    const appliedPick = promotions.find((p) => p.applied && p.displayType !== "free_gift" && p.rewardOptions?.length > 0);
+    const target = offerTarget || unclaimedGift || appliedPick;
     if (!target) { navigate("/checkout"); return; }
     setCheckoutMode(true);
     setJustUnlocked(false); // replace any 'applied' view with the full offer list
@@ -259,6 +310,7 @@ const PromotionUnlockSheet = () => {
   // changes. This is what actually opens the sheet.
   useEffect(() => {
     if (!pendingAdd) return;
+    if (isFetching) return; // decide on the answer for the cart WITH the new item, never the previous one
     if (showCartModal) return; // never fight the cart drawer
     if (activePromoId) return; // already showing one
     if (Date.now() - lastAutoOpenRef.current < REOPEN_COOLDOWN_MS) return;
@@ -270,14 +322,24 @@ const PromotionUnlockSheet = () => {
       && p.displayType !== "free_shipping" && !celebratedIdsRef.current.has(p.id));
     // Suggestions ("add one more…") now wait for Checkout (see checkout intent
     // above) instead of interrupting every add; only a just-completed offer opens here.
-    const target = unlockedNow;
+    // This add earned a reward the shopper still has to pick (wooden katana -> choose a stand at
+    // 50% OFF): show those options right away, like the cart drawer does, not just "applied".
+    const canPick = (p) => p.qualifying && p.rewardTargetPending && p.recommendedProducts?.some((c) => c.offerPrice != null);
+    // also an offer this add did NOT touch whose reward was just taken by a better one
+    // (Wooden + stand, then LED: the stand goes free to LED, Wooden needs a new pick).
+    // Not filtered by "dismissed": that offer was celebrated (and so marked) when its stand was first claimed.
+    const pickNow = promotions.find((p) => p.actionableForAdd && canPick(p) && !dismissedIds.has(p.id))
+      || promotions.find((p) => !p.actionableForAdd && !p.applied && canPick(p));
+    const target = pickNow || unlockedNow;
     if (!target) return;
+    // show it with the full list (applied offers + picks + checkout), not a lone row
+    if (pickNow && !pickNow.actionableForAdd) { setCheckoutMode(true); setJustUnlocked(false); }
 
     clearTimeout(pendingAddTimerRef.current);
     // Open immediately - no artificial delay between "add" and the sheet showing up.
     setActivePromoId(target.id);
     lastAutoOpenRef.current = Date.now();
-  }, [bestActionable, promotions, showCartModal, activePromoId, pendingAdd]);
+  }, [bestActionable, promotions, showCartModal, activePromoId, pendingAdd, isFetching]);
 
   // The live, re-evaluated version of whichever promotion the sheet is
   // currently anchored to - so progress/recommendations update in place as
@@ -387,6 +449,7 @@ const PromotionUnlockSheet = () => {
     setJustUnlocked(false);
     setPendingAdd(null);
     setCheckoutMode(false);
+    setStepTwoFor(null); // the 2-step journey starts fresh next time
     autoAddRef.current = false;
     clearTimeout(closeTimerRef.current);
     closeTimerRef.current = setTimeout(() => { setActivePromoId(null); setExternalIds(null); }, 300);
@@ -401,7 +464,34 @@ const PromotionUnlockSheet = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, isFetching, livePromo]);
 
-  const handleAdd = async (product) => {
+  // "-" on a card: one unit of that exact option out of the cart
+  const handleSub = async (product) => {
+    if (addingRef.current) return;
+    const line = cartItems.find((i) => String(i.productId || i.mongoId || i.id) === String(product.productId)
+      && (!product.variantName || i.selectedVariant === product.variantName));
+    if (!line) return;
+    addingRef.current = true;
+    setAddError("");
+    setAddingProductId(`${product.productId}:${product.sku || ""}`);
+    const qty = Number(line.quantity) || 0;
+    const variant = line.selectedVariant || "N/A";
+    try {
+      if (isAuthenticated || !!localStorage.getItem("authToken")) {
+        await updateCartAPI({ productId: product.productId, quantity: 1, action: qty > 1 ? "sub" : "remove", variant, image: line.image }).unwrap();
+      } else if (qty > 1) {
+        dispatch(updateQuantity({ id: line.id || product.productId, quantity: qty - 1, selectedVariant: variant }));
+      } else {
+        dispatch(removeItem({ id: line.id || product.productId, selectedVariant: variant }));
+      }
+    } catch (err) {
+      setAddError(err?.data?.message || "Could not update the cart. Please try again.");
+    } finally {
+      addingRef.current = false;
+      setAddingProductId(null);
+    }
+  };
+
+  const handleAdd = async (product, stepFor = null) => {
     if (addingRef.current) return;
     addingRef.current = true;
     setAddError("");
@@ -438,6 +528,7 @@ const PromotionUnlockSheet = () => {
         itemId: product.productId, sku: product.sku, itemName: product.productName,
         itemVariant: product.variantName, price: product.price, quantity: 1, placement: "promo_unlock_sheet",
       });
+      if (stepFor) { stepScrolledRef.current = null; setStepTwoFor(stepFor); }
     } catch (err) {
       console.error("[PromotionUnlockSheet] add to cart failed:", err);
       setAddError(err?.data?.message || "Could not add this item. Please try again.");
@@ -528,8 +619,8 @@ const PromotionUnlockSheet = () => {
             </h3>
             <p id="promotion-sheet-description" className="mt-1 text-sm text-muted">
               {promo?.displayType === "free_gift"
-                ? `${(promo.rewardLabel || "").replace(/\s*[—-]\s*free\s*$/i, "") || "Your free gift"} — claim it to add it to your order.`
-                : `${promo?.rewardLabel || promo?.title} - applied to your cart.`}
+                ? `${(promo.rewardLabel || "").replace(/\s*[\u2014-]\s*free\s*$/i, "") || "Your free gift"} - claim it to add it to your order.`
+                : `${promo?.title || promo?.rewardLabel} - applied to your cart.`}
             </p>
             {promo?.displayType === "free_gift" && (() => {
               // free gifts are never added automatically: the shopper claims them
@@ -564,7 +655,7 @@ const PromotionUnlockSheet = () => {
               style={festive ? { background: "radial-gradient(70% 120% at 50% -10%, rgb(var(--gl-brand) / 0.28), transparent 70%), rgb(var(--gl-ink))" } : undefined}
             >
 
-            <h3 id="promotion-sheet-title" className={`truncate pr-10 text-xl font-black leading-tight tracking-tight sm:text-2xl ${festive ? "text-paper" : "text-ink"}`} title={checkoutMode || rows.length > 1 ? "Your offers" : promo?.title}>{checkoutMode || rows.length > 1 ? "Your offers" : promo?.title}</h3>
+            <h3 id="promotion-sheet-title" className={`line-clamp-2 pr-10 text-xl font-black leading-tight tracking-tight sm:text-2xl ${festive ? "text-paper" : "text-ink"}`} title={checkoutMode || rows.length > 1 ? "Your offers" : promo?.title}>{checkoutMode || rows.length > 1 ? "Your offers" : promo?.title}</h3>
             {festive && (
               <>
                 <span className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] bg-gradient-to-r from-transparent via-star to-transparent" aria-hidden="true" />
@@ -611,34 +702,48 @@ const PromotionUnlockSheet = () => {
               <div className="mt-4 rounded-xl border border-ink/15 bg-white px-3 py-2.5">
                 <p className="text-[11px] font-bold uppercase tracking-wide text-muted">Applied now</p>
                 {promotions.filter((p) => p.applied && p.displayType !== "free_gift" && p.displayType !== "free_shipping").map((p) => (
-                  <p key={p.id} className="mt-1 flex items-start gap-2 text-[13px] font-bold text-ink">
+                  <div key={p.id} className="mt-1 flex items-start gap-2 text-[13px] font-bold text-ink">
                     <span className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full bg-brand text-[9px] text-white" aria-hidden="true">✓</span>
-                    <span>{p.title}{p.rewardLabel ? <span className="font-semibold text-muted"> · {p.rewardLabel}</span> : null}</span>
-                  </p>
+                    <div className="min-w-0 flex-1">{p.title}
+                      {/* the stand picked for this offer, switchable (Single -> Double) */}
+                      <div className="font-normal"><OfferRewardPicks promo={p} rewards={groupCartByOffer(cartItems, promotions, pricing).groups.filter((g) => g.promo.id === p.id).flatMap((g) => g.rewards)} pricing={pricing} /></div>
+                    </div>
+                  </div>
                 ))}
                 {/* offers in the same group that this cart also qualifies for, but that the
                     applied one replaced (you get one per group) - shown so a switch is visible */}
                 {promotions.filter((x) => !x.applied && x.qualifying && x.group && promotions.some((p) => p.applied && p.group === x.group && p.id !== x.id)).map((x) => (
                   <p key={x.id} className="mt-1 flex items-start gap-2 text-[12.5px] text-muted">
                     <span className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full border border-hair text-[9px]" aria-hidden="true">↑</span>
-                    <span><span className="font-semibold text-ink/70">{x.title}</span>{x.rewardLabel ? ` · ${x.rewardLabel}` : ""}<br /><span className="text-[11.5px]">Also unlocked. You get one stand offer per order, the best one is applied. Reduce the quantity in your cart to switch back.</span></span>
+                    <span><span className="font-semibold text-ink/70">{x.title}</span><br /><span className="text-[11.5px]">Also unlocked. You get one stand offer per order, the best one is applied. Reduce the quantity in your cart to switch back.</span></span>
                   </p>
                 ))}
               </div>
             )}
             {checkoutMode && rows.length > 0 && <p className="mt-5 font-archivo text-[15px] font-extrabold text-ink">More offers</p>}
             {rows.map((row, rowIndex) => {
-              const items = row.recommendedProducts || [];
+              // reward picks: only discounted options (a tier-gated Triple comes without a price)
+              const items = (row.recommendedProducts || []).filter((c) => !(row.qualifying && row.rewardTargetPending) || c.offerPrice != null);
               return (
-                <div key={row.id} data-offer-row className={`overflow-hidden rounded-xl border border-hair bg-white p-3 shadow-sm ${rowIndex === 0 ? "mt-3" : "mt-4"}`}>
+                <div key={row.id} data-offer-row data-step-two={stepTwoFor === row.id && row.rewardTargetPending ? "" : undefined} className={`overflow-hidden rounded-xl border bg-white p-3 shadow-sm ${stepTwoFor === row.id && row.rewardTargetPending ? "border-brand" : "border-hair"} ${rowIndex === 0 ? "mt-3" : "mt-4"}`}>
+                  {stepTwoFor === row.id && row.rewardTargetPending && (
+                    <p className="mb-2 flex items-center gap-2 text-[12px] font-bold text-ink">
+                      <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-ink text-[11px] text-paper" aria-hidden="true">✓</span>
+                      Step 1 done. Step 2: pick your stand below
+                    </p>
+                  )}
                   <div className="mb-3 flex items-end justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate text-[10px] font-extrabold uppercase tracking-[0.13em] text-brand">
+                      <p className="line-clamp-2 text-[10px] font-extrabold uppercase tracking-[0.13em] text-brand">
                         {row.title || "Complete your offer"}
                       </p>
                       <p className="mt-0.5 text-sm font-bold text-ink">
-                        {row.rewardTargetPending ? "Choose your reward item" : (rows.length > 1 ? row.progressText : "Add an eligible item")}
+                        {row.rewardTargetPending ? (row.applied && row.rewardsLeft ? "Pick one more reward" : "Choose your reward item") : (rows.length > 1 ? row.progressText : "Add an eligible item")}
                       </p>
+                      {row.rewardTargetPending && !row.applied && promotions.some((p) => p.applied && p.id !== row.id && p.rewardOptions?.length) && (
+                        // its stand went to the better deal (e.g. FREE with the LED offer); this offer still gives one
+                        <p className="mt-0.5 text-[11.5px] text-muted">Your stand now counts for "{promotions.find((p) => p.applied && p.id !== row.id && p.rewardOptions?.length)?.title}" (the better deal). This offer still gives you one - pick it below.</p>
+                      )}
                       {(() => {
                         // an offer in the same group replaces the one already applied (never both)
                         const current = row.group && !row.applied ? promotions.find((p) => p.applied && p.id !== row.id && p.group === row.group) : null;
@@ -667,6 +772,8 @@ const PromotionUnlockSheet = () => {
                     {items.map((product) => (
                       <div key={`${row.id}-${product.productId}-${product.sku || ""}`} className={items.length > 3 ? "shrink-0 snap-start" : "w-full min-w-0"}>
                         <RecommendationCard
+                          inCart={inCartQty(product)}
+                          onSub={handleSub}
                           product={product}
                           onAdd={handleAdd}
                           isAdding={addingProductId === `${product.productId}:${product.sku || ""}`}
@@ -683,9 +790,25 @@ const PromotionUnlockSheet = () => {
             {/* "Add 1 more → 1 more FREE" for repeating offers (one reward per trigger item):
                 the server sends the offer once, so the next step is built from its trigger
                 products (triggerProductIds) and the cached catalogue */}
-            {checkoutMode && rows.map((row) => {
+            {checkoutMode && promotions.filter((p) => p.applied && p.displayType !== "free_gift").map((row) => {
               const ids = row.triggerProductIds || [];
-              if (!ids.length || !(row.qualifying || row.applied)) return null;
+              // a reward still waiting to be picked comes first; step 1 of the next one only after that
+              if (!ids.length || !(row.qualifying || row.applied) || row.rewardTargetPending) return null;
+              // only stand-type offers that can still repeat (never free shipping, never past the cap)
+              if (!canGetOneMore(row, cartItems) && stepTwoFor !== row.id) return null;
+              // both steps just done: confirm it and offer the way forward, never loop back to step 1
+              if (stepTwoFor === row.id) {
+                return (
+                  <div key={`done-${row.id}`} data-offer-row data-step-done className="mt-4 rounded-xl border border-brand bg-white p-3 shadow-sm">
+                    <p className="flex items-center gap-2 text-sm font-bold text-ink">
+                      <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-brand text-[11px] text-white" aria-hidden="true">✓</span>
+                      Both steps done - your stand offer is applied
+                    </p>
+                    <p className="mt-1 text-[12px] text-muted">{row.title}</p>
+                    
+                  </div>
+                );
+              }
               // the admin already has a next tier for this group ("Buy 2 …") - that card is shown instead
               // tiered offers ("Buy 1/2/3") give ONE reward; "add 1 more" would be false once the top
               // tier is reached. Only a lone repeating offer (no tiers in its group) gets this card.
@@ -698,12 +821,22 @@ const PromotionUnlockSheet = () => {
               return (
                 <div key={`more-${row.id}`} data-offer-row className="mt-4 overflow-hidden rounded-xl border border-hair bg-white p-3 shadow-sm">
                   <p className="text-[10px] font-extrabold uppercase tracking-[0.13em] text-brand">{row.title}</p>
-                  <p className="mt-0.5 text-sm font-bold text-ink">Add 1 more {nounOf(cards[0].productName)} to get 1 more {(row.rewardLabel || "").trim().split(/\s+/).pop() || "reward"} FREE</p>
-                  {row.rewardLabel && <p className="mt-0.5 text-[12px] text-muted">Every {nounOf(cards[0].productName)} unlocks one {row.rewardLabel.replace(/^FREE\s+/i, "")}.</p>}
+                  <p className="mt-0.5 text-sm font-bold text-ink">Get one more {(row.rewardLabel || "reward").split(",")[0].replace(/\s+per\s+\w+$/i, "").trim()} in 2 steps</p>
+                  {/* step 1 is live here; step 2 (the reward pick) opens as soon as the item is in the cart */}
+                  <ol className="mt-2 space-y-1.5 text-[12px]">
+                    <li className="flex items-center gap-2 font-bold text-ink">
+                      <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-brand text-[11px] text-paper">1</span>
+                      Add another {nounOf(cards[0].productName)} below
+                    </li>
+                    <li className="flex items-center gap-2 text-muted">
+                      <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full border border-hair text-[11px]">2</span>
+                      Then pick your {(row.rewardLabel || "reward").split(",")[0].replace(/\s+per\s+\w+$/i, "").trim()} - it opens right after
+                    </li>
+                  </ol>
                   <div className="mt-3 flex gap-3 snap-x snap-mandatory overflow-x-auto overscroll-x-contain px-1 pb-1 scrollbar-hide" aria-label="Eligible products">
                     {cards.map((product) => (
                       <div key={`${row.id}-${product.sku}`} className="shrink-0 snap-start">
-                        <RecommendationCard product={product} onAdd={handleAdd} isAdding={addingProductId === `${product.productId}:${product.sku || ""}`} isBusy={Boolean(addingProductId)} />
+                        <RecommendationCard product={product} inCart={inCartQty(product)} onSub={handleSub} onAdd={(prod) => handleAdd(prod, row.id)} isAdding={addingProductId === `${product.productId}:${product.sku || ""}`} isBusy={Boolean(addingProductId)} />
                       </div>
                     ))}
                   </div>
@@ -717,9 +850,14 @@ const PromotionUnlockSheet = () => {
         {/* checkout lives OUTSIDE the scrolling list (footer of the sheet), so it never covers products */}
         {checkoutMode && !justUnlocked && (
           <div className="shrink-0 border-t border-hair bg-paper px-5 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] sm:px-7">
-            <button type="button" onClick={() => { close(false); navigate("/checkout"); }} className="h-12 w-full rounded-xl bg-brand text-sm font-bold text-paper transition-colors hover:bg-brandHi">
-              Continue to checkout
-            </button>
+            <div className="grid grid-cols-[auto_1fr] gap-2">
+              <button type="button" onClick={() => { close(false); navigate("/offers"); }} className="h-12 rounded-xl border border-ink/20 bg-white px-4 text-sm font-bold text-ink transition-colors hover:border-ink">
+                Explore offers
+              </button>
+              <button type="button" onClick={() => { close(false); navigate("/checkout"); }} className="h-12 w-full rounded-xl bg-brand text-sm font-bold text-paper transition-colors hover:bg-brandHi">
+                Continue to checkout
+              </button>
+            </div>
           </div>
         )}
       </div>

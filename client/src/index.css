@@ -1050,9 +1050,13 @@
 @media(min-width:640px){.uo-card{padding:20px}.uo-h{font-size:17px}.uo-h1{font-size:34px}.uo-circle{width:64px;height:64px;font-size:26px}}
 @media(min-width:1024px){.uo-card{padding:22px 24px}}
 
-/* Theme scrollbar (page + .un-scroll panels): thin, ink thumb, red on hover */
-html,.un-scroll{scrollbar-width:thin;scrollbar-color:rgb(var(--gl-ink)/.45) transparent}
-html::-webkit-scrollbar,.un-scroll::-webkit-scrollbar{width:8px;height:8px}
-html::-webkit-scrollbar-track,.un-scroll::-webkit-scrollbar-track{background:transparent}
-html::-webkit-scrollbar-thumb,.un-scroll::-webkit-scrollbar-thumb{background:rgb(var(--gl-ink)/.35);border-radius:999px;border:2px solid transparent;background-clip:padding-box}
-html::-webkit-scrollbar-thumb:hover,.un-scroll::-webkit-scrollbar-thumb:hover{background:rgb(var(--gl-brand));background-clip:padding-box}
+/* Theme scrollbar on every scrolling area (page, popups, drawers, lists): thin, ink thumb, red on hover.
+   Strips that hide their scrollbar (.scrollbar-hide, .no-scrollbar, .gl-hscroll) keep winning: they sit in later layers or are unlayered, so they beat this base-layer rule. */
+@layer base{
+*{scrollbar-width:thin;scrollbar-color:rgb(var(--gl-ink)/.4) transparent}
+*::-webkit-scrollbar{width:8px;height:8px}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{background:rgb(var(--gl-ink)/.35);border-radius:999px;border:2px solid transparent;background-clip:padding-box}
+*::-webkit-scrollbar-thumb:hover{background:rgb(var(--gl-brand));background-clip:padding-box}
+*::-webkit-scrollbar-button{display:none;width:0;height:0}
+}
