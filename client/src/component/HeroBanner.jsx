@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom';
  *
  * Image-first: each slide is a finished creative (headline, offer and button are
  * in the picture). One slide = a plain static banner, no scripting. Two or more =
- * a native CSS scroll-snap slider (swipe on touch, arrows on desktop, dots) with
+ * a native CSS scroll-snap slider (swipe on touch, arrows on desktop) with
  * optional autoplay. The parent keeps its built-in hero when there are no slides.
  *
  * Speed: the box is sized with aspect-ratio (4:5 mobile, 12:5 from 768px) so
@@ -23,10 +23,15 @@ const CSS = `
 .hb-track:focus-visible { outline: 3px solid #fff; outline-offset: -3px; }
 /* The box is the PICTURE'S OWN shape (--rm mobile, --rd desktop, from the admin upload): nothing is cropped and nothing shifts.
    Very tall artwork is capped to the screen; the pictures then sit centred and the sides take the artwork's own edge colours. */
-.hb-slide, .hb-single { position: relative; width: 100%; overflow: hidden; aspect-ratio: var(--rm, 4 / 5); max-height: 85svh; background: var(--gl-ink, #141414); }
+.hb-slide, .hb-single { position: relative; width: 100%; overflow: hidden; aspect-ratio: var(--rm, 4 / 5); max-height: 85svh; background: var(--bgm, rgb(var(--gl-ink))); }
 .hb-slide { flex: 0 0 100%; scroll-snap-align: start; }
-@media (min-width: 768px) { .hb-slide, .hb-single { aspect-ratio: var(--rd, 12 / 5); max-height: min(720px, 85vh); } }
-.hb-fade .hb-img { -webkit-mask-image: linear-gradient(to right, transparent, #000 5%, #000 95%, transparent); mask-image: linear-gradient(to right, transparent, #000 5%, #000 95%, transparent); }
+@media (min-width: 768px) { .hb-slide, .hb-single { aspect-ratio: var(--rd, 12 / 5); max-height: min(720px, 85vh); background: var(--bgd, rgb(var(--gl-ink))); } }
+/* the picture's edges melt into the space around it (same colours), so no seam shows: top/bottom on phones, sides on desktop */
+.hb-fade-m .hb-img { -webkit-mask-image: linear-gradient(to bottom, transparent, #000 4%, #000 96%, transparent); mask-image: linear-gradient(to bottom, transparent, #000 4%, #000 96%, transparent); }
+@media (min-width: 768px) {
+  .hb-fade-m .hb-img { -webkit-mask-image: none; mask-image: none; }
+  .hb-fade-d .hb-img { -webkit-mask-image: linear-gradient(to right, transparent, #000 5%, #000 95%, transparent); mask-image: linear-gradient(to right, transparent, #000 5%, #000 95%, transparent); }
+}
 .hb-slide picture, .hb-single picture { display: block; width: 100%; height: 100%; }
 .hb-img { position: relative; z-index: 1; display: block; width: 100%; height: 100%; object-fit: contain; }
 /* Shown behind the picture until it has loaded (or if it never does): brand name on a soft shimmer, so a slow connection never looks like an empty black box. */
@@ -44,23 +49,19 @@ const CSS = `
 @media (min-width: 768px) { .hb-arrow { display: grid; } }
 .hb-note { position: absolute; z-index: 2; left: 10px; bottom: 5px; max-width: 60%; color: #fff; font: 500 9px/1.2 Inter, system-ui, sans-serif; text-shadow: 0 0 3px rgba(0,0,0,.65), 0 0 1px rgba(0,0,0,.8); pointer-events: none; }
 @media (min-width: 768px) { .hb-note { left: 14px; bottom: 7px; font-size: 10px; } }
-.hb-dots { position: absolute; left: 0; right: 0; bottom: 6px; display: flex; justify-content: center; align-items: center; pointer-events: none; }
-.hb-dot { pointer-events: auto; width: 24px; height: 24px; display: grid; place-items: center; background: none; border: 0; padding: 0; cursor: pointer; }
-.hb-dot i { display: block; width: 8px; height: 8px; background: rgba(255,255,255,.55); border: 1px solid rgba(20,20,20,.5); transition: width .2s, background .2s; }
-.hb-dot[aria-current="true"] i { width: 22px; background: #fff; }
-.hb-dot:focus-visible { outline: 3px solid #fff; outline-offset: -2px; }
-.hb-pause { right: 8px; bottom: 6px; width: 32px; height: 32px; font-size: 11px; }
-@media (prefers-reduced-motion: reduce) { .hb-dot i { transition: none; } }
-`;
+@media (prefers-reduced-motion: reduce) { `;
 
 const BLANK = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
 
 // Per-slide box: its own shape for mobile / desktop, plus the artwork's edge colours (top → bottom) for any space beside it.
+const grad = (c) => (c ? `linear-gradient(to bottom, ${c[0]}, ${c[1]})` : undefined);
 const boxStyle = (s) => ({
   '--rm': s.mr || undefined,
   '--rd': s.dr || undefined,
-  background: s.bg ? `linear-gradient(to bottom, ${s.bg[0]}, ${s.bg[1]})` : undefined,
+  '--bgm': grad(s.mbg || s.bg), // phones: the mobile picture's own colours (old slides: the desktop ones)
+  '--bgd': grad(s.bg),
 });
+const fadeClass = (s) => `${s.bg ? ' hb-fade-d' : ''}${s.mbg ? ' hb-fade-m' : ''}`;
 
 const reduceMotion = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
@@ -124,7 +125,6 @@ const HeroBanner = ({ slides: input = [], autoplay = { enabled: false, seconds: 
   const [hover, setHover] = useState(false);
   const [focusIn, setFocusIn] = useState(false);
   const [tabHidden, setTabHidden] = useState(false);
-  const [userPaused, setUserPaused] = useState(false);
 
   const active = rawActive < n ? rawActive : 0; // a broken image can drop a slide under the index
   const markDead = useCallback((id) => setDead((d) => new Set(d).add(id)), []);
@@ -163,7 +163,7 @@ const HeroBanner = ({ slides: input = [], autoplay = { enabled: false, seconds: 
     return () => document.removeEventListener('visibilitychange', on);
   }, []);
 
-  const playing = n > 1 && !!autoplay?.enabled && onScreen && !hover && !focusIn && !tabHidden && !userPaused && !reduceMotion();
+  const playing = n > 1 && !!autoplay?.enabled && onScreen && !hover && !focusIn && !tabHidden && !reduceMotion();
   useEffect(() => {
     if (!playing) return undefined;
     const id = setTimeout(() => go(active + 1), Math.min(10, Math.max(3, autoplay.seconds || 5)) * 1000);
@@ -177,7 +177,7 @@ const HeroBanner = ({ slides: input = [], autoplay = { enabled: false, seconds: 
     return (
       <section className="hb" aria-label="Featured offer">
         <style>{CSS}</style>
-        <div className={`hb-single${s.bg ? ' hb-fade' : ''}`} style={boxStyle(s)}>
+        <div className={`hb-single${fadeClass(s)}`} style={boxStyle(s)}>
           <SlideLink link={s.link} label={s.alt} tabbable>
             <SlidePicture slide={s} first onDead={markDead} />
           </SlideLink>
@@ -209,7 +209,7 @@ const HeroBanner = ({ slides: input = [], autoplay = { enabled: false, seconds: 
           <div
             key={s.id}
             data-i={i}
-            className={`hb-slide${s.bg ? ' hb-fade' : ''}`}
+            className={`hb-slide${fadeClass(s)}`}
             style={boxStyle(s)}
             role="group"
             aria-roledescription="slide"
@@ -230,20 +230,6 @@ const HeroBanner = ({ slides: input = [], autoplay = { enabled: false, seconds: 
       <button type="button" className="hb-btn hb-arrow hb-next" aria-label="Next slide" onClick={() => go(active + 1)}>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
       </button>
-
-      <div className="hb-dots">
-        {slides.map((s, i) => (
-          <button key={s.id} type="button" className="hb-dot" aria-label={`Go to slide ${i + 1}`} aria-current={i === active ? 'true' : undefined} onClick={() => go(i)}>
-            <i />
-          </button>
-        ))}
-      </div>
-
-      {autoplay?.enabled && (
-        <button type="button" className="hb-btn hb-pause" aria-label={userPaused ? 'Play slideshow' : 'Pause slideshow'} onClick={() => setUserPaused((p) => !p)}>
-          <span aria-hidden="true">{userPaused ? '▶' : '❚❚'}</span>
-        </button>
-      )}
     </section>
   );
 };

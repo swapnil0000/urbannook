@@ -32,6 +32,7 @@ export const getActiveHeroBannerController = asyncHandler(async (_req, res) => {
         dr: Math.round(dr * 1000) / 1000,
         mr: Math.round(mr * 1000) / 1000,
         bg: /^#[0-9a-f]{6}$/i.test(s.bgTop || "") && /^#[0-9a-f]{6}$/i.test(s.bgBottom || "") ? [s.bgTop, s.bgBottom] : null,
+        mbg: s.mobileImage && /^#[0-9a-f]{6}$/i.test(s.mobileBgTop || "") && /^#[0-9a-f]{6}$/i.test(s.mobileBgBottom || "") ? [s.mobileBgTop, s.mobileBgBottom] : null,
       };
     });
   const seconds = Math.min(10, Math.max(3, Number(doc?.autoplay?.seconds) || 5));
