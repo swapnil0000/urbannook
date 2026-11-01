@@ -18,7 +18,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ScrollColorBand, MotionRoot } from '../../component/motion';
 import { variantSku, trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist, trackVariantSelect, trackShare, trackDeliveryCheck } from '../../utils/analytics';
 import { productsApi, useGetProductByIdQuery, useGetProductsQuery, useGetBlogPostsQuery } from '../../store/api/productsApi';
-import { useAddToCartMutation, useUpdateCartMutation, useCalculateShippingMutation, useGetFreeShippingOfferQuery } from '../../store/api/userApi';
+import { useAddToCartMutation, useUpdateCartMutation, useCalculateShippingMutation, useGetFreeShippingOfferQuery, useGetHomeComboOffersQuery } from '../../store/api/userApi';
+import { buildOfferLines } from '../../utils/productOfferLines';
 import { shippingDetails, RETURN_POLICY } from '../../utils/productSchema';
 import { useGetProductReviewsQuery, useSubmitProductReviewMutation, useUpdateProductReviewMutation } from '../../store/api/testimonialsApi';
 import { addItem, updateQuantity, removeItem, updateSelection } from '../../store/slices/cartSlice';
@@ -35,6 +36,7 @@ import { useCartPromotions } from '../../hooks/useCartPromotions';
 import SaleTag from '../../component/festive/SaleTag';
 import SaleDealBox from '../../component/festive/SaleDealBox';
 import StockStatus from '../../component/StockStatus';
+import { shortVariantNames } from '../../utils/variantShortName';
 import ProductQuestions from '../../component/support/ProductQuestions';
 
 const MotionDiv = motion.div;
@@ -79,7 +81,7 @@ const VersionPicker = ({ variant, onOpen }) => {
   return (
     <div className="mt-4">
       <p className="gl-lbl text-[10px] text-muted mb-2">Type</p>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-stretch gap-2">
         {types.map((t) => {
           const isCurrent = lc(t) === lc(currentType);
           const target = versions.find((o) => lc(o.type) === lc(t));
@@ -92,7 +94,7 @@ const VersionPicker = ({ variant, onOpen }) => {
               disabled={unavailable}
               onClick={() => !isCurrent && target && onOpen(target)}
               title={unavailable ? `${t} version not available for this design` : target?.outOfStock ? `${t} version is out of stock` : undefined}
-              className={`min-w-[5.5rem] px-4 py-2 rounded-lg border text-sm font-bold transition-colors ${
+              className={`flex min-h-[3.25rem] min-w-[5.5rem] flex-col items-center justify-center px-4 py-1.5 rounded-lg border text-sm font-bold leading-tight transition-colors ${
                 isCurrent
                   ? 'border-ink bg-ink text-paper'
                   : unavailable
@@ -100,8 +102,10 @@ const VersionPicker = ({ variant, onOpen }) => {
                     : 'border-hair text-ink bg-white hover:border-ink'
               }`}
             >
-              {t}
-              {target?.outOfStock && !isCurrent && <span className="block text-[10px] font-semibold text-muted">Out of stock</span>}
+              <span>{t}</span>
+              <span className="block min-h-[12px] text-[10px] font-semibold leading-3 text-muted">
+                {target?.outOfStock && !isCurrent ? 'Out of stock' : '\u00a0'}
+              </span>
             </button>
           );
         })}
@@ -198,6 +202,13 @@ const ProductDetailPage = () => {
   // Same args as the header's list (entry-server globalQueries), so this reads
   // that cached list instead of embedding a second copy in the page's HTML.
   const { data: relRes } = useGetProductsQuery({ page: 1, limit: 24 });
+  // Live offers for this product, shown right under the price (the full offer
+  // cards sit much lower; from the top nobody knew an offer existed).
+  const { data: comboRes } = useGetHomeComboOffersQuery();
+  const offerLines = useMemo(() => {
+    const names = new Map(productList(relRes).map((x) => [String(x.productId), x.productName]));
+    return buildOfferLines(comboRes?.data?.combos || [], names).get(String(productId)) || [];
+  }, [comboRes, relRes, productId]);
   const related = useMemo(() => productList(relRes).filter((p) => p.productId !== productId).slice(0, 4), [relRes, productId]);
 
   // Product FAQs — use CMS-provided product.faqs if present, else generate helpful
@@ -266,6 +277,18 @@ const ProductDetailPage = () => {
   }, [product, currentPrice, selectedVariant]);
 
   const availableVariants = useMemo(() => (product?.variantDetails ? product.variantDetails.map((v) => v.variantName) : []), [product]);
+  const activeVariants = useMemo(() => (product?.variantDetails || []).filter((v) => v && v.isActive !== false), [product]);
+  // Warm every variant's gallery in the browser cache once the page is idle,
+  // so switching a swatch swaps to an already-decoded photo instead of a
+  // blank frame while it downloads (that blank was the "flicker").
+  useEffect(() => {
+    if (!activeVariants.length) return undefined;
+    const urls = [...new Set(activeVariants.flatMap((v) => (v.variantImage || []).slice(0, 2)))];
+    const run = () => urls.forEach((u) => { const im = new Image(); im.decoding = 'async'; im.src = u; });
+    const id = typeof window.requestIdleCallback === 'function' ? window.requestIdleCallback(run, { timeout: 2000 }) : setTimeout(run, 800);
+    return () => (typeof window.cancelIdleCallback === 'function' ? window.cancelIdleCallback(id) : clearTimeout(id));
+  }, [activeVariants]);
+  const shortNames = useMemo(() => { const n = activeVariants.map((v) => v.variantName); const sh = shortVariantNames(n); return new Map(n.map((x, i) => [x, sh[i]])); }, [activeVariants]);
 
   // Admin-curated combo + recommendation rows (empty => sections render nothing).
   const recommendedProducts = product?.recommendedProductsDetails || [];
@@ -671,7 +694,7 @@ const ProductDetailPage = () => {
           <div className="min-w-0">
             {/* ZONE A — IDENTITY (on paper): kicker + rating chip, title + heart, lede */}
             <div className="flex items-center justify-between gap-3">
-              <p className="gl-lbl text-brand">{product.productSubCategory || product.productCategory || '3D Printed'}</p>
+              <p className="gl-lbl text-ink border border-ink/25 px-3 py-1.5">{product.productSubCategory || product.productCategory || '3D Printed'}</p>
               {totalReviews > 0 && avgRating > 0 && (
                 <button onClick={() => document.getElementById('reviews')?.scrollIntoView({ behavior: 'smooth' })} className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-hair px-2.5 py-1 hover:border-ink transition-colors">
                   <Stars n={avgRating} className="text-xs" />
@@ -695,6 +718,10 @@ const ProductDetailPage = () => {
                 {selectedVariantSubTag && (
                   <p className="text-base md:text-lg font-normal text-muted leading-snug mt-1">{selectedVariantSubTag}</p>
                 )}
+                {/* The badge stands for the real policies in the trust strip below, nothing more */}
+                <span className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1 text-[12px] font-bold text-paper" title="Free replacement if it arrives damaged · ships in 24-48 hrs">
+                  <i className="fa-solid fa-check text-[10px]" aria-hidden="true" /> UrbanNook Assured
+                </span>
               </div>
               <div className="shrink-0 pt-1 flex items-center gap-2">
                 <button onClick={handleShareClick} aria-label="Share this product" className="w-9 h-9 grid place-items-center rounded-full border border-hair text-ink hover:border-ink transition-colors">
@@ -730,9 +757,22 @@ const ProductDetailPage = () => {
                 <SaleTag />
               </div>
               {discountPercent > 0 && <p className="text-sm font-semibold text-save mt-1.5">You save {inr(maxVariantPrice - currentPrice)}</p>}
+              {offerLines.length > 0 && (
+                <button type="button" onClick={() => document.getElementById('pdp-offers')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                  className="mt-2.5 flex w-full flex-col gap-1 text-left" aria-label={`${offerLines.length} offers on this product — see details`}>
+                  {offerLines.map((o) => (
+                    <span key={o.title} className="inline-flex max-w-full items-start gap-1.5 self-start rounded-r-sm border-l-[3px] border-brand bg-brand/[0.08] px-2.5 py-1.5 text-[12.5px] font-bold leading-tight text-saleDeep">
+                      <span aria-hidden="true">🎁</span><span>{o.text}</span>
+                    </span>
+                  ))}
+                  <span className="text-[12px] font-semibold text-brand underline underline-offset-2">{offerLines.length > 1 ? `See ${offerLines.length} offers` : 'See offer'} ↓</span>
+                </button>
+              )}
+              {/* prices are GST-inclusive (the order page says "Incl. GST" too) */}
+              <p className="text-xs text-muted mt-1">Inclusive of all taxes</p>
 
               {/* real stock for the selected variant ("Only 2 left" at 5 or fewer) + dispatch time */}
-              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-hair bg-white/60 px-3 py-2">
+              <div className={`mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border px-3 py-2.5 ${isOutOfStock ? 'border-hair bg-white/60' : 'border-save/30 bg-save/10'}`}>
                 <StockStatus outOfStock={isOutOfStock} left={selectedVariantObj?.variantQuantity} lowAt={5} />
                 {!isOutOfStock && <span className="text-[12px] text-muted"><i className="fa-solid fa-truck-fast mr-1 text-brand" aria-hidden="true" />Ships in 24-48 hrs</span>}
               </div>
@@ -743,19 +783,46 @@ const ProductDetailPage = () => {
               {/* variants */}
               {availableVariants.length > 0 && (
                 <>
-                  <div className="border-t border-hair my-4" />
+                  <div className="my-4" />
 
-                  {/* Picture swatches. Deliberately large: at thumbnail size a
-                      katana is a thin diagonal nobody can identify, so these are
-                      ~100px and carry a short name underneath — picture AND
-                      label, rather than asking either to work alone. Where the
-                      variant genuinely IS a colour (the pen stand) the tile
-                      shows that colour instead of a photo of it. The row scrolls
-                      rather than wraps, so eleven variants stay one line instead
-                      of stacking into a column. */}
-                  
-
-                 
+                  {/* Picture swatches with the picked design's name on the label
+                      row. Each tile is a real link to that variant's own URL
+                      (crawlable); a normal click stays on this page and swaps
+                      the variant in place via onSelectVariant. The row scrolls
+                      rather than wraps, so many variants stay one line. */}
+                  {activeVariants.length > 1 && (
+                    <div>
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="min-w-0 truncate font-archivo text-[14px] font-bold leading-5 text-ink" title={selectedVariant}>{product.productCategory === 'Lamp' ? 'Design' : 'Variant'}: <span className="font-semibold text-ink/70">{shortNames.get(selectedVariant) || selectedVariant}</span></p>
+                      </div>
+                      <div className="mt-2.5 -mx-1 px-1 py-1 flex gap-2 sm:gap-2.5 overflow-x-auto gl-hscroll">
+                        {activeVariants.map((v) => {
+                          const on = v.variantName === selectedVariant;
+                          const oos = isVariantOutOfStock(v);
+                          // real photo whenever the variant has one; a flat colour only as a last resort
+                          const isColour = !v.variantImage?.[0] && v.variantSwatchType === 'color' && v.variantSwatchValue;
+                          return (
+                            <Link
+                              key={v.sku || v.variantName}
+                              to={v.sku ? `/product/${product.productId}/${v.sku}` : `/product/${product.productId}`}
+                              onClick={(e) => { e.preventDefault(); onSelectVariant(v); }}
+                              aria-current={on ? 'true' : undefined}
+                              title={v.variantName}
+                              className={`group shrink-0 w-[88px] sm:w-[96px] rounded-xl border-2 bg-white p-1.5 transition-all ${on ? 'border-ink shadow-md' : 'border-transparent shadow-sm hover:border-hair'}`}
+                            >
+                              <span className={`relative block aspect-square overflow-hidden rounded-lg bg-surface ${oos ? 'opacity-50' : ''}`}>
+                                {isColour
+                                  ? <span className="block w-full h-full" style={{ background: v.variantSwatchValue }} />
+                                  : <img src={v.variantImage?.[0] || variantImage(v.variantName)} alt={v.variantName} loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" onError={onImgErr} />}
+                                {on && <span className="absolute right-1 top-1 grid h-4 w-4 place-items-center rounded-full bg-ink text-[9px] text-white" aria-hidden="true">✓</span>}
+                              </span>
+                              <span className={`block h-8 overflow-hidden px-0.5 pt-1.5 pb-0.5 text-center font-archivo text-[12.5px] leading-tight line-clamp-2 ${on ? 'font-bold text-ink' : 'font-semibold text-ink/70'} ${oos ? 'line-through' : ''}`}>{shortNames.get(v.variantName) || v.variantName}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
 
@@ -817,6 +884,7 @@ const ProductDetailPage = () => {
                   up top; the offers popup (OffersPopup) announces them on arrival. */}
               {/* live sale countdown right above the offers it belongs to */}
               <SaleDealBox className="mt-4" />
+              <div id="pdp-offers" className="scroll-mt-24" />
               <ProductOffers productId={productId} className="mt-3" cartTotal={cartTotal} appliedIds={appliedOfferIds} cartPromotions={cartPromotions} onApply={isOutOfStock ? undefined : handleApplyOffer} disabled={isAdding} />
 
               {/* Coupons (guest list is server-rendered; see entry-server.jsx) */}
@@ -1164,7 +1232,7 @@ const ProductDetailPage = () => {
         )}
       </div>
 
-      {/* sticky mobile Add-to-Cart bar — appears after the main CTA scrolls out of view */}
+      {/* sticky Add-to-Cart bar (mobile above the bottom nav, desktop at the very bottom) — appears after the main CTA scrolls out of view */}
       <AnimatePresence>
         {!buyBoxVisible && product && !isLoading && (
           <MotionDiv
@@ -1172,9 +1240,8 @@ const ProductDetailPage = () => {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 90, opacity: 0 }}
             transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            data-sticky-buybar // the floating Help button lifts above this bar while it is shown
-            className="md:hidden fixed inset-x-0 z-30 bg-paper/95 backdrop-blur border-t border-hair px-4 py-3 flex items-center gap-3"
-            style={{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom))' }}
+            data-sticky-buybar="all" // the floating Help button lifts above this bar while it is shown ("all" = desktop too)
+            className="fixed inset-x-0 z-30 bg-paper/95 backdrop-blur border-t border-hair px-4 py-3 flex items-center gap-3 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] md:bottom-0 md:px-[max(1.25rem,calc((100vw-1280px)/2+1.25rem))]"
           >
             {/* the thumbnail is the first thing to go once the bar also has to
                 hold a stepper — at 390px there is not room for both */}
@@ -1182,8 +1249,14 @@ const ProductDetailPage = () => {
               <img src={variantImage(selectedVariant)} alt="" className="w-11 h-11 rounded-lg object-cover border border-hair shrink-0" onError={onImgErr} />
             )}
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold truncate leading-tight">{product.productName}</p>
-              <p className="text-sm font-extrabold">{inr(currentPrice)}</p>
+              <p className="text-xs md:text-sm font-bold truncate leading-tight">{product.productName}</p>
+              {selectedVariant && selectedVariant !== product.productName && <p className="hidden md:block gl-lbl text-[10px] text-muted truncate">{selectedVariant}</p>}
+              <p className="text-sm font-extrabold md:hidden">{inr(currentPrice)}</p>
+            </div>
+            {/* desktop: price + struck MRP beside the buttons, like the main buy box */}
+            <div className="hidden md:flex items-baseline gap-2 shrink-0">
+              <span className="text-xl font-extrabold tabular-nums">{inr(currentPrice)}</span>
+              {discountPercent > 0 && <span className="text-sm text-faint line-through tabular-nums">{inr(maxVariantPrice)}</span>}
             </div>
             {isOutOfStock ? (
               <button onClick={() => setShowNotifyModal(true)} className="gl-press border border-ink text-ink font-bold text-sm px-5 h-11 rounded-xl shrink-0 hover:bg-ink hover:text-paper transition-colors">Notify me</button>
@@ -1212,7 +1285,11 @@ const ProductDetailPage = () => {
                 <button onClick={handleCheckoutClick} className="gl-press bg-brand text-white font-bold text-sm px-4 h-11 rounded-xl shrink-0 hover:bg-brandHi">Checkout</button>
               </>
             ) : (
-              <button onClick={handleBuyNow} disabled={isAdding} className="gl-press bg-brand text-white font-bold text-sm px-6 h-11 rounded-xl shrink-0 hover:bg-brandHi disabled:opacity-60">{isAdding ? 'Please wait…' : 'Buy Now'}</button>
+              <>
+                {/* desktop has the room for both buttons, like the main buy box */}
+                <button onClick={() => handleInitialAddToCart()} disabled={isAdding} className="hidden md:block gl-press border border-ink text-ink font-bold text-sm px-6 h-11 rounded-xl shrink-0 hover:bg-ink hover:text-paper transition-colors disabled:opacity-60">Add to Cart</button>
+                <button onClick={handleBuyNow} disabled={isAdding} className="gl-press bg-brand text-white font-bold text-sm px-6 h-11 rounded-xl shrink-0 hover:bg-brandHi disabled:opacity-60">{isAdding ? 'Please wait…' : 'Buy Now'}</button>
+              </>
             )}
           </MotionDiv>
         )}

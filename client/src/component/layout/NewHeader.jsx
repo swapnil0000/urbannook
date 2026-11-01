@@ -2,17 +2,19 @@ import { useState, useEffect, useRef, Suspense, useMemo, lazy } from 'react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { useGetWishlistQuery } from '../../store/api/userApi';
-import { useGetProductsQuery } from '../../store/api/productsApi';
+import { useGetProductsQuery, useGetCategoriesQuery } from '../../store/api/productsApi';
 import { logout as logoutAction } from '../../store/slices/authSlice';
 import { setShowLoginModal, clearLoginCallback } from '../../store/slices/uiSlice';
 import { useLogoutMutation } from '../../store/api/authApi';
 import { useAuth, useUI } from '../../hooks/useRedux';
 import { clearCsrfToken } from '../../store/api/apiSlice';
-import { categoryPath } from '../../utils/categoryUrl';
+import { categoryPath, CATEGORY_LABEL } from '../../utils/categoryUrl';
+import { buildNavMenu } from '../../utils/navMenu';
+import NavDropdown from './NavDropdown';
+import MobileNavAccordion from './MobileNavAccordion';
 
 /* Labels the team already uses. Anything new falls back to the admin's own
    category name — better a plain "Decor" than an invented "Decors". */
-const CATEGORY_LABEL = { Lamp: 'Lamps', 'Pen Stand': 'Pen Stands' };
 const MAX_NAV_CATEGORIES = 4; // beyond this the bar wraps; "Shop All" covers the rest
 
 const SignupForm = lazy(() => import('./auth/SignupForm'));
@@ -34,6 +36,7 @@ const NewHeader = () => {
   const wishlistItems = useSelector((state) => state.wishlist.items);
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [openMobileMenu, setOpenMobileMenu] = useState(null); // one accordion open at a time
   const [showLogin, setShowLogin] = useState(false);
   const [showSignup, setShowSignup] = useState(false);
   const [user, setUser] = useState(null);
@@ -62,17 +65,23 @@ const NewHeader = () => {
     return seen;
   }, [prodRes]);
 
-  const categoryLinks = useMemo(
-    () => categories.map((c) => ({
+  // Desktop dropdown per category (series/collections + its products), built
+  // from data already on the page: the products list above and GET /categories.
+  const { data: pagesRes } = useGetCategoriesQuery();
+  const categoryLinks = useMemo(() => {
+    const list = prodRes?.data?.products || prodRes?.data?.listofPublishedProducts || [];
+    return categories.map((c) => ({
       name: CATEGORY_LABEL[c] || c,
       path: categoryPath(c),
       key: `cat-${c}`,
-    })),
-    [categories],
-  );
+      menu: buildNavMenu(c, list, pagesRes?.data || []),
+    }));
+  }, [categories, prodRes, pagesRes]);
 
   const navLinks = useMemo(() => [
     { name: 'Shop All', path: '/products', key: 'products' },
+    // Offers right after Shop All: with 10+ live offers it is a main way in.
+    { name: 'Offers', path: '/offers', key: 'offers' },
     ...categoryLinks.slice(0, MAX_NAV_CATEGORIES),
     { name: 'Customize', path: '/customize', key: 'customize' },
   ], [categoryLinks]);
@@ -80,6 +89,7 @@ const NewHeader = () => {
   /* The drawer has room to list every category, so it never hides one. */
   const mobileNavLinks = useMemo(() => [
     { name: 'Shop All', path: '/products', key: 'products' },
+    { name: 'Offers', path: '/offers', key: 'offers' },
     ...categoryLinks,
     { name: 'Customize', path: '/customize', key: 'customize' },
   ], [categoryLinks]);
@@ -91,6 +101,7 @@ const NewHeader = () => {
     if (path === '/contact-us') return 'support';
     if (path === '/about-us') return 'about-us';
     if (path.startsWith('/customize')) return 'customize';
+    if (path.startsWith('/offers')) return 'offers';
     return '';
   }, [location.pathname]);
 
@@ -155,11 +166,13 @@ const NewHeader = () => {
 
           {/* center nav */}
           <nav className="hidden md:flex items-center gap-6 text-sm font-semibold">
-            {navLinks.map((item) => (
+            {navLinks.map((item) => (item.menu ? (
+              <NavDropdown key={item.key} label={item.name} to={item.path} active={location.pathname === item.path} menu={item.menu} />
+            ) : (
               <Link key={item.key} to={item.path} className={`flex items-center gap-1.5 transition-colors ${activeRoute === item.key ? 'text-brand' : 'text-paper/70 hover:text-brand'}`}>
                 {item.name}
               </Link>
-            ))}
+            )))}
           </nav>
 
           {/* right actions */}
@@ -202,11 +215,13 @@ const NewHeader = () => {
 
         {/* mobile dropdown */}
         {isMenuOpen && (
-          <div className="md:hidden border-t border-white/10 bg-ink text-paper px-5 py-3">
+          <div className="md:hidden border-t border-white/10 bg-ink text-paper px-5 py-3 max-h-[calc(100svh-7rem)] overflow-y-auto overscroll-contain">
             <nav className="flex flex-col">
-              {mobileNavLinks.map((item) => (
+              {mobileNavLinks.map((item) => (item.menu ? (
+                <MobileNavAccordion key={item.key} label={item.name} active={location.pathname === item.path} menu={item.menu} onNavigate={handleMobileNav} open={openMobileMenu === item.key} onToggle={() => setOpenMobileMenu((k) => (k === item.key ? null : item.key))} />
+              ) : (
                 <button key={item.key} onClick={() => handleMobileNav(item.path)} className={`text-left py-3 border-b border-white/10 font-semibold ${activeRoute === item.key ? 'text-brand' : 'text-paper'}`}>{item.name}</button>
-              ))}
+              )))}
             </nav>
             {user ? (
               <div className="flex items-center justify-between py-4">

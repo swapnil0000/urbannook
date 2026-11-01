@@ -31,6 +31,12 @@ const SUPPRESSED_PREFIXES = ['/checkout', '/payment-processing', '/payment-faile
 export const THEME_COPY = {
   diwali: {
     priceLabel: 'Diwali Price',
+    saleTitle: 'Diwali Sale', // sale bar headline when admin set no messages
+    // Home festive band: lead with the shopper's need, not our sale.
+    bandLine: 'Gifts for every fan on your list, from katanas to lamps.',
+    bandCta: 'Find a gift',
+    // The band shows real markdowns; the combos section below shows offers.
+    bandTitle: 'Biggest price drops',
     eyebrow: 'For This Diwali',
     offersTitle: 'Diwali Offers',
     offersSubtitle: 'Festive combos picked for gifting — more value in every box.',

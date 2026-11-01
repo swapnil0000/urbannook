@@ -75,14 +75,14 @@ const GiftingSection = ({ section }) => {
  * configured — this is exactly the original single Combo Offers section, so
  * the normal storefront is unchanged.
  */
-const FestiveSections = () => {
+const FestiveSections = ({ lead }) => {
   const { active, sections, page } = useSiteCampaign();
-  if (!active || page !== 'home' || sections.length === 0) return <ComboOfferSection />;
+  if (!active || page !== 'home' || sections.length === 0) return <ComboOfferSection lead={lead} />;
 
   return (
     <>
-      {sections.map((s) => (s.type === 'combos'
-        ? <ComboOfferSection key={s.id} title={s.title} subtitle={s.subtitle} />
+      {sections.map((s, i) => (s.type === 'combos'
+        ? <ComboOfferSection key={s.id} title={s.title} subtitle={s.subtitle} lead={i === sections.findIndex((x) => x.type === 'combos') ? lead : undefined} />
         : <GiftingSection key={s.id} section={s} />))}
       {/* the coupon strip lives inside the combos section; without one, show it on its own */}
       {!sections.some((s) => s.type === 'combos') && <CouponOffersSection />}

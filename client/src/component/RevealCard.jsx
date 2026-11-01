@@ -34,7 +34,7 @@ function getSharedObserver() {
         if (!wasShown && ratio >= SHOW_AT) {
           shownState.set(entry.target, true);
           setVisible(true);
-        } else if (wasShown && ratio <= HIDE_AT) {
+        } else if (wasShown && ratio <= HIDE_AT && !REVEAL_ONCE) {
           shownState.set(entry.target, false);
           setVisible(false);
         }
@@ -52,6 +52,12 @@ function getSharedObserver() {
 const REDUCE_MOTION =
   typeof window !== "undefined" &&
   !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+// Touch screens reveal once and stay: hiding cards again as they leave the
+// viewport made fast flick-scrolling show blank tiles and re-render every
+// card, which read as the site lagging on phones.
+const REVEAL_ONCE =
+  typeof window !== "undefined" &&
+  !!window.matchMedia?.("(pointer: coarse)").matches;
 
 /**
  * Wraps one grid item so it rises + fades in as it scrolls into view, and
@@ -62,9 +68,13 @@ const REDUCE_MOTION =
  * or paint cost), and the whole thing is skipped under
  * prefers-reduced-motion, so it can't be the thing that slows the page down.
  */
+const INSTANT_COUNT = 8;
+
 const RevealCard = ({ index = 0, children, className = "" }) => {
   const ref = useRef(null);
-  const [visible, setVisible] = useState(REDUCE_MOTION);
+  // The first rows render visible at once: hiding cards that are already on
+  // screen and fading them in made a category switch flash blank for a beat.
+  const [visible, setVisible] = useState(REDUCE_MOTION || index < INSTANT_COUNT);
 
   useEffect(() => {
     if (REDUCE_MOTION) return;

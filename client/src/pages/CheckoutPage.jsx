@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense, useRef, Fragment } from "react";
+import { useState, useEffect, useMemo, lazy, Suspense, useRef, Fragment } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 
@@ -36,7 +36,7 @@ import GiftClaimList from "../component/promotions/GiftClaimList";
 import { CartGiftProgress } from "../component/offers/CartValueGift";
 import GiftWrapOffer from "../component/GiftWrapOffer";
 import SealBadgeCard, { UnderlineAmount } from "../component/promotions/SealBadgeCard";
-import { useGetCheckoutPromotionsQuery } from "../store/api/userApi";
+import { useGetCheckoutPromotionsQuery, useGetAvailableCouponsQuery } from "../store/api/userApi";
 import { buildPromotionCartItems } from "../utils/promotionCartItems";
 import useOfferTerms from "../hooks/useOfferTerms";
 import { useShippingDelayNotice } from "../hooks/useShippingDelayNotice";
@@ -760,6 +760,13 @@ const CheckoutPage = () => {
   }, [userProfile, address, pinCode, senderMobile]);
 
   const cartItemsLength = cartItems?.length;
+  // Coupon lookup args, shared with CheckoutCouponTickets so RTK serves both
+  // from one request. The "Apply coupon" entry point only shows when at least
+  // one coupon exists for this cart; with none, a code box just invites errors.
+  const couponItems = useMemo(() => (cartItems || []).map((i) => ({ productId: i.mongoId || String(i.id).split(":")[0] })), [cartItems]);
+  const { data: couponsRes } = useGetAvailableCouponsQuery({ userId: userProfile?.userId, items: couponItems });
+  const hasCoupons = (couponsRes?.data || []).length > 0;
+  const openCouponModal = hasCoupons ? () => setShowCouponModal(true) : undefined;
   const cartTotalAmount =
     cartItems.reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0) - ruleDiscountSavings;
   const userEmail = userProfile?.email;
@@ -1606,7 +1613,7 @@ const CheckoutPage = () => {
             cartTotal={cartTotalAmount}
             isGuest={isGuest}
             userId={userProfile?.userId}
-            items={cartItems.map((i) => ({ productId: i.mongoId || i.id.split(":")[0] }))}
+            items={couponItems}
             onApplied={isGuest ? handleGuestCouponApplied : handleCouponApplied}
             onRemove={isGuest ? handleGuestCouponRemoved : handleCouponRemoved}
           />
@@ -2406,7 +2413,7 @@ const CheckoutPage = () => {
                       itemCount={cartItems.length}
                       isLoadingShipping={isCalculatingShipping}
                       paymentMethod={paymentMethod}
-                      onApplyCoupon={() => setShowCouponModal(true)}
+                      onApplyCoupon={openCouponModal}
                       onRemoveCoupon={
                         isGuest ? handleGuestCouponRemoved : handleCouponRemoved
                       }
@@ -2631,7 +2638,7 @@ const CheckoutPage = () => {
                 itemCount={cartItems.length}
                 isLoadingShipping={isCalculatingShipping}
                 paymentMethod={paymentMethod}
-                onApplyCoupon={() => setShowCouponModal(true)}
+                onApplyCoupon={openCouponModal}
                 onRemoveCoupon={
                   isGuest ? handleGuestCouponRemoved : handleCouponRemoved
                 }

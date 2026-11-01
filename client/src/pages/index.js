@@ -20,6 +20,7 @@ export const Return = lazyWithPreload(() => import("./legal/Return.jsx"));
 export const ContactPage = lazyWithPreload(() => import("./support/ContactPage.jsx"));
 export const CustomizePage = lazyWithPreload(() => import("./support/CustomizePage.jsx"));
 export const AllProductsPage = lazyWithPreload(() => import("./shop/AllProductsPage.jsx"));
+export const OffersPage = lazyWithPreload(() => import("./shop/OffersPage.jsx"));
 export const CategoryPage = lazyWithPreload(() => import("./shop/CategoryPage.jsx"));
 export const ProductDetailPage = lazyWithPreload(() => import("./shop/ProductDetailPage.jsx"));
 export const ProductVariantsPage = lazyWithPreload(() => import("./shop/ProductVariantsPage.jsx"));

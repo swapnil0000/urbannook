@@ -59,7 +59,7 @@ const VariantTile = ({ card, selected, onPick }) => {
  * (`combo.builder`). Pricing and validity of the exact selection come from the
  * existing cart promotion endpoint, so the sheet never invents a discount.
  */
-const ComboBuilderSheet = ({ combo, onClose, mode = 'builder', cartItems = [], onDismiss }) => {
+const ComboBuilderSheet = ({ combo, onClose, mode = 'builder', cartItems = [], onDismiss, onAdded }) => {
   const dispatch = useDispatch();
   const { isAuthenticated } = useSelector((s) => s.auth);
   const [addToCartAPI] = useAddToCartMutation();
@@ -238,6 +238,8 @@ const ComboBuilderSheet = ({ combo, onClose, mode = 'builder', cartItems = [], o
         trackAddToCart({ itemId: card.productId, sku: card.sku, itemName: card.productName, itemVariant: card.variantName, price: card.price, quantity, placement: 'home_combo_builder' });
       }
       close();
+      // e.g. the /offers page continues straight to checkout (real payment options)
+      if (onAdded) setTimeout(onAdded, 260);
     } catch (err) {
       setError(err?.data?.message || 'Could not add the combo. Please try again.');
     } finally {
@@ -253,7 +255,8 @@ const ComboBuilderSheet = ({ combo, onClose, mode = 'builder', cartItems = [], o
     ? (slotDef.options.find((o) => o.productId === activeProduct) || slotDef.options[0])?.cards || []
     : [];
 
-  const gridCols = slots.length >= 3 ? 'grid-cols-3' : 'grid-cols-2';
+  // 2 across on phones: at 3 across the design names were cut to "Zoro En…"
+  const gridCols = slots.length >= 3 ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2';
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-label={combo.title}>

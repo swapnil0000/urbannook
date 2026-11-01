@@ -227,3 +227,16 @@ Local SSR check: home goes from 0 to 9 product links.
 Also checked on 2026-10-24: the live sitemap lists only 3 categories and `/category/anime-katana` is an empty
 SPA shell, but a local `ssg.mjs` run against the live API renders all 143 pages incl. every collection/series
 (sitemap 115 URLs). The live build predates the collections; the next client build fixes it.
+
+## Suggestion for the SEO owner (2026-11-01, branch feat/ui-revamp-gyaan-patterns)
+- New page **`/offers`** (all live combo offers + coupons, `SEOHead` title "Offers & Combos", canonical `/offers`).
+  It is not in `client/scripts/ssg.mjs` → static routes (line ~46), so it is not pre-rendered or in the sitemap.
+  Suggest adding `['/offers', 0.7]` there if it should be indexed.
+- Shop sort/filter state (Availability, Category, Price, Sort) is client state only, never URL params, on purpose:
+  no duplicate indexable URLs.
+- Header dropdown menus, Shop pills and PDP swatches are real `<Link>`s to category / collection / variant pages,
+  so they add crawlable internal links.
+- Performance (measured 2026-11-01, prod build, phone at 4x CPU): on `/products` the analytics tags
+  (GA `gtag`, Meta `fbevents.js`, Clarity) are the biggest third-party main-thread cost (~400 ms of self time
+  during load). Suggest loading them after `load`/idle (e.g. `requestIdleCallback`) in `client/index.html` /
+  `utils/analytics.js`, keeping the first `page_view`. Owner's call; not changed here.
