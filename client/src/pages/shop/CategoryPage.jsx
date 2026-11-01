@@ -5,7 +5,7 @@ import SEOHead from '../../component/SEOHead';
 import UnProductCard from '../../component/UnProductCard';
 import RevealCard from '../../component/RevealCard';
 import ScrollRow from '../../component/ScrollRow';
-import SaleTag from '../../component/festive/SaleTag';
+import SaleBanner from '../../component/festive/SaleBanner';
 import { useGetHomeComboOffersQuery } from '../../store/api/userApi';
 import { buildOfferLines } from '../../utils/productOfferLines';
 import { ShopFilterSidebar, ShopFilterButton, ShopSort, ActiveFilterChips } from '../../component/ShopFilters';
@@ -150,7 +150,7 @@ const CategoryPage = () => {
           <Link to="/" className="hover:text-brand">Home</Link> / <Link to="/products" className="hover:text-brand">Shop</Link> / <span className="text-ink">{name}</span>
         </nav>
         {/* the sale, announced once per page (no longer repeated on every card) */}
-        <div className="mb-3 flex justify-center"><SaleTag /></div>
+        <SaleBanner className="mb-5" />
         <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">{copy.h1}</h1>
         <p className="text-muted mt-2">{itemCount} {itemCount === 1 ? 'design' : 'designs'}</p>
 
