@@ -61,7 +61,7 @@ const BlogListPage = () => {
   return (
     <div className="font-inter bg-paper text-ink min-h-screen">
       <SEOHead
-        title="Journal – Anime Swords, Car Culture & Desk Setup Guides"
+        title="Journal - Anime Swords, Car Culture & Desk Setup Guides"
         description="Stories and guides from UrbanNook: the anime swords behind our katanas, car culture behind our caliper lamps, and ideas for your desk and setup."
         url="/blog"
         structuredData={structuredData}

@@ -45,7 +45,7 @@ const PasskeyEnroll = () => {
       <div className="flex-1 min-w-0">
         <p className="gl-lbl text-[10px] text-brand mb-1">Faster sign-in</p>
         <h3 className="font-archivo font-bold text-ink text-base leading-tight">Enable a passkey</h3>
-        <p className="text-muted text-xs mt-0.5">Sign in with Face ID, fingerprint or your device PIN — no password.</p>
+        <p className="text-muted text-xs mt-0.5">Sign in with Face ID, fingerprint or your device PIN - no password.</p>
       </div>
       {done ? (
         <span className="shrink-0 gl-lbl text-[10px] text-save flex items-center gap-1.5">

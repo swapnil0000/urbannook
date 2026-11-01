@@ -17,9 +17,9 @@ describe('mergeSeo', () => {
   });
 
   it('partial entry: title overrides title and OG title only', () => {
-    const out = mergeSeo(page, { metaTitle: 'Desk Lamps – Buy Online | UrbanNook' });
-    expect(out.fullTitle).toBe('Desk Lamps – Buy Online | UrbanNook');
-    expect(out.ogTitle).toBe('Desk Lamps – Buy Online | UrbanNook');
+    const out = mergeSeo(page, { metaTitle: 'Desk Lamps - Buy Online | UrbanNook' });
+    expect(out.fullTitle).toBe('Desk Lamps - Buy Online | UrbanNook');
+    expect(out.ogTitle).toBe('Desk Lamps - Buy Online | UrbanNook');
     expect(out.description).toBe('Page desc');
     expect(out.canonicalUrl).toBe(page.canonicalUrl);
   });

@@ -56,7 +56,7 @@ const PasskeyPrompt = () => {
         const res = await checkStatus().unwrap();
         if (res?.data?.hasPasskey) markSeen(uid);
         else setShow(true);
-      } catch { /* status check failed — skip prompting */ }
+      } catch { /* status check failed - skip prompting */ }
     }, 900);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps

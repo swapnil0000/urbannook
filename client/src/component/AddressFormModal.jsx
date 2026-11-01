@@ -634,7 +634,7 @@ const AddressFormModal = ({
           {/* <div className="flex items-center gap-2 mb-1">
             <i className="fa-solid fa-map-pin text-brand text-xs"></i>
             <p className="text-[10px] font-bold uppercase tracking-widest text-brand">
-              Area — auto-filled from map pin, editable
+              Area - auto-filled from map pin, editable
             </p>
             {locationSummary && (
               <button

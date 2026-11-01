@@ -79,7 +79,7 @@ const ProductOffers = ({ productId, className = '', onApply, disabled = false, c
                 <p className="mt-0.5 text-[11px] font-semibold text-brand">
                   {instead.upgrade
                     ? <>Your cart unlocked a bigger offer: {instead.promo.title}</>
-                    : <>Your free stand comes from &ldquo;{instead.promo.title}&rdquo; — one stand offer per order</>}
+                    : <>Your free stand comes from &ldquo;{instead.promo.title}&rdquo; - one stand offer per order</>}
                 </p>
               )}
             </div>

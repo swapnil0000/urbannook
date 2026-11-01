@@ -79,7 +79,7 @@ const CouponList = ({ onCouponApplied, userId, isGuest, cartTotal, items }) => {
         </div>
         <div>
           <p className="text-sm font-bold text-gray-600">No offers right now</p>
-          <p className="text-xs text-gray-400 mt-1">New coupons drop regularly — check back soon!</p>
+          <p className="text-xs text-gray-400 mt-1">New coupons drop regularly - check back soon!</p>
         </div>
       </div>
     );
