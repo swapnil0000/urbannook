@@ -20,7 +20,7 @@ const MessageLink = ({ to, className, children, tabIndex }) => {
     : <Link to={to} className={className} tabIndex={tabIndex}>{children}</Link>;
 };
 
-/** "12d : 23h : 15m : 08s" — the campaign end on the server's clock. */
+/** "12d : 23h : 15m : 08s" - the campaign end on the server's clock. */
 const SaleTimer = ({ label }) => {
   const t = useCountdown({ seconds: true });
   if (!t.visible) return null;
@@ -42,7 +42,7 @@ const SaleTimer = ({ label }) => {
       <span className="inline-flex items-baseline gap-1">
         {t.d > 0 && <>{unit(t.d, 'd')}{sep}</>}
         {unit(t.h, 'h')}{sep}{unit(t.m, 'm')}
-        {/* seconds only where there is room — on phones the offer message needs the width */}
+        {/* seconds only where there is room - on phones the offer message needs the width */}
         <span className="hidden items-baseline gap-1 sm:inline-flex">{sep}{unit(t.s, 's')}</span>
       </span>
     </span>
@@ -54,7 +54,7 @@ const SaleTimer = ({ label }) => {
  * (admin → Operations Hub → Festive → ticker messages, each tied to its
  * promotion so it disappears the moment that offer ends), the campaign
  * countdown and a "Shop now" link to the message's own page. Every word and
- * date comes from the campaign — nothing about the offers is written here.
+ * date comes from the campaign - nothing about the offers is written here.
  */
 const SaleBar = ({ messages, countdownLabel, showCountdown, upTo = 0 }) => {
   const [i, setI] = useState(0);
@@ -104,14 +104,14 @@ const SaleBar = ({ messages, countdownLabel, showCountdown, upTo = 0 }) => {
 };
 
 /**
- * Site-wide announcement bar — editorial "2040" styling (ink band, mono
+ * Site-wide announcement bar - editorial "2040" styling (ink band, mono
  * labels, red asterisk separators) carrying the operational headlines from
  * main: the conditional shipping-delay notice plus the evergreen ones.
  *
  * While a festive campaign is live and has messages (admin → Operations Hub →
  * Festive), the bar becomes the sale bar above instead: one offer message at
  * a time, the countdown and "Shop now". The server already dropped anything
- * expired, disabled, or tied to a promotion that isn't live — when the
+ * expired, disabled, or tied to a promotion that isn't live - when the
  * campaign ends the list is simply empty and the bar is exactly the original one.
  */
 const NewsTicker = () => {
@@ -135,6 +135,7 @@ const NewsTicker = () => {
     combos: comboRes?.data?.combos || [],
     coupons: couponRes?.data || [],
     promises: SALE_BAR_PROMISES,
+    nameById: new Map((prodRes?.data?.listofPublishedProducts || prodRes?.data?.products || []).map((x) => [String(x.productId), x.productName])),
   });
 
   if (festive && barMessages.length) {

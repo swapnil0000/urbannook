@@ -31,7 +31,7 @@ const CartValueGift = ({ promo, target, cartTotal, className = '' }) => {
             <div className="h-full rounded-full bg-gradient-to-r from-star to-brand transition-[width] duration-500" style={{ width: `${pct}%` }} />
           </div>
           <p className="mt-1.5 text-[11px] font-semibold text-star">
-            {left > 0 ? `Add ${inr(left)} more to your cart to get it free 🎁` : 'Unlocked! Claim it in your cart 🎉'}
+            {left > 0 ? `Add ${inr(left)} more to your cart to get it free` : 'Unlocked! Claim it in your cart'}
           </p>
         </div>
       )}

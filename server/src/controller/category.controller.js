@@ -23,14 +23,14 @@ const loadCatalog = () =>
     return { products, categories: buildCategories(products, categoryDocs) };
   });
 
-// GET /categories — every category that has published products (no product data).
+// GET /categories - every category that has published products (no product data).
 const listCategories = asyncHandler(async (req, res) => {
   const { categories } = await loadCatalog();
   const data = categories.map(({ productIds, variantSkus, ...c }) => c);
   return res.status(200).json(new ApiRes(200, "Category List", data, true));
 });
 
-// GET /category/:slug — one category with its products, in shop order.
+// GET /category/:slug - one category with its products, in shop order.
 const categoryDetails = asyncHandler(async (req, res) => {
   const slug = toCategorySlug(req.params.slug);
   const { products, categories } = await loadCatalog();

@@ -31,8 +31,8 @@ export const activeFilterCount = (f) => (f.inStock ? 1 : 0) + (f.outOfStock ? 1 
 // Quick price bands for the Price filter (₹). `max: ''` = no upper bound.
 export const PRICE_RANGES = [
   { label: 'Under ₹500', min: '', max: '499' },
-  { label: '₹500 – ₹1,000', min: '500', max: '1000' },
-  { label: '₹1,000 – ₹2,000', min: '1000', max: '2000' },
+  { label: '₹500 - ₹1,000', min: '500', max: '1000' },
+  { label: '₹1,000 - ₹2,000', min: '1000', max: '2000' },
   { label: 'Over ₹2,000', min: '2000', max: '' },
 ];
 
@@ -40,7 +40,7 @@ export const PRICE_RANGES = [
 // duplicate indexable URLs. Sold-out items always stay at the end.
 export const SORT_OPTIONS = [
   { key: 'featured', label: 'Our top picks' },
-  { key: 'most-bought', label: 'Most bought' },
+  { key: 'bestseller', label: 'Bestsellers' },
   { key: 'trending', label: 'Trending now' },
   { key: 'price-asc', label: 'Price: low to high' },
   { key: 'price-desc', label: 'Price: high to low' },
@@ -70,6 +70,9 @@ const COMPARE = {
   featured: (a, b) => (Number(b.p?.priority) || 0) - (Number(a.p?.priority) || 0) || featuredRank(a) - featuredRank(b),
   trending: (a, b) => soldOf(b) - soldOf(a),
   'most-bought': (a, b) => soldAllOf(b) - soldAllOf(a),
+  // admin's Bestseller tag first, then real units sold
+  // Bestsellers = what sold most (all-time units); "Most bought" was the same list
+  bestseller: (a, b) => soldAllOf(b) - soldAllOf(a) || tagRank(['best_seller'])(a) - tagRank(['best_seller'])(b),
   'price-asc': (a, b) => a.price - b.price,
   'price-desc': (a, b) => b.price - a.price,
   discount: (a, b) => offOf(b) - offOf(a),
@@ -79,7 +82,9 @@ const COMPARE = {
 // Stable sort (Array.prototype.sort is stable), so ties keep the grouped order.
 export const sortShopItems = (items, key = 'featured') => {
   const cmp = COMPARE[key] || COMPARE.featured;
-  return [...items].sort((a, b) => (a.soldOut === b.soldOut ? cmp(a, b) : a.soldOut ? 1 : -1));
+  // Trending / Most bought list only what actually sold (nothing sold = not trending)
+  const pool = key === 'trending' ? items.filter((x) => soldOf(x) > 0) : key === 'most-bought' ? items.filter((x) => soldAllOf(x) > 0) : items;
+  return [...pool].sort((a, b) => (a.soldOut === b.soldOut ? cmp(a, b) : a.soldOut ? 1 : -1));
 };
 
 // "Cloud" chips on cards, from real sales only: the top DEMAND_TOP cards by

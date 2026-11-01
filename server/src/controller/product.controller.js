@@ -21,7 +21,7 @@ const productListing = asyncHandler(async (req, res) => {
     const perPage = Number(limit) || 10;
     /*category -> Filter by category	Electronics , search -> Keyword search in name	iPhone */
     // isAddon products (e.g. Gift Wrap) are real, cart-addable products but
-    // never belong in the browsable grid — excluded here only; still
+    // never belong in the browsable grid - excluded here only; still
     // fetchable directly by ID via specificProductDetails below.
     const query = { isPublished: true, isAddon: { $ne: true } };
     let sort = { priority: -1, createdAt: -1 }; // admin priority first, then latest
@@ -150,7 +150,7 @@ const specificProductDetails = asyncHandler(async (req, res) => {
     // Cross-product versions (Wooden ↔ LED): for every variant that has a
     // variantGroup, inline the OTHER published, active variants in that group
     // so the PDP can render its version toggle without another request.
-    // A variant with a group but no other versions gets `versions: []` — the
+    // A variant with a group but no other versions gets `versions: []` - the
     // PDP shows the toggle greyed out. No group = no `versions` key at all.
     const groups = [
       ...new Set((productDetails.variantDetails || []).map((v) => v.variantGroup).filter(Boolean)),

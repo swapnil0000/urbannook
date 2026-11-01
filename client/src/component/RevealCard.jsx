@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 // One shared IntersectionObserver for every RevealCard on the page instead
-// of one per card — however many products are in the grid, this stays a
+// of one per card - however many products are in the grid, this stays a
 // single native observer (cheap, off-main-thread hit-testing), not N of
 // them. Each card just registers/unregisters its own callback on mount.
 let sharedObserver = null;
@@ -11,12 +11,12 @@ const callbacks = new WeakMap();
 const shownState = new WeakMap();
 
 // A single threshold + `entry.isIntersecting` flips at exactly one crossing
-// point — on mobile, momentum/elastic scroll causes tiny sub-pixel jitter
+// point - on mobile, momentum/elastic scroll causes tiny sub-pixel jitter
 // right at that boundary (most obvious at the very top/bottom "edge" of the
 // scrollable area), which flips isIntersecting true/false repeatedly in a
 // few frames: a visible flicker. Fixing it needs a gap between the ratio
 // that SHOWS a card and the ratio that HIDES it again, so jitter inside
-// that gap does nothing — sampled at multiple ratios via the threshold
+// that gap does nothing - sampled at multiple ratios via the threshold
 // array below so the callback actually receives intermediate values
 // instead of just a single crossing event.
 const SHOW_AT = 0.15;
@@ -39,7 +39,7 @@ function getSharedObserver() {
           setVisible(false);
         }
         // Anything between HIDE_AT and SHOW_AT while state hasn't flipped is
-        // exactly the jitter band — deliberately ignored.
+        // exactly the jitter band - deliberately ignored.
       }
     },
     { threshold: [0, HIDE_AT, SHOW_AT, 0.3, 0.5], rootMargin: "-5% 0px -5% 0px" },
@@ -47,7 +47,7 @@ function getSharedObserver() {
   return sharedObserver;
 }
 
-// Read once at module load, not on every render/mount — this can't change
+// Read once at module load, not on every render/mount - this can't change
 // mid-session in any way that matters for a decorative scroll animation.
 const REDUCE_MOTION =
   typeof window !== "undefined" &&
@@ -62,7 +62,7 @@ const REVEAL_ONCE =
 /**
  * Wraps one grid item so it rises + fades in as it scrolls into view, and
  * reverses the same way if it scrolls back out (scrolling up "removes" a
- * card the same way scrolling down "added" it) — kept deliberately two-way
+ * card the same way scrolling down "added" it) - kept deliberately two-way
  * instead of the more common reveal-once pattern, per how this was asked
  * for. Only `opacity`/`transform` are animated (compositor-only, no layout
  * or paint cost), and the whole thing is skipped under
@@ -90,7 +90,7 @@ const RevealCard = ({ index = 0, children, className = "" }) => {
     };
   }, []);
 
-  // Reveal two cards at a time — both cards of a pair share the exact same
+  // Reveal two cards at a time - both cards of a pair share the exact same
   // delay (so they rise together), and the delay alternates between two
   // values so consecutive pairs still feel sequenced. Capped to 2 steps so
   // a long grid never ends up with a growing, ever-slower stagger.

@@ -48,7 +48,7 @@ const SortMenu = ({ value, options, onChange, label = 'Sort by' }) => {
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true" className={`transition-transform ${open ? 'rotate-180' : ''}`}><path d="M6 9l6 6 6-6" /></svg>
       </button>
       {open && (
-        <ul id={listId} role="listbox" aria-label={label} className="absolute right-0 top-full z-40 mt-1 w-56 border border-hair bg-white py-1 shadow-xl list-none m-0 p-0">
+        <ul id={listId} role="listbox" aria-label={label} className="un-scroll absolute right-0 top-full z-40 mt-1 max-h-64 w-56 overflow-y-auto border border-hair bg-white py-1 shadow-xl list-none m-0 p-0">
           {options.map((o, i) => (
             <li key={o.key} role="option" aria-selected={o.key === value}>
               <button

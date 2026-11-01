@@ -1,7 +1,7 @@
 import { isVariantOutOfStock } from './variantStock';
 
 // Biggest real markdown on anything you can buy right now: variantMrp vs
-// variantPrice on active, in-stock variants. No number is invented — with no
+// variantPrice on active, in-stock variants. No number is invented - with no
 // discounted stock the "Up to" pill is simply left out.
 export const maxDiscountPercent = (products = []) => {
   let best = 0;

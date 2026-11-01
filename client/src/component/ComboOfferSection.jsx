@@ -14,7 +14,7 @@ import MysteryGiftArt from './offers/MysteryGiftArt';
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
 
 /**
- * Admin-driven homepage offers, sourced from GET /promotions/display/home —
+ * Admin-driven homepage offers, sourced from GET /promotions/display/home -
  * ordinary Promotion V2 documents (placement "home") plus the optional
  * `homeCard` presentation fields.
  *
@@ -32,7 +32,7 @@ const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
  * because the global hard-edged rule zeroes any class containing "rounded-".
  */
 
-// What the headline savings tag says — derived from the computed numbers.
+// What the headline savings tag says - derived from the computed numbers.
 const headlineSavings = (c) => {
   if (c.save > 0) {
     if (c.savingsMode === 'percent' && c.percentOff > 0) return `${c.percentOff}% OFF`;
@@ -114,7 +114,8 @@ export const OfferCard = ({ combo, festive, priceLabel, onAdded }) => {
   const tag = headlineSavings(combo);
   // "Save {save}" is a per-cart template; the server-resolved `benefit` is the shown text
   const savingsPill = combo.savingsLabel && !/[{}]/.test(combo.savingsLabel) ? combo.savingsLabel : combo.benefit;
-  const cta = combo.ctaLabel || (combo.ctaAction === 'link' ? 'View Offer' : 'Add to Cart');
+  // every offer opens the chooser first (pick designs), so one consistent label
+  const cta = combo.ctaAction === 'link' ? 'View Offer' : 'Shop Now';
   const badge = combo.badgeLabel || (isReward ? 'Free Reward' : 'Combo Offer');
   const caption = combo.badgeText || (isReward ? 'Free with your purchase' : 'Buy together & save');
 
@@ -158,7 +159,7 @@ export const OfferCard = ({ combo, festive, priceLabel, onAdded }) => {
 
   return (
     <article className="un-card un-r-card un-shine group relative flex h-full flex-col p-[5px]">
-      {/* image — one fixed 4:3 frame for every card, centre-cropped, never distorted */}
+      {/* image - one fixed 4:3 frame for every card, centre-cropped, never distorted */}
       <button type="button" onClick={viewOffer} className="un-r-media relative block aspect-[4/3] w-full shrink-0 cursor-pointer overflow-hidden bg-surface text-left focus-visible:outline-none" aria-label={`View ${combo.title}`}>
         {combo.bannerImage ? (
           <img src={combo.bannerImage} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
@@ -186,7 +187,7 @@ export const OfferCard = ({ combo, festive, priceLabel, onAdded }) => {
       <div className="flex min-h-0 flex-1 flex-col px-2.5 pb-2.5 pt-3">
         {/* fixed-height title block: titles of any length keep the price panel aligned */}
         <div className="shrink-0 pb-2.5">
-          <h3 className="line-clamp-1 font-archivo text-[19px] font-bold leading-[1.25] tracking-tight text-ink" title={combo.title}>{combo.title}</h3>
+          <h3 className="font-archivo text-[18px] font-bold leading-[1.25] tracking-tight text-ink" title={combo.title}>{combo.title}</h3>
           {/* subtitle hidden for now (re-enable by restoring this line):
           {subtitle && <p className="mt-1 line-clamp-1 text-[12.5px] font-normal leading-snug text-muted">{subtitle}</p>} */}
         </div>
@@ -322,7 +323,7 @@ const TeaserTile = ({ index }) => {
   );
 };
 
-// `lead` (optional): replaces the default heading block — the home page passes
+// `lead` (optional): replaces the default heading block - the home page passes
 // the sale header (FestiveOfferBand) so sale + price drops + combos are one section.
 const ComboOfferSection = ({ title, subtitle, lead }) => {
   const { data, isLoading } = useGetHomeComboOffersQuery();

@@ -16,7 +16,8 @@ export const recentSalesByProduct = async (productIds = [], now = new Date()) =>
   const since = new Date(now.getTime() - TRENDING_WINDOW_DAYS * 24 * 60 * 60 * 1000);
   const since7Days = new Date(now.getTime() - RECENT_SALES_WINDOW_DAYS * 24 * 60 * 60 * 1000);
   const rows = await Order.aggregate([
-    { $match: { status: { $in: SOLD_STATUSES } } },
+    // productId narrows orders before the unwind (same result, far cheaper)
+    { $match: { status: { $in: SOLD_STATUSES }, "items.productId": { $in: productIds } } },
     { $unwind: "$items" },
     {
       $match: {

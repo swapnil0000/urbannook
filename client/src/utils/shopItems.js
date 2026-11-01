@@ -1,7 +1,7 @@
 // Shop grids list one card per sellable variant (gyaanstore-style), so card
 // counts and Availability counts match what a customer can actually buy.
 // Shared by CategoryPage and AllProductsPage.
-// One card per sellable variant, linking to that variant's own page — a
+// One card per sellable variant, linking to that variant's own page - a
 // category with one product and four variants (BMW, Ferrari, …) shows four
 // cards. Variants hidden by admin (isActive:false) are skipped.
 export const toItems = (products = []) => {

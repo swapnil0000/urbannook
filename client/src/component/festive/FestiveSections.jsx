@@ -11,7 +11,7 @@ const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
  * Admin-picked gifting/"festive favourites" products (admin → Festive →
  * Sections: specific products and/or whole categories, capped). The server
  * resolves them and only returns sellable products; the optional offer badge is
- * the NAME of the linked, currently-live promotion — no discount or shipping
+ * the NAME of the linked, currently-live promotion - no discount or shipping
  * claim is written here. Prices shown are plain current prices ("From ₹X").
  */
 const GiftingSection = ({ section }) => {
@@ -71,8 +71,8 @@ const GiftingSection = ({ section }) => {
 
 /**
  * The homepage's festive sections, in the admin-configured order, below
- * Bestsellers. With no live campaign — or a campaign with no sections
- * configured — this is exactly the original single Combo Offers section, so
+ * Bestsellers. With no live campaign - or a campaign with no sections
+ * configured - this is exactly the original single Combo Offers section, so
  * the normal storefront is unchanged.
  */
 const FestiveSections = ({ lead }) => {
