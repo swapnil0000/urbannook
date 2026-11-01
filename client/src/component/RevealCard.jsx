@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 // One shared IntersectionObserver for every RevealCard on the page instead
-// of one per card — however many products are in the grid, this stays a
+// of one per card - however many products are in the grid, this stays a
 // single native observer (cheap, off-main-thread hit-testing), not N of
 // them. Each card just registers/unregisters its own callback on mount.
 let sharedObserver = null;
@@ -11,12 +11,12 @@ const callbacks = new WeakMap();
 const shownState = new WeakMap();
 
 // A single threshold + `entry.isIntersecting` flips at exactly one crossing
-// point — on mobile, momentum/elastic scroll causes tiny sub-pixel jitter
+// point - on mobile, momentum/elastic scroll causes tiny sub-pixel jitter
 // right at that boundary (most obvious at the very top/bottom "edge" of the
 // scrollable area), which flips isIntersecting true/false repeatedly in a
 // few frames: a visible flicker. Fixing it needs a gap between the ratio
 // that SHOWS a card and the ratio that HIDES it again, so jitter inside
-// that gap does nothing — sampled at multiple ratios via the threshold
+// that gap does nothing - sampled at multiple ratios via the threshold
 // array below so the callback actually receives intermediate values
 // instead of just a single crossing event.
 const SHOW_AT = 0.15;
@@ -34,12 +34,12 @@ function getSharedObserver() {
         if (!wasShown && ratio >= SHOW_AT) {
           shownState.set(entry.target, true);
           setVisible(true);
-        } else if (wasShown && ratio <= HIDE_AT) {
+        } else if (wasShown && ratio <= HIDE_AT && !REVEAL_ONCE) {
           shownState.set(entry.target, false);
           setVisible(false);
         }
         // Anything between HIDE_AT and SHOW_AT while state hasn't flipped is
-        // exactly the jitter band — deliberately ignored.
+        // exactly the jitter band - deliberately ignored.
       }
     },
     { threshold: [0, HIDE_AT, SHOW_AT, 0.3, 0.5], rootMargin: "-5% 0px -5% 0px" },
@@ -47,24 +47,34 @@ function getSharedObserver() {
   return sharedObserver;
 }
 
-// Read once at module load, not on every render/mount — this can't change
+// Read once at module load, not on every render/mount - this can't change
 // mid-session in any way that matters for a decorative scroll animation.
 const REDUCE_MOTION =
   typeof window !== "undefined" &&
   !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+// Touch screens reveal once and stay: hiding cards again as they leave the
+// viewport made fast flick-scrolling show blank tiles and re-render every
+// card, which read as the site lagging on phones.
+const REVEAL_ONCE =
+  typeof window !== "undefined" &&
+  !!window.matchMedia?.("(pointer: coarse)").matches;
 
 /**
  * Wraps one grid item so it rises + fades in as it scrolls into view, and
  * reverses the same way if it scrolls back out (scrolling up "removes" a
- * card the same way scrolling down "added" it) — kept deliberately two-way
+ * card the same way scrolling down "added" it) - kept deliberately two-way
  * instead of the more common reveal-once pattern, per how this was asked
  * for. Only `opacity`/`transform` are animated (compositor-only, no layout
  * or paint cost), and the whole thing is skipped under
  * prefers-reduced-motion, so it can't be the thing that slows the page down.
  */
+const INSTANT_COUNT = 8;
+
 const RevealCard = ({ index = 0, children, className = "" }) => {
   const ref = useRef(null);
-  const [visible, setVisible] = useState(REDUCE_MOTION);
+  // The first rows render visible at once: hiding cards that are already on
+  // screen and fading them in made a category switch flash blank for a beat.
+  const [visible, setVisible] = useState(REDUCE_MOTION || index < INSTANT_COUNT);
 
   useEffect(() => {
     if (REDUCE_MOTION) return;
@@ -80,7 +90,7 @@ const RevealCard = ({ index = 0, children, className = "" }) => {
     };
   }, []);
 
-  // Reveal two cards at a time — both cards of a pair share the exact same
+  // Reveal two cards at a time - both cards of a pair share the exact same
   // delay (so they rise together), and the delay alternates between two
   // values so consecutive pairs still feel sequenced. Capped to 2 steps so
   // a long grid never ends up with a growing, ever-slower stagger.

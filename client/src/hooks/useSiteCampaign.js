@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { getApiUrl } from '../config/appUrls';
 
 /**
- * Festive campaign state — ONE request per page load, shared by everything
+ * Festive campaign state - ONE request per page load, shared by everything
  * festive (ticker, lights, torans, sparkles, fireworks, countdown, sections).
  *
  * The SERVER decides eligibility (GET /site-campaign/active compares its own
@@ -27,13 +27,19 @@ const PREVIEW_KEY = 'un_festive_preview';
 const SUPPRESSED_PREFIXES = ['/checkout', '/payment-processing', '/payment-failed', '/order-confirm'];
 
 // Display copy that belongs to the THEME (not to any offer). Prices, savings
-// and shipping claims never live here — they come from real promotions.
+// and shipping claims never live here - they come from real promotions.
 export const THEME_COPY = {
   diwali: {
     priceLabel: 'Diwali Price',
+    saleTitle: 'Diwali Sale', // sale bar headline when admin set no messages
+    // Home festive band: lead with the shopper's need, not our sale.
+    bandLine: 'Gifts for every fan on your list, from katanas to lamps.',
+    bandCta: 'Find a gift',
+    // The band shows real markdowns; the combos section below shows offers.
+    bandTitle: 'Biggest price drops',
     eyebrow: 'For This Diwali',
     offersTitle: 'Diwali Offers',
-    offersSubtitle: 'Festive combos picked for gifting — more value in every box.',
+    offersSubtitle: 'Festive combos picked for gifting - more value in every box.',
     badge: 'Diwali Special',
   },
 };
@@ -112,7 +118,7 @@ export function SiteCampaignProvider({ children }) {
   const { campaign, offset } = state;
   const endsAtMs = campaign ? Date.parse(campaign.endsAt) : null;
 
-  // In-session expiry at the configured end time (skipped for previews —
+  // In-session expiry at the configured end time (skipped for previews -
   // their dates are irrelevant), then the server re-decides.
   useEffect(() => {
     if (!campaign || campaign.preview || !endsAtMs) return undefined;
@@ -160,7 +166,7 @@ export const useSiteCampaignState = () => useContext(Ctx);
 
 /**
  * The festive layer as seen from the current page.
- *   can(effect, { heavy })  — should this decoration render here, now?
+ *   can(effect, { heavy })  - should this decoration render here, now?
  *     · campaign live, not on checkout/payment pages
  *     · the admin enabled `effect`, and enabled decorations for this page type
  *     · phones: needs showOnMobile; `heavy` effects (fireworks, sparkles,

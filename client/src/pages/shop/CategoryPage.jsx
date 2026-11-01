@@ -1,9 +1,19 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { useGetCategoryBySlugQuery, useGetCategoriesQuery, useGetBlogPostsQuery } from '../../store/api/productsApi';
+import { useGetCategoryBySlugQuery, useGetCategoriesQuery, useGetBlogPostsQuery, useGetProductsQuery } from '../../store/api/productsApi';
 import SEOHead from '../../component/SEOHead';
 import UnProductCard from '../../component/UnProductCard';
 import RevealCard from '../../component/RevealCard';
+import ScrollRow from '../../component/ScrollRow';
+import SaleTag from '../../component/festive/SaleTag';
+import { useGetHomeComboOffersQuery } from '../../store/api/userApi';
+import { buildOfferLines } from '../../utils/productOfferLines';
+import { ShopFilterSidebar, ShopFilterButton, ShopSort, ActiveFilterChips } from '../../component/ShopFilters';
+import { useSessionState } from '../../hooks/useSessionState';
+import { EMPTY_FILTERS, applyShopFilters, sortShopItems, demandChips, recentSalesChips } from '../../utils/shopFilters';
+import { toItems } from '../../utils/shopItems';
+import { shopPills } from '../../utils/shopPills';
+import { CATEGORY_LABEL } from '../../utils/categoryUrl';
 import NotFound from '../NotFound';
 import { trackViewItemList } from '../../utils/analytics';
 
@@ -19,49 +29,22 @@ const pageCopy = ({ kind, slug, name, itemCount }) => {
   const tail = 'Gift wrap, partial COD and delivery across India.';
   if (slug === 'anime-katana') return {
     h1: 'Anime Katana: Wooden & LED Swords',
-    title: 'Anime Katana – Wooden & LED Swords, Buy Online in India',
+    title: 'Anime Katana - Wooden & LED Swords, Buy Online in India',
     description: `${itemCount} anime katanas from Demon Slayer, One Piece, Naruto, Bleach and games: 104 cm wooden and LED display swords. ${tail}`,
   };
   if (kind === 'series') return {
     h1: `${name} Swords & Collectibles`,
-    title: `${name} Katana, Swords & Collectibles – Buy in India`,
+    title: `${name} Katana, Swords & Collectibles - Buy in India`,
     description: `${itemCount} ${name} katanas, swords and collectibles: wooden and LED display swords and figures for fans. ${tail}`,
   };
   if (kind === 'game') return {
     h1: name,
-    title: `${name} – Gaming Katana Replicas, Buy in India`,
+    title: `${name} - Gaming Katana Replicas, Buy in India`,
     description: `${itemCount} katanas from video games: wooden and LED display replicas for gamers and collectors. ${tail}`,
   };
-  return { h1: name, title: `${name} – Buy Online in India`, description: `Shop ${itemCount} ${name} designs at UrbanNook. ${tail}` };
+  return { h1: name, title: `${name} - Buy Online in India`, description: `Shop ${itemCount} ${name} designs at UrbanNook. ${tail}` };
 };
 const PER_PAGE = 24;
-
-// One card per sellable variant, linking to that variant's own page — a
-// category with one product and four variants (BMW, Ferrari, …) shows four
-// cards. Variants hidden by admin (isActive:false) are skipped.
-// Cards are interleaved round-robin across products (1st variant of each
-// product, then the 2nd of each, …) so a product with many variants (21
-// wooden katanas) doesn't fill the whole first page and hide the others.
-const toItems = (products = []) => {
-  const perProduct = products.map((p) => {
-    const variants = (p.variantDetails || []).filter((v) => v && v.isActive !== false);
-    if (!variants.length) return [{ key: p.productId, p, href: `/product/${p.productId}` }];
-    return variants.map((v, i) => ({
-      key: `${p.productId}-${v.sku || i}`,
-      // Card shows this variant's name/image/price; second image would be
-      // another variant's, so it's dropped.
-      p: { ...p, productName: v.variantName || p.productName, variantDetails: [v], secondaryImages: [], effectivePrice: undefined, effectiveMrp: undefined },
-      href: v.sku ? `/product/${p.productId}/${v.sku}` : `/product/${p.productId}`,
-      soldOut: v.variantOutOfStock === true || (v.variantQuantity != null && v.variantQuantity <= 0),
-    }));
-  });
-  const total = perProduct.reduce((n, list) => n + list.length, 0);
-  const out = [];
-  for (let i = 0; out.length < total; i++) {
-    for (const list of perProduct) if (list[i]) out.push(list[i]);
-  }
-  return out;
-};
 
 const CategoryPage = () => {
   const { slug } = useParams();
@@ -74,12 +57,28 @@ const CategoryPage = () => {
   const stories = storiesRes?.data || [];
 
   const category = data?.data;
-  const items = useMemo(() => toItems(category?.products), [category]);
+  const allItems = useMemo(() => toItems(category?.products), [category]);
+  // Availability / price filters: client state only (see ShopFilters), reset per category.
+  const [filters, setFilters] = useSessionState(`shop:${slug}:filters`, EMPTY_FILTERS);
+  const [sort, setSort] = useSessionState(`shop:${slug}:sort`, 'featured');
+  // Live combo benefit per product, for the card's offer line (cached query).
+  const { data: comboRes } = useGetHomeComboOffersQuery();
+  // Names across the whole catalogue (same cached list as the header), so a
+  // reward line can name a product from another category ("with a Lamp").
+  const { data: allProdRes } = useGetProductsQuery({ page: 1, limit: 24 });
+  const offerLines = useMemo(() => {
+    const list = allProdRes?.data?.listofPublishedProducts || allProdRes?.data?.products || category?.products || [];
+    return buildOfferLines(comboRes?.data?.combos || [], new Map(list.map((x) => [String(x.productId), x.productName])));
+  }, [comboRes, allProdRes, category]);
+  const chips = useMemo(() => demandChips(allItems), [allItems]);
+  // Filters and sort start fresh on every category.
+  const items = useMemo(() => sortShopItems(applyShopFilters(allItems, filters), sort), [allItems, filters, sort]);
+  const recentSales = useMemo(() => recentSalesChips(items), [items]);
   const totalPages = Math.max(1, Math.ceil(items.length / PER_PAGE));
   const page = Math.min(Math.max(1, parseInt(searchParams.get('page'), 10) || 1), totalPages);
   const pageItems = useMemo(() => items.slice((page - 1) * PER_PAGE, page * PER_PAGE), [items, page]);
   // Chips: every other page that is worth a visit (indexable), categories first.
-  const otherCategories = (allRes?.data || []).filter((c) => c.slug !== slug && c.indexable !== false);
+  const pills = useMemo(() => shopPills(allRes?.data || [], slug), [allRes, slug]);
 
   useEffect(() => { window.scrollTo(0, 0); }, [slug, page]);
   useEffect(() => {
@@ -137,7 +136,7 @@ const CategoryPage = () => {
   return (
     <div className="font-inter bg-surface text-ink min-h-screen">
       <SEOHead
-        title={page > 1 ? `${title} – Page ${page}` : title}
+        title={page > 1 ? `${title} - Page ${page}` : title}
         description={description}
         url={pagePath(page)}
         image={category.image || undefined}
@@ -147,37 +146,55 @@ const CategoryPage = () => {
       />
 
       <div className="max-w-[1280px] mx-auto px-5 pt-10">
-        <nav aria-label="Breadcrumb" className="text-sm text-faint mb-5">
+        <nav aria-label="Breadcrumb" className="text-sm text-faint mb-5 pt-4">
           <Link to="/" className="hover:text-brand">Home</Link> / <Link to="/products" className="hover:text-brand">Shop</Link> / <span className="text-ink">{name}</span>
         </nav>
+        {/* the sale, announced once per page (no longer repeated on every card) */}
+        <div className="mb-3 flex justify-center"><SaleTag /></div>
         <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">{copy.h1}</h1>
         <p className="text-muted mt-2">{itemCount} {itemCount === 1 ? 'design' : 'designs'}</p>
 
 
-        {otherCategories.length > 0 && (
-          <div className="mt-6 -mx-4 sm:-mx-6 px-4 sm:px-6 overflow-x-auto gl-hscroll">
-            <div className="flex items-center gap-2.5 w-max">
+        {pills.length > 0 && (
+          <ScrollRow className="mt-6" activeKey={slug}>
               <Link to="/products" className="gl-press px-4 py-2 rounded-full text-sm font-semibold bg-white border border-hair hover:border-ink">All</Link>
-              <span className="gl-press px-4 py-2 rounded-full text-sm font-semibold bg-brand text-white">{name}</span>
-              {otherCategories.map((c) => (
-                <Link key={c.slug} to={`/category/${c.slug}`} className="gl-press px-4 py-2 rounded-full text-sm font-semibold bg-white border border-hair hover:border-ink">{c.name}</Link>
+              {/* same fixed order as Shop All; the current one is highlighted in place */}
+              {pills.map((c) => (
+                <Link key={c.slug} to={`/category/${c.slug}`} aria-current={c.slug === slug ? 'page' : undefined}
+                  className={`gl-press px-4 py-2 rounded-full text-sm font-semibold border ${c.slug === slug ? 'bg-brand text-white border-brand' : 'bg-white border-hair hover:border-ink'}`}>{CATEGORY_LABEL[c.name] || c.name}</Link>
               ))}
-            </div>
-          </div>
+          </ScrollRow>
         )}
       </div>
 
-      <section className="max-w-[1280px] mx-auto px-5 py-8">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-          {pageItems.map(({ key, p, href, soldOut }, i) => (
+      <section className="max-w-[1280px] mx-auto px-5 py-8 flex gap-8 [overflow-anchor:none]">
+        <ShopFilterSidebar items={allItems} filters={filters} setFilters={setFilters} />
+        <div className="flex-1 min-w-0">
+        <div className="mb-4 flex items-center justify-between gap-2 sm:gap-3">
+          <ShopFilterButton items={allItems} filters={filters} setFilters={setFilters} resultCount={items.length} />
+          <p className="ml-auto whitespace-nowrap text-xs text-muted sm:text-sm">{items.length} of {allItems.length} items</p>
+          <ShopSort value={sort} onChange={setSort} />
+        </div>
+        <ActiveFilterChips filters={filters} setFilters={setFilters} />
+        {items.length === 0 && (
+          <div className="text-center py-20 border border-hair bg-white">
+            <p className="font-extrabold text-lg">No products match these filters</p>
+            <button type="button" onClick={() => setFilters(EMPTY_FILTERS)} className="mt-3 text-sm font-bold text-brand hover:underline">Clear filters</button>
+          </div>
+        )}
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
+          {pageItems.map(({ key, p, href, badge }, i) => (
             <RevealCard key={key} index={i}>
               <UnProductCard
                 p={p}
                 href={href}
+                badge={badge}
+                demand={sort === 'trending' ? 'trending' : chips.get(key)} trendCount={Number(p.variantDetails?.[0]?.soldRecent || 0)}
+                recentSalesUnits={recentSales.get(key)}
+                offerLine={offerLines.get(String(p.productId))}
                 index={i}
                 listId={`category_${category.slug}`}
                 listName={`Category: ${name}`}
-                badge={soldOut ? 'Sold out' : undefined}
                 showWishlist={false}
               />
             </RevealCard>
@@ -195,6 +212,7 @@ const CategoryPage = () => {
             {page < totalPages && <Link to={pagePath(page + 1)} rel="next" className="px-4 py-2 border border-hair rounded-lg text-sm font-semibold hover:border-ink">Next</Link>}
           </nav>
         )}
+        </div>
       </section>
 
       {stories.length > 0 && (
