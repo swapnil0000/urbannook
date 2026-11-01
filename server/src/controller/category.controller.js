@@ -5,18 +5,21 @@ import { asyncHandler } from "../middleware/errorHandler.middleware.js";
 import { NotFoundError } from "../utils/errors.js";
 import { apiCache } from "../module/cache.manager.module.js";
 import { buildCategories, toCategorySlug } from "../utils/category.util.js";
+import { recentSalesByProduct, withRecentSales } from "../utils/productSignals.util.js";
 
 // Same in-memory product cache (10 min) as the other product endpoints
 // (System Guide §7).
 const loadCatalog = () =>
   apiCache.handle({ route: "categories:catalog" }, async () => {
-    const [products, categoryDocs] = await Promise.all([
+    const [catalogProducts, categoryDocs] = await Promise.all([
       Product.find({ isPublished: true, isAddon: { $ne: true } })
         .sort({ priority: -1, createdAt: -1 })
         .select("-_id -createdAt -updatedAt -__v")
         .lean(),
       Category.find({}).select("-_id name slug categoryId image displayOrder isActive").lean(),
     ]);
+    const sales = await recentSalesByProduct(catalogProducts.map((p) => p.productId));
+    const products = withRecentSales(catalogProducts, sales);
     return { products, categories: buildCategories(products, categoryDocs) };
   });
 

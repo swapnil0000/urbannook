@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { addItem } from '../../store/slices/cartSlice';
 import SEOHead from '../../component/SEOHead';
 import { productImg, firstVariant, inr } from '../../component/UnProductCard';
 import HomeProductCard from '../../component/HomeProductCard';
 import FestiveSections from '../../component/festive/FestiveSections';
+import FestiveOfferBand from '../../component/festive/FestiveOfferBand';
 import RangoliDivider from '../../component/festive/RangoliDivider';
 import { Reveal, Stagger, StaggerItem, Parallax, TextReveal, useInView, motion, AnimatePresence, MotionRoot } from '../../component/motion';
 import { useGetFeaturedProductsQuery, useGetProductsQuery } from '../../store/api/productsApi';
@@ -466,12 +467,12 @@ const HeroCarousel = ({ products = [], offers = [], onProduct, onVariant, onShop
         }} />
 
       <div
-        className="relative flex flex-col min-h-[calc(100svh-6.25rem)] md:min-h-[calc(100vh-6.5rem)]"
+        className="relative flex flex-col md:min-h-[calc(100vh-6.5rem)]"
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
       >
         {/* ── TOP: the featured piece ── */}
-        <div className="flex-1 flex flex-col md:flex-row items-center gap-7 md:gap-10 px-5 md:px-10 pt-7 md:pt-10">
+        <div className="flex-1 flex flex-col md:flex-row items-center gap-5 md:gap-10 px-4 sm:px-5 md:px-10 pt-5 md:pt-10">
           {/* copy */}
           <div key={`t-${f.id}`} className="un-in order-2 md:order-1 w-full md:w-[27rem] lg:w-[30rem] md:shrink-0">
             {f.offer ? (
@@ -567,9 +568,9 @@ const HeroCarousel = ({ products = [], offers = [], onProduct, onVariant, onShop
                     key={t.key}
                     onClick={() => onVariant(f.id, t.sku)}
                     aria-label={`Shop ${t.label}`}
-                    className="group relative shrink-0 snap-start text-left border border-white/10 overflow-hidden w-[62vw] max-w-[240px] sm:w-[clamp(190px,20vw,260px)] sm:max-w-none"
+                    className="group relative shrink-0 snap-start text-left overflow-hidden rounded-lg border border-white/10 bg-un-ink2 w-[68vw] max-w-[260px] sm:w-[clamp(190px,20vw,260px)] sm:max-w-none"
                   >
-                    <div className="relative w-full aspect-[4/5] overflow-hidden bg-surface">
+                    <div className="relative w-full aspect-[4/5] overflow-hidden">
                       {/* The photo is contained (not cropped); the tile's
                           bg-surface fills any letterbox. A blurred full-size
                           copy used to sit behind it — removed, its blur filter
@@ -584,12 +585,16 @@ const HeroCarousel = ({ products = [], offers = [], onProduct, onVariant, onShop
                         fetchPriority={i === 0 ? 'high' : undefined}
                         decoding={i === 0 ? undefined : 'async'}
                         onError={onImgErr}
-                        className="relative w-full h-full object-contain transition-transform duration-[900ms] group-hover:scale-[1.04]"
+                        className="relative w-full h-full object-cover transition-transform duration-[900ms] group-hover:scale-[1.05]"
                       />
-                    </div>
-                    <div className="w-full flex items-center justify-between gap-3 px-3.5 py-2.5 bg-white border-t border-hair">
-                      <span className="gl-lbl text-[10px] text-ink truncate min-w-0">{t.label}</span>
-                      <span className="gl-lbl text-[10px] text-brand shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">Shop →</span>
+                      {/* name on the photo (cover-cropped, no cream letterbox bands
+                          or a separate white strip): reads as one premium tile */}
+                      <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 bg-gradient-to-t from-black/85 via-black/40 to-transparent px-3 pb-3 pt-10">
+                        <span className="min-w-0 text-[13px] font-bold leading-tight text-white line-clamp-2">{t.label}</span>
+                        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand text-white transition-transform group-hover:translate-x-0.5" aria-hidden="true">
+                          <i className="fa-solid fa-arrow-right text-[10px]" />
+                        </span>
+                      </span>
                     </div>
                   </button>
                 ))}
@@ -621,8 +626,9 @@ const HeroCarousel = ({ products = [], offers = [], onProduct, onVariant, onShop
              tile rather than trailing off into dead space, and the tiles
              stretch to share whatever width is left — a short catalogue fills
              the row instead of leaving a gap, a long one just scrolls. */}
-        <div className="shrink-0 px-5 md:px-10 pt-7 pb-7">
+        <div className="shrink-0 px-4 sm:px-5 md:px-10 pt-6 pb-6 md:pt-7 md:pb-7">
           <div className="flex items-baseline justify-between gap-4 mb-3">
+            <h3 className="text-[15px] font-extrabold text-paper md:text-lg">More to explore</h3>
             {/* <span className="gl-lbl text-[10px] text-paper/50">
               {strip.isRest ? 'More from the drop' : 'The drop'} · {String(strip.items.length).padStart(2, '0')} pieces
             </span> */}
@@ -651,15 +657,28 @@ const HeroCarousel = ({ products = [], offers = [], onProduct, onVariant, onShop
               </div>
             ))}
 
+            {/* "Shop all" as one more card of the same width (it used to grow
+                to fill the row: a big empty box). A 2x2 peek of the catalogue
+                makes it read as "more like these", not a blank tile. */}
             <button
               onClick={onShop}
-              className="snap-start shrink-0 grow basis-[142px] sm:basis-[158px] md:basis-[176px] max-w-[360px] gl-press border border-white/15 hover:border-brand/60 hover:bg-white/[0.03] transition-colors flex flex-col items-center justify-center gap-2 py-8"
+              aria-label={`Shop all ${products.length} pieces`}
+              className="group snap-start shrink-0 basis-[142px] sm:basis-[158px] md:basis-[176px] gl-press flex flex-col border border-white/15 bg-white/[0.03] hover:border-brand/60 transition-colors text-left"
             >
-              <span className="grid place-items-center w-10 h-10 rounded-full border border-white/25 text-paper/80">
-                <i className="fa-solid fa-arrow-right text-xs" />
+              <span className="grid grid-cols-2 gap-px bg-white/10 aspect-square overflow-hidden">
+                {products.slice(0, 4).map((p, k) => (
+                  <img key={p.productId || k} src={productImg(p)} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover bg-white transition-transform duration-500 group-hover:scale-105" onError={onImgErr} />
+                ))}
               </span>
-              <span className="gl-lbl text-[10px] text-paper/70">Shop all</span>
-              <span className="gl-lbl text-[9px] text-paper/35">{String(products.length).padStart(2, '0')} pieces</span>
+              <span className="flex flex-1 items-center justify-between gap-2 px-3 py-3">
+                <span>
+                  <span className="block text-[13px] font-bold text-paper">Shop all</span>
+                  <span className="gl-lbl text-[9px] text-paper/50">{String(products.length).padStart(2, '0')} pieces</span>
+                </span>
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand text-white transition-transform group-hover:translate-x-0.5" aria-hidden="true">
+                  <i className="fa-solid fa-arrow-right text-[11px]" />
+                </span>
+              </span>
             </button>
           </div>
         </div>
@@ -776,6 +795,8 @@ const HomePage = () => {
         onShop={() => navigate('/products')}
       />
 
+
+
       {/* ══ MARQUEE ══ — butted straight against the plate, no gutter: both
           are ink, so the hero runs into the band with no visible seam. */}
       {/* <MarqueeBand /> */}
@@ -796,7 +817,8 @@ const HomePage = () => {
     
       {/* ══ PRODUCTS — adaptive to catalog size ══ */}
       {/* Diwali offers sit above Bestsellers (only with a catalog big enough to have them) */}
-      {!isFewProducts && bestsellers.length >= MIN_TAGGED && <FestiveSections />}
+      {/* sale header (price drops) + combo offers as one section */}
+      {!isFewProducts && bestsellers.length >= MIN_TAGGED && <FestiveSections lead={<FestiveOfferBand products={products} />} />}
       <RangoliDivider />
       {isFewProducts ? (
         /* Small, curated catalog: ONE collection, no repeated grids. */

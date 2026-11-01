@@ -5,6 +5,7 @@ import {
   useUpdateCartMutation,
   useGetFreeShippingOfferQuery,
   useGetGiftWrapOfferQuery,
+  useGetCouponOffersQuery,
 } from '../../store/api/userApi';
 import { updateQuantity, removeItem } from '../../store/slices/cartSlice';
 import { resolveVariantTitle } from '../../utils/variantTitle';
@@ -13,6 +14,7 @@ import FreeShippingStrip from '../FreeShippingStrip';
 import OfferProgress from '../festive/OfferProgress';
 import GiftWrapOffer, { GiftWrapLineItem } from '../GiftWrapOffer';
 import PromotionBannerList from '../promotions/PromotionBannerList';
+import { groupCartByOffer } from '../../utils/cartOfferGroups';
 import { requestCheckout } from '../../utils/checkoutIntent';
 import GiftClaimList from '../promotions/GiftClaimList';
 import { CartGiftProgress } from '../offers/CartValueGift';
@@ -29,6 +31,13 @@ const CartDrawer = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const [mounted, setMounted] = useState(false);
+  // `shown` flips one frame AFTER mount, so the panel first paints off-screen
+  // and then slides in. Driving the classes from isOpen directly mounted it
+  // already at translate-x-0, so it popped in with no transition.
+  const [shown, setShown] = useState(false);
+  // Public coupons (same cached list as the sale bar / offers page) — drives the coupon badge.
+  const { data: couponOffersRes } = useGetCouponOffersQuery('guest');
+  const hasLiveCoupons = (couponOffersRes?.data || []).length > 0;
 
   const { items: cartItems, totalAmount, giftWrap: giftWrapSelected } = useSelector((state) => state.cart);
   const { isAuthenticated } = useSelector((state) => state.auth);
@@ -69,12 +78,17 @@ const CartDrawer = ({ isOpen, onClose }) => {
     if (isOpen) {
       setMounted(true);
       document.body.style.overflow = 'hidden';
+      let raf2;
+      const raf1 = requestAnimationFrame(() => { raf2 = requestAnimationFrame(() => setShown(true)); });
       return () => {
+        cancelAnimationFrame(raf1);
+        cancelAnimationFrame(raf2);
         document.body.style.overflow = '';
       };
     }
     else {
-      const timer = setTimeout(() => setMounted(false), 300);
+      setShown(false);
+      const timer = setTimeout(() => setMounted(false), 350);
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
@@ -173,87 +187,8 @@ const CartDrawer = ({ isOpen, onClose }) => {
   const isFreeShippingEligible =
     !!offerConfig?.isActive && (offerConfig?.thresholdAmount || 0) > 0 && subtotal >= offerConfig.thresholdAmount;
 
-  return (
-    <div className="fixed inset-0 z-[9999] flex justify-end font-inter text-ink">
-
-      <style>{`
-        .un-cart-ticket-shimmer {
-          animation: ppc-shimmer 1.1s ease-out 1 forwards;
-        }
-        @keyframes un-coupon-star-float {
-          0% { transform: translateY(3px) scale(0.4) rotate(0deg); opacity: 0; }
-          25% { opacity: 1; }
-          100% { transform: translateY(-14px) scale(1) rotate(30deg); opacity: 0; }
-        }
-        .un-coupon-star {
-          position: absolute;
-          pointer-events: none;
-          animation: un-coupon-star-float 2.4s ease-in-out infinite;
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .un-cart-ticket-shimmer { animation: none; opacity: 0; }
-          .un-coupon-star { animation: none; opacity: 0; }
-        }
-      `}</style>
-
-      {/* Backdrop */}
-      <div
-        className={`absolute inset-0 bg-ink/50 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0'}`}
-        onClick={onClose}
-      />
-
-      {/* Drawer Panel */}
-      <div
-        className={`relative w-full max-w-[430px] bg-paper h-full shadow-2xl flex flex-col transform transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${
-          isOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
-      >
-
-        {/* --- HEADER --- */}
-        <div className="px-5 py-3 border-b border-hair flex items-center justify-between shrink-0">
-          <div className="flex items-baseline gap-2.5">
-            <h2 className="text-xl font-extrabold tracking-tight">Your Cart</h2>
-            <span className="gl-lbl text-brand text-[11px]">{cartItems.length} {cartItems.length === 1 ? 'item' : 'items'}</span>
-          </div>
-          <button
-            onClick={onClose}
-            aria-label="Close cart"
-            className="w-9 h-9 rounded-full border border-hair grid place-items-center text-muted hover:border-ink hover:text-ink transition-colors"
-          >
-            <i className="fa-solid fa-xmark text-sm" />
-          </button>
-        </div>
-
-        {/* --- SCROLLABLE CONTENT --- */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 scrollbar-hide">
-
-          {cartItems.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center gap-5">
-              <div className="w-20 h-20 rounded-full bg-brand/10 grid place-items-center">
-                <i className="fa-solid fa-bag-shopping text-2xl text-brand" />
-              </div>
-              <div>
-                <h3 className="text-lg font-extrabold mb-1">Your cart is empty</h3>
-                <p className="text-sm text-muted max-w-[240px] mx-auto leading-relaxed">Add a piece you love — it'll show up here.</p>
-              </div>
-              <button
-                onClick={() => { onClose(); navigate('/products'); }}
-                className="gl-press bg-brand text-white text-sm font-bold px-7 py-3 rounded-xl hover:bg-brandHi transition-colors"
-              >
-                Start shopping
-              </button>
-            </div>
-          ) : (
-            <>
-              {/* Free-shipping threshold nudge — hidden unless admin's promotion is on */}
-              <OfferProgress location="cart" className="mb-3" fallback={<FreeShippingStrip cartTotal={subtotal} variant="compact" className="mb-3" />} />
-              {/* Other active Promotion V2 offers — renders nothing when none apply */}
-              <CartGiftProgress promotions={cartPromotions} className="mb-3" />
-              <PromotionBannerList promotions={cartPromotions} pricing={promotionPricing} className="mb-3" />
-              {/* free gifts: claim card, then a FREE GIFT line once claimed — never added automatically */}
-              <GiftClaimList className="mb-3" />
-              <div className="divide-y divide-hair">
-                {cartItems.map((item) => {
+  // One cart line (used inside offer groups and in the plain list).
+  const renderItem = (item) => {
                   const itemQty = typeof item.quantity === 'object' ? Number(item.quantity?.quantity || 0) : Number(item.quantity || 0);
                   const itemId = item.mongoId || item.productId || item.id;
                   const variant = item.selectedVariant && item.selectedVariant !== 'N/A' ? item.selectedVariant : null;
@@ -338,7 +273,124 @@ const CartDrawer = ({ isOpen, onClose }) => {
                       </div>
                     </div>
                   );
-                })}
+  };
+
+  const offerGroups = groupCartByOffer(cartItems, cartPromotions, promotionPricing);
+  // Applied offers now live in their groups above; the banner list keeps the
+  // ones still in progress ("add 1 more…"), so nothing is shown twice.
+  const pendingPromotions = cartPromotions.filter((pr) => !offerGroups.groups.some((g) => g.promo.id === pr.id));
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex justify-end font-inter text-ink">
+
+      <style>{`
+        .un-cart-ticket-shimmer {
+          animation: ppc-shimmer 1.1s ease-out 1 forwards;
+        }
+        @keyframes un-coupon-star-float {
+          0% { transform: translateY(3px) scale(0.4) rotate(0deg); opacity: 0; }
+          25% { opacity: 1; }
+          100% { transform: translateY(-14px) scale(1) rotate(30deg); opacity: 0; }
+        }
+        .un-coupon-star {
+          position: absolute;
+          pointer-events: none;
+          animation: un-coupon-star-float 2.4s ease-in-out infinite;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .un-cart-ticket-shimmer { animation: none; opacity: 0; }
+          .un-coupon-star { animation: none; opacity: 0; }
+        }
+      `}</style>
+
+      {/* Backdrop */}
+      <div
+        className={`absolute inset-0 bg-ink/50 backdrop-blur-sm transition-opacity duration-300 motion-reduce:transition-none ${shown ? 'opacity-100' : 'opacity-0'}`}
+        onClick={onClose}
+      />
+
+      {/* Drawer Panel */}
+      <div
+        className={`relative w-full max-w-[430px] bg-paper h-full shadow-2xl flex flex-col transform transition-transform duration-[350ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none will-change-transform ${
+          shown ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+
+        {/* --- HEADER --- */}
+        <div className="px-5 py-3 border-b border-hair flex items-center justify-between shrink-0">
+          <div className="flex items-baseline gap-2.5">
+            <h2 className="text-xl font-extrabold tracking-tight">Your Cart</h2>
+            <span className="gl-lbl text-brand text-[11px]">{cartItems.length} {cartItems.length === 1 ? 'item' : 'items'}</span>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close cart"
+            className="w-9 h-9 rounded-full border border-hair grid place-items-center text-muted hover:border-ink hover:text-ink transition-colors"
+          >
+            <i className="fa-solid fa-xmark text-sm" />
+          </button>
+        </div>
+
+        {/* --- SCROLLABLE CONTENT --- */}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-3 sm:px-5 sm:py-4 scrollbar-hide">
+
+          {cartItems.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-center gap-5">
+              <div className="w-20 h-20 rounded-full bg-brand/10 grid place-items-center">
+                <i className="fa-solid fa-bag-shopping text-2xl text-brand" />
+              </div>
+              <div>
+                <h3 className="text-lg font-extrabold mb-1">Your cart is empty</h3>
+                <p className="text-sm text-muted max-w-[240px] mx-auto leading-relaxed">Add a piece you love — it'll show up here.</p>
+              </div>
+              <button
+                onClick={() => { onClose(); navigate('/products'); }}
+                className="gl-press bg-brand text-white text-sm font-bold px-7 py-3 rounded-xl hover:bg-brandHi transition-colors"
+              >
+                Start shopping
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Free-shipping threshold nudge — hidden unless admin's promotion is on */}
+              <OfferProgress location="cart" className="mb-3" fallback={<FreeShippingStrip cartTotal={subtotal} variant="compact" className="mb-3" />} />
+              {/* Other active Promotion V2 offers — renders nothing when none apply */}
+              <CartGiftProgress promotions={cartPromotions} className="mb-3" />
+              <PromotionBannerList promotions={pendingPromotions} pricing={promotionPricing} className="mb-3" />
+              {/* free gifts: claim card, then a FREE GIFT line once claimed — never added automatically */}
+              <GiftClaimList className="mb-3" />
+              <div className="divide-y divide-hair">
+                {/* Offers grouped with what unlocked them: "because you added → you get" */}
+                {offerGroups.groups.map(({ promo, savings, triggers, rewards }) => (
+                  <section key={promo.id} className="mb-3 overflow-hidden rounded-xl border border-ink/15 bg-white shadow-sm" aria-label={`Offer: ${promo.title}`}>
+                    {/* theme colours: ink header, red check + accent */}
+                    <header className="flex items-start gap-2.5 bg-ink px-3 py-2.5 text-paper">
+                      <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-brand text-[11px] font-bold text-white" aria-hidden="true">✓</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="gl-lbl text-[9px] text-paper/70">Offer applied</p>
+                        <p className="text-[13.5px] font-extrabold leading-snug">{promo.title}</p>
+                      </div>
+                    </header>
+                    {/* the saving on its own strip, so it reads as the payoff */}
+                    {savings > 0 && (
+                      <p className="flex items-center gap-2 border-b border-brand/15 bg-brand/[0.07] px-3 py-2 text-[12.5px] font-bold text-brand">
+                        <span aria-hidden="true">🎉</span> You saved ₹{savings.toLocaleString('en-IN')} with this offer
+                      </p>
+                    )}
+                    <div className="px-3">
+                      {triggers.length > 0 && (
+                        <>
+                          <p className="pt-2 text-[10px] font-semibold uppercase tracking-wide text-muted">Because you added</p>
+                          <div className="divide-y divide-hair">{triggers.map(renderItem)}</div>
+                        </>
+                      )}
+                      <p className="pt-2 text-[10px] font-bold uppercase tracking-wide text-brand">You get</p>
+                      <div className="divide-y divide-hair">{rewards.map(renderItem)}</div>
+                    </div>
+                  </section>
+                ))}
+                {offerGroups.groups.length > 0 && offerGroups.rest.length > 0 && <p className="pt-1 text-[10px] font-semibold uppercase tracking-wide text-muted">Also in your cart</p>}
+                {offerGroups.rest.map(renderItem)}
                 <GiftWrapLineItem />
               </div>
             </>
@@ -347,16 +399,16 @@ const CartDrawer = ({ isOpen, onClose }) => {
 
         {/* --- FOOTER (CHECKOUT) --- */}
         {cartItems?.length > 0 && (
-          <div className="px-5 pt-3 pb-4 border-t border-hair shrink-0 shadow-[0_-8px_20px_-14px_rgba(0,0,0,0.25)]">
+          <div className="px-4 pt-2.5 pb-3 sm:px-5 sm:pt-3 sm:pb-4 border-t border-hair shrink-0 shadow-[0_-8px_20px_-14px_rgba(0,0,0,0.25)]">
             {/* Gift wrap — renders nothing unless the admin's turned the
                 seasonal offer on (Admin -> Offers -> Gift Wrap). */}
-            <div className="border-b border-hair mb-3 empty:hidden">
+            <div className="border-b border-hair mb-2 sm:mb-3 empty:hidden">
               <GiftWrapOffer />
             </div>
 
             {/* Subtotal / shipping / total folded into one block: the total
                 is what matters, the breakdown sits on one line under it. */}
-            <div className="flex items-end justify-between gap-3 mb-4">
+            <div className="flex items-end justify-between gap-3 mb-3 sm:mb-4">
               <div className="min-w-0">
                 <p className="text-sm font-bold">Total</p>
                 <p className="text-[11px] text-muted mt-0.5">
@@ -379,12 +431,11 @@ const CartDrawer = ({ isOpen, onClose }) => {
               <span className="text-xl font-extrabold tabular-nums">₹{(Number(subtotal) || 0).toLocaleString('en-IN')}</span>
             </div>
 
-            {/* Static "Avail Coupons at Checkout" badge sitting on the
-                button's shoulder — solid, fully opaque, on TOP of the button.
-                Always shown, unconditionally — not tied to any real coupon
-                count. */}
+            {/* "Avail Coupons at Checkout" badge on the button's shoulder —
+                only while at least one public coupon is live (same rule as
+                checkout's coupon entry: no coupon, no promise of one). */}
             <div className="relative">
-              <div className="absolute left-4 -top-3 z-10 overflow-visible rounded-lg bg-gradient-to-br from-[#e6322a] via-[#d30505] to-[#7a0000] px-3 py-1.5 border border-[#ffffff33]" style={{ boxShadow: '0 4px 12px rgba(211,5,5,0.45), 0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.35)' }}>
+              {hasLiveCoupons && <div className="absolute left-4 -top-3 z-10 overflow-visible rounded-lg bg-gradient-to-br from-[#e6322a] via-[#d30505] to-[#7a0000] px-3 py-1.5 border border-[#ffffff33]" style={{ boxShadow: '0 4px 12px rgba(211,5,5,0.45), 0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.35)' }}>
                 <span className="un-coupon-star" style={{ top: '-9px', right: '10px', fontSize: '10px', color: '#ffd23f' }} aria-hidden="true">
                   <i className="fa-solid fa-star" />
                 </span>
@@ -406,7 +457,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
                     style={{ background: 'linear-gradient(100deg, rgba(255,255,255,0) 30%, rgba(255,255,255,0.7) 50%, rgba(255,255,255,0) 70%)' }}
                   />
                 </div>
-              </div>
+              </div>}
               <button
                 onClick={handleCheckout}
                 className="gl-press relative z-0 w-full h-12 bg-ink text-white rounded-xl font-bold uppercase tracking-[0.15em] text-[10px] hover:bg-brandHi transition-colors flex items-center justify-center gap-2 px-6"
@@ -423,7 +474,8 @@ const CartDrawer = ({ isOpen, onClose }) => {
               <span className="text-faint">·</span>
               <span className="flex items-center gap-1">
                 <i className="fa-solid fa-hand-holding-dollar text-brand" />
-                Partial COD — small advance, rest at your door
+                <span className="sm:hidden">Partial COD available</span>
+                <span className="hidden sm:inline">Partial COD — small advance, rest at your door</span>
               </span>
             </div>
           </div>

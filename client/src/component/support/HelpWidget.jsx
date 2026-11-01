@@ -222,6 +222,7 @@ const HelpWidget = () => {
         .un-help-fab { bottom: calc(env(safe-area-inset-bottom) + 70px); transition: bottom .3s ease, transform .2s ease }
         body:has([data-sticky-buybar]) .un-help-fab { bottom: calc(env(safe-area-inset-bottom) + 136px) }
         @media (min-width: 768px) { .un-help-fab, body:has([data-sticky-buybar]) .un-help-fab { bottom: 1.5rem } }
+        @media (min-width: 768px) { body:has([data-sticky-buybar="all"]) .un-help-fab { bottom: 6rem } }
       `}</style>
       <button
         type="button"

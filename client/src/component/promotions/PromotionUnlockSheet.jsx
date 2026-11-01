@@ -597,7 +597,7 @@ const PromotionUnlockSheet = () => {
             {rows.map((row, rowIndex) => {
               const items = row.recommendedProducts || [];
               return (
-                <div key={row.id} className={rowIndex === 0 ? "mt-5" : "mt-5 border-t border-hair pt-4"}>
+                <div key={row.id} data-offer-row className={rowIndex === 0 ? "mt-5" : "mt-5 border-t border-hair pt-4"}>
                   <div className="mb-3 flex items-end justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-[10px] font-extrabold uppercase tracking-[0.13em] text-brand">
@@ -616,7 +616,18 @@ const PromotionUnlockSheet = () => {
                         ) : null;
                       })()}
                     </div>
-                    {items.length > 3 && <span className="shrink-0 text-[10px] font-semibold text-muted">Swipe <i className="fa-solid fa-arrow-right ml-1" aria-hidden="true" /></span>}
+                    {items.length > 3 && (
+                      // our own scroll control instead of the browser's scrollbar
+                      <span className="flex shrink-0 items-center gap-1.5">
+                        {[-1, 1].map((d) => (
+                          <button key={d} type="button" aria-label={d < 0 ? 'Scroll left' : 'Scroll right'}
+                            onClick={(e) => { const row = e.currentTarget.closest('[data-offer-row]')?.querySelector('[aria-label="Eligible products"]'); row?.scrollBy({ left: d * row.clientWidth * 0.7, behavior: 'smooth' }); }}
+                            className="grid h-7 w-7 place-items-center rounded-full border border-hair bg-white text-ink shadow-sm hover:border-ink">
+                            <i className={`fa-solid fa-chevron-${d < 0 ? 'left' : 'right'} text-[10px]`} aria-hidden="true" />
+                          </button>
+                        ))}
+                      </span>
+                    )}
                   </div>
                   {/* up to 3 options sit side by side (Single / Double / Triple stand all visible, none hidden off-screen) */}
                   <div className={`pb-1 ${items.length === 1 ? "flex" : items.length <= 3 ? `grid gap-2 ${items.length === 2 ? "grid-cols-2" : "grid-cols-3"}` : "flex gap-3 -mx-5 snap-x snap-mandatory overflow-x-auto overscroll-x-contain px-5 scrollbar-hide sm:-mx-7 sm:px-7"}`} aria-label="Eligible products">

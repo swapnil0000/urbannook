@@ -592,6 +592,9 @@ const getCartDisplayController = asyncHandler(async (req, res) => {
   for (const entry of display) {
     const promotion = relevant.find((p) => String(p._id) === entry.id);
     entry.actionableForAdd = previewIds.has(entry.id) || Boolean(promotion && didAddedItemAdvancePromotion(promotion, beforeCtx, ctx));
+    // Which products' presence unlocks this offer (from its condition tree),
+    // so the cart can show "because you added X, you get Y". Display only.
+    entry.triggerProductIds = promotion ? conditionProductIds(promotion, true) : [];
   }
   // Recommendations power the "add more to unlock" bottom sheet — only
   // meaningful for the cart surface (checkout display stays text-only; by

@@ -42,21 +42,27 @@ const PendingRewardRow = ({ promo }) => {
   };
 
   return (
-    <div className="flex min-w-0 items-center gap-3 border border-save/25 bg-save/5 px-3 py-2.5 text-ink">
-      {card.image && <img src={card.image} alt="" className="h-11 w-11 shrink-0 object-cover" />}
-      <div className="min-w-0 flex-1">
-        <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-save">Offer unlocked</p>
-        <p className="truncate text-xs font-bold" title={label}>{label}</p>
-        <p className="text-[11px] text-muted">
-          {card.offerPrice != null
-            ? <><span className="font-bold text-save">{inr(card.offerPrice)}</span> <span className="line-through">{inr(card.price)}</span></>
-            : promo.subtitle}
-        </p>
-        {error && <p className="text-[11px] font-semibold text-brand" role="alert">{error}</p>}
+    // Same family as the cart's "Offer applied" group: ink header, red accent.
+    <div className="min-w-0 overflow-hidden rounded-xl border border-ink/15 bg-white shadow-sm">
+      <p className="flex items-center gap-2 bg-ink px-3 py-1.5 gl-lbl text-[9px] text-paper/80">
+        <span className="h-1.5 w-1.5 rounded-full bg-brand motion-safe:animate-pulse" aria-hidden="true" />
+        Offer unlocked · {promo.title || 'add it to your cart'}
+      </p>
+      <div className="flex min-w-0 items-center gap-3 px-3 py-2.5 text-ink">
+        {card.image && <img src={card.image} alt="" className="h-12 w-12 shrink-0 rounded-md bg-surface object-cover" />}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[13px] font-bold" title={label}>{label}</p>
+          <p className="text-[12px] text-muted">
+            {card.offerPrice != null
+              ? <><span className="font-extrabold text-brand">{card.offerPrice === 0 ? 'FREE' : inr(card.offerPrice)}</span> <span className="line-through">{inr(card.price)}</span></>
+              : promo.subtitle}
+          </p>
+          {error && <p className="text-[11px] font-semibold text-brand" role="alert">{error}</p>}
+        </div>
+        <button type="button" onClick={add} disabled={busy} className="gl-press shrink-0 rounded-lg bg-brand px-4 py-2.5 text-[12px] font-extrabold uppercase tracking-wide text-white hover:bg-brandHi disabled:opacity-60">
+          {busy ? "Adding…" : "Add"}
+        </button>
       </div>
-      <button type="button" onClick={add} disabled={busy} className="shrink-0 bg-ink px-3 py-2 text-[11px] font-extrabold uppercase tracking-wide text-paper disabled:opacity-60">
-        {busy ? "Adding…" : "Add"}
-      </button>
     </div>
   );
 };

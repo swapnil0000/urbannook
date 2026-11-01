@@ -3,6 +3,7 @@ import Product from "../model/product.model.js";
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
 import { NotFoundError } from "../utils/errors.js";
 import { apiCache } from "../module/cache.manager.module.js";
+import { recentSalesByProduct, withRecentSales } from "../utils/productSignals.util.js";
 
 const productListing = asyncHandler(async (req, res) => {
   const {
@@ -51,14 +52,21 @@ const productListing = asyncHandler(async (req, res) => {
       if (featured === "true") query.tags = "featured";
     }
 
-    const [listOfProducts, totalProducts] = await Promise.all([
+    const [pageProducts, totalProducts] = await Promise.all([
       Product.find(query)
         .skip((page - 1) * perPage)
         .limit(perPage)
         .sort(sort)
-        .select("-_id -createdAt -updatedAt -__v"),
+        // createdAt stays in: the storefront's "New arrivals" sort reads it.
+        .select("-_id -updatedAt -__v")
+        .lean(),
       Product.countDocuments(query),
     ]);
+    // Real units sold per product/variant power "Most bought" (all time),
+    // "Trending" (30 days), and the 7-day product-card sales badge. Cached
+    // with the rest of this response (apiCache, 10 min).
+    const sales = await recentSalesByProduct(pageProducts.map((p) => p.productId));
+    const listOfProducts = withRecentSales(pageProducts, sales);
 
     return {
       listofPublishedProducts: listOfProducts,
