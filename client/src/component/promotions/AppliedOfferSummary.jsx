@@ -82,7 +82,10 @@ export const OfferRewardPicks = ({ promo, rewards, pricing, promoRewards = rewar
               <span className="min-w-0 font-bold text-ink">
                 <span className="text-muted">You picked: </span>{shortVariant(it.selectedVariant || it.name)} stand{units > 1 ? ` × ${units}` : ""}
               </span>
-              {shown && <span className="shrink-0 font-extrabold tabular-nums text-brand">{inr(shown.total)}{shown.was != null && shown.was > shown.total && <span className="ml-1 text-[11px] font-semibold text-muted line-through">{inr(shown.was)}</span>}</span>}
+              {shown && <span className="shrink-0 font-extrabold tabular-nums text-brand">{inr(shown.total)}{shown.was != null && shown.was > shown.total && <span className="ml-1 text-[11px] font-semibold text-muted line-through">{inr(shown.was)}</span>}{shown.was > shown.total && line && (() => {
+                const unit = it.offerUnits != null ? it.offerUnitPrice : line.discountedUnitPrice; // per stand, not the mixed line total
+                return <span className="ml-1.5 text-[10.5px] font-bold text-save">{unit === 0 ? "FREE" : `${Math.round((1 - unit / line.originalUnitPrice) * 100)}% OFF`}</span>;
+              })()}</span>}
             </div>
             {others.length > 0 && (
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">

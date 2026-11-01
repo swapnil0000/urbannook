@@ -280,7 +280,13 @@ const CartDrawer = ({ isOpen, onClose }) => {
                             <p className={`text-sm font-extrabold ${priceLine?.savings > 0 ? 'text-brand' : ''}`}>
                               ₹{(priceLine?.lineTotal ?? rawLineTotal).toLocaleString('en-IN')}
                             </p>
-                            {priceLine?.savings > 0 && <p className="text-[10px] font-bold text-save">Save ₹{priceLine.savings.toLocaleString('en-IN')}</p>}
+                            {/* the offer itself ("50% OFF" / "FREE"), not a rupee figure that is ₹1 off the
+                                price next to it after rounding (₹224 vs save ₹225); the ₹ total is in the header */}
+                            {priceLine?.savings > 0 && (() => {
+                              const unit = shared ? item.offerUnitPrice : priceLine.discountedUnitPrice;
+                              const pct = Math.round((1 - unit / priceLine.originalUnitPrice) * 100);
+                              return <p className="text-[10px] font-bold text-save">{unit === 0 ? 'FREE' : `${pct}% OFF`}</p>;
+                            })()}
                           </div>
                         </div>
                         {/* more of this reward than the offer covers (e.g. a katana was removed but its
