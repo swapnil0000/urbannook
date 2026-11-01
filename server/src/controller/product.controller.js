@@ -3,6 +3,7 @@ import Product from "../model/product.model.js";
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
 import { NotFoundError } from "../utils/errors.js";
 import { apiCache } from "../module/cache.manager.module.js";
+import { recentSalesByProduct, withRecentSales } from "../utils/productSignals.util.js";
 
 const productListing = asyncHandler(async (req, res) => {
   const {
@@ -20,7 +21,7 @@ const productListing = asyncHandler(async (req, res) => {
     const perPage = Number(limit) || 10;
     /*category -> Filter by category	Electronics , search -> Keyword search in name	iPhone */
     // isAddon products (e.g. Gift Wrap) are real, cart-addable products but
-    // never belong in the browsable grid — excluded here only; still
+    // never belong in the browsable grid - excluded here only; still
     // fetchable directly by ID via specificProductDetails below.
     const query = { isPublished: true, isAddon: { $ne: true } };
     let sort = { priority: -1, createdAt: -1 }; // admin priority first, then latest
@@ -51,14 +52,21 @@ const productListing = asyncHandler(async (req, res) => {
       if (featured === "true") query.tags = "featured";
     }
 
-    const [listOfProducts, totalProducts] = await Promise.all([
+    const [pageProducts, totalProducts] = await Promise.all([
       Product.find(query)
         .skip((page - 1) * perPage)
         .limit(perPage)
         .sort(sort)
-        .select("-_id -createdAt -updatedAt -__v"),
+        // createdAt stays in: the storefront's "New arrivals" sort reads it.
+        .select("-_id -updatedAt -__v")
+        .lean(),
       Product.countDocuments(query),
     ]);
+    // Real units sold per product/variant power "Most bought" (all time),
+    // "Trending" (30 days), and the 7-day product-card sales badge. Cached
+    // with the rest of this response (apiCache, 10 min).
+    const sales = await recentSalesByProduct(pageProducts.map((p) => p.productId));
+    const listOfProducts = withRecentSales(pageProducts, sales);
 
     return {
       listofPublishedProducts: listOfProducts,
@@ -142,7 +150,7 @@ const specificProductDetails = asyncHandler(async (req, res) => {
     // Cross-product versions (Wooden ↔ LED): for every variant that has a
     // variantGroup, inline the OTHER published, active variants in that group
     // so the PDP can render its version toggle without another request.
-    // A variant with a group but no other versions gets `versions: []` — the
+    // A variant with a group but no other versions gets `versions: []` - the
     // PDP shows the toggle greyed out. No group = no `versions` key at all.
     const groups = [
       ...new Set((productDetails.variantDetails || []).map((v) => v.variantGroup).filter(Boolean)),

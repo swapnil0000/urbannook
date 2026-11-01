@@ -21,11 +21,11 @@ import { describeGiftEntitlements } from "../services/giftClaims.service.js";
 // Public: every currently active, in-date-range V2 promotion. Previously
 // returned the RAW Promotion documents (full conditionTree, rewards,
 // linkedCouponCode, maxUsesTotal/maxUsesPerUser, promotionGroup, etc.) to
-// any unauthenticated caller — a genuine data leak (audit 2026-10-08,
+// any unauthenticated caller - a genuine data leak (audit 2026-10-08,
 // Critical Bug #8): a scraper could read out every active coupon code and
 // every internal targeting rule. Now routed through the same
 // presentation-layer sanitization the Display API already uses, with an
-// empty cart context (no items) — only the fields the Universal Renderer
+// empty cart context (no items) - only the fields the Universal Renderer
 // contract exposes are returned. Still intentionally unauthenticated (admin/
 // debug + a future anonymous PDP consumer, per the route file's original
 // comment), just no longer leaking internal configuration.
@@ -37,10 +37,10 @@ const getActivePromotionsController = asyncHandler(async (_req, res) => {
 });
 
 // Public: the subset of active promotions that reference this product,
-// either as a condition or as a reward target — a structural "does this
+// either as a condition or as a reward target - a structural "does this
 // apply to this page" filter, not a live cart evaluation (same pattern the
 // now-deleted legacy getBannerForProductController used). Sanitized the
-// same way as getActivePromotionsController above — see that comment for
+// same way as getActivePromotionsController above - see that comment for
 // why.
 const getPromotionsForProductController = asyncHandler(async (req, res) => {
   const { productId } = req.params;
@@ -51,11 +51,11 @@ const getPromotionsForProductController = asyncHandler(async (req, res) => {
   return res.status(200).json(new ApiRes(200, "OK", display, true));
 });
 
-// Shared by evaluatePromotionsController and the display/* endpoints below —
+// Shared by evaluatePromotionsController and the display/* endpoints below -
 // resolves client items (variant known only by NAME) into engine-ready items
 // (variant known by SKU) + the productMeta/subtotal context the condition
 // tree needs. Client-supplied `subtotal` is trusted only for DISPLAY
-// purposes (closer progress messages, e.g. "add ₹250 more") — checkout
+// purposes (closer progress messages, e.g. "add ₹250 more") - checkout
 // itself never reads anything from this controller, so there's no payment
 //-amount trust boundary being crossed here; the real order total is always
 // computed independently in rp.payment.controller.js.
@@ -89,7 +89,7 @@ async function resolveItemsAndContext(items, { subtotal, customerType, orderCoun
     customerType,
     orderCount,
     deliveryAddress,
-    // Optional — a coupon-linked promotion only previews as matched when the
+    // Optional - a coupon-linked promotion only previews as matched when the
     // caller tells us a coupon is actually applied (see
     // promotionCouponGateOk in promotionEngine.util.js). Not yet sent by
     // every client surface; omitted = that promotion simply won't show here,
@@ -100,29 +100,29 @@ async function resolveItemsAndContext(items, { subtotal, customerType, orderCoun
 }
 
 // Public: evaluates the posted cart against every active V2 promotion:
-// { items: [{productId, quantity, selectedVariant}] } — client only ever
+// { items: [{productId, quantity, selectedVariant}] } - client only ever
 // knows a variant by its NAME, this is the one place that resolves
 // name -> sku (via a Product lookup) before calling into
 // promotionEngine.util.js.
 const evaluatePromotionsController = asyncHandler(async (req, res) => {
   const { items, couponCode } = req.body;
-  // subtotal: 0 (display-only evaluation — the real subtotal is checkout's
+  // subtotal: 0 (display-only evaluation - the real subtotal is checkout's
   // job; conditions needing it just won't match here, "optimistic,
-  // re-validated at order-creation" — same convention every display
+  // re-validated at order-creation" - same convention every display
   // surface in this file already uses).
   const { resolvedItems, ctx } = await resolveItemsAndContext(items, { subtotal: 0, couponCode });
 
   const activePromotions = await getActivePromotions();
   const result = evaluatePromotions(resolvedItems, ctx, activePromotions);
 
-  // Map not JSON-serializable — flatten discountCandidatesByProduct to a
+  // Map not JSON-serializable - flatten discountCandidatesByProduct to a
   // plain object.
   return res.status(200).json(
     new ApiRes(
       200,
       "OK",
       {
-        // id+name only — NOT the raw matched Promotion documents (no
+        // id+name only - NOT the raw matched Promotion documents (no
         // conditionTree/rewards/linkedCouponCode/usage caps). See the leak
         // fix comment on getActivePromotionsController above; this endpoint
         // had the same issue for whichever promotions happened to match.
@@ -140,14 +140,14 @@ const evaluatePromotionsController = asyncHandler(async (req, res) => {
   );
 });
 
-// ── Display API (Phase 3) — fully display-ready. Frontend renders only;
+// ── Display API (Phase 3) - fully display-ready. Frontend renders only;
 // never interprets conditionTree/rewards/promotionType. Every promotion
 // returned has already been through promotionPresentation.service.js. ────
 
 // A promotion is relevant to the CURRENT cart if either: its conditionTree
 // mentions a product actually in the cart (or a reward targets one), or it
 // has no product-specific condition at all (pure cart/order-wide rule, e.g.
-// "spend ₹2000+" or "guest checkout only") — those apply regardless of
+// "spend ₹2000+" or "guest checkout only") - those apply regardless of
 // which products are in the cart. Prevents showing a completely unrelated
 // product-specific promotion (e.g. a different item's buy-get-free) in the
 // cart/checkout display list.
@@ -157,7 +157,7 @@ function hasProductCondition(node) {
   return node.field === "product" || node.field === "productList";
 }
 // Deliberately CONDITION-only (unlike promotionReferencesProduct, which also
-// matches reward targets — right for "does this promotion mention this
+// matches reward targets - right for "does this promotion mention this
 // product at all" on the PDP, wrong here: a cart containing only the FREE
 // GIFT product shouldn't surface a promo whose actual trigger product isn't
 // in the cart).
@@ -193,21 +193,21 @@ function appliedPromotionIdsFromResult(result) {
 // but not yet qualifying, resolve the SAME unmet leaf buildProgressText (in
 // promotionPresentation.service.js) already found into real, in-stock
 // catalog products the customer could add. Generic over product/category/
-// subcategory/tag leaves — never hardcodes a specific offer/product. Kept in
+// subcategory/tag leaves - never hardcodes a specific offer/product. Kept in
 // this controller (not the presentation service) because it needs DB reads;
 // the presentation service is deliberately pure JSON-shaping with no I/O.
 
 // Mirrors buildProgressText's own AND/OR walk (promotionPresentation.service.js)
 // but returns the unmet LEAF itself instead of pre-rendered text, and only
 // for leaf types that actually name products (product/category/subcategory/
-// tag) — any other unmet leaf (cartSubtotal, geo, schedule, etc.) has no
+// tag) - any other unmet leaf (cartSubtotal, geo, schedule, etc.) has no
 // "which products" answer, so recommendations stay empty for those, same as
 // progressText already does for its own "no safe guess" cases.
 function findFirstUnmetProductLeaf(node, ctx) {
   if (!node) return null;
   if (node.op) {
     const children = node.children || [];
-    // A NOT'd subtree has no sensible "add this product" recommendation —
+    // A NOT'd subtree has no sensible "add this product" recommendation -
     // the fix for an unmet NOT (the negated condition is currently TRUE) is
     // to have LESS of something, which this "add N more to unlock" surface
     // can never suggest. Treat the whole subtree as having no recommendable
@@ -230,7 +230,7 @@ function findFirstUnmetProductLeaf(node, ctx) {
 function findUnmetProductLeaves(node, ctx) {
   if (!node || evaluateConditionTree(node, ctx)) return [];
   if (!node.op) return ["product", "productList", "category", "subcategory", "tag"].includes(node.field) ? [node] : [];
-  // Same reasoning as findFirstUnmetProductLeaf — a NOT's unmet leaf isn't
+  // Same reasoning as findFirstUnmetProductLeaf - a NOT's unmet leaf isn't
   // addable, so it contributes nothing here.
   if (node.op === "NOT") return [];
   return (node.children || []).flatMap((child) => findUnmetProductLeaves(child, ctx));
@@ -300,7 +300,7 @@ function cardAdvancesLeaf(card, leaf, ctx) {
 }
 
 // Shapes one Product doc (+ optionally a specific variant) into the small,
-// storefront-ready card shape the bottom sheet needs — never the raw
+// storefront-ready card shape the bottom sheet needs - never the raw
 // product/variant document.
 function toRecommendationCard(product, variant) {
   const v = variant || product.variantDetails?.find((candidate) =>
@@ -388,7 +388,7 @@ async function resolveMissingRewardTargets(promotion, ctx) {
 const PRODUCT_RECOMMENDATION_PROJECTION = "productId productName productImg productStatus variantDetails";
 
 // Resolves a single unmet leaf into up to `limit` real, in-stock, purchasable
-// recommendation cards — a "product" leaf resolves to that exact
+// recommendation cards - a "product" leaf resolves to that exact
 // product/variant; category/subcategory/tag leaves resolve to a handful of
 // real catalog matches (generic DB query, never a hardcoded list).
 async function resolveRecommendationsForLeaf(leaf, { limit = 20 } = {}) {
@@ -401,7 +401,7 @@ async function resolveRecommendationsForLeaf(leaf, { limit = 20 } = {}) {
     if (!product) return [];
     return cardsForTarget(product, leaf.variantSku).slice(0, limit);
   }
-  // An admin-picked list of specific products/variants — resolve each entry
+  // An admin-picked list of specific products/variants - resolve each entry
   // directly (no catalog query beyond fetching exactly these productIds),
   // in the admin's own configured order.
   if (leaf.field === "productList") {
@@ -431,7 +431,7 @@ async function resolveRecommendationsForLeaf(leaf, { limit = 20 } = {}) {
   return cards.slice(0, limit);
 }
 
-// Resolves the promotion's own reward target(s) into the same card shape —
+// Resolves the promotion's own reward target(s) into the same card shape -
 // so the sheet can show "unlock THIS" distinctly from "add THESE to
 // qualify". Only reward types with an explicit single targetProductId are
 // resolvable this way; a category-wide scoped reward applies to whatever's
@@ -454,7 +454,7 @@ async function resolveRewardCard(promotion) {
 
 // Mutates `display` in place, attaching `recommendedProducts`/`rewardProduct`
 // to every entry that's actionable (not yet qualifying, but close enough
-// that progressText already names a concrete next step) — skips everything
+// that progressText already names a concrete next step) - skips everything
 // else so an already-qualifying or structurally-unreachable promotion never
 // pays for extra product lookups.
 async function attachRecommendations(display, promotionsById, ctx) {
@@ -494,7 +494,7 @@ async function attachRecommendations(display, promotionsById, ctx) {
   return display;
 }
 
-// GET /promotions/display/product/:id — PDP. Structural filter (like
+// GET /promotions/display/product/:id - PDP. Structural filter (like
 // getPromotionsForProductController) + "pdp" placement gate, run through the
 // presentation layer against a 1-item hypothetical cart (qty 1) so
 // progressText/qualifying reflect "if you add just this product".
@@ -519,8 +519,8 @@ const getProductDisplayController = asyncHandler(async (req, res) => {
   return res.status(200).json(new ApiRes(200, "OK", { promotions: display }, true));
 });
 
-// POST /promotions/display/cart — Cart/Mini-cart. Body: { items, placement?
-// } where placement is "cart" (default) or "mini_cart" — same data, just a
+// POST /promotions/display/cart - Cart/Mini-cart. Body: { items, placement?
+// } where placement is "cart" (default) or "mini_cart" - same data, just a
 // different placements-field gate, since admin can choose to show a
 // promotion in one but not the other.
 // Entitlements + display info for the claim card / cart line. The customer-facing name and image are the
@@ -592,13 +592,16 @@ const getCartDisplayController = asyncHandler(async (req, res) => {
   for (const entry of display) {
     const promotion = relevant.find((p) => String(p._id) === entry.id);
     entry.actionableForAdd = previewIds.has(entry.id) || Boolean(promotion && didAddedItemAdvancePromotion(promotion, beforeCtx, ctx));
+    // Which products' presence unlocks this offer (from its condition tree),
+    // so the cart can show "because you added X, you get Y". Display only.
+    entry.triggerProductIds = promotion ? conditionProductIds(promotion, true) : [];
   }
-  // Recommendations power the "add more to unlock" bottom sheet — only
+  // Recommendations power the "add more to unlock" bottom sheet - only
   // meaningful for the cart surface (checkout display stays text-only; by
   // then the customer is mid-payment-flow, not browsing to add products).
   const promotionsById = new Map(relevant.map((p) => [String(p._id), p]));
   await attachRecommendations(display, promotionsById, ctx);
-  // "2 of 3 Katanas" — the noun for promotions whose progress is shown on its own
+  // "2 of 3 Katanas" - the noun for promotions whose progress is shown on its own
   // (the Phuljadi asks for them by id); one small lookup, only for those.
   const nounIds = display.filter((e) => previewIds.has(e.id) && e.progress && e.progress.mode !== "amount").map((e) => e.id);
   if (nounIds.length) {
@@ -625,10 +628,10 @@ const getCartDisplayController = asyncHandler(async (req, res) => {
   return res.status(200).json(new ApiRes(200, "OK", { promotions: display, pricing, gifts: gifts.entitlements, invalidGiftClaims: gifts.invalidClaims }, true));
 });
 
-// POST /promotions/display/checkout — Checkout. Same as cart display but
+// POST /promotions/display/checkout - Checkout. Same as cart display but
 // also accepts delivery/customer context so pincode/state/customerType/
 // orderCount conditions can be evaluated for real (PDP/cart display never
-// know this yet) — still display-only, never affects the actual charge
+// know this yet) - still display-only, never affects the actual charge
 // (that stays rp.payment.controller.js's job, independently computed).
 const getCheckoutDisplayController = asyncHandler(async (req, res) => {
   const { items, customerType, orderCount, deliveryAddress, couponCode } = req.body;
@@ -648,7 +651,7 @@ const getCheckoutDisplayController = asyncHandler(async (req, res) => {
   return res.status(200).json(new ApiRes(200, "OK", { promotions: display, pricing }, true));
 });
 
-// Which exact productIds a conditionTree names via "product" leaves —
+// Which exact productIds a conditionTree names via "product" leaves -
 // recursive over AND/OR groups, ignores every other leaf shape (category/
 // cartSubtotal/etc. have no single product to extract). Used only to find
 // the 2-product "buy A+B together" shape for the homepage combo card; has
@@ -752,7 +755,7 @@ function buildComboBuilder(promos, productMap, shortNameOf, hiddenRewardLabel) {
     const slots = slotsFromCondition(promo.conditionTree);
     if (!slots.length) continue;
     // "Buy A, get B at 50% off": the discounted product is not in the condition, so the shopper has to add it
-    // too — it becomes one more slot, pinned to the reward's own variant, and the sheet adds both together.
+    // too - it becomes one more slot, pinned to the reward's own variant, and the sheet adds both together.
     const firstReward = (promo.rewards || [])[0];
     const discountTarget = firstReward && ["percent_off_product", "flat_off_product", "discounted_product"].includes(firstReward.type)
       && firstReward.targetProductId ? firstReward : null;
@@ -817,7 +820,7 @@ function buildComboBuilder(promos, productMap, shortNameOf, hiddenRewardLabel) {
   return combos;
 }
 
-// What the admin set for the product page (promotion.placementCards.pdp) — sent along with each home
+// What the admin set for the product page (promotion.placementCards.pdp) - sent along with each home
 // combo so the product page's offer banner can show the admin's own picture / wording. null when untouched.
 const pdpCardOf = (promo) => {
   const c = promo.placementCards?.pdp;
@@ -825,13 +828,13 @@ const pdpCardOf = (promo) => {
   return { bannerImage: c.bannerImage || null, tagline: c.subtitle || "", badgeLabel: c.badgeLabel || "", badgeText: c.badgeText || "", savingsLabel: c.savingsLabel || "" };
 };
 
-// Public: GET /promotions/display/home — homepage combo cards. Only
+// Public: GET /promotions/display/home - homepage combo cards. Only
 // promotions with placements including "home" AND whose conditionTree names
-// exactly 2 distinct products (the "buy A+B together" shape — see
+// exactly 2 distinct products (the "buy A+B together" shape - see
 // PROMOTION_TEMPLATES' combo_free_shipping template in the admin repo for
 // the same condition shape). For each, builds a hypothetical "exactly these
 // 2 products, 1 each" cart and runs it through the SAME evaluatePromotions
-// engine checkout uses — against every active promotion, not just this one,
+// engine checkout uses - against every active promotion, not just this one,
 // same "hypothetical cart" convention getProductDisplayController already
 // uses for the PDP. mrp/price/save are the real, computed numbers; nothing
 // here is typed in by the admin.
@@ -853,7 +856,7 @@ const getHomeDisplayController = asyncHandler(async (_req, res) => {
     ? await Product.find({ productId: { $in: rewardTargetIds } }, { productId: 1, variantDetails: 1 }).lean()
     : [];
   // The "choose" button opens a bottom sheet of the products behind each
-  // admin-configured choice link (/products/<productId>) — resolved here, in
+  // admin-configured choice link (/products/<productId>) - resolved here, in
   // stock only, so the storefront never guesses what can be added.
   const choiceIdOf = (url) => String(url || "").match(/^\/products\/([^/?#]+)/)?.[1] || null;
   const choiceIds = [...new Set(rewardPromos.flatMap((p) => (p.homeCard?.ctaChoices || []).map((c) => choiceIdOf(c.url))).filter(Boolean))];
@@ -934,7 +937,7 @@ const getHomeDisplayController = asyncHandler(async (_req, res) => {
       pdpCard: pdpCardOf(promo),
       // what the shopper gets (the stand that is 50% off, the free gift): the reward's own
       // image, else that product's photo. A "Mystery Gift" never shows the product it really
-      // is — only an image the admin set on the reward.
+      // is - only an image the admin set on the reward.
       ...(() => {
         const rw = (promo.rewards || []).find((r) => r.image || r.targetProductId || r.targetScope?.items?.length);
         const mystery = ["free_product", "gift_choice"].includes(rw?.type) && /mystery/i.test(`${promo.name} ${hc.subtitle || ""} ${hc.savingsLabel || ""}`);
@@ -954,7 +957,7 @@ const getHomeDisplayController = asyncHandler(async (_req, res) => {
       ctaAction: hc.ctaAction === "choose" && (hc.ctaChoices || []).length ? "choose" : hc.ctaAction === "link" && hc.ctaUrl ? "link" : "cart",
       ctaUrl: hc.ctaUrl || "",
       // every live promotion that grants the same reward (e.g. wooden / LED / mixed
-      // variants of "Dual Stand Free") — the unlock sheet shows one row for each
+      // variants of "Dual Stand Free") - the unlock sheet shows one row for each
       relatedPromotionIds: (() => {
         const rw = (promo.rewards || []).find((r) => r.targetProductId);
         const mine = String(promo._id);
@@ -1027,7 +1030,7 @@ const getHomeDisplayController = asyncHandler(async (_req, res) => {
       // A combo's reward isn't always a ₹ price cut (free_shipping/
       // free_product give no product-level discount at all, so save would
       // be 0 and the storefront's "Save ₹X" pill would have nothing to
-      // show) — surfaced here so the card can fall back to a "Free
+      // show) - surfaced here so the card can fall back to a "Free
       // Shipping"/"Free Gift" pill instead of silently showing no badge.
       // free_product.promotionId is matched against this promo specifically
       // (resolveProductWinners can drop it for another promo); freeShipping
@@ -1045,13 +1048,13 @@ const getHomeDisplayController = asyncHandler(async (_req, res) => {
         ctaLabel: homeCard.ctaLabel?.trim() || "Add to Cart",
         bannerImage: homeCard.bannerImage || null,
         pdpCard: pdpCardOf(promo),
-        // null when no bannerImage — storefront renders a 50/50 split of
+        // null when no bannerImage - storefront renders a 50/50 split of
         // these two images itself, never a hardcoded placeholder.
         fallbackImages: homeCard.bannerImage ? null : variants.map((v) => v.variantImage?.[0] || ""),
         mrp,
         price,
         save: Math.max(0, mrp - price),
-        // Rounded from the computed numbers above — never typed by an admin.
+        // Rounded from the computed numbers above - never typed by an admin.
         percentOff: mrp > 0 ? Math.round((Math.max(0, mrp - price) / mrp) * 100) : 0,
         freeShipping: result.freeShipping,
         freeGift: grantsFreeProduct,
@@ -1067,7 +1070,7 @@ const getHomeDisplayController = asyncHandler(async (_req, res) => {
         primaryProductId: homeCard.primaryProductId || productIds[0] || null,
         builder: { combos: buildComboBuilder([promo], builderMap, shortNameOf, "") },
         // Every in-stock variant the shopper may pick for each required product
-        // (restricted to the SKU the promotion pins, if it pins one) — drives the
+        // (restricted to the SKU the promotion pins, if it pins one) - drives the
         // variant-selection bottom sheet. Admin-configured; nothing hardcoded.
         options: (() => {
           const pinned = collectConditionSkus(promo.conditionTree);
@@ -1105,7 +1108,7 @@ export {
   getCartDisplayController,
   getCheckoutDisplayController,
   getHomeDisplayController,
-  // Pure, DB-free helpers — exported for unit testing.
+  // Pure, DB-free helpers - exported for unit testing.
   findFirstUnmetProductLeaf,
   didAddedItemAdvancePromotion,
   toRecommendationCard,
