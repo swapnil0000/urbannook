@@ -433,3 +433,12 @@ admin rights for 1–2 people only.
 | 12 | Build-time rendering of every public page (SSG, §2.1), real 404s, `/products/<id>` 301, `workers.dev` off | 🚧 Built on branch `seo/ssg-foundation` (2026-10-15), not deployed |
 
 Update this table in the same PR that changes a step's status.
+
+## Homepage hero banner (admin-managed images)
+
+Admin (Operations Hub → Hero banner) writes one `herobanners` document; the storefront reads it through
+the public `GET /hero-banner/active` (`server/src/controller/heroBanner.controller.js`) and renders
+`client/src/component/HeroBanner.jsx` on the homepage, falling back to the built-in hero when no slide is live.
+Images are uploaded only to `urbannook-assets-storage` (`banner-image`). No new secrets, no new infra, no cache or
+Cloudflare changes: the endpoint is an uncached single-document read (browser `max-age=60`, RTK 5 min), and the
+homepage prefetches it in `entry-server.jsx` so it is in the prerendered HTML. Details: System Guide §4.8 and §7.

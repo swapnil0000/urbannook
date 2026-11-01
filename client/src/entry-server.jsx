@@ -24,7 +24,7 @@ import { SsrContext } from './utils/ssrContext';
 // args must match what the page's hooks pass, so the hooks find this data in
 // the cache and the browser doesn't fetch it again.
 const PREFETCH = [
-  { path: '/', load: () => [['getFeaturedProducts', { limit: 1 }], ['getTestimonials', undefined]] },
+  { path: '/', load: () => [['getFeaturedProducts', { limit: 1 }], ['getTestimonials', undefined], ['getHeroBanner', undefined]] },
   { path: '/products', load: () => [] },
   { path: '/category/:slug', load: ({ slug }) => [['getCategoryBySlug', slug], ['getCategories', undefined], ['getBlogPosts', { series: slug, limit: 6 }]] },
   { path: '/product/:productId', load: ({ productId }) => productPage(productId) },
