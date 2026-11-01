@@ -425,6 +425,9 @@ const CheckoutPage = () => {
     { skip: cartItems.length === 0 },
   );
   const checkoutPromotions = checkoutPromotionsData?.data?.promotions || [];
+  // An applied free_shipping Promotion (e.g. free delivery with an LED katana) - the server
+  // already zeroes shipping for it when the order is created, so the page must show it too.
+  const promoFreeShipping = checkoutPromotions.some((p) => p.displayType === "free_shipping" && p.applied);
   // Same server-evaluated item discount preview shown in the cart. It is
   // subtracted from the raw/coupon subtotal for display only; order creation
   // independently applies the promotion when calculating the real charge.
@@ -664,14 +667,13 @@ const CheckoutPage = () => {
         const result = paymentMethod === "COD" ? codRes : prepaidRes;
 
         if (result.success && result.data) {
-          // Free shipping is a single admin-configured field - cart subtotal
-          // vs a ₹ threshold, nothing product-specific - so a plain
-          // comparison is the correct (and only) eligibility check.
+          // Free shipping: an applied free_shipping Promotion (can be product-
+          // specific, e.g. LED katana) or the legacy ₹ threshold config.
           const offerConfig = freeShippingOfferData?.data;
           const cartSubtotal =
             cartItems.reduce((s, i) => s + Number(i.price || 0) * Number(i.quantity || 0), 0) - ruleDiscountSavings;
-          const isFreeShippingEligible =
-            !!offerConfig?.isActive && (offerConfig?.thresholdAmount || 0) > 0 && cartSubtotal >= offerConfig.thresholdAmount;
+          const isFreeShippingEligible = promoFreeShipping ||
+            (!!offerConfig?.isActive && (offerConfig?.thresholdAmount || 0) > 0 && cartSubtotal >= offerConfig.thresholdAmount);
           // realAmount = actual carrier rate, always - this is what the COD
           // 2x-advance must be based on (matches the server's realShippingAmount).
           // amount = what the customer's total/display reflects - 0 when free
@@ -711,7 +713,7 @@ const CheckoutPage = () => {
 
     fetchShippingRate();
     return () => { cancelled = true; };
-  }, [currentStep, reviewStep, pinCode, cartItems, paymentMethod, freeShippingOfferData, ruleDiscountSavings]);
+  }, [currentStep, reviewStep, pinCode, cartItems, paymentMethod, freeShippingOfferData, ruleDiscountSavings, promoFreeShipping]);
 
   useEffect(() => {
     if (savedAddressData?.success) {
