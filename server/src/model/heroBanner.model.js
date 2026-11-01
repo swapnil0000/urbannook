@@ -17,6 +17,9 @@ const slideSchema = new mongoose.Schema(
     // Edge colours sampled from the artwork: fill the space beside it when the banner height is capped.
     bgTop: { type: String, trim: true, default: "" },
     bgBottom: { type: String, trim: true, default: "" },
+    // Same idea for the MOBILE picture: its top-row / bottom-row colours (full width), for any space above or below it.
+    mobileBgTop: { type: String, trim: true, default: "" },
+    mobileBgBottom: { type: String, trim: true, default: "" },
     // Tiny fine-print line shown in white over the bottom-left of the banner, e.g. "* Applicable items only". "" = none.
     note: { type: String, trim: true, default: "", maxlength: 60 },
     alt: { type: String, required: true, trim: true },
