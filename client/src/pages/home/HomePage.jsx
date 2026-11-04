@@ -5,6 +5,9 @@ import { addItem } from '../../store/slices/cartSlice';
 import SEOHead from '../../component/SEOHead';
 import { productImg, firstVariant, inr } from '../../component/UnProductCard';
 import HomeProductCard from '../../component/HomeProductCard';
+import GiftEditSection from '../../component/home/GiftEditSection';
+import TrustStrip from '../../component/home/TrustStrip';
+import StatementSection from '../../component/home/StatementSection';
 import FestiveSections from '../../component/festive/FestiveSections';
 import FestiveOfferBand from '../../component/festive/FestiveOfferBand';
 import RangoliDivider from '../../component/festive/RangoliDivider';
@@ -65,39 +68,6 @@ const SecHead = ({ index, kicker, title, onView }) => (
 //   </div>
 // );
 
-/* The middle figure is maintained by hand - bump it when the milestone moves.
-   It used to read "0 - Mass produced", which was meant as a boast about not
-   mass producing but rendered as a large animated zero and simply looked like
-   a number that had failed to load. A "+" is deliberate: the claim stays true
-   as the count grows, so a stale value is never a false one. */
-const STATS = [
-  { to: 100, suffix: '%', label: 'Made in India' },
-  { to: 900, suffix: '+', label: 'Orders delivered' },
-  { to: 48, suffix: 'h', label: 'To ship' },
-];
-
-/** Number that eases 0→value the first time it scrolls into view. */
-const CountUp = ({ to = 0, suffix = '', duration = 1.4 }) => {
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true, amount: 0.6 });
-  const [val, setVal] = useState(0);
-  useEffect(() => {
-    if (!inView) return;
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { setVal(to); return; }
-    let raf;
-    const start = performance.now();
-    const tick = (now) => {
-      const p = Math.min((now - start) / (duration * 1000), 1);
-      const eased = 1 - Math.pow(1 - p, 3); // easeOutCubic
-      setVal(Math.round(to * eased));
-      if (p < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [inView, to, duration]);
-  return <span ref={ref}>{val}{suffix}</span>;
-};
-
 /** Photo-led review card for the testimonial wall. */
 const ReviewCard = ({ t, img, tag, onClick }) => (
   <figure
@@ -136,69 +106,6 @@ const RotatingSeal = ({ text = '· MADE TO ORDER · 3D-PRINTED IN INDIA ' }) => 
     </svg>
   </div>
 );
-
-/** 3D curved coverflow carousel - ported from the reference: cards on a curved
- *  plane, center flat & forward, sides angled/blurred, auto-scrolls right→left,
- *  pauses on hover, click a card to focus it. Responsive (sizes scale to width). */
-const CoverflowCarousel = ({ images }) => {
-  const N = images.length;
-  const [active, setActive] = useState(Math.min(2, Math.max(N - 1, 0)));
-  const [paused, setPaused] = useState(false);
-  const stageRef = useRef(null);
-  const [stageW, setStageW] = useState(360);
-
-  useEffect(() => {
-    const measure = () => { if (stageRef.current) setStageW(stageRef.current.offsetWidth); };
-    measure();
-    window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
-  }, []);
-  useEffect(() => {
-    if (N <= 1 || paused) return undefined;
-    const id = setInterval(() => setActive((a) => (a + 1) % N), 3000);
-    return () => clearInterval(id);
-  }, [N, paused]);
-
-  const cardW = Math.min(stageW * 0.74, 380);
-  const cardH = cardW * 0.74;          // ~4:3, matches the reference 380×280
-  const shift = Math.min(stageW * 0.5, 280);
-
-  return (
-    <div
-      ref={stageRef}
-      className="relative w-full flex items-center justify-center select-none"
-      style={{ perspective: '1500px', height: cardH + 56 }}
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-    >
-      <div className="relative" style={{ transformStyle: 'preserve-3d', width: cardW, height: cardH }}>
-        {images.map((src, i) => {
-          let offset = i - active;
-          if (offset < -Math.floor(N / 2)) offset += N;
-          if (offset > Math.floor(N / 2)) offset -= N;
-          const abs = Math.abs(offset);
-          return (
-            <div
-              key={i}
-              onClick={() => setActive(i)}
-              className="absolute inset-0 overflow-hidden border border-white/10 shadow-2xl bg-ink cursor-pointer"
-              style={{
-                transform: `translateX(${offset * shift}px) translateZ(${-abs * 140}px) rotateY(${-offset * 15}deg) scale(${abs === 0 ? 1.05 : 1 - abs * 0.1})`,
-                opacity: abs === 0 ? 1 : abs === 1 ? 0.8 : 0.4,
-                filter: abs === 0 ? 'none' : 'blur(1px) brightness(0.85)',
-                zIndex: 10 - abs,
-                display: abs <= 2 ? 'block' : 'none',
-                transition: 'transform 0.7s cubic-bezier(0.25,1,0.5,1), opacity 0.7s ease, filter 0.7s ease',
-              }}
-            >
-              <img src={src} alt="" loading="lazy" className="w-full h-full object-cover pointer-events-none" onError={onImgErr} />
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
 
 const FAQS = [
   { q: 'Can I customise my piece?', a: "Yes! Every product is 3D-printed to order, so we can tweak the colour or finish, add your initials or a logo, or tailor it to your setup. Just message us before you order and we'll make it yours." },
@@ -718,24 +625,6 @@ const HomePage = () => {
   };
   const heroImg = productImg(featured);
 
-  // Auto-carousel of the featured product's own shots (different images, one product)
-  const carouselImages = useMemo(() => {
-    const real = (list) => [...new Set(list.filter((x) => x && !x.includes('/assets/logo')))];
-
-    const gallery = real((firstVariant(featured)?.variantImage || []));
-    if (gallery.length > 1) return gallery;
-
-    const own = real([...gallery, ...(featured?.secondaryImages || []), featured?.productImg]);
-    if (own.length > 1) return own;
-
-    /* Still thin - build the reel from the catalogue instead, so the coverflow
-       always has something to rotate. A single-image "carousel" reads as a
-       broken carousel, and a single LOGO image reads as a broken page. */
-    const across = real(products.map(productImg)).slice(0, 8);
-    return across.length ? across : own.length ? own : gallery;
-  }, [featured, products]);
-
-
   // ── Catalog-size-aware merchandising ──────────────────────────────
   // Below MERCH_THRESHOLD we can't fill separate Bestsellers / New /
   // Feed grids without repeating the same SKUs, so we show ONE curated
@@ -756,6 +645,18 @@ const HomePage = () => {
   const MIN_TAGGED = 2;
   const bestsellers = byTag('best_seller').slice(0, 8);
   const arrivals = byTag('new_arrival').slice(0, 8);
+
+  /* "The UrbanNook way" photos: the piece the admin tagged Featured (Products → edit → tags), else the first Bestseller -
+     both admin choices, never an arbitrary catalogue product. Its own shots only (every variant's photos, then the
+     gallery); nothing tagged yet → no carousel rather than a made-up one. */
+  const statementProduct = useMemo(() => productList(featRes)[0] || bestsellers[0] || null, [featRes, bestsellers]);
+  const carouselImages = useMemo(() => {
+    const p = statementProduct;
+    if (!p) return [];
+    const real = (list) => [...new Set(list.filter((x) => x && !x.includes('/assets/logo')))];
+    const variants = (p.variantDetails || []).filter((v) => v && v.isActive !== false);
+    return real([...variants.flatMap((v) => v.variantImage || []), ...(p.secondaryImages || []), p.productImg]);
+  }, [statementProduct]);
 
   // Sizing for the single "Collection" grid so 2-7 products never look stranded.
   const colsFor = (k) => (k <= 2 ? 'grid-cols-2 max-w-[720px]'
@@ -843,60 +744,14 @@ const HomePage = () => {
           </div>
         </section>
       ) : bestsellers.length >= MIN_TAGGED ? (
-        /* Full catalog: differentiated, tag-driven Bestsellers grid. */
-        <section className="bg-surface border-y border-hair mt-4">
-          <div className="max-w-[1280px] mx-auto px-5 py-9 md:py-14">
-            <SecHead index="01" kicker="The Hype" title="Bestsellers" onView={() => navigate('/products')} />
-            {isLoading
-              ? <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">{[...Array(4)].map((_, i) => <div key={i} className="aspect-[4/5] bg-hair animate-pulse rounded-none border border-hair" />)}</div>
-              : <Stagger className={`grid ${colsFor(bestsellers.length)} mx-auto gap-4 md:gap-6`} stagger={0.06}>{bestsellers.map((p, i) => <StaggerItem key={p.productId || i}><HomeProductCard p={p} index={i} listId="home_best" listName="Bestsellers" /></StaggerItem>)}</Stagger>}
-          </div>
-        </section>
+        /* Full catalog: the redesigned Bestsellers (content/homeRedesign.js). */
+        <GiftEditSection products={bestsellers} loading={isLoading} />
       ) : null}
 
 
 
 
-        <Reveal className="max-w-[1280px] mx-auto px-5 py-5 md:py-7" y={18}>
-        <div className="border border-hair overflow-hidden">
-          <div className="h-1 bg-brand"></div>
-          {/* bold stat tiles with hairline grid (gap-px over a hair bg) */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-hair">
-            <div className="bg-surface px-3 py-3.5 md:py-6 flex flex-col items-center justify-center text-center">
-              <div className="flex items-baseline gap-1">
-                <span className="font-archivo text-2xl md:text-4xl font-extrabold text-brand leading-none tabular-nums">4.9</span>
-                <span className="text-muted text-xs font-bold">/5</span>
-              </div>
-              <span className="text-star text-[10px] mt-1 tracking-tight">★★★★★</span>
-              <span className="gl-lbl text-[8px] text-faint mt-1">Avg rating</span>
-            </div>
-            <div className="bg-surface px-3 py-3.5 md:py-6 flex flex-col items-center justify-center text-center">
-              <span className="font-archivo text-2xl md:text-4xl font-extrabold text-brand leading-none">2,000+</span>
-              <span className="gl-lbl text-[8px] text-faint mt-1.5">Desks upgraded</span>
-            </div>
-            <div className="bg-surface px-3 py-3.5 md:py-6 flex flex-col items-center justify-center text-center">
-              <span className="font-archivo text-2xl md:text-4xl font-extrabold text-brand leading-none">100%</span>
-              <span className="gl-lbl text-[8px] text-faint mt-1.5">Made in India 🇮🇳</span>
-            </div>
-            <div className="bg-surface px-3 py-3.5 md:py-6 flex flex-col items-center justify-center text-center">
-              <span className="font-archivo text-2xl md:text-4xl font-extrabold text-brand leading-none">7-Day</span>
-              <span className="gl-lbl text-[8px] text-faint mt-1.5">Easy replacement</span>
-            </div>
-          </div>
-          {/* secure-checkout + payment strip */}
-          {/* <div className="border-t border-hair bg-white px-4 py-2.5 flex items-center justify-center gap-x-3 gap-y-1.5 flex-wrap">
-            <span className="gl-lbl text-[9px] text-ink flex items-center gap-1.5">
-              <i className="fa-solid fa-lock text-[9px] text-save" /> Secure checkout
-            </span>
-            <span className="hidden sm:block w-px h-3.5 bg-hair" />
-            <div className="flex items-center gap-1.5 flex-wrap justify-center">
-              {['VISA', 'Mastercard', 'UPI', 'RuPay', 'Partial COD'].map((x) => (
-                <span key={x} className="gl-lbl text-[9px] text-muted border border-hair px-2 py-1 bg-surface">{x}</span>
-              ))}
-            </div>
-          </div> */}
-        </div>
-      </Reveal>
+      <TrustStrip />
 
 
       {/* The combo-banner "Bundle - free-shipping cross-sell" section (and
@@ -920,35 +775,8 @@ const HomePage = () => {
         </section>
       )} */}
 
-      {/* ══ STATEMENT - hero carousel on top, manifesto below ══ */}
-      <section className="my-6 bg-ink text-paper border-y border-white/10 overflow-hidden">
-        <div className="max-w-[1100px] mx-auto px-7 md:px-12 py-12 md:py-24 flex flex-col items-center text-center">
-          {/* CAROUSEL - 3D curved coverflow of the product's shots */}
-          <div className="relative w-full max-w-[1000px]">
-            {/* warm ambient glow behind the stage */}
-            <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl" style={{ width: '460px', height: '460px', background: 'radial-gradient(circle, rgba(232,93,39,0.38) 0%, rgba(230,51,41,0.12) 42%, transparent 70%)' }} />
-            {/* Nothing to rotate before the catalogue lands - an empty stage
-                is better than a stage of placeholders. */}
-            {carouselImages.length > 0 && <CoverflowCarousel images={carouselImages} />}
-          </div>
-
-          {/* MANIFESTO - below the carousel */}
-          <div className="mt-10 md:mt-14 max-w-2xl">
-            <p className="gl-lbl mb-4 text-brand">The UrbanNook Way</p>
-            <TextReveal as="h2" text="Built to order. Not to sit in a warehouse." delay={0.1} className="font-archivo text-4xl md:text-6xl font-extrabold tracking-tight leading-[0.95] text-paper" />
-            <Reveal delay={0.2} className="mt-6 text-paper/70 text-base md:text-lg mx-auto max-w-md">Every piece is 3D-printed the moment you order it - less waste, sharper detail, and a finish you won't find on a shelf.</Reveal>
-            <motion.div className="mt-8 h-px w-24 bg-white/30 mx-auto origin-center" initial={{ scaleX: 0 }} whileInView={{ scaleX: 1 }} viewport={{ once: true }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.2 }} />
-            <div className="mt-8 grid grid-cols-3 gap-4 max-w-md mx-auto">
-              {STATS.map((s) => (
-                <div key={s.label}>
-                  <div className="font-archivo text-3xl md:text-5xl font-extrabold tracking-tight tabular-nums text-paper"><CountUp to={s.to} suffix={s.suffix} /></div>
-                  <div className="gl-lbl text-[9px] mt-1.5 text-paper/50">{s.label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* ══ STATEMENT - the brand promise + the featured piece's shots (content/homeRedesign.js) ══ */}
+      <StatementSection images={carouselImages} />
 
       {/* ══ SHOP BY COLLECTION - only when there are real categories to browse ══ */}
       {!isFewProducts && hasRealCollections && (
