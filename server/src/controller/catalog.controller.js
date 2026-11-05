@@ -274,7 +274,8 @@ const googleProductFeed = asyncHandler(async (req, res) => {
   let excluded = 0;
 
   for (const p of products) {
-    const variants = p.variantDetails || [];
+    // Variants hidden in the admin (unpublished drafts, retired) aren't on the site.
+    const variants = (p.variantDetails || []).filter((v) => v && v.isActive !== false);
     if (!p.productId || !p.productName || !variants.length) {
       skipped += 1;
       continue;

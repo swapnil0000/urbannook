@@ -30,7 +30,7 @@ describe("stock decrement + OOS re-sort keeps every variant field", () => {
     await decrementStockForOrder(order("A")); // A hits 0 → out of stock → re-sorted to the end
 
     const doc = await Product.collection.findOne({ productId: "p1" });
-    expect(doc.variantDetails.map((v) => v.variantName)).toEqual(["B", "C", "A"]); // it really was re-sorted (the write that used to strip)
+    expect(doc.variantDetails.map((v) => v.variantName)).toEqual(["C", "A", "B"]); // it really was re-sorted (the write that used to strip); hidden B goes last
     const byName = Object.fromEntries(doc.variantDetails.map((v) => [v.variantName, v]));
     expect(byName.A).toMatchObject({ variantQuantity: 0, variantOutOfStock: true, variantMrp: 2499, variantDes: "about A", variantSwatchType: "color", variantSwatchValue: "#112233", isActive: true });
     expect(byName.B).toMatchObject({ variantMrp: 3000, isActive: false, variantDes: "about B" }); // a retired variant stays retired
