@@ -41,7 +41,7 @@ import html_to_pdf from "html-pdf-node";
 import { generateInvoiceHtmlTemplate } from "../template/invoiceTemplate.template.js";
 import { calculateShippingRate, staticShippingCharge } from "../services/shipping.service.js";
 import { apiCache } from "../module/cache.manager.module.js";
-import { sortVariantsOOSLast, deriveProductStatus, syncVariantOutOfStock } from "../utils/variantSort.js";
+import { sortVariantsOOSLast, deriveProductStatus, syncVariantOutOfStock, hasNoVisibleVariants, firstVisibleVariant } from "../utils/variantSort.js";
 
 // ── Per-variant stock decrement ───────────────────────────────────────────────
 // A "buy X get Y [% off/free]" reward (cart_rule or Promotion V2) must only
@@ -299,9 +299,17 @@ const isVariantOutOfStock = (variant) =>
 // unmatched / "N/A" (single-design) items pass through untouched.
 const assertVariantAvailable = (product, variantName, qty) => {
   if (!product?.variantDetails?.length) return;
+  // Every variant hidden in the admin: the product is not on sale.
+  if (hasNoVisibleVariants(product)) {
+    throw new ValidationError(`"${product.productName}" is not available.`);
+  }
   if (!variantName || variantName === "N/A") return;
   const variant = product.variantDetails.find((v) => v.variantName === variantName);
   if (!variant) return;
+  // Hidden in the admin (unpublished draft or retired): not on sale.
+  if (variant.isActive === false) {
+    throw new ValidationError(`"${product.productName} — ${variantName}" is not available.`);
+  }
   if (isVariantOutOfStock(variant)) {
     throw new ValidationError(`"${product.productName} — ${variantName}" is out of stock.`);
   }
@@ -642,8 +650,8 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       if (matchedVariant && matchedVariant.variantPrice) {
         priceAtPurchase = matchedVariant.variantPrice;
       } else {
-        // Default to first variant's price if no match or no price on match
-        priceAtPurchase = product.variantDetails[0].variantPrice || 0;
+        // Default to the first visible variant's price if no match or no price on match
+        priceAtPurchase = firstVisibleVariant(product)?.variantPrice || 0;
       }
     }
 
@@ -2178,7 +2186,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     let matchedVariant = null;
     if (product.variantDetails && product.variantDetails.length > 0) {
       matchedVariant = product.variantDetails.find((v) => v.variantName === itemVariant);
-      priceAtPurchase = matchedVariant?.variantPrice || product.variantDetails[0].variantPrice || 0;
+      priceAtPurchase = matchedVariant?.variantPrice || firstVisibleVariant(product)?.variantPrice || 0;
     }
     // Shipping-rate calculation uses the pre-discount price (weight/rate
     // tiers, not the customer's charged amount) — deliberately NOT touched

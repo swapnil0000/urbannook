@@ -6,6 +6,7 @@ import { NotFoundError } from "../utils/errors.js";
 import { apiCache } from "../module/cache.manager.module.js";
 import { buildCategories, toCategorySlug } from "../utils/category.util.js";
 import { recentSalesByProduct, withRecentSales } from "../utils/productSignals.util.js";
+import { visibleProductsOnly } from "../utils/variantSort.js";
 
 // Same in-memory product cache (10 min) as the other product endpoints
 // (System Guide §7).
@@ -19,7 +20,9 @@ const loadCatalog = () =>
       Category.find({}).select("-_id name slug categoryId image displayOrder isActive").lean(),
     ]);
     const sales = await recentSalesByProduct(catalogProducts.map((p) => p.productId));
-    const products = withRecentSales(catalogProducts, sales);
+    // Unpublished (hidden) variants never leave the server; a product with
+    // every variant hidden is left out entirely.
+    const products = withRecentSales(visibleProductsOnly(catalogProducts), sales);
     return { products, categories: buildCategories(products, categoryDocs) };
   });
 
