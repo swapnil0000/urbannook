@@ -12,7 +12,7 @@ const CATEGORIES = [
   {
     id: 'delivery', title: 'Orders & Delivery', icon: 'fa-truck-fast', tint: 'bg-sky-100 text-sky-700',
     faqs: [
-      { q: 'How fast will my order ship?', a: 'Every piece is made to order and dispatched within 24-48 hours, with delivery pan-India.' },
+      // { q: 'How fast will my order ship?', a: 'Every piece is made to order and dispatched within 24-48 hours, with delivery pan-India.' }, // paused: no 24-48 hr promise for now
       { q: 'How do I track my order?', a: 'Once your order is dispatched you get a tracking link by email and SMS. You can also see the live status in My Orders.' },
       { q: 'Do you ship outside India?', a: 'Right now we ship to all pin codes within India only.' },
     ],

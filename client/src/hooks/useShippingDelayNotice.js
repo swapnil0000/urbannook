@@ -4,6 +4,7 @@ import {
   SHIPPING_DELAY_MESSAGE,
   SHIPPING_DELAY_EXPIRES_AT,
 } from "../config/shippingDelayNotice";
+import { SITE_SHIPPING_NOTICE, SITE_SHIPPING_NOTICE_STARTS, SITE_SHIPPING_NOTICE_ENDS } from "../config/siteShippingNotice";
 
 /**
  * Returns the shipping-delay message string when it should show, or null
@@ -22,4 +23,10 @@ export const useShippingDelayNotice = () => {
   if (!hasProduct) return null;
   if (new Date() >= SHIPPING_DELAY_EXPIRES_AT) return null;
   return SHIPPING_DELAY_MESSAGE;
+};
+
+/** The site-wide shipping note (ticker + checkout), only between its start and end dates, else null. */
+export const useSiteShippingNotice = () => {
+  const now = new Date();
+  return now >= SITE_SHIPPING_NOTICE_STARTS && now < SITE_SHIPPING_NOTICE_ENDS ? SITE_SHIPPING_NOTICE : null;
 };

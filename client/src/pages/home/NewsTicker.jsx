@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useShippingDelayNotice } from '../../hooks/useShippingDelayNotice';
+import { useShippingDelayNotice, useSiteShippingNotice } from '../../hooks/useShippingDelayNotice';
 import { useSiteCampaign, THEME_COPY } from '../../hooks/useSiteCampaign';
 import { useGetProductsQuery } from '../../store/api/productsApi';
 import { maxDiscountPercent } from '../../utils/festiveDeals';
@@ -117,6 +117,7 @@ const SaleBar = ({ messages, countdownLabel, showCountdown, upTo = 0 }) => {
 const NewsTicker = () => {
   const [isPaused, setIsPaused] = useState(false);
   const shippingDelayMessage = useShippingDelayNotice();
+  const siteShipNotice = useSiteShippingNotice();
   const { active: festive, messages: festiveMessages, can, page, stripText, countdownLabel, themeKey } = useSiteCampaign();
   const showCountdown = can('countdown');
   const showStrip = Boolean(stripText) && page !== 'home' && can('sectionAccents');
@@ -129,16 +130,16 @@ const NewsTicker = () => {
   const needOffers = festive && !festiveMessages.length;
   const { data: comboRes } = useGetHomeComboOffersQuery(undefined, { skip: !needOffers });
   const { data: couponRes } = useGetCouponOffersQuery('guest', { skip: !needOffers });
-  const barMessages = buildSaleBarMessages({
+  const barMessages = [...buildSaleBarMessages({
     adminMessages: festiveMessages,
     saleTitle: showCountdown ? THEME_COPY[themeKey]?.saleTitle : '',
     combos: comboRes?.data?.combos || [],
     coupons: couponRes?.data || [],
     promises: SALE_BAR_PROMISES,
     nameById: new Map((prodRes?.data?.listofPublishedProducts || prodRes?.data?.products || []).map((x) => [String(x.productId), x.productName])),
-  });
+  }), ...(siteShipNotice ? [{ key: 'ship-notice', text: siteShipNotice }] : [])];
 
-  if (festive && barMessages.length) {
+  if (festive && barMessages.length > (siteShipNotice ? 1 : 0)) {
     return (
       <div className="relative block border-b border-star/30 bg-ink text-paper" role="region" aria-label="Sale announcements">
         <style>{`
@@ -152,6 +153,7 @@ const NewsTicker = () => {
   }
 
   const items = [
+    ...(siteShipNotice ? [{ key: 'ship-notice', text: siteShipNotice }] : []),
     ...festiveMessages.map((m) => ({ key: `f-${m.id}`, text: m.text, to: m.linkUrl, festive: true })),
     ...(shippingDelayMessage ? [{ key: 'delay', text: shippingDelayMessage, to: '/products' }] : []),
     ...STORE_PROMISES.map((text) => ({ key: text, text, to: '/products' })),
