@@ -223,6 +223,54 @@ describe("shipping and tracking", () => {
     expect(v.timeline.find((s) => s.key === "delivered").state).not.toBe("done");
   });
 
+  describe("partial shipment by quantity (3 katanas: 2 now, 1 later)", () => {
+    const katanas = () => base({ items: [line("Zoro katana", 1499, 3)] });
+    const first = (over = {}) => ship({ _id: "p1", itemIndexes: [0], itemQuantities: [{ index: 0, qty: 2 }], ...over });
+
+    it("parcel 1 on its way, 1 katana not shipped → 'Partly shipped', parcel shows 2, 1 pending", () => {
+      const v = view(katanas(), [first()]);
+      expect(v.stage.code).toBe("PARTIALLY_SHIPPED");
+      expect(v.shipments[0].items).toEqual([expect.objectContaining({ name: "Zoro katana", quantity: 2 })]);
+      expect(v.pendingItems).toEqual([expect.objectContaining({ name: "Zoro katana", quantity: 1 })]);
+      expect(v.shipments[0]).not.toHaveProperty("lines");
+    });
+
+    it("parcel 1 delivered with 1 katana still unshipped is NOT 'Delivered'", () => {
+      const v = view(katanas(), [first({ shipmentStatus: "DELIVERED" })]);
+      expect(v.stage.code).toBe("PARTIALLY_DELIVERED");
+      expect(v.stage.message).toMatch(/ships separately/);
+      expect(v.timeline.find((s) => s.key === "delivered").state).not.toBe("done");
+    });
+
+    it("both parcels delivered → 'Delivered', nothing pending", () => {
+      const v = view(katanas(), [first({ shipmentStatus: "DELIVERED" }), ship({ _id: "p2", awbNumber: "AWB2", shipmentStatus: "DELIVERED", itemIndexes: [0], itemQuantities: [{ index: 0, qty: 1 }] })]);
+      expect(v.stage.code).toBe("DELIVERED");
+      expect(v.pendingItems).toEqual([]);
+      expect(v.shipments.map((s) => s.items[0].quantity)).toEqual([2, 1]);
+    });
+
+    it("out for delivery with a unit still unshipped says only part is out", () => {
+      const v = view(katanas(), [first({ shipmentStatus: "OUT_FOR_DELIVERY" })]);
+      expect(v.stage).toMatchObject({ code: "OUT_FOR_DELIVERY", headline: "Part of your order is out for delivery" });
+    });
+
+    it("the order summary counts the units still to ship", () => {
+      expect(buildOrderSummary(view(katanas(), [first()])).pendingCount).toBe(1);
+    });
+
+    it("a line split (itemIndexes only) still works and leaves the other line pending", () => {
+      const o = base({ items: [line("Katana", 1000), line("Stand", 299)] });
+      const v = view(o, [ship({ itemIndexes: [0] })]);
+      expect(v.stage.code).toBe("PARTIALLY_SHIPPED");
+      expect(v.pendingItems.map((i) => i.name)).toEqual(["Stand"]);
+    });
+
+    it("nothing pending before any parcel exists, or with a whole-order parcel", () => {
+      expect(view(katanas()).pendingItems).toEqual([]);
+      expect(view(katanas(), [ship()]).pendingItems).toEqual([]);
+    });
+  });
+
   it("a shipment without item mapping carries no item list (the whole order)", () => {
     expect(view(base(), [ship()]).shipments[0].items).toBeNull();
   });

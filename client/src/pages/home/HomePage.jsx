@@ -10,7 +10,7 @@ import RangoliDivider from '../../component/festive/RangoliDivider';
 import { Reveal, Stagger, StaggerItem, Parallax, TextReveal, useInView, motion, AnimatePresence, MotionRoot } from '../../component/motion';
 import { useGetFeaturedProductsQuery, useGetProductsQuery, useGetHeroBannerQuery } from '../../store/api/productsApi';
 import HeroBanner from '../../component/HeroBanner';
-import { useGetTestimonialsQuery } from '../../store/api/testimonialsApi';
+import { useGetTestimonialsQuery, useGetGoogleReviewsQuery } from '../../store/api/testimonialsApi';
 import { useGetHomeComboOffersQuery } from '../../store/api/userApi';
 import { recordOfferInterest } from '../../utils/offerInterest';
 import { trackViewItemList, trackAddToCart } from '../../utils/analytics';
@@ -105,10 +105,12 @@ const ReviewCard = ({ t, img, tag, onClick }) => (
   >
     <img src={img} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform duration-[800ms] ease-out group-hover:scale-125" onError={onImgErr} />
     <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent" />
-    <span className="absolute top-4 right-4 gl-lbl text-[8px] text-white/90 border border-white/40 px-2 py-1 backdrop-blur-sm">✓ Verified</span>
+    <span className="absolute top-4 right-4 gl-lbl text-[8px] text-white/90 border border-white/40 px-2 py-1 backdrop-blur-sm">{t.source === 'google' ? 'G · Google review' : '✓ Verified'}</span>
     <figcaption className="absolute inset-x-3 bottom-3 p-4 bg-paper/95 backdrop-blur">
       <div className="flex items-center gap-2.5 mb-2.5">
-        <span className="w-9 h-9 rounded-full bg-brand text-white grid place-items-center font-archivo font-extrabold text-sm shrink-0">{(t.userName || 'U').charAt(0).toUpperCase()}</span>
+        {t.photo
+          ? <img src={t.photo} alt="" loading="lazy" referrerPolicy="no-referrer" className="w-9 h-9 rounded-full object-cover shrink-0" />
+          : <span className="w-9 h-9 rounded-full bg-brand text-white grid place-items-center font-archivo font-extrabold text-sm shrink-0">{(t.userName || 'U').charAt(0).toUpperCase()}</span>}
         <div className="min-w-0 flex-1">
           <p className="gl-lbl text-[10px] text-ink truncate">{t.userName}</p>
           <span className="text-star text-[11px] leading-none">{stars(t.rating)}</span>
@@ -759,7 +761,13 @@ const HomePage = () => {
     { userName: 'Simran', content: "Gifted the Porsche caliper — my brother hasn't turned it off since.", rating: 5 },
     { userName: 'Kabir', content: "Pen stand is tiny but adorable. Desk finally looks intentional.", rating: 4 },
   ];
-  const reviews = testimonials.length ? testimonials : fallbackReviews;
+  // Google reviews (4★+, with text) lead the wall; our own approved testimonials follow.
+  const { data: googleRes } = useGetGoogleReviewsQuery();
+  const google = googleRes?.data?.configured ? googleRes.data : null;
+  const googleReviews = (google?.reviews || []).filter((r) => r.rating >= 4)
+    .map((r) => ({ userName: r.author, content: r.text, rating: r.rating, photo: r.authorPhoto, url: r.url || google.mapsUrl, source: 'google' }));
+  const ownReviews = [...googleReviews, ...testimonials];
+  const reviews = ownReviews.length ? ownReviews : fallbackReviews;
 
   useEffect(() => {
     if (products.length) trackViewItemList?.({ listName: 'Home', listId: 'home', items: products.map((p, i) => ({ itemId: p.productId, itemName: p.productName, price: firstVariant(p)?.variantPrice || 0, index: i })) });
@@ -972,7 +980,7 @@ const HomePage = () => {
       <section className="bg-paper py-4 md:py-20 overflow-hidden">
         <Reveal className="max-w-[1280px] mx-auto px-5 flex items-end justify-between gap-4 mb-8">
           <div>
-            <Kicker>★ 4.9 · 2,000+ Reviews</Kicker>
+            <Kicker>{google?.rating ? `★ ${google.rating.toFixed(1)} on Google · ${google.total} reviews` : '★ 4.9 · 2,000+ Reviews'}</Kicker>
             <h2 className="font-archivo text-3xl md:text-5xl font-extrabold tracking-tight mt-2">Straight from your desks</h2>
           </div>
           <span className="hidden sm:block gl-lbl text-[10px] text-faint whitespace-nowrap">Hover to pause · zoom · tap to shop</span>
@@ -989,12 +997,21 @@ const HomePage = () => {
               <div key={dup} className="flex shrink-0" aria-hidden={dup === 1}>
                 {reviews.map((t, i) => {
                   const prod = products.length ? products[i % products.length] : null;
-                  return <ReviewCard key={i} t={t} img={prod ? productImg(prod) : heroImg} tag={prod?.productName || 'UrbanNook'} onClick={() => prod && navigate(`/product/${prod.productId}`)} />;
+                  const open = t.source === 'google' && t.url ? () => window.open(t.url, '_blank', 'noopener') : () => prod && navigate(`/product/${prod.productId}`);
+                  return <ReviewCard key={i} t={t} img={prod ? productImg(prod) : heroImg} tag={t.source === 'google' ? 'Read on Google' : prod?.productName || 'UrbanNook'} onClick={open} />;
                 })}
               </div>
             ))}
           </div>
         </div>
+
+        {google && (
+          <div className="max-w-[1280px] mx-auto px-5 mt-6 flex flex-wrap items-center justify-center gap-3">
+            <a href={google.writeReviewUrl} target="_blank" rel="noopener noreferrer" className="gl-lbl text-[11px] bg-ink text-paper px-4 py-2.5 hover:bg-brand transition">★ Write a review on Google</a>
+            {google.mapsUrl && <a href={google.mapsUrl} target="_blank" rel="noopener noreferrer" className="gl-lbl text-[11px] border border-ink text-ink px-4 py-2.5 hover:bg-ink hover:text-paper transition">See all reviews on Google →</a>}
+            <span className="w-full text-center text-[10px] text-faint">Google reviews shown as provided by Google.</span>
+          </div>
+        )}
       </section>
 
       {/* ══ FAQ ══ */}

@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Testimonial from "../model/testimonial.model.js";
 import { ValidationError } from "../utils/errors.js";
 import ProductReview from "../model/product.specific.testimonial.model.js";
@@ -224,25 +225,64 @@ const createProductSpecificTestimonialService = async ({
   };
 };
 
+/**
+ * Products whose reviews are shown together with `productId`'s: those sharing a
+ * variantGroup with it (admin → product → variant "versions", e.g. a design that
+ * exists as both a Wooden and an LED katana). Reviews stay stored on their own
+ * product; only the listing pools them. Returns Map productId → productName,
+ * without `productId` itself.
+ */
+const getReviewGroupProducts = async (productId) => {
+  const products = mongoose.connection.db.collection("products");
+  const own = await products.findOne({ productId }, { projection: { "variantDetails.variantGroup": 1 } });
+  const groups = [...new Set((own?.variantDetails || []).map((v) => v.variantGroup).filter(Boolean))];
+  if (!groups.length) return new Map();
+  const related = await products
+    .find({ productId: { $ne: productId }, isPublished: true, "variantDetails.variantGroup": { $in: groups } }, { projection: { productId: 1, productName: 1 } })
+    .toArray();
+  return new Map(related.map((p) => [p.productId, p.productName]));
+};
+
+/**
+ * Pools a product's reviews with its review-group siblings' (see
+ * getReviewGroupProducts): the product's own reviews first, then the siblings',
+ * each newest first. A sibling's review without a variant label gets its
+ * product's name as `variant`, so the page shows "Bought: Anime Wooden Katana".
+ * Pure — exported for tests.
+ */
+export const poolGroupReviews = (productId, reviews, relatedNames = new Map()) => {
+  const newest = (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+  const own = reviews.filter((r) => r.productId === productId).sort(newest);
+  const related = reviews
+    .filter((r) => r.productId !== productId && relatedNames.has(r.productId))
+    .sort(newest)
+    .map((r) => ({ ...r, variant: r.variant || relatedNames.get(r.productId), fromRelatedProduct: true }));
+  return [...own, ...related];
+};
+
 const getProductReviewsService = async (productId, userId = null) => {
   if (!productId) {
     return { success: false, statusCode: 400, message: "productId is required", data: null };
   }
 
-  // Find all approved reviews OR reviews that belong to the current user (even if not approved)
+  const relatedNames = await getReviewGroupProducts(productId);
+
+  // Approved reviews of this product and its review-group siblings, plus the
+  // current user's own not-yet-approved review of THIS product.
   const query = {
-    productId,
+    productId: { $in: [productId, ...relatedNames.keys()] },
     $or: [{ isApproved: true }],
   };
 
   if (userId) {
-    query.$or.push({ userId, isApproved: false });
+    query.$or.push({ userId, productId, isApproved: false });
   }
 
-  const reviews = await ProductReview.find(query)
-    .sort({ createdAt: -1 })
-    .select("-__v")
-    .lean();
+  const reviews = poolGroupReviews(
+    productId,
+    await ProductReview.find(query).select("-__v").lean(),
+    relatedNames,
+  );
 
   // Calculate average rating (only for approved reviews)
   const approvedReviews = reviews.filter((r) => r.isApproved);
