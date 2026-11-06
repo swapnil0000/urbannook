@@ -125,9 +125,9 @@ export const productsApi = apiSlice.injectEndpoints({
       providesTags: (result, error, slug) => [{ type: 'Blog', id: slug }],
     }),
 
-    // One category page: name, indexable flag, products
+    // One category page: name, indexable flag, products. `slug` or `slug/subSlug` for a sub-category page.
     getCategoryBySlug: builder.query({
-      query: (slug) => `category/${encodeURIComponent(slug)}`,
+      query: (slug) => `category/${String(slug).split('/').map(encodeURIComponent).join('/')}`,
       providesTags: (result, error, slug) => [{ type: 'Category', id: slug }],
     }),
     

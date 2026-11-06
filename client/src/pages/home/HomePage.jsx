@@ -7,6 +7,7 @@ import { productImg, firstVariant, inr } from '../../component/UnProductCard';
 import HomeProductCard from '../../component/HomeProductCard';
 import GiftEditSection from '../../component/home/GiftEditSection';
 import TrustStrip from '../../component/home/TrustStrip';
+import CollectionsSection from '../../component/home/CollectionsSection';
 import StatementSection from '../../component/home/StatementSection';
 import FestiveSections from '../../component/festive/FestiveSections';
 import FestiveOfferBand from '../../component/festive/FestiveOfferBand';
@@ -664,13 +665,6 @@ const HomePage = () => {
     : 'grid-cols-2 lg:grid-cols-4');
   const collectionCols = colsFor(n);
 
-  const collections = useMemo(() => {
-    const seen = [];
-    products.forEach((p) => { if (p.productCategory && !seen.find((c) => c.name === p.productCategory)) seen.push({ name: p.productCategory, img: productImg(p), count: '' }); });
-    const soon = [{ name: 'Wall Posters', img: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=600&q=80', soon: true }, { name: 'Desk Décor', img: 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=600&q=80', soon: true }];
-    return [...seen, ...soon].slice(0, 4);
-  }, [products]);
-  const hasRealCollections = collections.filter((c) => !c.soon).length >= 3;
 
   const { data: testRes } = useGetTestimonialsQuery();
   const testimonials = (testRes?.data?.testimonials || []).slice(0, 3);
@@ -778,25 +772,8 @@ const HomePage = () => {
       {/* ══ STATEMENT - the brand promise + the featured piece's shots (content/homeRedesign.js) ══ */}
       <StatementSection images={carouselImages} />
 
-      {/* ══ SHOP BY COLLECTION - only when there are real categories to browse ══ */}
-      {!isFewProducts && hasRealCollections && (
-        <section className="max-w-[1280px] mx-auto px-5 py-9 md:py-14">
-          <SecHead index="03" kicker="Find Your Corner" title="Shop by Collection" />
-          <Stagger className="grid grid-cols-2 md:grid-cols-4 gap-4" stagger={0.07}>
-            {collections.map((c, i) => (
-              <StaggerItem key={i}>
-                <button onClick={() => navigate(c.soon ? '/products' : `/products?category=${encodeURIComponent(c.name)}`)} className="gl-pcard un-card group relative rounded-none overflow-hidden aspect-[4/5] bg-hair cursor-pointer text-left w-full">
-                  <img src={c.img} alt={c.name} loading="lazy" className="gl-img absolute inset-0 w-full h-full object-cover" onError={onImgErr} />
-                  <span className="un-glare"></span>
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-transparent"></div>
-                  {c.soon && <span className="absolute top-3 left-3 z-[3] gl-lbl text-[8px] bg-white/90 text-ink px-2 py-1 rounded">Coming soon</span>}
-                  <div className="absolute bottom-0 p-4 text-white z-[3]"><p className="font-archivo font-extrabold text-lg tracking-tight">{c.name}</p><p className="text-white/70 text-xs">{c.soon ? 'Notify me' : 'Shop now →'}</p></div>
-                </button>
-              </StaggerItem>
-            ))}
-          </Stagger>
-        </section>
-      )}
+      {/* ══ SHOP BY COLLECTION - the admin's categories → sub-categories → products → variants (content/homeRedesign.js) ══ */}
+      {!isFewProducts && <CollectionsSection />}
 
       {/* ══ SHOP THE FEED - needs enough distinct products to avoid repeats ══ */}
       {/* {!isFewProducts && (

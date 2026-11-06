@@ -45,10 +45,44 @@ export const STATEMENT = {
   stats: [
     { source: 'ordersDelivered', round: 10, suffix: '+', label: 'Orders delivered' },
     { source: 'ratingAvg', decimals: 1, unit: '/5', label: 'Average rating' },
-    { source: 'ratingCount', round: 10, suffix: '+', label: 'Verified reviews' },
+    { source: 'googleReviewCount', round: 10, suffix: '+', label: 'Verified Google reviews' },
   ],
-  counter: '{i} / {n}',
-  prev: 'Previous photo',
-  next: 'Next photo',
   goTo: 'Show photo {i}',
+};
+
+// The modal behind the "Verified Google reviews" figure. Every review in it is a real approved Google review read live
+// from GET /stats/google-reviews (added in Admin → Product Reviews → Import Google); only the wording lives here.
+export const GOOGLE_REVIEWS = {
+  title: 'Verified Google reviews',
+  summary: '{avg} average from {n} reviews',
+  note: 'Real reviews from our Google profile, shown here exactly as customers wrote them.',
+  forProduct: 'On {product}',
+  loading: 'Loading reviews…',
+  empty: 'No reviews to show right now.',
+  error: "Couldn't load the reviews. Please try again.",
+  retry: 'Try again',
+  close: 'Close reviews',
+  openHint: 'See the reviews',
+  photoOpen: 'View photo',
+  photoClose: 'Close photo',
+  stars: '{n} out of 5 stars',
+};
+
+// "Shop by collection" on the homepage and the sub-category row on category pages. Every tile is read live from
+// GET /categories (admin Categories → name, order, image; the sub-categories come from the products' own
+// sub-category); only the wording lives here. A category with no admin image shows its first product's photo.
+export const COLLECTIONS = {
+  index: '03',
+  eyebrow: 'Find your corner',
+  heading: 'Shop by collection',
+  sub: 'Each corner opens into its own range, sorted by type.',
+  count: ['{n} corners.', 'One for every space.'],
+  viewAll: 'All products',
+  viewAllHref: '/products',
+  designs: { one: '{n} design', many: '{n} designs' },
+  moreSubs: '+{n}',
+  max: 8,
+  min: 2,
+  // sub-category row on /category/<slug> and /category/<slug>/<sub>
+  subRow: { label: 'Browse by type', all: 'All' },
 };

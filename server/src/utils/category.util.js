@@ -23,39 +23,76 @@ export const MIN_INDEXABLE_ITEMS = 3;
 export const activeVariants = (p) =>
   (p?.variantDetails || []).filter((v) => v && v.isActive !== false);
 
+// First real photo of a product (variant shot first), used as a tile cover when no admin image is set.
+const coverOf = (p) => activeVariants(p)[0]?.variantImage?.[0] || p?.productImg || p?.productImage || "";
+
 /**
  * @param {object[]} products  published, non-addon products
  * @param {object[]} categoryDocs  admin Category documents
- * @returns {object[]} one entry per productCategory, ordered by admin displayOrder then name
+ * @returns {object[]} one entry per productCategory, in the admin's arrangement (Categories workspace):
+ *   1) displayOrder 1,2,3… as set there; 2) unset (0) after those, in the admin list order (creation);
+ *   3) categories with no admin document last, A-Z. Sub-categories follow the same rule.
  */
 export const buildCategories = (products, categoryDocs = []) => {
   const docs = categoryDocs.filter((c) => c && c.isActive !== false);
+  // Admin rank: explicit displayOrder first, unset (0) after in list order, so "0" never jumps to the top.
+  const rank = new Map(docs.map((c, i) => [c, c.displayOrder > 0 ? c.displayOrder : 1000 + i]));
   const byId = new Map(docs.filter((c) => c.categoryId).map((c) => [c.categoryId, c]));
   const bySlug = new Map(docs.map((c) => [toCategorySlug(c.slug || c.name), c]));
+  // Admin sub-category order/name per category doc: slug → { name, order }.
+  const docSubs = (doc) => new Map((doc?.subcategories || []).map((sc, i) => [
+    toCategorySlug(sc.slug || sc.name), { name: sc.name, order: sc.displayOrder > 0 ? sc.displayOrder : 1000 + i },
+  ]));
 
   const out = new Map();
   for (const p of products) {
-    if (!p?.productCategory) continue;
-    const slug = toCategorySlug(p.productCategory);
+    if (!p) continue;
+    // The admin Category is the source of truth: a product linked by categoryId follows its category's current
+    // name/slug even if the product's own productCategory text is stale (renamed) or empty.
+    const doc = byId.get(p.categoryId) || bySlug.get(toCategorySlug(p.productCategory));
+    const label = doc?.name || p.productCategory;
+    if (!label) continue;
+    const slug = toCategorySlug(label);
     if (!slug) continue;
-    const doc = byId.get(p.categoryId) || bySlug.get(slug);
     if (!out.has(slug)) {
       out.set(slug, {
         slug,
-        name: p.productCategory,
+        name: label,
         image: doc?.image || "",
-        displayOrder: doc?.displayOrder ?? Number.MAX_SAFE_INTEGER,
+        displayOrder: doc ? rank.get(doc) : Number.MAX_SAFE_INTEGER,
+        cover: "",
         productIds: [],
         itemCount: 0,
+        subs: new Map(),
+        subOrder: docSubs(doc),
       });
     }
     const entry = out.get(slug);
+    const items = activeVariants(p).length || 1;
     entry.productIds.push(p.productId);
-    entry.itemCount += activeVariants(p).length || 1;
+    entry.itemCount += items;
+    entry.cover ||= coverOf(p);
+    // Level 2: the product's sub-category (hierarchy category → sub-category → products → variants).
+    const subSlug = toCategorySlug(p.productSubCategory);
+    if (subSlug) {
+      if (!entry.subs.has(subSlug)) {
+        const known = entry.subOrder.get(subSlug);
+        entry.subs.set(subSlug, { slug: subSlug, name: known?.name || p.productSubCategory, order: known?.order ?? Number.MAX_SAFE_INTEGER, image: "", productIds: [], itemCount: 0 });
+      }
+      const sub = entry.subs.get(subSlug);
+      sub.productIds.push(p.productId);
+      sub.itemCount += items;
+      sub.image ||= coverOf(p);
+    }
   }
 
   const categories = [...out.values()]
-    .map((c) => ({ ...c, kind: "category", indexable: c.itemCount >= MIN_INDEXABLE_ITEMS }))
+    .map(({ subs, subOrder, ...c }) => ({
+      ...c,
+      kind: "category",
+      indexable: c.itemCount >= MIN_INDEXABLE_ITEMS,
+      subcategories: [...subs.values()].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name)).map(({ order, ...sc }) => sc),
+    }))
     .sort((a, b) => a.displayOrder - b.displayOrder || a.name.localeCompare(b.name));
   const taken = new Set(categories.map((c) => c.slug));
   return [...categories, ...buildCollections(products).filter((c) => !taken.has(c.slug))];

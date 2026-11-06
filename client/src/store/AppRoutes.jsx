@@ -116,6 +116,14 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/category/:slug/:subSlug"
+        element={
+          <Suspense fallback={<MinimalLoader />}>
+            <CategoryPage />
+          </Suspense>
+        }
+      />
+      <Route
         path="/products/:productId"
         element={
           <Suspense fallback={<MinimalLoader />}>

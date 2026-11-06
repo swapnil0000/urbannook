@@ -50,3 +50,48 @@ describe("buildCategories", () => {
     expect(out[0].image).toBe("");
   });
 });
+
+describe("buildCategories sub-categories", () => {
+  const img = (u) => [{ variantImage: [u] }];
+  const products = [
+    { productId: "a", productCategory: "Anime", productSubCategory: "Katana", variantDetails: [{ variantImage: ["k.webp"] }, {}] },
+    { productId: "b", productCategory: "Anime", productSubCategory: "Katana", variantDetails: img("k2.webp") },
+    { productId: "c", productCategory: "Anime", productSubCategory: "LED Katana", variantDetails: img("l.webp") },
+    { productId: "d", productCategory: "Anime", variantDetails: img("n.webp") },
+  ];
+  const docs = [{ name: "Anime", slug: "anime", subcategories: [{ name: "LED Katana", slug: "led_katana", displayOrder: 1 }, { name: "Katana", slug: "katana", displayOrder: 2 }] }];
+
+  it("lists sub-categories with counts, photo and the admin order; products without one stay at category level", () => {
+    const [c] = buildCategories(products, docs);
+    expect(c.subcategories.map((s) => [s.slug, s.name, s.itemCount, s.image])).toEqual([
+      ["led-katana", "LED Katana", 1, "l.webp"],
+      ["katana", "Katana", 3, "k.webp"],
+    ]);
+    expect(c.subcategories[1].productIds).toEqual(["a", "b"]);
+    expect(c.itemCount).toBe(5);
+    expect(c.cover).toBe("k.webp");
+  });
+  it("has an empty list when no product names a sub-category", () => {
+    const [c] = buildCategories([{ productId: "x", productCategory: "Lamp", variantDetails: [{}] }]);
+    expect(c.subcategories).toEqual([]);
+  });
+
+  it("orders categories like the admin: set orders first, unset (0) after in admin list order, unknown last", () => {
+    const pr = (n) => ({ productId: n, productCategory: n, variantDetails: [{}] });
+    const out = buildCategories(["Zeta", "Beta", "Alpha", "Gamma", "Other"].map(pr), [
+      { name: "Zeta", slug: "zeta", displayOrder: 0 },
+      { name: "Beta", slug: "beta", displayOrder: 2 },
+      { name: "Alpha", slug: "alpha", displayOrder: 0 },
+      { name: "Gamma", slug: "gamma", displayOrder: 1 },
+    ]);
+    expect(out.map((c) => c.name)).toEqual(["Gamma", "Beta", "Zeta", "Alpha", "Other"]);
+  });
+
+  it("follows the admin category by categoryId even when the product's category text is stale or empty", () => {
+    const out = buildCategories(
+      [{ productId: "a", categoryId: "CAT-009", productCategory: "Old Name", variantDetails: [{}] }, { productId: "b", categoryId: "CAT-009", variantDetails: [{}] }],
+      [{ name: "My Custom", slug: "my_custom", categoryId: "CAT-009", displayOrder: 1 }],
+    );
+    expect(out.map((c) => [c.slug, c.name, c.itemCount])).toEqual([["my-custom", "My Custom", 2]]);
+  });
+});

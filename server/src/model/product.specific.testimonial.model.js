@@ -10,6 +10,8 @@ const productSpecificTestimonialSchema = mongoose.Schema(
     imageUrl: { type: String, default: null }, // S3 URL (legacy single image)
     imageUrls: { type: [String], default: [] }, // up to 3 images
     isApproved: { type: Boolean, default: false },
+    // Set by the admin panel (website / google / whatsapp / …); declared here so the storefront can filter on it.
+    source: { type: String },
   },
   { timestamps: true }
 );

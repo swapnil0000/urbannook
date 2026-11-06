@@ -4,4 +4,5 @@ import { listCategories, categoryDetails } from "../controller/category.controll
 const categoryRouter = Router();
 categoryRouter.get("/categories", listCategories);
 categoryRouter.get("/category/:slug", categoryDetails);
+categoryRouter.get("/category/:slug/:subSlug", categoryDetails);
 export default categoryRouter;

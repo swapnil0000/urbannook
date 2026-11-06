@@ -5,6 +5,7 @@ import SEOHead from '../../component/SEOHead';
 import UnProductCard from '../../component/UnProductCard';
 import RevealCard from '../../component/RevealCard';
 import ScrollRow from '../../component/ScrollRow';
+import SubcategoryRow from '../../component/SubcategoryRow';
 import SaleBanner from '../../component/festive/SaleBanner';
 import { useGetHomeComboOffersQuery } from '../../store/api/userApi';
 import { buildOfferLines } from '../../utils/productOfferLines';
@@ -47,9 +48,10 @@ const pageCopy = ({ kind, slug, name, itemCount }) => {
 const PER_PAGE = 24;
 
 const CategoryPage = () => {
-  const { slug } = useParams();
+  const { slug, subSlug } = useParams();
+  const pageKey = subSlug ? `${slug}/${subSlug}` : slug;
   const [searchParams] = useSearchParams();
-  const { data, isLoading, error } = useGetCategoryBySlugQuery(slug);
+  const { data, isLoading, error } = useGetCategoryBySlugQuery(pageKey);
   const { data: allRes } = useGetCategoriesQuery();
   // A franchise page (/category/demon-slayer …) ends with that franchise's journal
   // posts; the API returns none for other slugs. Same args as entry-server.jsx.
@@ -59,8 +61,8 @@ const CategoryPage = () => {
   const category = data?.data;
   const allItems = useMemo(() => toItems(category?.products), [category]);
   // Availability / price filters: client state only (see ShopFilters), reset per category.
-  const [filters, setFilters] = useSessionState(`shop:${slug}:filters`, EMPTY_FILTERS);
-  const [sort, setSort] = useSessionState(`shop:${slug}:sort`, 'featured');
+  const [filters, setFilters] = useSessionState(`shop:${pageKey}:filters`, EMPTY_FILTERS);
+  const [sort, setSort] = useSessionState(`shop:${pageKey}:sort`, 'featured');
   // Live combo benefit per product, for the card's offer line (cached query).
   const { data: comboRes } = useGetHomeComboOffersQuery();
   // Names across the whole catalogue (same cached list as the header), so a
@@ -80,7 +82,7 @@ const CategoryPage = () => {
   // Chips: every other page that is worth a visit (indexable), categories first.
   const pills = useMemo(() => shopPills(allRes?.data || [], slug), [allRes, slug]);
 
-  useEffect(() => { window.scrollTo(0, 0); }, [slug, page]);
+  useEffect(() => { window.scrollTo(0, 0); }, [pageKey, page]);
   useEffect(() => {
     if (!category || !pageItems.length) return;
     trackViewItemList?.({
@@ -106,9 +108,11 @@ const CategoryPage = () => {
     );
   }
 
-  const { name, indexable, itemCount } = category;
-  const copy = pageCopy(category);
-  const basePath = `/category/${category.slug}`;
+  const { name, indexable, itemCount, subcategory, subcategories } = category;
+  const copy = subcategory
+    ? { h1: subcategory.name, title: `${subcategory.name} - ${name} - Buy Online in India`, description: `Shop ${itemCount} ${subcategory.name} designs in ${name} at UrbanNook. Gift wrap, partial COD and delivery across India.` }
+    : pageCopy(category);
+  const basePath = subcategory ? `/category/${category.slug}/${subcategory.slug}` : `/category/${category.slug}`;
   const pagePath = (n) => (n > 1 ? `${basePath}?page=${n}` : basePath);
 
   // Defaults (pageCopy above); Admin → SEO Pages (/category/<slug>) can override
@@ -128,7 +132,8 @@ const CategoryPage = () => {
       itemListElement: [
         { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE}/` },
         { '@type': 'ListItem', position: 2, name: 'Shop', item: `${SITE}/products` },
-        { '@type': 'ListItem', position: 3, name, item: `${SITE}${basePath}` },
+        { '@type': 'ListItem', position: 3, name, item: `${SITE}/category/${category.slug}` },
+        ...(subcategory ? [{ '@type': 'ListItem', position: 4, name: subcategory.name, item: `${SITE}${basePath}` }] : []),
       ],
     },
   ];
@@ -147,13 +152,15 @@ const CategoryPage = () => {
 
       <div className="max-w-[1280px] mx-auto px-5 pt-10">
         <nav aria-label="Breadcrumb" className="text-sm text-faint mb-5 pt-4">
-          <Link to="/" className="hover:text-brand">Home</Link> / <Link to="/products" className="hover:text-brand">Shop</Link> / <span className="text-ink">{name}</span>
+          <Link to="/" className="hover:text-brand">Home</Link> / <Link to="/products" className="hover:text-brand">Shop</Link> / {subcategory ? <><Link to={`/category/${category.slug}`} className="hover:text-brand">{name}</Link> / <span className="text-ink">{subcategory.name}</span></> : <span className="text-ink">{name}</span>}
         </nav>
         {/* the sale, announced once per page (no longer repeated on every card) */}
         <SaleBanner className="mb-5" />
         <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">{copy.h1}</h1>
         <p className="text-muted mt-2">{itemCount} {itemCount === 1 ? 'design' : 'designs'}</p>
 
+
+        <SubcategoryRow slug={category.slug} subcategories={subcategories} active={subcategory?.slug} />
 
         {pills.length > 0 && (
           <ScrollRow className="mt-6" activeKey={slug}>
@@ -193,8 +200,8 @@ const CategoryPage = () => {
                 recentSalesUnits={recentSales.get(key)}
                 offerLine={offerLines.get(String(p.productId))}
                 index={i}
-                listId={`category_${category.slug}`}
-                listName={`Category: ${name}`}
+                listId={`category_${category.slug}${subcategory ? `_${subcategory.slug}` : ''}`}
+                listName={`Category: ${name}${subcategory ? ` / ${subcategory.name}` : ''}`}
                 showWishlist={false}
               />
             </RevealCard>
