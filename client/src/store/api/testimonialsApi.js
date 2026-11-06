@@ -7,6 +7,10 @@ export const testimonialsApi = apiSlice.injectEndpoints({
       query: () => 'testimonials',
       providesTags: ['Testimonials'],
     }),
+    // Rating, review count and up to 5 reviews from the Google business profile
+    getGoogleReviews: builder.query({
+      query: () => 'google-reviews',
+    }),
     submitTestimonial: builder.mutation({
       query: (testimonialData) => ({
         url: 'testimonials',
@@ -42,6 +46,7 @@ export const testimonialsApi = apiSlice.injectEndpoints({
 
 export const {
   useGetTestimonialsQuery,
+  useGetGoogleReviewsQuery,
   useSubmitTestimonialMutation,
   useGetProductReviewsQuery,
   useSubmitProductReviewMutation,
