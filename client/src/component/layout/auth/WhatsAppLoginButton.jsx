@@ -30,7 +30,7 @@ export default function WhatsAppLoginButton({ onError }) {
 
   /* Tracked per code rather than as a plain boolean, so starting a fresh
      login clears the nudge on its own instead of needing an effect to reset
-     it — resetting state inside an effect just costs an extra render. */
+     it - resetting state inside an effect just costs an extra render. */
   const [slowForToken, setSlowForToken] = useState(null);
 
   useEffect(() => {

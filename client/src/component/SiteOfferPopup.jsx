@@ -126,7 +126,7 @@ const POPUP_STYLES = `
 
   /* Chrome and Safari repaint an autofilled field with their own near-white
      background and near-black text through a UA style that ordinary CSS rules
-     cannot override — on this dark sheet that turned the number field white.
+     cannot override - on this dark sheet that turned the number field white.
      An inset box-shadow is the accepted way to repaint the fill, and
      -webkit-text-fill-color the only way to recolour the text. The two colours
      below are #1c3026 composited with the white/5 and white/7 overlays the
@@ -524,7 +524,7 @@ const SiteOfferPopup = memo(() => {
                 {/* ---- Hero ---- */}
                 <div className="text-center">
                   {/* Capped width so this row can never run under the close
-                      button on narrow phones — it wraps instead of colliding. */}
+                      button on narrow phones - it wraps instead of colliding. */}
                   <div className="mx-auto mb-4 flex max-w-[78%] items-center justify-center gap-2.5">
                     <span className="h-px w-6 bg-paper/25" />
                     <span className="text-[9px] font-bold uppercase tracking-[0.24em] text-paper/60">
@@ -540,7 +540,7 @@ const SiteOfferPopup = memo(() => {
                     {amount} OFF
                   </p>
                   {/* The qualifying condition sits with the headline, not buried
-                      in fine print — someone gives up their number on the
+                      in fine print - someone gives up their number on the
                       strength of this claim. */}
                   <p className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-paper/15 bg-white/5 px-3 py-1 text-[11px] font-medium tracking-wide text-paper/80">
                     <i className="fa-solid fa-bag-shopping text-[9px] text-paper/50" />
@@ -676,7 +676,7 @@ const SiteOfferPopup = memo(() => {
 
                 {copyFailed && (
                   <p role="alert" className="mt-3 text-[11px] text-red-300">
-                    Couldn&apos;t copy automatically — tap and hold the code above to copy it.
+                    Couldn&apos;t copy automatically - tap and hold the code above to copy it.
                   </p>
                 )}
 

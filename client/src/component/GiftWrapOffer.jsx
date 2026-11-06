@@ -143,7 +143,7 @@ const GiftWrapOffer = ({ image, variant = "row", eligible = false, className = "
           <div className="min-w-0 flex-1">
             <p className="text-[14px] font-bold leading-tight text-ink">{offer.title || "Make it a gift"}</p>
             <p className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-muted">
-              {selected ? "Added — packed in a festive gift box" : `Festive gift box + note · ₹${price}${eligibleCount > 1 ? " each" : ""}`}
+              {selected ? "Added - packed in a festive gift box" : `Festive gift box + note · ₹${price}${eligibleCount > 1 ? " each" : ""}`}
             </p>
           </div>
           {selected ? (
@@ -239,7 +239,7 @@ const GiftWrapOffer = ({ image, variant = "row", eligible = false, className = "
                   checkbox with the top-right corner left open; the tick sits
                   behind the box and its tip pokes out through that gap when
                   checked. Always mounted, just scaled/faded via CSS transition
-                  (no keyframes, no JS) — smooth but deliberately cheap. */}
+                  (no keyframes, no JS) - smooth but deliberately cheap. */}
               <div className="w-full flex flex-row items-start justify-between gap-1 mb-4">
                 {NOTE_OPTIONS.map((opt) => {
                   const checked = noteOptions.includes(opt.value);

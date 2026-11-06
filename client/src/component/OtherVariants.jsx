@@ -41,7 +41,7 @@ const OtherVariants = ({ productId, productName, variants = [], currentVariantNa
       </div>
 
       {/* Single scrollable row (matches the old site's layout) instead of a
-          multi-row grid — the card design itself is unchanged. */}
+          multi-row grid - the card design itself is unchanged. */}
       <div
         className="flex gap-4 md:gap-6 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         style={{ touchAction: "pan-x" }}
@@ -70,7 +70,7 @@ const OtherVariants = ({ productId, productName, variants = [], currentVariantNa
                 p={asProduct}
                 index={index}
                 listId="other_variants"
-                listName={`${productName} — Other Variants`}
+                listName={`${productName} - Other Variants`}
                 href={`/product/${productId}/${encodeURIComponent(variant?.sku || variant?.variantName)}`}
                 badge={oos ? "Out of stock" : null}
                 showWishlist={false}

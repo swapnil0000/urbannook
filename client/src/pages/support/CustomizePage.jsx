@@ -53,7 +53,7 @@ const CustomizePage = () => {
   );
 
   /* Arriving from a product page preselects it, straight out of the URL at
-     first render — doing it in an effect meant a frame of empty selects and
+     first render - doing it in an effect meant a frame of empty selects and
      an extra render for nothing. */
   const [form, setForm] = useState(() => ({
     name: '',
@@ -103,7 +103,7 @@ const CustomizePage = () => {
     if (form.name.trim().length < 2) e.name = 'Please enter your name.';
     if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) e.email = 'Please enter a valid email address.';
     if (!/^[6-9]\d{9}$/.test(form.mobile.trim())) e.mobile = 'Please enter a valid 10-digit mobile number.';
-    if (form.message.trim().length < 10) e.message = 'Tell us a little more — at least 10 characters.';
+    if (form.message.trim().length < 10) e.message = 'Tell us a little more - at least 10 characters.';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -126,7 +126,7 @@ const CustomizePage = () => {
 
     try {
       const res = await submitCustomization(fd).unwrap();
-      showNotification(res?.message || 'Request sent — we will get back to you.', 'success');
+      showNotification(res?.message || 'Request sent - we will get back to you.', 'success');
       setDone(true);
     } catch (err) {
       showNotification(err?.data?.message || 'Could not send your request. Please try again.', 'error');
@@ -144,7 +144,7 @@ const CustomizePage = () => {
           </h1>
           <p className="text-muted mt-5">
             Our team reads every customization request and replies on
-            {' '}<b className="text-ink">{form.email.trim()}</b> — usually within a working day.
+            {' '}<b className="text-ink">{form.email.trim()}</b> - usually within a working day.
           </p>
           <div className="mt-8 flex flex-wrap gap-3 justify-center">
             <button
@@ -187,7 +187,7 @@ const CustomizePage = () => {
           Make it yours.
         </h1>
         <p className="text-muted mt-5 max-w-xl">
-          Nothing here sits in a warehouse — every piece is printed once you order it. So a
+          Nothing here sits in a warehouse - every piece is printed once you order it. So a
           different colour, a name on the side, or a livery we don&apos;t stock is a normal
           ask. Tell us what you have in mind and we&apos;ll come back with what&apos;s
           possible and what it costs.
@@ -237,7 +237,7 @@ const CustomizePage = () => {
             label="What would you like changed?"
             required
             error={errors.message}
-            hint="Colour, text to print on it, size, a character or livery — the more detail the faster we can quote."
+            hint="Colour, text to print on it, size, a character or livery - the more detail the faster we can quote."
           >
             <textarea
               className={`${inputCls} min-h-[140px] resize-y`}
@@ -279,7 +279,7 @@ const CustomizePage = () => {
             >
               {isLoading ? 'Sending…' : 'Send request'}
             </button>
-            <span className="text-xs text-faint">No payment now — we quote first.</span>
+            <span className="text-xs text-faint">No payment now - we quote first.</span>
           </div>
         </form>
       </section>

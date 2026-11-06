@@ -195,7 +195,7 @@ const CouponOffersSection = ({ variant = 'section' }) => {
           ))}
         </div>
         {!all && offers.length > 3 && (
-          <p className="hidden lg:block mt-4 gl-lbl text-[10px] text-muted">+ {offers.length - 3} more — tap See All</p>
+          <p className="hidden lg:block mt-4 gl-lbl text-[10px] text-muted">+ {offers.length - 3} more - tap See All</p>
         )}
       </div>
 

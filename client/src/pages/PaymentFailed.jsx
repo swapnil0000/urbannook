@@ -6,11 +6,11 @@ import { useSelector } from "react-redux";
 const COPY = {
   failed: {
     title: "Payment Failed",
-    body: "Your payment didn't go through, so no order has been placed. If any amount was debited, your bank reverses it automatically — contact us if it doesn't show up in 5–7 working days.",
+    body: "Your payment didn't go through, so no order has been placed. If any amount was debited, your bank reverses it automatically - contact us if it doesn't show up in 5-7 working days.",
   },
   cancelled: {
     title: "Order Cancelled",
-    body: "This order was cancelled, so it will not be delivered. If any amount was debited, it will be returned to you — contact us if you have any doubt.",
+    body: "This order was cancelled, so it will not be delivered. If any amount was debited, it will be returned to you - contact us if you have any doubt.",
   },
   notfound: {
     title: "We couldn't confirm this order",

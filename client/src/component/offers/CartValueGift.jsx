@@ -22,7 +22,7 @@ const CartValueGift = ({ promo, target, cartTotal, className = '' }) => {
         <div className="min-w-0 flex-1">
           <p className="gl-lbl text-[10px] text-star">Free gift · on every order</p>
           <p className="mt-0.5 text-base font-black leading-tight">{name} <span className="ml-1 inline-block -rotate-3 bg-brand px-1.5 py-0.5 align-middle text-[11px] font-black text-paper">FREE</span></p>
-          {target > 0 && <p className="mt-0.5 text-xs text-paper/70">On orders above {inr(target)} — anything on the site counts</p>}
+          {target > 0 && <p className="mt-0.5 text-xs text-paper/70">On orders above {inr(target)} - anything on the site counts</p>}
         </div>
       </div>
       {target > 0 && (
@@ -31,7 +31,7 @@ const CartValueGift = ({ promo, target, cartTotal, className = '' }) => {
             <div className="h-full rounded-full bg-gradient-to-r from-star to-brand transition-[width] duration-500" style={{ width: `${pct}%` }} />
           </div>
           <p className="mt-1.5 text-[11px] font-semibold text-star">
-            {left > 0 ? `Add ${inr(left)} more to your cart to get it free 🎁` : 'Unlocked! Claim it in your cart 🎉'}
+            {left > 0 ? `Add ${inr(left)} more to your cart to get it free` : 'Unlocked! Claim it in your cart'}
           </p>
         </div>
       )}

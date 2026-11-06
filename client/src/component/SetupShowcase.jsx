@@ -101,7 +101,7 @@ const SetupShowcase = ({
                     <figcaption className="ss-cap">
                       {item.quote && <p className="ss-quote">“{item.quote}”</p>}
                       {item.author && (
-                        <span className="ss-author">— {item.author}</span>
+                        <span className="ss-author">- {item.author}</span>
                       )}
                     </figcaption>
                   )}

@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useShippingDelayNotice } from '../../hooks/useShippingDelayNotice';
-import { useSiteCampaign } from '../../hooks/useSiteCampaign';
+import { useSiteCampaign, THEME_COPY } from '../../hooks/useSiteCampaign';
+import { useGetProductsQuery } from '../../store/api/productsApi';
+import { maxDiscountPercent } from '../../utils/festiveDeals';
+import { useGetHomeComboOffersQuery, useGetCouponOffersQuery } from '../../store/api/userApi';
+import { buildSaleBarMessages } from '../../utils/saleBarMessages';
+import { STORE_PROMISES, SALE_BAR_PROMISES } from '../../utils/storePromises';
 import FestiveCountdown, { useCountdown } from '../../component/festive/FestiveCountdown';
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -15,7 +20,7 @@ const MessageLink = ({ to, className, children, tabIndex }) => {
     : <Link to={to} className={className} tabIndex={tabIndex}>{children}</Link>;
 };
 
-/** "12d : 23h : 15m : 08s" — the campaign end on the server's clock. */
+/** "12d : 23h : 15m : 08s" - the campaign end on the server's clock. */
 const SaleTimer = ({ label }) => {
   const t = useCountdown({ seconds: true });
   if (!t.visible) return null;
@@ -37,7 +42,7 @@ const SaleTimer = ({ label }) => {
       <span className="inline-flex items-baseline gap-1">
         {t.d > 0 && <>{unit(t.d, 'd')}{sep}</>}
         {unit(t.h, 'h')}{sep}{unit(t.m, 'm')}
-        {/* seconds only where there is room — on phones the offer message needs the width */}
+        {/* seconds only where there is room - on phones the offer message needs the width */}
         <span className="hidden items-baseline gap-1 sm:inline-flex">{sep}{unit(t.s, 's')}</span>
       </span>
     </span>
@@ -49,9 +54,9 @@ const SaleTimer = ({ label }) => {
  * (admin → Operations Hub → Festive → ticker messages, each tied to its
  * promotion so it disappears the moment that offer ends), the campaign
  * countdown and a "Shop now" link to the message's own page. Every word and
- * date comes from the campaign — nothing about the offers is written here.
+ * date comes from the campaign - nothing about the offers is written here.
  */
-const SaleBar = ({ messages, countdownLabel, showCountdown }) => {
+const SaleBar = ({ messages, countdownLabel, showCountdown, upTo = 0 }) => {
   const [i, setI] = useState(0);
   const [paused, setPaused] = useState(false);
   const n = messages.length;
@@ -84,6 +89,9 @@ const SaleBar = ({ messages, countdownLabel, showCountdown }) => {
           {m.text}
         </MessageLink>
       </div>
+      {upTo > 0 && (
+        <span className="hidden shrink-0 rounded-full bg-paper px-3 py-1 text-[13px] font-extrabold leading-none text-sale sm:inline-block md:text-[15px]">Up to {upTo}% OFF</span>
+      )}
       {showCountdown && <SaleTimer label={countdownLabel} />}
       <Link
         to={shopTo}
@@ -96,24 +104,41 @@ const SaleBar = ({ messages, countdownLabel, showCountdown }) => {
 };
 
 /**
- * Site-wide announcement bar — editorial "2040" styling (ink band, mono
+ * Site-wide announcement bar - editorial "2040" styling (ink band, mono
  * labels, red asterisk separators) carrying the operational headlines from
  * main: the conditional shipping-delay notice plus the evergreen ones.
  *
  * While a festive campaign is live and has messages (admin → Operations Hub →
  * Festive), the bar becomes the sale bar above instead: one offer message at
  * a time, the countdown and "Shop now". The server already dropped anything
- * expired, disabled, or tied to a promotion that isn't live — when the
+ * expired, disabled, or tied to a promotion that isn't live - when the
  * campaign ends the list is simply empty and the bar is exactly the original one.
  */
 const NewsTicker = () => {
   const [isPaused, setIsPaused] = useState(false);
   const shippingDelayMessage = useShippingDelayNotice();
-  const { active: festive, messages: festiveMessages, can, page, stripText, countdownLabel } = useSiteCampaign();
+  const { active: festive, messages: festiveMessages, can, page, stripText, countdownLabel, themeKey } = useSiteCampaign();
   const showCountdown = can('countdown');
   const showStrip = Boolean(stripText) && page !== 'home' && can('sectionAccents');
+  // Same args as the header/home, so this is a cache hit, not a new request.
+  const { data: prodRes } = useGetProductsQuery({ page: 1, limit: 24 }, { skip: !festive });
+  const upTo = maxDiscountPercent(prodRes?.data?.listofPublishedProducts || prodRes?.data?.products || []);
+  // No admin messages but a live sale: still show the sale bar, rotating the
+  // theme headline and every live offer (combos + public coupons), so shoppers
+  // see what the sale actually is, not a timer lost in the corner.
+  const needOffers = festive && !festiveMessages.length;
+  const { data: comboRes } = useGetHomeComboOffersQuery(undefined, { skip: !needOffers });
+  const { data: couponRes } = useGetCouponOffersQuery('guest', { skip: !needOffers });
+  const barMessages = buildSaleBarMessages({
+    adminMessages: festiveMessages,
+    saleTitle: showCountdown ? THEME_COPY[themeKey]?.saleTitle : '',
+    combos: comboRes?.data?.combos || [],
+    coupons: couponRes?.data || [],
+    promises: SALE_BAR_PROMISES,
+    nameById: new Map((prodRes?.data?.listofPublishedProducts || prodRes?.data?.products || []).map((x) => [String(x.productId), x.productName])),
+  });
 
-  if (festive && festiveMessages.length) {
+  if (festive && barMessages.length) {
     return (
       <div className="relative block border-b border-star/30 bg-ink text-paper" role="region" aria-label="Sale announcements">
         <style>{`
@@ -121,11 +146,7 @@ const NewsTicker = () => {
           .un-salebar-msg { animation: unSaleMsg .35s ease-out both }
           @media (prefers-reduced-motion: reduce) { .un-salebar-msg { animation: none } }
         `}</style>
-        <SaleBar
-          messages={festiveMessages.map((msg) => ({ key: msg.id, text: msg.text, to: msg.linkUrl }))}
-          countdownLabel={countdownLabel}
-          showCountdown={showCountdown}
-        />
+        <SaleBar messages={barMessages} countdownLabel={countdownLabel} showCountdown={showCountdown} upTo={upTo} />
       </div>
     );
   }
@@ -133,8 +154,7 @@ const NewsTicker = () => {
   const items = [
     ...festiveMessages.map((m) => ({ key: `f-${m.id}`, text: m.text, to: m.linkUrl, festive: true })),
     ...(shippingDelayMessage ? [{ key: 'delay', text: shippingDelayMessage, to: '/products' }] : []),
-    ...['Ready to ship within 48 hrs', 'Partial COD available', 'Pan-India delivery', 'Made in India']
-      .map((text) => ({ key: text, text, to: '/products' })),
+    ...STORE_PROMISES.map((text) => ({ key: text, text, to: '/products' })),
   ];
 
   const renderText = (item, hidden) => {

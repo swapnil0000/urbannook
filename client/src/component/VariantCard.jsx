@@ -1,21 +1,16 @@
 import { Link } from "react-router-dom";
 import { trackSelectItem } from "../utils/analytics";
 import { isVariantOutOfStock } from "../utils/variantStock";
-import { useSiteCampaign } from "../hooks/useSiteCampaign";
-import SaleTag from "./festive/SaleTag";
 import StockStatus from "./StockStatus";
 
 /**
- * Shared variant-level card — one product's single variant (own title,
+ * Shared variant-level card - one product's single variant (own title,
  * image, price). Used on the /products/:id variant-list page. Tapping it
  * goes to the existing /product/:productId/:sku PDP route. It is a real
  * <a href> (not a click handler) so search engines can follow it from the
  * pre-rendered HTML to the product page.
  */
-const VariantCard = ({ productId, productName, variant, index, listId = "product_variants", listName, offerBadge = null }) => {
-  // Diwali touches while a festive campaign is live (admin's section-accents switch)
-  const { active, can } = useSiteCampaign();
-  const festive = active && can("sectionAccents");
+const VariantCard = ({ productId, productName, variant, index, listId = "product_variants", listName, offerBadge = null, demand = null }) => {
   const price = Number(variant?.variantPrice || 0);
   const mrp = Number(variant?.variantMrp || 0);
   const thumbnail = variant?.variantImage?.[0] || "/placeholder.jpg";
@@ -30,7 +25,7 @@ const VariantCard = ({ productId, productName, variant, index, listId = "product
       itemVariant: variant?.variantName,
       price,
       listId,
-      listName: listName || `${productName} — Variants`,
+      listName: listName || `${productName} - Variants`,
       index,
     });
   };
@@ -39,9 +34,8 @@ const VariantCard = ({ productId, productName, variant, index, listId = "product
     <Link
       to={href}
       onClick={trackClick}
-      className={`gl-pcard group relative rounded-none overflow-hidden bg-white border flex flex-col h-full cursor-pointer ${festive ? "border-star/70 shadow-[0_12px_28px_-16px_rgb(var(--gl-star))] hover:border-star" : "border-hair"}`}
+      className={`gl-pcard group relative rounded-none overflow-hidden bg-white border flex flex-col h-full cursor-pointer border-hair`}
     >
-      {festive && <span className="absolute inset-x-0 top-0 z-10 h-[3px] bg-gradient-to-r from-brand via-star to-brand" aria-hidden="true" />}
       <div className="relative w-full aspect-square bg-surface overflow-hidden">
         <img
           src={thumbnail}
@@ -53,14 +47,15 @@ const VariantCard = ({ productId, productName, variant, index, listId = "product
             Out of Stock
           </span>
         )}
-        {/* Product's best live offer as a small corner chip — the full wording
+        {/* Product's best live offer as a small corner chip - the full wording
             is in the offer strip above the grid (ProductVariantsPage). */}
-        {offerBadge && !oos && (
-          <span title={offerBadge.label} className="absolute top-2 left-2 z-10 inline-flex items-center gap-1 px-1.5 py-1 bg-brand text-white text-[9.5px] md:text-[10.5px] font-extrabold uppercase leading-none tracking-wide shadow">
-            <i className={`fa-solid ${offerBadge.gift ? "fa-gift" : "fa-tag"} text-[9px]`} aria-hidden="true" /> {offerBadge.chip}
+        {(demand || (offerBadge && !oos)) && (
+          <span className="absolute top-2 left-2 z-10 flex flex-col items-start gap-1">
+            {demand && <span className="rounded-full bg-white/95 px-2 py-1 text-[10px] font-bold text-ink shadow-md md:text-[11px]">{demand}</span>}
+            {offerBadge && !oos && <span title={offerBadge.label} className="rounded-full bg-white/95 px-2 py-1 text-[10px] font-bold text-saleDeep shadow-md md:text-[11px]">Offer available</span>}
           </span>
         )}
-        {/* % off as a pill on the photo — the first thing the eye lands on */}
+        {/* % off as a pill on the photo - the first thing the eye lands on */}
         {mrp > price && !oos && (
           <span className="absolute bottom-2 left-2 z-10 rounded-full bg-sale px-2 py-0.5 text-[10.5px] font-extrabold text-white shadow-sm md:text-[11.5px]">
             {Math.round(((mrp - price) / mrp) * 100)}% OFF
@@ -68,8 +63,7 @@ const VariantCard = ({ productId, productName, variant, index, listId = "product
         )}
       </div>
 
-      <div className={`p-3 md:p-3.5 flex flex-col flex-grow border-t ${festive ? "bg-gradient-to-b from-white to-star/15 border-star/40" : "bg-white border-hair"}`}>
-        <SaleTag className="mb-1.5 self-start" />
+      <div className={`p-3 md:p-3.5 flex flex-col flex-grow border-t bg-white border-hair`}>
         {/* Two lines max, ellipsis after; min-h reserves both lines so a
             row of these cards never ends up with mismatched heights. */}
         <h3 title={variant?.variantName || ""} className="font-archivo font-bold text-ink leading-snug text-left w-full text-[13px] md:text-[15px] line-clamp-2 min-h-[2.75em] break-words mb-1">

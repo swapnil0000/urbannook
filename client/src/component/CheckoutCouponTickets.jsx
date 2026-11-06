@@ -35,7 +35,7 @@ const CheckoutCouponTickets = ({ appliedCoupon, discount = 0, cartTotal = 0, isG
     if (!coupon.eligible) {
       showNotification(
         coupon.shortfall > 0
-          ? `This order doesn't satisfy the coupon conditions — add ${inr(coupon.shortfall)} more to use ${coupon.code}`
+          ? `This order doesn't satisfy the coupon conditions - add ${inr(coupon.shortfall)} more to use ${coupon.code}`
           : "This order doesn't satisfy the coupon conditions",
         'error',
       );

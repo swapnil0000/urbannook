@@ -7,7 +7,7 @@ const TOKEN_TTL_MS = 5 * 60 * 1000;
 
 /* How long to wait for the app to take over before falling back to a URL.
    Generous on purpose: iOS sometimes shows an "Open in WhatsApp?" prompt
-   first, and the page stays visible while that sits there — a short timeout
+   first, and the page stays visible while that sits there - a short timeout
    would navigate away underneath it. When the handoff succeeds the timer is
    cancelled anyway, so the wait only ever costs the not-installed case. */
 const APP_HANDOFF_TIMEOUT_MS = 2500;

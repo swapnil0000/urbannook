@@ -87,13 +87,13 @@ const Phuljadi = ({ promotionId, intensity = 'medium', className = '', fallback 
 
   let message;
   if (complete) message = `${name} Unlocked!`;
-  else if (progress.blocked) message = 'Almost there — adjust your cart to match the offer.';
+  else if (progress.blocked) message = 'Almost there - adjust your cart to match the offer.';
   else if (single?.kind === 'amount') message = `Add ${inr(single.need - single.have)} more to unlock ${name}`;
   else if (single) {
     const rem = single.need - single.have;
     const noun = progress.noun || 'item';
-    message = `${single.have} of ${single.need} ${plural(noun, single.need)} Added — Add ${rem} more to unlock ${name}!`;
-  } else message = `${progress.current} of ${progress.target} steps done — ${entry.progressText || `keep going to unlock ${name}`}`;
+    message = `${single.have} of ${single.need} ${plural(noun, single.need)} Added - Add ${rem} more to unlock ${name}!`;
+  } else message = `${progress.current} of ${progress.target} steps done - ${entry.progressText || `keep going to unlock ${name}`}`;
 
   // rod geometry: 100% of the rod = the coated part; the bare handle sits after it
   const HANDLE = 16; // px

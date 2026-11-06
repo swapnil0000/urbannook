@@ -66,7 +66,7 @@ const Footer = () => {
     <div className="max-w-[1280px] mx-auto px-5 py-14 grid grid-cols-2 md:grid-cols-4 gap-8">
       <div className="col-span-2 md:col-span-1">
         <p className="font-extrabold text-white text-xl tracking-tight">URBAN&nbsp;NOOK</p>
-        <p className="text-sm mt-3 max-w-xs">3D-printed desk lamps, pen stands & décor. Made to order in India — make every corner count.</p>
+        <p className="text-sm mt-3 max-w-xs">3D-printed desk lamps, pen stands & décor. Made to order in India - make every corner count.</p>
         <div className="flex gap-4 mt-4 text-sm text-white/60">
           <a href="https://www.instagram.com/urbannook.store" target="_blank" rel="noreferrer" className="hover:text-white">Instagram</a>
         </div>

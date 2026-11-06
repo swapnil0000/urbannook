@@ -4,7 +4,7 @@ export const SUPPORT_EMAIL = "urbanadmin@urbannook.in";
 // Support WhatsApp / phone (same number as the contact page), digits only for wa.me
 export const SUPPORT_WHATSAPP = "919124081005";
 export const SUPPORT_PHONE_DISPLAY = "+91 91240 81005";
-export const SUPPORT_HOURS = "Mon–Sat, 9am – 7pm";
+export const SUPPORT_HOURS = "Mon-Sat, 9am - 7pm";
 
 /**
  * Click-to-chat link that opens WhatsApp with `text` already typed to our

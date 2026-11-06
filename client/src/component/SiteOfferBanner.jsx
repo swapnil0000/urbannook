@@ -93,7 +93,7 @@ const SiteOfferBanner = ({
           </p>
         ) : otherCouponApplied ? (
           <p className="mt-2.5 text-[12px] font-semibold text-brand">
-            {appliedCoupon} is already applied — remove it to use this offer
+            {appliedCoupon} is already applied - remove it to use this offer
           </p>
         ) : (
           shortfall > 0 && (

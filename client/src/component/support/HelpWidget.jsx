@@ -3,11 +3,11 @@ import { createPortal } from 'react-dom';
 import { Link, useLocation } from 'react-router-dom';
 import { SUPPORT_EMAIL, SUPPORT_HOURS, getSupportWhatsAppUrl, onSupportWhatsAppClick } from '../../utils/contactHelper';
 
-// Never on the money pages — nothing should pull a shopper away mid-payment.
+// Never on the money pages - nothing should pull a shopper away mid-payment.
 const HIDDEN_ON = [/^\/checkout/, /^\/payment-/, /^\/order-confirm/];
 
 // Answers are the store's own policies as already written on the contact page,
-// return policy and product pages — nothing here promises anything new.
+// return policy and product pages - nothing here promises anything new.
 const CATEGORIES = [
   {
     id: 'delivery', title: 'Orders & Delivery', icon: 'fa-truck-fast', tint: 'bg-sky-100 text-sky-700',
@@ -86,7 +86,7 @@ const Card = ({ title, children }) => (
 );
 
 /**
- * "Help & Support" panel: Message Us (WhatsApp to the support number — those
+ * "Help & Support" panel: Message Us (WhatsApp to the support number - those
  * messages land in the admin WhatsApp inbox and the team replies there, which
  * the shopper receives on WhatsApp), and Browse FAQs with search and categories.
  */
@@ -205,7 +205,7 @@ const HelpPanel = ({ onClose, pageContext }) => {
 
 /**
  * Floating "Help" button (bottom right, above the phone nav bar) that opens the
- * Help & Support panel — a popover on desktop, a bottom sheet on phones.
+ * Help & Support panel - a popover on desktop, a bottom sheet on phones.
  */
 const HelpWidget = () => {
   const [open, setOpen] = useState(false);
@@ -222,6 +222,7 @@ const HelpWidget = () => {
         .un-help-fab { bottom: calc(env(safe-area-inset-bottom) + 70px); transition: bottom .3s ease, transform .2s ease }
         body:has([data-sticky-buybar]) .un-help-fab { bottom: calc(env(safe-area-inset-bottom) + 136px) }
         @media (min-width: 768px) { .un-help-fab, body:has([data-sticky-buybar]) .un-help-fab { bottom: 1.5rem } }
+        @media (min-width: 768px) { body:has([data-sticky-buybar="all"]) .un-help-fab { bottom: 6rem } }
       `}</style>
       <button
         type="button"

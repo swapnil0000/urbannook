@@ -18,6 +18,8 @@ const WishlistButton = ({ productId, className = "", size = "md" }) => {
   );
 
   const handleWishlistToggle = async (e) => {
+    // inside a card <Link>: stop the tap from also opening the product
+    e.preventDefault();
     e.stopPropagation();
 
     const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('authToken'); // no localStorage during SSR

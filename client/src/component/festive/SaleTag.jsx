@@ -13,9 +13,9 @@ const SaleTag = ({ className = '' }) => {
   const label = LABELS[themeKey];
   if (!active || !can('sectionAccents') || !label) return null;
   return (
-    <span className={`inline-flex items-center gap-1.5 border border-brand/35 bg-brand/10 px-1.5 py-[3px] text-brand ${className}`}>
+    <span className={`inline-flex items-center gap-1.5 border border-brand/35 bg-brand/10 rounded-full px-3.5 py-1.5 shadow-sm text-brand ${className}`}>
       <span className="h-1.5 w-1.5 rounded-full bg-brand motion-safe:animate-pulse" aria-hidden="true" />
-      <span className="gl-lbl text-[8.5px] leading-none tracking-[0.16em] md:text-[9.5px]">{label}</span>
+      <span className="font-archivo text-[14px] font-extrabold leading-none tracking-wide md:text-[15px]">{label}</span>
     </span>
   );
 };

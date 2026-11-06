@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useGetProductByIdQuery } from "../../store/api/productsApi";
+import { useGetProductByIdQuery, useGetProductsQuery } from "../../store/api/productsApi";
 import { useGetProductPromotionsQuery } from "../../store/api/userApi";
 import { bestOfferBadge } from "../../utils/offerBadge";
 import SEOHead from "../../component/SEOHead";
@@ -29,6 +29,12 @@ const ProductVariantsPage = () => {
   const festive = festiveActive && can('sectionAccents');
 
   const product = productResponse?.data;
+  // the top real sellers of this product's designs (all-time units) get a Bestseller chip
+  // sales figures come from the list API (same cached query as the header)
+  const { data: listRes } = useGetProductsQuery({ page: 1, limit: 24 });
+  const soldSource = (listRes?.data?.listofPublishedProducts || []).find((x) => x.productId === product?.productId) || product;
+  const topSellers = new Set((soldSource?.variantDetails || []).filter((v) => Number(v.soldTotal) > 0)
+    .sort((a, b) => Number(b.soldTotal) - Number(a.soldTotal)).slice(0, 3).map((v) => v.sku));
   const variants = product?.variantDetails || [];
   const fromPrice = Math.min(...variants.map((v) => Number(v.variantPrice) || Infinity));
 
@@ -36,7 +42,7 @@ const ProductVariantsPage = () => {
   useEffect(() => {
     if (product && variants.length > 0) {
       trackViewItemList({
-        listName: `${product.productName} — Variants`,
+        listName: `${product.productName} - Variants`,
         listId: "product_variants",
         items: variants.map((v, index) => ({
           itemId: product.productId,
@@ -60,7 +66,7 @@ const ProductVariantsPage = () => {
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-brand/5 rounded-full blur-[120px] pointer-events-none"></div>
       {festive && <div className="pointer-events-none absolute inset-x-0 top-0 h-[360px]" style={{ background: 'radial-gradient(60% 100% at 50% 0%, rgb(var(--gl-star) / 0.16), transparent 70%)' }} aria-hidden="true" />}
 
-      <section className="pt-[1rem] pb-4 md:pt-[1rem] md:pb-5 px-4 md:px-6 relative z-10">
+      <section className="pt-12 pb-4 md:pt-10 md:pb-5 px-4 md:px-6 relative z-10">
         <div className="max-w-7xl mx-auto">
           <button
             onClick={() => navigate("/products")}
@@ -124,6 +130,7 @@ const ProductVariantsPage = () => {
                     variant={variant}
                     index={index}
                     offerBadge={offerBadge}
+                    demand={topSellers.has(variant.sku) ? 'Bestseller' : null}
                   />
                 </RevealCard>
               ))}

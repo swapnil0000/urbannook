@@ -45,7 +45,7 @@ describe("order confirm page", () => {
   });
 
   for (const status of ["CREATED", "PROCESSING"]) {
-    it(`${status}: not paid yet — waits on the processing page, never says confirmed`, async () => {
+    it(`${status}: not paid yet - waits on the processing page, never says confirmed`, async () => {
       await open({ data: { status, isGuestOrder: false } });
       await waitFor(() => expect(screen.getByTestId("where").textContent).toBe("/payment-processing/order_abc"));
       expect(screen.queryByText("Order Confirmed!")).toBeNull();

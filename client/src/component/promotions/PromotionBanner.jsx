@@ -5,7 +5,7 @@ const inr = (amount) => `₹${Math.round(Number(amount) || 0).toLocaleString('en
 const PromotionBanner = ({ promo, savings = 0 }) => {
   // A free gift is added at checkout as a ₹0 line, so the cart says so plainly.
   const isGift = promo.displayType === 'free_gift';
-  const title = isGift ? String(promo.title).split(' — ')[0] : promo.title;
+  const title = isGift ? String(promo.title).split(' - ')[0] : promo.title;
   return (
   <div className="flex min-w-0 items-center gap-3 rounded-xl border border-save/25 bg-save/5 px-3 py-2.5 text-ink">
     {promo.image ? (

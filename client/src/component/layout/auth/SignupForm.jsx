@@ -206,7 +206,7 @@ const SignupForm = ({ onClose, onSwitchToLogin }) => {
         </div>
 
         {/* --- RIGHT SIDE (Scrollable Form Area) --- */}
-        <div ref={scrollContainerRef} className="w-full md:w-7/12 overflow-y-auto px-6 py-8 md:px-12 md:py-10 relative bg-paper">
+        <div ref={scrollContainerRef} className="un-scroll w-full md:w-7/12 overflow-y-auto px-6 py-8 md:px-12 md:py-10 relative bg-paper">
           <button 
             className="absolute top-4 right-4 md:top-6 md:right-6 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:text-ink transition-colors z-20"
             onClick={() => {

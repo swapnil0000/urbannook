@@ -261,7 +261,7 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
         </div>
 
         {/* --- RIGHT SIDE (Form) --- */}
-        <div className="w-full md:w-7/12 overflow-y-auto px-8 py-10 md:p-12 relative flex flex-col justify-center">
+        <div className="un-scroll w-full md:w-7/12 overflow-y-auto px-8 py-10 md:p-12 relative flex flex-col justify-center">
           <button 
             className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:text-ink transition-colors z-20"
             onClick={() => {

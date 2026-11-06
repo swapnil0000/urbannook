@@ -17,7 +17,7 @@ import { trackSelectItem } from '../../utils/analytics';
 // (a new kanji label, an accented letter) falls back to the serif stack — add
 // it to FONT_GLYPHS if it should use these fonts.
 const FONT_GLYPHS = Array.from({ length: 95 }, (_, i) => String.fromCharCode(32 + i)).join('')
-  + '×–—‘’“”…•·₹é'
+  + '×--‘’“”…•·₹é'
   + 'こちのる侍像刀品器巣帰庫持映武物語都間';
 const JP_FONTS_URL = 'https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Noto+Serif+JP:wght@400;600&display=swap&text='
   + encodeURIComponent(FONT_GLYPHS);
@@ -302,7 +302,7 @@ const BlogPostPage = () => {
                     <figcaption className="p-3">
                       <Stars n={r.rating} />
                       <p className="text-sm leading-relaxed mt-1 line-clamp-3">“{r.text}”</p>
-                      <p className="text-xs mt-2 tracking-widest uppercase opacity-60">— {r.name}</p>
+                      <p className="text-xs mt-2 tracking-widest uppercase opacity-60">- {r.name}</p>
                     </figcaption>
                   )}
                 </figure>

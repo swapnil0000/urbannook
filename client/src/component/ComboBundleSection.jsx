@@ -218,7 +218,7 @@ const BundleTile = ({
       </div>
 
       {/* Name (2 lines max, height reserved so tiles line up), variant and
-          price — clickable through to that product's page */}
+          price - clickable through to that product's page */}
       <button
         type="button"
         onClick={goToProduct}

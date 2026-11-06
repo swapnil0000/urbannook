@@ -190,7 +190,7 @@ const FreeShippingPopup = memo(() => {
             </div>
 
             <p className="mb-3 text-[12px] text-white/55">
-              No code needed — it applies automatically at checkout.
+              No code needed - it applies automatically at checkout.
             </p>
 
             <button

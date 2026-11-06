@@ -9,7 +9,7 @@ import WishlistButton from "../WishlistButton";
    Customer order pages, in one file: confirmation hero, tracking, payment,
    items, price details, address/contact, actions, recommendations, the archive
    row and the page itself. Look: the `.uo-*` classes in index.css. Data: the
-   server's order view (server/src/services/orderView.service.js) — nothing here
+   server's order view (server/src/services/orderView.service.js) - nothing here
    calculates money.
    ────────────────────────────────────────────────────────────────────────── */
 
@@ -203,7 +203,7 @@ const Stepper = ({ steps }) => (
         <span className="uo-dot" aria-hidden="true">{s.state === "done" && <i className="fa-solid fa-check" />}</span>
         <span className="uo-step-l block">
           <span className="hidden sm:inline">{s.label}</span><span className="sm:hidden">{s.short || s.label}</span>
-          <span className="sr-only">{s.state === "done" ? " — completed" : s.state === "current" ? " — in progress" : " — upcoming"}</span>
+          <span className="sr-only">{s.state === "done" ? " - completed" : s.state === "current" ? " - in progress" : " - upcoming"}</span>
         </span>
         {s.at ? (
           <>
