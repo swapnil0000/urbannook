@@ -38,12 +38,12 @@ const PasskeyEnroll = () => {
   };
 
   return (
-    <div className="bg-surface border border-hair p-5 md:p-6 font-inter text-ink flex items-center gap-4">
-      <div className="shrink-0 w-12 h-12 rounded-full bg-brand/10 grid place-items-center">
-        <i className="fa-solid fa-fingerprint text-brand text-xl"></i>
+    <div className="bg-paper border border-hair p-5 md:p-6 font-inter text-ink flex flex-wrap sm:flex-nowrap items-center gap-4">
+      <div className="shrink-0 w-12 h-12 border border-hair grid place-items-center">
+        <i className="fa-solid fa-fingerprint text-ink text-xl"></i>
       </div>
       <div className="flex-1 min-w-0">
-        <p className="gl-lbl text-[10px] text-brand mb-1">Faster sign-in</p>
+        <p className="font-mono uppercase text-[10px] tracking-[0.13em] text-muted mb-1.5">Faster sign-in</p>
         <h3 className="font-archivo font-bold text-ink text-base leading-tight">Enable a passkey</h3>
         <p className="text-muted text-xs mt-0.5">Sign in with Face ID, fingerprint or your device PIN - no password.</p>
       </div>
@@ -55,7 +55,7 @@ const PasskeyEnroll = () => {
         <button
           onClick={enroll}
           disabled={busy}
-          className="shrink-0 gl-press bg-brand text-white gl-lbl text-[10px] px-4 py-2.5 hover:bg-brandHi transition-colors disabled:opacity-50"
+          className="shrink-0 h-[42px] px-5 border border-ink bg-ink text-paper text-xs font-semibold hover:bg-brandHi hover:border-brandHi transition-colors disabled:opacity-50"
         >
           {busy ? 'Waiting...' : 'Enable'}
         </button>

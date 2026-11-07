@@ -223,6 +223,66 @@ describe("shipping and tracking", () => {
     expect(v.timeline.find((s) => s.key === "delivered").state).not.toBe("done");
   });
 
+  describe("partly shipped: some items have a parcel that left, some do not", () => {
+    const two = () => base({ items: [line("Katana", 1000), line("Stand", 299)] });
+
+    it("one split parcel on its way, the other item has no parcel: 'Partly shipped', not 'on its way'", () => {
+      const v = view(two(), [ship({ itemIndexes: [0] })]);
+      expect(v.stage).toMatchObject({ code: "PARTIALLY_SHIPPED", label: "Partly shipped", tone: "info" });
+      expect(v.stage.message).toMatch(/1 of 2 items have shipped/);
+      expect(v.stage.message).toMatch(/still being prepared/);
+      expect(v.partial).toEqual({ shipped: 1, total: 2, delivered: 0 });
+      expect(v.items.map((i) => [i.name, i.fulfilment.state, i.fulfilment.label])).toEqual([["Katana", "shipped", "In transit"], ["Stand", "pending", "Not shipped yet"]]);
+      expect(v.items[0].fulfilment.parcelId).toBe(v.shipments[0].id);
+      expect(v.items[1].fulfilment.parcelId).toBeNull();
+      expect(v.timeline.find((t) => t.key === "shipped")).toMatchObject({ label: "Partly shipped", state: "done" });
+      expect(v.timeline.find((t) => t.key === "delivered").state).not.toBe("done");
+    });
+
+    it("a delivered split parcel with the rest unshipped is NOT 'Delivered'", () => {
+      const v = view(two(), [ship({ shipmentStatus: "DELIVERED", itemIndexes: [0] })]);
+      expect(v.stage.code).toBe("PARTIALLY_SHIPPED");
+      expect(v.stage.message).toMatch(/\(1 delivered\)/);
+      expect(v.items[0].fulfilment).toMatchObject({ state: "shipped", stage: "delivered", label: "Delivered" });
+      expect(v.timeline.find((t) => t.key === "delivered").state).not.toBe("done");
+    });
+
+    it("the other item's parcel exists but has not been picked up yet: that item is 'being prepared'", () => {
+      const v = view(two(), [ship({ _id: "a", itemIndexes: [0] }), ship({ _id: "b", awbNumber: "AWB2", shipmentStatus: "PUSHED", itemIndexes: [1] })]);
+      expect(v.stage.code).toBe("PARTIALLY_SHIPPED");
+      expect(v.items[1].fulfilment).toMatchObject({ state: "preparing", label: "Being prepared" });
+    });
+
+    it("nothing has left yet (a parcel is only being prepared): not partly shipped, items carry no fulfilment tag", () => {
+      const v = view(two(), [ship({ shipmentStatus: "PUSHED", itemIndexes: [0] })]);
+      expect(v.stage.code).toBe("CONFIRMED");
+      expect(v.partial).toBeUndefined();
+      expect(v.items.every((i) => i.fulfilment === undefined)).toBe(true);
+    });
+
+    it("a whole-order shipment, or every item covered, is not 'partly' anything", () => {
+      expect(view(two(), [ship()]).partial).toBeUndefined();
+      expect(view(two(), [ship({ _id: "a", itemIndexes: [0] }), ship({ _id: "b", awbNumber: "AWB2", itemIndexes: [1] })]).stage.code).toBe("IN_TRANSIT");
+    });
+
+    it("a cancelled split parcel hands its items back: nothing shipped any more", () => {
+      const v = view(two(), [ship({ isCancelled: true, itemIndexes: [0] })]);
+      expect(v.partial).toBeUndefined();
+      expect(v.stage.code).toBe("CONFIRMED");
+    });
+
+    it("courier trouble still wins: an exception parcel shows 'Needs attention' even with items unshipped", () => {
+      expect(view(two(), [ship({ shipmentStatus: "EXCEPTION", itemIndexes: [0] })]).stage.code).toBe("EXCEPTION");
+    });
+
+    it("the archive row carries the counts so the list can say it too", () => {
+      const row = buildOrderSummary(view(two(), [ship({ itemIndexes: [0] })]));
+      expect(row.stage.label).toBe("Partly shipped");
+      expect(row.partial).toEqual({ shipped: 1, total: 2, delivered: 0 });
+      expect(buildOrderSummary(view(base(), [ship()])).partial).toBeUndefined();
+    });
+  });
+
   it("a shipment without item mapping carries no item list (the whole order)", () => {
     expect(view(base(), [ship()]).shipments[0].items).toBeNull();
   });

@@ -11,7 +11,12 @@ export const statsApi = apiSlice.injectEndpoints({
       query: () => 'stats/google-reviews',
       keepUnusedDataFor: 600,
     }),
+    // Every approved review that has a photo, for the homepage "Straight from your desks" wall
+    getPhotoReviews: builder.query({
+      query: () => 'stats/photo-reviews',
+      keepUnusedDataFor: 600,
+    }),
   }),
 });
 
-export const { useGetPublicStatsQuery, useGetGoogleReviewsQuery } = statsApi;
+export const { useGetPublicStatsQuery, useGetGoogleReviewsQuery, useGetPhotoReviewsQuery } = statsApi;

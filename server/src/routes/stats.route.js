@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getSiteStats, getGoogleReviews } from "../utils/siteStats.util.js";
+import { getSiteStats, getGoogleReviews, getPhotoReviews } from "../utils/siteStats.util.js";
 
 const statsRouter = Router();
 
@@ -21,6 +21,15 @@ statsRouter.get("/stats/google-reviews", async (req, res) => {
     return res.status(200).json({ success: true, data: await getGoogleReviews() });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Failed to fetch Google reviews" });
+  }
+});
+
+// The photo-review wall on the homepage ("Straight from your desks"): every approved review that has a photo
+statsRouter.get("/stats/photo-reviews", async (req, res) => {
+  try {
+    return res.status(200).json({ success: true, data: await getPhotoReviews() });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Failed to fetch photo reviews" });
   }
 });
 

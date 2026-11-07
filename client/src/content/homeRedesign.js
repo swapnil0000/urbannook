@@ -26,8 +26,9 @@ export const GIFT_EDIT = {
 export const TRUST = {
   label: 'Why people trust us',
   items: [
+    // average of every approved review in the database (all products, Google imports included), out of 5
     { source: 'ratingAvg', decimals: 1, unit: '/5', label: 'Average rating', stars: 5 },
-    { source: 'ordersDelivered', round: 10, group: true, suffix: '+', label: 'Orders delivered' },
+    { value: 2000, group: true, suffix: '+', label: 'Desks upgraded' },
     { value: 100, suffix: '%', label: 'Made in India' },
     { value: 7, suffix: '-day', label: 'Easy replacement' },
   ],
@@ -44,8 +45,6 @@ export const STATEMENT = {
   // An item with no data yet (0) is simply not shown. `round` floors big counts to a clean figure (947 → "940+").
   stats: [
     { source: 'ordersDelivered', round: 10, suffix: '+', label: 'Orders delivered' },
-    { source: 'ratingAvg', decimals: 1, unit: '/5', label: 'Average rating' },
-    { source: 'googleReviewCount', round: 10, suffix: '+', label: 'Verified Google reviews' },
   ],
   goTo: 'Show photo {i}',
 };
@@ -86,3 +85,58 @@ export const COLLECTIONS = {
   // sub-category row on /category/<slug> and /category/<slug>/<sub>
   subRow: { label: 'Browse by type', all: 'All' },
 };
+
+// "Straight from your desks": every approved review that has a customer photo, read live from GET /stats/photo-reviews
+// (nothing is hand-typed or invented; with no photo reviews the section is not shown).
+export const PHOTO_REVIEWS = {
+  index: '05',
+  eyebrow: 'Real desks',
+  heading: 'Straight from your desks',
+  sub: 'Photos and words from the people who put them on their desks.',
+  count: ['{n} photo reviews.', 'Straight from customers.'],
+  rated: '{avg} average from {n} reviews',
+  morePhotos: '+{n}',
+  viewProduct: 'View product',
+  photoAlt: 'Photo from {name}',
+};
+
+// Account → My profile. Every word of the page lives here; the figures (name, email, mobile, pincode) come from the user's profile.
+export const ACCOUNT_PROFILE = {
+  eyebrow: 'Account / Profile',
+  heading: 'Your details.',
+  sub: 'The name, number and pincode we use to deliver your orders.',
+  cardTitle: 'Personal details',
+  fields: { name: 'Full name', email: 'Email address', mobile: 'Mobile number', pincode: 'Pin code' },
+  locked: 'cannot be changed',
+  notSet: 'Not set',
+  mobileHint: '10-digit mobile number',
+  pincodeHint: '6-digit pin code',
+  noName: 'Your account',
+  edit: 'Edit details',
+  save: 'Save changes',
+  saving: 'Saving…',
+  cancel: 'Cancel',
+  linksLabel: 'Your account',
+  links: [
+    { label: 'My orders', to: '/orders' },
+    { label: 'Wishlist', to: '/wishlist' },
+  ],
+};
+
+// Account → My orders (list). The order data itself comes from GET orders/summaries; only the wording lives here.
+export const ACCOUNT_ORDERS = {
+  eyebrow: 'Account / Orders',
+  heading: 'Your orders.',
+  sub: 'Everything you have ordered. Open one to track it or see the full details.',
+  count: { one: '{n} order', many: '{n} orders' },
+  loadingLabel: 'Loading your orders',
+  errorTitle: "We couldn't load your orders",
+  errorBody: 'Please try again. Your orders are safe.',
+  retry: 'Try again',
+  emptyTitle: 'No orders yet',
+  emptyBody: "When you place an order, you'll track it here.",
+  browse: 'Browse products',
+};
+
+// Swipe rails on phones (gift edit, collections): the cue under the row.
+export const RAIL = { swipe: 'Swipe' };

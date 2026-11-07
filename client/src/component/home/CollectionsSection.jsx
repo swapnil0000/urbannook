@@ -1,18 +1,26 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Reveal, Stagger, StaggerItem } from '../motion';
 import { useGetCategoriesQuery } from '../../store/api/productsApi';
 import { COLLECTIONS as C } from '../../content/homeRedesign';
 import { designsLabel } from '../../utils/designsLabel';
+import { imageCandidates } from '../../utils/collectionImage';
+import RailProgress from './RailProgress';
 
 const SUBS_SHOWN = 3;
+/** Walks the candidate list: if one fails to load, the next is tried, ending on the logo. */
+const TileImage = ({ sources }) => {
+  const [i, setI] = useState(0);
+  return <img src={sources[Math.min(i, sources.length - 1)]} alt="" loading="lazy" decoding="async" className="rd-card-photo w-full h-full object-cover" onError={() => setI((n) => n + 1)} />;
+};
 
-const CollectionCard = ({ c }) => {
+const CollectionCard = ({ c, products }) => {
   const subs = (c.subcategories || []).map((s) => s.name);
   const extra = subs.length - SUBS_SHOWN;
   return (
     <Link to={`/category/${c.slug}`} className="rd-card rd-col-card group block" aria-label={`${c.name} - ${designsLabel(c.itemCount)}`}>
       <div className="rd-card-img rd-col-img relative overflow-hidden bg-ink">
-        <img src={c.image || c.cover || '/assets/logo.webp'} alt="" loading="lazy" className="rd-card-photo w-full h-full object-cover" onError={(e) => { e.currentTarget.src = '/assets/logo.webp'; }} />
+        <TileImage sources={imageCandidates(c, products)} />
         <div className="rd-col-shade absolute inset-0" aria-hidden="true" />
         <span className="rd-arrow absolute top-3 right-3 grid place-items-center bg-paper text-ink"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M3 11 11 3M4.5 3H11v6.5" /></svg></span>
         <div className="rd-col-cap absolute left-0 right-0 bottom-0 text-paper">
@@ -31,7 +39,7 @@ const CollectionCard = ({ c }) => {
 
 /** Homepage "Shop by collection": the admin's categories (never a hand-typed list), each leading to /category/<slug>
  *  and from there to its sub-categories → products → variants. Hidden when there are fewer than C.min to show. */
-const CollectionsSection = () => {
+const CollectionsSection = ({ products = [] }) => {
   const { data, isLoading } = useGetCategoriesQuery();
   const list = (data?.data || []).filter((c) => c.kind === 'category' && c.itemCount > 0).slice(0, C.max);
   if (!isLoading && list.length < C.min) return null;
@@ -53,7 +61,7 @@ const CollectionsSection = () => {
       </Reveal>
       {isLoading
         ? <div className="rd-grid">{[...Array(4)].map((_, i) => <div key={i} className="rd-card-img bg-hair animate-pulse" />)}</div>
-        : <Stagger className="rd-grid" stagger={0.06}>{list.map((c) => <StaggerItem key={c.slug}><CollectionCard c={c} /></StaggerItem>)}</Stagger>}
+        : <><Stagger className="rd-grid" stagger={0.06}>{list.map((c) => <StaggerItem key={c.slug}><CollectionCard c={c} products={products} /></StaggerItem>)}</Stagger><RailProgress /></>}
     </section>
   );
 };

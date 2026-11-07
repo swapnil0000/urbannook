@@ -320,3 +320,34 @@ describe("archive row", () => {
     expect(screen.queryByRole("link", { name: "Track" })).toBeNull();
   });
 });
+
+describe("partly shipped order", () => {
+  const partial = { shipped: 1, total: 2, delivered: 0 };
+  const shippedItem = item({ index: 0, name: "Katana", fulfilment: { state: "shipped", stage: "in_transit", label: "In transit", parcelId: "s1" } });
+  const waitingItem = item({ index: 1, productId: "p2", name: "Stand", fulfilment: { state: "pending", stage: null, label: "Not shipped yet", parcelId: null } });
+
+  it("each item says whether it shipped, and a note explains the rest", () => {
+    wrap(<Items items={[shippedItem, waitingItem]} partial={partial} />);
+    expect(screen.getByText("Shipped · In transit")).toBeTruthy();
+    expect(screen.getByText("Not shipped yet")).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toMatch(/1 of 2 items have shipped/);
+  });
+  it("a delivered line reads 'Delivered', and an ordinary order shows no tags or note", () => {
+    wrap(<Items items={[item({ fulfilment: { state: "shipped", stage: "delivered", label: "Delivered", parcelId: "s1" } })]} partial={{ shipped: 1, total: 2, delivered: 1 }} />);
+    expect(screen.getByText("Delivered")).toBeTruthy();
+    document.body.innerHTML = "";
+    wrap(<Items items={[item()]} />);
+    expect(screen.queryByText("Not shipped yet")).toBeNull();
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+  it("the page header says 'Partly shipped' instead of 'On its way'", () => {
+    wrap(<OrderPageBody view={view({ stage: stage({ code: "PARTIALLY_SHIPPED", label: "Partly shipped", headline: "Part of your order is on its way", message: "1 of 2 items have shipped." }), items: [shippedItem, waitingItem], partial })} mode="details" />);
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Order Partly shipped");
+    expect(screen.getByText("Not shipped yet")).toBeTruthy();
+  });
+  it("the archive row shows how many items have shipped", () => {
+    wrap(<OrderSummaryCard order={{ orderId: "0192f0aa-1111-7aaa-8bbb-123456789abc", placedAt: "2026-10-28T10:00:00.000Z", status: "PAID", stage: { code: "PARTIALLY_SHIPPED", label: "Partly shipped", tone: "info" }, payment: { state: "PAID", label: "Paid", orderTotal: 1000, amountPaid: 1000, amountDue: 0, method: "PREPAID" }, itemCount: 2, preview: [], extraItems: 0, canTrack: true, partial }} />);
+    expect(screen.getByText("Partly shipped")).toBeTruthy();
+    expect(screen.getByText(/1 of 2 items shipped/)).toBeTruthy();
+  });
+});

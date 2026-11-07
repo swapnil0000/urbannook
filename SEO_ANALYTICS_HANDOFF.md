@@ -291,3 +291,62 @@ order now follows the grouped variant order (same URLs).
 
 **Cart / offers popup / checkout:** UI only (offer cards, free-gift claim, scrollbars). These are not crawled pages,
 so there is no SEO impact.
+
+## Homepage lower sections polish (2026-11-06, branch feat/home-redesign-gift-edit) — for the SEO owner
+
+Presentation-only work on the sections below the hero. **Not touched:** `client/scripts/prerender.mjs`,
+`jenkins/scripts/upload-client.sh`, `client/src/utils/analytics.js`, the hero, the announcement strip, the header, any
+server/DB/deploy/cache/secret behaviour. Evidence: `docs/design-review/seo-a11y-before.json` / `seo-a11y-after.json`.
+
+What a reader of the page (and a crawler) will notice:
+
+1. **FAQ questions are now `<h3>` headings** inside the `<h2>` "Questions? Answered." (they were plain button text). Heading
+   order stays H1 → H2 → H3, no skipped levels. **All six answers are now in the page markup** (collapsed with CSS,
+   `visibility:hidden` while closed) instead of being added/removed by JS, so they exist in the rendered HTML and for screen
+   readers. Google may still weigh collapsed text lower than visible text. Is a FAQPage JSON-LD wanted? Not added.
+2. **"Customize a piece" is now a real link** (`<a href="/customize">`) instead of a button that navigated by script.
+3. **Collection tiles**: the image is a real photo (admin category image → API `cover` → a published product of that
+   category from the catalogue the page already loaded → logo last). Links, counts, order, `alt=""` (decorative; the link text
+   is the `<h3>` name) unchanged.
+4. **Offers section**: the hard-coded "Coming Soon / Unlocking Soon / Next Drop / Stay Tuned" locked teaser tiles are removed
+   (they were invented upcoming promotions, no admin or campaign switch controlled them). Real offers, prices, conditions, CTAs
+   unchanged. The sale header lost the duplicated "lowest prices / happiness guaranteed" line (it is in the announcement strip).
+5. **Newsletter** now posts to the existing `POST /join/community` (the footer form's endpoint). The unbacked claims
+   "10% off the first order" and "Unsubscribe anytime" were removed: the backend sends a welcome email promising early access
+   to drops, tips and updates, and has no discount code and no unsubscribe link/endpoint.
+6. **Sticky Add bar and Help button (phones)** step aside while an offer tile, coupon, product/category/review card, FAQ row,
+   sign-up form or CTA is in the bottom 210px; they come back in the gaps. This is the only behaviour change and it is client
+   only (`useOverlayAvoidance` in `HomePage.jsx`, `body[data-clear-fab]` in `index.css`). Analytics events are untouched.
+
+Open items for the owner (not decided here): (a) the footer newsletter input has no `<label>`; (b) the "Refer & Save"
+section says rewards are "launching soon" but no referral backend exists; (c) FAQ/Help/PDP still say "24-48 hours" shipping
+in several places; (d) the homepage FAQ says "dispatches within ~48 hours".
+
+## Info / support / legal pages in the new theme (2026-11-06) — for the SEO owner
+
+Presentation only; every page keeps its route, `SEOHead` (title / description / canonical / noIndex), structured data and
+wording. New shared shell `client/src/component/DocShell.jsx` (+ `.rd-doc*` in `index.css`).
+
+- **FAQs `/faqs`:** FAQPage JSON-LD unchanged. Category headings are now `<h2>` and each question `<h3>` (were `<h3>` / `<h4>`,
+  which skipped a level under the `<h1>`). All answers are visible text.
+- **Shipping & Exchange `/return-policy`, Privacy, Terms (and the unrouted Cancellation page):** same text and section order; only the frame, type
+  scale and callout styling changed. The watermark word ("Exchange", "Questions"…) that sat behind the page was decorative
+  `aria-hidden` text and is gone.
+- **Contact `/contact-us`:** form fields now have real `<label for>` + `autocomplete`; the inquiry-type buttons expose
+  `aria-pressed`; the page FAQ keeps every answer in the markup (collapsed with CSS) instead of mounting it on click; the
+  "Frequently asked" label is an `<h2>`.
+- **About `/about-us`:** same copy; the four emoji icons on the trust rows and the Font Awesome icons on the value cards were
+  dropped (decorative); the values title is now an `<h2>` in a labelled `<section>`.
+- **Customer support `/customer-support`:** native `<select>` replaces the custom dropdown (Topic); tabs are real
+  `role="tablist"`; FAQ answers stay in the markup.
+- **Customize `/customize`:** every field has a bound label; breadcrumb kept (`<nav aria-label="Breadcrumb">`).
+
+Not changed, needs an owner decision:
+1. `/rewards` (`pages/info/RewardsPage.jsx`) is a **demo page with fabricated data** (hard-coded 2,450 points, a 2024 history,
+   a redeem button that does nothing) but it is routed, has a `SEOHead` and is in the prerender list in `entry-server.jsx`.
+   Suggest removing the route / adding `noIndex`. Not restyled.
+2. `/about-us` shows `totalOrders + 350` ("500+" even when the stats API is down: `|| 150` fallback). The 350 is padding.
+3. Response-time promises disagree across pages: Contact "2-4 business hours" / "Response within 24h", Support "within 2 hours" /
+   "Guaranteed response in 24h" / WhatsApp "24/7".
+4. `pages/legal/CancellationPolicy.jsx` is imported but its `/cancellation-refund` route is commented out in `AppRoutes.jsx`, so the
+   page is unreachable (it was re-skinned only so it stays consistent if it is ever re-enabled; `/return-policy` covers the same ground).

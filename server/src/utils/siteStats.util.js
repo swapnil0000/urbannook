@@ -13,6 +13,9 @@ const IN_PIPELINE = ["CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED"];
 // script (userId "google:<id>"). Only approved ones are ever public.
 const GOOGLE_REVIEW = { isApproved: true, $or: [{ source: "google" }, { userId: /^google:/ }] };
 const GOOGLE_LIST_MAX = 100;
+// Every approved review that carries at least one photo (website customers + Google imports) for the homepage wall.
+const PHOTO_REVIEW = { isApproved: true, $or: [{ imageUrls: { $exists: true, $ne: [] } }, { imageUrl: { $nin: [null, ""] } }] };
+const PHOTO_LIST_MAX = 200;
 
 export const computeSiteStats = async () => {
   const [totalOrders, ordersDelivered, rating, googleReviewCount] = await Promise.all([
@@ -48,5 +51,27 @@ export const computeGoogleReviews = async () => {
   return { count: reviews.length, average, reviews };
 };
 
+/** The homepage "Straight from your desks" wall: approved reviews that have photos, newest first, public fields only
+ *  (never the userId), each with its product's name so a card can lead to the product. */
+export const computePhotoReviews = async () => {
+  const rows = await ProductReview.find(PHOTO_REVIEW).sort({ createdAt: -1 }).limit(PHOTO_LIST_MAX)
+    .select("productId userName rating desc imageUrl imageUrls createdAt").lean();
+  const names = new Map((await Product.find({ productId: { $in: [...new Set(rows.map((r) => r.productId))] } }).select("productId productName").lean()).map((p) => [p.productId, p.productName]));
+  const reviews = rows
+    .map((r) => ({
+      id: String(r._id),
+      userName: r.userName,
+      rating: r.rating,
+      desc: r.desc,
+      images: (r.imageUrls?.length ? r.imageUrls : r.imageUrl ? [r.imageUrl] : []).filter(Boolean),
+      productId: r.productId,
+      productName: names.get(r.productId) || "",
+      createdAt: r.createdAt,
+    }))
+    .filter((r) => r.images.length);
+  return { count: reviews.length, reviews };
+};
+
 export const getSiteStats = () => apiCache.handle("site_stats", computeSiteStats);
+export const getPhotoReviews = () => apiCache.handle("photo_reviews", computePhotoReviews);
 export const getGoogleReviews = () => apiCache.handle("google_reviews", computeGoogleReviews);

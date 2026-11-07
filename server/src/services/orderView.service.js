@@ -361,8 +361,27 @@ const buildShipments = (order, records, now, trackUrlTemplate) => {
   return [];
 };
 
+// ── partial shipment ───────────────────────────────────────────────────────
+// Which order lines have actually left (a parcel past "being prepared") and which have not. Only split parcels (itemIndexes)
+// can leave lines behind: a whole-order parcel covers every line. Returns null unless SOME lines have shipped and some have not,
+// so a normal order (and a fully covered multi-parcel order) is untouched.
+const buildPartial = (items, shipments) => {
+  if (!items.length || !shipments.length) return null;
+  const covers = (s, i) => (s.itemIndexes ? s.itemIndexes.includes(i) : true);
+  const lines = items.map((_, i) => {
+    const mine = shipments.filter((s) => covers(s, i));
+    const left = mine.find((s) => s.stage !== "preparing");
+    if (left) return { state: "shipped", stage: left.stage, label: left.label, parcelId: left.id };
+    if (mine.length) return { state: "preparing", stage: "preparing", label: STAGE_COPY.preparing.label, parcelId: mine[0].id };
+    return { state: "pending", stage: null, label: "Not shipped yet", parcelId: null };
+  });
+  const shipped = lines.filter((l) => l.state === "shipped").length;
+  if (shipped === 0 || shipped === items.length) return null;
+  return { shipped, total: items.length, delivered: lines.filter((l) => l.stage === "delivered").length, lines };
+};
+
 // One line of copy + a tone for the page header.
-const buildStage = (order, payment, shipments) => {
+const buildStage = (order, payment, shipments, partial = null) => {
   if (isCancelled(order)) return { code: "CANCELLED", label: "Cancelled", headline: "This order was cancelled", message: payment.refundedAmount > 0 || payment.refundInProgressAmount > 0 ? "Your refund details are below." : "It will not be delivered.", tone: "danger" };
   if (payment.state === "FAILED") return { code: "PAYMENT_FAILED", label: "Payment failed", headline: "Your payment didn't go through", message: "No order was placed. If any amount was debited, your bank reverses it automatically.", tone: "danger" };
   if (payment.state === "PENDING") return { code: "PAYMENT_PENDING", label: "Payment pending", headline: "We're confirming your payment", message: "This page updates once your bank confirms. Please don't pay again.", tone: "warning" };
@@ -370,6 +389,18 @@ const buildStage = (order, payment, shipments) => {
   const active = shipments;
   if (active.some((s) => s.stage === "rto")) return { code: "RTO", label: "Returning to us", headline: "Your parcel is returning to us", message: STAGE_COPY.rto.message, tone: "danger" };
   if (active.some((s) => s.stage === "exception")) return { code: "EXCEPTION", label: "Needs attention", headline: "Delivery needs your attention", message: STAGE_COPY.exception.message, tone: "warning" };
+
+  // Some items have shipped and some have not: never say "on its way" / "delivered" for the whole order.
+  if (partial) {
+    const left = partial.total - partial.shipped;
+    return {
+      code: "PARTIALLY_SHIPPED",
+      label: "Partly shipped",
+      headline: "Part of your order is on its way",
+      message: `${partial.shipped} of ${partial.total} ${partial.total === 1 ? "item has" : "items have"} shipped${partial.delivered ? ` (${partial.delivered} delivered)` : ""}. The other ${left === 1 ? "item is" : `${left} items are`} still being prepared and will get ${left === 1 ? "its" : "their"} own tracking.`,
+      tone: "info",
+    };
+  }
 
   const delivered = active.length > 0 && active.every((s) => s.stage === "delivered");
   if (delivered || (order.status === "DELIVERED" && !active.length)) return { code: "DELIVERED", label: "Delivered", headline: "Your order was delivered", message: payment.method !== "PREPAID" && payment.balanceOnDelivery > 0 ? "The balance was payable to the courier on delivery." : "We hope you love it.", tone: "success" };
@@ -389,11 +420,11 @@ const buildStage = (order, payment, shipments) => {
   };
 };
 
-const buildTimeline = (order, payment, shipments, stage) => {
+const buildTimeline = (order, payment, shipments, stage, partial = null) => {
   if (["CANCELLED", "PAYMENT_FAILED", "RTO", "EXCEPTION"].includes(stage.code)) return null;
   const paid = isOrderPaid(order);
   const rank = shipments.length ? Math.max(...shipments.map((s) => STAGE_RANK[s.stage] ?? 0)) : -1;
-  const allDelivered = shipments.length > 0 && shipments.every((s) => s.stage === "delivered") || (order.status === "DELIVERED" && !shipments.length);
+  const allDelivered = !partial && (shipments.length > 0 && shipments.every((s) => s.stage === "delivered") || (order.status === "DELIVERED" && !shipments.length));
   const dispatched = shipments.filter((s) => (STAGE_RANK[s.stage] ?? 0) >= 1).map((s) => s.dispatchedAt).filter(Boolean).sort();
   const ofd = shipments.map((s) => s.outForDeliveryAt).filter(Boolean).sort();
   const deliveredAts = shipments.map((s) => s.deliveredAt).filter(Boolean).sort();
@@ -404,7 +435,7 @@ const buildTimeline = (order, payment, shipments, stage) => {
     { key: "confirmed", label: payment.method === "PREPAID" ? "Payment confirmed" : "Order confirmed", short: payment.method === "PREPAID" ? "Payment" : "Confirmed", at: paid ? statusTime(order, "PAID") : null, done: paid },
     // No timestamp is ever recorded for packing — "Preparing" is the honest name for the wait between confirmation and dispatch.
     { key: "preparing", label: "Preparing", short: "Preparing", at: null, done: shippedDone },
-    { key: "shipped", label: "Shipped", short: "Shipped", at: dispatched[0] || statusTime(order, "SHIPPED"), done: shippedDone },
+    { key: "shipped", label: partial ? "Partly shipped" : "Shipped", short: partial ? "Part shipped" : "Shipped", at: dispatched[0] || statusTime(order, "SHIPPED"), done: shippedDone },
   ];
   // Only shown while it can still happen, or when the courier actually reported it — never claimed after the fact.
   if (!allDelivered || ofd.length) steps.push({ key: "out_for_delivery", label: "Out for delivery", short: "Out for delivery", mobileHidden: true, at: ofd[0] || null, done: rank >= 2 || allDelivered });
@@ -463,8 +494,9 @@ export const buildOrderView = ({ order, shipments: records = [], cases = [], now
   const items = buildItems(order);
   const pricing = buildPricing(order, items, payment);
   const shipments = buildShipments(order, records, now, trackUrlTemplate);
-  const stage = buildStage(order, payment, shipments);
-  const timeline = buildTimeline(order, payment, shipments, stage);
+  const partial = buildPartial(items, shipments);
+  const stage = buildStage(order, payment, shipments, partial);
+  const timeline = buildTimeline(order, payment, shipments, stage, partial);
   const invoiceReady = isOrderPaid(order) && !isCancelled(order) && !!order.invoiceData?.isGenerated && !!order.invoiceData?.s3FileKey;
 
   return {
@@ -475,7 +507,9 @@ export const buildOrderView = ({ order, shipments: records = [], cases = [], now
     status: order.status,
     stage,
     payment,
-    items,
+    // On a partly shipped order every line says whether it has shipped (and where its parcel is); otherwise items are unchanged.
+    items: partial ? items.map((it, i) => ({ ...it, fulfilment: partial.lines[i] })) : items,
+    ...(partial && { partial: { shipped: partial.shipped, total: partial.total, delivered: partial.delivered } }),
     itemCount: items.reduce((s, i) => s + i.quantity, 0),
     pricing,
     shipments: shipments.map((s) => ({
@@ -517,5 +551,6 @@ export const buildOrderSummary = (view) => ({
   preview: view.items.slice(0, 4).map((i) => ({ name: i.name, image: i.image, quantity: i.quantity, isFreeGift: i.isFreeGift })),
   extraItems: Math.max(0, view.items.length - 4),
   shipmentCount: view.shipments.length,
+  ...(view.partial && { partial: view.partial }),
   canTrack: view.actions.track,
 });

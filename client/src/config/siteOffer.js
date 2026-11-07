@@ -34,6 +34,7 @@ const SUPPRESSED_PREFIXES = [
   '/payment-processing',
   '/payment-failed',
   '/order-confirm',
+  '/profile', // the account page: no promo popup over someone editing their details
 ];
 
 export function isSuppressedPath(pathname = '') {

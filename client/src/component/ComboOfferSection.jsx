@@ -5,7 +5,6 @@ import { addItem } from '../store/slices/cartSlice';
 import { useGetHomeComboOffersQuery } from '../store/api/userApi';
 import { useSiteCampaign, THEME_COPY } from '../hooks/useSiteCampaign';
 import FestiveCountdown from './festive/FestiveCountdown';
-import SectionDecor from './festive/SectionDecor';
 import ComboBuilderSheet from './ComboBuilderSheet';
 import { recordOfferInterest } from '../utils/offerInterest';
 import CouponOffersSection from './offers/CouponOffersSection';
@@ -267,59 +266,20 @@ const OfferTile = ({ combo }) => {
         recordOfferInterest(combo.id, combo.primaryProductId);
         navigate(`/products/${combo.primaryProductId}`);
       }}
-      className="un-tile group flex h-full w-full flex-col overflow-hidden text-center transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+      className="un-tile group flex h-full w-full flex-col overflow-hidden text-left transition-colors duration-200 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-paper"
       aria-label={benefit ? `${tagline}. ${benefit}` : tagline}
     >
-      {/* the artwork fills the media area; its edges fade softly into the card instead of a hard frame */}
-      <span className="un-tile-img relative block aspect-square w-full shrink-0 overflow-hidden">
+      {/* the product photo is the focus: shown whole, no mask or frame */}
+      <span className="un-tile-img relative block aspect-[4/5] w-full shrink-0 overflow-hidden">
         {img
           ? <img src={img} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]" onError={(e) => { e.currentTarget.src = '/assets/logo.webp'; }} />
           : <MysteryGiftArt className="absolute inset-0" />}
       </span>
-      <span className="un-tile-strip flex h-[48px] shrink-0 flex-col items-center justify-center gap-[3px] px-2 text-center">
-        <span className="w-full truncate text-[11.5px] font-semibold leading-none text-white sm:text-[12.5px]">{tagline}</span>
-        {benefit && <span className="un-tile-benefit w-full truncate text-[10px] font-medium leading-none tracking-tight sm:text-[11px]">{benefit}</span>}
+      <span className="un-tile-strip flex flex-1 flex-col justify-start gap-1.5 px-3.5 pb-4 pt-3.5">
+        <span className="un-tile-title font-archivo text-[14px] font-semibold leading-snug text-paper sm:text-[15px]">{tagline}</span>
+        {benefit && <span className="un-tile-benefit text-[12.5px] leading-snug sm:text-[13px]">{benefit}</span>}
       </span>
     </button>
-  );
-};
-
-// Upcoming-drop teasers fill the grid when fewer offers are live than the grid holds, so it never looks empty.
-// Not interactive: no click, no focus, hidden from the tab order.
-const GRID_SLOTS = 6;
-const TEASERS = [
-  { head: 'Coming Soon', sub: 'Exciting Offers Ahead' },
-  { head: 'Unlocking Soon', sub: 'New Deals on the Way' },
-  { head: 'Next Drop', sub: 'Launching Soon' },
-  { head: 'Coming Soon', sub: 'New Deals Unlocking' },
-  { head: 'Stay Tuned', sub: 'Launching in the Next Drop' },
-];
-const LockIcon = () => (
-  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <rect x="5" y="11" width="14" height="9" rx="2" />
-    <path d="M8 11V8a4 4 0 0 1 8 0v3" />
-    <circle cx="12" cy="15.5" r="1" fill="currentColor" stroke="none" />
-  </svg>
-);
-const TeaserTile = ({ index }) => {
-  const t = TEASERS[index % TEASERS.length];
-  return (
-    <div className="un-tile un-tile-locked flex h-full w-full select-none flex-col overflow-hidden text-center" aria-label={`${t.head}. ${t.sub}`} role="group">
-      <span className="un-tile-img relative flex aspect-square w-full shrink-0 items-center justify-center overflow-hidden" aria-hidden="true">
-        {/* festive silhouette: a gift box outline behind the lock */}
-        <svg viewBox="0 0 64 64" className="absolute h-[64%] w-[64%] text-star/20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round">
-          <rect x="10" y="26" width="44" height="28" rx="2" />
-          <rect x="7" y="19" width="50" height="8" rx="2" />
-          <path d="M32 19v35M32 19c-4-9-14-9-14-4s8 4 14 4zm0 0c4-9 14-9 14-4s-8 4-14 4z" />
-        </svg>
-        <span className="un-lock-badge relative flex h-11 w-11 items-center justify-center text-star" style={{ borderRadius: "50%" }}><LockIcon /></span>
-        <span className="un-teaser-tag absolute right-1.5 top-1.5 px-1.5 py-[2px] text-[8px] font-bold uppercase tracking-[0.14em] text-star">Locked</span>
-      </span>
-      <span className="un-tile-strip flex h-[48px] shrink-0 flex-col items-center justify-center gap-[3px] px-2 text-center">
-        <span className="w-full truncate text-[11.5px] font-semibold leading-none text-white/90 sm:text-[12.5px]">{t.head}</span>
-        <span className="un-tile-benefit w-full truncate text-[10px] font-medium leading-none tracking-tight sm:text-[11px]">{t.sub}</span>
-      </span>
-    </div>
   );
 };
 
@@ -333,7 +293,6 @@ const ComboOfferSection = ({ title, subtitle, lead }) => {
   const festive = active && can('sectionAccents');
   const copy = THEME_COPY[themeKey] || {};
   const n = combos.length;
-  const teasers = n > 0 && n < GRID_SLOTS ? GRID_SLOTS - n : 0;
 
   if (isLoading) return null;
   // no combo offers: coupons (if any) still show on their own
@@ -346,12 +305,10 @@ const ComboOfferSection = ({ title, subtitle, lead }) => {
   return (
     <div className="relative">
       <section className="un-offers relative overflow-hidden bg-ink pb-9 pt-12 sm:pb-12 sm:pt-14" aria-label={heading}>
+        {/* one soft glow behind the heading while a campaign is live - no extra rules or ornaments */}
         {festive && (
           <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-            <div className="absolute inset-0" style={{ background: 'radial-gradient(60% 55% at 50% 0%, rgb(var(--gl-brand) / 0.22), transparent 70%)' }} />
-            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-star/60 to-transparent" />
-            <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-star/40 to-transparent" />
-            <SectionDecor />
+            <div className="absolute inset-0" style={{ background: 'radial-gradient(60% 55% at 50% 0%, rgb(var(--gl-brand) / 0.16), transparent 70%)' }} />
           </div>
         )}
 
@@ -368,19 +325,11 @@ const ComboOfferSection = ({ title, subtitle, lead }) => {
         </div>
         )}
 
-        {/* offer tiles: with teasers the grid is a fixed 3-wide (6 on desktop) so rows are always full;
-            with a full set of live offers the original centred wrap stays */}
-        <div className={`relative z-10 mx-auto mt-5 max-w-[1100px] px-4 sm:mt-6 sm:px-6 ${teasers > 0
-          ? 'grid grid-cols-3 gap-x-3.5 gap-y-4 sm:gap-x-4 sm:gap-y-5 lg:grid-cols-6 lg:gap-x-5'
-          : 'flex flex-wrap justify-center gap-x-3.5 gap-y-4 sm:gap-x-4 sm:gap-y-5 lg:gap-x-5'}`}>
+        {/* offer tiles - only the real, live offers. Phones: a swipe rail with the next tile peeking; sm+: a centred wrap */}
+        <div className="un-offer-rail relative z-10 mx-auto mt-6 max-w-[1100px] sm:mt-8">
           {combos.map((c) => (
-            <div key={c.id} className={teasers > 0 ? 'min-w-0' : 'min-w-0 max-w-full shrink-0 grow-0 basis-[calc((100%_-_1.75rem)/3)] sm:basis-[calc((100%_-_3rem)/4)] lg:basis-[calc((100%_-_6.25rem)/6)]'}>
+            <div key={c.id} className="un-offer-cell min-w-0">
               <OfferTile combo={c} />
-            </div>
-          ))}
-          {Array.from({ length: teasers }, (_, i) => (
-            <div key={`teaser-${i}`} className="min-w-0">
-              <TeaserTile index={i} />
             </div>
           ))}
         </div>

@@ -1,6 +1,7 @@
 import { Reveal } from '../motion';
 import CountUp from './CountUp';
 import CoverflowCarousel from './CoverflowCarousel';
+import TrustStrip from './TrustStrip';
 import { STATEMENT as C } from '../../content/homeRedesign';
 import { useSiteStats } from './useSiteStats';
 
@@ -14,17 +15,19 @@ const StatementSection = ({ images }) => {
         <p className="rd-eyebrow font-mono uppercase text-paper/60">{C.index} / {C.eyebrow}</p>
         <h2 className="rd-st-h2 font-archivo text-paper">{C.heading}</h2>
         <p className="rd-st-body font-inter text-paper/70">{C.body}</p>
-        <dl className="rd-st-stats" style={{ gridTemplateColumns: `repeat(${Math.max(stats.length, 1)}, auto)` }}>
+        {stats.length > 0 && <dl className="rd-st-stats" style={{ gridTemplateColumns: `repeat(${Math.max(stats.length, 1)}, auto)` }}>
           {stats.map((s) => (
             <div key={s.label}>
               <dt className="rd-st-label font-mono uppercase text-paper/60">{s.label}</dt>
               <dd className="rd-st-value font-archivo text-paper"><CountUp to={s.value} suffix={s.suffix} decimals={s.decimals} />{s.unit && <span className="rd-st-unit text-paper/60">{s.unit}</span>}</dd>
             </div>
           ))}
-        </dl>
+        </dl>}
       </Reveal>
       {images.length > 0 && <CoverflowCarousel images={images} />}
     </div>
+    {/* proof points live inside the dark band: light figures on ink, a hairline above */}
+    <TrustStrip />
   </section>
   );
 };

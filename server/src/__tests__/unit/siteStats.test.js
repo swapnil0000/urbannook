@@ -2,12 +2,12 @@ import { describe, it, expect, beforeAll, beforeEach } from "@jest/globals";
 
 // The public stats endpoint used to match lowercase statuses against an UPPERCASE enum and always answered 0.
 // (the in-memory MongoDB is connected by src/__tests__/setup.js)
-let Order, ProductReview, Product, computeSiteStats, computeGoogleReviews;
+let Order, ProductReview, Product, computeSiteStats, computeGoogleReviews, computePhotoReviews;
 beforeAll(async () => {
   ({ default: Order } = await import("../../model/order.model.js"));
   ({ default: ProductReview } = await import("../../model/product.specific.testimonial.model.js"));
   ({ default: Product } = await import("../../model/product.model.js"));
-  ({ computeSiteStats, computeGoogleReviews } = await import("../../utils/siteStats.util.js"));
+  ({ computeSiteStats, computeGoogleReviews, computePhotoReviews } = await import("../../utils/siteStats.util.js"));
 });
 beforeEach(async () => { await Order.collection.deleteMany({}); await ProductReview.collection.deleteMany({}); await Product.collection.deleteMany({}); });
 
@@ -43,5 +43,29 @@ describe("Google reviews", () => {
   });
   it("is empty, never invented, when there are none", async () => {
     expect(await computeGoogleReviews()).toEqual({ count: 0, average: 0, reviews: [] });
+  });
+});
+
+describe("Photo reviews", () => {
+  const base = { productId: "P1", desc: "Lovely lamp, great finish", rating: 5 };
+  it("lists every approved review that has a photo (legacy imageUrl or imageUrls), newest first, no userId, skipping the rest", async () => {
+    await Product.collection.insertOne({ productId: "P1", productName: "Brake Caliper Lamp" });
+    await ProductReview.collection.insertMany([
+      { ...base, userId: "u1", userName: "Asha", isApproved: true, imageUrls: ["https://cdn/a.webp", "https://cdn/b.webp"], createdAt: new Date("2026-10-01") },
+      { ...base, userId: "u2", userName: "Ravi", isApproved: true, imageUrl: "https://cdn/c.webp", createdAt: new Date("2026-10-05") },
+      { ...base, userId: "google:z", userName: "Meera", isApproved: true, imageUrls: ["https://cdn/g.webp"], createdAt: new Date("2026-09-01") },
+      { ...base, userId: "u3", userName: "No Photo", isApproved: true, imageUrls: [], createdAt: new Date("2026-10-06") },
+      { ...base, userId: "u4", userName: "Pending", isApproved: false, imageUrls: ["https://cdn/p.webp"], createdAt: new Date("2026-10-07") },
+    ]);
+    const { count, reviews } = await computePhotoReviews();
+    expect(count).toBe(3);
+    expect(reviews.map((r) => r.userName)).toEqual(["Ravi", "Asha", "Meera"]);
+    expect(reviews[0].images).toEqual(["https://cdn/c.webp"]);
+    expect(reviews[1].images).toHaveLength(2);
+    expect(reviews[1].productName).toBe("Brake Caliper Lamp");
+    expect(reviews.every((r) => !("userId" in r))).toBe(true);
+  });
+  it("is empty when nothing has a photo", async () => {
+    expect(await computePhotoReviews()).toEqual({ count: 0, reviews: [] });
   });
 });

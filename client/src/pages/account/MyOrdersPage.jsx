@@ -4,12 +4,19 @@ import { useSelector } from "react-redux";
 import { useGetOrderSummariesQuery } from "../../store/api/userApi";
 import { useUI } from "../../hooks/useRedux";
 import { OrderSummaryCard } from "../../component/orders/OrderPage";
+import { ACCOUNT_ORDERS as C } from "../../content/homeRedesign";
 
 const ListSkeleton = () => (
-  <div className="space-y-3 animate-pulse" role="status" aria-label="Loading your orders">
-    {[0, 1, 2].map((i) => (
-      <div key={i} className="uo-card h-40" />
-    ))}
+  <div className="rd-ord-list animate-pulse" role="status" aria-label={C.loadingLabel}>
+    {[0, 1, 2].map((i) => <div key={i} className="rd-ord-skel" />)}
+  </div>
+);
+
+const Notice = ({ title, body, action, onAction }) => (
+  <div className="rd-ord-notice">
+    <h2 className="font-archivo">{title}</h2>
+    <p className="font-inter text-muted">{body}</p>
+    <button type="button" onClick={onAction} className="rd-acct-btn rd-acct-btn--solid font-inter">{action}</button>
   </div>
 );
 
@@ -37,35 +44,28 @@ const MyOrdersPage = () => {
   }, [loggedIn, navigate, openLoginModal, showNotification]);
 
   return (
-    <main className="uo min-h-screen font-inter">
-      <div className="max-w-3xl mx-auto px-3 sm:px-6 pt-5 sm:pt-8 pb-28 md:pb-16">
-        <div className="mb-5 flex items-end justify-between gap-3">
+    <main className="uo uo-rd min-h-screen font-inter">
+      <div className="rd-acct rd-ord-page">
+        <header className="rd-acct-head rd-ord-head">
           <div>
-            <p className="gl-lbl text-brand mb-1">History</p>
-            <h1 className="font-archivo font-extrabold text-3xl sm:text-4xl text-ink leading-tight">Your orders</h1>
+            <p className="rd-eyebrow font-mono uppercase text-muted">{C.eyebrow}</p>
+            <h1 className="rd-h2 font-archivo text-ink">{C.heading}</h1>
+            <p className="rd-sub font-inter text-muted">{C.sub}</p>
           </div>
-          {orders.length > 0 && <p className="text-sm text-muted pb-1">{orders.length} {orders.length === 1 ? "order" : "orders"}</p>}
-        </div>
+          {orders.length > 0 && (
+            <p className="rd-count font-mono uppercase text-muted">{(orders.length === 1 ? C.count.one : C.count.many).replace("{n}", String(orders.length).padStart(2, "0"))}</p>
+          )}
+        </header>
 
         {isLoading ? (
           <ListSkeleton />
         ) : isError ? (
-          <div className="uo-card text-center" style={{ padding: 32 }}>
-            <h2 className="font-archivo font-extrabold text-xl">We couldn&apos;t load your orders</h2>
-            <p className="mt-2 text-sm text-muted">Please try again. Your orders are safe.</p>
-            <button type="button" onClick={refetch} className="uo-btn uo-btn-primary mt-5">Try again</button>
-          </div>
+          <Notice title={C.errorTitle} body={C.errorBody} action={C.retry} onAction={refetch} />
         ) : orders.length === 0 ? (
-          <div className="uo-card text-center" style={{ padding: 40 }}>
-            <h2 className="font-archivo font-extrabold text-xl">No orders yet</h2>
-            <p className="mt-2 text-sm text-muted">When you place an order, you&apos;ll track it here.</p>
-            <button type="button" onClick={() => navigate("/products")} className="uo-btn uo-btn-primary mt-5">Browse products</button>
-          </div>
+          <Notice title={C.emptyTitle} body={C.emptyBody} action={C.browse} onAction={() => navigate("/products")} />
         ) : (
-          <div className="space-y-3">
-            {orders.map((o) => (
-              <OrderSummaryCard key={o.orderId} order={o} />
-            ))}
+          <div className="rd-ord-list">
+            {orders.map((o) => <OrderSummaryCard key={o.orderId} order={o} />)}
           </div>
         )}
       </div>

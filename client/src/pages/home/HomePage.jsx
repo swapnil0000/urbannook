@@ -6,16 +6,19 @@ import SEOHead from '../../component/SEOHead';
 import { productImg, firstVariant, inr } from '../../component/UnProductCard';
 import HomeProductCard from '../../component/HomeProductCard';
 import GiftEditSection from '../../component/home/GiftEditSection';
-import TrustStrip from '../../component/home/TrustStrip';
 import CollectionsSection from '../../component/home/CollectionsSection';
 import StatementSection from '../../component/home/StatementSection';
+import PhotoReviewsSection from '../../component/home/PhotoReviewsSection';
+import FaqSection from '../../component/home/FaqSection';
+import ReferSection from '../../component/home/ReferSection';
+import NewsletterSection from '../../component/home/NewsletterSection';
+import CustomizeSection from '../../component/home/CustomizeSection';
 import FestiveSections from '../../component/festive/FestiveSections';
 import FestiveOfferBand from '../../component/festive/FestiveOfferBand';
 import RangoliDivider from '../../component/festive/RangoliDivider';
 import { Reveal, Stagger, StaggerItem, Parallax, TextReveal, useInView, motion, AnimatePresence, MotionRoot } from '../../component/motion';
 import { useGetFeaturedProductsQuery, useGetProductsQuery, useGetHeroBannerQuery } from '../../store/api/productsApi';
 import HeroBanner from '../../component/HeroBanner';
-import { useGetTestimonialsQuery } from '../../store/api/testimonialsApi';
 import { useGetHomeComboOffersQuery } from '../../store/api/userApi';
 import { recordOfferInterest } from '../../utils/offerInterest';
 import { trackViewItemList, trackAddToCart } from '../../utils/analytics';
@@ -23,7 +26,6 @@ import { trackViewItemList, trackAddToCart } from '../../utils/analytics';
 const onImgErr = (e) => { e.currentTarget.src = '/assets/logo.webp'; };
 
 const productList = (res) => res?.data?.products || res?.data?.listofPublishedProducts || [];
-const stars = (n) => { const r = Math.max(1, Math.min(5, n || 5)); return '★'.repeat(r) + '☆'.repeat(5 - r); };
 
 const MARQUEE = ['3D-Printed', 'Made to Order', 'Pan-India Delivery', 'Car Culture', 'Desk Icons', 'Partial COD'];
 
@@ -69,29 +71,6 @@ const SecHead = ({ index, kicker, title, onView }) => (
 //   </div>
 // );
 
-/** Photo-led review card for the testimonial wall. */
-const ReviewCard = ({ t, img, tag, onClick }) => (
-  <figure
-    onClick={onClick}
-    className="group relative shrink-0 w-[288px] sm:w-[330px] aspect-[5/6] overflow-hidden bg-hair mr-4 md:mr-5 cursor-pointer transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_24px_50px_-24px_rgba(20,20,20,0.55)]"
-  >
-    <img src={img} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform duration-[800ms] ease-out group-hover:scale-125" onError={onImgErr} />
-    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent" />
-    <span className="absolute top-4 right-4 gl-lbl text-[8px] text-white/90 border border-white/40 px-2 py-1 backdrop-blur-sm">✓ Verified</span>
-    <figcaption className="absolute inset-x-3 bottom-3 p-4 bg-paper/95 backdrop-blur">
-      <div className="flex items-center gap-2.5 mb-2.5">
-        <span className="w-9 h-9 rounded-full bg-brand text-white grid place-items-center font-archivo font-extrabold text-sm shrink-0">{(t.userName || 'U').charAt(0).toUpperCase()}</span>
-        <div className="min-w-0 flex-1">
-          <p className="gl-lbl text-[10px] text-ink truncate">{t.userName}</p>
-          <span className="text-star text-[11px] leading-none">{stars(t.rating)}</span>
-        </div>
-        <span className="gl-lbl text-[8px] text-brand shrink-0 max-w-[92px] truncate">{tag} →</span>
-      </div>
-      <p className="text-ink text-[13px] leading-snug line-clamp-3">“{t.content}”</p>
-    </figcaption>
-  </figure>
-);
-
 /** Slowly rotating circular-text stamp - an editorial accent to fill space. */
 const RotatingSeal = ({ text = '· MADE TO ORDER · 3D-PRINTED IN INDIA ' }) => (
   <div className="w-full h-full animate-[spin_16s_linear_infinite]">
@@ -118,50 +97,41 @@ const FAQS = [
 ];
 
 /** Accordion FAQ - one item open at a time, smooth height animation. */
-const FaqSection = ({ onContact }) => {
-  const [open, setOpen] = useState(0);
-  return (
-    <section className="max-w-[860px] mx-auto px-5 py-5 md:py-20">
-      <Reveal className="text-center mb-8 md:mb-10">
-        <Kicker className="justify-center">Good to know</Kicker>
-        <h2 className="font-archivo text-3xl md:text-5xl font-extrabold tracking-tight mt-2">Questions? Answered.</h2>
-      </Reveal>
-      <div className="border-t border-hair">
-        {FAQS.map((f, i) => {
-          const isOpen = open === i;
-          return (
-            <div key={i} className="border-b border-hair">
-              <button onClick={() => setOpen(isOpen ? -1 : i)} className="w-full flex items-center justify-between gap-4 text-left py-5 group" aria-expanded={isOpen}>
-                <span className={`font-bold text-base md:text-lg transition-colors ${isOpen ? 'text-brand' : 'text-ink group-hover:text-brand'}`}>{f.q}</span>
-                <span className={`shrink-0 w-7 h-7 grid place-items-center border text-lg leading-none transition-all duration-300 ${isOpen ? 'bg-brand border-brand text-white rotate-45' : 'border-hair text-ink group-hover:border-ink'}`}>+</span>
-              </button>
-              <AnimatePresence initial={false}>
-                {isOpen && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-                    className="overflow-hidden"
-                  >
-                    <p className="text-muted leading-relaxed pb-5 pr-8 md:pr-10 max-w-2xl">{f.a}</p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          );
-        })}
-      </div>
-      <Reveal className="text-center mt-8">
-        <p className="text-muted text-sm">Still curious? <button onClick={onContact} className="text-brand font-bold underline underline-offset-2 hover:text-brandHi">Talk to us →</button></p>
-      </Reveal>
-    </section>
-  );
+/** Phones: the sticky Add bar and the Help button float over the bottom of the screen. Anything the shopper reads or taps
+ *  there (offer tiles, coupon tickets, product / category / review cards, FAQ rows, the sign-up form, the CTAs) must never
+ *  sit underneath them, so while one is in that zone the Add bar steps aside and the Help button fades out (body[data-clear-fab],
+ *  see index.css); both return in the gaps between sections. Cards are matched by class, the rest opt in with data-avoid-overlay. */
+const AVOID = '.un-offer-cell, .un-coupon, .rd-card, [data-avoid-overlay]';
+const useOverlayAvoidance = () => {
+  const [blocked, setBlocked] = useState(false);
+  useEffect(() => {
+    const phone = window.matchMedia('(max-width: 767px)');
+    let raf = 0;
+    let release = 0;
+    const measure = () => {
+      raf = 0;
+      if (!phone.matches) { clearTimeout(release); setBlocked(false); delete document.body.dataset.clearFab; return; }
+      const h = window.innerHeight;
+      const zoneTop = h - 210; // Help button + Add bar + bottom nav
+      const hit = [...document.querySelectorAll(AVOID)].some((el) => { const r = el.getBoundingClientRect(); return r.bottom > zoneTop && r.top < h - 56; });
+      if (hit) { clearTimeout(release); setBlocked(true); document.body.dataset.clearFab = '1'; }
+      else { clearTimeout(release); release = setTimeout(() => { setBlocked(false); delete document.body.dataset.clearFab; }, 220); }
+    };
+    const onMove = () => { if (!raf) raf = requestAnimationFrame(measure); };
+    measure();
+    window.addEventListener('scroll', onMove, { passive: true });
+    window.addEventListener('resize', onMove);
+    return () => {
+      window.removeEventListener('scroll', onMove); window.removeEventListener('resize', onMove);
+      cancelAnimationFrame(raf); clearTimeout(release); delete document.body.dataset.clearFab;
+    };
+  }, []);
+  return blocked;
 };
 
 /** Mobile-only sticky "add to cart" bar - slides up once you scroll past the hero,
  *  sits just above the bottom nav, hides near the footer. */
-const StickyAddBar = ({ product, onAdd }) => {
+const StickyAddBar = ({ product, onAdd, blocked = false }) => {
   const [show, setShow] = useState(false);
   const [added, setAdded] = useState(false);
   useEffect(() => {
@@ -175,7 +145,7 @@ const StickyAddBar = ({ product, onAdd }) => {
   const handle = () => { onAdd(); setAdded(true); setTimeout(() => setAdded(false), 1600); };
   return (
     <AnimatePresence>
-      {show && (
+      {show && !blocked && (
         <motion.div
           initial={{ y: 90, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 90, opacity: 0 }}
           transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
@@ -203,37 +173,6 @@ const StickyAddBar = ({ product, onAdd }) => {
         </motion.div>
       )}
     </AnimatePresence>
-  );
-};
-
-/** Refer & Save teaser - shares the brand (Web Share API, falls back to copy link). */
-const ReferSave = () => {
-  const [copied, setCopied] = useState(false);
-  const share = async () => {
-    const url = 'https://www.urbannook.in';
-    const text = 'Check out UrbanNook - 3D-printed desk lamps & décor, made to order in India.';
-    try {
-      if (navigator.share) await navigator.share({ title: 'UrbanNook', text, url });
-      else { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000); }
-    } catch { /* user dismissed the share sheet */ }
-  };
-  return (
-    <section className="max-w-[1280px] mx-auto px-5 py-5 md:py-14">
-      <Reveal className="relative overflow-hidden bg-ink text-paper border border-white/10 p-8 md:p-14 text-center md:text-left">
-        <span aria-hidden="true" className="pointer-events-none select-none absolute -right-2 -bottom-10 md:-bottom-16 font-archivo text-[8rem] md:text-[14rem] font-extrabold text-white/[0.05] leading-none">₹</span>
-        <div className="relative md:flex md:items-center md:justify-between gap-8">
-          <div className="max-w-xl md:mx-0 mx-auto">
-            <p className="gl-lbl text-brand mb-3">Refer &amp; Save</p>
-            <h3 className="font-archivo text-3xl md:text-5xl font-extrabold tracking-tight leading-[0.95]">Know someone whose<br className="hidden md:block" /> desk needs this?</h3>
-            <p className="text-paper/70 mt-4 max-w-md md:mx-0 mx-auto">Share UrbanNook with a friend. Our referral rewards are launching soon - share now and you&apos;ll be first in line to earn.</p>
-          </div>
-          <button onClick={share} className="un-btn gl-press mt-6 md:mt-0 shrink-0 bg-brand text-white font-bold text-sm px-8 py-4 inline-flex items-center gap-2">
-            <span className="un-fill bg-brandHi"></span>
-            <i className="fa-solid fa-share-nodes" /> {copied ? 'Link copied ✓' : 'Share UrbanNook'}
-          </button>
-        </div>
-      </Reveal>
-    </section>
   );
 };
 
@@ -601,6 +540,7 @@ const HomePage = () => {
   useEffect(() => { window.scrollTo(0, 0); }, []);
 
   const { data: featRes } = useGetFeaturedProductsQuery({ limit: 1 }, { refetchOnMountOrArgChange: false, refetchOnFocus: false, refetchOnReconnect: false });
+  const overlayBlocked = useOverlayAvoidance();
   const { data: prodRes, isLoading } = useGetProductsQuery({ page: 1, limit: 24 });
   const products = useMemo(() => productList(prodRes), [prodRes]);
   const { data: homeOffersRes } = useGetHomeComboOffersQuery();
@@ -624,7 +564,6 @@ const HomePage = () => {
     dispatch(addItem({ id: p.productId, mongoId: p.productId, name: p.productName, price: v.variantPrice, image: v.variantImage?.[0], quantity: 1, selectedVariant: v.variantName }));
     trackAddToCart?.({ itemId: p.productId, itemName: p.productName, itemVariant: v.variantName || '', price: v.variantPrice || 0, quantity: 1 });
   };
-  const heroImg = productImg(featured);
 
   // ── Catalog-size-aware merchandising ──────────────────────────────
   // Below MERCH_THRESHOLD we can't fill separate Bestsellers / New /
@@ -666,14 +605,6 @@ const HomePage = () => {
   const collectionCols = colsFor(n);
 
 
-  const { data: testRes } = useGetTestimonialsQuery();
-  const testimonials = (testRes?.data?.testimonials || []).slice(0, 3);
-  const fallbackReviews = [
-    { userName: 'Aryan', content: "The red glow is unreal on a late-night setup. Way cooler in person.", rating: 5 },
-    { userName: 'Simran', content: "Gifted the Porsche caliper - my brother hasn't turned it off since.", rating: 5 },
-    { userName: 'Kabir', content: "Pen stand is tiny but adorable. Desk finally looks intentional.", rating: 4 },
-  ];
-  const reviews = testimonials.length ? testimonials : fallbackReviews;
 
   useEffect(() => {
     if (products.length) trackViewItemList?.({ listName: 'Home', listId: 'home', items: products.map((p, i) => ({ itemId: p.productId, itemName: p.productName, price: firstVariant(p)?.variantPrice || 0, index: i })) });
@@ -745,9 +676,6 @@ const HomePage = () => {
 
 
 
-      <TrustStrip />
-
-
       {/* The combo-banner "Bundle - free-shipping cross-sell" section (and
           the useGetAllFreeShippingBannersQuery it read from) was removed
           entirely 2026-10-09, same sweep as FreeShippingBanner/
@@ -773,7 +701,7 @@ const HomePage = () => {
       <StatementSection images={carouselImages} />
 
       {/* ══ SHOP BY COLLECTION - the admin's categories → sub-categories → products → variants (content/homeRedesign.js) ══ */}
-      {!isFewProducts && <CollectionsSection />}
+      {!isFewProducts && <CollectionsSection products={products} />}
 
       {/* ══ SHOP THE FEED - needs enough distinct products to avoid repeats ══ */}
       {/* {!isFewProducts && (
@@ -795,83 +723,23 @@ const HomePage = () => {
         </section>
       )} */}
 
-      {/* ══ TESTIMONIALS - two-row review wall (opposite directions, hover to pause + zoom, tap to shop) ══ */}
-      <section className="bg-paper py-4 md:py-20 overflow-hidden">
-        <Reveal className="max-w-[1280px] mx-auto px-5 flex items-end justify-between gap-4 mb-8">
-          <div>
-            <Kicker>★ 4.9 · 2,000+ Reviews</Kicker>
-            <h2 className="font-archivo text-3xl md:text-5xl font-extrabold tracking-tight mt-2">Straight from your desks</h2>
-          </div>
-          <span className="hidden sm:block gl-lbl text-[10px] text-faint whitespace-nowrap">Hover to pause · zoom · tap to shop</span>
-        </Reveal>
-
-        <div className="relative">
-          {/* edge fades */}
-          <div className="pointer-events-none absolute inset-y-0 left-0 w-14 md:w-28 bg-gradient-to-r from-paper to-transparent z-10" />
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-14 md:w-28 bg-gradient-to-l from-paper to-transparent z-10" />
-
-          {/* single fast row */}
-          <div className="un-marquee" style={{ animationDuration: '22s' }}>
-            {[0, 1].map((dup) => (
-              <div key={dup} className="flex shrink-0" aria-hidden={dup === 1}>
-                {reviews.map((t, i) => {
-                  const prod = products.length ? products[i % products.length] : null;
-                  return <ReviewCard key={i} t={t} img={prod ? productImg(prod) : heroImg} tag={prod?.productName || 'UrbanNook'} onClick={() => prod && navigate(`/product/${prod.productId}`)} />;
-                })}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* ══ STRAIGHT FROM YOUR DESKS - every approved review that has a customer photo (content/homeRedesign.js) ══ */}
+      <PhotoReviewsSection />
 
       {/* ══ FAQ ══ */}
-      <FaqSection onContact={() => navigate('/contact-us')} />
+      <FaqSection faqs={FAQS} onContact={() => navigate('/contact-us')} />
 
       {/* ══ REFER & SAVE ══ */}
-      <ReferSave />
+      <ReferSection />
 
-      {/* ══ NEWSLETTER - doubles as the "we're just getting started" beat ══ */}
-      <section className="max-w-[820px] mx-auto px-5 py-5 md:py-20 text-center">
-        <Kicker className="justify-center mb-3">{isFewProducts ? 'The next drop' : 'Join the list'}</Kicker>
-        <TextReveal as="h2" text={isFewProducts ? 'Be first to the next piece' : 'Get first access to drops'} className="font-archivo text-3xl md:text-5xl font-extrabold tracking-tight" />
-        <p className="text-muted mt-4">{isFewProducts ? 'We add new made-to-order pieces often. Join for early access + 10% off your first order.' : 'New pieces land often. Members get early access + 10% off the first order.'}</p>
-        <form onSubmit={(e) => e.preventDefault()} className="mt-7 flex max-w-md mx-auto rounded-xl overflow-hidden border border-ink bg-white">
-          <input type="email" placeholder="Enter your email" className="flex-1 px-4 py-4 text-sm outline-none bg-transparent" />
-          <button className="un-btn gl-press bg-brand text-white font-bold text-sm px-7"><span className="un-fill bg-brandHi"></span>Join</button>
-        </form>
-        <p className="gl-lbl text-[9px] text-faint mt-4">No spam · Unsubscribe anytime</p>
-      </section>
+      {/* ══ NEWSLETTER - real signup (POST /join/community), shows the server's answer ══ */}
+      <NewsletterSection fewProducts={isFewProducts} />
 
-      {/* ══ ABOUT - compact brand intro, kept at the bottom above the footer ══ */}
-      {/* ══ CUSTOMIZE - every piece is printed to order, so this is a normal
-             ask rather than an exception. Replaces the old "About" panel:
-             that told people who we are, this gives them something to do. ══ */}
-      <section className="max-w-[1280px] mx-auto px-5 py-5 md:py-16">
-        <Reveal className="relative overflow-hidden bg-surface border border-hair p-8 md:p-14">
-          <span aria-hidden="true" className="pointer-events-none select-none absolute -right-3 -bottom-10 md:-bottom-16 font-archivo text-[6rem] md:text-[13rem] font-extrabold text-ink/[0.04] leading-none tracking-tight">YOURS</span>
-          <div className="relative max-w-2xl">
-            <p className="gl-lbl text-brand mb-4">Customization · Made to order</p>
-            <TextReveal as="h2" text="Make it yours." className="font-archivo text-4xl md:text-6xl font-extrabold tracking-tight leading-[0.95]" />
-            <p className="mt-5 text-muted text-base md:text-lg max-w-xl">
-              Nothing here sits in a warehouse - every piece is 3D-printed once you order it.
-              So a different colour, your name on the side, or a livery we don&apos;t stock is a
-              normal ask. Tell us what you want and we&apos;ll come back with what&apos;s
-              possible and <span className="text-ink font-semibold">what it costs</span>.
-            </p>
-            <Stagger className="mt-6 flex flex-wrap gap-2" stagger={0.05}>
-              {['Custom colours', 'Name / text on it', 'Your own livery', 'Gifting', 'Bulk orders'].map((t) => (
-                <StaggerItem key={t} as="span" className="gl-lbl text-[10px] border border-hair bg-white px-3 py-1.5">{t}</StaggerItem>
-              ))}
-            </Stagger>
-            <button onClick={() => navigate('/customize')} className="un-btn gl-press mt-7 bg-ink text-paper font-bold text-sm px-7 py-3.5">
-              <span className="un-fill bg-brand"></span>Customize a piece
-            </button>
-          </div>
-        </Reveal>
-      </section>
+      {/* ══ CUSTOMIZE - every piece is printed to order, so this is a normal ask rather than an exception ══ */}
+      <CustomizeSection />
 
       {/* mobile sticky add-to-cart - featured product */}
-      <StickyAddBar product={featured} onAdd={() => featured && addOne(featured)} />
+      <StickyAddBar product={featured} onAdd={() => featured && addOne(featured)} blocked={overlayBlocked} />
     </div>
   );
 };

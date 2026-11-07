@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import DocShell from '../../component/DocShell';
 // Import the helper
 import {  SUPPORT_EMAIL } from '../../utils/contactHelper';
 
@@ -8,33 +9,7 @@ const CancellationPolicy = () => {
   }, []);
 
   return (
-    <div className="bg-paper min-h-screen text-ink font-inter relative selection:bg-brand selection:text-white">
-      
-      {/* Background Elements */}
-      <div className="absolute top-20 left-0 w-full overflow-hidden pointer-events-none opacity-[0.04]">
-        <div aria-hidden="true" className="font-archivo text-[15vw] font-extrabold text-center leading-none text-ink tracking-tighter uppercase whitespace-nowrap">
-          Refund Policy
-        </div>
-      </div>
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-brand/5 rounded-full blur-[120px] pointer-events-none"></div>
-
-      <div className="relative z-10 max-w-4xl mx-auto px-6 py-20 md:py-28">
-        
-        {/* Header */}
-        <div className="mb-2 text-left  border-b border-hair pb-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface border border-hair w-fit mb-6">
-            <span className="w-1.5 h-1.5 rounded-full bg-brand"></span>
-            <span className="gl-lbl text-[10px] text-brand">Support</span>
-          </div>
-
-          <h1 className="font-archivo text-4xl md:text-6xl font-extrabold text-ink mb-4 leading-tight">
-            Cancellation &amp; <span className="text-brand">Refunds</span>
-          </h1>
-          <p className="text-muted text-sm md:text-base">
-            Transparent policies for a worry-free experience.
-          </p>
-        </div>
-
+    <DocShell eyebrow="Support" title="Cancellation &amp; Refunds" sub="Transparent policies for a worry-free experience.">
         {/* Content */}
         <div className="space-y-12">
           
@@ -69,8 +44,7 @@ const CancellationPolicy = () => {
             </p>
           </section>
         </div>
-      </div>
-    </div>
+    </DocShell>
   );
 };
 

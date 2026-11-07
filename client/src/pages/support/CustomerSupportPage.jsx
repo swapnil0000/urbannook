@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useSubmitContactMutation } from '../../store/api/userApi';
 import { useUI } from '../../hooks/useRedux';
-import CustomSelect from '../../component/CustomSelect';
+import DocShell from '../../component/DocShell';
 import { supportFaqs, subjectOptions } from '../../data/constant';
 import { getSupportWhatsAppUrl, onSupportWhatsAppClick } from '../../utils/contactHelper';
 
@@ -66,234 +66,101 @@ const CustomerSupportPage = () => {
     };
 
 
+    const waText = SUPPORT_CHAT_TEXT;
+    const fieldCls = (bad) => `rd-input font-inter text-ink${bad ? ' is-bad' : ''}`;
+    const contacts = [
+        { key: 'call', label: 'Call Support', value: '+91 91240 81005', note: 'Mon-Sat, 9AM - 7PM', href: 'tel:+919124081005' },
+        { key: 'mail', label: 'Email Us', value: 'urbanadmin@urbannook.in', note: 'Guaranteed response in 24h', href: 'mailto:urbanadmin@urbannook.in' },
+        { key: 'wa', label: 'Chat on WhatsApp', value: '+91 91240 81005', note: 'Available 24/7', href: getSupportWhatsAppUrl(waText), onClick: onSupportWhatsAppClick(waText), rel: 'noreferrer' },
+    ];
+
     return (
-        <div className="bg-paper min-h-screen font-inter text-ink selection:bg-brand selection:text-white">
-            {/* --- AMBIENT BACKGROUND --- */}
-            <div className="fixed top-0 left-0 w-full h-[600px] bg-gradient-to-b from-surface to-paper pointer-events-none opacity-60"></div>
-            <div className="fixed -bottom-40 -left-40 w-[600px] h-[600px] bg-brand rounded-full blur-[200px] opacity-[0.04] pointer-events-none"></div>
+        <DocShell wide eyebrow="Support" title="How can we assist you?">
+            {/* tabs */}
+            <div className="rd-seg rd-sup-tabs" role="tablist" aria-label="Support">
+                {['contact', 'faq'].map((tab) => (
+                    <button key={tab} type="button" role="tab" id={`sup-tab-${tab}`} aria-selected={activeTab === tab} aria-controls={`sup-panel-${tab}`} aria-pressed={activeTab === tab} onClick={() => setActiveTab(tab)} className="font-inter">
+                        {tab === 'contact' ? 'Message Us' : 'Common Queries'}
+                    </button>
+                ))}
+            </div>
 
-            <main className="max-w-5xl mx-auto pt-28 pb-20 px-4 md:px-8 relative z-10">
-                {/* --- HEADER --- */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-brand/20 pb-8 lg:pb-12">
+            {/* contact form tab */}
+            {activeTab === 'contact' && (
+                <div id="sup-panel-contact" role="tabpanel" aria-labelledby="sup-tab-contact" className="rd-ct-grid rd-sup-grid">
                     <div>
-                        <div className="flex items-center gap-3 mb-2">
-                            <span className="h-[1px] w-8 bg-brand"></span>
-                            <span className="gl-lbl text-brand text-[10px]">Support</span>
-                        </div>
-                        <h1 className="text-4xl md:text-5xl lg:text-6xl font-archivo font-extrabold text-ink leading-tight">
-                            How can we <span className="text-brand">assist you?</span>
-                        </h1>
-                    </div>
-                </div>
-
-                {/* --- TAB SWITCHER --- */}
-                <div className="flex justify-start mb-8">
-                    <div className="bg-[#f5f7f8] p-1.5 rounded-full border border-hair backdrop-blur-md flex relative shadow-inner">
-                        {['contact', 'faq'].map((tab) => (
-                            <button
-                                key={tab}
-                                onClick={() => setActiveTab(tab)}
-                                className={`relative px-6 md:px-8 py-2.5 md:py-3 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all z-10 ${
-                                    activeTab === tab ? 'text-white' : 'text-gray-400 hover:text-gray-400'
-                                }`}
-                            >
-                                {tab === 'contact' ? 'Message Us' : 'Common Queries'}
-                                {activeTab === tab && (
-                                    <div className="absolute inset-0 bg-brand rounded-full -z-10 shadow-lg shadow-brand/20" />
-                                )}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                {/* --- CONTACT FORM TAB --- */}
-                {activeTab === 'contact' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
-                        {/* Left: Interactive Form (LIGHT BOX) */}
-                        <div className="lg:col-span-8 bg-[#f5f7f8] border border-transparent rounded-[24px] p-6 md:p-8 shadow-xl">
-                            <div className="mb-8 border-b border-gray-200 pb-6">
-                                <h3 className="text-2xl font-archivo font-bold text-ink mb-2">Send a Request</h3>
-                                <p className="text-sm text-gray-500 font-light">Our team typically responds within 2 hours.</p>
+                        <h2 className="rd-ct-h font-archivo text-ink">Send a Request</h2>
+                        <p className="rd-ct-p font-inter text-muted">Our team typically responds within 2 hours.</p>
+                        <form onSubmit={handleSubmit} className="rd-ct-form" noValidate>
+                            <div className="rd-ct-row">
+                                <div className="rd-fld">
+                                    <label htmlFor="sup-name" className="font-mono uppercase text-muted">Your Name</label>
+                                    <input id="sup-name" name="name" autoComplete="name" value={formData.name} onChange={handleInputChange} type="text" required className={fieldCls(errors.name)} aria-invalid={Boolean(errors.name) || undefined} placeholder="John Doe" />
+                                    {errors.name && <p className="rd-fld-err" role="alert">{errors.name}</p>}
+                                </div>
+                                <div className="rd-fld">
+                                    <label htmlFor="sup-email" className="font-mono uppercase text-muted">Email Address</label>
+                                    <input id="sup-email" name="email" autoComplete="email" value={formData.email} onChange={handleInputChange} type="email" required className={fieldCls(errors.email)} aria-invalid={Boolean(errors.email) || undefined} placeholder="john@example.com" />
+                                    {errors.email && <p className="rd-fld-err" role="alert">{errors.email}</p>}
+                                </div>
                             </div>
-
-                            <form onSubmit={handleSubmit} className="space-y-6">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] uppercase tracking-widest text-brand font-bold ml-2">Your Name</label>
-                                        <input
-                                            name="name"
-                                            value={formData.name}
-                                            onChange={handleInputChange}
-                                            type="text"
-                                            required
-                                            className={`w-full bg-white border rounded-xl px-5 py-4 text-ink focus:outline-none transition-colors placeholder-gray-300 shadow-sm ${
-                                                errors.name ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-brand'
-                                            }`}
-                                            placeholder="John Doe"
-                                        />
-                                        {errors.name && (
-                                            <p className="text-red-500 text-xs ml-2">{errors.name}</p>
-                                        )}
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] uppercase tracking-widest text-brand font-bold ml-2">Email Address</label>
-                                        <input
-                                            name="email"
-                                            value={formData.email}
-                                            onChange={handleInputChange}
-                                            type="email"
-                                            required
-                                            className={`w-full bg-white border rounded-xl px-5 py-4 text-ink focus:outline-none transition-colors placeholder-gray-300 shadow-sm ${
-                                                errors.email ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-brand'
-                                            }`}
-                                            placeholder="john@example.com"
-                                        />
-                                        {errors.email && (
-                                            <p className="text-red-500 text-xs ml-2">{errors.email}</p>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <CustomSelect
-                                    options={subjectOptions}
-                                    value={formData.subject}
-                                    onChange={handleInputChange}
-                                    placeholder="Select a topic..."
-                                    error={errors.subject}
-                                    label="Topic"
-                                    name="subject"
-                                />
-
-                                <div className="space-y-2">
-                                    <label className="text-[10px] uppercase tracking-widest text-brand font-bold ml-2">Message</label>
-                                    <textarea
-                                        name="message"
-                                        value={formData.message}
-                                        onChange={handleInputChange}
-                                        required
-                                        rows="4"
-                                        className={`w-full bg-white border rounded-xl px-5 py-4 text-ink focus:outline-none transition-colors placeholder-gray-300 resize-none shadow-sm ${
-                                            errors.message ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-brand'
-                                        }`}
-                                        placeholder="How can we help you today?"
-                                    ></textarea>
-                                    {errors.message && (
-                                        <p className="text-red-500 text-xs ml-2">{errors.message}</p>
-                                    )}
-                                </div>
-
-                                <button
-                                    type="submit"
-                                    disabled={isSubmitting}
-                                    className={`w-full py-4 rounded-xl font-bold uppercase tracking-widest text-xs transition-all shadow-lg flex items-center justify-center gap-3 ${
-                                        isSubmitting 
-                                            ? 'bg-gray-400 text-white cursor-not-allowed' 
-                                            : 'bg-brand text-white hover:bg-brandHi'
-                                    }`}
-                                >
-                                    {isSubmitting ? (
-                                        <>
-                                            <i className="fa-solid fa-spinner fa-spin"></i>
-                                            Processing...
-                                        </>
-                                    ) : (
-                                        <>Send Message <i className="fa-solid fa-paper-plane"></i></>
-                                    )}
-                                </button>
-                            </form>
-                        </div>
-
-                        {/* Right: Contact Cards (LIGHT BOXES) */}
-                        <div className="lg:col-span-4 space-y-4">
-                            {/* Call Support */}
-                            <a href="tel:+919124081005" className="block p-6 rounded-2xl bg-surface border border-transparent hover:border-brand/50 hover:shadow-lg transition-all group cursor-pointer shadow-md">
-                                <div className="flex items-start gap-4">
-                                    <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center text-brand group-hover:bg-brand group-hover:text-white transition-all">
-                                        <i className="fa-solid fa-phone"></i>
-                                    </div>
-                                    <div>
-                                        <h4 className="text-ink font-archivo font-bold text-lg mb-1 group-hover:text-brand transition-colors">Call Support</h4>
-                                        <p className="text-brand font-mono text-sm mb-2 font-bold">+91 91240 81005</p>
-                                        <p className="text-xs text-gray-500">Mon-Sat, 9AM - 7PM</p>
-                                    </div>
-                                </div>
-                            </a>
-
-                            {/* Email Us */}
-                            <a href="mailto:urbanadmin@urbannook.in" className="block p-6 rounded-2xl bg-surface border border-transparent hover:border-brand/50 hover:shadow-lg transition-all group cursor-pointer shadow-md">
-                                <div className="flex items-start gap-4">
-                                    <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center text-brand group-hover:bg-brand group-hover:text-white transition-all">
-                                        <i className="fa-solid fa-envelope"></i>
-                                    </div>
-                                    <div>
-                                        <h4 className="text-ink font-archivo font-bold text-lg mb-1 group-hover:text-brand transition-colors">Email Us</h4>
-                                        <p className="text-brand font-mono text-sm mb-2 hover:underline font-bold">urbanadmin@urbannook.in</p>
-                                        <p className="text-xs text-gray-500">Guaranteed response in 24h</p>
-                                    </div>
-                                </div>
-                            </a>
-
-                            {/* WhatsApp */}
-                            <a href={getSupportWhatsAppUrl(SUPPORT_CHAT_TEXT)} onClick={onSupportWhatsAppClick(SUPPORT_CHAT_TEXT)} rel="noreferrer" className="block p-6 rounded-2xl bg-surface border border-transparent hover:border-brand/50 hover:shadow-lg transition-all group cursor-pointer shadow-md">
-                                <div className="flex items-start gap-4">
-                                    <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center text-brand group-hover:bg-brand group-hover:text-white transition-all">
-                                        <i className="fa-brands fa-whatsapp text-xl"></i>
-                                    </div>
-                                    <div>
-                                        <h4 className="text-ink font-archivo font-bold text-lg mb-1 group-hover:text-brand transition-colors">Chat on WhatsApp</h4>
-                                        <p className="text-brand font-mono text-sm mb-2 font-bold">+91 91240 81005</p>
-                                        <p className="text-xs text-gray-500">Available 24/7</p>
-                                    </div>
-                                </div>
-                            </a>
-                        </div>
+                            <div className="rd-fld">
+                                <label htmlFor="sup-topic" className="font-mono uppercase text-muted">Topic</label>
+                                <select id="sup-topic" name="subject" value={formData.subject} onChange={handleInputChange} className={`${fieldCls(errors.subject)} rd-input--select`} aria-invalid={Boolean(errors.subject) || undefined}>
+                                    {subjectOptions.map((o) => <option key={o.value || 'none'} value={o.value} disabled={o.disabled}>{o.label}</option>)}
+                                </select>
+                                {errors.subject && <p className="rd-fld-err" role="alert">{errors.subject}</p>}
+                            </div>
+                            <div className="rd-fld">
+                                <label htmlFor="sup-message" className="font-mono uppercase text-muted">Message</label>
+                                <textarea id="sup-message" name="message" value={formData.message} onChange={handleInputChange} required rows="5" className={`${fieldCls(errors.message)} rd-input--area`} aria-invalid={Boolean(errors.message) || undefined} placeholder="How can we help you today?"></textarea>
+                                {errors.message && <p className="rd-fld-err" role="alert">{errors.message}</p>}
+                            </div>
+                            <button type="submit" disabled={isSubmitting} className="rd-btn font-inter">{isSubmitting ? 'Processing...' : 'Send Message'}</button>
+                        </form>
                     </div>
-                )}
 
-                {/* --- FAQ TAB (LIGHT BOX) --- */}
-                {activeTab === 'faq' && (
-                    <div>
-                        <div className="bg-[#f5f7f8] border border-transparent rounded-[24px] overflow-hidden shadow-xl">
-                            {supportFaqs.map((faq, index) => (
-                                <div key={faq.id} className="border-b border-gray-200 last:border-0">
-                                    <button
-                                        onClick={() => setExpandedFaq(expandedFaq === index ? null : index)}
-                                        className="w-full p-6 md:p-8 flex justify-between items-center text-left group hover:bg-white transition-colors"
-                                    >
-                                        <span className={`text-base md:text-lg font-archivo font-bold transition-colors ${
-                                            expandedFaq === index ? 'text-brand' : 'text-ink'
-                                        }`}>
-                                            {faq.question}
-                                        </span>
-                                        <span className={`w-8 h-8 rounded-full border flex items-center justify-center transition-all duration-300 ${
-                                            expandedFaq === index ? 'rotate-180 bg-brand text-white border-brand' : 'text-gray-400 border-gray-200'
-                                        }`}>
-                                            <i className="fa-solid fa-chevron-down text-xs"></i>
-                                        </span>
-                                    </button>
-                                    <div className={`overflow-hidden bg-white transition-all duration-300 ${
-                                        expandedFaq === index ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
-                                    }`}>
-                                        <div className="px-6 md:px-8 pb-8 text-gray-500 text-sm leading-relaxed font-light">
-                                            {faq.answer}
-                                        </div>
-                                    </div>
-                                </div>
+                    <aside>
+                        <ul className="rd-sup-contacts">
+                            {contacts.map((c) => (
+                                <li key={c.key}>
+                                    <a href={c.href} onClick={c.onClick} rel={c.rel}>
+                                        <span className="font-mono uppercase text-muted">{c.label}</span>
+                                        <span className="rd-sup-v font-archivo text-ink">{c.value}</span>
+                                        <span className="font-inter text-muted">{c.note}</span>
+                                    </a>
+                                </li>
                             ))}
-                        </div>
-                        <div className="mt-8 text-center">
-                            <p className="text-muted text-xs uppercase tracking-widest mb-4">Still need help?</p>
-                            <button
-                                onClick={() => setActiveTab('contact')}
-                                className="text-brand border-b border-brand pb-1 hover:text-ink hover:border-ink transition-colors text-sm font-archivo"
-                            >
-                                Write to us directly
-                            </button>
-                        </div>
+                        </ul>
+                    </aside>
+                </div>
+            )}
+
+            {/* FAQ tab: every answer stays in the markup, collapsed with CSS */}
+            {activeTab === 'faq' && (
+                <div id="sup-panel-faq" role="tabpanel" aria-labelledby="sup-tab-faq">
+                    <div className="rd-faq-list">
+                        {supportFaqs.map((faq, index) => {
+                            const isOpen = expandedFaq === index;
+                            return (
+                                <div key={faq.id} className="rd-faq-row" data-open={isOpen ? '1' : '0'}>
+                                    <h2 className="rd-faq-q">
+                                        <button type="button" id={`supfaq-${faq.id}-q`} aria-expanded={isOpen} aria-controls={`supfaq-${faq.id}-a`} onClick={() => setExpandedFaq(isOpen ? null : index)} className="font-archivo text-ink">
+                                            <span>{faq.question}</span>
+                                            <span className="rd-faq-icon font-mono" aria-hidden="true">{isOpen ? '–' : '+'}</span>
+                                        </button>
+                                    </h2>
+                                    <div id={`supfaq-${faq.id}-a`} role="region" aria-labelledby={`supfaq-${faq.id}-q`} className="rd-faq-a">
+                                        <div><p className="font-inter text-muted">{faq.answer}</p></div>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
-                )}
-            </main>
-        </div>
+                    <p className="rd-sup-more font-inter text-muted">Still need help? <button type="button" onClick={() => setActiveTab('contact')} className="rd-faq-talk font-inter text-ink">Write to us directly</button></p>
+                </div>
+            )}
+        </DocShell>
     );
 };
 

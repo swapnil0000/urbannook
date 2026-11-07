@@ -67,11 +67,10 @@ const Card = ({ id, title, icon, aside, children, className = "", labelId }) => 
 // ── hero ─────────────────────────────────────────────────────────────────────
 const HERO_TITLE = {
   CONFIRMED: ["Order ", "Confirmed!"], IN_TRANSIT: ["Order ", "On its way"], OUT_FOR_DELIVERY: ["Order ", "Out for delivery"], DELIVERED: ["Order ", "Delivered"],
-  PARTIALLY_DELIVERED: ["Order ", "Partly delivered"], EXCEPTION: ["Delivery ", "Needs attention"], RTO: ["Order ", "Returning to us"],
+  PARTIALLY_DELIVERED: ["Order ", "Partly delivered"], PARTIALLY_SHIPPED: ["Order ", "Partly shipped"], EXCEPTION: ["Delivery ", "Needs attention"], RTO: ["Order ", "Returning to us"],
   CANCELLED: ["Order ", "Cancelled"], PAYMENT_PENDING: ["Payment ", "Pending"], PAYMENT_FAILED: ["Payment ", "Failed"],
 };
-const HERO_ICON = { CONFIRMED: "fa-check", DELIVERED: "fa-check", PARTIALLY_DELIVERED: "fa-truck-fast", IN_TRANSIT: "fa-truck-fast", OUT_FOR_DELIVERY: "fa-truck-fast", PAYMENT_PENDING: "fa-hourglass-half", EXCEPTION: "fa-exclamation", RTO: "fa-rotate-left", CANCELLED: "fa-xmark", PAYMENT_FAILED: "fa-xmark" };
-const LIVE_STAGES = ["CONFIRMED", "IN_TRANSIT", "OUT_FOR_DELIVERY", "PARTIALLY_DELIVERED", "EXCEPTION"];
+const HERO_ICON = { CONFIRMED: "fa-check", DELIVERED: "fa-check", PARTIALLY_DELIVERED: "fa-truck-fast", PARTIALLY_SHIPPED: "fa-truck-fast", IN_TRANSIT: "fa-truck-fast", OUT_FOR_DELIVERY: "fa-truck-fast", PAYMENT_PENDING: "fa-hourglass-half", EXCEPTION: "fa-exclamation", RTO: "fa-rotate-left", CANCELLED: "fa-xmark", PAYMENT_FAILED: "fa-xmark" };
 
 const CELEBRATED_KEY = "un_order_celebrated";
 // One quiet pop on the mark, once per order, only right after checkout — never when history is reopened.
@@ -96,7 +95,6 @@ const Hero = ({ view, mode }) => {
   const { stage, payment } = view;
   const [lead, accent] = HERO_TITLE[stage.code] || ["Order ", stage.label];
   const live = !["CANCELLED", "PAYMENT_FAILED"].includes(stage.code);
-  const reassure = LIVE_STAGES.includes(stage.code); // only for an order that is really on its way — never for a pending or cancelled one
   const thanks = mode === "confirmation" && stage.code === "CONFIRMED";
 
   return (
@@ -112,12 +110,6 @@ const Hero = ({ view, mode }) => {
             </p>
           </div>
         </div>
-        {reassure && (
-          <div className="hidden md:flex items-center gap-4 shrink-0 pr-2">
-            <div className="uo-cube" aria-hidden="true">U<b>N</b></div>
-            <div><p className="font-bold text-[14px]">Your order is in good hands!</p><p className="uo-sub">We&apos;ll notify you at every step.</p></div>
-          </div>
-        )}
       </div>
 
       {/* desktop: four cells · mobile: ID, then one meta line */}
@@ -133,14 +125,7 @@ const Hero = ({ view, mode }) => {
         <p className="mt-1 text-[12px] text-muted">{formatISTDateTime(view.placedAt)} · {view.itemCount} {view.itemCount === 1 ? "item" : "items"} · <span className="font-bold text-ink">{formatINR(payment.orderTotal)}</span></p>
       </div>
 
-      {reassure && (
-        <div className="md:hidden mt-3 flex items-center gap-3">
-          <div className="uo-cube" style={{ width: 48, height: 48, fontSize: 14 }} aria-hidden="true">U<b>N</b></div>
-          <div><p className="font-bold text-[13px]">Your order is in good hands!</p><p className="uo-sub">We&apos;ll notify you at every step.</p></div>
-        </div>
-      )}
-
-      <div className="mt-4 flex flex-wrap gap-2.5 sm:gap-3">
+      <div className="uo-hero-actions mt-7 flex flex-wrap items-center gap-x-7 gap-y-3">
         {live ? (
           // With a shipment: straight to the courier tracking page for the latest AWB. Before dispatch: the status section below.
           view.actions.trackUrl ? (
@@ -318,6 +303,13 @@ export const Payment = ({ payment }) => {
 };
 
 // ── items ────────────────────────────────────────────────────────────────────
+// On a partly shipped order every line says whether it has gone: delivered (green), on its way / shipped (plain),
+// being prepared, or not shipped yet (amber). Orders that ship in one go carry no tag.
+const FulfilmentChip = ({ f }) => {
+  const cls = f.state === "pending" ? "uo-chip-amber" : f.stage === "delivered" ? "uo-chip-green" : "uo-chip-plain";
+  return <span className={`uo-chip ${cls}`}>{f.state === "shipped" && f.stage !== "delivered" ? `Shipped · ${f.label}` : f.label}</span>;
+};
+
 const Item = ({ item }) => {
   const title = resolveVariantTitle(item.name, item.variantTitleTemplate, item.variant);
   const discounted = item.unitOriginal && !item.isFreeGift;
@@ -333,7 +325,10 @@ const Item = ({ item }) => {
         {item.variantSku && <p className="uo-sub">SKU: {item.variantSku}</p>}
         <p className="sm:hidden mt-1 font-bold text-[14px]">{item.isFreeGift ? "FREE" : formatINR(item.lineTotal)}</p>
       </div>
-      <div className="uo-qty"><span className="uo-chip uo-chip-plain">Qty: {item.quantity}</span></div>
+      <div className="uo-qty flex flex-wrap items-center gap-1.5">
+        <span className="uo-chip uo-chip-plain">Qty: {item.quantity}</span>
+        {item.fulfilment && <FulfilmentChip f={item.fulfilment} />}
+      </div>
       <div className="hidden sm:block text-right min-w-0">
         {item.isFreeGift ? (
           item.giftValue > 0 ? <p className="uo-green font-semibold">Worth {formatINR(item.giftValue)}</p> : <p className="uo-sub">Free</p>
@@ -351,12 +346,13 @@ const Item = ({ item }) => {
   );
 };
 
-export const Items = ({ items }) => {
+export const Items = ({ items, partial }) => {
   const [all, setAll] = useState(false);
   const count = items.reduce((s, i) => s + i.quantity, 0);
   const hidden = !all && items.length > 3;
   return (
     <Card title={`Items in Your Order (${count})`} icon="fa-clipboard-list" labelId="items-h" aside={items.length > 3 ? <button type="button" onClick={() => setAll((a) => !a)} aria-expanded={all} className="sm:hidden uo-red font-semibold text-[12px] min-h-[32px]">{all ? "Show less" : "View All"}</button> : null}>
+      {partial && <p className="uo-sub mb-3" role="status">{partial.shipped} of {partial.total} {partial.total === 1 ? "item has" : "items have"} shipped. The rest {partial.total - partial.shipped === 1 ? "is" : "are"} still being prepared and will get {partial.total - partial.shipped === 1 ? "its" : "their"} own tracking.</p>}
       <ul className="list-none m-0 p-0">
         {items.map((it, i) => (
           <div key={`${it.index}-${it.productId}`} className={hidden && i >= 3 ? "hidden sm:contents" : "contents"}><Item item={it} /></div>
@@ -495,15 +491,15 @@ const Recommendations = ({ orderId }) => {
 // Desktop: main column (tracking · items · address/contact) + sidebar (payment · price · actions).
 // Mobile: one column in the approved order — tracking, payment, items, price, address/contact, actions.
 export const OrderPageBody = ({ view, mode = "details" }) => (
-  <div className="flex flex-col gap-3 lg:gap-4">
+  <div className="flex flex-col gap-10 lg:gap-14">
     <Hero view={view} mode={mode} />
-    <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(320px,31%)] lg:gap-4 lg:items-start">
-      <div className="contents lg:flex lg:flex-col lg:gap-4 lg:min-w-0">
+    <div className="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(300px,30%)] lg:gap-16 lg:items-start">
+      <div className="contents lg:flex lg:flex-col lg:gap-12 lg:min-w-0">
         <div className="order-1 lg:order-none"><Tracking view={view} /></div>
-        <div className="order-3 lg:order-none"><Items items={view.items} /></div>
-        <div className="order-5 lg:order-none grid gap-3 md:grid-cols-[1.25fr_1fr] lg:gap-4"><Address d={view.delivery} /><Contact d={view.delivery} /></div>
+        <div className="order-3 lg:order-none"><Items items={view.items} partial={view.partial} /></div>
+        <div className="order-5 lg:order-none grid gap-10 md:grid-cols-[1.25fr_1fr] lg:gap-12"><Address d={view.delivery} /><Contact d={view.delivery} /></div>
       </div>
-      <div className="contents lg:flex lg:flex-col lg:gap-4 lg:min-w-0">
+      <div className="contents lg:flex lg:flex-col lg:gap-12 lg:min-w-0">
         <div className="order-2 lg:order-none"><Payment payment={view.payment} /></div>
         <div className="order-4 lg:order-none"><Price pricing={view.pricing} payment={view.payment} /></div>
         <div className="order-6 lg:order-none"><Actions view={view} /></div>
@@ -514,8 +510,8 @@ export const OrderPageBody = ({ view, mode = "details" }) => (
 );
 
 export const OrderPageShell = ({ children }) => (
-  <main className="uo min-h-screen font-inter">
-    <div className="max-w-[1380px] mx-auto px-3 sm:px-6 lg:px-8 pt-3 sm:pt-5 pb-28 md:pb-12">{children}</div>
+  <main className="uo uo-rd min-h-screen font-inter">
+    <div className="max-w-[1180px] mx-auto px-5 sm:px-8 pt-8 sm:pt-12 pb-28 md:pb-20">{children}</div>
   </main>
 );
 
@@ -559,34 +555,29 @@ export const OrderSummaryCard = ({ order }) => {
   const tone = PAYMENT_TONE[order.payment.state] || "info";
   const due = order.payment.amountDue > 0 && !["CANCELLED", "FAILED", "PENDING"].includes(order.payment.state);
   return (
-    <article className="uo-card">
-      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-        <div className="min-w-0">
-          <p className="flex items-center gap-1 font-bold text-[14px]">Order <span className="font-mono">…{shortRef(order.orderId)}</span><CopyButton value={order.orderId} label="Copy full order ID" /></p>
-          <p className="uo-sub">Placed {formatISTDate(order.placedAt)} · {order.itemCount} {order.itemCount === 1 ? "item" : "items"}</p>
-        </div>
-        <div className="text-right">
-          <p className="font-extrabold text-[18px] leading-tight">{formatINR(order.payment.orderTotal)}</p>
-          {due && <p className="text-[12px] font-semibold">{formatINR(order.payment.amountDue)} on delivery</p>}
-        </div>
-      </div>
-      <div className="mt-3 flex items-center gap-2" aria-label="Items in this order">
+    <article className="rd-ord">
+      <div className="rd-ord-thumbs" aria-label="Items in this order">
         {order.preview.map((p, i) => (
-          <div key={i} className="uo-img relative" style={{ width: 56, height: 56 }} title={`${p.name} × ${p.quantity}`}>
-            {p.image ? <img src={p.image} alt={p.name} loading="lazy" decoding="async" width="56" height="56" /> : <i className="fa-regular fa-image text-faint" aria-hidden="true" />}
-            {p.quantity > 1 && <span className="absolute bottom-0 right-0 bg-ink text-paper text-[10px] px-1">×{p.quantity}</span>}
+          <div key={i} className="rd-ord-thumb" title={`${p.name} × ${p.quantity}`}>
+            {p.image ? <img src={p.image} alt={p.name} loading="lazy" decoding="async" width="72" height="72" /> : <i className="fa-regular fa-image text-faint" aria-hidden="true" />}
+            {p.quantity > 1 && <span className="rd-ord-qty font-mono">×{p.quantity}</span>}
           </div>
         ))}
-        {order.extraItems > 0 && <span className="uo-sub">+{order.extraItems} more</span>}
+        {order.extraItems > 0 && <span className="rd-ord-more font-mono uppercase">+{order.extraItems} more</span>}
       </div>
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="uo-chip uo-chip-plain">{order.stage.label}</span>
-          <span className={`uo-chip ${tone === "success" ? "uo-chip-green" : tone === "danger" ? "uo-chip-red" : "uo-chip-plain"}`}>{order.payment.label}</span>
+      <div className="rd-ord-info">
+        <p className="rd-ord-status font-mono uppercase"><i className={`rd-ord-dot rd-ord-dot--${tone}`} aria-hidden="true" /><span>{order.stage.label}</span></p>
+        <p className="rd-ord-ref font-mono uppercase">Order <span>…{shortRef(order.orderId)}</span><CopyButton value={order.orderId} label="Copy full order ID" /></p>
+        <p className="rd-ord-meta font-inter">Placed {formatISTDate(order.placedAt)} · {order.itemCount} {order.itemCount === 1 ? "item" : "items"} · {order.payment.label}{order.partial ? ` · ${order.partial.shipped} of ${order.partial.total} items shipped` : ""}</p>
+      </div>
+      <div className="rd-ord-side">
+        <div>
+          <p className="rd-ord-total font-archivo">{formatINR(order.payment.orderTotal)}</p>
+          {due && <p className="rd-ord-due font-inter">{formatINR(order.payment.amountDue)} on delivery</p>}
         </div>
-        <div className="flex items-center gap-2">
-          {order.canTrack && <Link to={`/orders/${order.orderId}#tracking`} className="uo-btn" style={{ minHeight: 40 }}>Track</Link>}
-          <Link to={`/orders/${order.orderId}`} className="uo-btn uo-btn-primary" style={{ minHeight: 40 }}>View details</Link>
+        <div className="rd-ord-links">
+          {order.canTrack && <Link to={`/orders/${order.orderId}#tracking`} className="rd-ord-link font-mono uppercase">Track</Link>}
+          <Link to={`/orders/${order.orderId}`} className="rd-ord-link rd-ord-link--main font-mono uppercase">View details <span aria-hidden="true">→</span></Link>
         </div>
       </div>
     </article>

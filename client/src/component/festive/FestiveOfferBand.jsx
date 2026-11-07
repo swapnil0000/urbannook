@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom';
 import FestiveCountdown from './FestiveCountdown';
 import { useSiteCampaign, THEME_COPY } from '../../hooks/useSiteCampaign';
-import { STORE_PROMISES } from '../../utils/storePromises';
 import { isVariantOutOfStock } from '../../utils/variantStock';
 import { maxDiscountPercent } from '../../utils/festiveDeals';
 
@@ -41,33 +40,33 @@ const FestiveOfferBand = ({ products = [] }) => {
     // page no longer shows two "Diwali" sections saying the same thing.
     <div className="relative mx-auto grid max-w-[1100px] items-center gap-6 px-4 sm:px-6 md:grid-cols-[1.1fr_1fr] md:gap-10">
       <div className="min-w-0 text-left">
-        <span className="inline-flex items-center gap-2 gl-lbl text-[10px] text-star tracking-[0.18em]">
-          <span className="h-1.5 w-1.5 rounded-full bg-star motion-safe:animate-pulse" aria-hidden="true" />
+        <span className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.13em] text-paper/70">
+          <span className="h-1.5 w-1.5 rounded-full bg-brand motion-safe:animate-pulse" aria-hidden="true" />
           {headline} · live
         </span>
-        <h2 className="mt-2 font-anton uppercase text-[34px] leading-[0.95] tracking-tight text-paper sm:text-5xl md:text-6xl">{copy.offersTitle || headline}</h2>
-        {copy.bandLine && <p className="mt-3 max-w-md text-[15px] leading-snug text-paper/80 md:text-lg">{copy.bandLine}</p>}
-        <p className="mt-2 gl-lbl text-[9.5px] text-star sm:text-[10px]">✦ {STORE_PROMISES[0]} ✦ {STORE_PROMISES[1].split(' · ')[0]}</p>
-        <div className="mt-4 flex flex-wrap items-center gap-2.5">
-          {upTo > 0 && <span className="rounded-full bg-sale px-3.5 py-1.5 text-[15px] font-extrabold leading-none text-white md:text-lg">Up to {upTo}% OFF</span>}
+        <h2 className="mt-3 font-archivo text-[38px] font-semibold leading-[1.04] tracking-[-0.06em] text-paper sm:text-5xl md:text-[54px]">{copy.offersTitle || headline}</h2>
+        {copy.bandLine && <p className="mt-4 max-w-md text-[15px] leading-relaxed text-paper/75">{copy.bandLine}</p>}
+        {/* the two real facts of the sale, one quiet line each: the biggest markdown and when it ends */}
+        <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3">
+          {upTo > 0 && <p className="font-archivo text-[22px] font-semibold leading-none tracking-[-0.04em] text-paper">Up to <span className="text-brand">{upTo}%</span> off</p>}
           <FestiveCountdown tone="light" />
         </div>
-        <div className="mt-4 flex flex-wrap gap-2.5">
-          <Link to="/offers" className="gl-press inline-flex h-11 items-center gap-2 rounded-xl bg-brand px-5 text-sm font-bold text-white hover:bg-brandHi">See all offers <span aria-hidden="true">→</span></Link>
-          <Link to="/products" className="gl-press inline-flex h-11 items-center gap-2 rounded-xl border border-white/30 px-5 text-sm font-bold text-paper hover:border-white">{copy.bandCta || 'Shop the sale'}</Link>
+        <div className="mt-7 flex flex-wrap items-center gap-x-7 gap-y-3">
+          <Link to="/offers" className="inline-flex h-12 items-center gap-2 bg-brandHi px-6 text-[13px] font-semibold text-paper transition-colors hover:bg-brand">See all offers <span aria-hidden="true">→</span></Link>
+          <Link to="/products" className="inline-flex items-center border-b border-paper/50 pb-0.5 text-[13px] font-semibold text-paper transition-colors hover:border-paper">{copy.bandCta || 'Shop the sale'}</Link>
         </div>
       </div>
 
       {/* biggest real markdowns; each tile opens that product */}
       {deals.length > 0 && (
         <div>
-          <p className="mb-2 gl-lbl text-[10px] text-paper/60">{copy.bandTitle || 'Biggest price drops'}</p>
+          <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.13em] text-paper/60">{copy.bandTitle || 'Biggest price drops'}</p>
           <ul className="grid grid-cols-3 gap-2.5 list-none m-0 p-0 sm:gap-3">
             {deals.map((d) => (
               <li key={d.id}>
-                <Link to={`/products/${d.id}`} className="group relative block aspect-[3/4] overflow-hidden border border-white/15 bg-white/5">
+                <Link to={`/products/${d.id}`} className="group relative block aspect-[3/4] overflow-hidden bg-white/5">
                   <img src={d.img} alt={d.name} loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" onError={(e) => { e.currentTarget.src = '/assets/logo.webp'; }} />
-                  <span className="absolute bottom-1.5 left-1.5 rounded-full bg-sale px-2 py-0.5 text-[10.5px] font-extrabold text-white sm:text-[11px]">{d.off}% OFF</span>
+                  <span className="absolute bottom-0 left-0 bg-ink px-2 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-paper">{d.off}% off</span>
                 </Link>
               </li>
             ))}

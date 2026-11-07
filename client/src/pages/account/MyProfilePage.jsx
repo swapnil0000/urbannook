@@ -1,5 +1,7 @@
 import { useEffect, useState, useCallback, Suspense } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth, useUI } from '../../hooks/useRedux';
+import { ACCOUNT_PROFILE as C } from '../../content/homeRedesign';
 import { useGetUserProfileQuery, useUpdateUserProfileMutation } from '../../store/api/userApi';
 import PasskeyEnroll from '../../component/layout/auth/PasskeyEnroll';
 
@@ -86,8 +88,19 @@ const MyProfilePage = () => {
     setFormData({ ...formData, [name]: value });
   };
 
+  const handleCancel = () => {
+    setFormData(originalData);
+    setIsEditing(false);
+  };
+
   const handleSave = async () => {
     try {
+      // Pin code, when given, is exactly 6 digits
+      if (formData.userPinCode && !/^\d{6}$/.test(String(formData.userPinCode).trim())) {
+        showNotification('Pin code must be exactly 6 digits', 'error');
+        return;
+      }
+
       // Validate mobile number if provided
       if (formData.userMobileNumber) {
         const mobileStr = String(formData.userMobileNumber).trim();
@@ -168,130 +181,93 @@ const MyProfilePage = () => {
   }, []);
 
   const profileFields = [
-    { label: 'Full Name', name: 'userName', value: formData.userName, type: 'text', icon: 'fa-user' },
-    { label: 'Email Address', name: 'userEmail', value: formData.userEmail, type: 'email', icon: 'fa-envelope', disabled: true },
-    { 
-      label: 'Mobile Number', 
-      name: 'userMobileNumber', 
-      value: formData.userMobileNumber, 
-      type: 'tel', 
-      icon: 'fa-phone', 
-      // Allow editing mobile number for all users (Google OAuth users need to add it, traditional users can update it)
-      disabled: false
-    },
-    { label: 'Pin Code', name: 'userPinCode', value: formData.userPinCode, type: 'text', icon: 'fa-map-pin' },
-    // { label: 'Shipping Address', name: 'userAddress', value: formData.userAddress, type: 'textarea', icon: 'fa-location-dot', fullWidth: true }
+    { label: C.fields.name, name: 'userName', value: formData.userName, type: 'text', autoComplete: 'name' },
+    { label: C.fields.email, name: 'userEmail', value: formData.userEmail, type: 'email', disabled: true },
+    // Mobile is editable for everyone (Google sign-ins need to add it, others can change it)
+    { label: C.fields.mobile, name: 'userMobileNumber', value: formData.userMobileNumber, type: 'tel', inputMode: 'numeric', autoComplete: 'tel-national', placeholder: C.mobileHint },
+    { label: C.fields.pincode, name: 'userPinCode', value: formData.userPinCode, type: 'text', inputMode: 'numeric', autoComplete: 'postal-code', placeholder: C.pincodeHint },
   ];
+  const shownName = formData.userName || user?.name || '';
+  const initial = (shownName || formData.userEmail || 'U').trim().charAt(0).toUpperCase();
 
   return (
-    <div className="bg-paper min-h-screen font-inter text-ink selection:bg-brand selection:text-white">
+    <div className="bg-paper text-ink font-inter selection:bg-brand selection:text-white">
+    <div className="rd-acct">
+      <Suspense fallback={<div className="grid place-items-center py-24"><div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin" /></div>}>
+        <header className="rd-acct-head">
+          <p className="rd-eyebrow font-mono uppercase text-muted">{C.eyebrow}</p>
+          <h1 className="rd-h2 font-archivo text-ink">{C.heading}</h1>
+          <p className="rd-sub font-inter text-muted">{C.sub}</p>
+        </header>
 
-      {/* --- AMBIENT BACKGROUND --- */}
-      <div className="fixed top-0 left-0 w-full h-[600px] bg-gradient-to-b from-surface to-paper pointer-events-none opacity-60"></div>
-      <div className="fixed -bottom-40 -left-40 w-[600px] h-[600px] bg-brand rounded-full blur-[200px] opacity-[0.04] pointer-events-none"></div>
+        <div className="rd-acct-grid">
+          {/* identity + shortcuts */}
+          <aside className="rd-acct-side bg-ink text-paper">
+            <span className="rd-acct-avatar font-archivo" aria-hidden="true">{initial}</span>
+            <p className="rd-acct-name font-archivo text-paper">{shownName || C.noName}</p>
+            {formData.userEmail && <p className="rd-acct-mail font-inter text-paper/60">{formData.userEmail}</p>}
+            <nav className="rd-acct-links" aria-label={C.linksLabel}>
+              {C.links.map((l) => (
+                <Link key={l.to} to={l.to} className="font-mono uppercase text-paper">{l.label} <span aria-hidden="true">→</span></Link>
+              ))}
+            </nav>
+          </aside>
 
-      <main className="max-w-5xl mx-auto pt-28 pb-20 px-4 md:px-8 relative z-10">
-        
-        <Suspense fallback={
-          <div className="flex items-center justify-center py-20">
-            <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin"></div>
-          </div>
-        }>
-        
-        {/* --- HEADER --- */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-brand/20 pb-8 lg:pb-12">
-           <div>
-             <div className="flex items-center gap-3 mb-2">
-                 <span className="h-[1px] w-8 bg-brand"></span>
-                 <span className="gl-lbl text-brand text-[10px]">Profile</span>
-             </div>
-             <h1 className="text-4xl md:text-5xl lg:text-6xl font-archivo font-extrabold text-ink leading-tight">
-               Your <span className="text-brand ">Sanctuary.</span>
-             </h1>
-           </div>
-           
-           <button 
-             onClick={() => isEditing ? handleSave() : setIsEditing(true)}
-             disabled={updating}
-             className={`px-6 md:px-8 py-2.5 md:py-3 rounded-full font-bold uppercase tracking-widest text-[10px] transition-all duration-300 shadow-lg active:scale-95 flex items-center justify-center gap-2 w-full md:w-auto ${
-               isEditing
-                 ? 'bg-brand text-white hover:bg-ink'
-                 : 'bg-surface border border-hair text-ink hover:bg-brand hover:text-white hover:border-brand'
-             } ${updating ? 'opacity-50 cursor-not-allowed' : ''}`}
-           >
-             {updating ? (
-               <>
-                 <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div> 
-                 Saving...
-               </>
-             ) : isEditing ? (
-               <>
-                 <i className="fa-solid fa-check"></i> Save Changes
-               </>
-             ) : (
-               <>
-                 <i className="fa-solid fa-pen"></i> Edit Profile
-               </>
-             )}
-           </button>
-        </div>
-
-        {/* --- PROFILE LAYOUT --- */}
-        <div className="grid grid-cols-1 gap-6">
-
-          {/* Passkey enrollment — enable Face ID / fingerprint sign-in */}
-          <PasskeyEnroll />
-
-          {/* Personal Info Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
-            {profileFields.map((field, idx) => (
-              <div 
-                key={idx} 
-                className={`bg-surface rounded-[24px] p-5 md:p-6 border border-transparent shadow-md hover:shadow-lg transition-all duration-300 group ${
-                  field.fullWidth ? 'md:col-span-2' : ''
-                }`}
-              >
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-8 h-8 rounded-full bg-brand/10 flex items-center justify-center text-brand group-hover:bg-brand group-hover:text-white transition-all">
-                    <i className={`fa-solid ${field.icon} text-[12px]`}></i>
-                  </div>
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-brand">
-                    {field.label}
-                  </label>
-                </div>
-                
-                  {(isEditing && !field.disabled) ? (
-                    field.type === 'textarea' ? (
-                      <textarea
-                        name={field.name}
-                        value={field.value}
-                        onChange={handleInputChange}
-                        className="w-full p-4 bg-white border border-gray-200 rounded-xl focus:border-brand outline-none transition-all text-sm font-medium text-ink resize-none placeholder-gray-400 shadow-inner"
-                        rows="3"
-                      />
-                    ) : (
-                      <input
-                        type={field.type}
-                        name={field.name}
-                        value={field.value}
-                        onChange={handleInputChange}
-                        placeholder={field.name === 'userMobileNumber' ? '10-digit mobile number' : ''}
-                        className="w-full p-4 bg-white border border-gray-200 rounded-xl focus:border-brand outline-none transition-all text-sm font-medium text-ink placeholder-gray-400 shadow-inner"
-                      />
-                    )
-                  ) : (
-                    <div className="min-h-[2.5rem] flex items-center">
-                      <p className={`font-archivo text-base md:text-lg text-ink ${field.name === 'userEmail' ? 'truncate' : ''}`}>
-                        {field.value || <span className="text-gray-400 text-sm italic">Not set</span>}
-                      </p>
-                    </div>
-                  )}
+          <div className="rd-acct-main">
+            {/* details */}
+            <section className="rd-acct-card" aria-label={C.cardTitle}>
+              <div className="rd-acct-card-head">
+                <h2 className="font-mono uppercase text-ink">{C.cardTitle}</h2>
+                {!isEditing && (
+                  <button type="button" onClick={() => setIsEditing(true)} className="rd-acct-btn rd-acct-btn--ghost font-inter">{C.edit}</button>
+                )}
               </div>
-            ))}
+              <div className="rd-acct-fields">
+                {profileFields.map((f) => {
+                  const editable = isEditing && !f.disabled;
+                  const id = `acct-${f.name}`;
+                  return (
+                    <div key={f.name} className="rd-acct-field">
+                      <label htmlFor={editable ? id : undefined} className="rd-acct-label font-mono uppercase text-muted">
+                        {f.label}{f.disabled && <span className="rd-acct-lock"> · {C.locked}</span>}
+                      </label>
+                      {editable ? (
+                        <input
+                          id={id}
+                          type={f.type}
+                          name={f.name}
+                          value={f.value}
+                          onChange={handleInputChange}
+                          placeholder={f.placeholder}
+                          inputMode={f.inputMode}
+                          autoComplete={f.autoComplete}
+                          className="rd-acct-input font-inter text-ink"
+                        />
+                      ) : (
+                        <p className={`rd-acct-value font-archivo ${f.name === 'userEmail' ? 'truncate' : ''}`}>
+                          {f.value || <span className="rd-acct-empty font-inter text-muted">{C.notSet}</span>}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {isEditing && (
+                <div className="rd-acct-actions">
+                  <button type="button" onClick={handleSave} disabled={updating} className="rd-acct-btn rd-acct-btn--solid font-inter">
+                    {updating ? C.saving : C.save}
+                  </button>
+                  <button type="button" onClick={handleCancel} disabled={updating} className="rd-acct-btn rd-acct-btn--ghost font-inter">{C.cancel}</button>
+                </div>
+              )}
+            </section>
+
+            {/* Passkey enrollment - enable Face ID / fingerprint sign-in */}
+            <PasskeyEnroll />
           </div>
         </div>
-        </Suspense>
-      </main>
+      </Suspense>
+    </div>
     </div>
   );
 };

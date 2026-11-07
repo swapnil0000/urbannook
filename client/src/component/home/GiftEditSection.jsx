@@ -3,6 +3,7 @@ import { Reveal, Stagger, StaggerItem } from '../motion';
 import { firstVariant, productImg, productHref, inr } from '../HomeProductCard';
 import { trackSelectItem } from '../../utils/analytics';
 import { GIFT_EDIT as C } from '../../content/homeRedesign';
+import RailProgress from './RailProgress';
 
 const GiftCard = ({ p, index }) => {
   const v = firstVariant(p);
@@ -51,7 +52,7 @@ const GiftEditSection = ({ products, loading }) => {
       </Reveal>
       {loading
         ? <div className="rd-grid">{[...Array(C.max)].map((_, i) => <div key={i} className="rd-card-img bg-hair animate-pulse" />)}</div>
-        : <Stagger className="rd-grid" stagger={0.06}>{list.map((p, i) => <StaggerItem key={p.productId || i}><GiftCard p={p} index={i} /></StaggerItem>)}</Stagger>}
+        : <><Stagger className="rd-grid" stagger={0.06}>{list.map((p, i) => <StaggerItem key={p.productId || i}><GiftCard p={p} index={i} /></StaggerItem>)}</Stagger><RailProgress /></>}
     </section>
   );
 };
