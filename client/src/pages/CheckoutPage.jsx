@@ -35,6 +35,7 @@ import PromotionBannerList from "../component/promotions/PromotionBannerList";
 import GiftClaimList from "../component/promotions/GiftClaimList";
 import { CartGiftProgress } from "../component/offers/CartValueGift";
 import GiftWrapOffer from "../component/GiftWrapOffer";
+import FestiveDelayNote from "../component/FestiveDelayNote";
 import SealBadgeCard, { UnderlineAmount } from "../component/promotions/SealBadgeCard";
 import { useGetCheckoutPromotionsQuery, useGetAvailableCouponsQuery } from "../store/api/userApi";
 import { buildPromotionCartItems } from "../utils/promotionCartItems";
@@ -1804,6 +1805,8 @@ const CheckoutPage = () => {
           <PromotionBannerList promotions={checkoutPromotions} pricing={checkoutPromotionsData?.data?.pricing} />
         </div>
       )}
+      {/* Diwali courier delay - every step, so it's seen before paying */}
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4 empty:hidden"><FestiveDelayNote /></div>
       {/* Cart-value free gift still locked ("add ₹X more") - every step, it's the nudge that grows the order */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4 empty:hidden"><CartGiftProgress promotions={checkoutPromotions} /></div>
       {/* festive gift wrap - shoppers who tap "Go to Checkout" on the product page never see the cart drawer */}

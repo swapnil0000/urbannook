@@ -43,6 +43,7 @@ import { nounOf } from '../../utils/offerName';
 // "Choose …" label from the product itself: Katana (LED and Wooden share designs), Lamp, Figure, Kunai…
 const variantLabel = (name = '') => (/figure|statue/i.test(name) ? 'Figure' : nounOf(name).replace(/^LED\s+/i, ''));
 import ProductQuestions from '../../component/support/ProductQuestions';
+import FestiveDelayNote from '../../component/FestiveDelayNote';
 
 const MotionDiv = motion.div;
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
@@ -791,6 +792,7 @@ const ProductDetailPage = () => {
                 <StockStatus outOfStock={isOutOfStock} left={selectedVariantObj?.variantQuantity} lowAt={5} />
                 {!isOutOfStock && <span className="text-[12px] text-muted"><i className="fa-solid fa-truck-fast mr-1 text-brand" aria-hidden="true" />Ships in 24-48 hrs</span>}
               </div>
+              {!isOutOfStock && <FestiveDelayNote variant="inline" className="mt-1.5" />}
 
               {/* festive gift wrap, offered here too - "Go to Checkout" skips the cart drawer where it used to be the only place */}
               {product?.giftWrapEligible && !isOutOfStock && <GiftWrapOffer variant="card" eligible className="mt-3" />}
