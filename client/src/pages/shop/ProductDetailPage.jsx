@@ -232,7 +232,7 @@ const ProductDetailPage = () => {
     const cat = (product.productCategory || '').toLowerCase();
     const isLamp = cat.includes('lamp');
     const list = [
-      { q: 'How long does delivery take?', a: 'Every piece is 3D-printed to order and ships pan-India within 24-48 hours, with tracking.' },
+      // { q: 'How long does delivery take?', a: 'Every piece is 3D-printed to order and ships pan-India within 24-48 hours, with tracking.' }, // paused: no 24-48 hr promise for now
     ];
     // Answer from the admin "Power Source" spec when set - never guess (not every lamp is USB).
     const powerSpec = [...(product.specifications || []), ...((product.variantDetails || []).flatMap((v) => v.specifications || []))]
@@ -733,7 +733,7 @@ const ProductDetailPage = () => {
                   <p className="text-base md:text-lg font-normal text-muted leading-snug mt-1">{selectedVariantSubTag}</p>
                 )}
                 {/* The badge stands for the real policies in the trust strip below, nothing more */}
-                <span className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1 text-[12px] font-bold text-paper" title="Free replacement if it arrives damaged · ships in 24-48 hrs">
+                <span className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1 text-[12px] font-bold text-paper" title="Free replacement if it arrives damaged">
                   <i className="fa-solid fa-check text-[10px]" aria-hidden="true" /> UrbanNook Assured
                 </span>
               </div>
@@ -783,7 +783,7 @@ const ProductDetailPage = () => {
               {/* real stock for the selected variant ("Only 2 left" at 5 or fewer) + dispatch time */}
               <div className={`mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border px-3 py-2.5 ${isOutOfStock ? 'border-hair bg-white/60' : 'border-save/30 bg-save/10'}`}>
                 <StockStatus outOfStock={isOutOfStock} left={selectedVariantObj?.variantQuantity} lowAt={5} />
-                {!isOutOfStock && <span className="text-[12px] text-muted"><i className="fa-solid fa-truck-fast mr-1 text-brand" aria-hidden="true" />Ships in 24-48 hrs</span>}
+                {/* paused: no 24-48 hr promise for now */}
               </div>
 
               {/* festive gift wrap, offered here too - "Go to Checkout" skips the cart drawer where it used to be the only place */}
@@ -954,9 +954,9 @@ const ProductDetailPage = () => {
 
               {/* trust strip inside the card */}
               <p className="mt-5 text-sm font-bold text-ink">Shop with peace of mind</p>
-              <div className="mt-2.5 grid grid-cols-4 gap-1 text-center">
+              <div className="mt-2.5 grid grid-cols-3 gap-1 text-center">
                 {[
-                  ['fa-truck-fast', 'Dispatch', '24-48 hrs'],
+                  // ['fa-truck-fast', 'Dispatch', '24-48 hrs'], // paused: no 24-48 hr promise for now
                   ['fa-money-bill-wave', 'Payment', product.isCodAvailable ? 'Partial COD' : 'Secure pay'],
                   ['fa-rotate-left', 'Replacement', 'Free if damaged*'],
                   ['fa-location-dot', 'Delivery', 'Pan-India'],
@@ -1033,7 +1033,7 @@ const ProductDetailPage = () => {
                 {product.warranty && <p className="text-muted mt-2 text-sm leading-relaxed"><span className="font-semibold text-ink">Warranty:</span> {product.warranty}</p>}
               </details>
             )}
-            <details className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Shipping &amp; Exchange<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary><p className="text-muted mt-3 text-sm">Made to order, ships pan-India within 24-48 hours. Free replacement if it arrives damaged or wrong .{product.isCodAvailable ? ' Partial COD available.' : ''}</p></details>
+            <details className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Shipping &amp; Exchange<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary><p className="text-muted mt-3 text-sm">Made to order, ships pan-India. Free replacement if it arrives damaged or wrong .{product.isCodAvailable ? ' Partial COD available.' : ''}</p></details>
           </div>
           {product.disclaimer && <p className="text-xs text-faint mt-4 text-center leading-relaxed">{product.disclaimer}</p>}
         </section>

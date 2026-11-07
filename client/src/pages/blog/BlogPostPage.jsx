@@ -264,7 +264,7 @@ const BlogPostPage = () => {
               <div className="flex flex-col gap-3">
                 {picks.map((pick, i) => <PickCard key={pick.key} pick={pick} index={i} listId={listId} listName={listName} />)}
               </div>
-              <p className="text-xs opacity-70 mt-4 leading-relaxed">Gift wrap available · Partial COD · Dispatched in ~48 hours</p>
+              <p className="text-xs opacity-70 mt-4 leading-relaxed">Gift wrap available · Partial COD</p>
             </div>
           </aside>
         )}
