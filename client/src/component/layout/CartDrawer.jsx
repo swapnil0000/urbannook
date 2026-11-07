@@ -14,6 +14,7 @@ import { trackViewCart, trackRemoveFromCart, track } from '../../utils/analytics
 import FreeShippingStrip from '../FreeShippingStrip';
 import OfferProgress from '../festive/OfferProgress';
 import GiftWrapOffer, { GiftWrapLineItem } from '../GiftWrapOffer';
+import FestiveDelayNote from '../FestiveDelayNote';
 import PromotionBannerList from '../promotions/PromotionBannerList';
 import { groupCartByOffer } from '../../utils/cartOfferGroups';
 import { offerName } from '../../utils/offerName';
@@ -414,6 +415,8 @@ const CartDrawer = ({ isOpen, onClose }) => {
             <div className="border-b border-hair mb-2 sm:mb-3 empty:hidden">
               <GiftWrapOffer />
             </div>
+
+            <FestiveDelayNote className="mb-2 sm:mb-3" />
 
             {/* Subtotal / shipping / total folded into one block: the total
                 is what matters, the breakdown sits on one line under it. */}

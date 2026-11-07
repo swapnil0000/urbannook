@@ -67,11 +67,11 @@ const Card = ({ id, title, icon, aside, children, className = "", labelId }) => 
 // ── hero ─────────────────────────────────────────────────────────────────────
 const HERO_TITLE = {
   CONFIRMED: ["Order ", "Confirmed!"], IN_TRANSIT: ["Order ", "On its way"], OUT_FOR_DELIVERY: ["Order ", "Out for delivery"], DELIVERED: ["Order ", "Delivered"],
-  PARTIALLY_DELIVERED: ["Order ", "Partly delivered"], EXCEPTION: ["Delivery ", "Needs attention"], RTO: ["Order ", "Returning to us"],
+  PARTIALLY_DELIVERED: ["Order ", "Partly delivered"], PARTIALLY_SHIPPED: ["Order ", "Partly shipped"], EXCEPTION: ["Delivery ", "Needs attention"], RTO: ["Order ", "Returning to us"],
   CANCELLED: ["Order ", "Cancelled"], PAYMENT_PENDING: ["Payment ", "Pending"], PAYMENT_FAILED: ["Payment ", "Failed"],
 };
-const HERO_ICON = { CONFIRMED: "fa-check", DELIVERED: "fa-check", PARTIALLY_DELIVERED: "fa-truck-fast", IN_TRANSIT: "fa-truck-fast", OUT_FOR_DELIVERY: "fa-truck-fast", PAYMENT_PENDING: "fa-hourglass-half", EXCEPTION: "fa-exclamation", RTO: "fa-rotate-left", CANCELLED: "fa-xmark", PAYMENT_FAILED: "fa-xmark" };
-const LIVE_STAGES = ["CONFIRMED", "IN_TRANSIT", "OUT_FOR_DELIVERY", "PARTIALLY_DELIVERED", "EXCEPTION"];
+const HERO_ICON = { CONFIRMED: "fa-check", DELIVERED: "fa-check", PARTIALLY_DELIVERED: "fa-truck-fast", PARTIALLY_SHIPPED: "fa-truck-fast", IN_TRANSIT: "fa-truck-fast", OUT_FOR_DELIVERY: "fa-truck-fast", PAYMENT_PENDING: "fa-hourglass-half", EXCEPTION: "fa-exclamation", RTO: "fa-rotate-left", CANCELLED: "fa-xmark", PAYMENT_FAILED: "fa-xmark" };
+const LIVE_STAGES = ["CONFIRMED", "IN_TRANSIT", "OUT_FOR_DELIVERY", "PARTIALLY_DELIVERED", "PARTIALLY_SHIPPED", "EXCEPTION"];
 
 const CELEBRATED_KEY = "un_order_celebrated";
 // One quiet pop on the mark, once per order, only right after checkout — never when history is reopened.
@@ -194,7 +194,7 @@ const PANEL = {
   CONFIRMED: ["fa-box", "Your order is being prepared", "We're packing your items. You'll get tracking details once it's dispatched."],
   PAYMENT_PENDING: ["fa-hourglass-half", null, null],
 };
-const PANEL_ICON = { IN_TRANSIT: "fa-truck-fast", OUT_FOR_DELIVERY: "fa-truck-fast", DELIVERED: "fa-box-open", PARTIALLY_DELIVERED: "fa-truck-fast", EXCEPTION: "fa-triangle-exclamation", RTO: "fa-rotate-left" };
+const PANEL_ICON = { IN_TRANSIT: "fa-truck-fast", OUT_FOR_DELIVERY: "fa-truck-fast", DELIVERED: "fa-box-open", PARTIALLY_DELIVERED: "fa-truck-fast", PARTIALLY_SHIPPED: "fa-truck-fast", EXCEPTION: "fa-triangle-exclamation", RTO: "fa-rotate-left" };
 
 const Stepper = ({ steps }) => (
   <ol className="uo-steps" aria-label="Order progress">
@@ -255,6 +255,9 @@ const Shipment = ({ s, index, total }) => {
 
 export const Tracking = ({ view }) => {
   const { timeline, shipments, stage } = view;
+  const pendingItems = view.pendingItems || [];
+  // units no parcel carries yet count as one more parcel to come ("Parcel 1 of 2")
+  const parcelTotal = shipments.length + (pendingItems.length ? 1 : 0);
   if (!timeline && !shipments.length) return null; // cancelled / failed: the header already says so, and there is no journey to draw
   const [icon, head, body] = PANEL[stage.code] || [PANEL_ICON[stage.code] || "fa-box", stage.headline, stage.message];
   return (
@@ -267,7 +270,19 @@ export const Tracking = ({ view }) => {
           <div className="min-w-0"><p className="font-bold text-[14px]">{head || stage.headline}</p><p className="uo-sub mt-0.5">{body || stage.message}</p></div>
         </div>
       )}
-      {shipments.length > 0 && <div className="mt-3 space-y-2.5">{shipments.map((s, i) => <Shipment key={s.id} s={s} index={i} total={shipments.length} />)}</div>}
+      {shipments.length > 0 && (
+        <div className="mt-3 space-y-2.5">
+          {shipments.map((s, i) => <Shipment key={s.id} s={s} index={i} total={parcelTotal} />)}
+          {/* Partial shipment: what hasn't been sent yet, so the customer knows more is coming */}
+          {pendingItems.length > 0 && (
+            <article className="uo-cell" style={{ padding: "12px 14px", borderStyle: "dashed" }}>
+              <p className="font-semibold text-[13px]">Parcel {parcelTotal} of {parcelTotal} · Not shipped yet</p>
+              <p className="mt-1.5 text-[13px]">Still to come: {pendingItems.map((i) => `${i.quantity} × ${i.name}${i.variant ? ` (${i.variant})` : ""}`).join(", ")}</p>
+              <p className="uo-sub mt-1">We&apos;ll ship it separately — its tracking number appears here as soon as it&apos;s on its way.</p>
+            </article>
+          )}
+        </div>
+      )}
     </Card>
   );
 };

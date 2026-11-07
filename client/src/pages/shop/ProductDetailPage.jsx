@@ -43,6 +43,7 @@ import { nounOf } from '../../utils/offerName';
 // "Choose …" label from the product itself: Katana (LED and Wooden share designs), Lamp, Figure, Kunai…
 const variantLabel = (name = '') => (/figure|statue/i.test(name) ? 'Figure' : nounOf(name).replace(/^LED\s+/i, ''));
 import ProductQuestions from '../../component/support/ProductQuestions';
+import FestiveDelayNote from '../../component/FestiveDelayNote';
 
 const MotionDiv = motion.div;
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
@@ -549,7 +550,13 @@ const ProductDetailPage = () => {
 
   // reviews
   const rd = reviewsData?.data || {};
-  const reviews = useMemo(() => rd.reviews || [], [rd.reviews]);
+  // Reviews of the variant on screen first (variantSku is set on reviews the team adds from
+  // the admin's Customer Hub → Reviews); the rest keep their newest-first order.
+  const reviews = useMemo(() => {
+    const list = rd.reviews || [];
+    const sku = selectedVariantObj?.sku;
+    return sku ? [...list].sort((a, b) => (b.variantSku === sku) - (a.variantSku === sku)) : list;
+  }, [rd.reviews, selectedVariantObj?.sku]);
   const avgRating = rd.avgRating || 0;
   const totalReviews = rd.totalReviews || reviews.length;
 
@@ -785,6 +792,7 @@ const ProductDetailPage = () => {
                 <StockStatus outOfStock={isOutOfStock} left={selectedVariantObj?.variantQuantity} lowAt={5} />
                 {/* paused: no 24-48 hr promise for now */}
               </div>
+              {!isOutOfStock && <FestiveDelayNote variant="inline" className="mt-1.5" />}
 
               {/* festive gift wrap, offered here too - "Go to Checkout" skips the cart drawer where it used to be the only place */}
               {product?.giftWrapEligible && !isOutOfStock && <GiftWrapOffer variant="card" eligible className="mt-3" />}
@@ -1156,7 +1164,8 @@ const ProductDetailPage = () => {
                     {imgs.length > 0 && (
                       <div className="flex gap-2 mt-3">{imgs.map((u, i) => <button key={i} onClick={() => setLightbox({ list: imgs, idx: i })} className="w-14 h-14 rounded-lg overflow-hidden border border-hair"><img src={u} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" /></button>)}</div>
                     )}
-                    <p className="mt-3 text-xs font-bold">{rev.userName || 'Customer'}{rev.verified !== false ? ' · Verified' : ''}</p>
+                    <p className="mt-3 text-xs font-bold">{rev.userName || 'Customer'}{rev.verified !== false ? ' · Verified' : ''}{rev.source === 'google' && <span className="font-normal text-muted"> · via Google</span>}</p>
+                    {rev.variant && <p className="text-[11px] text-muted mt-0.5">Bought: {rev.variant}</p>}
                   </div>
                 );
               })}
