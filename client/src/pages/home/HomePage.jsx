@@ -205,7 +205,7 @@ const CoverflowCarousel = ({ images }) => {
 const FAQS = [
   { q: 'Can I customise my piece?', a: "Yes! Every product is 3D-printed to order, so we can tweak the colour or finish, add your initials or a logo, or tailor it to your setup. Just message us before you order and we'll make it yours." },
   { q: 'Do you offer Cash on Delivery (COD)?', a: 'We offer partial COD - pay a small advance online at checkout to confirm the order, and the rest in cash when it arrives. Full COD (no advance) is not available.' },
-  { q: 'How long will my order take?', a: 'Each piece is printed after you order, so it dispatches within ~48 hours and reaches you in 2-7 days depending on your pincode. Pan-India delivery on every order.' },
+  { q: 'How long will my order take?', a: 'Each piece is printed after you order, so it reaches you in 2-7 days depending on your pincode. Pan-India delivery on every order.' },
   { q: 'Can I return it?', a: "We don't accept returns or exchanges for change of mind, colour or preference. If your item arrives damaged, defective or wrong, report it within 3 days with an unboxing video and we'll replace it free." },
   { q: 'What are the products made of?', a: 'Premium PLA + PETG with a signature 3D-printed layer texture and glossy resin detailing - sturdy, lightweight, and built to live on your desk for years.' },
   { q: 'Do you do bulk orders or corporate gifting?', a: "Yes - we love custom bulk and corporate gifting with your branding. Reach out via Contact Us and we'll sort a quote for you." },
