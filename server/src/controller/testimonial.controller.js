@@ -8,6 +8,7 @@ import {
   approveReviewService,
   updateProductReviewService,
 } from "../services/testimonial.service.js";
+import { getGoogleReviewsService } from "../services/googleReviews.service.js";
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
 import { ValidationError } from "../utils/errors.js";
 
@@ -20,6 +21,12 @@ const submitTestimonial = asyncHandler(async (req, res) => {
   const { userName, userRole, userLocation, content, rating, colorTheme, productId, userEmail } = req.body;
   const result = await createTestimonialService({ userName, userRole, userLocation, content, rating, colorTheme, productId, userEmail });
   return res.status(result.statusCode).json(new ApiRes(result.statusCode, result.message, result.data, result.success));
+});
+
+// GET /google-reviews - rating, count and up to 5 reviews from the Google business profile (cached 6 h)
+const getGoogleReviews = asyncHandler(async (_, res) => {
+  const data = await getGoogleReviewsService();
+  return res.status(200).json(new ApiRes(200, "Google reviews", data, true));
 });
 
 // POST /specific/review - submit product review (auth required, multipart/form-data, up to 3 images)
@@ -93,6 +100,7 @@ const handleReviewApproval = asyncHandler(async (req, res) => {
 
 export {
   getTestimonials,
+  getGoogleReviews,
   submitTestimonial,
   submitProductReview,
   updateProductReview,
