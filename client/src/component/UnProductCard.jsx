@@ -49,13 +49,11 @@ const UnProductCard = ({
   showWishlist = true,
   demand = null,
   trendCount = 0, // set by the Trending sort: units sold in 30 days (the sort key) // 'most-bought' | 'trending' (from real sales, see demandChips)
-  recentSalesUnits = 0, // exact 7-day units for this product's top matching variants
   offerLine = null, // [{ text, title }] live combo benefits (utils/productOfferLines.js)
 }) => {
   const v = firstVariant(p);
   const soldOut = allActiveVariantsOOS(p);
   const badge = badgeOverride !== undefined ? badgeOverride : badgeOf(p);
-  const soldLast7Days = Number(recentSalesUnits || 0);
   const img2 = secondImg(p);
   // Struck MRP + % off, same source of truth as ProductCard: the first
   // variant's own variantMrp (never a synthesised markup).
@@ -93,13 +91,11 @@ const UnProductCard = ({
           const chips = [
             demand && (demand === 'most-bought' ? 'Most bought' : trendCount > 0 ? null : 'Trending now'),
             !demand && badge,
-            // one sales line: last 7 days when that number is meaningful, else last 30 days
-            soldLast7Days >= 3 ? `${soldLast7Days.toLocaleString('en-IN')} sold/7d` : trendCount > 0 ? `${trendCount.toLocaleString('en-IN')} sold/30d` : null,
           ].filter(Boolean).slice(0, 2);
           return (
             // row is always rendered (same height with or without chips) so titles line up
             <div className="mb-1.5 flex h-[18px] flex-nowrap gap-1 md:h-5">
-              {chips.map((c) => <span key={c} className={`shrink-0 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-tight md:text-[11px] ${/sold\//.test(c) ? 'bg-brand/10 text-saleDeep' : 'bg-ink text-paper'}`}>{c}</span>)}
+              {chips.map((c) => <span key={c} className={`shrink-0 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-tight md:text-[11px] bg-ink text-paper`}>{c}</span>)}
             </div>
           );
         })()}

@@ -4,7 +4,7 @@
 export const STORE_PROMISES = [
   'Lowest prices since launch',
   '100% happiness guaranteed · free replacement if it arrives damaged',
-  'Ready to ship within 48 hrs',
+  // 'Ready to ship within 48 hrs', // paused: no dispatch-time promise for now
   'Partial COD available',
   'Pan-India delivery',
   'Made in India',
