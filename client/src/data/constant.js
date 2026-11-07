@@ -168,10 +168,11 @@ export const contactPageFaqs = [
         question: "Do you offer custom 3D printed designs?",
         answer: "Yes, we love bringing your ideas to life. Whether it's a specific color variant or a completely bespoke piece, select 'Interior Design' in the form and detail your vision."
     },
-    {
-        question: "How long does standard shipping take?",
-        answer: "All our pieces are made to order to ensure the highest quality. We ship within 24-48 hours of ordering, pan-India."
-    },
+    // paused: no 24-48 hr shipping promise for now
+    // {
+    //     question: "How long does standard shipping take?",
+    //     answer: "All our pieces are made to order to ensure the highest quality. We ship within 24-48 hours of ordering, pan-India."
+    // },
     {
         question: "What is your exchange policy?",
         answer: "We don't accept returns or exchanges for change of mind, colour or preference. If your item arrives damaged, defective or wrong, report it within 3 days with an unboxing video and we'll replace it free."

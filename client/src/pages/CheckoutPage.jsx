@@ -39,7 +39,7 @@ import SealBadgeCard, { UnderlineAmount } from "../component/promotions/SealBadg
 import { useGetCheckoutPromotionsQuery, useGetAvailableCouponsQuery } from "../store/api/userApi";
 import { buildPromotionCartItems } from "../utils/promotionCartItems";
 import useOfferTerms from "../hooks/useOfferTerms";
-import { useShippingDelayNotice } from "../hooks/useShippingDelayNotice";
+import { useShippingDelayNotice, useSiteShippingNotice } from "../hooks/useShippingDelayNotice";
 import { calcLocalDiscount } from "../utils/couponDiscount";
 import { trackBeginCheckout, trackPurchase, trackAddShippingInfo, trackAddPaymentInfo, trackPaymentFailed, trackPaymentModalDismissed, trackCheckoutStep, trackOrderCreated, trackSelectPaymentMethod, trackDeliveryCheck, trackApplyCoupon, trackRemoveCoupon, getFbCookies, getGaIds, getAnonymousId, cacheAddressForCapi, setMetaAdvancedMatching } from "../utils/analytics";
 
@@ -283,6 +283,7 @@ const CheckoutPage = () => {
   const { items: cartItems, selections: cartSelections, giftWrap: giftWrapSelected, giftWrapNoteOptions, claimedGifts } = useSelector((s) => s.cart);
   const { isAuthenticated } = useSelector((s) => s.auth);
   const shippingDelayMessage = useShippingDelayNotice();
+  const siteShipNotice = useSiteShippingNotice();
   const isGuest = !isAuthenticated && !localStorage.getItem("authToken");
   const STEPS = isGuest ? GUEST_STEPS : AUTH_STEPS;
   const paymentCompletedRef = useRef(false);
@@ -1568,6 +1569,7 @@ const CheckoutPage = () => {
           <p className="text-sm text-gray-500 mt-2">
             {unitCount} {unitCount === 1 ? "item" : "items"} ready to go.
           </p>
+          {siteShipNotice && <p className="mt-1 text-[11px] leading-snug text-gray-400">{siteShipNotice}</p>}
           {/* unclaimed free gift: claim it right here before paying */}
           <div className="mt-4 empty:hidden"><GiftClaimList /></div>
 
@@ -1757,6 +1759,11 @@ const CheckoutPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Site-wide shipping note: one small line on every step, gone by itself on its end date (config/siteShippingNotice.js). */}
+      {siteShipNotice && (
+        <p className="max-w-5xl mx-auto px-4 sm:px-6 pt-3 text-center text-[11px] leading-snug text-ink/60">{siteShipNotice}</p>
+      )}
 
       {/* ── Shipping delay notice - Review & Pay step only, while the
           affected product is in cart, auto-hides past its configured expiry
