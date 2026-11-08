@@ -502,6 +502,30 @@ const buildResolutions = (cases) =>
  * @param {Date} [p.now]
  * @param {string} [p.trackUrlTemplate]  customer tracking link with an {awb} placeholder (SHIPMOZO_TRACK_URL)
  */
+// ── team update ───────────────────────────────────────────────────────────
+// A delay update the team sent from the admin (Customer Hub → Delivery follow-up). The admin
+// writes order.customerNotice; `message` is the exact text that went on WhatsApp and email, so
+// the order page says the same thing. Shown only while it still applies.
+const NOTICE_KINDS = ["COURIER_DELAY", "NOT_SHIPPED_DELAY"];
+const NOTICE_MAX_AGE_MS = 30 * 24 * 3600 * 1000;
+
+export const buildNotice = (order, stage, shipments, pending, now = new Date()) => {
+  const n = order.customerNotice;
+  if (!n || !NOTICE_KINDS.includes(n.kind)) return null;
+  const message = cleanText(n.message, 600);
+  const at = iso(n.sentAt);
+  if (!message || !at || new Date(at).getTime() < now.getTime() - NOTICE_MAX_AGE_MS) return null;
+  if (["DELIVERED", "CANCELLED", "PAYMENT_FAILED", "RTO"].includes(stage.code)) return null;
+  if (n.kind === "COURIER_DELAY") {
+    const parcel = n.awb ? shipments.find((s) => s.awb === n.awb) : null;
+    if (parcel && ["delivered", "rto"].includes(parcel.stage)) return null;
+    if (!shipments.some((s) => ["shipped", "in_transit", "out_for_delivery", "exception"].includes(s.stage))) return null;
+  } else if (!pending.length && !shipments.some((s) => s.stage === "preparing")) {
+    return null; // everything it was about has shipped since
+  }
+  return { kind: n.kind, message, at };
+};
+
 export const buildOrderView = ({ order, shipments: records = [], cases = [], now = new Date(), trackUrlTemplate }) => {
   const payment = buildPayment(order, cases);
   const items = buildItems(order);
@@ -533,6 +557,8 @@ export const buildOrderView = ({ order, shipments: records = [], cases = [], now
     // Units no parcel carries yet ("1 × Zoro katana ships separately").
     pendingItems: pending.filter((l) => items[l.index]).map((l) => itemCard(items[l.index], l.qty)),
     timeline,
+    // Delay update from the team, or null (see buildNotice).
+    notice: buildNotice(order, stage, shipments, pending, now),
     delivery: buildDelivery(order),
     cancelledAt: isCancelled(order) ? iso(order.cancelledAt) : null,
     resolutions: buildResolutions(cases),
