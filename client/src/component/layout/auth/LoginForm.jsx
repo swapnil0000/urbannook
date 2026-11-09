@@ -13,8 +13,11 @@ import useFormValidation from '../../../hooks/useFormValidation';
 import { trackLogin, trackLoginFailed } from '../../../utils/analytics';
 import { startAuthentication, browserSupportsWebAuthn } from '@simplewebauthn/browser';
 import { usePasskeyLoginOptionsMutation, usePasskeyLoginVerifyMutation } from '../../../store/api/passkeyApi';
+import { useGetPublicStatsQuery, shownCount } from '../../../store/api/statsApi';
 
 const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
+  // sign-ups minus testers, rounded down (was a hand-typed "500+")
+  const { data: statsRes } = useGetPublicStatsQuery();
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { loginCallback, loginPrefillEmail } = useSelector((state) => state.ui);
@@ -253,7 +256,7 @@ const LoginForm = ({ onClose, onSwitchToSignup, onLoginSuccess }) => {
                         ))}
                     </div>
                     <div>
-                        <p className="text-white text-xs font-bold">Join 500+ Members</p>
+                        <p className="text-white text-xs font-bold">Join {shownCount(statsRes?.data, 'members')}+ Members</p>
                         <p className="text-surface text-[10px] uppercase tracking-widest">Community</p>
                     </div>
                 </div>

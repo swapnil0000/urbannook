@@ -490,3 +490,36 @@ describe("customer, invoice and archive summary", () => {
     expect(view(base({ items, amount: 600 })).itemCount).toBe(60);
   });
 });
+
+describe("delay update from the team (order.customerNotice)", () => {
+  const notice = (over = {}) => ({ kind: "COURIER_DELAY", message: "Your order has been shipped with Delhivery (tracking number AWB123). The courier is taking longer than usual.", awb: "AWB123", sentAt: T("30"), ...over });
+
+  it("shows the exact text the customer got on WhatsApp / email while the parcel is on its way", () => {
+    const v = view(base({ customerNotice: notice() }), [ship()]);
+    expect(v.notice).toEqual({ kind: "COURIER_DELAY", message: notice().message, at: T("30").toISOString() });
+  });
+
+  it("goes away once the parcel is delivered, and never shows on a cancelled order", () => {
+    expect(view(base({ customerNotice: notice() }), [ship({ shipmentStatus: "DELIVERED" })]).notice).toBeNull();
+    expect(view(base({ customerNotice: notice(), resolutionStatus: "CANCELLED" }), [ship()]).notice).toBeNull();
+  });
+
+  it("a courier-delay note never shows on an order that has not shipped", () => {
+    expect(view(base({ customerNotice: notice() }), []).notice).toBeNull();
+  });
+
+  it("a not-shipped note shows while units are waiting and disappears once everything ships", () => {
+    const items = [line("Katana", 1299), line("Stand", 499)];
+    const n = notice({ kind: "NOT_SHIPPED_DELAY", awb: null, message: "Stand x 1 from your order is taking longer than usual to get ready." });
+    const partial = view(base({ items, customerNotice: n }), [ship({ itemQuantities: [{ index: 0, qty: 1 }] })]);
+    expect(partial.notice?.kind).toBe("NOT_SHIPPED_DELAY");
+    const all = view(base({ items, customerNotice: n }), [ship()]);
+    expect(all.notice).toBeNull();
+  });
+
+  it("ignores an old (30+ days), unknown or empty note", () => {
+    expect(view(base({ customerNotice: notice({ sentAt: new Date("2026-09-01T00:00:00Z") }) }), [ship()]).notice).toBeNull();
+    expect(view(base({ customerNotice: notice({ kind: "PROMO" }) }), [ship()]).notice).toBeNull();
+    expect(view(base({ customerNotice: notice({ message: "  " }) }), [ship()]).notice).toBeNull();
+  });
+});

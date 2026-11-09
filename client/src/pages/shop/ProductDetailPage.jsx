@@ -739,10 +739,6 @@ const ProductDetailPage = () => {
                 {selectedVariantSubTag && (
                   <p className="text-base md:text-lg font-normal text-muted leading-snug mt-1">{selectedVariantSubTag}</p>
                 )}
-                {/* The badge stands for the real policies in the trust strip below, nothing more */}
-                <span className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1 text-[12px] font-bold text-paper" title="Free replacement if it arrives damaged">
-                  <i className="fa-solid fa-check text-[10px]" aria-hidden="true" /> UrbanNook Assured
-                </span>
               </div>
               <div className="shrink-0 pt-1 flex items-center gap-2">
                 <button onClick={handleShareClick} aria-label="Share this product" className="w-9 h-9 grid place-items-center rounded-full border border-hair text-ink hover:border-ink transition-colors">
