@@ -13,6 +13,7 @@ import { useGetFeaturedProductsQuery, useGetProductsQuery, useGetHeroBannerQuery
 import HeroBanner from '../../component/HeroBanner';
 import { useGetTestimonialsQuery, useGetGoogleReviewsQuery } from '../../store/api/testimonialsApi';
 import { useGetHomeComboOffersQuery } from '../../store/api/userApi';
+import { useGetPublicStatsQuery, ordersShown, shownCount, shownRating } from '../../store/api/statsApi';
 import { recordOfferInterest } from '../../utils/offerInterest';
 import { trackViewItemList, trackAddToCart } from '../../utils/analytics';
 
@@ -65,14 +66,14 @@ const SecHead = ({ index, kicker, title, onView }) => (
 //   </div>
 // );
 
-/* The middle figure is maintained by hand - bump it when the milestone moves.
-   It used to read "0 - Mass produced", which was meant as a boast about not
-   mass producing but rendered as a large animated zero and simply looked like
-   a number that had failed to load. A "+" is deliberate: the claim stays true
-   as the count grows, so a stale value is never a false one. */
-const STATS = [
+/* The middle figure is live: paid orders from GET /stats/public, rounded down
+   to the hundred (ordersShown). It was typed in by hand and went stale
+   ("900+" with 1000+ orders). It used to read "0 - Mass produced", which
+   rendered as a large animated zero and looked like a number that had failed
+   to load. */
+const statsFor = (orders) => [
   { to: 100, suffix: '%', label: 'Made in India' },
-  { to: 900, suffix: '+', label: 'Orders delivered' },
+  { to: ordersShown(orders), suffix: '+', label: 'Orders placed' },
   { to: 48, suffix: 'h', label: 'To ship' },
 ];
 
@@ -698,6 +699,8 @@ const HomePage = () => {
   const { data: prodRes, isLoading } = useGetProductsQuery({ page: 1, limit: 24 });
   const products = useMemo(() => productList(prodRes), [prodRes]);
   const { data: homeOffersRes } = useGetHomeComboOffersQuery();
+  const { data: statsRes } = useGetPublicStatsQuery();
+  const stats = statsRes?.data;
   const homeOffers = homeOffersRes?.data?.combos || [];
   // Admin-managed hero (Operations Hub → Hero banner). No live slide, or every image broken → the built-in hero below.
   const { data: heroRes } = useGetHeroBannerQuery();
@@ -872,23 +875,24 @@ const HomePage = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-hair">
             <div className="bg-surface px-3 py-3.5 md:py-6 flex flex-col items-center justify-center text-center">
               <div className="flex items-baseline gap-1">
-                <span className="font-archivo text-2xl md:text-4xl font-extrabold text-brand leading-none tabular-nums">4.9</span>
+                <span className="font-archivo text-2xl md:text-4xl font-extrabold text-brand leading-none tabular-nums">{shownRating(stats)}</span>
                 <span className="text-muted text-xs font-bold">/5</span>
               </div>
               <span className="text-star text-[10px] mt-1 tracking-tight">★★★★★</span>
-              <span className="gl-lbl text-[8px] text-faint mt-1">Avg rating</span>
+              <span className="gl-lbl text-[8px] text-faint mt-1">{shownCount(stats, 'totalReviews')}+ reviews</span>
             </div>
             <div className="bg-surface px-3 py-3.5 md:py-6 flex flex-col items-center justify-center text-center">
-              <span className="font-archivo text-2xl md:text-4xl font-extrabold text-brand leading-none">2,000+</span>
-              <span className="gl-lbl text-[8px] text-faint mt-1.5">Desks upgraded</span>
+              <span className="font-archivo text-2xl md:text-4xl font-extrabold text-brand leading-none">{shownCount(stats, 'totalOrders').toLocaleString('en-IN')}+</span>
+              <span className="gl-lbl text-[8px] text-faint mt-1.5">Orders placed</span>
             </div>
             <div className="bg-surface px-3 py-3.5 md:py-6 flex flex-col items-center justify-center text-center">
               <span className="font-archivo text-2xl md:text-4xl font-extrabold text-brand leading-none">100%</span>
               <span className="gl-lbl text-[8px] text-faint mt-1.5">Made in India 🇮🇳</span>
             </div>
             <div className="bg-surface px-3 py-3.5 md:py-6 flex flex-col items-center justify-center text-center">
-              <span className="font-archivo text-2xl md:text-4xl font-extrabold text-brand leading-none">7-Day</span>
-              <span className="gl-lbl text-[8px] text-faint mt-1.5">Easy replacement</span>
+              {/* the Return policy: 3 days from delivery, damaged / defective / wrong items */}
+              <span className="font-archivo text-2xl md:text-4xl font-extrabold text-brand leading-none">3-Day</span>
+              <span className="gl-lbl text-[8px] text-faint mt-1.5">Damage replacement</span>
             </div>
           </div>
           {/* secure-checkout + payment strip */}
@@ -947,7 +951,7 @@ const HomePage = () => {
             <Reveal delay={0.2} className="mt-6 text-paper/70 text-base md:text-lg mx-auto max-w-md">Every piece is 3D-printed the moment you order it - less waste, sharper detail, and a finish you won't find on a shelf.</Reveal>
             <motion.div className="mt-8 h-px w-24 bg-white/30 mx-auto origin-center" initial={{ scaleX: 0 }} whileInView={{ scaleX: 1 }} viewport={{ once: true }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.2 }} />
             <div className="mt-8 grid grid-cols-3 gap-4 max-w-md mx-auto">
-              {STATS.map((s) => (
+              {statsFor(stats?.totalOrders).map((s) => (
                 <div key={s.label}>
                   <div className="font-archivo text-3xl md:text-5xl font-extrabold tracking-tight tabular-nums text-paper"><CountUp to={s.to} suffix={s.suffix} /></div>
                   <div className="gl-lbl text-[9px] mt-1.5 text-paper/50">{s.label}</div>
@@ -1002,7 +1006,7 @@ const HomePage = () => {
       <section className="bg-paper py-4 md:py-20 overflow-hidden">
         <Reveal className="max-w-[1280px] mx-auto px-5 flex items-end justify-between gap-4 mb-8">
           <div>
-            <Kicker>{google?.rating ? `★ ${google.rating.toFixed(1)} on Google · ${google.total} reviews` : '★ 4.9 · 2,000+ Reviews'}</Kicker>
+            <Kicker>{google?.rating ? `★ ${google.rating.toFixed(1)} on Google · ${google.total} reviews` : `★ ${shownRating(stats)} · ${shownCount(stats, 'totalReviews')}+ reviews`}</Kicker>
             <h2 className="font-archivo text-3xl md:text-5xl font-extrabold tracking-tight mt-2">Straight from your desks</h2>
           </div>
           <span className="hidden sm:block gl-lbl text-[10px] text-faint whitespace-nowrap">Hover to pause · zoom · tap to shop</span>
@@ -1046,7 +1050,7 @@ const HomePage = () => {
       <section className="max-w-[820px] mx-auto px-5 py-5 md:py-20 text-center">
         <Kicker className="justify-center mb-3">{isFewProducts ? 'The next drop' : 'Join the list'}</Kicker>
         <TextReveal as="h2" text={isFewProducts ? 'Be first to the next piece' : 'Get first access to drops'} className="font-archivo text-3xl md:text-5xl font-extrabold tracking-tight" />
-        <p className="text-muted mt-4">{isFewProducts ? 'We add new made-to-order pieces often. Join for early access + 10% off your first order.' : 'New pieces land often. Members get early access + 10% off the first order.'}</p>
+        <p className="text-muted mt-4">{/* no first-order discount exists (only flat ₹ coupons) - don't promise one */}{isFewProducts ? 'We add new made-to-order pieces often. Join for early access to new drops and offers.' : 'New pieces land often. Members get early access to new drops and offers.'}</p>
         <form onSubmit={(e) => e.preventDefault()} className="mt-7 flex max-w-md mx-auto rounded-xl overflow-hidden border border-ink bg-white">
           <input type="email" placeholder="Enter your email" className="flex-1 px-4 py-4 text-sm outline-none bg-transparent" />
           <button className="un-btn gl-press bg-brand text-white font-bold text-sm px-7"><span className="un-fill bg-brandHi"></span>Join</button>
