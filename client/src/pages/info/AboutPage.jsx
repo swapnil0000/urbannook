@@ -2,12 +2,13 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { aboutValues } from '../../data/constant';
 import SEOHead from '../../component/SEOHead';
-import { useGetPublicStatsQuery } from '../../store/api/statsApi';
+import { useGetPublicStatsQuery, ordersShown } from '../../store/api/statsApi';
 
 const AboutPage = () => {
   const navigate = useNavigate();
   const { data: statsData } = useGetPublicStatsQuery();
-  const totalOrders = statsData?.data?.totalOrders || 150;
+  // real paid orders, rounded down ("1000+") - it used to add a made-up 350 to a count that was always 0
+  const ordersLabel = `${ordersShown(statsData?.data?.totalOrders)}+`;
 
   useEffect(() => { window.scrollTo(0, 0); }, []);
 
@@ -21,7 +22,7 @@ const AboutPage = () => {
         <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight leading-[1.05] max-w-3xl">Designing calm corners for <span className="text-brand">chaotic lives.</span></h1>
         <p className="text-lg text-muted mt-5 max-w-xl">Your desk should tell the story of who you are - a collection of what you love. We 3D-print that, one piece at a time, in India.</p>
         <div className="mt-8 grid grid-cols-3 gap-4 max-w-lg">
-          {[[`${totalOrders + 350}+`, 'Orders shipped'], ['100%', 'Made in India'], ['In-house', 'Design & print']].map(([n, l]) => (
+          {[[ordersLabel, 'Orders placed'], ['100%', 'Made in India'], ['In-house', 'Design & print']].map(([n, l]) => (
             <div key={l} className="border border-hair rounded-2xl p-4 text-center"><div className="text-2xl md:text-3xl font-extrabold">{n}</div><div className="text-[11px] text-muted mt-1">{l}</div></div>
           ))}
         </div>
@@ -39,7 +40,7 @@ const AboutPage = () => {
           <button onClick={() => navigate('/products')} className="gl-press mt-7 bg-brand text-white font-bold text-sm px-7 py-3.5 rounded-xl hover:bg-brandHi">Shop the collection</button>
         </div>
         <div className="space-y-4">
-          {[['🚚', `${totalOrders + 350}+ successful deliveries`, 'Trusted by homes across India'], ['🔒', '100% secure transactions', 'End-to-end encryption via Razorpay'], ['🛠️', 'In-house design & production', 'Strict QC — never cheap drop-shipping']].map(([e, t, d]) => (
+          {[['🚚', `${ordersLabel} orders placed`, 'Trusted by homes across India'], ['🔒', '100% secure transactions', 'End-to-end encryption via Razorpay'], ['🛠️', 'In-house design & production', 'Strict QC — never cheap drop-shipping']].map(([e, t, d]) => (
             <div key={t} className="border border-hair rounded-2xl p-6 flex gap-4 items-start hover:border-brand transition-colors">
               <span className="text-2xl">{e}</span>
               <div><p className="font-bold">{t}</p><p className="text-sm text-muted mt-1">{d}</p></div>

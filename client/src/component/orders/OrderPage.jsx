@@ -263,6 +263,13 @@ export const Tracking = ({ view }) => {
   return (
     <Card id="tracking" title="Order Tracking" icon="fa-shield-halved" labelId="tracking-h" className="scroll-mt-20">
       {/* No progress line for exceptions or returns — that would be a false normal journey. */}
+      {/* Delay update from the team — the same text the customer got on WhatsApp / email */}
+      {view.notice && (
+        <div className="uo-banner uo-banner-amber mb-3" role="status">
+          <p className="font-bold text-[13px]">Update from Urban Nook · {formatISTDate(view.notice.at)}</p>
+          <p className="mt-1 text-[13px]">{view.notice.message}</p>
+        </div>
+      )}
       {timeline && <Stepper steps={timeline} />}
       {(head || shipments.length === 0) && (
         <div className="uo-panel" style={{ marginTop: timeline ? 18 : 0 }}>
