@@ -77,7 +77,9 @@ const GiftingSection = ({ section }) => {
  */
 const FestiveSections = ({ lead }) => {
   const { active, sections, page } = useSiteCampaign();
-  if (!active || page !== 'home' || sections.length === 0) return <ComboOfferSection lead={lead} />;
+  // Offers follow the admin's festive campaign: outside its live window nothing is shown here.
+  if (!active || page !== 'home') return null;
+  if (sections.length === 0) return <ComboOfferSection lead={lead} />;
 
   return (
     <>

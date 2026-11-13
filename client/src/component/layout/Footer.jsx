@@ -72,7 +72,7 @@ const Footer = () => {
         </div>
       </div>
       <div>
-        <p className="gl-lbl text-white/50 mb-4">Shop</p>
+        <p className="gl-lbl text-white/60 mb-4">Shop</p>
         <ul className="space-y-2 text-sm">
           {categories.map((c) => (
             <li key={c}><Link to={categoryPath(c)} className="hover:text-white">{CATEGORY_LABEL[c] || c}</Link></li>
@@ -82,7 +82,7 @@ const Footer = () => {
         </ul>
       </div>
       <div>
-        <p className="gl-lbl text-white/50 mb-4">Help</p>
+        <p className="gl-lbl text-white/60 mb-4">Help</p>
         <ul className="space-y-2 text-sm">
           <li><a href="/orders" onClick={handleTrackOrderClick} className="hover:text-white cursor-pointer">Track Order</a></li>
           <li><Link to="/return-policy" className="hover:text-white">Shipping & Exchange</Link></li>
@@ -91,28 +91,28 @@ const Footer = () => {
           <li><Link to="/contact-us" className="hover:text-white">Contact</Link></li>
         </ul>
       </div>
-      <div>
-        <p className="gl-lbl text-white/50 mb-4">Newsletter</p>
-        <form onSubmit={handleCommunityJoin} className="flex rounded-lg overflow-hidden bg-white/10">
+      <div className="col-span-2 md:col-span-1">
+        <p className="gl-lbl text-white/60 mb-4">Newsletter</p>
+        <form onSubmit={handleCommunityJoin} className="flex w-full rounded-lg overflow-hidden bg-white/10">
           <input
             type="email"
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             disabled={isSubmitting}
-            className="flex-1 bg-transparent px-3 py-2.5 text-sm outline-none placeholder:text-white/40 disabled:opacity-50"
+            className="min-w-0 flex-1 bg-transparent px-3 py-3 text-base md:text-sm outline-none placeholder:text-white/55 disabled:opacity-50"
           />
           <button
             type="submit"
             disabled={isSubmitting}
-            className="bg-brand px-4 text-sm font-bold text-white hover:bg-brandHi transition-colors disabled:opacity-50"
+            className="shrink-0 bg-brand px-5 text-sm font-bold text-white hover:bg-brandHi transition-colors disabled:opacity-50"
             aria-label="Subscribe"
           >
             {isSubmitting ? '…' : '→'}
           </button>
         </form>
-        <p className="mt-2.5 gl-lbl text-[9px] text-white/35">Monthly updates on drops. No spam, ever.</p>
-        <div className="flex gap-1.5 mt-4 text-[10px] font-bold text-white/50 flex-wrap">
+        <p className="mt-2.5 gl-lbl text-[10px] text-white/60">Monthly updates on drops. No spam, ever.</p>
+        <div className="flex gap-1.5 mt-4 text-[10px] font-bold text-white/70 flex-wrap">
           {['VISA', 'Mastercard', 'UPI', 'RuPay', 'Partial COD'].map((x) => <span key={x} className="border border-white/20 rounded px-1.5 py-0.5">{x}</span>)}
         </div>
       </div>

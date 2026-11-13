@@ -4,6 +4,7 @@ import { asyncHandler } from "../middleware/errorHandler.middleware.js";
 import { NotFoundError } from "../utils/errors.js";
 import { apiCache } from "../module/cache.manager.module.js";
 import { recentSalesByProduct, withRecentSales } from "../utils/productSignals.util.js";
+import { LIST_SELECT, FULL_SELECT } from "../utils/productListFields.util.js";
 
 const productListing = asyncHandler(async (req, res) => {
   const {
@@ -14,6 +15,7 @@ const productListing = asyncHandler(async (req, res) => {
     category,
     subCategory,
     featured,
+    full,
   } = req.query;
 
   const fetcher = async () => {
@@ -24,6 +26,9 @@ const productListing = asyncHandler(async (req, res) => {
     // never belong in the browsable grid - excluded here only; still
     // fetchable directly by ID via specificProductDetails below.
     const query = { isPublished: true, isAddon: { $ne: true } };
+    // Only the plain listing is slimmed (no search / featured / category filters / ?full=1): those are the callers whose
+    // client (productsApi getProducts) already discards the same fields, so what the storefront receives is identical.
+    const slimList = full !== "1" && !search && !featured && !category && !subCategory && !status;
     let sort = { priority: -1, createdAt: -1 }; // admin priority first, then latest
 
     if (search) {
@@ -57,8 +62,9 @@ const productListing = asyncHandler(async (req, res) => {
         .skip((page - 1) * perPage)
         .limit(perPage)
         .sort(sort)
-        // createdAt stays in: the storefront's "New arrivals" sort reads it.
-        .select("-_id -updatedAt -__v")
+        // createdAt stays in: the storefront's "New arrivals" sort reads it. Page-only fields (descriptions,
+        // specifications, packaging) are not read for a list: see utils/productListFields.util.js (?full=1 = everything).
+        .select(slimList ? LIST_SELECT : FULL_SELECT)
         .lean(),
       Product.countDocuments(query),
     ]);

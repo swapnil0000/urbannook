@@ -77,7 +77,7 @@ const RecommendedProducts = ({ products = [], title = "You May Also Like" }) => 
               className="snap-start shrink-0 w-[150px] sm:w-[170px] md:w-[185px]"
             >
               <MinimalCard
-                image={firstVariant?.variantImage?.[0]}
+                image={product.productImg || firstVariant?.variantImage?.[0]}
                 alt={product.productName}
                 title={product.productName}
                 price={price}

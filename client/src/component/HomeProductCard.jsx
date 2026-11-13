@@ -4,7 +4,8 @@ import { trackSelectItem } from '../utils/analytics';
 
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
 const firstVariant = (p) => p?.variantDetails?.[0] || {};
-const productImg = (p) => firstVariant(p)?.variantImage?.[0] || p?.productImg || p?.productImage || '/assets/logo.webp';
+// The admin's main product image first (Products → edit); the first variant's photo only when there is none.
+const productImg = (p) => p?.productImg || p?.productImage || (p?.variantDetails || []).find((v) => v?.variantImage?.[0])?.variantImage?.[0] || '/assets/logo.webp';
 const secondImg = (p) => p?.secondaryImages?.[0] || p?.variantDetails?.[1]?.variantImage?.[0] || null;
 const productHref = (p) => `/products/${p.productId}`;
 const badgeOf = (p) => {
@@ -51,9 +52,9 @@ const HomeProductCard = ({ p, index = 0, listId = 'grid', listName = 'Grid' }) =
         <img src={productImg(p)} alt={p.productName} loading="lazy" className="gl-img w-full h-full object-cover" onError={(e) => { e.currentTarget.src = '/assets/logo.webp'; }} />
         {/* Hover-only image: lazy, so it isn't preloaded or fetched with the page. */}
         {img2 && <img src={img2} alt="" loading="lazy" decoding="async" className="gl-img2 absolute inset-0 w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
-        <div className="absolute bottom-0 right-0 z-10 bg-sale text-white px-1.5 py-1 leading-tight text-right">
-          <div className="gl-lbl text-[5px] opacity-90">Starting at</div>
-          <div className="text-[10px] font-extrabold">{inr(price)}</div>
+        <div className="absolute bottom-0 right-0 z-10 bg-sale text-white px-2 py-1.5 leading-tight text-right">
+          <div className="gl-lbl text-[10px] opacity-90">Starting at</div>
+          <div className="text-[14px] font-extrabold">{inr(price)}</div>
         </div>
       </div>
       <div className="p-3.5 flex flex-col flex-1 min-w-0">

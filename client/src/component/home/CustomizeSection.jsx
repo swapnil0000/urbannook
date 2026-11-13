@@ -9,7 +9,6 @@ const CustomizeSection = () => (
   <section className="rd-gift rd-cust bg-surface text-ink" aria-label="Make it yours">
     <Reveal className="rd-cust-grid">
       <div>
-        <p className="rd-eyebrow font-mono uppercase text-muted">Customization · Made to order</p>
         <TextReveal as="h2" text="Make it yours." className="rd-h2 font-archivo text-ink" />
       </div>
       <div>

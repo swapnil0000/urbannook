@@ -1,6 +1,7 @@
 // Shop grids list one card per sellable variant (gyaanstore-style), so card
 // counts and Availability counts match what a customer can actually buy.
 // Shared by CategoryPage and AllProductsPage.
+import { summarizeProduct } from './collectionSections';
 // One card per sellable variant, linking to that variant's own page - a
 // category with one product and four variants (BMW, Ferrari, …) shows four
 // cards. Variants hidden by admin (isActive:false) are skipped.
@@ -30,3 +31,17 @@ export const toItems = (products = []) => {
   return [...out.filter((x) => !x.soldOut), ...out.filter((x) => x.soldOut)];
 };
 
+
+/**
+ * One item per PARENT product (the Shop All / category-page card), shaped like toItems() so the same filters and sorts
+ * run on it: `price`/`mrp` come from the cheapest buyable variant, `soldOut` = every active variant sold out,
+ * `group` = the product (Type filter). `href` opens the variants page; `ldHref` is the canonical product URL for
+ * structured data. Sold-out products go last (stable otherwise).
+ */
+export const toParentItems = (products = []) => {
+  const out = products.filter(Boolean).map((p) => {
+    const s = summarizeProduct(p);
+    return { key: p.productId, p, parent: true, href: `/products/${p.productId}`, ldHref: `/product/${p.productId}`, soldOut: s.soldOut, price: s.price, mrp: s.mrp, group: p.productName };
+  });
+  return [...out.filter((x) => !x.soldOut), ...out.filter((x) => x.soldOut)];
+};

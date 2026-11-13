@@ -20,5 +20,7 @@ describe('collection tile image candidates', () => {
   it('skips inactive variants and never treats a missing photo as a photo', () => {
     expect(photoOf({ variantDetails: [{ isActive: false, variantImage: ['old.webp'] }, { variantImage: ['live.webp'] }] })).toBe('live.webp');
     expect(photoOf({})).toBe('');
+    // the admin's main product image wins over any variant photo
+    expect(photoOf({ productImg: 'main.webp', variantDetails: [{ variantImage: ['v1.webp'] }] })).toBe('main.webp');
   });
 });

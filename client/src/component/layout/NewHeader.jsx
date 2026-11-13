@@ -33,6 +33,15 @@ const NewHeader = () => {
   const { isAuthenticated, user: authUser } = useAuth();
   const { showLoginModal, loginCallback } = useSelector((state) => state.ui);
   const { showCartModal: showCart, openCart, closeCart } = useUI();
+  // The drawer's hooks fetch offers, coupons, promotions and the catalogue as soon as it mounts, so it is only mounted
+  // once the shopper opens the cart (its code is fetched in an idle moment so the first open is still instant).
+  const [cartUsed, setCartUsed] = useState(false);
+  useEffect(() => { if (showCart) setCartUsed(true); }, [showCart]);
+  useEffect(() => {
+    const warm = () => import('./CartDrawer');
+    if (typeof window.requestIdleCallback === 'function') { const id = window.requestIdleCallback(warm, { timeout: 4000 }); return () => window.cancelIdleCallback?.(id); }
+    const t = setTimeout(warm, 3000); return () => clearTimeout(t);
+  }, []);
   const wishlistItems = useSelector((state) => state.wishlist.items);
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -261,11 +270,13 @@ const NewHeader = () => {
           />
         )}
 
-        <CartDrawer
-          isOpen={showCart}
-          onClose={closeCart}
-          cartItems={cartItems}
-        />
+        {cartUsed && (
+          <CartDrawer
+            isOpen={showCart}
+            onClose={closeCart}
+            cartItems={cartItems}
+          />
+        )}
       </Suspense>
     </>
   );

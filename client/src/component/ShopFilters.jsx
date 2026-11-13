@@ -130,7 +130,7 @@ export const ShopFilterButton = ({ items, filters, setFilters, resultCount }) =>
   const n = activeFilterCount(filters);
   return (
     <div className="lg:hidden">
-      <button type="button" onClick={() => setOpen(true)} className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap border border-hair bg-white px-3 h-10 text-[13px] font-semibold hover:border-ink sm:gap-2 sm:px-4 sm:text-sm">
+      <button type="button" onClick={() => setOpen(true)} className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap border border-hair bg-paper px-3 h-10 rounded-[1px] text-[13px] font-semibold transition-colors hover:border-ink hover:bg-ink hover:text-paper sm:gap-2 sm:px-4 sm:text-sm">
         <i className="fa-solid fa-sliders text-xs" aria-hidden="true" /> Filter{n > 0 ? ` (${n})` : ''}
       </button>
       {open && (
@@ -138,11 +138,11 @@ export const ShopFilterButton = ({ items, filters, setFilters, resultCount }) =>
           <div className="shop-filter-backdrop absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
           <div className="shop-filter-drawer absolute inset-y-0 left-0 w-[86vw] max-w-sm bg-paper p-5 overflow-y-auto flex flex-col">
             <div className="flex items-center justify-between mb-2">
-              <p className="font-extrabold text-lg">Filters</p>
+              <p className="font-archivo text-lg font-semibold tracking-tight">Filters</p>
               <button type="button" onClick={() => setOpen(false)} aria-label="Close filters" className="text-2xl leading-none">×</button>
             </div>
             <div className="flex-1"><Panel items={items} filters={filters} setFilters={setFilters} /></div>
-            <button type="button" onClick={() => setOpen(false)} className="gl-press mt-4 h-12 bg-brand text-white font-bold text-sm rounded-xl">Show {resultCount} {resultCount === 1 ? 'result' : 'results'}</button>
+            <button type="button" onClick={() => setOpen(false)} className="mt-4 h-12 rounded-[1px] bg-ink text-sm font-semibold text-paper transition-colors hover:bg-brandHi">Show {resultCount} {resultCount === 1 ? 'result' : 'results'}</button>
           </div>
         </div>
       )}
@@ -167,7 +167,7 @@ export const ActiveFilterChips = ({ filters, setFilters }) => {
     <div className="mb-3 flex flex-wrap items-center gap-2">
       {chips.map((c) => (
         <button key={c.key} type="button" onClick={() => setFilters({ ...filters, ...c.drop })} aria-label={`Remove filter ${c.label}`}
-          className="inline-flex items-center gap-1.5 rounded-full bg-brand/10 px-3 py-1 text-[12px] font-semibold text-saleDeep hover:bg-brand/20">
+          className="inline-flex items-center gap-1.5 rounded-[1px] border border-hair px-3 py-1.5 text-[12px] font-semibold text-ink transition-colors hover:border-ink hover:bg-ink hover:text-paper">
           {c.label} <span aria-hidden="true">×</span>
         </button>
       ))}

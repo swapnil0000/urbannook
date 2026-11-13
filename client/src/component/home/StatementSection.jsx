@@ -1,7 +1,6 @@
 import { Reveal } from '../motion';
 import CountUp from './CountUp';
 import CoverflowCarousel from './CoverflowCarousel';
-import TrustStrip from './TrustStrip';
 import { STATEMENT as C } from '../../content/homeRedesign';
 import { useSiteStats } from './useSiteStats';
 
@@ -9,25 +8,22 @@ import { useSiteStats } from './useSiteStats';
 const StatementSection = ({ images }) => {
   const stats = useSiteStats(C.stats);
   return (
-  <section className="rd-statement bg-ink text-paper">
+  <section className="rd-statement bg-paper text-ink">
     <div className={`rd-statement-grid${images.length ? '' : ' rd-statement-solo'}`}>
       <Reveal className="rd-statement-copy">
-        <p className="rd-eyebrow font-mono uppercase text-paper/60">{C.index} / {C.eyebrow}</p>
-        <h2 className="rd-st-h2 font-archivo text-paper">{C.heading}</h2>
-        <p className="rd-st-body font-inter text-paper/70">{C.body}</p>
+        <h2 className="rd-st-h2 font-archivo text-ink">{C.heading}</h2>
+        <p className="rd-st-body font-inter text-muted">{C.body}</p>
         {stats.length > 0 && <dl className="rd-st-stats" style={{ gridTemplateColumns: `repeat(${Math.max(stats.length, 1)}, auto)` }}>
           {stats.map((s) => (
             <div key={s.label}>
-              <dt className="rd-st-label font-mono uppercase text-paper/60">{s.label}</dt>
-              <dd className="rd-st-value font-archivo text-paper"><CountUp to={s.value} suffix={s.suffix} decimals={s.decimals} />{s.unit && <span className="rd-st-unit text-paper/60">{s.unit}</span>}</dd>
+              <dt className="rd-st-label font-mono uppercase text-muted">{s.label}</dt>
+              <dd className="rd-st-value font-archivo text-ink"><CountUp to={s.value} suffix={s.suffix} decimals={s.decimals} />{s.unit && <span className="rd-st-unit text-muted">{s.unit}</span>}</dd>
             </div>
           ))}
         </dl>}
       </Reveal>
       {images.length > 0 && <CoverflowCarousel images={images} />}
     </div>
-    {/* proof points live inside the dark band: light figures on ink, a hairline above */}
-    <TrustStrip />
   </section>
   );
 };

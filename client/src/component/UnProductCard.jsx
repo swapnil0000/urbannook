@@ -6,7 +6,8 @@ import { trackSelectItem } from '../utils/analytics';
 
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
 const firstVariant = (p) => p?.variantDetails?.[0] || {};
-const productImg = (p) => firstVariant(p)?.variantImage?.[0] || p?.productImg || p?.productImage || '/assets/logo.webp';
+// The admin's main product image first (Products → edit); the first variant's photo only when there is none.
+const productImg = (p) => p?.productImg || p?.productImage || (p?.variantDetails || []).find((v) => v?.variantImage?.[0])?.variantImage?.[0] || '/assets/logo.webp';
 const secondImg = (p) => p?.secondaryImages?.[0] || p?.variantDetails?.[1]?.variantImage?.[0] || null;
 // Shop grid → variant list → PDP. Tapping a product card opens that
 // product's variant page (/products/:id); the PDP is reached from there, per

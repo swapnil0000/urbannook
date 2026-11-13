@@ -8,12 +8,20 @@ import SEOHead from '../../component/SEOHead';
 import { useSeoContent, faqPageJsonLd } from '../../utils/seoContent';
 import WishlistButton from '../../component/WishlistButton';
 import UnProductCard from '../../component/UnProductCard';
-import RecommendedProducts from '../../component/RecommendedProducts';
-import OtherVariants from '../../component/OtherVariants';
 import NotifyMeModal from '../../component/NotifyMeModal';
+import OtherVariants from '../../component/OtherVariants';
 import ComparisonTable from '../../component/ComparisonTable';
 import ImageCarousel from '../../component/ImageCarousel';
 import CommunityShots from '../../component/CommunityShots';
+import ProductOffers from '../../component/offers/ProductOffers';
+import CouponOffersSection from '../../component/offers/CouponOffersSection';
+import SaleDealBox from '../../component/festive/SaleDealBox';
+import { PDP } from '../../content/pdpContent';
+import ProductGallery from '../../component/pdp/ProductGallery';
+import ReviewsSection from '../../component/pdp/ReviewsSection';
+import Stars from '../../component/pdp/Stars';
+import ReviewPhotoViewer from '../../component/ReviewPhotoViewer';
+import OffersDisclosure from '../../component/pdp/OffersDisclosure';
 import { motion, AnimatePresence } from 'motion/react';
 import { ScrollColorBand, MotionRoot } from '../../component/motion';
 import { variantSku, trackViewItem, trackAddToCart, trackRemoveFromCart, trackAddToWishlist, trackVariantSelect, trackShare, trackDeliveryCheck } from '../../utils/analytics';
@@ -28,16 +36,12 @@ import { useCartData } from '../../hooks/useCartSync';
 import FreeShippingStrip from '../../component/FreeShippingStrip';
 import OfferProgress from '../../component/festive/OfferProgress';
 import { compressImage } from '../../utils/compressImage';
-import ProductOffers from '../../component/offers/ProductOffers';
 import GiftWrapOffer from '../../component/GiftWrapOffer';
-import CouponOffersSection from '../../component/offers/CouponOffersSection';
 import { requestCheckout } from '../../utils/checkoutIntent';
 import { useCartPromotions } from '../../hooks/useCartPromotions';
 import SaleTag from '../../component/festive/SaleTag';
-import SaleDealBox from '../../component/festive/SaleDealBox';
 import StockStatus from '../../component/StockStatus';
 import { shortVariantNames } from '../../utils/variantShortName';
-import ScrollRow from '../../component/ScrollRow';
 import { nounOf } from '../../utils/offerName';
 
 // "Choose …" label from the product itself: Katana (LED and Wooden share designs), Lamp, Figure, Kunai…
@@ -48,10 +52,6 @@ const MotionDiv = motion.div;
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
 const productList = (res) => res?.data?.products || res?.data?.listofPublishedProducts || [];
 const onImgErr = (e) => { e.currentTarget.src = '/assets/logo.webp'; };
-const Stars = ({ n = 5, className = '' }) => {
-  const r = Math.round(n);
-  return <span className={`text-star ${className}`}>{'★'.repeat(Math.max(0, Math.min(5, r)))}{'☆'.repeat(Math.max(0, 5 - r))}</span>;
-};
 
 // Effective per-variant out-of-stock - mirrors the server rule: a manual admin
 // flag, or a tracked quantity (variantQuantity != null) that has reached 0.
@@ -393,6 +393,7 @@ const ProductDetailPage = () => {
     return () => io.disconnect();
   }, [product?.productId]);
 
+  // Lightbox: Escape closes, arrows move between photos.
   const viewedProductRef = useRef(null);
   useEffect(() => {
     if (product && selectedVariant && viewedProductRef.current !== product.productId) {
@@ -560,15 +561,22 @@ const ProductDetailPage = () => {
     return counts;
   }, [reviews]);
 
-  // All customer-uploaded review photos, for the editorial "In the wild" showcase.
-  const communityShots = useMemo(() => {
+  // Every customer-uploaded review photo with its author's comment, for the "In the wild" band.
+  const reviewPhotos = useMemo(() => {
     const shots = [];
     reviews.forEach((r) => {
       const imgs = r.imageUrls?.length ? r.imageUrls : (r.imageUrl ? [r.imageUrl] : []);
       imgs.forEach((u) => shots.push({ url: u, name: r.userName || 'Customer', rating: r.rating, text: r.desc }));
     });
-    return shots.slice(0, 8);
+    return shots;
   }, [reviews]);
+  // Review cards open the viewer on that one review's photos, each showing the same review's name, stars and comment.
+  const openReviewPhoto = (rev, idx) => {
+    const list = (rev.imageUrls?.length ? rev.imageUrls : rev.imageUrl ? [rev.imageUrl] : []).filter(Boolean);
+    const meta = { name: rev.userName || 'Customer', rating: rev.rating, text: rev.desc };
+    setLightbox({ list, meta: list.map(() => meta), idx });
+  };
+  const communityShots = useMemo(() => reviewPhotos.slice(0, 8), [reviewPhotos]);
   // Stable URL array so the carousel doesn't reset every render.
   const communityShotUrls = useMemo(() => communityShots.map((s) => s.url), [communityShots]);
 
@@ -687,357 +695,236 @@ const ProductDetailPage = () => {
   };
 
   return (
-    <div ref={pageRef} className="font-inter bg-paper text-ink min-h-screen overflow-x-clip">
+    <div ref={pageRef} className="pdp font-inter bg-paper text-ink min-h-screen overflow-x-clip">
       <SEOHead title={seoTitle} description={pageDescription} url={seoUrl} image={galleryImages[0]} type="product" structuredData={[structuredData, breadcrumbData, ...(seoFaqs.length ? [faqPageJsonLd(faqs)] : [])]} />
 
-      <div className="max-w-[1280px] mx-auto px-5 py-6 md:py-8">
-        {/* breadcrumb */}
-        <div className="text-sm text-faint mb-5 pt-6 md:pt-4">{/* clears the hanging Diwali lights */}
-          <Link to="/" className="hover:text-brand">Home</Link> / <Link to={product.productCategory ? categoryPath(product.productCategory) : '/products'} className="hover:text-brand">{product.productCategory || 'Shop'}</Link> / {variantCrumb
-            ? <><Link to={`/product/${product.productId}`} className="hover:text-brand">{product.productName}</Link> / <span className="text-ink">{variantCrumb}</span></>
-            : <span className="text-ink">{product.productName}</span>}
-        </div>
+      <div className="pdp-wrap">
+        <nav className="pdp-crumb" aria-label="Breadcrumb">
+          <Link to="/">Home</Link> / <Link to={product.productCategory ? categoryPath(product.productCategory) : '/products'}>{product.productCategory || 'Shop'}</Link> / {variantCrumb
+            ? <><Link to={`/product/${product.productId}`}>{product.productName}</Link> / <span aria-current="page">{variantCrumb}</span></>
+            : <span aria-current="page">{product.productName}</span>}
+        </nav>
 
-        <div className="grid lg:grid-cols-2 gap-8 lg:gap-10">
-          {/* GALLERY - one big full-width framed image (swipe + dots on mobile, arrows on desktop) */}
-          <div className="lg:sticky lg:top-24 self-start w-full min-w-0">
-            <ImageCarousel priority images={galleryImages} alt={(i) => `${imageTitle} - photo ${i + 1}`} onImgErr={onImgErr} onItemClick={(i) => setLightbox({ list: galleryImages, idx: i })} />
-          </div>
+        <div className="pdp-grid">
+          {/* GALLERY - a stable main photo (no auto-advance), thumbnails on desktop, swipe + dots on a phone */}
+          <ProductGallery
+            key={selectedVariant || 'default'}
+            images={galleryImages}
+            alt={(i) => `${imageTitle} - photo ${i + 1}`}
+            onImgErr={onImgErr}
+            onOpen={(i) => setLightbox({ list: galleryImages, idx: i })}
+          />
 
-          {/* INFO */}
-          <div className="min-w-0">
-            {/* ZONE A - IDENTITY (on paper): kicker + rating chip, title + heart, lede */}
-            <div className="flex items-center justify-between gap-3">
-              <p className="gl-lbl text-ink border border-ink/25 px-3 py-1.5">{product.productSubCategory || product.productCategory || '3D Printed'}</p>
-              {totalReviews > 0 && avgRating > 0 && (
-                <button onClick={() => document.getElementById('reviews')?.scrollIntoView({ behavior: 'smooth' })} className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-hair px-2.5 py-1 hover:border-ink transition-colors">
-                  <Stars n={avgRating} className="text-xs" />
-                  <span className="text-xs font-bold text-ink">{Number(avgRating).toFixed(1)}</span>
-                  <span className="text-xs text-muted">({totalReviews})</span>
-                </button>
-              )}
-            </div>
-            <div className="flex items-start justify-between gap-3 mt-2">
-              <div className="min-w-0">
-                {/* No line-clamp - a long name used to get cut off with an
-                    ellipsis after 2 lines on mobile. min-h is a MINIMUM, not
-                    a cap, so it still keeps short titles' height consistent
-                    without truncating a longer one. */}
-                <h1 className="text-[26px] md:text-4xl font-extrabold tracking-tight text-ink leading-tight min-h-[26px] md:min-h-[20px]">
-                  {heading}
-                </h1>
-                {heading !== (selectedVariant || product.productName) && selectedVariant && (
-                  <p className="text-base md:text-lg font-semibold text-ink leading-snug mt-1">{selectedVariant}</p>
-                )}
-                {selectedVariantSubTag && (
-                  <p className="text-base md:text-lg font-normal text-muted leading-snug mt-1">{selectedVariantSubTag}</p>
-                )}
-                {/* The badge stands for the real policies in the trust strip below, nothing more */}
-                <span className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1 text-[12px] font-bold text-paper" title="Free replacement if it arrives damaged">
-                  <i className="fa-solid fa-check text-[10px]" aria-hidden="true" /> UrbanNook Assured
-                </span>
-              </div>
-              <div className="shrink-0 pt-1 flex items-center gap-2">
-                <button onClick={handleShareClick} aria-label="Share this product" className="w-9 h-9 grid place-items-center rounded-full border border-hair text-ink hover:border-ink transition-colors">
-                  <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="m8.7 13.5 6.6 3.9M15.3 6.6 8.7 10.5" /></svg>
+          {/* BUY COLUMN: identity → price → design → stock → buttons → assurances → offers → optional extras */}
+          <div className="pdp-buy">
+            <div className="pdp-id">
+              <p className="pdp-eyebrow font-mono uppercase">{product.productSubCategory || product.productCategory || '3D Printed'}</p>
+              <div className="pdp-tools">
+                <button type="button" onClick={handleShareClick} aria-label="Share this product" className="pdp-tool">
+                  <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="m8.7 13.5 6.6 3.9M15.3 6.6 8.7 10.5" /></svg>
                 </button>
                 <WishlistButton productId={product.productId} />
               </div>
             </div>
+
+            <h1 className="pdp-title font-archivo text-ink">{heading}</h1>
+            {heading !== (selectedVariant || product.productName) && selectedVariant && <p className="pdp-sub font-semibold text-ink">{selectedVariant}</p>}
+            {selectedVariantSubTag && <p className="pdp-sub">{selectedVariantSubTag}</p>}
             {showShare && (
-              <div className="flex items-center gap-2 mt-3">
-                <span className="text-xs font-bold text-muted mr-1">Share:</span>
-                <button onClick={() => openShare('whatsapp', `https://api.whatsapp.com/send?text=${encodeURIComponent(`${shareText} ${shareUrl}`)}`)} aria-label="Share on WhatsApp" className="w-9 h-9 grid place-items-center rounded-full border border-hair text-ink hover:border-ink hover:bg-surface transition-colors"><i className="fa-brands fa-whatsapp text-base" /></button>
-                <button onClick={() => openShare('facebook', `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`)} aria-label="Share on Facebook" className="w-9 h-9 grid place-items-center rounded-full border border-hair text-ink hover:border-ink hover:bg-surface transition-colors"><i className="fa-brands fa-facebook-f text-sm" /></button>
-                <button onClick={() => openShare('x', `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`)} aria-label="Share on X" className="w-9 h-9 grid place-items-center rounded-full border border-hair text-ink hover:border-ink hover:bg-surface transition-colors"><i className="fa-brands fa-x-twitter text-sm" /></button>
-                <button onClick={() => openShare('instagram', 'https://www.instagram.com/urbannook.store')} aria-label="Instagram" className="w-9 h-9 grid place-items-center rounded-full border border-hair text-ink hover:border-ink hover:bg-surface transition-colors"><i className="fa-brands fa-instagram text-base" /></button>
-                <button onClick={copyShareLink} aria-label="Copy link" className="w-9 h-9 grid place-items-center rounded-full border border-hair text-ink hover:border-ink hover:bg-surface transition-colors"><i className="fa-solid fa-link text-xs" /></button>
+              <div className="flex flex-wrap items-center gap-2 mt-3">
+                <span className="text-xs font-semibold text-muted mr-1">Share:</span>
+                <button type="button" onClick={() => openShare('whatsapp', `https://api.whatsapp.com/send?text=${encodeURIComponent(`${shareText} ${shareUrl}`)}`)} aria-label="Share on WhatsApp" className="pdp-tool"><i className="fa-brands fa-whatsapp text-base" /></button>
+                <button type="button" onClick={() => openShare('facebook', `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`)} aria-label="Share on Facebook" className="pdp-tool"><i className="fa-brands fa-facebook-f text-sm" /></button>
+                <button type="button" onClick={() => openShare('x', `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`)} aria-label="Share on X" className="pdp-tool"><i className="fa-brands fa-x-twitter text-sm" /></button>
+                <button type="button" onClick={() => openShare('instagram', 'https://www.instagram.com/urbannook.store')} aria-label="Instagram" className="pdp-tool"><i className="fa-brands fa-instagram text-base" /></button>
+                <button type="button" onClick={copyShareLink} aria-label="Copy link" className="pdp-tool"><i className="fa-solid fa-link text-xs" /></button>
               </div>
             )}
-            {/* {displayDescription && <p className="text-xs text-muted leading-relaxed mt-2">{displayDescription}</p>} */}
 
-            {/* ZONE B - BUY CARD: price → savings → variants → urgency → CTA → trust, one unit.
-                py only, no px: the horizontal p-4/p-5 used to indent this
-                whole block (price, buttons, trust strip) further right than
-                Zone A's title/kicker above it, which sit with no padding of
-                their own - everything below looked shifted right instead of
-                lining up to the same left edge. Vertical spacing is kept. */}
-            <div className="mt-1  bg-paper  md:max-w-md">
-              {/* price hero */}
-              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
-                <span className="text-4xl md:text-5xl font-extrabold text-ink tracking-tight tabular-nums leading-none">{inr(currentPrice)}</span>
-                {discountPercent > 0 && <span className="text-base md:text-lg text-faint line-through tabular-nums">{inr(maxVariantPrice)}</span>}
-                {discountPercent > 0 && <span className="rounded-full bg-sale px-2.5 py-1 text-[12px] font-extrabold leading-none text-white">{discountPercent}% OFF</span>}
-                <SaleTag />
+            {/* one row: price (left, % off over the struck MRP beside it) and the rating (right) */}
+            <div className="pdp-priceRow">
+              <div className="pdp-price">
+                <span className="pdp-price-now font-archivo">{inr(currentPrice)}</span>
+                {discountPercent > 0 && (
+                  <span className="pdp-price-stack">
+                    <span className="pdp-price-off font-mono">{discountPercent}% off</span>
+                    <span className="pdp-price-mrp">{inr(maxVariantPrice)}</span>
+                  </span>
+                )}
               </div>
-              {discountPercent > 0 && <p className="text-sm font-semibold text-save mt-1.5">You save {inr(maxVariantPrice - currentPrice)}</p>}
-              {pdpPromos.length > 0 && (
-                <button type="button" onClick={() => document.getElementById('pdp-offers')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-                  className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-bold text-brand underline underline-offset-2">
-                  {pdpPromos.length > 1 ? `${pdpPromos.length} offers on this product` : '1 offer on this product'} ↓
+              {totalReviews > 0 && avgRating > 0 && (
+                <button type="button" onClick={() => document.getElementById('reviews')?.scrollIntoView({ behavior: 'smooth' })} className="pdp-rate" aria-label={`Rated ${Number(avgRating).toFixed(1)} out of 5 from ${totalReviews} reviews. Go to reviews`}>
+                  <Stars n={avgRating} className="text-sm" />
+                  <span className="pdp-rate-text"><b>{Number(avgRating).toFixed(1)}</b> · {totalReviews}+ reviews</span>
                 </button>
               )}
-              {/* prices are GST-inclusive (the order page says "Incl. GST" too) */}
-              <p className="text-xs text-muted mt-1">Inclusive of all taxes</p>
+            </div>
+            <p className="pdp-tax">{PDP.tax}{discountPercent > 0 && <> · You save {inr(maxVariantPrice - currentPrice)}</>}</p>
+            <SaleTag className="pdp-saletag" />
 
-              {/* real stock for the selected variant ("Only 2 left" at 5 or fewer) + dispatch time */}
-              <div className={`mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border px-3 py-2.5 ${isOutOfStock ? 'border-hair bg-white/60' : 'border-save/30 bg-save/10'}`}>
-                <StockStatus outOfStock={isOutOfStock} left={selectedVariantObj?.variantQuantity} lowAt={5} />
-                {/* paused: no 24-48 hr promise for now */}
-              </div>
+            <VersionPicker
+              variant={selectedVariantObj}
+              onOpen={(t) => navigate(t.sku ? `/product/${t.productId}/${t.sku}` : `/products/${t.productId}`, { state: { keepScroll: true } })}
+            />
 
-              {/* festive gift wrap, offered here too - "Go to Checkout" skips the cart drawer where it used to be the only place */}
-              {product?.giftWrapEligible && !isOutOfStock && <GiftWrapOffer variant="card" eligible className="mt-3" />}
+            {/* real stock for the selected design ("Only 2 left" at 5 or fewer) */}
+            <div className="pdp-stock">
+              <StockStatus outOfStock={isOutOfStock} left={selectedVariantObj?.variantQuantity} lowAt={5} />
+            </div>
+            {product?.giftWrapEligible && !isOutOfStock && <GiftWrapOffer variant="card" eligible className="mt-3" />}
 
-              {/* variants */}
-              {availableVariants.length > 0 && (
+            {/* BUY BUTTONS */}
+            <div ref={buyBoxRef} className="pdp-cta">
+              {isOutOfStock ? (
+                <button type="button" onClick={() => setShowNotifyModal(true)} className="pdp-btn pdp-btn--ghost">
+                  <i className="fa-regular fa-bell text-xs" aria-hidden="true" /> Notify me when back
+                </button>
+              ) : isInCart ? (
                 <>
-                  <div className="my-4" />
-
-                  {/* Picture swatches with the picked design's name on the label
-                      row. Each tile is a real link to that variant's own URL
-                      (crawlable); a normal click stays on this page and swaps
-                      the variant in place via onSelectVariant. The row scrolls
-                      rather than wraps, so many variants stay one line. */}
-                  {/* Designs as plain name pills: each design (Insoku, Rengoku…) is its
-                      own piece, so photo tiles labelled "Variant" misled shoppers.
-                      Real links to each design's URL; a click swaps in place. */}
-                  {activeVariants.length > 1 && (
-                    <div>
-                      <p className="font-archivo text-[14px] font-bold text-ink">{activeVariants.some((v) => v.variantSwatchType === 'color') ? 'Colour' : variantLabel(product.productName)}: <span className="font-semibold text-ink/70">{shortNames.get(selectedVariant) || selectedVariant}</span></p>
-                      {/* one swipeable row (in stock first, sold out after) instead of a wall of pills */}
-                      <ScrollRow className="mt-2.5" fade="from-paper" activeKey={selectedVariant}>
-                        {[...activeVariants].sort((a, b) => Number(isVariantOutOfStock(a)) - Number(isVariantOutOfStock(b))).map((v) => {
-                          const on = v.variantName === selectedVariant;
-                          const oos = isVariantOutOfStock(v);
-                          return (
-                            <Link key={v.sku || v.variantName}
-                              to={v.sku ? `/product/${product.productId}/${v.sku}` : `/product/${product.productId}`}
-                              onClick={(e) => { e.preventDefault(); onSelectVariant(v); }}
-                              aria-current={on ? 'true' : undefined} title={v.variantName}
-                              className={`shrink-0 whitespace-nowrap rounded-full border px-3.5 py-2 font-archivo text-[13px] leading-none transition-colors ${on ? 'border-ink bg-ink font-bold text-paper' : 'border-hair bg-white font-semibold text-ink hover:border-ink'} ${oos ? 'text-muted line-through' : ''}`}>
-                              {shortNames.get(v.variantName) || v.variantName}
-                            </Link>
-                          );
-                        })}
-                      </ScrollRow>
-                    </div>
-                  )}
+                  <div className="pdp-qty">
+                    <button type="button" onClick={() => handleUpdateQty(currentCartQty - 1)} aria-label={currentCartQty > 1 ? 'Decrease quantity' : 'Remove from cart'}>−</button>
+                    <span aria-live="polite">{currentCartQty}</span>
+                    <button type="button" onClick={() => handleUpdateQty(currentCartQty + 1)} aria-label="Increase quantity">+</button>
+                  </div>
+                  <button type="button" onClick={handleCheckoutClick} className="pdp-btn pdp-btn--solid">View offers &amp; checkout</button>
+                </>
+              ) : (
+                <>
+                  <button type="button" onClick={() => handleInitialAddToCart()} disabled={isAdding} className="pdp-btn pdp-btn--ghost">Add to Cart</button>
+                  <button type="button" onClick={handleBuyNow} disabled={isAdding} className="pdp-btn pdp-btn--solid">{isAdding ? 'Please wait…' : 'Buy Now'}</button>
                 </>
               )}
-
-              <VersionPicker
-                variant={selectedVariantObj}
-                onOpen={(t) => navigate(t.sku ? `/product/${t.productId}/${t.sku}` : `/products/${t.productId}`, { state: { keepScroll: true } })}
-              />
-
-              {/* urgency + delivery */}
-              {/* <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs mt-4">
-                {isOutOfStock ? (
-                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-faint" /><span className="text-muted font-semibold">Out of stock</span></span>
-                ) : selectedVariantLowStock && selectedVariantQty !== 1 ? (
-                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-brand animate-pulse" /><span className="text-brand font-semibold">Few left - selling fast</span></span>
-                ) : (
-                  <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-save" /><span className="text-ink font-semibold">In stock</span></span>
-                )}
-                <span className="text-muted"><i className="fa-solid fa-truck-fast mr-1" aria-hidden="true" />Ships in 24-48 hrs</span>
-              </div> */}
-
-              {/* CTA */}
-              <div ref={buyBoxRef} className="flex items-center gap-3 mt-4">
-                {isOutOfStock ? (
-                  <button
-                    onClick={() => setShowNotifyModal(true)}
-                    className="gl-press flex-1 h-12 border border-ink text-ink font-bold text-sm rounded-xl hover:bg-ink hover:text-paper transition-colors flex items-center justify-center gap-2"
-                  >
-                    <i className="fa-regular fa-bell text-xs" /> Notify me when back
-                  </button>
-                ) : isInCart ? (
-                  <>
-                    <div className="flex items-center border border-ink rounded-xl h-12 shrink-0">
-                      <button onClick={() => handleUpdateQty(currentCartQty - 1)} className="w-10 h-full text-lg">−</button>
-                      <span className="w-8 text-center font-bold">{currentCartQty}</span>
-                      <button onClick={() => handleUpdateQty(currentCartQty + 1)} className="w-10 h-full text-lg">+</button>
-                    </div>
-                    <button onClick={handleCheckoutClick} className="gl-press flex-1 h-12 bg-brand text-paper font-bold text-sm rounded-xl hover:bg-brandHi">View offers & checkout</button>
-                  </>
-                ) : (
-                  <>
-                    <button onClick={() => handleInitialAddToCart()} disabled={isAdding} className="gl-press flex-1 h-12 border border-ink text-ink font-bold text-sm rounded-xl hover:bg-ink hover:text-paper transition-colors disabled:opacity-60 whitespace-nowrap">
-                      Add to Cart
-                    </button>
-                    <button onClick={handleBuyNow} disabled={isAdding} className="gl-press flex-1 h-12 bg-brand text-paper font-bold text-sm rounded-xl hover:bg-brandHi disabled:opacity-60 whitespace-nowrap">
-                      {isAdding ? 'Please wait…' : 'Buy Now'}
-                    </button>
-                  </>
-                )}
-              </div>
-
-              {/* Free-shipping threshold, right under the CTA where the buy
-                  decision happens - hidden unless admin's promotion is on. */}
-              {!isOutOfStock && <OfferProgress location="product" className="mt-3" fallback={<FreeShippingStrip cartTotal={cartTotal} variant="compact" className="mt-3" />} />}
-
-              {/* questions right by the buy buttons - straight to our WhatsApp, with this product's link */}
-              <ProductQuestions productName={product.productName} variantName={selectedVariant} url={shareUrl} className="mt-3" />
-
-              {/* Offers right under the buy buttons - price and variants stay clean
-                  up top; the offers popup (OffersPopup) announces them on arrival. */}
-              {/* live sale countdown right above the offers it belongs to */}
-              <SaleDealBox className="mt-4" />
-              <div id="pdp-offers" className="scroll-mt-24" />
-              <ProductOffers productId={productId} className="mt-3" cartTotal={cartTotal} appliedIds={appliedOfferIds} cartPromotions={cartPromotions} onApply={isOutOfStock ? undefined : handleApplyOffer} disabled={isAdding} />
-
-              {/* Coupons (guest list is server-rendered; see entry-server.jsx) */}
-              <CouponOffersSection variant="pdp" />
-
-              {/* Customization - admin opt-in per product (product.isCustomizable),
-                  not every product is customisable. Carries the product (and the
-                  variant they are looking at) through so the request form
-                  arrives prefilled. */}
-              {product.isCustomizable && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigate(
-                      `/customize?product=${encodeURIComponent(product.productId)}${
-                        selectedVariant ? `&variant=${encodeURIComponent(selectedVariant)}` : ''
-                      }`,
-                    )
-                  }
-                  className="mt-4 w-full flex items-center justify-between gap-3 border border-hair bg-white px-4 py-3 rounded-xl hover:border-ink transition-colors text-left"
-                >
-                  <span className="min-w-0">
-                    <span className="block text-sm font-bold text-ink">Want it customised?</span>
-                    <span className="block text-xs text-muted mt-0.5">
-                      Different colour, your name on it, or your own livery.
-                    </span>
-                  </span>
-                  <span className="gl-lbl text-[10px] text-brand shrink-0">Ask us →</span>
-                </button>
-              )}
-
-              {/* pincode delivery check */}
-              {/* <div className="mt-4 pt-4 border-t border-hair">
-                <p className="gl-lbl text-ink mb-2">Check delivery</p>
-                <div className="flex gap-2">
-                  <input
-                    type="tel"
-                    inputMode="numeric"
-                    maxLength={6}
-                    value={pinInput}
-                    onChange={(e) => { setPinInput(e.target.value.replace(/\D/g, '').slice(0, 6)); if (pinStatus) setPinStatus(null); }}
-                    onKeyDown={(e) => e.key === 'Enter' && !isCheckingPin && pinInput.length === 6 && handlePinCheck()}
-                    placeholder="Enter 6-digit pincode"
-                    className="flex-1 min-w-0 h-11 px-3.5 rounded-xl border border-hair bg-white text-sm text-ink outline-none focus:border-brand tabular-nums"
-                  />
-                  <button
-                    onClick={handlePinCheck}
-                    disabled={isCheckingPin || pinInput.length !== 6}
-                    className="gl-press h-11 px-5 rounded-xl border border-ink text-ink font-bold text-sm hover:bg-ink hover:text-paper transition-colors disabled:opacity-40 shrink-0"
-                  >
-                    {isCheckingPin ? 'Checking…' : 'Check'}
-                  </button>
-                </div>
-                {pinStatus && (
-                  pinStatus.ok ? (
-                    <div className="mt-2 text-sm font-semibold text-save">
-                      ✓ {pinStatus.msg}
-                      <span className="block text-xs font-medium text-muted mt-0.5">
-                        Expected delivery by {pinStatus.eta}{pinStatus.charge != null && <> · Shipping {inr(pinStatus.charge)}</>}
-                      </span>
-                    </div>
-                  ) : (
-                    <p className="mt-2 text-sm font-semibold text-brand">✕ {pinStatus.msg}</p>
-                  )
-                )}
-              </div> */}
-
-              {/* trust strip inside the card */}
-              <p className="mt-5 text-sm font-bold text-ink">Shop with peace of mind</p>
-              <div className="mt-2.5 grid grid-cols-3 gap-1 text-center">
-                {[
-                  // ['fa-truck-fast', 'Dispatch', '24-48 hrs'], // paused: no 24-48 hr promise for now
-                  ['fa-money-bill-wave', 'Payment', product.isCodAvailable ? 'Partial COD' : 'Secure pay'],
-                  ['fa-rotate-left', 'Replacement', 'Free if damaged*'],
-                  ['fa-location-dot', 'Delivery', 'Pan-India'],
-                ].map(([icon, title, sub]) => (
-                  <div key={title} className="flex flex-col items-center gap-1">
-                    <span className="grid h-11 w-11 place-items-center rounded-full border border-hair bg-white text-ink"><i className={`fa-solid ${icon} text-[15px]`} aria-hidden="true" /></span>
-                    <span className="text-[11.5px] font-bold text-ink">{title}</span>
-                    <span className="text-[10.5px] leading-tight text-muted">{sub}</span>
-                  </div>
-                ))}
-              </div>
-              <p className="mt-1.5 text-[8px] text-faint text-center">
-                *Applicable only with an unboxing video showing the damaged product and its shipping label.
-              </p>
             </div>
 
-            {/* OFFERS - UPI / EMI / card offers, applied via Razorpay at checkout */}
-            {/* <div className="mt-4 rounded-2xl border border-hair bg-white p-4 md:max-w-md">
-              <div className="flex items-center justify-between mb-3">
-                <p className="gl-lbl text-brand">Available offers</p>
-                <span className="text-[10px] font-bold text-muted uppercase tracking-wider">Powered by Razorpay</span>
+            {/* free-shipping threshold (admin's promotion), right under the buttons */}
+            {!isOutOfStock && <OfferProgress location="product" className="mt-3" fallback={<FreeShippingStrip cartTotal={cartTotal} variant="compact" className="mt-3" />} />}
+
+            {/* questions right by the buy buttons - straight to our WhatsApp, with this product's link */}
+            <ProductQuestions productName={product.productName} variantName={selectedVariant} url={shareUrl} className="mt-3" />
+
+            {/* Offers right under the buy buttons - price and variants stay clean
+                up top; the offers popup (OffersPopup) announces them on arrival. */}
+            {/* live sale countdown right above the offers it belongs to */}
+            <SaleDealBox className="mt-4" />
+            <div id="pdp-offers" className="scroll-mt-24" />
+            <ProductOffers productId={productId} className="mt-3" cartTotal={cartTotal} appliedIds={appliedOfferIds} cartPromotions={cartPromotions} onApply={isOutOfStock ? undefined : handleApplyOffer} disabled={isAdding} />
+
+            {/* Coupons (guest list is server-rendered; see entry-server.jsx) */}
+            <CouponOffersSection variant="pdp" />
+
+            {/* Customization - admin opt-in per product (product.isCustomizable),
+                not every product is customisable. Carries the product (and the
+                variant they are looking at) through so the request form
+                arrives prefilled. */}
+            {product.isCustomizable && (
+              <button
+                type="button"
+                onClick={() =>
+                  navigate(
+                    `/customize?product=${encodeURIComponent(product.productId)}${
+                      selectedVariant ? `&variant=${encodeURIComponent(selectedVariant)}` : ''
+                    }`,
+                  )
+                }
+                className="mt-4 w-full flex items-center justify-between gap-3 border border-hair bg-white px-4 py-3 rounded-xl hover:border-ink transition-colors text-left"
+              >
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold text-ink">Want it customised?</span>
+                  <span className="block text-xs text-muted mt-0.5">
+                    Different colour, your name on it, or your own livery.
+                  </span>
+                </span>
+                <span className="gl-lbl text-[10px] text-brand shrink-0">Ask us →</span>
+              </button>
+            )}
+
+            {/* pincode delivery check */}
+            {/* <div className="mt-4 pt-4 border-t border-hair">
+              <p className="gl-lbl text-ink mb-2">Check delivery</p>
+              <div className="flex gap-2">
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={pinInput}
+                  onChange={(e) => { setPinInput(e.target.value.replace(/\D/g, '').slice(0, 6)); if (pinStatus) setPinStatus(null); }}
+                  onKeyDown={(e) => e.key === 'Enter' && !isCheckingPin && pinInput.length === 6 && handlePinCheck()}
+                  placeholder="Enter 6-digit pincode"
+                  className="flex-1 min-w-0 h-11 px-3.5 rounded-xl border border-hair bg-white text-sm text-ink outline-none focus:border-brand tabular-nums"
+                />
+                <button
+                  onClick={handlePinCheck}
+                  disabled={isCheckingPin || pinInput.length !== 6}
+                  className="gl-press h-11 px-5 rounded-xl border border-ink text-ink font-bold text-sm hover:bg-ink hover:text-paper transition-colors disabled:opacity-40 shrink-0"
+                >
+                  {isCheckingPin ? 'Checking…' : 'Check'}
+                </button>
               </div>
-              <ul className="space-y-2.5 text-sm text-ink">
-                <li className="flex items-start gap-2.5">
-                  <i className="fa-solid fa-bolt text-brand text-xs mt-1 w-4 text-center shrink-0" />
-                  <span><b>UPI</b> - pay instantly with GPay, PhonePe, Paytm &amp; more</span>
-                </li>
-                <li className="flex items-start gap-2.5">
-                  <i className="fa-regular fa-credit-card text-brand text-xs mt-1 w-4 text-center shrink-0" />
-                  <span><b>EMI</b> available on eligible credit &amp; debit cards</span>
-                </li>
-                <li className="flex items-start gap-2.5">
-                  <i className="fa-solid fa-tag text-brand text-xs mt-1 w-4 text-center shrink-0" />
-                  <span>Bank &amp; card <b>offers auto-applied</b> on the payment page</span>
-                </li>
-                {product.isCodAvailable && (
-                  <li className="flex items-start gap-2.5">
-                    <i className="fa-solid fa-money-bill-wave text-brand text-xs mt-1 w-4 text-center shrink-0" />
-                    <span><b>Partial COD</b> - small advance online, rest on delivery</span>
-                  </li>
-                )}
-              </ul>
+              {pinStatus && (
+                pinStatus.ok ? (
+                  <div className="mt-2 text-sm font-semibold text-save">
+                    ✓ {pinStatus.msg}
+                    <span className="block text-xs font-medium text-muted mt-0.5">
+                      Expected delivery by {pinStatus.eta}{pinStatus.charge != null && <> · Shipping {inr(pinStatus.charge)}</>}
+                    </span>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm font-semibold text-brand">✕ {pinStatus.msg}</p>
+                )
+              )}
             </div> */}
 
-            {/* ZONE C - promotion banner slot. The old combo-banner system
-                (FreeShippingBanner/ProductPageBanner, reading the now-deleted
-                cart-rule/offers adapter) was removed entirely 2026-10-09 -
-                this surface now has no renderer yet. The data layer for a
-                replacement already exists (useGetProductPromotionsQuery,
-                src/store/api/userApi.js, hitting Promotion Engine V2's
-                sanitized Display API) - UI here is a deliberate follow-up,
-                not an oversight. */}
-
+            {/* trust strip inside the card */}
+            <p className="mt-5 text-sm font-bold text-ink">Shop with peace of mind</p>
+            <div className="mt-2.5 grid grid-cols-3 gap-1 text-center">
+              {[
+                // ['fa-truck-fast', 'Dispatch', '24-48 hrs'], // paused: no 24-48 hr promise for now
+                ['fa-money-bill-wave', 'Payment', product.isCodAvailable ? 'Partial COD' : 'Secure pay'],
+                ['fa-rotate-left', 'Replacement', 'Free if damaged*'],
+                ['fa-location-dot', 'Delivery', 'Pan-India'],
+              ].map(([icon, title, sub]) => (
+                <div key={title} className="flex flex-col items-center gap-1">
+                  <span className="grid h-11 w-11 place-items-center rounded-full border border-hair bg-white text-ink"><i className={`fa-solid ${icon} text-[15px]`} aria-hidden="true" /></span>
+                  <span className="text-[11.5px] font-bold text-ink">{title}</span>
+                  <span className="text-[10.5px] leading-tight text-muted">{sub}</span>
+                </div>
+              ))}
+            </div>
+            <p className="mt-1.5 text-[8px] text-faint text-center">
+              *Applicable only with an unboxing video showing the damaged product and its shipping label.
+            </p>
           </div>
         </div>
 
-        {/* PRODUCT DETAILS - full-bleed LIGHT-GREY (surface) band: description / specs / shipping */}
-        <div className="w-screen ml-[calc(50%-50vw)] bg-paper mt-16">
-        <section className="max-w-3xl mx-auto px-5 ">
-          <p className="gl-lbl text-brand mb-2 text-center">The full rundown</p>
-          <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight mb-6 text-center">Product details</h2>
-          <div className="divide-y divide-hair border-y border-hair">
-            {displayDescription && (
-              <details open className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Description<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary><p className="text-muted mt-3 text-xs leading-relaxed">{displayDescription}</p></details>
-            )}
-            {specs.length > 0 && (
-              <details className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Specifications<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary>
-                <div className="mt-3 text-sm">{specs.map((s, i) => <div key={i} className="flex justify-between py-1.5 border-b border-hair last:border-0"><span className="text-muted">{s.key}</span><span className="font-medium text-right">{s.value}</span></div>)}</div>
-              </details>
-            )}
-            {(product.materialAndCare || product.warranty) && (
-              <details className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Material &amp; Care<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary>
-                {product.materialAndCare && <p className="text-muted mt-3 text-sm leading-relaxed">{product.materialAndCare}</p>}
-                {product.warranty && <p className="text-muted mt-2 text-sm leading-relaxed"><span className="font-semibold text-ink">Warranty:</span> {product.warranty}</p>}
-              </details>
-            )}
-            <details className="group py-4"><summary className="flex justify-between items-center gap-4 cursor-pointer font-bold list-none">Shipping &amp; Exchange<span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span></summary><p className="text-muted mt-3 text-sm">Made to order, ships pan-India. Free replacement if it arrives damaged or wrong .{product.isCodAvailable ? ' Partial COD available.' : ''}</p></details>
+        {/* PRODUCT DETAILS - one set of accordions */}
+        <section className="pdp-sec pdp-sec-grid" aria-labelledby="pdp-details-h">
+          <div>
+            <p className="rd-eyebrow font-mono uppercase text-muted">{PDP.details.eyebrow}</p>
+            <h2 id="pdp-details-h" className="pdp-h2 font-archivo">{PDP.details.heading}</h2>
           </div>
-          {product.disclaimer && <p className="text-xs text-faint mt-4 text-center leading-relaxed">{product.disclaimer}</p>}
+          <div>
+            <div className="pdp-acc">
+              {displayDescription && (
+                <details name="pdp-details" open><summary>Description<span className="pdp-plus" aria-hidden="true" /></summary><div className="pdp-acc-body"><p>{displayDescription}</p></div></details>
+              )}
+              {specs.length > 0 && (
+                <details name="pdp-details"><summary>Specifications<span className="pdp-plus" aria-hidden="true" /></summary>
+                  <div className="pdp-acc-body pdp-specs">{specs.map((sp, i) => <div key={i}><span>{sp.key}</span><span>{sp.value}</span></div>)}</div>
+                </details>
+              )}
+              {(product.materialAndCare || product.warranty) && (
+                <details name="pdp-details"><summary>Material &amp; Care<span className="pdp-plus" aria-hidden="true" /></summary>
+                  <div className="pdp-acc-body">
+                    {product.materialAndCare && <p>{product.materialAndCare}</p>}
+                    {product.warranty && <p><span className="font-semibold text-ink">Warranty:</span> {product.warranty}</p>}
+                  </div>
+                </details>
+              )}
+              <details name="pdp-details"><summary>Shipping &amp; Exchange<span className="pdp-plus" aria-hidden="true" /></summary><div className="pdp-acc-body"><p>{PDP.details.shipping}{product.isCodAvailable ? PDP.details.shippingCod : ''}</p></div></details>
+            </div>
+            {product.disclaimer && <p className="pdp-note">{product.disclaimer}</p>}
+          </div>
         </section>
-        </div>
 
         {/* LOOK CLOSER - full-bleed LIGHT-GREY (surface) band, auto-playing carousel (tap to zoom) */}
         {galleryImages.length > 1 && (
@@ -1079,7 +966,7 @@ const ProductDetailPage = () => {
                 <span>Seen in</span><br /><span className="opacity-40">real setups.</span>
               </h2>
               <p className="opacity-60 text-sm mb-7">Straight from {totalReviews > 0 ? `${totalReviews} verified ` : ''}customers who bought it.</p>
-              <CommunityShots shots={communityShots} onImgErr={onImgErr} onOpen={(i) => setLightbox({ list: communityShotUrls, idx: i })} />
+              <CommunityShots shots={communityShots} onImgErr={onImgErr} onOpen={(i) => setLightbox({ list: communityShotUrls, meta: communityShots, idx: i })} />
             </div>
           </ScrollColorBand>
         )}
@@ -1092,20 +979,18 @@ const ProductDetailPage = () => {
         {/* REVIEWS - full-bleed LIGHT-GREY (surface) band */}
         <div className="w-screen ml-[calc(50%-50vw)] bg-paper mt-16">
         <div id="reviews" className="max-w-[1280px] mx-auto px-5 scroll-mt-24">
-          <div className="flex items-start justify-between gap-4 mb-6">
-            <div>
-              <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">Ratings &amp; Reviews</h2>
-              {totalReviews > 0 && (
-                <div className="flex items-center gap-2 mt-2">
-                  <Stars n={avgRating || 5} className="text-base" />
-                  <span className="font-extrabold">{Number(avgRating || 0).toFixed(1)}</span>
-                  <span className="text-muted text-sm">· {totalReviews} review{totalReviews === 1 ? '' : 's'}</span>
-                </div>
-              )}
-            </div>
-            <button onClick={openReviewForm} className="gl-press shrink-0 bg-brand text-white font-bold text-sm px-5 py-2.5 rounded-xl hover:bg-brandHi">Write a review</button>
-          </div>
-
+          <ReviewsSection
+            reviews={reviews}
+            avg={avgRating}
+            total={totalReviews}
+            dist={ratingDist}
+            currentUserId={currentUserId}
+            visible={visibleReviews}
+            onMore={() => setVisibleReviews((n) => n + PDP.reviews.pageSize)}
+            onWrite={openReviewForm}
+            onEdit={handleEditReview}
+            onOpenPhoto={openReviewPhoto}
+          >
           <div id="review-form-anchor" />
           {showReviewForm && (
             <div className="border border-hair rounded-2xl p-6 mb-8 bg-white">
@@ -1128,50 +1013,10 @@ const ProductDetailPage = () => {
             </div>
           )}
 
-          {/* {reviews.length > 0 && (
-            <div className="max-w-md mb-8 space-y-1.5">
-              {[5, 4, 3, 2, 1].map((star) => {
-                const c = ratingDist[star - 1];
-                const pct = reviews.length ? (c / reviews.length) * 100 : 0;
-                return (
-                  <div key={star} className="flex items-center gap-3 text-xs">
-                    <span className="w-9 text-muted tabular-nums shrink-0">{star} ★</span>
-                    <div className="flex-1 h-2 rounded-full bg-hair overflow-hidden"><div className="h-full bg-star rounded-full transition-all duration-500" style={{ width: `${pct}%` }} /></div>
-                    <span className="w-6 text-right text-faint tabular-nums shrink-0">{c}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )} */}
-
-          <div className="grid sm:grid-cols-2 gap-4">
-              {reviews.length === 0 ? (
-                <div className="sm:col-span-2 text-muted text-sm bg-white border border-hair rounded-2xl p-8 text-center">No reviews yet - be the first to review this product.</div>
-              ) : reviews.slice(0, visibleReviews).map((rev) => {
-                const imgs = rev.imageUrls?.length ? rev.imageUrls : rev.imageUrl ? [rev.imageUrl] : [];
-                return (
-                  <div key={rev._id} className="bg-white border border-hair rounded-2xl p-5">
-                    <div className="flex items-center justify-between"><Stars n={rev.rating} className="text-sm" />{rev.userId && rev.userId === currentUserId && <button onClick={() => handleEditReview(rev)} className="text-xs text-brand font-semibold">Edit</button>}</div>
-                    <p className="text-muted text-sm mt-2">{rev.desc}</p>
-                    {imgs.length > 0 && (
-                      <div className="flex gap-2 mt-3">{imgs.map((u, i) => <button key={i} onClick={() => setLightbox({ list: imgs, idx: i })} className="w-14 h-14 rounded-lg overflow-hidden border border-hair"><img src={u} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" /></button>)}</div>
-                    )}
-                    <p className="mt-3 text-xs font-bold">{rev.userName || 'Customer'}{rev.verified !== false ? ' · Verified' : ''}</p>
-                  </div>
-                );
-              })}
-            </div>
-          {reviews.length > visibleReviews && (
-            <div className="text-center mt-6">
-              <button onClick={() => setVisibleReviews((n) => n + 3)} className="gl-press border border-ink font-bold text-sm px-6 py-2.5 rounded-xl hover:bg-ink hover:text-white transition-colors">
-                Show more reviews ({reviews.length - visibleReviews} more)
-              </button>
-            </div>
-          )}
+          </ReviewsSection>
         </div>
         </div>
 
-        {/* related */}
         {/* Other variants of THIS product - after reviews, before cross-sell */}
         <OtherVariants
           productId={product.productId}
@@ -1180,51 +1025,48 @@ const ProductDetailPage = () => {
           currentVariantName={selectedVariant}
         />
 
-        {/* Admin-curated recommendations (distinct from the generic grid below) */}
-        {/* {recommendedProducts.length > 0 && (
-          <RecommendedProducts products={recommendedProducts} />
-        )} */}
-
+        {/* related */}
         {related.length > 0 && (
-          <div className="mt-16">
-            <div className="flex items-end justify-between mb-6"><h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">You may also like</h2><button onClick={() => navigate('/products')} className="text-sm font-bold underline underline-offset-4 decoration-2 hover:text-brand">View all →</button></div>
-            {/* Single scrollable row (matches the old site's layout) instead
-                of a multi-row grid - the card design itself is unchanged. */}
-            <div
-              className="flex gap-4 md:gap-6 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-              style={{ touchAction: 'pan-x' }}
-            >
-              {related.map((p, i) => (
-                <div key={p.productId || i} className="snap-start shrink-0 w-[160px] sm:w-[190px] md:w-[220px]">
-                  <UnProductCard p={p} index={i} listId="pdp_related" listName="Related" />
+          <section className="pdp-sec" aria-labelledby="pdp-related-h">
+            <div className="pdp-sec-head">
+              <h2 id="pdp-related-h" className="pdp-h2 pdp-h2--flush font-archivo">{PDP.related.heading}</h2>
+              <Link to="/products" className="pdp-link">{PDP.related.all}</Link>
+            </div>
+            <div className="pdp-related">
+              {related.map((rp, i) => (
+                <div key={rp.productId || i}>
+                  <UnProductCard p={rp} index={i} listId="pdp_related" listName="Related" />
                 </div>
               ))}
             </div>
-          </div>
-        )}
-          {/* "Why fans love it": the short Admin → SEO Pages intro for this URL (2-3 lines)
-              and, when a published blog post is linked to this product, "Know the story →".
-              The full story lives in the blog, not on the product page. */}
-          {(seoIntro.length > 0 || story) && (
-          <section className="mt-16 max-w-3xl mx-auto text-center">
-            <p className="gl-lbl text-brand mb-2">The story</p>
-            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-5">Why fans love it</h2>
-            {seoIntro.map((t, i) => <p key={i} className="text-muted text-sm leading-relaxed mt-2">{t}</p>)}
-            {story && <Link to={`/blog/${story.slug}`} className="inline-block mt-4 text-sm font-bold text-brand hover:underline">Know the story →</Link>}
           </section>
-          )}
-          {faqs.length > 0 && (
-          <section className="mt-16">
-            <p className="gl-lbl text-brand mb-2 text-center">Good to know</p>
-            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-8 text-center">Questions, answered</h2>
-            <div className="max-w-3xl mx-auto divide-y divide-hair border-y border-hair">
+        )}
+
+        {/* "Why fans love it": the short Admin → SEO Pages intro for this URL and, when a published blog post is linked, "Know the story →". */}
+        {(seoIntro.length > 0 || story) && (
+          <section className="pdp-sec pdp-sec-grid" aria-labelledby="pdp-story-h">
+            <div>
+              <p className="rd-eyebrow font-mono uppercase text-muted">{PDP.story.eyebrow}</p>
+              <h2 id="pdp-story-h" className="pdp-h2 font-archivo">{PDP.story.heading}</h2>
+            </div>
+            <div className="pdp-acc-body pdp-acc-body--flush">
+              {seoIntro.map((t, i) => <p key={i}>{t}</p>)}
+              {story && <p><Link to={`/blog/${story.slug}`} className="pdp-link">{PDP.story.cta}</Link></p>}
+            </div>
+          </section>
+        )}
+
+        {faqs.length > 0 && (
+          <section className="pdp-sec pdp-sec-grid" aria-labelledby="pdp-faq-h">
+            <div>
+              <p className="rd-eyebrow font-mono uppercase text-muted">{PDP.faq.eyebrow}</p>
+              <h2 id="pdp-faq-h" className="pdp-h2 font-archivo">{PDP.faq.heading}</h2>
+            </div>
+            <div className="pdp-acc">
               {faqs.map((f, i) => (
-                <details key={i} className="group py-4">
-                  <summary className="flex items-center justify-between gap-4 cursor-pointer font-bold list-none">
-                    <span>{f.q}</span>
-                    <span className="shrink-0 text-brand text-2xl leading-none transition-transform duration-300 group-open:rotate-45">＋</span>
-                  </summary>
-                  <p className="text-muted text-sm mt-3 leading-relaxed">{f.a}</p>
+                <details key={i} name="pdp-faq">
+                  <summary><span>{f.q}</span><span className="pdp-plus" aria-hidden="true" /></summary>
+                  <div className="pdp-acc-body"><p>{f.a}</p></div>
                 </details>
               ))}
             </div>
@@ -1241,31 +1083,31 @@ const ProductDetailPage = () => {
             exit={{ y: 90, opacity: 0 }}
             transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
             data-sticky-buybar="all" // the floating Help button lifts above this bar while it is shown ("all" = desktop too)
-            className="fixed inset-x-0 z-30 bg-paper/95 backdrop-blur border-t border-hair px-4 py-3 flex items-center gap-3 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] md:bottom-0 md:px-[max(1.25rem,calc((100vw-1280px)/2+1.25rem))]"
+            className="fixed inset-x-0 z-30 bg-paper/95 backdrop-blur border-t border-hair px-4 py-3 flex items-center gap-3 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] md:bottom-0 md:px-[max(1.25rem,calc((100vw-1240px)/2+3rem))]"
           >
             {/* the thumbnail is the first thing to go once the bar also has to
                 hold a stepper - at 390px there is not room for both */}
             {!isInCart && (
-              <img src={variantImage(selectedVariant)} alt="" className="w-11 h-11 rounded-lg object-cover border border-hair shrink-0" onError={onImgErr} />
+              <img src={variantImage(selectedVariant)} alt="" className="w-11 h-11 rounded-none object-cover border border-hair shrink-0" onError={onImgErr} />
             )}
             <div className="min-w-0 flex-1">
               <p className="text-xs md:text-sm font-bold truncate leading-tight">{product.productName}</p>
               {selectedVariant && selectedVariant !== product.productName && <p className="hidden md:block gl-lbl text-[10px] text-muted truncate">{selectedVariant}</p>}
-              <p className="text-sm font-extrabold md:hidden">{inr(currentPrice)}</p>
+              <p className="text-sm font-semibold md:hidden">{inr(currentPrice)}</p>
             </div>
             {/* desktop: price + struck MRP beside the buttons, like the main buy box */}
             <div className="hidden md:flex items-baseline gap-2 shrink-0">
-              <span className="text-xl font-extrabold tabular-nums">{inr(currentPrice)}</span>
+              <span className="text-xl font-semibold tabular-nums">{inr(currentPrice)}</span>
               {discountPercent > 0 && <span className="text-sm text-faint line-through tabular-nums">{inr(maxVariantPrice)}</span>}
             </div>
             {isOutOfStock ? (
-              <button onClick={() => setShowNotifyModal(true)} className="gl-press border border-ink text-ink font-bold text-sm px-5 h-11 rounded-xl shrink-0 hover:bg-ink hover:text-paper transition-colors">Notify me</button>
+              <button onClick={() => setShowNotifyModal(true)} className="gl-press border border-ink text-ink font-bold text-sm px-5 h-11 rounded-none shrink-0 hover:bg-ink hover:text-paper transition-colors">Notify me</button>
             ) : isInCart ? (
               <>
                 {/* Same handleUpdateQty the main buy box uses, so the cart API
                     call (and the guest-cart dispatch) stays in one place -
                     this bar only adds a second way to reach it. */}
-                <div className="flex items-center border border-ink rounded-xl h-11 shrink-0">
+                <div className="flex items-center border border-ink rounded-none h-11 shrink-0">
                   <button
                     onClick={() => handleUpdateQty(currentCartQty - 1)}
                     aria-label={currentCartQty > 1 ? 'Decrease quantity' : 'Remove from cart'}
@@ -1282,13 +1124,13 @@ const ProductDetailPage = () => {
                     +
                   </button>
                 </div>
-                <button onClick={handleCheckoutClick} className="gl-press bg-brand text-white font-bold text-sm px-4 h-11 rounded-xl shrink-0 hover:bg-brandHi">Offers & checkout</button>
+                <button onClick={handleCheckoutClick} className="gl-press bg-brandHi text-paper font-bold text-sm px-4 h-11 rounded-none shrink-0 hover:bg-brand">Offers & checkout</button>
               </>
             ) : (
               <>
                 {/* desktop has the room for both buttons, like the main buy box */}
-                <button onClick={() => handleInitialAddToCart()} disabled={isAdding} className="hidden md:block gl-press border border-ink text-ink font-bold text-sm px-6 h-11 rounded-xl shrink-0 hover:bg-ink hover:text-paper transition-colors disabled:opacity-60">Add to Cart</button>
-                <button onClick={handleBuyNow} disabled={isAdding} className="gl-press bg-brand text-white font-bold text-sm px-6 h-11 rounded-xl shrink-0 hover:bg-brandHi disabled:opacity-60">{isAdding ? 'Please wait…' : 'Buy Now'}</button>
+                <button onClick={() => handleInitialAddToCart()} disabled={isAdding} className="hidden md:block gl-press border border-ink text-ink font-bold text-sm px-6 h-11 rounded-none shrink-0 hover:bg-ink hover:text-paper transition-colors disabled:opacity-60">Add to Cart</button>
+                <button onClick={handleBuyNow} disabled={isAdding} className="gl-press bg-brandHi text-paper font-bold text-sm px-6 h-11 rounded-none shrink-0 hover:bg-brand disabled:opacity-60">{isAdding ? 'Please wait…' : 'Buy Now'}</button>
               </>
             )}
           </MotionDiv>
@@ -1311,10 +1153,7 @@ const ProductDetailPage = () => {
 
       {/* lightbox */}
       {lightbox && (
-        <div className="fixed inset-0 z-[130] bg-black/80 grid place-items-center p-6" onClick={() => setLightbox(null)}>
-          <img src={lightbox.list[lightbox.idx]} alt="" className="max-h-[85vh] max-w-full rounded-xl" onClick={(e) => e.stopPropagation()} />
-          <button className="absolute top-5 right-5 w-10 h-10 rounded-full bg-paper text-ink grid place-items-center text-xl" onClick={() => setLightbox(null)}>×</button>
-        </div>
+        <ReviewPhotoViewer list={lightbox.list} meta={lightbox.meta} idx={lightbox.idx} onIdx={(n) => setLightbox((l) => ({ ...l, idx: n }))} onClose={() => setLightbox(null)} />
       )}
     </div>
   );

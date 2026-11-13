@@ -8,7 +8,8 @@ const TYPE_KINDS = ['collection'];
 const SERIES_KINDS = ['series', 'game'];
 const MAX_LINKS = 8;
 
-const firstImage = (p) => p?.variantDetails?.[0]?.variantImage?.[0] || p?.productImg || '';
+// the admin's main product image first, the first variant's photo only when it is missing
+const firstImage = (p) => p?.productImg || (p?.variantDetails || []).find((v) => v?.variantImage?.[0])?.variantImage?.[0] || '';
 
 /**
  * Dropdown content for one header category: link groups + a featured product.

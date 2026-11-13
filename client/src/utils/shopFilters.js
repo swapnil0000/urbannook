@@ -54,15 +54,16 @@ const tagRank = (order) => (x) => {
   return i === -1 ? order.length : i;
 };
 const featuredRank = tagRank(['best_seller', 'featured', 'trending']);
-const mrpOf = (x) => Number(x.p?.variantDetails?.[0]?.variantMrp || 0);
+const mrpOf = (x) => Number(x.mrp ?? x.p?.variantDetails?.[0]?.variantMrp ?? 0);
 const offOf = (x) => { const m = mrpOf(x); return m > x.price && x.price > 0 ? (m - x.price) / m : 0; };
 // Real signals from the products API (server/src/utils/productSignals.util.js):
 // units sold in the last 30 days for this card's variant, and the product's
 // createdAt. Missing (older API) = 0, so the sort degrades to the server order.
-const soldOf = (x) => Number(x.p?.variantDetails?.[0]?.soldRecent ?? x.p?.soldRecent ?? 0);
+// parent items (one card per product) rank by the product's own sales, variant cards by their variant's
+const soldOf = (x) => Number((x.parent ? x.p?.soldRecent : x.p?.variantDetails?.[0]?.soldRecent) ?? x.p?.soldRecent ?? 0);
 const soldLast7DaysOf = (x) => Number(x.p?.variantDetails?.[0]?.soldLast7Days ?? x.p?.soldLast7Days ?? 0);
 const createdOf = (x) => Date.parse(x.p?.createdAt || '') || 0;
-const soldAllOf = (x) => Number(x.p?.variantDetails?.[0]?.soldTotal ?? x.p?.soldTotal ?? 0);
+const soldAllOf = (x) => Number((x.parent ? x.p?.soldTotal : x.p?.variantDetails?.[0]?.soldTotal) ?? x.p?.soldTotal ?? 0);
 const productSoldAllOf = (x) => Number(x.p?.soldTotal ?? 0);
 
 const COMPARE = {

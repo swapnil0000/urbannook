@@ -97,7 +97,7 @@ const ProductCard = ({ product, index = 0, listId = "all_products", listName = "
 
   const firstVariant = product?.variantDetails?.[0];
   const price = Number(product?.effectivePrice ?? firstVariant?.variantPrice ?? 0);
-  const thumbnail = firstVariant?.variantImage?.[0] || "/placeholder.jpg";
+  const thumbnail = product?.productImg || firstVariant?.variantImage?.[0] || "/placeholder.jpg";
   // Distinct variant photos, deduped — a size/color variant that reuses the
   // same image as another shouldn't create a pointless jump-cut in the loop.
   // Memoized on the underlying variant data so this isn't rebuilt (a fresh

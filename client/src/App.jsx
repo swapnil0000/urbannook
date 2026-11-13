@@ -14,6 +14,7 @@ import { fetchCsrfToken } from './store/api/apiSlice';
 import AppRoutes from './store/AppRoutes';
 import SeoPageContent from './component/SeoPageContent';
 import NewsTicker from './pages/home/NewsTicker';
+import AfterIdle from './component/AfterIdle';
 import FestiveEffects from './component/festive/FestiveEffects';
 import { SiteCampaignProvider } from './hooks/useSiteCampaign';
 import { trackPageView, setUserId, captureAttribution, setMetaAdvancedMatching } from './utils/analytics';
@@ -233,15 +234,15 @@ function App({ store = browserStore, helmetContext }) {
                 </ErrorBoundary>
                 {/* Free-shipping popup — shows once, everywhere except checkout */}
                 <ErrorBoundary>
-                  <FreeShippingPopup />
+                  <AfterIdle><FreeShippingPopup /></AfterIdle>
                 </ErrorBoundary>
                 {/* Live offers carousel — waits while the free-shipping popup is due */}
                 <ErrorBoundary>
-                  <OffersPopup />
+                  <AfterIdle><OffersPopup /></AfterIdle>
                 </ErrorBoundary>
                 {/* Promotion V2 "add more to unlock" bottom sheet */}
                 <ErrorBoundary>
-                  <PromotionUnlockSheet />
+                  <AfterIdle><PromotionUnlockSheet /></AfterIdle>
                   <GiftClaimWatcher />
                 </ErrorBoundary>
                 <ErrorBoundary>

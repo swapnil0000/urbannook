@@ -97,9 +97,8 @@ const PhotoReviewsSection = () => {
     <section className="rd-gift rd-rev bg-paper text-ink" aria-label={C.heading}>
       <Reveal className="rd-gift-head">
         <div>
-          <p className="rd-eyebrow font-mono uppercase text-muted">{C.index} / {C.eyebrow}</p>
           <h2 className="rd-h2 font-archivo text-ink">{C.heading}</h2>
-          <p className="rd-sub font-inter text-muted">{C.sub}</p>
+          {C.sub && <p className="rd-sub font-inter text-muted">{C.sub}</p>}
         </div>
         <div className="rd-head-side">
           <p className="rd-count font-mono uppercase text-muted">

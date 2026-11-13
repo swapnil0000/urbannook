@@ -24,7 +24,7 @@ export const activeVariants = (p) =>
   (p?.variantDetails || []).filter((v) => v && v.isActive !== false);
 
 // First real photo of a product (variant shot first), used as a tile cover when no admin image is set.
-const coverOf = (p) => activeVariants(p)[0]?.variantImage?.[0] || p?.productImg || p?.productImage || "";
+const coverOf = (p) => p?.productImg || p?.productImage || activeVariants(p).find((v) => v?.variantImage?.[0])?.variantImage?.[0] || "";
 
 /**
  * @param {object[]} products  published, non-addon products

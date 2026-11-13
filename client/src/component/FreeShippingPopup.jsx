@@ -68,7 +68,8 @@ const POPUP_STYLES = `
 const FreeShippingPopup = memo(() => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { data } = useGetFreeShippingOfferQuery();
+  // Not asked for on the home page (the popup is not shown there): the offer is fetched from the first other page on.
+  const { data } = useGetFreeShippingOfferQuery(undefined, { skip: location.pathname === '/' });
   const config = data?.data;
   const threshold = Number(config?.thresholdAmount) || 0;
 

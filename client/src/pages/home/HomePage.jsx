@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
-import { addItem } from '../../store/slices/cartSlice';
 import SEOHead from '../../component/SEOHead';
-import { productImg, firstVariant, inr } from '../../component/UnProductCard';
+import { productImg, firstVariant } from '../../component/UnProductCard';
 import HomeProductCard from '../../component/HomeProductCard';
 import GiftEditSection from '../../component/home/GiftEditSection';
 import CollectionsSection from '../../component/home/CollectionsSection';
 import StatementSection from '../../component/home/StatementSection';
+import TrustStrip from '../../component/home/TrustStrip';
 import PhotoReviewsSection from '../../component/home/PhotoReviewsSection';
+import GoogleReviewsSection from '../../component/home/GoogleReviewsSection';
 import FaqSection from '../../component/home/FaqSection';
 import ReferSection from '../../component/home/ReferSection';
 import NewsletterSection from '../../component/home/NewsletterSection';
@@ -16,12 +16,13 @@ import CustomizeSection from '../../component/home/CustomizeSection';
 import FestiveSections from '../../component/festive/FestiveSections';
 import FestiveOfferBand from '../../component/festive/FestiveOfferBand';
 import RangoliDivider from '../../component/festive/RangoliDivider';
-import { Reveal, Stagger, StaggerItem, Parallax, TextReveal, useInView, motion, AnimatePresence, MotionRoot } from '../../component/motion';
+import { Reveal, Stagger, StaggerItem, Parallax, TextReveal, useInView, AnimatePresence, MotionRoot } from '../../component/motion';
 import { useGetFeaturedProductsQuery, useGetProductsQuery, useGetHeroBannerQuery } from '../../store/api/productsApi';
 import HeroBanner from '../../component/HeroBanner';
 import { useGetHomeComboOffersQuery } from '../../store/api/userApi';
 import { recordOfferInterest } from '../../utils/offerInterest';
-import { trackViewItemList, trackAddToCart } from '../../utils/analytics';
+import { trackViewItemList } from '../../utils/analytics';
+import useOverlayAvoidance from '../../hooks/useOverlayAvoidance';
 
 const onImgErr = (e) => { e.currentTarget.src = '/assets/logo.webp'; };
 
@@ -97,84 +98,6 @@ const FAQS = [
 ];
 
 /** Accordion FAQ - one item open at a time, smooth height animation. */
-/** Phones: the sticky Add bar and the Help button float over the bottom of the screen. Anything the shopper reads or taps
- *  there (offer tiles, coupon tickets, product / category / review cards, FAQ rows, the sign-up form, the CTAs) must never
- *  sit underneath them, so while one is in that zone the Add bar steps aside and the Help button fades out (body[data-clear-fab],
- *  see index.css); both return in the gaps between sections. Cards are matched by class, the rest opt in with data-avoid-overlay. */
-const AVOID = '.un-offer-cell, .un-coupon, .rd-card, [data-avoid-overlay]';
-const useOverlayAvoidance = () => {
-  const [blocked, setBlocked] = useState(false);
-  useEffect(() => {
-    const phone = window.matchMedia('(max-width: 767px)');
-    let raf = 0;
-    let release = 0;
-    const measure = () => {
-      raf = 0;
-      if (!phone.matches) { clearTimeout(release); setBlocked(false); delete document.body.dataset.clearFab; return; }
-      const h = window.innerHeight;
-      const zoneTop = h - 210; // Help button + Add bar + bottom nav
-      const hit = [...document.querySelectorAll(AVOID)].some((el) => { const r = el.getBoundingClientRect(); return r.bottom > zoneTop && r.top < h - 56; });
-      if (hit) { clearTimeout(release); setBlocked(true); document.body.dataset.clearFab = '1'; }
-      else { clearTimeout(release); release = setTimeout(() => { setBlocked(false); delete document.body.dataset.clearFab; }, 220); }
-    };
-    const onMove = () => { if (!raf) raf = requestAnimationFrame(measure); };
-    measure();
-    window.addEventListener('scroll', onMove, { passive: true });
-    window.addEventListener('resize', onMove);
-    return () => {
-      window.removeEventListener('scroll', onMove); window.removeEventListener('resize', onMove);
-      cancelAnimationFrame(raf); clearTimeout(release); delete document.body.dataset.clearFab;
-    };
-  }, []);
-  return blocked;
-};
-
-/** Mobile-only sticky "add to cart" bar - slides up once you scroll past the hero,
- *  sits just above the bottom nav, hides near the footer. */
-const StickyAddBar = ({ product, onAdd, blocked = false }) => {
-  const [show, setShow] = useState(false);
-  const [added, setAdded] = useState(false);
-  useEffect(() => {
-    const onScroll = () => setShow(window.scrollY > 640 && (window.innerHeight + window.scrollY) < document.body.offsetHeight - 340);
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-  if (!product) return null;
-  const v = firstVariant(product);
-  const handle = () => { onAdd(); setAdded(true); setTimeout(() => setAdded(false), 1600); };
-  return (
-    <AnimatePresence>
-      {show && !blocked && (
-        <motion.div
-          initial={{ y: 90, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 90, opacity: 0 }}
-          transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-          data-sticky-buybar // the floating Help button lifts above this bar while it is shown
-          className="md:hidden fixed left-0 right-0 z-30 px-3"
-          style={{ bottom: 'calc(env(safe-area-inset-bottom) + 58px)' }}
-        >
-          <div className="flex items-center gap-3 bg-ink text-paper border border-white/10 shadow-[0_-8px_30px_rgba(0,0,0,0.45)] p-2">
-            <img src={productImg(product)} alt="" className="w-12 h-12 object-cover shrink-0 bg-white/10" onError={onImgErr} />
-            <div className="min-w-0 flex-1">
-              <p className="text-[12px] font-bold truncate leading-tight">{product.productName}</p>
-              {/* price + real struck MRP / % off from the variant - no shipping claim (that depends on the live offer) */}
-              <p className="text-[11px] text-paper/60 leading-tight">
-                <b className="text-paper">{inr(v.variantPrice)}</b>
-                {Number(v.variantMrp) > Number(v.variantPrice) && (
-                  <> <s>{inr(v.variantMrp)}</s> · <span className="font-bold text-star">{Math.round((1 - v.variantPrice / v.variantMrp) * 100)}% OFF</span></>
-                )}
-              </p>
-            </div>
-            <button onClick={handle} className={`un-btn gl-press shrink-0 font-bold text-xs px-5 py-3 ${added ? 'bg-save text-white' : 'bg-brand text-white'}`}>
-              {!added && <span className="un-fill bg-brandHi"></span>}
-              {added ? '✓ Added' : 'Add'}
-            </button>
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-};
 
 /* ══ HERO - "THE DROP" ══════════════════════════════════════════════════
    Catalogue-forward on a dark stage. Two things share the first screen:
@@ -474,54 +397,38 @@ const HeroCarousel = ({ products = [], offers = [], onProduct, onVariant, onShop
              tile rather than trailing off into dead space, and the tiles
              stretch to share whatever width is left - a short catalogue fills
              the row instead of leaving a gap, a long one just scrolls. */}
-        <div className="shrink-0 px-4 sm:px-5 md:px-10 pt-6 pb-6 md:pt-7 md:pb-7">
+        {/* <div className="relative shrink-0 bg-paper text-ink px-4 sm:px-5 md:px-10 pt-6 pb-6 md:pt-7 md:pb-7">
           <div className="flex items-baseline justify-between gap-4 mb-3">
-            <h3 className="text-[15px] font-extrabold text-paper md:text-lg">More to explore</h3>
-            {/* <span className="gl-lbl text-[10px] text-paper/50">
-              {strip.isRest ? 'More from the drop' : 'The drop'} · {String(strip.items.length).padStart(2, '0')} pieces
-            </span> */}
+            <h3 className="text-[15px] font-extrabold text-ink md:text-lg">More to explore</h3>
             <button onClick={onShop}
-              className="gl-lbl text-[10px] text-paper/70 hover:text-brand border-b border-white/25 hover:border-brand pb-0.5 transition-colors">
+              className="gl-lbl text-[10px] text-ink/70 hover:text-brand border-b border-ink/25 hover:border-brand pb-0.5 transition-colors">
               Shop all →
             </button>
           </div>
 
-          {/* items-stretch: a row of flush, even-height cards. HomeProductCard's
-              title reserves a fixed 2-line min-height, so a stretched card's
-              extra space lands as blank room below the %-off line, never as
-              a gap between the title and the price. */}
-          {/* shrink-0, NOT grow: every card gets the exact same fixed
-              width. grow let flex distribute leftover row space unevenly
-              across cards (down to small natural-size differences between
-              them), so the square image - sized off its own card's width -
-              came out visibly bigger on some cards than others. A short
-              catalogue just leaves blank space at the row's end now, which
-              reads fine on a horizontal scroller. */}
           <div className="flex gap-3 md:gap-4 overflow-x-auto gl-hscroll pb-1 snap-x items-stretch">
             {strip.items.map((p, k) => (
               <div key={p.productId || k}
-                className="snap-start shrink-0 basis-[142px] sm:basis-[158px] md:basis-[176px]">
+                className="snap-start shrink-0 basis-[156px] sm:basis-[172px] md:basis-[208px]">
                 <HomeProductCard p={p} index={k} listId="home_drop" listName="The Drop" />
               </div>
             ))}
 
-            {/* "Shop all" as one more card of the same width (it used to grow
-                to fill the row: a big empty box). A 2x2 peek of the catalogue
-                makes it read as "more like these", not a blank tile. */}
+            
             <button
               onClick={onShop}
               aria-label={`Shop all ${products.length} pieces`}
-              className="group snap-start shrink-0 basis-[142px] sm:basis-[158px] md:basis-[176px] gl-press flex flex-col border border-white/15 bg-white/[0.03] hover:border-brand/60 transition-colors text-left"
+              className="group snap-start shrink-0 basis-[156px] sm:basis-[172px] md:basis-[208px] gl-press flex flex-col border border-hair bg-surface hover:border-brand/60 transition-colors text-left"
             >
-              <span className="grid grid-cols-2 gap-px bg-white/10 aspect-square overflow-hidden">
+              <span className="grid grid-cols-2 gap-px bg-hair aspect-square overflow-hidden">
                 {products.slice(0, 4).map((p, k) => (
                   <img key={p.productId || k} src={productImg(p)} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover bg-white transition-transform duration-500 group-hover:scale-105" onError={onImgErr} />
                 ))}
               </span>
               <span className="flex flex-1 items-center justify-between gap-2 px-3 py-3">
                 <span>
-                  <span className="block text-[13px] font-bold text-paper">Shop all</span>
-                  <span className="gl-lbl text-[9px] text-paper/50">{String(products.length).padStart(2, '0')} pieces</span>
+                  <span className="block text-[13px] font-bold text-ink">Shop all</span>
+                  <span className="gl-lbl text-[9px] text-muted">{String(products.length).padStart(2, '0')} pieces</span>
                 </span>
                 <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand text-white transition-transform group-hover:translate-x-0.5" aria-hidden="true">
                   <i className="fa-solid fa-arrow-right text-[11px]" />
@@ -529,7 +436,7 @@ const HeroCarousel = ({ products = [], offers = [], onProduct, onVariant, onShop
               </span>
             </button>
           </div>
-        </div>
+        </div> */}
       </div>
     </section>
   );
@@ -540,7 +447,7 @@ const HomePage = () => {
   useEffect(() => { window.scrollTo(0, 0); }, []);
 
   const { data: featRes } = useGetFeaturedProductsQuery({ limit: 1 }, { refetchOnMountOrArgChange: false, refetchOnFocus: false, refetchOnReconnect: false });
-  const overlayBlocked = useOverlayAvoidance();
+  useOverlayAvoidance(); // keeps the Help button off cards / forms on a phone
   const { data: prodRes, isLoading } = useGetProductsQuery({ page: 1, limit: 24 });
   const products = useMemo(() => productList(prodRes), [prodRes]);
   const { data: homeOffersRes } = useGetHomeComboOffersQuery();
@@ -555,15 +462,6 @@ const HomePage = () => {
      source - when it comes back empty, fall back to the catalogue we have
      already loaded rather than to productImg(undefined), which resolves to
      the logo placeholder. That fallback is what put the logo on the page. */
-  const featured = useMemo(() => productList(featRes)[0] || products[0], [featRes, products]);
-  // Mobile sticky bar's "Add" (StickyAddBar below). Restored: it was removed with
-  // the free-shipping bundle section but the sticky bar still calls it.
-  const dispatch = useDispatch();
-  const addOne = (p) => {
-    const v = firstVariant(p);
-    dispatch(addItem({ id: p.productId, mongoId: p.productId, name: p.productName, price: v.variantPrice, image: v.variantImage?.[0], quantity: 1, selectedVariant: v.variantName }));
-    trackAddToCart?.({ itemId: p.productId, itemName: p.productName, itemVariant: v.variantName || '', price: v.variantPrice || 0, quantity: 1 });
-  };
 
   // ── Catalog-size-aware merchandising ──────────────────────────────
   // Below MERCH_THRESHOLD we can't fill separate Bestsellers / New /
@@ -655,6 +553,9 @@ const HomePage = () => {
       {/* sale header (price drops) + combo offers as one section */}
       {!isFewProducts && bestsellers.length >= MIN_TAGGED && <FestiveSections lead={<FestiveOfferBand products={products} />} />}
       <RangoliDivider />
+
+      {/* ══ SHOP BY COLLECTION - the admin's categories → sub-categories → products → variants (content/homeRedesign.js) ══ */}
+      {!isFewProducts && <CollectionsSection products={products} />}
       {isFewProducts ? (
         /* Small, curated catalog: ONE collection, no repeated grids. */
         <section className="bg-surface border-y border-hair mt-4">
@@ -672,6 +573,9 @@ const HomePage = () => {
         /* Full catalog: the redesigned Bestsellers (content/homeRedesign.js). */
         <GiftEditSection products={bestsellers} loading={isLoading} />
       ) : null}
+
+      {/* ══ TRUST STRIP - rating, orders delivered, replacement, made in India: reassurance right after the products ══ */}
+      <div className="rd-trust-band bg-paper"><TrustStrip /></div>
 
 
 
@@ -697,12 +601,6 @@ const HomePage = () => {
         </section>
       )} */}
 
-      {/* ══ STATEMENT - the brand promise + the featured piece's shots (content/homeRedesign.js) ══ */}
-      <StatementSection images={carouselImages} />
-
-      {/* ══ SHOP BY COLLECTION - the admin's categories → sub-categories → products → variants (content/homeRedesign.js) ══ */}
-      {!isFewProducts && <CollectionsSection products={products} />}
-
       {/* ══ SHOP THE FEED - needs enough distinct products to avoid repeats ══ */}
       {/* {!isFewProducts && (
         <section className="bg-surface border-y border-hair">
@@ -726,6 +624,15 @@ const HomePage = () => {
       {/* ══ STRAIGHT FROM YOUR DESKS - every approved review that has a customer photo (content/homeRedesign.js) ══ */}
       <PhotoReviewsSection />
 
+      {/* ══ STATEMENT - the brand promise + the featured piece's shots (content/homeRedesign.js) ══ */}
+      <StatementSection images={carouselImages} />
+
+      {/* ══ LOVED BY OUR CUSTOMERS - the real Google Business Profile reviews (content/homeRedesign.js GOOGLE_BUSINESS) ══ */}
+      <GoogleReviewsSection />
+
+      {/* ══ CUSTOMIZE - every piece is printed to order, so this is a normal ask rather than an exception ══ */}
+      <CustomizeSection />
+
       {/* ══ FAQ ══ */}
       <FaqSection faqs={FAQS} onContact={() => navigate('/contact-us')} />
 
@@ -735,11 +642,6 @@ const HomePage = () => {
       {/* ══ NEWSLETTER - real signup (POST /join/community), shows the server's answer ══ */}
       <NewsletterSection fewProducts={isFewProducts} />
 
-      {/* ══ CUSTOMIZE - every piece is printed to order, so this is a normal ask rather than an exception ══ */}
-      <CustomizeSection />
-
-      {/* mobile sticky add-to-cart - featured product */}
-      <StickyAddBar product={featured} onAdd={() => featured && addOne(featured)} blocked={overlayBlocked} />
     </div>
   );
 };

@@ -27,7 +27,6 @@ const NewsletterSection = ({ fewProducts = false }) => {
   return (
     <section className="rd-gift rd-news bg-paper text-ink" aria-labelledby="news-h">
       <Reveal className="rd-news-inner">
-        <p className="rd-eyebrow font-mono uppercase text-muted">{fewProducts ? 'The next drop' : 'Join the list'}</p>
         <h2 id="news-h" className="rd-h2 font-archivo text-ink">{fewProducts ? 'Be first to the next piece' : 'Get first access to drops'}</h2>
         <p className="rd-sub font-inter text-muted">{fewProducts ? 'We add new made-to-order pieces often. Join for early access to drops and updates.' : 'New pieces land often. Join the list for early access to drops and updates.'}</p>
         <form onSubmit={submit} className="rd-news-form" noValidate>

@@ -3,7 +3,6 @@ import { Reveal, Stagger, StaggerItem } from '../motion';
 import { firstVariant, productImg, productHref, inr } from '../HomeProductCard';
 import { trackSelectItem } from '../../utils/analytics';
 import { GIFT_EDIT as C } from '../../content/homeRedesign';
-import RailProgress from './RailProgress';
 
 const GiftCard = ({ p, index }) => {
   const v = firstVariant(p);
@@ -39,20 +38,19 @@ const GiftEditSection = ({ products, loading }) => {
     <section className="rd-gift bg-paper text-ink">
       <Reveal className="rd-gift-head">
         <div>
-          <p className="rd-eyebrow font-mono uppercase text-muted">{C.index} / {C.eyebrow}</p>
           <h2 className="rd-h2 font-archivo text-ink">{C.heading}</h2>
-          <p className="rd-sub font-inter text-muted">{C.sub}</p>
+          {C.sub && <p className="rd-sub font-inter text-muted">{C.sub}</p>}
         </div>
         <div className="rd-head-side">
           <p className="rd-count font-mono uppercase text-muted">
             {countA.replace('{n}', String(list.length).padStart(2, '0'))}<br />{countB}
           </p>
-          <Link to={C.viewAllHref} className="rd-viewall font-inter text-ink">{C.viewAll} <span aria-hidden="true">→</span></Link>
+          <Link to={C.viewAllHref} className="rd-viewall-arrow text-ink" aria-label={C.viewAll}><svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4" /></svg></Link>
         </div>
       </Reveal>
       {loading
         ? <div className="rd-grid">{[...Array(C.max)].map((_, i) => <div key={i} className="rd-card-img bg-hair animate-pulse" />)}</div>
-        : <><Stagger className="rd-grid" stagger={0.06}>{list.map((p, i) => <StaggerItem key={p.productId || i}><GiftCard p={p} index={i} /></StaggerItem>)}</Stagger><RailProgress /></>}
+        : <><Stagger className="rd-grid" stagger={0.06}>{list.map((p, i) => <StaggerItem key={p.productId || i}><GiftCard p={p} index={i} /></StaggerItem>)}</Stagger></>}
     </section>
   );
 };

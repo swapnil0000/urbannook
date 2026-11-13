@@ -68,7 +68,8 @@ const OffersPopup = memo(() => {
   const location = useLocation();
   const navigate = useNavigate();
   const { data } = useGetHomeComboOffersQuery();
-  const { data: fsData } = useGetFreeShippingOfferQuery();
+  // The free-shipping popup never shows on the home page, so there is nothing to wait for there: no request.
+  const { data: fsData } = useGetFreeShippingOfferQuery(undefined, { skip: location.pathname === '/' });
   const fsDue = !!fsData?.data?.isActive && Number(fsData?.data?.thresholdAmount) > 0 && !freeShippingPopupDone();
 
   const pagePid = productIdFromPath(location.pathname);

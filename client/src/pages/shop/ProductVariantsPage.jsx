@@ -31,7 +31,7 @@ const ProductVariantsPage = () => {
   const product = productResponse?.data;
   // the top real sellers of this product's designs (all-time units) get a Bestseller chip
   // sales figures come from the list API (same cached query as the header)
-  const { data: listRes } = useGetProductsQuery({ page: 1, limit: 24 });
+  const { data: listRes } = useGetProductsQuery({ page: 1, limit: 24 }, { refetchOnMountOrArgChange: 300 });
   const soldSource = (listRes?.data?.listofPublishedProducts || []).find((x) => x.productId === product?.productId) || product;
   const topSellers = new Set((soldSource?.variantDetails || []).filter((v) => Number(v.soldTotal) > 0)
     .sort((a, b) => Number(b.soldTotal) - Number(a.soldTotal)).slice(0, 3).map((v) => v.sku));

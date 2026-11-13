@@ -9,7 +9,7 @@ export const GIFT_EDIT = {
   eyebrow: 'Thoughtfully picked',
   index: '01',
   heading: 'A little unexpected. A lot of joy.',
-  sub: 'For the ones who make your everyday brighter.',
+  // sub: 'For the ones who make your everyday brighter.',
   // {n} = how many products the admin has tagged Bestseller (shown, max `max`)
   count: ['{n} finds.', 'Endless personality.'],
   cardBadge: 'The gift edit',
@@ -40,7 +40,7 @@ export const STATEMENT = {
   index: '04',
   eyebrow: 'The UrbanNook way',
   heading: 'Built to order. Not to sit in a warehouse.',
-  body: "Every piece is 3D-printed the moment you order it - less waste, sharper detail, and a finish you won't find on a shelf.",
+  // body: "Every piece is 3D-printed the moment you order it - less waste, sharper detail, and a finish you won't find on a shelf.",
   // `source` = a number read live from GET /stats/public (real delivered orders, real approved-review average / count).
   // An item with no data yet (0) is simply not shown. `round` floors big counts to a clean figure (947 → "940+").
   stats: [
@@ -67,6 +67,35 @@ export const GOOGLE_REVIEWS = {
   stars: '{n} out of 5 stars',
 };
 
+// Homepage "Loved by our customers": the real Google Business Profile reviews (GET /stats/google-business-reviews). Only wording
+// lives here; the rating, count, names, dates and texts are read live and never typed.
+export const GOOGLE_BUSINESS = {
+  index: '04',
+  eyebrow: 'On Google',
+  heading: 'Loved by Our Customers',
+  // sub: 'Real experiences. Real people. Real reviews.',
+  source: 'Google reviews',
+  basedOn: 'based on {n} reviews',
+  basedOnOne: 'based on 1 review',
+  viewAll: 'Read reviews on Google',
+  write: 'Write a Google review',
+  more: 'Show more reviews',
+  readMore: 'Read more',
+  readLess: 'Show less',
+  reply: 'Reply from Urban Nook',
+  stars: '{n} out of 5 stars',
+  postedOnGoogle: 'Posted on Google',
+  avatarAlt: 'Profile photo of {name}',
+  initialCount: 9,
+  step: 6,
+  longAt: 230,
+  longAtPhone: 110, // phone cards are a fixed size: text longer than this is cut with an ellipsis + "Read more"
+  openPhoto: 'Open photo from {name}',
+  photoAlt: 'Photo shared by {name} in a Google review of Urban Nook',
+  photoCount: '{n} photos',
+  viewerLabel: 'Review photo',
+};
+
 // "Shop by collection" on the homepage and the sub-category row on category pages. Every tile is read live from
 // GET /categories (admin Categories → name, order, image; the sub-categories come from the products' own
 // sub-category); only the wording lives here. A category with no admin image shows its first product's photo.
@@ -74,7 +103,7 @@ export const COLLECTIONS = {
   index: '03',
   eyebrow: 'Find your corner',
   heading: 'Shop by collection',
-  sub: 'Each corner opens into its own range, sorted by type.',
+  // sub: 'Each corner opens into its own range, sorted by type.',
   count: ['{n} corners.', 'One for every space.'],
   viewAll: 'All products',
   viewAllHref: '/products',
@@ -92,7 +121,7 @@ export const PHOTO_REVIEWS = {
   index: '05',
   eyebrow: 'Real desks',
   heading: 'Straight from your desks',
-  sub: 'Photos and words from the people who put them on their desks.',
+  // sub: 'Photos and words from the people who put them on their desks.',
   count: ['{n} photo reviews.', 'Straight from customers.'],
   rated: '{avg} average from {n} reviews',
   morePhotos: '+{n}',

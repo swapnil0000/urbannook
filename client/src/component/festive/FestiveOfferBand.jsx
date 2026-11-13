@@ -12,8 +12,9 @@ const HEADLINES = { diwali: 'Diwali Sale' };
 const topDeals = (products = []) => products
   .map((p) => {
     const v = (p?.variantDetails || []).find((x) => x && x.isActive !== false && !isVariantOutOfStock(x) && Number(x.variantMrp) > Number(x.variantPrice));
-    if (!v || !v.variantImage?.[0]) return null;
-    return { id: p.productId, name: p.productName, img: v.variantImage[0], off: Math.round(((v.variantMrp - v.variantPrice) / v.variantMrp) * 100) };
+    const img = p.productImg || v?.variantImage?.[0];
+    if (!v || !img) return null;
+    return { id: p.productId, name: p.productName, img, off: Math.round(((v.variantMrp - v.variantPrice) / v.variantMrp) * 100) };
   })
   .filter(Boolean)
   .sort((a, b) => b.off - a.off)

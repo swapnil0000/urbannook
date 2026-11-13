@@ -11,7 +11,6 @@ const FaqSection = ({ faqs, onContact }) => {
     <section className="rd-gift rd-faq bg-paper text-ink" aria-labelledby={`${base}-h`}>
       <div className="rd-faq-grid">
         <Reveal className="rd-faq-intro">
-          <p className="rd-eyebrow font-mono uppercase text-muted">Good to know</p>
           <h2 id={`${base}-h`} className="rd-h2 font-archivo text-ink">Questions? Answered.</h2>
           <p className="rd-sub font-inter text-muted">Still curious? <button type="button" onClick={onContact} className="rd-faq-talk font-inter text-ink">Talk to us →</button></p>
         </Reveal>

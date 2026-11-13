@@ -5,7 +5,6 @@ import { useGetCategoriesQuery } from '../../store/api/productsApi';
 import { COLLECTIONS as C } from '../../content/homeRedesign';
 import { designsLabel } from '../../utils/designsLabel';
 import { imageCandidates } from '../../utils/collectionImage';
-import RailProgress from './RailProgress';
 
 const SUBS_SHOWN = 3;
 /** Walks the candidate list: if one fails to load, the next is tried, ending on the logo. */
@@ -48,20 +47,19 @@ const CollectionsSection = ({ products = [] }) => {
     <section className="rd-gift rd-col bg-paper text-ink">
       <Reveal className="rd-gift-head">
         <div>
-          <p className="rd-eyebrow font-mono uppercase text-muted">{C.index} / {C.eyebrow}</p>
           <h2 className="rd-h2 font-archivo text-ink">{C.heading}</h2>
-          <p className="rd-sub font-inter text-muted">{C.sub}</p>
+          {C.sub && <p className="rd-sub font-inter text-muted">{C.sub}</p>}
         </div>
         <div className="rd-head-side">
           <p className="rd-count font-mono uppercase text-muted">
             {countA.replace('{n}', String(list.length).padStart(2, '0'))}<br />{countB}
           </p>
-          <Link to={C.viewAllHref} className="rd-viewall font-inter text-ink">{C.viewAll} <span aria-hidden="true">→</span></Link>
+          <Link to={C.viewAllHref} className="rd-viewall-arrow text-ink" aria-label={C.viewAll}><svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4" /></svg></Link>
         </div>
       </Reveal>
       {isLoading
         ? <div className="rd-grid">{[...Array(4)].map((_, i) => <div key={i} className="rd-card-img bg-hair animate-pulse" />)}</div>
-        : <><Stagger className="rd-grid" stagger={0.06}>{list.map((c) => <StaggerItem key={c.slug}><CollectionCard c={c} products={products} /></StaggerItem>)}</Stagger><RailProgress /></>}
+        : <><Stagger className="rd-grid" stagger={0.06}>{list.map((c) => <StaggerItem key={c.slug}><CollectionCard c={c} products={products} /></StaggerItem>)}</Stagger></>}
     </section>
   );
 };
