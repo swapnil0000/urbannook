@@ -29,7 +29,6 @@ import FreeShippingStrip from '../../component/FreeShippingStrip';
 import OfferProgress from '../../component/festive/OfferProgress';
 import { compressImage } from '../../utils/compressImage';
 import ProductOffers from '../../component/offers/ProductOffers';
-import GiftWrapOffer from '../../component/GiftWrapOffer';
 import CouponOffersSection from '../../component/offers/CouponOffersSection';
 import { requestCheckout } from '../../utils/checkoutIntent';
 import { useCartPromotions } from '../../hooks/useCartPromotions';
@@ -43,7 +42,6 @@ import { nounOf } from '../../utils/offerName';
 // "Choose …" label from the product itself: Katana (LED and Wooden share designs), Lamp, Figure, Kunai…
 const variantLabel = (name = '') => (/figure|statue/i.test(name) ? 'Figure' : nounOf(name).replace(/^LED\s+/i, ''));
 import ProductQuestions from '../../component/support/ProductQuestions';
-import FestiveDelayNote from '../../component/FestiveDelayNote';
 
 const MotionDiv = motion.div;
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
@@ -788,10 +786,7 @@ const ProductDetailPage = () => {
                 <StockStatus outOfStock={isOutOfStock} left={selectedVariantObj?.variantQuantity} lowAt={5} />
                 {/* paused: no 24-48 hr promise for now */}
               </div>
-              {!isOutOfStock && <FestiveDelayNote variant="inline" className="mt-1.5" />}
 
-              {/* festive gift wrap, offered here too - "Go to Checkout" skips the cart drawer where it used to be the only place */}
-              {product?.giftWrapEligible && !isOutOfStock && <GiftWrapOffer variant="card" eligible className="mt-3" />}
 
               {/* variants */}
               {availableVariants.length > 0 && (

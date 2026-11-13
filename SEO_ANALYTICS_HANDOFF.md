@@ -291,3 +291,19 @@ order now follows the grouped variant order (same URLs).
 
 **Cart / offers popup / checkout:** UI only (offer cards, free-gift claim, scrollbars). These are not crawled pages,
 so there is no SEO impact.
+
+## K. Page speed: requests for the analytics scripts (2026-11-13) — yours to decide
+
+Lighthouse (mobile, 4G throttled) on the live site: home 45, /products 45, category 56, product 45-54
+(desktop 75-84). Mobile loses most of its time to main-thread work; the analytics tags are a large
+share of it. Not changed by the storefront team (rule 9) — please consider:
+
+1. **gtag.js is loaded twice** (one library per id): `gtag/js?id=G-B7NGCFCRFG` (~195 KB) and, pulled in by
+   `gtag('config','AW-18461503961')`, `gtag/js?id=AW-…` (~147 KB). ~700 ms of CPU on mobile, the biggest
+   third-party cost. Options: load gtag after `window.load` like Clarity / the Meta Pixel already are (the
+   `dataLayer` queue keeps early events), and/or route Ads through GA4 (linked conversions) so only one
+   library loads.
+2. **Meta Pixel** `signals/config/…` + `fbevents.js` ≈ 247 KB, ~300 ms CPU. Already deferred 1.5 s after
+   load; a longer delay (or `requestIdleCallback`) would move it out of the measured window.
+3. **Clarity** ≈ 25 KB but a 200 ms long task on /products. Already deferred 3 s; consider sampling
+   (e.g. load for 30 % of sessions).

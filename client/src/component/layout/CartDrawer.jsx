@@ -13,8 +13,8 @@ import { resolveVariantTitle } from '../../utils/variantTitle';
 import { trackViewCart, trackRemoveFromCart, track } from '../../utils/analytics';
 import FreeShippingStrip from '../FreeShippingStrip';
 import OfferProgress from '../festive/OfferProgress';
-import GiftWrapOffer, { GiftWrapLineItem } from '../GiftWrapOffer';
-import FestiveDelayNote from '../FestiveDelayNote';
+import { useRetireGiftWrap } from '../../hooks/useRetireGiftWrap';
+import ShipsWithinNote from '../ShipsWithinNote';
 import PromotionBannerList from '../promotions/PromotionBannerList';
 import { groupCartByOffer } from '../../utils/cartOfferGroups';
 import { offerName } from '../../utils/offerName';
@@ -49,6 +49,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
   const { items: cartItems, totalAmount, giftWrap: giftWrapSelected } = useSelector((state) => state.cart);
   const { isAuthenticated } = useSelector((state) => state.auth);
   const { data: giftWrapOfferRes } = useGetGiftWrapOfferQuery();
+  useRetireGiftWrap(); // gift wrap is no longer offered: take an old pick off this cart
 
   // Replays the ticket's one-time shimmer sweep each time the drawer opens
   // (not on every re-render while it's already open) by remounting the
@@ -368,7 +369,6 @@ const CartDrawer = ({ isOpen, onClose }) => {
               <OfferProgress location="cart" className="mb-3" fallback={<FreeShippingStrip cartTotal={subtotal} variant="compact" className="mb-3" />} />
               {/* Other active Promotion V2 offers - renders nothing when none apply */}
               <CartGiftProgress promotions={cartPromotions} className="mb-3" />
-              <PromotionBannerList promotions={pendingPromotions} pricing={promotionPricing} className="mb-3" />
               {/* free gifts: claim card, then a FREE GIFT line once claimed - never added automatically */}
               <GiftClaimList className="mb-3" />
               <div className="divide-y divide-hair">
@@ -401,8 +401,10 @@ const CartDrawer = ({ isOpen, onClose }) => {
                 ))}
                 {offerGroups.groups.length > 0 && offerGroups.rest.length > 0 && <p className="pt-1 text-[10px] font-semibold uppercase tracking-wide text-muted">Also in your cart</p>}
                 {offerGroups.rest.map(renderItem)}
-                <GiftWrapLineItem />
               </div>
+              {/* offers still to finish ("pick a pen stand for ₹150") come AFTER the cart's own items:
+                  above them, a 4-option picker pushed the lamp the shopper just added off the screen */}
+              <PromotionBannerList promotions={pendingPromotions} pricing={promotionPricing} className="mt-3" />
             </>
           )}
         </div>
@@ -410,13 +412,7 @@ const CartDrawer = ({ isOpen, onClose }) => {
         {/* --- FOOTER (CHECKOUT) --- */}
         {cartItems?.length > 0 && (
           <div className="px-4 pt-2.5 pb-3 sm:px-5 sm:pt-3 sm:pb-4 border-t border-hair shrink-0 shadow-[0_-8px_20px_-14px_rgba(0,0,0,0.25)]">
-            {/* Gift wrap - renders nothing unless the admin's turned the
-                seasonal offer on (Admin -> Offers -> Gift Wrap). */}
-            <div className="border-b border-hair mb-2 sm:mb-3 empty:hidden">
-              <GiftWrapOffer />
-            </div>
-
-            <FestiveDelayNote className="mb-2 sm:mb-3" />
+            <ShipsWithinNote className="mb-2 sm:mb-3" />
 
             {/* Subtotal / shipping / total folded into one block: the total
                 is what matters, the breakdown sits on one line under it. */}

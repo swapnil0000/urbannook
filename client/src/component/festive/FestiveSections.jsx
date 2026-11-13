@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom';
 import ComboOfferSection from '../ComboOfferSection';
 import FestiveCountdown from './FestiveCountdown';
 import SectionDecor from './SectionDecor';
-import CouponOffersSection from '../offers/CouponOffersSection';
 import { useSiteCampaign, THEME_COPY } from '../../hooks/useSiteCampaign';
 
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
@@ -85,7 +84,6 @@ const FestiveSections = ({ lead }) => {
         ? <ComboOfferSection key={s.id} title={s.title} subtitle={s.subtitle} lead={i === sections.findIndex((x) => x.type === 'combos') ? lead : undefined} />
         : <GiftingSection key={s.id} section={s} />))}
       {/* the coupon strip lives inside the combos section; without one, show it on its own */}
-      {!sections.some((s) => s.type === 'combos') && <CouponOffersSection />}
     </>
   );
 };

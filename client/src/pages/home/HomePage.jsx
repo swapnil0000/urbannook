@@ -399,7 +399,7 @@ const toFeature = (p) => {
   };
 };
 
-const HeroCarousel = ({ products = [], offers = [], onProduct, onVariant, onShop }) => {
+const HeroCarousel = ({ products = [], offers = [], onVariant, onShop }) => {
   // The first few products take turns in the featured slot; the rail below
   // carries the whole catalogue regardless. Products with a live offer
   // (GET /promotions/display/home) lead the rotation and carry that offer,
@@ -438,6 +438,12 @@ const HeroCarousel = ({ products = [], offers = [], onProduct, onVariant, onShop
   const go = (d) => setI((x) => (x + d + n) % n);
 
   const railRef = useRef(null);
+  // "More to explore" row: arrows page it by what's on screen (5 cards on desktop).
+  const stripRef = useRef(null);
+  const pageStrip = (d) => {
+    const el = stripRef.current;
+    if (el) el.scrollBy({ left: d * el.clientWidth, behavior: 'smooth' });
+  };
   const scrollRail = (d) => {
     const el = railRef.current;
     if (!el) return;
@@ -449,13 +455,19 @@ const HeroCarousel = ({ products = [], offers = [], onProduct, onVariant, onShop
   // A new featured product means a new set of variants - start at the front.
   useEffect(() => { railRef.current?.scrollTo({ left: 0 }); }, [idx]);
 
+  // The row's list changes once offers load (offer products move up into the
+  // rotation). Scroll-snap then keeps the card it had snapped to in view - now
+  // the 2nd one - so the row opened one card in, the first cut off. Start over.
+  const stripKey = strip.items.map((p) => p.productId).join(',');
+  useEffect(() => { stripRef.current?.scrollTo({ left: 0 }); }, [stripKey]);
+
   if (!f) return <section className="bg-ink min-h-[calc(100svh-6.25rem)] animate-pulse" />;
 
   return (
     <section className="relative bg-ink text-paper overflow-hidden">
       <style>{`
-        @keyframes un-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
-        .un-in { animation: un-in 520ms cubic-bezier(.16,1,.3,1) both; }
+        @keyframes un-in { from { opacity: 0; } to { opacity: 1; } }
+        .un-in { animation: un-in 420ms ease-out both; }
         @media (prefers-reduced-motion: reduce) {
           .un-in { animation: none; }
         }
@@ -477,25 +489,38 @@ const HeroCarousel = ({ products = [], offers = [], onProduct, onVariant, onShop
       >
         {/* ── TOP: the featured piece ── */}
         <div className="flex-1 flex flex-col md:flex-row items-center gap-5 md:gap-10 px-4 sm:px-5 md:px-10 pt-5 md:pt-10">
-          {/* copy */}
-          <div key={`t-${f.id}`} className="un-in order-2 md:order-1 w-full md:w-[27rem] lg:w-[30rem] md:shrink-0">
-            {f.offer ? (
-              <p className="mb-3 inline-flex max-w-full items-center gap-2 bg-brand px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-white">
-                <i className={`fa-solid ${f.offer.mysteryGift || f.offer.freeGift ? 'fa-gift' : 'fa-tag'} text-[10px]`} aria-hidden="true" />
-                <span className="truncate">Diwali offer · {f.offer.benefit || f.offer.title}</span>
-              </p>
-            ) : (
-              <p className="gl-lbl text-brand mb-3">
-                Drop {String(idx + 1).padStart(2, '0')} · Made to order
-              </p>
-            )}
+          {/* copy — only the product's own rows (tag, name, price) are keyed
+              and fade on a change; Shop all, the trust row and the dots /
+              arrows stay mounted, so they don't blink every rotation. */}
+          <div className="order-2 md:order-1 w-full md:w-[27rem] lg:w-[30rem] md:shrink-0">
+            {/* Every row below keeps a fixed height, so swapping the featured
+                product (every 6 s) never moves the page: offer tag or label
+                share one slot, the name always reserves its lines, price and
+                trust rows stay single-line. */}
+            <div key={`t-${f.id}`} className="un-in">
+            <div className="mb-2 md:mb-3 flex h-7 items-center">
+              {f.offer ? (
+                <p className="inline-flex max-w-full items-center gap-2 bg-brand px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-white">
+                  <i className={`fa-solid ${f.offer.mysteryGift || f.offer.freeGift ? 'fa-gift' : 'fa-tag'} text-[10px]`} aria-hidden="true" />
+                  <span className="truncate">Offer · {f.offer.benefit || f.offer.title}</span>
+                </p>
+              ) : (
+                <p className="gl-lbl text-brand">
+                  Drop {String(idx + 1).padStart(2, '0')} · Made to order
+                </p>
+              )}
+            </div>
             {/* The rotating featured product is a heading of its own, not the page's H1:
                 the H1 (below, visually hidden) says what the whole store is. */}
-            <h2 className="font-archivo text-[2.2rem] sm:text-5xl lg:text-6xl font-extrabold leading-[0.95] tracking-tight break-words">
-              {f.name}
-            </h2>
+            {/* fixed 2-line (desktop 3-line) slot; a shorter name sits on its
+                floor, next to the price, and the spare room goes above it */}
+            <div className="flex items-end font-archivo text-[1.65rem] sm:text-5xl lg:text-6xl leading-[1.02] md:leading-[0.95] min-h-[2.04em] md:min-h-[2.85em]">
+              <h2 className="font-extrabold tracking-tight break-words line-clamp-2 md:line-clamp-3">
+                {f.name}
+              </h2>
+            </div>
 
-            <div className="mt-4 flex items-baseline flex-wrap gap-x-3 gap-y-1">
+            <div className="mt-2 md:mt-4 flex h-6 items-center gap-x-3 overflow-hidden whitespace-nowrap">
               {f.variantCount > 1 && (
                 <span className="text-paper/75 text-sm md:text-base">{f.variantCount} variants</span>
               )}
@@ -509,29 +534,31 @@ const HeroCarousel = ({ products = [], offers = [], onProduct, onVariant, onShop
               )}
               {f.off > 0 && <span className="gl-lbl text-[10px] text-white bg-brand px-2 py-0.5">{f.off}% off</span>}
             </div>
-
-            <div className="mt-6 flex flex-wrap gap-3">
-              <button
-                onClick={() => { if (f.offer) recordOfferInterest(f.offer.id, f.id); onProduct(f.id); }}
-                className="un-btn gl-press bg-brand text-white font-bold text-sm px-7 py-3.5"
-              >
-                <span className="un-fill bg-brandHi"></span>{f.offer ? 'Get the offer' : 'Shop this drop'}
-              </button>
-              <button onClick={onShop} className="un-btn gl-press border border-white/35 text-white font-bold text-sm px-7 py-3.5">
-                <span className="un-fill bg-white/10"></span>Shop all
-              </button>
             </div>
 
-            <div className="mt-6 flex flex-wrap gap-x-5 gap-y-2">
+            {/* One small way out: the tiles already open each product, so the
+                big "Get the offer" / "Shop all" pair was two routes to the same
+                places. */}
+            <button onClick={onShop}
+              className="group mt-4 md:mt-6 inline-flex h-9 items-center gap-2.5 rounded-full border border-white/25 pl-4 pr-1 text-[12px] font-semibold text-paper transition-colors hover:border-white/60">
+              Shop all
+              <span className="grid h-7 w-7 place-items-center rounded-full bg-brand text-white transition-transform group-hover:translate-x-0.5" aria-hidden="true">
+                <i className="fa-solid fa-arrow-right text-[10px]" />
+              </span>
+            </button>
+
+            {/* not on phones: the announcement bar right above already says all three,
+                and the room is better spent on the product photos */}
+            <div className="mt-6 hidden sm:flex flex-nowrap gap-x-5 overflow-hidden whitespace-nowrap">
               {['48h dispatch', 'Partial COD', 'Free replacement if damaged'].map((t) => (
                 <span key={t} className="flex items-center gap-2 text-[11px] font-semibold text-paper/60">
-                  <span className="w-1.5 h-1.5 rounded-full bg-brand" />{t}
+                  <span className="w-1.5 h-1.5 shrink-0 rounded-full bg-brand" />{t}
                 </span>
               ))}
             </div>
 
             {n > 1 && (
-              <div className="mt-7 flex items-center gap-3">
+              <div className="mt-4 md:mt-7 flex items-center gap-3">
                 <div className="flex items-center gap-1.5">
                   {features.map((s, di) => (
                     <button key={s.id || di} onClick={() => setI(di)} aria-label={`Show ${s.name}`}
@@ -557,10 +584,13 @@ const HeroCarousel = ({ products = [], offers = [], onProduct, onVariant, onShop
 
 
           <div className="order-1 md:order-2 flex-1 min-w-0 w-full">
-            <div key={`r-${f.id}`} className="un-in relative">
+            <div className="relative">
+              {/* only the photos are keyed (new product = new set, fades in);
+                  the scrub row below stays mounted */}
               <div
+                key={`r-${f.id}`}
                 ref={railRef}
-                className="flex gap-3 md:gap-4 overflow-x-auto gl-hscroll snap-x snap-mandatory pb-1"
+                className="un-in flex gap-3 md:gap-4 overflow-x-auto gl-hscroll snap-x snap-mandatory pb-1"
                 style={{ touchAction: 'pan-x' }}
               >
                 {f.tiles.map((t, i) => (
@@ -570,9 +600,9 @@ const HeroCarousel = ({ products = [], offers = [], onProduct, onVariant, onShop
                      size every time the banner rotated. */
                   <button
                     key={t.key}
-                    onClick={() => onVariant(f.id, t.sku)}
+                    onClick={() => { if (f.offer) recordOfferInterest(f.offer.id, f.id); onVariant(f.id, t.sku); }}
                     aria-label={`Shop ${t.label}`}
-                    className="group relative shrink-0 snap-start text-left overflow-hidden rounded-lg border border-white/10 bg-un-ink2 w-[68vw] max-w-[260px] sm:w-[clamp(190px,20vw,260px)] sm:max-w-none"
+                    className="group relative shrink-0 snap-start text-left overflow-hidden rounded-lg border border-white/10 bg-un-ink2 w-[58vw] max-w-[260px] sm:w-[clamp(190px,20vw,260px)] sm:max-w-none"
                   >
                     <div className="relative w-full aspect-[4/5] overflow-hidden">
                       {/* The photo is contained (not cropped); the tile's
@@ -605,8 +635,8 @@ const HeroCarousel = ({ products = [], offers = [], onProduct, onVariant, onShop
               </div>
 
               {/* desktop scrub - mobile just swipes */}
-              {f.tiles.length > 1 && (
-                <div className="hidden md:flex items-center gap-2 mt-3">
+              {/* always laid out (hidden, not removed, for a 1-photo product) so the desktop hero never changes height */}
+              <div className={`hidden md:flex items-center gap-2 mt-3 ${f.tiles.length > 1 ? '' : 'invisible'}`}>
                   <button onClick={() => scrollRail(-1)} aria-label="Scroll variants left"
                     className="grid place-items-center w-8 h-8 border border-white/20 text-paper/70 hover:text-paper hover:border-white/50 transition-colors">
                     <i className="fa-solid fa-chevron-left text-[10px]" />
@@ -619,7 +649,6 @@ const HeroCarousel = ({ products = [], offers = [], onProduct, onVariant, onShop
                     {String(f.tiles.length).padStart(2, '0')} {f.variantCount > 1 ? 'variants' : 'views'} · swipe
                   </span>
                 </div>
-              )}
             </div>
           </div>
         </div>
@@ -630,16 +659,30 @@ const HeroCarousel = ({ products = [], offers = [], onProduct, onVariant, onShop
              tile rather than trailing off into dead space, and the tiles
              stretch to share whatever width is left - a short catalogue fills
              the row instead of leaving a gap, a long one just scrolls. */}
-        <div className="shrink-0 px-4 sm:px-5 md:px-10 pt-6 pb-6 md:pt-7 md:pb-7">
-          <div className="flex items-baseline justify-between gap-4 mb-3">
-            <h3 className="text-[15px] font-extrabold text-paper md:text-lg">More to explore</h3>
+        {/* light band: breaks the all-black first screen, and the white cards read as cards */}
+        <div className="shrink-0 bg-paper text-ink border-t border-hair px-4 sm:px-5 md:px-10 pt-6 pb-6 md:pt-7 md:pb-7">
+          <div className="flex items-center justify-between gap-4 mb-3">
+            <h3 className="text-[15px] font-extrabold text-ink md:text-lg">More to explore</h3>
             {/* <span className="gl-lbl text-[10px] text-paper/50">
               {strip.isRest ? 'More from the drop' : 'The drop'} · {String(strip.items.length).padStart(2, '0')} pieces
             </span> */}
-            <button onClick={onShop}
-              className="gl-lbl text-[10px] text-paper/70 hover:text-brand border-b border-white/25 hover:border-brand pb-0.5 transition-colors">
-              Shop all →
-            </button>
+            <div className="flex items-center gap-3">
+              <button onClick={onShop}
+                className="gl-lbl text-[10px] text-ink/70 hover:text-brand border-b border-ink/25 hover:border-brand pb-0.5 transition-colors">
+                Shop all →
+              </button>
+              {/* desktop arrows - phones just swipe */}
+              <div className="hidden md:flex items-center gap-1.5">
+                <button onClick={() => pageStrip(-1)} aria-label="Previous products"
+                  className="grid place-items-center w-8 h-8 border border-ink/20 text-ink/70 hover:text-ink hover:border-ink/50 transition-colors">
+                  <i className="fa-solid fa-chevron-left text-[10px]" />
+                </button>
+                <button onClick={() => pageStrip(1)} aria-label="Next products"
+                  className="grid place-items-center w-8 h-8 border border-ink/20 text-ink/70 hover:text-ink hover:border-ink/50 transition-colors">
+                  <i className="fa-solid fa-chevron-right text-[10px]" />
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* items-stretch: a row of flush, even-height cards. HomeProductCard's
@@ -653,10 +696,11 @@ const HeroCarousel = ({ products = [], offers = [], onProduct, onVariant, onShop
               came out visibly bigger on some cards than others. A short
               catalogue just leaves blank space at the row's end now, which
               reads fine on a horizontal scroller. */}
-          <div className="flex gap-3 md:gap-4 overflow-x-auto gl-hscroll pb-1 snap-x items-stretch">
+          {/* desktop shows exactly 5 cards (tablet 4), the rest scroll in */}
+          <div ref={stripRef} className="flex gap-3 md:gap-4 overflow-x-auto gl-hscroll pb-1 snap-x items-stretch">
             {strip.items.map((p, k) => (
               <div key={p.productId || k}
-                className="snap-start shrink-0 basis-[142px] sm:basis-[158px] md:basis-[176px]">
+                className="snap-start shrink-0 basis-[142px] sm:basis-[158px] md:basis-[calc((100%_-_48px)/4)] lg:basis-[calc((100%_-_64px)/5)]">
                 <HomeProductCard p={p} index={k} listId="home_drop" listName="The Drop" />
               </div>
             ))}
@@ -667,17 +711,17 @@ const HeroCarousel = ({ products = [], offers = [], onProduct, onVariant, onShop
             <button
               onClick={onShop}
               aria-label={`Shop all ${products.length} pieces`}
-              className="group snap-start shrink-0 basis-[142px] sm:basis-[158px] md:basis-[176px] gl-press flex flex-col border border-white/15 bg-white/[0.03] hover:border-brand/60 transition-colors text-left"
+              className="group snap-start shrink-0 basis-[142px] sm:basis-[158px] md:basis-[calc((100%_-_48px)/4)] lg:basis-[calc((100%_-_64px)/5)] gl-press flex flex-col border border-hair bg-white hover:border-brand/60 transition-colors text-left"
             >
-              <span className="grid grid-cols-2 gap-px bg-white/10 aspect-square overflow-hidden">
+              <span className="grid grid-cols-2 gap-px bg-hair aspect-square overflow-hidden">
                 {products.slice(0, 4).map((p, k) => (
                   <img key={p.productId || k} src={productImg(p)} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover bg-white transition-transform duration-500 group-hover:scale-105" onError={onImgErr} />
                 ))}
               </span>
               <span className="flex flex-1 items-center justify-between gap-2 px-3 py-3">
                 <span>
-                  <span className="block text-[13px] font-bold text-paper">Shop all</span>
-                  <span className="gl-lbl text-[9px] text-paper/50">{String(products.length).padStart(2, '0')} pieces</span>
+                  <span className="block text-[13px] font-bold text-ink">Shop all</span>
+                  <span className="gl-lbl text-[9px] text-muted">{String(products.length).padStart(2, '0')} pieces</span>
                 </span>
                 <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand text-white transition-transform group-hover:translate-x-0.5" aria-hidden="true">
                   <i className="fa-solid fa-arrow-right text-[11px]" />
@@ -808,7 +852,6 @@ const HomePage = () => {
       <HeroCarousel
         products={products}
         offers={homeOffers}
-        onProduct={(id) => navigate(`/products/${id}`)}
         /* a variant tile goes straight to that variant's page, not the list */
         onVariant={(id, sku) => navigate(sku ? `/product/${id}/${sku}` : `/products/${id}`)}
         onShop={() => navigate('/products')}

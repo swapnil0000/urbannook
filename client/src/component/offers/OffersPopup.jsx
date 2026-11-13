@@ -186,7 +186,7 @@ const OffersPopup = memo(() => {
 
           <div className="px-5 pt-3 text-center">
             <p id="un-op-title" className="text-[9px] font-bold uppercase tracking-[0.24em] text-paper/60">
-              {n === 1 ? 'Live offer' : `${n} live offers`} · Diwali at Urban Nook
+              {n === 1 ? 'Live offer' : `${n} live offers`} at UrbanNook
             </p>
           </div>
 
