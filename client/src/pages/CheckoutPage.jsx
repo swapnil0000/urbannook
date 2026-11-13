@@ -34,8 +34,8 @@ import OfferCheckoutReminder from "../component/offers/OfferCheckoutReminder";
 import PromotionBannerList from "../component/promotions/PromotionBannerList";
 import GiftClaimList from "../component/promotions/GiftClaimList";
 import { CartGiftProgress } from "../component/offers/CartValueGift";
-import GiftWrapOffer from "../component/GiftWrapOffer";
-import FestiveDelayNote from "../component/FestiveDelayNote";
+import { useRetireGiftWrap } from "../hooks/useRetireGiftWrap";
+import ShipsWithinNote from "../component/ShipsWithinNote";
 import SealBadgeCard, { UnderlineAmount } from "../component/promotions/SealBadgeCard";
 import { useGetCheckoutPromotionsQuery, useGetAvailableCouponsQuery } from "../store/api/userApi";
 import { buildPromotionCartItems } from "../utils/promotionCartItems";
@@ -411,6 +411,7 @@ const CheckoutPage = () => {
   const [calculateShipping, { isLoading: isCalculatingShipping }] = useCalculateShippingMutation();
   const { data: freeShippingOfferData } = useGetFreeShippingOfferQuery();
   const { data: giftWrapOfferData } = useGetGiftWrapOfferQuery();
+  useRetireGiftWrap(); // gift wrap is no longer offered: take an old pick off before paying
   // Promotion V2 - checkout-placement display (applied/qualifying offers
   // shown via PromotionBannerList below; also the source of truth for
   // "is free shipping REALLY eligible for these exact cart items", used by
@@ -1607,9 +1608,8 @@ const CheckoutPage = () => {
             </p>
           </div>
 
-          {/* the first checkout screen - the gift wrap and the cart-value gift nudge belong here too */}
+          {/* the first checkout screen - the cart-value gift nudge belongs here too */}
           <div className="mt-4 empty:hidden"><CartGiftProgress promotions={checkoutPromotions} /></div>
-          <div className="mt-4 empty:hidden"><GiftWrapOffer variant="card" /></div>
 
           {/* Prepaid opens Razorpay Magic straight away, so coupons are picked here. Applied only on tap. */}
           <CheckoutCouponTickets
@@ -1812,12 +1812,10 @@ const CheckoutPage = () => {
           <PromotionBannerList promotions={checkoutPromotions} pricing={checkoutPromotionsData?.data?.pricing} />
         </div>
       )}
-      {/* Diwali courier delay - every step, so it's seen before paying */}
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4 empty:hidden"><FestiveDelayNote /></div>
+      {/* dispatch promise - every step, so it's seen before paying */}
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4"><ShipsWithinNote /></div>
       {/* Cart-value free gift still locked ("add ₹X more") - every step, it's the nudge that grows the order */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4 empty:hidden"><CartGiftProgress promotions={checkoutPromotions} /></div>
-      {/* festive gift wrap - shoppers who tap "Go to Checkout" on the product page never see the cart drawer */}
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4 empty:hidden"><GiftWrapOffer variant="card" /></div>
       {/* Claimed free gifts that will be in the parcel (claiming itself happens in the cart) */}
       {/* free gifts: claim right here too (not only in the cart) */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4 empty:hidden"><GiftClaimList /></div>
