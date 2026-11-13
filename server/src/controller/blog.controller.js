@@ -7,6 +7,7 @@ import { NotFoundError } from "../utils/errors.js";
 import { apiCache } from "../module/cache.manager.module.js";
 import { cleanBlogHtml, youtubeId } from "../utils/blogHtml.js";
 import { SERIES, seriesOf } from "../utils/series.util.js";
+import { visibleProductsOnly } from "../utils/variantSort.js";
 
 // The franchise a post is about (Demon Slayer, One Piece, … or a video game),
 // from its title, else its tags when they name exactly one franchise — the same
@@ -88,7 +89,8 @@ const blogPostDetails = asyncHandler(async (req, res) => {
         images: (r.imageUrls?.length ? r.imageUrls : [r.imageUrl]).filter((u) => /^https:\/\//.test(u || "")).slice(0, 3),
       })).filter((r) => r.images.length),
       contentHtml: cleanBlogHtml(post.contentHtml || ""),
-      products: products.sort((a, b) => order.get(a.productId) - order.get(b.productId)),
+      // Unpublished (hidden) variants never leave the server.
+      products: visibleProductsOnly(products).sort((a, b) => order.get(a.productId) - order.get(b.productId)),
     };
   });
   if (!data) throw new NotFoundError("Post doesn't exist");

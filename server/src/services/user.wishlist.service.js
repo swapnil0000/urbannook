@@ -2,6 +2,7 @@ import Product from "../model/product.model.js";
 import WishList from "../model/user.wishlist.model.js";
 import { cartDetailsMissing } from "../utils/ValidateRes.js";
 import { ValidationError, NotFoundError, InternalServerError } from "../utils/errors.js";
+import { visibleProductsOnly } from "../utils/variantSort.js";
 
 const addToWishListService = async (userId, productId) => {
   let missing = cartDetailsMissing(userId, productId);
@@ -76,12 +77,13 @@ const getWishListService = async (userId) => {
     productId: { $in: wishList.products },
   }).select(
     "productId productName variantDetails productCategory productStatus -_id",
-  );
+  ).lean();
 
   return {
     statusCode: 200,
     message: "Wishlist fetched",
-    data: productDetails,
+    // Unpublished (hidden) variants never leave the server.
+    data: visibleProductsOnly(productDetails),
     success: true,
   };
 };
