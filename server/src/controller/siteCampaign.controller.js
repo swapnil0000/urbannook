@@ -25,7 +25,7 @@ const resolveLocations = (c) => {
 const firstSellable = (p) =>
   (p.variantDetails || []).find(
     (v) => v.isActive !== false && !v.variantOutOfStock && !(v.variantQuantity != null && Number(v.variantQuantity) <= 0),
-  ) || p.variantDetails?.[0] || null;
+  ) || (p.variantDetails || []).find((v) => v.isActive !== false) || null;
 
 const toCard = (p) => {
   const v = firstSellable(p);

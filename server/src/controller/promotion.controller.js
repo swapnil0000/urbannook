@@ -1,6 +1,7 @@
 import { ApiRes } from "../utils/index.js";
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
 import { ValidationError } from "../utils/errors.js";
+import { isVariantVisible } from "../utils/variantSort.js";
 import Product from "../model/product.model.js";
 import {
   getActivePromotions,
@@ -303,9 +304,10 @@ function cardAdvancesLeaf(card, leaf, ctx) {
 // storefront-ready card shape the bottom sheet needs - never the raw
 // product/variant document.
 function toRecommendationCard(product, variant) {
-  const v = variant || product.variantDetails?.find((candidate) =>
+  const v = variant || product.variantDetails?.find((candidate) => isVariantVisible(candidate) &&
     candidate.variantOutOfStock !== true && (candidate.variantQuantity == null || Number(candidate.variantQuantity) > 0));
-  if (!v) return null;
+  // Unpublished (hidden) variants are never offered.
+  if (!v || !isVariantVisible(v)) return null;
   const outOfStock = v.variantOutOfStock === true || (v.variantQuantity != null && Number(v.variantQuantity) <= 0);
   if (outOfStock) return null;
   return {
@@ -771,6 +773,7 @@ function buildComboBuilder(promos, productMap, shortNameOf, hiddenRewardLabel) {
         productId: id,
         label: shortNameOf(id),
         cards: (productMap.get(id)?.variantDetails || [])
+          .filter(isVariantVisible)
           .filter((v) => (slot.rewardOf ? !slot.rewardSku || v.sku === slot.rewardSku : !pinned.get(id)?.size || pinned.get(id).has(v.sku)))
           .map((v) => {
             const card = builderVariantCard(productMap.get(id), v);
@@ -1005,7 +1008,7 @@ const getHomeDisplayController = asyncHandler(async (_req, res) => {
   const firstActiveVariant = (product) =>
     (product?.variantDetails || []).find(
       (v) => v.isActive !== false && !v.variantOutOfStock && !(v.variantQuantity != null && Number(v.variantQuantity) <= 0),
-    ) || product?.variantDetails?.[0] || null;
+    ) || (product?.variantDetails || []).find(isVariantVisible) || null;
 
   const display = candidates
     .map(({ promo, productIds }) => {

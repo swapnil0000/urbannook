@@ -23,6 +23,7 @@ import {
 } from "../utils/errors.js";
 import html_to_pdf from "html-pdf-node";
 import { generateInvoiceHtmlTemplate } from "../template/invoiceTemplate.template.js";
+import { visibleProductsOnly } from "../utils/variantSort.js";
 import {
   getInvoicePresignedUrl,
   uploadInvoiceToS3,
@@ -281,7 +282,7 @@ const getOrderRecommendations = asyncHandler(async (req, res) => {
     .select("-_id -createdAt -updatedAt -__v")
     .lean();
   const byId = new Map(recs.map((p) => [String(p.productId), p]));
-  const products = recIds.map((id) => byId.get(id)).filter(Boolean).slice(0, 8);
+  const products = visibleProductsOnly(recIds.map((id) => byId.get(id)).filter(Boolean)).slice(0, 8);
   return res.status(200).json(new ApiRes(200, "Recommendations", { products }, true));
 });
 

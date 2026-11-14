@@ -4,6 +4,7 @@ import { asyncHandler } from "../middleware/errorHandler.middleware.js";
 import { NotFoundError } from "../utils/errors.js";
 import { apiCache } from "../module/cache.manager.module.js";
 import { recentSalesByProduct, withRecentSales } from "../utils/productSignals.util.js";
+import { withoutHiddenVariants, visibleProductsOnly, hasNoVisibleVariants } from "../utils/variantSort.js";
 
 const productListing = asyncHandler(async (req, res) => {
   const {
@@ -23,7 +24,13 @@ const productListing = asyncHandler(async (req, res) => {
     // isAddon products (e.g. Gift Wrap) are real, cart-addable products but
     // never belong in the browsable grid - excluded here only; still
     // fetchable directly by ID via specificProductDetails below.
-    const query = { isPublished: true, isAddon: { $ne: true } };
+    const query = {
+      isPublished: true,
+      isAddon: { $ne: true },
+      // Skip products whose every variant is unpublished in the admin, in the
+      // query itself so page size and totalProducts stay right.
+      $or: [{ variantDetails: { $exists: false } }, { variantDetails: { $size: 0 } }, { variantDetails: { $elemMatch: { isActive: { $ne: false } } } }],
+    };
     let sort = { priority: -1, createdAt: -1 }; // admin priority first, then latest
 
     if (search) {
@@ -66,7 +73,8 @@ const productListing = asyncHandler(async (req, res) => {
     // "Trending" (30 days), and the 7-day product-card sales badge. Cached
     // with the rest of this response (apiCache, 10 min).
     const sales = await recentSalesByProduct(pageProducts.map((p) => p.productId));
-    const listOfProducts = withRecentSales(pageProducts, sales);
+    // Unpublished (hidden) variants never leave the server.
+    const listOfProducts = withRecentSales(visibleProductsOnly(pageProducts), sales);
 
     return {
       listofPublishedProducts: listOfProducts,
@@ -99,16 +107,18 @@ const specificProductDetails = asyncHandler(async (req, res) => {
   const { productId } = req.params;
 
   const fetcher = async () => {
-    const productDetails = await Product.findOne({
+    const found = await Product.findOne({
       productId,
       isPublished: true,
     })
       .select("-_id -createdAt -updatedAt -__v")
       .lean();
 
-    if (!productDetails) {
+    if (!found || hasNoVisibleVariants(found)) {
       throw new NotFoundError("Product Doesn't exist");
     }
+    // Unpublished (hidden) variants never leave the server.
+    const productDetails = withoutHiddenVariants(found);
 
     // Inline the admin-curated recommended products so the PDP needs no extra
     // API call. Published only, and the admin-defined order is preserved.
@@ -124,7 +134,7 @@ const specificProductDetails = asyncHandler(async (req, res) => {
         .select("-_id -createdAt -updatedAt -__v")
         .lean();
       const byId = new Map(recs.map((p) => [String(p.productId), p]));
-      recommendedProductsDetails = recIds.map((id) => byId.get(id)).filter(Boolean);
+      recommendedProductsDetails = visibleProductsOnly(recIds.map((id) => byId.get(id)).filter(Boolean));
     }
     productDetails.recommendedProductsDetails = recommendedProductsDetails;
 
@@ -143,7 +153,7 @@ const specificProductDetails = asyncHandler(async (req, res) => {
         .select("-_id -createdAt -updatedAt -__v")
         .lean();
       const comboById = new Map(combos.map((p) => [String(p.productId), p]));
-      comboProductsDetails = comboIds.map((id) => comboById.get(id)).filter(Boolean);
+      comboProductsDetails = visibleProductsOnly(comboIds.map((id) => comboById.get(id)).filter(Boolean));
     }
     productDetails.comboProductsDetails = comboProductsDetails;
 
@@ -221,7 +231,8 @@ const getProductsByTag = asyncHandler(async (_, res) => {
         },
       },
     ]);
-    return productDetails[0];
+    const facets = productDetails[0] || {};
+    return Object.fromEntries(Object.entries(facets).map(([k, list]) => [k, visibleProductsOnly(list)]));
   };
 
   const result = await apiCache.handle("products_by_tags", fetcher);

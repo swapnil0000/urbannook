@@ -1,4 +1,5 @@
 import Product from "../model/product.model.js";
+import { isVariantVisible, hasNoVisibleVariants } from "../utils/variantSort.js";
 import Cart from "../model/user.cart.model.js";
 import User from "../model/user.model.js";
 import { cartDetailsMissing } from "../utils/ValidateRes.js";
@@ -31,18 +32,24 @@ const addToCartService = async ({ userId, productId, productQuanity, variant, co
 
   const product = await Product.findOne({ productId }).lean();
   if (!product) throw new NotFoundError("Product not found");
+  if (hasNoVisibleVariants(product)) throw new ValidationError("This variant is not available");
 
-  // 1. DETERMINE VARIANT (Strict Fallback)
+  // 1. DETERMINE VARIANT (Strict Fallback). Hidden variants (unpublished
+  // drafts, retired) are never the default and can't be added by name.
+  const visibleVariants = (product.variantDetails || []).filter(isVariantVisible);
   let vName = variant || color;
   if (!vName || vName === "N/A" || vName === "") {
-    vName = product.variantDetails?.[0]?.variantName || product.color?.[0] || "Standard Variant";
+    vName = visibleVariants[0]?.variantName || product.color?.[0] || "Standard Variant";
+  }
+  if ((product.variantDetails || []).some((v) => v.variantName === vName && !isVariantVisible(v))) {
+    throw new ValidationError("This variant is not available");
   }
 
   // 2. DETERMINE IMAGE
   let vImage = image;
   if (!vImage) {
     const matchedV = product.variantDetails?.find(v => v.variantName === vName);
-    vImage = matchedV?.variantImage?.[0] || product.productImg || product.variantDetails?.[0]?.variantImage?.[0] || "https://urbannook.in/assets/logo.webp";
+    vImage = matchedV?.variantImage?.[0] || product.productImg || visibleVariants[0]?.variantImage?.[0] || "https://urbannook.in/assets/logo.webp";
   }
 
   const cartKey = `${productId}:${vName}`;

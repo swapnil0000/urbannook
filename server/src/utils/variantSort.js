@@ -22,12 +22,45 @@ export function syncVariantOutOfStock(variants) {
 }
 
 // Stable partition: in-stock variants keep their relative order, all
-// out-of-stock variants move to the end (also keeping their relative order).
+// out-of-stock variants move to the end (also keeping their relative order),
+// and hidden variants (isActive false: unpublished drafts and retired ones)
+// go after those, so variantDetails[0] is never a hidden variant. Kept in
+// sync with the admin repo's copy.
 export function sortVariantsOOSLast(variants) {
   if (!Array.isArray(variants)) return variants;
-  const inStock = variants.filter((v) => !isVariantOOS(v));
-  const oos = variants.filter(isVariantOOS);
-  return [...inStock, ...oos];
+  const active = variants.filter((v) => v?.isActive !== false);
+  const hidden = variants.filter((v) => v?.isActive === false);
+  const inStock = active.filter((v) => !isVariantOOS(v));
+  const oos = active.filter(isVariantOOS);
+  return [...inStock, ...oos, ...hidden];
+}
+
+// A variant the admin has not published (or has retired) is never shown to
+// or sold to a customer. Only for responses sent to the browser: never use it
+// on a document that is written back, or the hidden variants would be deleted.
+export const isVariantVisible = (v) => !!v && v.isActive !== false;
+
+// True when the product has variants but the admin has hidden all of them:
+// such a product is not on sale at all (no visible price, nothing to buy).
+export const hasNoVisibleVariants = (product) =>
+  Array.isArray(product?.variantDetails) &&
+  product.variantDetails.length > 0 &&
+  !product.variantDetails.some(isVariantVisible);
+
+// First variant a customer may see; used for price/image fallbacks so an
+// unsorted document never prices an order from a hidden variant.
+export const firstVisibleVariant = (product) =>
+  (product?.variantDetails || []).find(isVariantVisible) || null;
+
+// For lists sent to the browser: drops hidden variants and any product left
+// with nothing visible.
+export function visibleProductsOnly(products) {
+  return (products || []).filter((p) => !hasNoVisibleVariants(p)).map(withoutHiddenVariants);
+}
+
+export function withoutHiddenVariants(product) {
+  if (!product || !Array.isArray(product.variantDetails)) return product;
+  return { ...product, variantDetails: product.variantDetails.filter(isVariantVisible) };
 }
 
 // The product-level `productStatus` the storefront gates listing filters and
@@ -42,6 +75,9 @@ export function sortVariantsOOSLast(variants) {
 export function deriveProductStatus(variantDetails, productQuantity, currentStatus) {
   if (currentStatus === "discontinued") return "discontinued";
   const activeVariants = (variantDetails || []).filter((v) => v?.isActive !== false);
+  // Variants exist but none is published yet (a draft product): the storefront
+  // hides it anyway, so keep the current status instead of a false "out of stock".
+  if ((variantDetails || []).length > 0 && activeVariants.length === 0) return currentStatus || "in_stock";
   const outOfStock = activeVariants.length > 0
     ? activeVariants.every(isVariantOOS)
     : Number(productQuantity) <= 0;
