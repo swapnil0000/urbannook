@@ -185,7 +185,7 @@ Components and where they run:
 
 | Component | Runs on | Notes |
 |---|---|---|
-| Storefront frontend | S3 `urbannook-prod-frontend`, served by Cloudflare Worker `urbannook-s3-proxy-prod` (no CloudFront) | Built by Jenkins, static files — including every public page rendered at build time (§2.1). Client releases are stored and rolled back as `client-<release>.tar.gz`. |
+| Storefront frontend | S3 `urbannook-prod-frontend`. Pages (HTML) served by Cloudflare Worker `urbannook-s3-proxy-prod`; hashed build files (`assets/*`) by `static.urbannook.in` (CloudFront + OAC, no Worker) when the build sets `VITE_STATIC_BASE` (§2.2) | Built by Jenkins, static files — including every public page rendered at build time (§2.1). Client releases are stored and rolled back as `client-<release>.tar.gz`. |
 | Storefront API | **Prod EC2** (pm2, fork mode, 1 instance) | The thing this document protects. |
 | Admin frontend | Vercel | Independent of prod EC2. |
 | Admin API | Render | Independent of prod EC2 → can roll prod back even when prod is down. |
@@ -230,6 +230,29 @@ There is **no server rendering at request time** and no extra process on the pro
 Freshness: rendered pages are as fresh as the last client build (deploy or nightly 21:30 IST). Prices and
 stock in the page update on hydration from the live API, so shoppers always see live values; crawlers see
 the build-time values. `client/server.mjs` (runtime SSR) is for local preview only (`npm run dev:ssr`).
+
+### 2.2 Worker request budget — static files never through a Worker
+
+Every request that reaches a Worker route counts toward the Cloudflare Workers quota, even when the file
+is cached (the Worker runs before the cache). On 2026-11-09 the Free plan limit (100k/day, resets 05:30 IST)
+was used up and the site returned 429: every page view cost ~50 Worker runs (42 JS chunks, 7 fonts, CSS,
+HTML) plus one per product image. Rule: **only pages (HTML) run the website Worker; build files and images do not.**
+
+- `client/vite.config.js`: when `VITE_STATIC_BASE` is set (Infisical prod `/user/client`,
+  `https://static.urbannook.in`), every `assets/*` URL in the build — script tags, lazy chunks, CSS,
+  fonts inside CSS — points there. Unset = same origin, as before (staging, local, old releases).
+- `static.urbannook.in` = CloudFront distribution, origin `urbannook-prod-frontend` path `assets/*` with
+  Origin Access Control (bucket stays private), CORS for `https://www.urbannook.in` and
+  `https://urbannook.in`. Cloudflare DNS: CNAME, DNS only.
+- `jenkins/scripts/upload-client.sh` uploads the hashed files (`assets/js|fonts|images/*`, `assets/*.css`) with
+  `immutable` and **never deletes** them, so tabs opened before a deploy and rolled-back releases still find their
+  chunks. Fixed-name files from `client/public/assets/` (logos, hero images) keep the old rule (no immutable, deleted
+  when removed). The bucket grows by a few MB per deploy (cents a year); optional later: an S3 lifecycle rule for
+  hashed files older than the oldest kept client release.
+- The prod smoke test fetches the bundle from the static host when `index.html` points there and fails without a
+  CORS header.
+- Turning it off: remove `VITE_STATIC_BASE` and deploy; the Worker still serves `/assets/*`.
+- Target: ~1 Worker run per page view (check Worker metrics after each change to how files are served).
 
 Browser-side caching (`client/public/sw.js`, production only): hashed build files are cache-first;
 images from `assets-prod.urbannook.in` are stale-while-revalidate (last 60 kept). The image cache needs
@@ -329,6 +352,11 @@ in the admin repo (`--patch` / `--undelete` / `--into`, dry-run by default, env-
 | 1. Symlink | New code is bad, server is fine | `current` → previous release, restart pm2 (or admin panel button 📋) | seconds |
 | 2. From local zip | Release folder deleted/corrupted | Extract `artifacts/<zip>` into a new release folder, switch | ~2 min |
 | 3. From S3 | Whole EC2 lost | New EC2 → Node + pm2 → `shared/.env.production` → download zip from S3 → extract → switch | ~10–15 min |
+
+Client rollback (`UrbanNook-Prod-Rollback`, client part) is unaffected by the static host (§2.2): old releases
+reference either `www…/assets/*` (built before `VITE_STATIC_BASE`) or `static…/assets/*`, and both serve the
+same files; each rollback re-uploads its own hashed files. Hashed files are never deleted only from this change on
+(earlier deploys used `--delete`), so tabs left open on builds older than that may still miss lazy chunks.
 
 ### 5.3 Manual runbook (break-glass, rule 9)
 
