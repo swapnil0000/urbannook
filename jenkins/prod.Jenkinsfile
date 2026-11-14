@@ -260,7 +260,7 @@ pipeline {
                 echo "$KEYS" | grep -qx "$k" || { echo "MISSING in Infisical prod /user/client: $k"; exit 1; }
               done
               # Optional: unset means the feature is off (same as before).
-              for k in VITE_GOOGLE_ADS_ID VITE_GADS_LABEL_PURCHASE VITE_MAGIC_CHECKOUT_ENABLED; do
+              for k in VITE_GOOGLE_ADS_ID VITE_GADS_LABEL_PURCHASE VITE_MAGIC_CHECKOUT_ENABLED VITE_STATIC_BASE; do
                 echo "$KEYS" | grep -qx "$k" || echo "WARNING: $k not set in Infisical — that feature is OFF in this build"
               done
 
@@ -492,9 +492,17 @@ REMOTE
             # Website: real HTML, and the JS bundle it references loads.
             CT=$(curl -fsS -o /tmp/smoke-index.html -w "%{content_type}" "https://www.urbannook.in/?smoke=$T")
             echo "$CT" | grep -q "text/html" || { echo "index: wrong content-type $CT"; exit 1; }
-            JS=$(grep -o '/assets/[^"]*\\.js' /tmp/smoke-index.html | head -1)
+            # The bundle URL is absolute when the build used the static host
+            # (VITE_STATIC_BASE, DEPLOYMENT_ARCHITECTURE.md §2.2): fetch it there,
+            # with the CORS check module scripts need, else from www as before.
+            JS=$(grep -o '\\(https://[^"/]*\\)\\?/assets/[^"]*\\.js' /tmp/smoke-index.html | head -1)
             [ -n "$JS" ] || { echo "index: no JS bundle referenced"; exit 1; }
-            curl -fsS -o /dev/null "https://www.urbannook.in$JS?smoke=$T"
+            case "$JS" in
+              https://*)
+                H=$(curl -fsS -o /dev/null -D - -H "Origin: https://www.urbannook.in" "$JS?smoke=$T")
+                echo "$H" | grep -qi "^access-control-allow-origin:" || { echo "static host: no CORS header on $JS"; exit 1; } ;;
+              *) curl -fsS -o /dev/null "https://www.urbannook.in$JS?smoke=$T" ;;
+            esac
             curl -fsS -o /dev/null "https://www.urbannook.in/sitemap.xml?smoke=$T"
             # Images: any 2xx/403/404 means the worker signs and reaches S3; 5xx = broken.
             C=$(curl -s -o /dev/null -w "%{http_code}" "https://assets-prod.urbannook.in/__smoke_$T.png")

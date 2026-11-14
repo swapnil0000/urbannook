@@ -105,7 +105,17 @@ export default defineConfig(({ mode, isSsrBuild }) => {
   // Vite does NOT auto-populate process.env from .env files, so load them here
   // and hand the GTM container id to the index.html replace plugin.
   const env = loadEnv(mode, '.', '');
+  // Hashed build files (assets/*) can come from a separate static host so they
+  // never run the website Worker — every Worker run counts toward the Cloudflare
+  // quota (DEPLOYMENT_ARCHITECTURE.md §2.2). Empty = same origin, as before.
+  const staticBase = (env.VITE_STATIC_BASE || '').replace(/\/+$/, '');
   return {
+  ...(staticBase && !isSsrBuild && {
+    experimental: {
+      renderBuiltUrl: (filename) =>
+        filename.startsWith('assets/') ? `${staticBase}/${filename}` : { relative: false },
+    },
+  }),
   plugins: [react(), bundleSizeMonitor(), htmlEnvReplace(env.VITE_GTM_ID, env.VITE_META_PIXEL_ID)],
   resolve: {
     alias: {
