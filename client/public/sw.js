@@ -21,8 +21,11 @@ const MAX_IMAGE_ENTRIES = 60;
 const ENABLE_IMAGE_CACHE = true;
 const IMAGE_HOSTS = ['assets-prod.urbannook.in'];
 
+// Hashed build files may come from the static host (VITE_STATIC_BASE in vite.config.js).
+const BUILD_ASSET_ORIGINS = [self.location.origin, 'https://static.urbannook.in'];
+
 const isHashedBuildAsset = (url) =>
-  url.origin === self.location.origin &&
+  BUILD_ASSET_ORIGINS.includes(url.origin) &&
   (/^\/assets\/(js|fonts|images)\//.test(url.pathname) ||
     /^\/assets\/.+-[A-Za-z0-9_-]{8}\.css$/.test(url.pathname));
 
