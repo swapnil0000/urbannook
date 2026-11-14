@@ -2,7 +2,7 @@ import express from "express";
 import request from "supertest";
 import Product from "../../model/product.model.js";
 import Category from "../../model/category.model.js";
-import categoryRouter from "../../routes/category.route.js";
+import categoryRouter from "../../routes/v1-deprecated/category.route.js";
 import { errorHandler } from "../../middleware/errorHandler.middleware.js";
 import { apiCache } from "../../module/cache.manager.module.js";
 

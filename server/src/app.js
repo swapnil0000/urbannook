@@ -39,6 +39,7 @@ import { corsOptions, logCorsConfig } from "./config/cors.config.js";
 import { errorHandler } from "./middleware/errorHandler.middleware.js";
 import { sanitizeRequestBody } from "./middleware/sanitization.middleware.js";
 import env from "./config/envConfigSetup.js";
+import v2Router from "./routes/v2/index.js";
 
 const app = express();
 
@@ -249,6 +250,11 @@ app.use(
   siteCampaignRouter,
   heroBannerRouter,
 );
+
+/* API v2 - new and reworked endpoints (routes/v2). v1 stays mounted above;
+   v1 routes that have a v2 successor live in routes/v1-deprecated/. */
+// express.json() above is mounted on /api/v1 only (raw-body paths), so v2 gets its own.
+app.use("/api/v2", express.json(), sanitizeRequestBody, v2Router);
 
 // TEMP deploy-verification log — remove once cart-rules deploy is confirmed
 // live on staging. Prints once at process boot so it's easy to grep PM2

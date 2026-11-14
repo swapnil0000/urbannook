@@ -51,6 +51,28 @@ compliant alternative instead.
 10. **Anything that changes how the system works updates the docs in the same PR**:
     `DEPLOYMENT_ARCHITECTURE.md` here and the System Guide in the admin repo.
 
+11. **API versioning.** New and reworked endpoints go to `/api/v2` (`server/src/routes/v2/`), layered
+    route → controller → service (`server/src/services/`), one envelope (`server/src/utils/apiV2.js`),
+    list views return slim cards. v1 endpoints are **never deleted**: once they have a v2 successor
+    they move to `server/src/routes/v1-deprecated/`, send `Deprecation` + `Link` headers
+    (`middleware/deprecation.middleware.js`), and carry a comment saying why they moved and where.
+
+## 3a. Mandatory workflow for every change (all developers and every AI assistant)
+
+1. `git fetch origin`, check out `main`, pull so local `main` equals `origin/main`. Cut the branch
+   from it. Conflicts or uncommitted work in the way: stop and ask the developer.
+2. An **engineer** (2–3 yrs level) makes the change.
+3. A **Senior Dev** (10 yrs full stack + deployment + AWS + AI) and a **Principal Architect**
+   (infra, cost, architecture, **SEO mandatory**) review together, discuss, and mark each finding
+   must-fix / not needed. Suspected bugs without evidence are reported to the developer separately.
+4. The engineer fixes the must-fix items; both re-check. Only when **both are OK** does it go to the
+   **QA Lead**, who tests everything.
+5. QA OK, then commit, **with the developer's own git identity only: no AI co-author lines, no
+   "generated with" text, no emoji**.
+6. Push the branch and open **two PRs: one to `main`, one to `staging`**. If `main` and `staging`
+   differ, the sync workflow raises its own PR; say whether that sync PR is merged yet.
+7. Never push to `main` directly.
+
 ## 4. Where things are
 
 - Deploy code: `jenkins/` (prod, rollback, staging, `scripts/`), `infra/cloudflare/`

@@ -1,230 +1,58 @@
+// API v1 product controllers - DEPRECATED, kept only so old clients keep
+// working. Successor: /api/v2/catalog/products (controller/v2/catalog.controller.js).
+// Why v2: v1 returns every product field (descriptions, specs, full galleries)
+// for list views and uses ad-hoc keys like `listofPublishedProducts`; v2 sends
+// slim product cards and one response envelope. Queries live in
+// services/catalog.service.js, shared by both versions.
 import { ApiRes } from "../utils/index.js";
-import Product from "../model/product.model.js";
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
-import { NotFoundError } from "../utils/errors.js";
-import { apiCache } from "../module/cache.manager.module.js";
-import { recentSalesByProduct, withRecentSales } from "../utils/productSignals.util.js";
+import {
+  listProducts,
+  getProductDetails,
+  getProductsByTags,
+} from "../services/catalog.service.js";
 
 const productListing = asyncHandler(async (req, res) => {
-  const {
-    limit,
-    currentPage,
+  const { limit, currentPage, search, status, category, subCategory, featured } = req.query;
+  const { products, pagination } = await listProducts({
+    page: Number(currentPage) || 1,
+    perPage: Number(limit) || 10,
     search,
     status,
     category,
     subCategory,
-    featured,
-  } = req.query;
+    featured: featured === "true",
+  });
 
-  const fetcher = async () => {
-    const page = Number(currentPage) || 1;
-    const perPage = Number(limit) || 10;
-    /*category -> Filter by category	Electronics , search -> Keyword search in name	iPhone */
-    // isAddon products (e.g. Gift Wrap) are real, cart-addable products but
-    // never belong in the browsable grid - excluded here only; still
-    // fetchable directly by ID via specificProductDetails below.
-    const query = { isPublished: true, isAddon: { $ne: true } };
-    let sort = { priority: -1, createdAt: -1 }; // admin priority first, then latest
-
-    if (search) {
-      if (search.length <= 2) {
-        // Short input like p , ph , pho
-        query.productName = {
-          $regex: `^${search}`,
-          $options: "i", // makes it case - insensitive Eg - Chair , chair, CHAIR - all same
-        };
-      } else {
-        // for length inputs like iPhone 15 Pro Max
-        query.$text = { $search: search };
-        sort = { score: { $meta: "textScore" }, createdAt: -1 };
-      }
-    }
-
-    if (!query.$text) {
-      if (category)
-        query.productCategory = { $regex: String(category), $options: "i" };
-      if (subCategory)
-        query.productSubCategory = {
-          $regex: String(subCategory),
-          $options: "i",
-        };
-      if (status) query.productStatus = status;
-      if (featured === "true") query.tags = "featured";
-    }
-
-    const [pageProducts, totalProducts] = await Promise.all([
-      Product.find(query)
-        .skip((page - 1) * perPage)
-        .limit(perPage)
-        .sort(sort)
-        // createdAt stays in: the storefront's "New arrivals" sort reads it.
-        .select("-_id -updatedAt -__v")
-        .lean(),
-      Product.countDocuments(query),
-    ]);
-    // Real units sold per product/variant power "Most bought" (all time),
-    // "Trending" (30 days), and the 7-day product-card sales badge. Cached
-    // with the rest of this response (apiCache, 10 min).
-    const sales = await recentSalesByProduct(pageProducts.map((p) => p.productId));
-    const listOfProducts = withRecentSales(pageProducts, sales);
-
-    return {
-      listofPublishedProducts: listOfProducts,
-      pagination: {
-        NolistofPublishedProducts: listOfProducts.length,
-        currentPage: page,
-        totalProducts,
-        // Was computed from this page's length, so it was always 1.
-        totalPages: Math.ceil(totalProducts / perPage),
-      },
-    };
+  // v1 response shape is frozen: old key names, and null when empty.
+  const result = {
+    listofPublishedProducts: products,
+    pagination: {
+      NolistofPublishedProducts: pagination.count,
+      currentPage: pagination.currentPage,
+      totalProducts: pagination.totalProducts,
+      totalPages: pagination.totalPages,
+    },
   };
-
-  const result = await apiCache.handle(req.query, fetcher);
   return res
     .status(200)
     .json(
       new ApiRes(
         200,
-        result.listofPublishedProducts.length === 0
-          ? "No Published Product found"
-          : "Product List",
-        result.listofPublishedProducts.length === 0 ? null : result,
+        products.length === 0 ? "No Published Product found" : "Product List",
+        products.length === 0 ? null : result,
         true,
       ),
     );
 });
 
 const specificProductDetails = asyncHandler(async (req, res) => {
-  const { productId } = req.params;
-
-  const fetcher = async () => {
-    const productDetails = await Product.findOne({
-      productId,
-      isPublished: true,
-    })
-      .select("-_id -createdAt -updatedAt -__v")
-      .lean();
-
-    if (!productDetails) {
-      throw new NotFoundError("Product Doesn't exist");
-    }
-
-    // Inline the admin-curated recommended products so the PDP needs no extra
-    // API call. Published only, and the admin-defined order is preserved.
-    const recIds = Array.isArray(productDetails.recommendedProducts)
-      ? productDetails.recommendedProducts.filter(Boolean).map(String)
-      : [];
-    let recommendedProductsDetails = [];
-    if (recIds.length) {
-      const recs = await Product.find({
-        productId: { $in: recIds },
-        isPublished: true,
-      })
-        .select("-_id -createdAt -updatedAt -__v")
-        .lean();
-      const byId = new Map(recs.map((p) => [String(p.productId), p]));
-      recommendedProductsDetails = recIds.map((id) => byId.get(id)).filter(Boolean);
-    }
-    productDetails.recommendedProductsDetails = recommendedProductsDetails;
-
-    // Inline the admin-picked combo companions (offered as a "buy together"
-    // popup after add-to-cart). Published only, admin order preserved; an
-    // empty result is what switches the popup off for that product.
-    const comboIds = Array.isArray(productDetails.comboProductIds)
-      ? productDetails.comboProductIds.filter(Boolean).map(String)
-      : [];
-    let comboProductsDetails = [];
-    if (comboIds.length) {
-      const combos = await Product.find({
-        productId: { $in: comboIds },
-        isPublished: true,
-      })
-        .select("-_id -createdAt -updatedAt -__v")
-        .lean();
-      const comboById = new Map(combos.map((p) => [String(p.productId), p]));
-      comboProductsDetails = comboIds.map((id) => comboById.get(id)).filter(Boolean);
-    }
-    productDetails.comboProductsDetails = comboProductsDetails;
-
-    // Cross-product versions (Wooden ↔ LED): for every variant that has a
-    // variantGroup, inline the OTHER published, active variants in that group
-    // so the PDP can render its version toggle without another request.
-    // A variant with a group but no other versions gets `versions: []` - the
-    // PDP shows the toggle greyed out. No group = no `versions` key at all.
-    const groups = [
-      ...new Set((productDetails.variantDetails || []).map((v) => v.variantGroup).filter(Boolean)),
-    ];
-    if (groups.length) {
-      const peers = await Product.find(
-        { isPublished: true, "variantDetails.variantGroup": { $in: groups } },
-        { _id: 0, productId: 1, variantDetails: 1 },
-      ).lean();
-      const byGroup = new Map();
-      for (const p of peers) {
-        for (const pv of p.variantDetails || []) {
-          if (!pv.variantGroup || pv.isActive === false) continue;
-          const list = byGroup.get(pv.variantGroup) || [];
-          list.push({
-            type: pv.variantType || "",
-            productId: p.productId,
-            sku: pv.sku || "",
-            variantName: pv.variantName || "",
-            outOfStock:
-              pv.variantOutOfStock === true ||
-              (pv.variantQuantity != null && pv.variantQuantity <= 0),
-          });
-          byGroup.set(pv.variantGroup, list);
-        }
-      }
-      for (const v of productDetails.variantDetails || []) {
-        if (!v.variantGroup) continue;
-        v.versions = (byGroup.get(v.variantGroup) || []).filter(
-          (o) => !(o.productId === productDetails.productId && o.sku === v.sku),
-        );
-      }
-    }
-
-    return productDetails;
-  };
-
-  const result = await apiCache.handle(req.params, fetcher);
-  // apiCache.clear()
+  const result = await getProductDetails(req.params.productId);
   return res.status(200).json(new ApiRes(200, `Product Details`, result, true));
 });
 
 const getProductsByTag = asyncHandler(async (_, res) => {
-  const fetcher = async () => {
-    const productDetails = await Product.aggregate([
-      {
-        $match: {
-          isPublished: true,
-          isAddon: { $ne: true },
-        },
-      },
-      {
-        $project: {
-          productName: 1,
-          productId: 1,
-          uiProductId: 1,
-          variantDetails: 1,
-          _id: 0,
-          tags: 1,
-        },
-      },
-      {
-        $facet: {
-          featured: [{ $match: { tags: "featured" } }, { $limit: 2 }],
-          new_arrival: [{ $match: { tags: "new_arrival" } }, { $limit: 2 }],
-          best_seller: [{ $match: { tags: "best_seller" } }, { $limit: 2 }],
-          trending: [{ $match: { tags: "trending" } }, { $limit: 2 }],
-        },
-      },
-    ]);
-    return productDetails[0];
-  };
-
-  const result = await apiCache.handle("products_by_tags", fetcher);
+  const result = await getProductsByTags();
   return res.status(200).json(new ApiRes(200, `productDetails`, result, true));
 });
 
