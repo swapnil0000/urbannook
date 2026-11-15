@@ -84,3 +84,59 @@ prepaid cost the customer exactly the same.
   - `checkout_help_shown`, with `reason`, `placement`, `order_id`, `value` and `call_open`.
   - `checkout_help_click`, with the same fields plus `channel` (call | whatsapp).
   - Compare these with the paid orders that follow to see how many calls convert.
+
+## COD → prepaid: pay-online link after a COD order
+
+- **What the customer gets:** once a COD order's advance is paid, a Razorpay payment link for the
+  balance minus the COD fee. It is open for 2 hours (`COD_LINK_WINDOW_MINUTES`). Razorpay sends it by
+  SMS, and by email when the order has a real address (never a `@wa.urbannook.in` placeholder). The
+  same link shows on the order page and the order confirmation page:
+  "Pay ₹X online now and skip the ₹49 COD fee". The click is tracked as `cod_pay_online_click`.
+- **When it is paid** (`payment_link.paid` webhook): the order becomes `PREPAID`.
+  - `codDetails.remainingAmount` → 0, `codDetails.codFee` → 0, `amount` is reduced by the waived fee.
+  - The second Razorpay payment id goes in `codConversion.paymentId`. A refund for that order must
+    cover both payments: `payment.razorpayPaymentId` (the advance) and `codConversion.paymentId`.
+    The order page shows the second one as `balancePaymentRef`.
+- **The courier:** admin does not push the order while the link is being created or is open. It holds
+  until expiry plus 10 minutes (`utils/codPrepaidLinkHold.js` in urbannook-admin). Auto-push skips the
+  order and the hourly sweep picks it up after. A manual or bulk push gets a 409 saying until when.
+- **Safety:**
+  - If a link is paid but the order can no longer switch, the payment is refunded at once
+    (`codConversion.status = refunded`). That covers an order already with the courier, a cancelled
+    order, or a wrong amount.
+  - If that refund fails, Zoho Cliq gets an alert.
+  - A link Razorpay refuses leaves an ordinary COD order (`status = failed`).
+- **Code:**
+  - Storefront: `server/src/services/codPrepaidLink.service.js`, which has the status lifecycle.
+  - The PAID write in `fulfilCapturedPayment` marks the order `pending`, in the same write that marks
+    it paid.
+  - Webhook cases `payment_link.paid`, `.expired` and `.cancelled` are in `razorpayWebHookController`.
+- **On by default.** No setting is needed. To switch it off, set `COD_PREPAID_LINK_ENABLED=false` in
+  Infisical (`/user/server`).
+- **A paid link is applied two ways:**
+  1. the `payment_link.paid` webhook (fast),
+  2. `cron/codPrepaidLink.reconcile.js` every 5 minutes, which asks Razorpay for each open link.
+  The cron also closes expired links and finishes a link creation that a restart interrupted. Because
+  of it, a missing webhook subscription can never leave a paid link on an order the courier then
+  collects cash for. Admin holds until expiry + 10 min, so the cron always runs first.
+  - Still worth adding `payment_link.paid`, `payment_link.expired` and `payment_link.cancelled` to the
+    Razorpay webhook, so conversion is instant.
+- **Deploy order:** admin first (or together), then the storefront.
+  - If the storefront goes first, admin does not hold yet, so COD orders can reach the courier before
+    the link is paid.
+  - A link paid after that is refunded automatically. That is safe, but the customer sees a refund.
+- **Local testing:** `server/.env` must point at the dev DB and `rzp_test_` keys (see
+  `.env.development`). With prod values, a local order is a real order and its link is a real link.
+- **Guests:** they cannot open the order page, so the order-status poll (`/user/order/status/:id`)
+  returns `payOnlineOffer`. The guest "Order Confirmed!" card shows the same button.
+- **WhatsApp:** sent right after the link is created, once the Gupshup template is approved and
+  `GUPSHUP_TEMPLATE_COD_PAY_LINK` is set in Infisical (staging and prod). The template is a Utility
+  template with 4 placeholders:
+  `{{1}}` name, `{{2}}` amount to pay now, `{{3}}` COD fee saved, `{{4}}` link.
+  Suggested text: "Hi {{1}}, your Urban Nook order is confirmed. Pay the balance of {{2}} online now
+  and skip the {{3}} COD fee: {{4}} (valid for 2 hours)."
+  `codConversion.whatsappSent` records whether Gupshup accepted it. Until the template is set,
+  Razorpay's SMS and email still go out.
+- **Testing locally:** with test-mode keys, a COD order gets a test link straight away. After you pay
+  it, the reconcile cron switches the order to prepaid within 5 minutes, even though webhooks cannot
+  reach localhost.
