@@ -187,10 +187,11 @@ const buildPricing = (order, items, payment) => {
   const couponApplied = order.coupon?.isApplied && num(order.coupon.discountAmount) > 0;
   const couponDiscount = couponApplied ? rupees(order.coupon.discountAmount) : 0;
   const giftWrapAmount = order.giftWrap?.selected ? rupees(num(order.giftWrap.price) * Math.max(1, num(order.giftWrap.quantity) || 1)) : 0;
+  const codFee = order.paymentMethod === "COD" ? rupees(order.codDetails?.codFee) : 0;
 
   const snapshotShipping = isNum(order.items?.[0]?.productSnapshot?.shipping) ? rupees(order.items[0].productSnapshot.shipping) : null;
   const recordedShipping = isNum(order.shippingInfo?.amount) ? rupees(order.shippingInfo.amount) : null;
-  const residualFor = (ship) => rupees(total - (itemsNet + giftWrapAmount + ship - couponDiscount));
+  const residualFor = (ship) => rupees(total - (itemsNet + giftWrapAmount + codFee + ship - couponDiscount));
 
   // Which figure is what the customer was charged for delivery? The one that makes the receipt add up.
   // (Magic orders store Razorpay's fee on shippingInfo; every other order stores the charged amount on the lines.)
@@ -229,6 +230,7 @@ const buildPricing = (order, items, payment) => {
   if (couponDiscount > 0) lines.push({ key: "coupon", label: "Coupon", amount: -couponDiscount, kind: "discount", detail: order.coupon.couponCodeName || null });
   if (giftWrapAmount > 0) lines.push({ key: "giftWrap", label: order.giftWrap?.title || "Gift wrap", amount: giftWrapAmount, kind: "charge" });
   lines.push({ key: "shipping", label: "Delivery", amount: shippingCharged, kind: "charge", original: shippingOriginal, free: shippingCharged === 0 });
+  if (codFee > 0) lines.push({ key: "codFee", label: "COD fee", amount: codFee, kind: "charge" });
   if (unexplainedCharge > 0) lines.push({ key: "adjustment", label: "Other charges", amount: unexplainedCharge, kind: "charge" });
 
   const freeGiftValue = rupees(items.filter((i) => i.isFreeGift).reduce((s, i) => s + (i.giftValue || 0), 0));
@@ -244,6 +246,7 @@ const buildPricing = (order, items, payment) => {
     shippingCharged,
     shippingOriginal,
     giftWrapAmount,
+    codFee,
     freeGiftValue,
     totalSavings: totalSavings > 0 ? totalSavings : null,
     total,

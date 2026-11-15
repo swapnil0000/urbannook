@@ -648,7 +648,9 @@ const getCheckoutDisplayController = asyncHandler(async (req, res) => {
   const appliedPromotionIds = appliedPromotionIdsFromResult(matchedResult);
 
   const display = buildPromotionDisplayList(relevant, ctx, { placement: "checkout", appliedPromotionIds });
-  return res.status(200).json(new ApiRes(200, "OK", { promotions: display, pricing }, true));
+  // freeShipping: a free_shipping promotion matched - the page must show what the
+  // order will charge (no delivery, no COD fee), same as rp.payment.controller.
+  return res.status(200).json(new ApiRes(200, "OK", { promotions: display, pricing, freeShipping: !!matchedResult.freeShipping }, true));
 });
 
 // Which exact productIds a conditionTree names via "product" leaves -

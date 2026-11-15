@@ -224,6 +224,13 @@ const orderSchema = new mongoose.Schema(
     codDetails: {
       partialAmountPaid: { type: Number, default: 0 },
       remainingAmount: { type: Number, default: 0 },
+      // COD fee inside `amount` (and collected in remainingAmount). 0 on orders before it existed.
+      codFee: { type: Number, default: 0 },
+    },
+    // Which arm of a checkout A/B trial placed this order (utils/checkoutExperiment.js).
+    checkoutExperiment: {
+      type: new mongoose.Schema({ name: String, arm: String }, { _id: false }),
+      default: undefined,
     },
 
     isGuestOrder: { type: Boolean, default: false },

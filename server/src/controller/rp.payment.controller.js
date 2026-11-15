@@ -34,12 +34,14 @@ import {
 import { asyncHandler } from "../middleware/errorHandler.middleware.js";
 import { ValidationError, NotFoundError } from "../utils/errors.js";
 import { computeOrderCharge } from "../utils/orderAmount.util.js";
+import { checkoutExperimentFrom } from "../utils/checkoutExperiment.js";
 import { buildPlaceholderEmail, isPlaceholderEmail } from "../utils/placeholderEmail.js";
 import { uploadInvoiceToS3 } from "../utils/s3.utils.js";
 import Address from "../model/address.new.model.js";
 import html_to_pdf from "html-pdf-node";
 import { generateInvoiceHtmlTemplate } from "../template/invoiceTemplate.template.js";
-import { calculateShippingRate, staticShippingCharge } from "../services/shipping.service.js";
+import { staticShippingCharge } from "../services/shipping.service.js";
+import { getShippingRateOrFallback } from "../services/shippingRateFallback.service.js";
 import { apiCache } from "../module/cache.manager.module.js";
 import { sortVariantsOOSLast, deriveProductStatus, syncVariantOutOfStock } from "../utils/variantSort.js";
 
@@ -312,29 +314,6 @@ const assertVariantAvailable = (product, variantName, qty) => {
   }
 };
 
-// Genuinely unserviceable pincode must still block checkout — we cannot accept an
-// order we cannot ship. Any OTHER failure (API down, network timeout after all
-// retries, transient error) falls back to a flat rate instead, so a shipping-API
-// outage doesn't take checkout down with it.
-const getShippingRateOrFallback = async (params) => {
-  try {
-    return await calculateShippingRate(params);
-  } catch (error) {
-    if (error.message?.includes("Pincode not serviceable")) throw error;
-    const flat = staticShippingCharge(params.cartValue);
-    console.error(`[SHIPPING] pin ${params.pincode} | rate calc failed, using static ₹${flat}: ${error.message}`);
-    return {
-      total_charges: flat,
-      type: "standard", // order schema enum is standard|dynamic
-      totalWeight: 0,
-      expectedNoOfBoxes: params.cartItems?.length || 0,
-      serviceName: null,
-      courierName: null,
-      estimatedDays: "24-48 hours",
-      paymentType: params.paymentType || "PREPAID",
-    };
-  }
-};
 import { getFreeShippingConfig } from "../utils/freeShippingOffer.util.js";
 // Promotion Engine V2 — the single discount-evaluation authority for the
 // real charge (cartRule.util.js and the legacy cart-rule/offers display
@@ -534,6 +513,18 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
       "Receiver mobile number must be exactly 10 digits",
     );
   }
+
+  // Order.userEmail is required, but Express (Magic) skips the contact form, so
+  // a WhatsApp-login member (placeholder email, which the form asks them to
+  // replace) arrives here with none. Without a fallback the order save failed
+  // AFTER the Razorpay order existed — a 500 "Internal server error" on every
+  // try. Same rule as the guest flow: the account's email, else a placeholder;
+  // the Magic webhook swaps a placeholder for the email Razorpay collected,
+  // and no mail is ever sent to one (utils/placeholderEmail.js).
+  const orderEmail =
+    String(userEmail || "").trim() ||
+    user?.email ||
+    buildPlaceholderEmail(finalSenderMobile || `magic-${userId}`);
 
   // Handle pricing logic
   let finalAmount;
@@ -1213,11 +1204,12 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     isInternalTestOrder,
     isMagic,
     paymentMethod: reqPaymentMethod,
+    freeShippingUnlocked,
   });
   // A coupon may take the whole product total, but the order still has delivery / gift wrap to pay; a ₹0 Razorpay order is never valid.
   if (!isInternalTestOrder && !(charge.finalAmount > 0)) throw new ValidationError("This order has nothing to pay. Please contact support.");
   finalAmount = charge.finalAmount;
-  const { isCOD, codPartialAmount, codRemainingAmount, razorpayChargeAmount, razorpayChargeAmountPaise } = charge;
+  const { isCOD, codFee, codPartialAmount, codRemainingAmount, razorpayChargeAmount, razorpayChargeAmountPaise } = charge;
 
   // Sync shipping in snapshots — customer-facing amount (0 when free-shipping offer applies)
   orderItems.forEach(i => { i.productSnapshot.shipping = String(chargedShippingAmount); });
@@ -1322,7 +1314,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
 
   const order = await Order.create({
     orderId: preGeneratedOrderId,
-    userEmail,
+    userEmail: orderEmail,
     userId,
     userName: deliveryAddressSnapshot.fullName,
     userMobile: deliveryAddressSnapshot.mobileNumber,
@@ -1359,13 +1351,14 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
     payment: { razorpayOrderId: razorpayOrder?.data?.id },
     status: "CREATED",
     isMagicOrder: isMagic,
+    checkoutExperiment: checkoutExperimentFrom(req.body?.checkoutExperiment),
     // Both read back by the Magic serviceability callback: it must not add a
     // shipping fee on top of a ₹1 internal test order, and it cannot re-derive
     // the cart rules that unlocked free shipping here.
     isInternalTestOrder,
     freeShippingUnlocked,
     paymentMethod: isCOD ? "COD" : "PREPAID",
-    codDetails: isCOD ? { partialAmountPaid: codPartialAmount, remainingAmount: codRemainingAmount } : undefined,
+    codDetails: isCOD ? { partialAmountPaid: codPartialAmount, remainingAmount: codRemainingAmount, codFee } : undefined,
     coupon: {
       couponCodeId,
       couponCodeName,
@@ -1391,7 +1384,7 @@ const razorpayCreateOrderController = asyncHandler(async (req, res) => {
         // modal on an order that carries no line_items breaks checkout.
         magic: isMagic,
         paymentMethod: isCOD ? "COD" : "PREPAID",
-        codDetails: isCOD ? { partialAmountPaid: codPartialAmount, remainingAmount: codRemainingAmount } : null,
+        codDetails: isCOD ? { partialAmountPaid: codPartialAmount, remainingAmount: codRemainingAmount, codFee } : null,
         senderMobile: finalSenderMobile,
         receiverMobile: finalReceiverMobile,
       },
@@ -2539,9 +2532,10 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     isInternalTestOrder,
     isMagic,
     paymentMethod: reqPaymentMethod,
+    freeShippingUnlocked,
   });
   if (!isInternalTestOrder && !(charge.finalAmount > 0)) throw new ValidationError("This order has nothing to pay. Please contact support.");
-  const { finalAmount, isCOD, codPartialAmount, codRemainingAmount, razorpayChargeAmount, razorpayChargeAmountPaise } = charge;
+  const { finalAmount, isCOD, codFee, codPartialAmount, codRemainingAmount, razorpayChargeAmount, razorpayChargeAmountPaise } = charge;
 
   // Update orderItems with shipping value now that it's calculated — customer-facing amount
   orderItems.forEach(i => { i.productSnapshot.shipping = String(chargedShippingAmount); });
@@ -2659,10 +2653,11 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
     payment: { razorpayOrderId: razorpayOrder?.data?.id },
     status: "CREATED",
     isMagicOrder: isMagic,
+    checkoutExperiment: checkoutExperimentFrom(req.body?.checkoutExperiment),
     isInternalTestOrder,
     freeShippingUnlocked,
     paymentMethod: isCOD ? "COD" : "PREPAID",
-    codDetails: isCOD ? { partialAmountPaid: codPartialAmount, remainingAmount: codRemainingAmount } : undefined,
+    codDetails: isCOD ? { partialAmountPaid: codPartialAmount, remainingAmount: codRemainingAmount, codFee } : undefined,
     isGuestOrder: true,
     guestInfo: { name: guestInfo?.name?.trim() || "", email: guestEmail, mobile: cleanMobile },
     coupon: { couponCodeId, couponCodeName, discountAmount, isApplied },
@@ -2680,7 +2675,7 @@ const guestCreateOrderController = asyncHandler(async (req, res) => {
         currency: "INR",
         magic: isMagic, // see the logged-in response — client follows this
         paymentMethod: isCOD ? "COD" : "PREPAID",
-        codDetails: isCOD ? { partialAmountPaid: codPartialAmount, remainingAmount: codRemainingAmount } : null,
+        codDetails: isCOD ? { partialAmountPaid: codPartialAmount, remainingAmount: codRemainingAmount, codFee } : null,
         senderMobile: cleanMobile,
         receiverMobile: cleanMobile,
         coupon: isApplied ? { code: couponCodeName, discountAmount } : null,

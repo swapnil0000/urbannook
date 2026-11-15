@@ -5,6 +5,19 @@ export const SUPPORT_EMAIL = "urbanadmin@urbannook.in";
 export const SUPPORT_WHATSAPP = "919124081005";
 export const SUPPORT_PHONE_DISPLAY = "+91 91240 81005";
 export const SUPPORT_HOURS = "Mon-Sat, 9am - 7pm";
+export const SUPPORT_TEL_URL = `tel:+${SUPPORT_WHATSAPP}`;
+
+/**
+ * Whether someone is there to pick up a call right now — SUPPORT_HOURS in IST
+ * (Mon-Sat, 9:00-19:00), whatever the shopper's own time zone. Outside it we
+ * offer WhatsApp only, so nobody rings a phone no one answers.
+ */
+export const isSupportCallOpen = (now = new Date()) => {
+    const ist = new Date(now.getTime() + 330 * 60 * 1000); // UTC+5:30
+    const day = ist.getUTCDay(); // 0 = Sunday
+    const hour = ist.getUTCHours();
+    return day !== 0 && hour >= 9 && hour < 19;
+};
 
 /**
  * Click-to-chat link that opens WhatsApp with `text` already typed to our

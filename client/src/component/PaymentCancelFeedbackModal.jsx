@@ -2,6 +2,7 @@ import { useState } from "react";
 import { getApiUrl } from "../config/appUrls";
 import { track } from "../utils/analytics";
 import { isInAppBrowser } from "../utils/browserEnv";
+import CheckoutHelpLine from "./support/CheckoutHelpLine";
 
 // Keys must match PAYMENT_FEEDBACK_REASONS in server/src/model/paymentFeedback.model.js.
 const REASONS = [
@@ -91,6 +92,8 @@ export default function PaymentCancelFeedbackModal({ razorpayOrderId, value, onC
                 <i className="fa-solid fa-xmark" />
               </button>
             </div>
+            {/* Someone who cancelled mid-payment is the one worth a call. */}
+            <CheckoutHelpLine compact reason="payment_cancelled" placement="cancel_feedback" orderId={razorpayOrderId} value={value} className="mt-3 rounded-xl bg-gray-50 p-3" />
 
             <div className="mt-4 flex flex-wrap gap-2">
               {REASONS.map((r) => {
