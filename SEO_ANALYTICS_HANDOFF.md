@@ -151,7 +151,9 @@ Under rule 9 these files are yours; this change is done in the open and needs yo
 - Worker: serves `ssg/<path>/index.html`, then old `product/*`, then the SPA shell for known app routes,
   otherwise the not-found page with **HTTP 404**. `/products/<id>` is served (200) as the variant chooser, canonical to `/product/<id>`, with the product's
   first photo as `og:image`/`twitter:image` (it used to fall back to the site logo, which Google showed as the
-  result thumbnail); old policy URLs (`/terms`, `/cancellation-refund[-policy]`,
+  result thumbnail). The header menu's photos (`NavDropdown`) are not in the server HTML; they mount on first
+  hover/focus, because as the first `<img>`s on every page Google used one of them (the Brake Caliper Lamp) as the
+  GTA 6 stand's thumbnail. Old policy URLs (`/terms`, `/cancellation-refund[-policy]`,
   `/shipping-policy`) → **301** to the current pages; trailing
   slash → 301. `workers_dev = false`.
 - Sitemap and `llms.txt` are written by `ssg.mjs`. The sitemap lists only pages that rendered, leaves out

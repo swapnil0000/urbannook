@@ -12,6 +12,7 @@ jest.unstable_mockModule("../services/shipping.service.js", () => ({
   staticShippingCharge: (v) => (Number(v) >= 1000 ? 149 : 99),
   calculateShippingRate: async ({ cartValue }) => ({ total_charges: Number(cartValue) >= 1000 ? 149 : 99, type: "dynamic" }),
   FALLBACK_SHIPPING_CHARGE: 179,
+  isPincodeNotServiceable: (e) => e?.data?.code === "PINCODE_NOT_SERVICEABLE",
 }));
 
 const LAMP = "lamp-1", PEN = "pen-1";

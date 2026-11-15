@@ -4,6 +4,7 @@ import Coupon from "../model/coupon.model.js";
 import {
   calculateShippingRate,
   staticShippingCharge,
+  isPincodeNotServiceable,
 } from "../services/shipping.service.js";
 import { validateNewCoupon, getUserCouponIdentity } from "../services/coupon.code.service.js";
 import { getFreeShippingConfig } from "../utils/freeShippingOffer.util.js";
@@ -229,7 +230,7 @@ export const magicShippingInfoController = asyncHandler(async (req, res) => {
         // ship it. Anything else (API down, timeout) falls back to a flat rate
         // rather than taking checkout down with it. Mirrors the behaviour of
         // getShippingRateOrFallback in the standard checkout path.
-        if (err.message?.includes("Pincode not serviceable")) {
+        if (isPincodeNotServiceable(err)) {
           console.log(`${TAG}[shipping] pin ${addr.zipcode} unserviceable → blocked`);
           return toRazorpayServiceableAddress(addr, 0, false);
         }
