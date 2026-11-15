@@ -8,6 +8,7 @@ import {
 } from "./config/validateEnv.js";
 import env from "./config/envConfigSetup.js";
 import startOrderCleanupJob from "./cron/zombieOrder.Cleanup.js";
+import startCodPrepaidLinkReconcileJob from "./cron/codPrepaidLink.reconcile.js";
 
 validateEnvironment();
 validateEnvironmentConfig();
@@ -19,6 +20,7 @@ connDB()
         `[INFO] Server started  Port: ${env.PORT || 8000}, NodeEnv: ${env.NODE_ENV || "development"}`,
       );
       startOrderCleanupJob();
+      startCodPrepaidLinkReconcileJob();
     });
   })
   .catch((err) => {

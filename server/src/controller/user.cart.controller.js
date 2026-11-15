@@ -1,5 +1,6 @@
 import { fulfilCapturedPayment, UNPAID_STATUSES } from "./rp.payment.controller.js";
 import { razorpayFetchOrderPaymentsService } from "../services/rp.payement.service.js";
+import { payOnlineOfferOf } from "../utils/codPayOnlineOffer.js";
 import {
   addToCartService,
   getCartService,
@@ -328,6 +329,12 @@ const getOrderStatus = asyncHandler(async (req, res) => {
         orderId: order.orderId,
         status,
         isGuestOrder: order.isGuestOrder ?? false,
+        // COD balance on offer online — the guest confirmation screen shows it
+        // (a guest cannot open the order page). Read fresh: the link is created
+        // right after the PAID write, possibly in this very request.
+        ...(status === "PAID" && order.paymentMethod === "COD"
+          ? { payOnlineOffer: payOnlineOfferOf(await Order.findById(order._id, { paymentMethod: 1, codConversion: 1 }).lean()) }
+          : {}),
         ...(order.isGuestOrder && status === "PAID" && order.guestInfo?.email
           ? { guestEmail: order.guestInfo.email, isNewGuestAccount: order.isNewGuestAccount ?? true }
           : {}),

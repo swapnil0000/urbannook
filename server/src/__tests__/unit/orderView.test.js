@@ -531,3 +531,31 @@ describe("delay update from the team (order.customerNotice)", () => {
     expect(view(base({ customerNotice: notice({ message: "  " }) }), [ship()]).notice).toBeNull();
   });
 });
+
+describe("COD balance offered online (payment link, COD fee waived)", () => {
+  const codOrder = (codConversion, over = {}) => base({
+    amount: 1798, paymentMethod: "COD",
+    codDetails: { partialAmountPaid: 298, remainingAmount: 1500, codFee: 49 },
+    codConversion, ...over,
+  });
+  const open = { status: "sent", shortUrl: "https://rzp.io/i/x", amount: 1451, feeWaived: 49, expiresAt: new Date("2026-10-31T13:00:00.000Z") };
+
+  it("shown while the link is open and nothing has shipped", () => {
+    expect(view(codOrder(open)).payOnlineOffer).toEqual({ url: "https://rzp.io/i/x", amount: 1451, feeWaived: 49, expiresAt: "2026-10-31T13:00:00.000Z" });
+  });
+
+  it.each([
+    ["expired", { ...open, expiresAt: new Date("2026-10-31T11:00:00.000Z") }, []],
+    ["already shipped", open, [ship()]],
+    ["not offered", undefined, []],
+    ["link failed", { status: "failed" }, []],
+  ])("%s: not shown", (_l, c, shipments) => {
+    expect(view(codOrder(c), shipments).payOnlineOffer).toBeNull();
+  });
+
+  it("paid online: shown as prepaid, with the second payment as a reference", () => {
+    const v = view(codOrder({ status: "paid", paymentId: "pay_bal" }, { paymentMethod: "PREPAID", amount: 1749, codDetails: { partialAmountPaid: 298, remainingAmount: 0, codFee: 0 } }));
+    expect(v.payOnlineOffer).toBeNull();
+    expect(v.payment).toMatchObject({ method: "PREPAID", amountPaid: 1749, amountDue: 0, balanceOnDelivery: 0, balancePaymentRef: "pay_bal" });
+  });
+});
