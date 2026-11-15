@@ -16,6 +16,7 @@ import { useGetHomeComboOffersQuery } from '../../store/api/userApi';
 import { useGetPublicStatsQuery, ordersShown, shownCount, shownRating } from '../../store/api/statsApi';
 import { recordOfferInterest } from '../../utils/offerInterest';
 import { trackViewItemList, trackAddToCart } from '../../utils/analytics';
+import { sortByCategoryPriority } from '../../utils/categoryUrl';
 
 const onImgErr = (e) => { e.currentTarget.src = '/assets/logo.webp'; };
 
@@ -816,7 +817,8 @@ const HomePage = () => {
     const seen = [];
     products.forEach((p) => { if (p.productCategory && !seen.find((c) => c.name === p.productCategory)) seen.push({ name: p.productCategory, img: productImg(p), count: '' }); });
     const soon = [{ name: 'Wall Posters', img: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=600&q=80', soon: true }, { name: 'Desk Décor', img: 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=600&q=80', soon: true }];
-    return [...seen, ...soon].slice(0, 4);
+    // Same order as the header (Gaming in Superheroes' old slot), then the "soon" fillers.
+    return [...sortByCategoryPriority(seen, (c) => c.name), ...soon].slice(0, 4);
   }, [products]);
   const hasRealCollections = collections.filter((c) => !c.soon).length >= 3;
 
