@@ -4,10 +4,7 @@ import { useSelector } from 'react-redux';
 import { useJoinCommunityMutation } from '../../store/api/userApi';
 import { useUI } from '../../hooks/useRedux';
 import { useGetProductsQuery } from '../../store/api/productsApi';
-import { categoryPath } from '../../utils/categoryUrl';
-
-// Same display names as the header nav (NewHeader.jsx CATEGORY_LABEL).
-const CATEGORY_LABEL = { Lamp: 'Lamps', 'Pen Stand': 'Pen Stands' };
+import { categoryPath, CATEGORY_LABEL, sortByCategoryPriority } from '../../utils/categoryUrl';
 
 /* GullyLabs-style footer — dark, clean, trust-forward. */
 const Footer = () => {
@@ -26,7 +23,8 @@ const Footer = () => {
     const list = prodRes?.data?.products || prodRes?.data?.listofPublishedProducts || [];
     const seen = [];
     list.forEach((p) => { const c = p?.productCategory; if (c && !seen.includes(c)) seen.push(c); });
-    return seen;
+    // Same order as the header; every category stays listed (keeps each category page linked).
+    return sortByCategoryPriority(seen);
   }, [prodRes]);
 
   const handleCommunityJoin = async (e) => {
