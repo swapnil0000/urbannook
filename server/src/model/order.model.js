@@ -232,6 +232,19 @@ const orderSchema = new mongoose.Schema(
       type: new mongoose.Schema({ name: String, arm: String }, { _id: false }),
       default: undefined,
     },
+    // Outcome of the WhatsApp order confirmation (rp.payment.controller →
+    // sendOrderConfirmationWhatsApp), written once when the order is paid.
+    // status: sent (Gupshup said "submitted") | failed (error = Gupshup's
+    // reason) | skipped (not configured / no number). Absent on older orders.
+    orderConfirmationWa: {
+      type: new mongoose.Schema({
+        status: { type: String, enum: ["sent", "failed", "skipped"] },
+        messageId: String,
+        error: String,
+        at: Date,
+      }, { _id: false }),
+      default: undefined,
+    },
 
     isGuestOrder: { type: Boolean, default: false },
     isNewGuestAccount: { type: Boolean, default: false },
