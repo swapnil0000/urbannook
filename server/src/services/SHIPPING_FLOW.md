@@ -81,7 +81,11 @@ courier industry practice hai.
   accept nahi karna chahiye). Baaki (network/timeout) errors par 1.5s × attempt number wait
   karke retry hota hai.
 - Agar API empty array de (`allServices.length === 0`) to "Pincode not serviceable" error throw
-  hota hai.
+  hota hai — ek `ValidationError` (HTTP 400, `data.code = "PINCODE_NOT_SERVICEABLE"`) jiska
+  message customer ko seedha dikhta hai ("Sorry, we don't deliver to pincode … yet"). Pehle yeh
+  plain `Error` tha, isliye checkout pe 500 "Internal server error" dikhta tha. Callers
+  (`getShippingRateOrFallback`, Magic shipping-info callback) ise `isPincodeNotServiceable(err)`
+  se pehchaante hain, message text se nahi.
 
 ## Step 6 — Options mein se courier + slab select karna (`selectCourierService`)
 
@@ -164,8 +168,14 @@ DELHIVERY "..." ₹... → charge ₹...` ya `... → FALLBACK ₹179`) — pura
 
 ## Kahaan use hota hai (high-level)
 
+Dono jagah function seedha nahi, `getShippingRateOrFallback`
+([shippingRateFallback.service.js](./shippingRateFallback.service.js)) ke through call hota hai:
+courier API band ho (timeout / 5xx, saare retries ke baad) to static ₹99/₹149 lag jaata hai,
+sirf "pincode not serviceable" 400 deta hai. Pehle quote API me ye fallback nahi tha, isliye API
+outage pe address step 500 dikhata tha jabki order create flat rate pe chal jaata.
+
 - **`dynamic.shipping.controller.js`** — checkout ke waqt "kitni shipping lagegi" quote dene ke
-  liye is poore result object ko as-is client ko bhej deta hai.
+  liye result object (+ COD par `codFee`) client ko bhej deta hai.
 - **`rp.payment.controller.js`** — order create karte waqt (dono authenticated aur guest
   checkout flow) yehi function call hota hai; `total_charges` se `realShippingAmount` nikal ke
   `Order.shippingInfo.amount` mein save hota hai (saath mein `type`, `expectedNoOfBoxes`,

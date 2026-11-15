@@ -106,6 +106,17 @@ const selectCourierService = (allServices, chargeableWeightInKg) => {
   return { selected, targetSlab, candidates, overweight };
 };
 
+// No courier delivers to the pincode. A 400 with words the customer can act on
+// — as a plain Error it reached the error handler as a 500 and checkout showed
+// "Internal server error". Callers recognise it by code, not by message text.
+const PINCODE_NOT_SERVICEABLE = "PINCODE_NOT_SERVICEABLE";
+const pincodeNotServiceableError = (pincode) =>
+  new ValidationError(
+    `Sorry, we don't deliver to pincode ${pincode} yet. Please use a different delivery address.`,
+    { code: PINCODE_NOT_SERVICEABLE, pincode },
+  );
+const isPincodeNotServiceable = (error) => error?.data?.code === PINCODE_NOT_SERVICEABLE;
+
 // cartValue = what the customer pays for the products (after offers); falls back to the list-price total.
 const calculateShippingRate = async ({ pincode, cartItems, paymentType = "PREPAID", cartValue }) => {
   if (!pincode || !cartItems || !Array.isArray(cartItems)) {
@@ -229,7 +240,7 @@ const calculateShippingRate = async ({ pincode, cartItems, paymentType = "PREPAI
 
         const allServices = response.data.data;
         if (allServices.length === 0) {
-          throw new Error("Pincode not serviceable - No courier available");
+          throw pincodeNotServiceableError(pincode);
         }
 
         const { selected, targetSlab, candidates, overweight } = selectCourierService(allServices, totalChargeableWeightInKg);
@@ -272,10 +283,10 @@ const calculateShippingRate = async ({ pincode, cartItems, paymentType = "PREPAI
       } catch (error) {
         lastError = error;
 
-        // If it's a 4xx error or "Pincode not serviceable" error, don't retry
+        // If it's a 4xx error or the pincode isn't serviceable, don't retry
         if (
           (error.response?.status && error.response.status >= 400 && error.response.status < 500) ||
-          error.message.includes("Pincode not serviceable")
+          isPincodeNotServiceable(error)
         ) {
           console.error(`[SHIPPING] pin ${pincode} | non-retryable error: ${error.message}${error.response ? ` (status ${error.response.status})` : ""}`);
           throw error;
@@ -297,4 +308,4 @@ const calculateShippingRate = async ({ pincode, cartItems, paymentType = "PREPAI
   }
 };
 
-export { calculateShippingRate, selectCourierService, staticShippingCharge, FALLBACK_SHIPPING_CHARGE };
+export { calculateShippingRate, selectCourierService, staticShippingCharge, FALLBACK_SHIPPING_CHARGE, isPincodeNotServiceable };

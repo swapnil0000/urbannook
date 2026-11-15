@@ -1,6 +1,7 @@
 export const generateInvoiceHtmlTemplate = (order) => {
   const discount = order.coupon?.discountAmount || 0;
   const shippingCharge = Number(order.items[0]?.productSnapshot?.shipping) || 0;
+  const codFee = order.paymentMethod === "COD" ? Number(order.codDetails?.codFee) || 0 : 0;
   const addr = order.deliveryAddress || {};
 
   return `
@@ -84,6 +85,7 @@ export const generateInvoiceHtmlTemplate = (order) => {
         <div class="totals-wrapper">
           <div class="totals-box">
             <div class="totals-row"><span>Shipping:</span><span>₹${shippingCharge}</span></div>
+            ${codFee > 0 ? `<div class="totals-row"><span>COD fee:</span><span>₹${codFee}</span></div>` : ''}
             ${discount > 0 ? `<div class="totals-row"><span>Discount:</span><span>-₹${discount}</span></div>` : ''}
             <div class="totals-row grand-total"><span>Grand Total:</span><span>₹${order.amount}</span></div>
           </div>

@@ -9,6 +9,12 @@
  * Magic × every coupon type) is testable without mocking a checkout.
  */
 
+// Added to every COD order — what the courier charges us to collect cash, plus
+// the RTO risk COD carries. Paying online skips it, which is the honest "save
+// ₹X" the checkout shows. The shipping quote returns it so the page never
+// keeps its own copy.
+export const COD_FEE = 49;
+
 /**
  * @param {object}  p
  * @param {number}  p.subtotal               product total after cart-rule discounts
@@ -25,6 +31,8 @@
  * @param {boolean} p.isInternalTestOrder    INTERNAL_TEST coupon ⇒ flat ₹1
  * @param {boolean} p.isMagic
  * @param {string}  p.paymentMethod          "COD" | anything else
+ * @param {boolean} p.freeShippingUnlocked   admin free shipping (threshold or a
+ *                                           free_shipping promotion) — waives the COD fee too
  */
 export const computeOrderCharge = ({
   subtotal = 0,
@@ -35,6 +43,7 @@ export const computeOrderCharge = ({
   isInternalTestOrder = false,
   isMagic = false,
   paymentMethod = "PREPAID",
+  freeShippingUnlocked = false,
 } = {}) => {
   // An INTERNAL_TEST coupon pins the order at ₹1 whatever the cart holds.
   //
@@ -46,13 +55,18 @@ export const computeOrderCharge = ({
   // ordinary coupon disappeared the same way. The discount now goes onto the
   // items themselves (see discountMagicLineItems), which is the only number
   // Razorpay reliably honours.
-  const finalAmount = isInternalTestOrder
-    ? 1
-    : Math.max(subtotal + giftWrapAmount + chargedShippingAmount - discountAmount, 0);
-
+  //
   // Magic is prepaid-only: its serviceability callback always answers cod:false,
   // so a COD request can never arrive on the Magic path.
   const isCOD = !isMagic && paymentMethod === "COD";
+  // Outside the coupon maths: a coupon discounts the products, never the fee.
+  // Free shipping from admin (threshold or promotion) makes COD delivery free
+  // too, fee included.
+  const codFee = isCOD && !isInternalTestOrder && !freeShippingUnlocked ? COD_FEE : 0;
+
+  const finalAmount = isInternalTestOrder
+    ? 1
+    : Math.max(subtotal + giftWrapAmount + chargedShippingAmount - discountAmount, 0) + codFee;
 
   // COD collects 2x the REAL shipping cost upfront as an RTO/fraud deposit.
   // Based on realShippingAmount on purpose — a free-shipping COD order must
@@ -74,6 +88,7 @@ export const computeOrderCharge = ({
   return {
     finalAmount,
     isCOD,
+    codFee,
     codPartialAmount,
     codRemainingAmount,
     razorpayChargeAmount,

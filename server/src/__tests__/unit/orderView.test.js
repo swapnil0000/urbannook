@@ -385,6 +385,14 @@ describe("pricing", () => {
     expect(v.pricing).toMatchObject({ itemsSubtotal: 1299, shippingCharged: 149, reconciles: true, totalSavings: null });
   });
 
+  it("COD fee is its own line, not an unexplained 'Other charges'", () => {
+    const v = view(base({ amount: 1497, paymentMethod: "COD", codDetails: { partialAmountPaid: 298, remainingAmount: 1199, codFee: 49 } }));
+    expect(v.pricing.lines.find((l) => l.key === "codFee")).toMatchObject({ label: "COD fee", amount: 49 });
+    expect(v.pricing.lines.find((l) => l.key === "adjustment")).toBeUndefined();
+    expect(sum(v)).toBe(1497);
+    expect(v.pricing).toMatchObject({ codFee: 49, reconciles: true });
+  });
+
   it("coupon is shown once, with its code, and the lines still add up", () => {
     const v = view(base({ amount: 1348, coupon: { isApplied: true, couponCodeName: "SAVE100", discountAmount: 100 } }));
     expect(v.pricing.lines.find((l) => l.key === "coupon")).toMatchObject({ amount: -100, detail: "SAVE100" });

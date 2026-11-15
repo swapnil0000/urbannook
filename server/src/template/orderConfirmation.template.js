@@ -147,7 +147,7 @@ const orderConfirmationTemplate = (orderDetails) => {
               <td style="padding:16px 20px;">
                 <p class="h-text" style="margin:0; font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:13px; color:#141414; line-height:1.7;">
                   ${isCOD
-                    ? `<strong>Cash on Delivery</strong> &mdash; &#8377;${codDetails?.partialAmountPaid ?? 0} paid in advance, &#8377;${codDetails?.remainingAmount ?? 0} due at delivery.`
+                    ? `<strong>Cash on Delivery</strong> &mdash; &#8377;${codDetails?.partialAmountPaid ?? 0} paid in advance, &#8377;${codDetails?.remainingAmount ?? 0} due at delivery${codDetails?.codFee > 0 ? ` (includes &#8377;${codDetails.codFee} COD fee)` : ""}.`
                     : `<strong>Paid online</strong> via Razorpay.`}
                 </p>
               </td>
