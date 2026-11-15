@@ -873,39 +873,14 @@
 }
 .un-bs-save{color:color-mix(in srgb,rgb(var(--gl-save)) 40%,#a7f3d6)}
 
-/* ============================================================
-   DIWALI OFFER TILES - amber section, scalloped edge, image tiles
-   with a dark-red benefit strip (ComboOfferSection.jsx).
-   Scoped to the offers section; colours derive from --gl-* tokens.
-   ============================================================ */
-.un-offers .un-tile{
-  border-radius:0;
-  border:1px solid rgb(var(--gl-paper)/.16);
-  background:rgb(var(--gl-paper)/.04);
-  transition:border-color .2s ease;
-  overflow:hidden;
-}
-.un-offers .un-tile:hover{border-color:rgb(var(--gl-paper)/.45)}
-.un-offers .un-tile-img{background:rgb(var(--gl-paper)/.06)}
-.un-offers .un-tile-strip{border-top:1px solid rgb(var(--gl-paper)/.12)}
-.un-offers .un-tile-benefit{color:rgb(var(--gl-paper)/.72)}
-/* tiles: a swipe rail on phones (next tile peeks so it reads as scrollable), a centred wrap from 640px up */
-.un-offer-rail{display:flex;gap:12px;padding:0 16px 6px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding:0 16px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
-.un-offer-rail::-webkit-scrollbar{display:none}
-.un-offer-cell{flex:0 0 46%;scroll-snap-align:start}
-@media (min-width:640px){
-  .un-offer-rail{flex-wrap:wrap;justify-content:center;overflow:visible;padding:0 24px;gap:16px;scroll-snap-type:none}
-  .un-offer-cell{flex:0 0 calc((100% - 48px)/4)}
-}
-@media (min-width:1024px){.un-offer-cell{flex:0 0 calc((100% - 80px)/6)}.un-offer-rail{gap:16px}}
-/* coupon ticket: dark burgundy / charcoal with champagne-gold edge */
+/* coupon ticket: white like the offer cards above, side notches cut by the
+   mask, a dashed tear line before the red "Get code" stub */
 .un-offers .un-coupon{
-  border-radius:8px;
-  background:linear-gradient(135deg,rgb(62 18 22) 0%,rgb(36 15 16) 55%,rgb(24 14 14) 100%);
-  box-shadow:inset 0 0 0 1px rgb(var(--gl-star)/.32),inset 0 1px 0 rgb(255 255 255/.08),0 12px 22px -14px rgb(0 0 0/.9);
-  min-height:74px;
+  border-radius:4px;
+  box-shadow:inset 0 0 0 1px rgb(var(--gl-hair));
+  min-height:78px;
 }
-.un-offers .un-coupon-perf{border-left:1.5px dashed rgb(var(--gl-star)/.4)}
+.un-offers .un-coupon-perf{border-left:1.5px dashed rgb(var(--gl-ink)/.22)}
 
 /* Page night mode - set on a page wrapper by <ScrollColorBand nightScopeRef>
    (component/motion) while a dark band is on screen. Swaps the page surface
@@ -2062,3 +2037,7 @@ summary:hover .pdp-plus{border-color:rgb(var(--gl-ink))}
   .cpc-row .cpc-img{width:84px}
 }
 @media (prefers-reduced-motion:reduce){.rd-tab,.cpc,.cpc-photo,.rd-railnav,.rd-pill{transition:none}.cpc:hover .cpc-photo{transform:none}}
+
+/* review card extras (data merged from main): "via Google" next to the name, "Bought: <design>" under the stars */
+.pdp-rv-via{margin-left:8px;font-weight:400;font-size:12px;color:rgb(var(--gl-muted))}
+.pdp-rv-bought{margin:6px 0 0;font-size:12px;color:rgb(var(--gl-muted))}

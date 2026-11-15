@@ -20,6 +20,9 @@ const shipmentRecordSchema = new mongoose.Schema(
     cloneSeq: Number,
     // Which items of the order this parcel carries (indexes into order.items). Absent = the whole order.
     itemIndexes: [Number],
+    // Split by quantity (admin, utils/parcelSplit.js): the units of each line in THIS parcel,
+    // e.g. 2 of a "katana × 3" now and 1 later. Absent = each listed line at its full quantity.
+    itemQuantities: [{ _id: false, index: Number, qty: Number }],
     shipmentStatus: String,
     awbNumber: String,
     courierCompany: String,
@@ -39,6 +42,6 @@ shipmentRecordSchema.index({ sourceOrderId: 1 });
 
 // Whitelist used as the projection of every customer-facing read.
 export const CUSTOMER_SHIPMENT_FIELDS =
-  "sourceOrderId cloneSeq itemIndexes shipmentStatus awbNumber courierCompany courierService isCancelled shipmentDirection trackingHistory expectedDeliveryDate lastTrackedAt dispatchConfirmedAt createdAt";
+  "sourceOrderId cloneSeq itemIndexes itemQuantities shipmentStatus awbNumber courierCompany courierService isCancelled shipmentDirection trackingHistory expectedDeliveryDate lastTrackedAt dispatchConfirmedAt createdAt";
 
 export default mongoose.models.ShipmentRecord || mongoose.model("ShipmentRecord", shipmentRecordSchema, "shipmentrecords");

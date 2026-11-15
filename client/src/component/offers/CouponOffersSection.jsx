@@ -28,7 +28,7 @@ const fmtDate = (d) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric',
 
 /** Small outlined percent mark — quiet, not an oversized badge. */
 const DiscountMark = () => (
-  <span className="grid h-8 w-8 shrink-0 place-items-center border border-star/60 bg-star/10 text-star" style={{ borderRadius: '50%' }} aria-hidden="true">
+  <span className="grid h-9 w-9 shrink-0 place-items-center border border-brand/40 bg-brand/10 text-brand" style={{ borderRadius: '50%' }} aria-hidden="true">
     <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M19 5 5 19" /><circle cx="7" cy="7" r="2.2" /><circle cx="17" cy="17" r="2.2" /></svg>
   </span>
 );
@@ -51,16 +51,17 @@ const StripCard = ({ offer, onOpen }) => {
       type="button"
       onClick={() => onOpen(offer)}
       style={ticketMask}
-      className="un-coupon group relative flex h-full w-full items-stretch text-left text-paper transition-transform duration-200 hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-star"
+      className="un-coupon group relative flex h-full w-full items-stretch bg-white text-left text-ink transition-transform duration-200 hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-brand"
       aria-label={`${headline}. ${detail}. Reveal coupon`}
     >
-      <span className="flex min-w-0 flex-1 items-center gap-2.5 py-2.5 pl-4 pr-2.5">
+      <span className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-4 pr-3">
         <DiscountMark />
         <span className="min-w-0">
-          <span className="block truncate font-archivo text-[18px] font-semibold leading-none tracking-tight text-[#f6dfa6]">{headline}</span>
-          <span className="mt-1 block truncate text-[11.5px] font-normal leading-tight text-paper/70">{detail}</span>
-          <span className="mt-1 block truncate text-[10px] font-normal leading-none text-paper/45">
-            <span className="underline underline-offset-2 decoration-paper/30">T&amp;C Apply</span>{offer.validUntil ? ` · Ends ${fmtDate(offer.validUntil)}` : ''}
+          <span className="block font-archivo text-[20px] font-extrabold leading-none tracking-tight text-brand">{headline}</span>
+          {/* the condition is the point of a coupon - wrap it, never cut it */}
+          <span className="mt-1.5 block text-[12px] font-medium leading-snug text-ink/75 line-clamp-2">{detail}</span>
+          <span className="gl-lbl mt-1.5 block text-[9px] leading-none text-muted">
+            <span className="underline underline-offset-2 decoration-ink/25">T&amp;C Apply</span>{offer.validUntil ? ` · Ends ${fmtDate(offer.validUntil)}` : ''}
           </span>
         </span>
       </span>
@@ -69,9 +70,9 @@ const StripCard = ({ offer, onOpen }) => {
         <span className="absolute -top-[6px] left-1/2 h-3 w-3 -translate-x-1/2 bg-ink" style={{ borderRadius: '50%' }} />
         <span className="absolute -bottom-[6px] left-1/2 h-3 w-3 -translate-x-1/2 bg-ink" style={{ borderRadius: '50%' }} />
       </span>
-      <span className="flex w-[58px] shrink-0 flex-col items-center justify-center gap-1 text-center">
-        <span className="text-[10px] font-semibold uppercase leading-none tracking-[0.1em] text-star">Reveal</span>
-        <span className="text-[14px] leading-none text-star transition-transform group-hover:translate-x-0.5" aria-hidden="true">→</span>
+      <span className="flex w-[64px] shrink-0 flex-col items-center justify-center gap-1.5 bg-brand text-center text-white">
+        <span className="gl-lbl text-[9.5px] leading-tight">Get<br />code</span>
+        <span className="text-[15px] leading-none transition-transform group-hover:translate-x-0.5" aria-hidden="true">→</span>
       </span>
     </button>
   );
@@ -137,7 +138,7 @@ const CouponOffersSection = ({ variant = 'section' }) => {
   if (variant === 'strip') {
     const visible = all ? offers : offers.slice(0, 3);
     return (
-      <div className="relative z-10 mx-auto mt-8 max-w-[1100px] px-4 sm:mt-10 sm:px-6" aria-label="Coupons">
+      <div className="relative z-10 mx-auto mt-8 max-w-[1240px] px-4 sm:mt-10 sm:px-6" aria-label="Coupons">{/* same width as the offer row above, so both start on one line */}
         <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
           <p className="gl-lbl inline-flex items-center gap-2 text-[11px] text-star/90" style={{ letterSpacing: '0.2em' }}><span aria-hidden="true">✦</span> Coupons</p>
           {offers.length > 1 && (
@@ -152,7 +153,7 @@ const CouponOffersSection = ({ variant = 'section' }) => {
           : 'gl-hscroll -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:snap-none sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 lg:grid-cols-3'}
         >
           {(all ? visible : offers).map((o, i) => (
-            <div key={o.id} className={all ? '' : `w-[72vw] max-w-[300px] shrink-0 snap-start sm:w-auto sm:max-w-none ${i >= 3 ? 'sm:hidden' : ''}`}>
+            <div key={o.id} className={all ? '' : `${offers.length === 1 ? 'w-full' : 'w-[84vw] max-w-[340px]'} shrink-0 snap-start sm:w-auto sm:max-w-none ${i >= 3 ? 'sm:hidden' : ''}`}>
               <StripCard offer={o} onOpen={setActive} />
             </div>
           ))}

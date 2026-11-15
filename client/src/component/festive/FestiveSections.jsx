@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom';
 import ComboOfferSection from '../ComboOfferSection';
 import FestiveCountdown from './FestiveCountdown';
 import SectionDecor from './SectionDecor';
-import CouponOffersSection from '../offers/CouponOffersSection';
 import { useSiteCampaign, THEME_COPY } from '../../hooks/useSiteCampaign';
 
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
@@ -77,9 +76,8 @@ const GiftingSection = ({ section }) => {
  */
 const FestiveSections = ({ lead }) => {
   const { active, sections, page } = useSiteCampaign();
-  // Offers follow the admin's festive campaign: outside its live window nothing is shown here.
-  if (!active || page !== 'home') return null;
-  if (sections.length === 0) return <ComboOfferSection lead={lead} />;
+  // The live combo offers always show on the homepage (as on main); an admin festive campaign only adds its own sections / theme on top.
+  if (!active || page !== 'home' || sections.length === 0) return <ComboOfferSection lead={lead} />;
 
   return (
     <>
@@ -87,7 +85,6 @@ const FestiveSections = ({ lead }) => {
         ? <ComboOfferSection key={s.id} title={s.title} subtitle={s.subtitle} lead={i === sections.findIndex((x) => x.type === 'combos') ? lead : undefined} />
         : <GiftingSection key={s.id} section={s} />))}
       {/* the coupon strip lives inside the combos section; without one, show it on its own */}
-      {!sections.some((s) => s.type === 'combos') && <CouponOffersSection />}
     </>
   );
 };

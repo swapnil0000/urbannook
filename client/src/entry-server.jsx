@@ -5,7 +5,6 @@ import { PassThrough } from 'node:stream';
 import { renderToPipeableStream } from 'react-dom/server';
 import { StaticRouter } from 'react-router';
 import { matchPath } from 'react-router-dom';
-import { CookiesProvider, Cookies } from 'react-cookie';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import App from './App.jsx';
 import config from './config/env.js';
@@ -101,11 +100,9 @@ export async function render(url, { timeoutMs = 8000 } = {}) {
   const app = (
     <SsrContext.Provider value={ssr}>
       <GoogleOAuthProvider clientId={config.googleClientId || ''}>
-        <CookiesProvider cookies={new Cookies()}>
-          <StaticRouter location={url}>
-            <App store={store} helmetContext={helmetContext} />
-          </StaticRouter>
-        </CookiesProvider>
+        <StaticRouter location={url}>
+          <App store={store} helmetContext={helmetContext} />
+        </StaticRouter>
       </GoogleOAuthProvider>
     </SsrContext.Provider>
   );

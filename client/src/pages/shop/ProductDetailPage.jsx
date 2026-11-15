@@ -36,7 +36,6 @@ import { useCartData } from '../../hooks/useCartSync';
 import FreeShippingStrip from '../../component/FreeShippingStrip';
 import OfferProgress from '../../component/festive/OfferProgress';
 import { compressImage } from '../../utils/compressImage';
-import GiftWrapOffer from '../../component/GiftWrapOffer';
 import { requestCheckout } from '../../utils/checkoutIntent';
 import { useCartPromotions } from '../../hooks/useCartPromotions';
 import SaleTag from '../../component/festive/SaleTag';
@@ -771,7 +770,6 @@ const ProductDetailPage = () => {
             <div className="pdp-stock">
               <StockStatus outOfStock={isOutOfStock} left={selectedVariantObj?.variantQuantity} lowAt={5} />
             </div>
-            {product?.giftWrapEligible && !isOutOfStock && <GiftWrapOffer variant="card" eligible className="mt-3" />}
 
             {/* BUY BUTTONS */}
             <div ref={buyBoxRef} className="pdp-cta">
@@ -981,6 +979,7 @@ const ProductDetailPage = () => {
         <div id="reviews" className="max-w-[1280px] mx-auto px-5 scroll-mt-24">
           <ReviewsSection
             reviews={reviews}
+            variantSku={selectedVariantObj?.sku}
             avg={avgRating}
             total={totalReviews}
             dist={ratingDist}

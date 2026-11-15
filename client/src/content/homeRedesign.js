@@ -28,9 +28,11 @@ export const TRUST = {
   items: [
     // average of every approved review in the database (all products, Google imports included), out of 5
     { source: 'ratingAvg', decimals: 1, unit: '/5', label: 'Average rating', stars: 5 },
-    { value: 2000, group: true, suffix: '+', label: 'Desks upgraded' },
+    // real paid orders (website + Instagram, team test orders left out), floored to the hundred - was a hand-typed 2,000
+    { source: 'totalOrders', round: 100, group: true, suffix: '+', label: 'Orders placed' },
     { value: 100, suffix: '%', label: 'Made in India' },
-    { value: 7, suffix: '-day', label: 'Easy replacement' },
+    // the Return policy: 3 days from delivery, damaged / defective / wrong items
+    { value: 3, suffix: '-day', label: 'Damage replacement' },
   ],
 };
 

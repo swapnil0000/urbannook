@@ -247,7 +247,7 @@ const getOrderSummaries = asyncHandler(async (req, res) => {
   const [shipments, cases] = ids.length
     ? await Promise.all([
         ShipmentRecord.find({ sourceOrderId: { $in: ids } })
-          .select("sourceOrderId cloneSeq itemIndexes shipmentStatus awbNumber isCancelled shipmentDirection expectedDeliveryDate lastTrackedAt dispatchConfirmedAt")
+          .select("sourceOrderId cloneSeq itemIndexes itemQuantities shipmentStatus awbNumber isCancelled shipmentDirection expectedDeliveryDate lastTrackedAt dispatchConfirmedAt")
           .lean()
           .catch(() => []),
         ResolutionCase.find({ orderId: { $in: ids } }).select(CUSTOMER_CASE_FIELDS).lean().catch(() => []),

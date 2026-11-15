@@ -2,17 +2,18 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { aboutValues } from '../../data/constant';
 import SEOHead from '../../component/SEOHead';
-import { useGetPublicStatsQuery } from '../../store/api/statsApi';
+import { useGetPublicStatsQuery, ordersShown } from '../../store/api/statsApi';
 
 const AboutPage = () => {
   const navigate = useNavigate();
   const { data: statsData } = useGetPublicStatsQuery();
-  const totalOrders = statsData?.data?.totalOrders || 150;
+  // real paid orders, rounded down ("1000+") - it used to add a made-up 350 to a count that was always 0
+  const ordersLabel = `${ordersShown(statsData?.data?.totalOrders)}+`;
 
   useEffect(() => { window.scrollTo(0, 0); }, []);
 
-  const stats = [[`${totalOrders + 350}+`, 'Orders shipped'], ['100%', 'Made in India'], ['In-house', 'Design & print']];
-  const proof = [[`${totalOrders + 350}+ successful deliveries`, 'Trusted by homes across India'], ['100% secure transactions', 'End-to-end encryption via Razorpay'], ['In-house design & production', 'Strict QC — never cheap drop-shipping']];
+  const stats = [[ordersLabel, 'Orders placed'], ['100%', 'Made in India'], ['In-house', 'Design & print']];
+  const proof = [[`${ordersLabel} orders placed`, 'Trusted by homes across India'], ['100% secure transactions', 'End-to-end encryption via Razorpay'], ['In-house design & production', 'Strict QC — never cheap drop-shipping']];
 
   return (
     <div className="rd-doc bg-paper text-ink font-inter selection:bg-brand selection:text-white">

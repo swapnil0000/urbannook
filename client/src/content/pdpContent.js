@@ -27,6 +27,8 @@ export const PDP = {
     distribution: 'Ratings by star',
     openPhoto: 'Open photo from',
     customer: 'Customer',
+    viaGoogle: 'via Google',
+    bought: 'Bought:',
     readMore: 'Read more',
     readLess: 'Show less',
     longAt: 200,

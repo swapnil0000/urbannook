@@ -223,63 +223,51 @@ describe("shipping and tracking", () => {
     expect(v.timeline.find((s) => s.key === "delivered").state).not.toBe("done");
   });
 
-  describe("partly shipped: some items have a parcel that left, some do not", () => {
-    const two = () => base({ items: [line("Katana", 1000), line("Stand", 299)] });
+  describe("partial shipment by quantity (3 katanas: 2 now, 1 later)", () => {
+    const katanas = () => base({ items: [line("Zoro katana", 1499, 3)] });
+    const first = (over = {}) => ship({ _id: "p1", itemIndexes: [0], itemQuantities: [{ index: 0, qty: 2 }], ...over });
 
-    it("one split parcel on its way, the other item has no parcel: 'Partly shipped', not 'on its way'", () => {
-      const v = view(two(), [ship({ itemIndexes: [0] })]);
-      expect(v.stage).toMatchObject({ code: "PARTIALLY_SHIPPED", label: "Partly shipped", tone: "info" });
-      expect(v.stage.message).toMatch(/1 of 2 items have shipped/);
-      expect(v.stage.message).toMatch(/still being prepared/);
-      expect(v.partial).toEqual({ shipped: 1, total: 2, delivered: 0 });
-      expect(v.items.map((i) => [i.name, i.fulfilment.state, i.fulfilment.label])).toEqual([["Katana", "shipped", "In transit"], ["Stand", "pending", "Not shipped yet"]]);
-      expect(v.items[0].fulfilment.parcelId).toBe(v.shipments[0].id);
-      expect(v.items[1].fulfilment.parcelId).toBeNull();
-      expect(v.timeline.find((t) => t.key === "shipped")).toMatchObject({ label: "Partly shipped", state: "done" });
-      expect(v.timeline.find((t) => t.key === "delivered").state).not.toBe("done");
-    });
-
-    it("a delivered split parcel with the rest unshipped is NOT 'Delivered'", () => {
-      const v = view(two(), [ship({ shipmentStatus: "DELIVERED", itemIndexes: [0] })]);
+    it("parcel 1 on its way, 1 katana not shipped → 'Partly shipped', parcel shows 2, 1 pending", () => {
+      const v = view(katanas(), [first()]);
       expect(v.stage.code).toBe("PARTIALLY_SHIPPED");
-      expect(v.stage.message).toMatch(/\(1 delivered\)/);
-      expect(v.items[0].fulfilment).toMatchObject({ state: "shipped", stage: "delivered", label: "Delivered" });
-      expect(v.timeline.find((t) => t.key === "delivered").state).not.toBe("done");
+      expect(v.shipments[0].items).toEqual([expect.objectContaining({ name: "Zoro katana", quantity: 2 })]);
+      expect(v.pendingItems).toEqual([expect.objectContaining({ name: "Zoro katana", quantity: 1 })]);
+      expect(v.shipments[0]).not.toHaveProperty("lines");
     });
 
-    it("the other item's parcel exists but has not been picked up yet: that item is 'being prepared'", () => {
-      const v = view(two(), [ship({ _id: "a", itemIndexes: [0] }), ship({ _id: "b", awbNumber: "AWB2", shipmentStatus: "PUSHED", itemIndexes: [1] })]);
+    it("parcel 1 delivered with 1 katana still unshipped is NOT 'Delivered'", () => {
+      const v = view(katanas(), [first({ shipmentStatus: "DELIVERED" })]);
+      expect(v.stage.code).toBe("PARTIALLY_DELIVERED");
+      expect(v.stage.message).toMatch(/ships separately/);
+      expect(v.timeline.find((s) => s.key === "delivered").state).not.toBe("done");
+    });
+
+    it("both parcels delivered → 'Delivered', nothing pending", () => {
+      const v = view(katanas(), [first({ shipmentStatus: "DELIVERED" }), ship({ _id: "p2", awbNumber: "AWB2", shipmentStatus: "DELIVERED", itemIndexes: [0], itemQuantities: [{ index: 0, qty: 1 }] })]);
+      expect(v.stage.code).toBe("DELIVERED");
+      expect(v.pendingItems).toEqual([]);
+      expect(v.shipments.map((s) => s.items[0].quantity)).toEqual([2, 1]);
+    });
+
+    it("out for delivery with a unit still unshipped says only part is out", () => {
+      const v = view(katanas(), [first({ shipmentStatus: "OUT_FOR_DELIVERY" })]);
+      expect(v.stage).toMatchObject({ code: "OUT_FOR_DELIVERY", headline: "Part of your order is out for delivery" });
+    });
+
+    it("the order summary counts the units still to ship", () => {
+      expect(buildOrderSummary(view(katanas(), [first()])).pendingCount).toBe(1);
+    });
+
+    it("a line split (itemIndexes only) still works and leaves the other line pending", () => {
+      const o = base({ items: [line("Katana", 1000), line("Stand", 299)] });
+      const v = view(o, [ship({ itemIndexes: [0] })]);
       expect(v.stage.code).toBe("PARTIALLY_SHIPPED");
-      expect(v.items[1].fulfilment).toMatchObject({ state: "preparing", label: "Being prepared" });
+      expect(v.pendingItems.map((i) => i.name)).toEqual(["Stand"]);
     });
 
-    it("nothing has left yet (a parcel is only being prepared): not partly shipped, items carry no fulfilment tag", () => {
-      const v = view(two(), [ship({ shipmentStatus: "PUSHED", itemIndexes: [0] })]);
-      expect(v.stage.code).toBe("CONFIRMED");
-      expect(v.partial).toBeUndefined();
-      expect(v.items.every((i) => i.fulfilment === undefined)).toBe(true);
-    });
-
-    it("a whole-order shipment, or every item covered, is not 'partly' anything", () => {
-      expect(view(two(), [ship()]).partial).toBeUndefined();
-      expect(view(two(), [ship({ _id: "a", itemIndexes: [0] }), ship({ _id: "b", awbNumber: "AWB2", itemIndexes: [1] })]).stage.code).toBe("IN_TRANSIT");
-    });
-
-    it("a cancelled split parcel hands its items back: nothing shipped any more", () => {
-      const v = view(two(), [ship({ isCancelled: true, itemIndexes: [0] })]);
-      expect(v.partial).toBeUndefined();
-      expect(v.stage.code).toBe("CONFIRMED");
-    });
-
-    it("courier trouble still wins: an exception parcel shows 'Needs attention' even with items unshipped", () => {
-      expect(view(two(), [ship({ shipmentStatus: "EXCEPTION", itemIndexes: [0] })]).stage.code).toBe("EXCEPTION");
-    });
-
-    it("the archive row carries the counts so the list can say it too", () => {
-      const row = buildOrderSummary(view(two(), [ship({ itemIndexes: [0] })]));
-      expect(row.stage.label).toBe("Partly shipped");
-      expect(row.partial).toEqual({ shipped: 1, total: 2, delivered: 0 });
-      expect(buildOrderSummary(view(base(), [ship()])).partial).toBeUndefined();
+    it("nothing pending before any parcel exists, or with a whole-order parcel", () => {
+      expect(view(katanas()).pendingItems).toEqual([]);
+      expect(view(katanas(), [ship()]).pendingItems).toEqual([]);
     });
   });
 
@@ -500,5 +488,38 @@ describe("customer, invoice and archive summary", () => {
   it("a large multi-item order is summarised without loss of count", () => {
     const items = Array.from({ length: 30 }, (_, i) => line(`P${i}`, 10, 2));
     expect(view(base({ items, amount: 600 })).itemCount).toBe(60);
+  });
+});
+
+describe("delay update from the team (order.customerNotice)", () => {
+  const notice = (over = {}) => ({ kind: "COURIER_DELAY", message: "Your order has been shipped with Delhivery (tracking number AWB123). The courier is taking longer than usual.", awb: "AWB123", sentAt: T("30"), ...over });
+
+  it("shows the exact text the customer got on WhatsApp / email while the parcel is on its way", () => {
+    const v = view(base({ customerNotice: notice() }), [ship()]);
+    expect(v.notice).toEqual({ kind: "COURIER_DELAY", message: notice().message, at: T("30").toISOString() });
+  });
+
+  it("goes away once the parcel is delivered, and never shows on a cancelled order", () => {
+    expect(view(base({ customerNotice: notice() }), [ship({ shipmentStatus: "DELIVERED" })]).notice).toBeNull();
+    expect(view(base({ customerNotice: notice(), resolutionStatus: "CANCELLED" }), [ship()]).notice).toBeNull();
+  });
+
+  it("a courier-delay note never shows on an order that has not shipped", () => {
+    expect(view(base({ customerNotice: notice() }), []).notice).toBeNull();
+  });
+
+  it("a not-shipped note shows while units are waiting and disappears once everything ships", () => {
+    const items = [line("Katana", 1299), line("Stand", 499)];
+    const n = notice({ kind: "NOT_SHIPPED_DELAY", awb: null, message: "Stand x 1 from your order is taking longer than usual to get ready." });
+    const partial = view(base({ items, customerNotice: n }), [ship({ itemQuantities: [{ index: 0, qty: 1 }] })]);
+    expect(partial.notice?.kind).toBe("NOT_SHIPPED_DELAY");
+    const all = view(base({ items, customerNotice: n }), [ship()]);
+    expect(all.notice).toBeNull();
+  });
+
+  it("ignores an old (30+ days), unknown or empty note", () => {
+    expect(view(base({ customerNotice: notice({ sentAt: new Date("2026-09-01T00:00:00Z") }) }), [ship()]).notice).toBeNull();
+    expect(view(base({ customerNotice: notice({ kind: "PROMO" }) }), [ship()]).notice).toBeNull();
+    expect(view(base({ customerNotice: notice({ message: "  " }) }), [ship()]).notice).toBeNull();
   });
 });

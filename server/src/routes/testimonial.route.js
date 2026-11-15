@@ -2,6 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import {
   getTestimonials,
+  getGoogleReviews,
   submitTestimonial,
   submitProductReview,
   updateProductReview,
@@ -27,6 +28,7 @@ const testimonialRouter = Router();
 
 // Global testimonials (homepage)
 testimonialRouter.get("/testimonials", getTestimonials);
+testimonialRouter.get("/google-reviews", getGoogleReviews);
 testimonialRouter.post("/testimonials", testimonialRateLimiter, sanitizeTestimonialInput, submitTestimonial);
 
 // Product-specific reviews

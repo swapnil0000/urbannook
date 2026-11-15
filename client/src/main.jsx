@@ -21,7 +21,6 @@ import '@fontsource/jetbrains-mono/latin-600.css'
 import './index.css'
 import App, { NewHeader, Footer } from './App.jsx'
 import { preloadPageForPath } from './pages/index.js'
-import { CookiesProvider } from 'react-cookie';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import config from './config/env.js';
 import { initPerformanceMetrics, onMetricsUpdate } from './utils/performanceMetrics.js';
@@ -85,11 +84,9 @@ window.addEventListener('unhandledrejection', (event) => {
 const app = (
   <StrictMode>
     <GoogleOAuthProvider clientId={config.googleClientId}>
-      <CookiesProvider>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      </CookiesProvider>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
     </GoogleOAuthProvider>
   </StrictMode>
 );

@@ -5,9 +5,9 @@ import { addItem } from '../store/slices/cartSlice';
 import { useGetHomeComboOffersQuery } from '../store/api/userApi';
 import { useSiteCampaign, THEME_COPY } from '../hooks/useSiteCampaign';
 import FestiveCountdown from './festive/FestiveCountdown';
+import SectionDecor from './festive/SectionDecor';
 import ComboBuilderSheet from './ComboBuilderSheet';
 import { recordOfferInterest } from '../utils/offerInterest';
-import CouponOffersSection from './offers/CouponOffersSection';
 import MysteryGiftArt from './offers/MysteryGiftArt';
 
 const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
@@ -242,42 +242,78 @@ export const OfferCard = ({ combo, festive, priceLabel, onAdded }) => {
   );
 };
 
+// How many of the offer's own product the deal asks for ("Buy 2 Katanas" -> 2):
+// the builder slots that can only be that product.
+const buyCount = (combo) => (combo.builder?.combos?.[0]?.slots || [])
+  .filter((s) => s.options?.length === 1 && s.options[0].productId === combo.primaryProductId).length;
+
+const Thumb = ({ img, children, reward = false }) => (
+  <span className={`relative block aspect-square w-[40%] shrink-0 overflow-hidden bg-white ${reward ? 'border border-dashed border-ink/40' : 'border border-hair'}`}>
+    {img
+      ? <img src={img} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" onError={(e) => { e.currentTarget.src = '/assets/logo.webp'; }} />
+      : <MysteryGiftArt className="absolute inset-0" />}
+    {children}
+  </span>
+);
+
+const Badge = ({ children }) => (
+  <span className="gl-lbl absolute inset-x-0 top-0 bg-sale py-[3px] text-center text-[8.5px] text-white">{children}</span>
+);
+
 /**
- * Compact image-tile grid for the homepage offers (replaces the old large
- * carousel cards). Each tile = admin-uploaded image + title + a dark-red strip
- * with the real benefit. Tiles are equal size and fully clickable; what a click
- * does: opens the offer's primary product's variants page (only that product's variants). Adding it to the cart makes the existing offer bottom sheet open with the eligible products.
+ * One homepage offer as a "deal equation", drawn like the shop's product
+ * cards (white card, hairline, red mono label over a bold name): on a paper
+ * band, what you buy (photo, x2) + what you get (the reward's photo with its
+ * FREE / 50% OFF badge); under it the benefit and the offer's name, whole.
+ * Built for the shopper the data says we have - on a phone, from an
+ * Instagram ad, buying a first combo. Both lines come from Admin (homeCard
+ * subtitle / promotion name, benefit label - "{save}" resolved server-side).
+ * A click remembers the interest (the checkout reminder uses it) and opens the
+ * offer's main product.
  */
-const OfferTile = ({ combo }) => {
+const OfferRow = ({ combo }) => {
   const navigate = useNavigate();
   const reward = combo.builder?.combos?.[0]?.reward;
-  // a mystery gift shows the wrapped box (or the admin's own reward image), never the katana that unlocks it
-  const img = combo.mysteryGift ? combo.rewardImage : combo.bannerImage || combo.items?.[0]?.image || combo.productImage || reward?.image || '/assets/logo.webp';
-  // both lines come from Admin: the display title (homeCard subtitle, else the promotion name) and the benefit label
-  // (homeCard savings label; "{save}" is resolved server-side from the real engine savings)
-  const tagline = combo.tagline || combo.title;
+  const buyImg = combo.productImage || combo.items?.[0]?.image || combo.bannerImage || '/assets/logo.webp';
+  const rewardImg = reward?.image || combo.rewardImage || null; // none (mystery gift) -> the wrapped-box art
+  const badge = reward?.badge || (combo.freeGift ? 'FREE' : null);
+  const qty = buyCount(combo);
+  // "Buy 2 pen stands, 20% off" rewards the same product: one photo, both labels
+  const sameThing = rewardImg && rewardImg === buyImg;
+  const title = combo.tagline || combo.title;
   const benefit = combo.benefit || '';
+  const qtyChip = qty > 1 && <span className="gl-lbl absolute bottom-1 left-1 bg-ink px-1.5 py-[2px] text-[9px] text-paper">×{qty}</span>;
   return (
     <button
       type="button"
       onClick={() => {
         if (!combo.primaryProductId) return;
-        // remember the interest (the checkout reminder uses it), then open the plain variants page
         recordOfferInterest(combo.id, combo.primaryProductId);
         navigate(`/products/${combo.primaryProductId}`);
       }}
-      className="un-tile group flex h-full w-full flex-col overflow-hidden text-left transition-colors duration-200 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-paper"
-      aria-label={benefit ? `${tagline}. ${benefit}` : tagline}
+      className="group flex h-full w-full flex-col overflow-hidden border border-hair bg-white text-left transition-colors hover:border-ink/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+      aria-label={benefit ? `${title}. ${benefit}` : title}
     >
-      {/* the product photo is the focus: shown whole, no mask or frame */}
-      <span className="un-tile-img relative block aspect-[4/5] w-full shrink-0 overflow-hidden">
-        {img
-          ? <img src={img} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]" onError={(e) => { e.currentTarget.src = '/assets/logo.webp'; }} />
-          : <MysteryGiftArt className="absolute inset-0" />}
+      <span className="flex aspect-[16/10] w-full items-center justify-center gap-2 bg-paper px-3" aria-hidden="true">
+        {sameThing ? (
+          <Thumb img={buyImg}>{badge && <Badge>{badge}</Badge>}{qtyChip}</Thumb>
+        ) : (
+          <>
+            <Thumb img={buyImg}>{qtyChip}</Thumb>
+            <span className="text-[18px] font-extrabold leading-none text-ink/60">+</span>
+            <Thumb img={rewardImg} reward>{badge && <Badge>{badge}</Badge>}</Thumb>
+          </>
+        )}
       </span>
-      <span className="un-tile-strip flex flex-1 flex-col justify-start gap-1.5 px-3.5 pb-4 pt-3.5">
-        <span className="un-tile-title font-archivo text-[14px] font-semibold leading-snug text-paper sm:text-[15px]">{tagline}</span>
-        {benefit && <span className="un-tile-benefit text-[12.5px] leading-snug sm:text-[13px]">{benefit}</span>}
+      <span className="flex flex-1 flex-col p-3 sm:p-3.5">
+        {benefit && <span className="gl-lbl text-[10px] leading-snug text-sale line-clamp-2">{benefit}</span>}
+        <span className="mt-1 min-h-[2.5em] font-archivo font-semibold text-[14px] leading-snug text-ink line-clamp-2 sm:text-[15px]">{title}</span>
+        <span className="mt-auto flex items-center justify-between gap-2 border-t border-hair pt-2.5">
+          <span className="text-[12px] font-semibold text-ink">Get this deal</span>
+          <span className="grid h-7 w-7 shrink-0 place-items-center bg-brand text-white transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true">
+            <Arrow />
+          </span>
+        </span>
       </span>
     </button>
   );
@@ -295,8 +331,7 @@ const ComboOfferSection = ({ title, subtitle, lead }) => {
   const n = combos.length;
 
   if (isLoading) return null;
-  // no combo offers: coupons (if any) still show on their own
-  if (n === 0) return <CouponOffersSection />;
+  if (n === 0) return null;
 
   const eyebrow = festive ? copy.eyebrow || 'Festive Offers' : 'Limited Time';
   const heading = title || (festive ? copy.offersTitle || 'Festive Offers' : 'Combo Offers');
@@ -305,36 +340,41 @@ const ComboOfferSection = ({ title, subtitle, lead }) => {
   return (
     <div className="relative">
       <section className="un-offers relative overflow-hidden bg-ink pb-9 pt-12 sm:pb-12 sm:pt-14" aria-label={heading}>
-        {/* one soft glow behind the heading while a campaign is live - no extra rules or ornaments */}
         {festive && (
           <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-            <div className="absolute inset-0" style={{ background: 'radial-gradient(60% 55% at 50% 0%, rgb(var(--gl-brand) / 0.16), transparent 70%)' }} />
+            <div className="absolute inset-0" style={{ background: 'radial-gradient(60% 55% at 50% 0%, rgb(var(--gl-brand) / 0.22), transparent 70%)' }} />
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-star/60 to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-star/40 to-transparent" />
+            <SectionDecor />
           </div>
         )}
 
         {lead && festive ? <div className="relative z-10">{lead}</div> : (
-        <div className="relative z-10 px-4 text-center sm:px-6">
+        <div className="relative z-10 px-5 text-left sm:px-[6%]">
+          {/* left-aligned on the same line as the cards, like the other home sections */}
           <div className="mb-1 sm:mb-2">
             <span className="inline-flex items-center gap-2 gl-lbl text-[11px] text-star tracking-[0.18em]">
-              <span aria-hidden="true">✦</span> {eyebrow} <span aria-hidden="true">✦</span>
+              <span aria-hidden="true">✦</span> {eyebrow}
             </span>
-            <h2 className="mt-1.5 font-archivo text-[26px] font-extrabold leading-tight text-paper sm:text-4xl">{heading}</h2>
-            {sub && <p className="mx-auto mt-2 max-w-xl text-sm text-paper/70 sm:text-base">{sub}</p>}
-            {festive && <div className="mt-3 flex justify-center"><FestiveCountdown tone="light" /></div>}
+            <h2 className="mt-1.5 font-archivo text-[26px] font-semibold leading-[1.12] tracking-[-0.055em] text-paper sm:text-[clamp(28px,3vw,44px)]">{heading}</h2>
+            {sub && <p className="mt-2 max-w-xl text-sm text-paper/70 sm:text-base">{sub}</p>}
+            {festive && <div className="mt-3 flex"><FestiveCountdown tone="light" /></div>}
           </div>
         </div>
         )}
 
-        {/* offer tiles - only the real, live offers. Phones: a swipe rail with the next tile peeking; sm+: a centred wrap */}
-        <div className="un-offer-rail relative z-10 mx-auto mt-6 max-w-[1100px] sm:mt-8">
-          {combos.map((c) => (
-            <div key={c.id} className="un-offer-cell min-w-0">
-              <OfferTile combo={c} />
-            </div>
-          ))}
+        {/* a swipe row on a phone (1.5 cards in view), every offer side by side on
+            desktop - the same pattern as "More to explore" */}
+        <div className="relative z-10 mt-5 sm:mt-6">
+          <div className="flex snap-x scroll-px-5 gap-3 overflow-x-auto px-5 pb-1 gl-hscroll sm:scroll-px-[6%] sm:gap-4 sm:px-[6%]">
+            {combos.map((c) => (
+              <div key={c.id} className="un-offer-cell shrink-0 snap-start basis-[64vw] max-w-[260px] sm:basis-[calc((100%_-_2*16px)/3)] lg:basis-[calc((100%_-_4*16px)/5)] lg:max-w-[232px]">
+                <OfferRow combo={c} />
+              </div>
+            ))}
+          </div>
         </div>
 
-        <CouponOffersSection variant="strip" />
       </section>
     </div>
   );

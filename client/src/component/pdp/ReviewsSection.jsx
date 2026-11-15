@@ -40,12 +40,14 @@ const Card = ({ rev, currentUserId, onEdit, onOpenPhoto }) => {
       <div className="pdp-rv-body">
         <div className="pdp-rv-head">
           <b>{name}</b>
+          {rev.source === 'google' && <span className="pdp-rv-via">{R.viaGoogle}</span>}
           {rev.userId && rev.userId === currentUserId && <button type="button" onClick={() => onEdit(rev)} className="pdp-link">{R.edit}</button>}
         </div>
         <div className="pdp-rv-meta">
           <Stars n={rev.rating} className="pdp-rv-stars" />
           {rev.createdAt && <time dateTime={rev.createdAt}>{when(rev.createdAt)}</time>}
         </div>
+        {rev.variant && <p className="pdp-rv-bought">{R.bought} {rev.variant}</p>}
         {rev.desc && <p className={`pdp-rv-text${long && !open ? ' is-clamped' : ''}`}>{rev.desc}</p>}
         {long && <button type="button" className="pdp-rv-toggle" aria-expanded={open} onClick={() => setOpen((o) => !o)}>{open ? R.readLess : R.readMore}</button>}
       </div>
@@ -56,11 +58,16 @@ const Card = ({ rev, currentUserId, onEdit, onOpenPhoto }) => {
 /** Marketplace-style ratings & reviews. Summary (score, bars, sort, "with photos") on top, then one card per review: its
  *  photos (swipeable, whole), name, stars, date and text together. A photo opens the viewer on that review's photos with
  *  its own comment. No separate photo gallery, so no photo appears twice. `children` is the write-a-review form. */
-const ReviewsSection = ({ reviews, avg, total, dist, currentUserId, visible, onMore, onWrite, onEdit, onOpenPhoto, children }) => {
+const ReviewsSection = ({ reviews, variantSku, avg, total, dist, currentUserId, visible, onMore, onWrite, onEdit, onOpenPhoto, children }) => {
   const [sort, setSort] = useState('recent');
   const [photosOnly, setPhotosOnly] = useState(false);
   const withPhotos = useMemo(() => reviews.filter((r) => reviewImages(r).length).length, [reviews]);
-  const list = useMemo(() => reviews.filter((r) => !photosOnly || reviewImages(r).length).sort(SORTS[sort]), [reviews, sort, photosOnly]);
+  // Newest first; for the default order, reviews of the design on screen come first (variantSku is set on reviews added from the
+  // admin's Customer Hub → Reviews). Array.sort is stable, so the rest keep their order.
+  const list = useMemo(() => {
+    const sorted = reviews.filter((r) => !photosOnly || reviewImages(r).length).sort(SORTS[sort]);
+    return sort === 'recent' && variantSku ? sorted.sort((a, b) => (b.variantSku === variantSku) - (a.variantSku === variantSku)) : sorted;
+  }, [reviews, sort, photosOnly, variantSku]);
   const shown = list.slice(0, visible);
 
   return (

@@ -179,7 +179,7 @@ const PANEL = {
   CONFIRMED: ["fa-box", "Your order is being prepared", "We're packing your items. You'll get tracking details once it's dispatched."],
   PAYMENT_PENDING: ["fa-hourglass-half", null, null],
 };
-const PANEL_ICON = { IN_TRANSIT: "fa-truck-fast", OUT_FOR_DELIVERY: "fa-truck-fast", DELIVERED: "fa-box-open", PARTIALLY_DELIVERED: "fa-truck-fast", EXCEPTION: "fa-triangle-exclamation", RTO: "fa-rotate-left" };
+const PANEL_ICON = { IN_TRANSIT: "fa-truck-fast", OUT_FOR_DELIVERY: "fa-truck-fast", DELIVERED: "fa-box-open", PARTIALLY_DELIVERED: "fa-truck-fast", PARTIALLY_SHIPPED: "fa-truck-fast", EXCEPTION: "fa-triangle-exclamation", RTO: "fa-rotate-left" };
 
 const Stepper = ({ steps }) => (
   <ol className="uo-steps" aria-label="Order progress">
@@ -240,11 +240,21 @@ const Shipment = ({ s, index, total }) => {
 
 export const Tracking = ({ view }) => {
   const { timeline, shipments, stage } = view;
+  const pendingItems = view.pendingItems || [];
+  // units no parcel carries yet count as one more parcel to come ("Parcel 1 of 2")
+  const parcelTotal = shipments.length + (pendingItems.length ? 1 : 0);
   if (!timeline && !shipments.length) return null; // cancelled / failed: the header already says so, and there is no journey to draw
   const [icon, head, body] = PANEL[stage.code] || [PANEL_ICON[stage.code] || "fa-box", stage.headline, stage.message];
   return (
     <Card id="tracking" title="Order Tracking" icon="fa-shield-halved" labelId="tracking-h" className="scroll-mt-20">
       {/* No progress line for exceptions or returns — that would be a false normal journey. */}
+      {/* Delay update from the team — the same text the customer got on WhatsApp / email */}
+      {view.notice && (
+        <div className="uo-banner uo-banner-amber mb-3" role="status">
+          <p className="font-bold text-[13px]">Update from Urban Nook · {formatISTDate(view.notice.at)}</p>
+          <p className="mt-1 text-[13px]">{view.notice.message}</p>
+        </div>
+      )}
       {timeline && <Stepper steps={timeline} />}
       {(head || shipments.length === 0) && (
         <div className="uo-panel" style={{ marginTop: timeline ? 18 : 0 }}>
@@ -252,7 +262,19 @@ export const Tracking = ({ view }) => {
           <div className="min-w-0"><p className="font-bold text-[14px]">{head || stage.headline}</p><p className="uo-sub mt-0.5">{body || stage.message}</p></div>
         </div>
       )}
-      {shipments.length > 0 && <div className="mt-3 space-y-2.5">{shipments.map((s, i) => <Shipment key={s.id} s={s} index={i} total={shipments.length} />)}</div>}
+      {shipments.length > 0 && (
+        <div className="mt-3 space-y-2.5">
+          {shipments.map((s, i) => <Shipment key={s.id} s={s} index={i} total={parcelTotal} />)}
+          {/* Partial shipment: what hasn't been sent yet, so the customer knows more is coming */}
+          {pendingItems.length > 0 && (
+            <article className="uo-cell" style={{ padding: "12px 14px", borderStyle: "dashed" }}>
+              <p className="font-semibold text-[13px]">Parcel {parcelTotal} of {parcelTotal} · Not shipped yet</p>
+              <p className="mt-1.5 text-[13px]">Still to come: {pendingItems.map((i) => `${i.quantity} × ${i.name}${i.variant ? ` (${i.variant})` : ""}`).join(", ")}</p>
+              <p className="uo-sub mt-1">We&apos;ll ship it separately — its tracking number appears here as soon as it&apos;s on its way.</p>
+            </article>
+          )}
+        </div>
+      )}
     </Card>
   );
 };
@@ -305,11 +327,6 @@ export const Payment = ({ payment }) => {
 // ── items ────────────────────────────────────────────────────────────────────
 // On a partly shipped order every line says whether it has gone: delivered (green), on its way / shipped (plain),
 // being prepared, or not shipped yet (amber). Orders that ship in one go carry no tag.
-const FulfilmentChip = ({ f }) => {
-  const cls = f.state === "pending" ? "uo-chip-amber" : f.stage === "delivered" ? "uo-chip-green" : "uo-chip-plain";
-  return <span className={`uo-chip ${cls}`}>{f.state === "shipped" && f.stage !== "delivered" ? `Shipped · ${f.label}` : f.label}</span>;
-};
-
 const Item = ({ item }) => {
   const title = resolveVariantTitle(item.name, item.variantTitleTemplate, item.variant);
   const discounted = item.unitOriginal && !item.isFreeGift;
@@ -327,7 +344,6 @@ const Item = ({ item }) => {
       </div>
       <div className="uo-qty flex flex-wrap items-center gap-1.5">
         <span className="uo-chip uo-chip-plain">Qty: {item.quantity}</span>
-        {item.fulfilment && <FulfilmentChip f={item.fulfilment} />}
       </div>
       <div className="hidden sm:block text-right min-w-0">
         {item.isFreeGift ? (
@@ -346,13 +362,12 @@ const Item = ({ item }) => {
   );
 };
 
-export const Items = ({ items, partial }) => {
+export const Items = ({ items }) => {
   const [all, setAll] = useState(false);
   const count = items.reduce((s, i) => s + i.quantity, 0);
   const hidden = !all && items.length > 3;
   return (
     <Card title={`Items in Your Order (${count})`} icon="fa-clipboard-list" labelId="items-h" aside={items.length > 3 ? <button type="button" onClick={() => setAll((a) => !a)} aria-expanded={all} className="sm:hidden uo-red font-semibold text-[12px] min-h-[32px]">{all ? "Show less" : "View All"}</button> : null}>
-      {partial && <p className="uo-sub mb-3" role="status">{partial.shipped} of {partial.total} {partial.total === 1 ? "item has" : "items have"} shipped. The rest {partial.total - partial.shipped === 1 ? "is" : "are"} still being prepared and will get {partial.total - partial.shipped === 1 ? "its" : "their"} own tracking.</p>}
       <ul className="list-none m-0 p-0">
         {items.map((it, i) => (
           <div key={`${it.index}-${it.productId}`} className={hidden && i >= 3 ? "hidden sm:contents" : "contents"}><Item item={it} /></div>
@@ -496,7 +511,7 @@ export const OrderPageBody = ({ view, mode = "details" }) => (
     <div className="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(300px,30%)] lg:gap-16 lg:items-start">
       <div className="contents lg:flex lg:flex-col lg:gap-12 lg:min-w-0">
         <div className="order-1 lg:order-none"><Tracking view={view} /></div>
-        <div className="order-3 lg:order-none"><Items items={view.items} partial={view.partial} /></div>
+        <div className="order-3 lg:order-none"><Items items={view.items} /></div>
         <div className="order-5 lg:order-none grid gap-10 md:grid-cols-[1.25fr_1fr] lg:gap-12"><Address d={view.delivery} /><Contact d={view.delivery} /></div>
       </div>
       <div className="contents lg:flex lg:flex-col lg:gap-12 lg:min-w-0">
@@ -568,7 +583,7 @@ export const OrderSummaryCard = ({ order }) => {
       <div className="rd-ord-info">
         <p className="rd-ord-status font-mono uppercase"><i className={`rd-ord-dot rd-ord-dot--${tone}`} aria-hidden="true" /><span>{order.stage.label}</span></p>
         <p className="rd-ord-ref font-mono uppercase">Order <span>…{shortRef(order.orderId)}</span><CopyButton value={order.orderId} label="Copy full order ID" /></p>
-        <p className="rd-ord-meta font-inter">Placed {formatISTDate(order.placedAt)} · {order.itemCount} {order.itemCount === 1 ? "item" : "items"} · {order.payment.label}{order.partial ? ` · ${order.partial.shipped} of ${order.partial.total} items shipped` : ""}</p>
+        <p className="rd-ord-meta font-inter">Placed {formatISTDate(order.placedAt)} · {order.itemCount} {order.itemCount === 1 ? "item" : "items"} · {order.payment.label}</p>
       </div>
       <div className="rd-ord-side">
         <div>

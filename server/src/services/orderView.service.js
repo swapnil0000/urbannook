@@ -283,6 +283,40 @@ export const buildTrackUrl = (template, awb) => {
   return awb ? t.split("{awb}").join(encodeURIComponent(awb)) : null;
 };
 
+// ── partial shipments ──────────────────────────────────────────────────────
+// A parcel says what it carries in one of three ways (same rules as the admin's
+// utils/parcelSplit.js): nothing → the whole order; itemIndexes → those lines
+// at full quantity; itemQuantities [{index, qty}] → exactly those units.
+
+const lineQtyOf = (item) => Math.max(1, num(item?.productSnapshot?.quantity) || 1);
+
+const parcelLinesOf = (order, r) => {
+  const items = order.items || [];
+  if (Array.isArray(r.itemQuantities) && r.itemQuantities.length) {
+    return r.itemQuantities
+      .map((l) => ({ index: num(l.index), qty: num(l.qty) }))
+      .filter((l) => Number.isInteger(l.index) && l.index >= 0 && l.index < items.length && l.qty > 0);
+  }
+  if (Array.isArray(r.itemIndexes) && r.itemIndexes.length) {
+    return r.itemIndexes.filter((i) => i >= 0 && i < items.length).map((index) => ({ index, qty: lineQtyOf(items[index]) }));
+  }
+  return null;
+};
+
+/**
+ * Units not in any parcel yet, once part of the order has shipped:
+ * [{ index, qty }]. Empty when nothing has a parcel yet (the whole order is
+ * still being prepared) or when a parcel carries the whole order.
+ */
+const buildPending = (order, shipments) => {
+  if (!shipments.length || shipments.some((s) => !s.lines)) return [];
+  const shipped = (order.items || []).map(() => 0);
+  for (const s of shipments) for (const l of s.lines) shipped[l.index] += l.qty;
+  return (order.items || [])
+    .map((item, index) => ({ index, qty: Math.max(0, lineQtyOf(item) - shipped[index]) }))
+    .filter((l) => l.qty > 0);
+};
+
 const buildShipments = (order, records, now, trackUrlTemplate) => {
   const nowMs = now.getTime();
   const forward = (records || [])
@@ -325,6 +359,10 @@ const buildShipments = (order, records, now, trackUrlTemplate) => {
       trackUrl: buildTrackUrl(trackUrlTemplate, awb),
       events,
       itemIndexes: Array.isArray(r.itemIndexes) && r.itemIndexes.length ? r.itemIndexes : null,
+      // [{ index, qty }] this parcel carries, or null = the whole order. A
+      // quantity split (admin's itemQuantities, e.g. 2 of a "katana × 3") wins
+      // over itemIndexes, which means those lines at their full quantity.
+      lines: parcelLinesOf(order, r),
     };
   };
 
@@ -355,33 +393,15 @@ const buildShipments = (order, records, now, trackUrlTemplate) => {
         trackUrl: buildTrackUrl(trackUrlTemplate, cleanText(String(t.trackingNumber), 60)),
         events: [],
         itemIndexes: null,
+        lines: null,
       },
     ];
   }
   return [];
 };
 
-// ── partial shipment ───────────────────────────────────────────────────────
-// Which order lines have actually left (a parcel past "being prepared") and which have not. Only split parcels (itemIndexes)
-// can leave lines behind: a whole-order parcel covers every line. Returns null unless SOME lines have shipped and some have not,
-// so a normal order (and a fully covered multi-parcel order) is untouched.
-const buildPartial = (items, shipments) => {
-  if (!items.length || !shipments.length) return null;
-  const covers = (s, i) => (s.itemIndexes ? s.itemIndexes.includes(i) : true);
-  const lines = items.map((_, i) => {
-    const mine = shipments.filter((s) => covers(s, i));
-    const left = mine.find((s) => s.stage !== "preparing");
-    if (left) return { state: "shipped", stage: left.stage, label: left.label, parcelId: left.id };
-    if (mine.length) return { state: "preparing", stage: "preparing", label: STAGE_COPY.preparing.label, parcelId: mine[0].id };
-    return { state: "pending", stage: null, label: "Not shipped yet", parcelId: null };
-  });
-  const shipped = lines.filter((l) => l.state === "shipped").length;
-  if (shipped === 0 || shipped === items.length) return null;
-  return { shipped, total: items.length, delivered: lines.filter((l) => l.stage === "delivered").length, lines };
-};
-
 // One line of copy + a tone for the page header.
-const buildStage = (order, payment, shipments, partial = null) => {
+const buildStage = (order, payment, shipments, pending = []) => {
   if (isCancelled(order)) return { code: "CANCELLED", label: "Cancelled", headline: "This order was cancelled", message: payment.refundedAmount > 0 || payment.refundInProgressAmount > 0 ? "Your refund details are below." : "It will not be delivered.", tone: "danger" };
   if (payment.state === "FAILED") return { code: "PAYMENT_FAILED", label: "Payment failed", headline: "Your payment didn't go through", message: "No order was placed. If any amount was debited, your bank reverses it automatically.", tone: "danger" };
   if (payment.state === "PENDING") return { code: "PAYMENT_PENDING", label: "Payment pending", headline: "We're confirming your payment", message: "This page updates once your bank confirms. Please don't pay again.", tone: "warning" };
@@ -390,22 +410,14 @@ const buildStage = (order, payment, shipments, partial = null) => {
   if (active.some((s) => s.stage === "rto")) return { code: "RTO", label: "Returning to us", headline: "Your parcel is returning to us", message: STAGE_COPY.rto.message, tone: "danger" };
   if (active.some((s) => s.stage === "exception")) return { code: "EXCEPTION", label: "Needs attention", headline: "Delivery needs your attention", message: STAGE_COPY.exception.message, tone: "warning" };
 
-  // Some items have shipped and some have not: never say "on its way" / "delivered" for the whole order.
-  if (partial) {
-    const left = partial.total - partial.shipped;
-    return {
-      code: "PARTIALLY_SHIPPED",
-      label: "Partly shipped",
-      headline: "Part of your order is on its way",
-      message: `${partial.shipped} of ${partial.total} ${partial.total === 1 ? "item has" : "items have"} shipped${partial.delivered ? ` (${partial.delivered} delivered)` : ""}. The other ${left === 1 ? "item is" : `${left} items are`} still being prepared and will get ${left === 1 ? "its" : "their"} own tracking.`,
-      tone: "info",
-    };
-  }
-
-  const delivered = active.length > 0 && active.every((s) => s.stage === "delivered");
+  // Units not in any parcel yet (partial shipment): the order isn't delivered
+  // until they ship and arrive too.
+  const unshipped = pending.length > 0;
+  const delivered = active.length > 0 && active.every((s) => s.stage === "delivered") && !unshipped;
   if (delivered || (order.status === "DELIVERED" && !active.length)) return { code: "DELIVERED", label: "Delivered", headline: "Your order was delivered", message: payment.method !== "PREPAID" && payment.balanceOnDelivery > 0 ? "The balance was payable to the courier on delivery." : "We hope you love it.", tone: "success" };
-  if (active.length > 1 && active.some((s) => s.stage === "delivered")) return { code: "PARTIALLY_DELIVERED", label: "Partly delivered", headline: "Part of your order was delivered", message: "The rest is still on its way — see each parcel below.", tone: "info" };
-  if (active.some((s) => s.stage === "out_for_delivery")) return { code: "OUT_FOR_DELIVERY", label: "Out for delivery", headline: "Your order is out for delivery", message: STAGE_COPY.out_for_delivery.message, tone: "info" };
+  if ((active.length > 1 || unshipped) && active.some((s) => s.stage === "delivered")) return { code: "PARTIALLY_DELIVERED", label: "Partly delivered", headline: "Part of your order was delivered", message: unshipped ? "The rest ships separately — its tracking will appear here." : "The rest is still on its way — see each parcel below.", tone: "info" };
+  if (active.some((s) => s.stage === "out_for_delivery")) return { code: "OUT_FOR_DELIVERY", label: "Out for delivery", headline: unshipped ? "Part of your order is out for delivery" : "Your order is out for delivery", message: unshipped ? "The rest ships separately — its tracking will appear here." : STAGE_COPY.out_for_delivery.message, tone: "info" };
+  if (unshipped && active.some((s) => s.stage === "in_transit" || s.stage === "shipped")) return { code: "PARTIALLY_SHIPPED", label: "Partly shipped", headline: "Part of your order is on its way", message: "The rest ships separately — its tracking will appear here.", tone: "info" };
   if (active.some((s) => s.stage === "in_transit" || s.stage === "shipped")) return { code: "IN_TRANSIT", label: "On its way", headline: "Your order is on its way", message: "Track it below.", tone: "info" };
 
   const cod = payment.method !== "PREPAID";
@@ -420,11 +432,12 @@ const buildStage = (order, payment, shipments, partial = null) => {
   };
 };
 
-const buildTimeline = (order, payment, shipments, stage, partial = null) => {
+const buildTimeline = (order, payment, shipments, stage, pending = []) => {
   if (["CANCELLED", "PAYMENT_FAILED", "RTO", "EXCEPTION"].includes(stage.code)) return null;
   const paid = isOrderPaid(order);
   const rank = shipments.length ? Math.max(...shipments.map((s) => STAGE_RANK[s.stage] ?? 0)) : -1;
-  const allDelivered = !partial && (shipments.length > 0 && shipments.every((s) => s.stage === "delivered") || (order.status === "DELIVERED" && !shipments.length));
+  // units not shipped yet keep "Delivered" open
+  const allDelivered = (shipments.length > 0 && shipments.every((s) => s.stage === "delivered") && !pending.length) || (order.status === "DELIVERED" && !shipments.length);
   const dispatched = shipments.filter((s) => (STAGE_RANK[s.stage] ?? 0) >= 1).map((s) => s.dispatchedAt).filter(Boolean).sort();
   const ofd = shipments.map((s) => s.outForDeliveryAt).filter(Boolean).sort();
   const deliveredAts = shipments.map((s) => s.deliveredAt).filter(Boolean).sort();
@@ -435,7 +448,7 @@ const buildTimeline = (order, payment, shipments, stage, partial = null) => {
     { key: "confirmed", label: payment.method === "PREPAID" ? "Payment confirmed" : "Order confirmed", short: payment.method === "PREPAID" ? "Payment" : "Confirmed", at: paid ? statusTime(order, "PAID") : null, done: paid },
     // No timestamp is ever recorded for packing — "Preparing" is the honest name for the wait between confirmation and dispatch.
     { key: "preparing", label: "Preparing", short: "Preparing", at: null, done: shippedDone },
-    { key: "shipped", label: partial ? "Partly shipped" : "Shipped", short: partial ? "Part shipped" : "Shipped", at: dispatched[0] || statusTime(order, "SHIPPED"), done: shippedDone },
+    { key: "shipped", label: "Shipped", short: "Shipped", at: dispatched[0] || statusTime(order, "SHIPPED"), done: shippedDone },
   ];
   // Only shown while it can still happen, or when the courier actually reported it — never claimed after the fact.
   if (!allDelivered || ofd.length) steps.push({ key: "out_for_delivery", label: "Out for delivery", short: "Out for delivery", mobileHidden: true, at: ofd[0] || null, done: rank >= 2 || allDelivered });
@@ -489,14 +502,39 @@ const buildResolutions = (cases) =>
  * @param {Date} [p.now]
  * @param {string} [p.trackUrlTemplate]  customer tracking link with an {awb} placeholder (SHIPMOZO_TRACK_URL)
  */
+// ── team update ───────────────────────────────────────────────────────────
+// A delay update the team sent from the admin (Customer Hub → Delivery follow-up). The admin
+// writes order.customerNotice; `message` is the exact text that went on WhatsApp and email, so
+// the order page says the same thing. Shown only while it still applies.
+const NOTICE_KINDS = ["COURIER_DELAY", "NOT_SHIPPED_DELAY"];
+const NOTICE_MAX_AGE_MS = 30 * 24 * 3600 * 1000;
+
+export const buildNotice = (order, stage, shipments, pending, now = new Date()) => {
+  const n = order.customerNotice;
+  if (!n || !NOTICE_KINDS.includes(n.kind)) return null;
+  const message = cleanText(n.message, 600);
+  const at = iso(n.sentAt);
+  if (!message || !at || new Date(at).getTime() < now.getTime() - NOTICE_MAX_AGE_MS) return null;
+  if (["DELIVERED", "CANCELLED", "PAYMENT_FAILED", "RTO"].includes(stage.code)) return null;
+  if (n.kind === "COURIER_DELAY") {
+    const parcel = n.awb ? shipments.find((s) => s.awb === n.awb) : null;
+    if (parcel && ["delivered", "rto"].includes(parcel.stage)) return null;
+    if (!shipments.some((s) => ["shipped", "in_transit", "out_for_delivery", "exception"].includes(s.stage))) return null;
+  } else if (!pending.length && !shipments.some((s) => s.stage === "preparing")) {
+    return null; // everything it was about has shipped since
+  }
+  return { kind: n.kind, message, at };
+};
+
 export const buildOrderView = ({ order, shipments: records = [], cases = [], now = new Date(), trackUrlTemplate }) => {
   const payment = buildPayment(order, cases);
   const items = buildItems(order);
   const pricing = buildPricing(order, items, payment);
   const shipments = buildShipments(order, records, now, trackUrlTemplate);
-  const partial = buildPartial(items, shipments);
-  const stage = buildStage(order, payment, shipments, partial);
-  const timeline = buildTimeline(order, payment, shipments, stage, partial);
+  const pending = isCancelled(order) ? [] : buildPending(order, shipments);
+  const stage = buildStage(order, payment, shipments, pending);
+  const timeline = buildTimeline(order, payment, shipments, stage, pending);
+  const itemCard = (i, quantity) => ({ name: i.name, variant: i.variant, quantity, image: i.image });
   const invoiceReady = isOrderPaid(order) && !isCancelled(order) && !!order.invoiceData?.isGenerated && !!order.invoiceData?.s3FileKey;
 
   return {
@@ -507,17 +545,20 @@ export const buildOrderView = ({ order, shipments: records = [], cases = [], now
     status: order.status,
     stage,
     payment,
-    // On a partly shipped order every line says whether it has shipped (and where its parcel is); otherwise items are unchanged.
-    items: partial ? items.map((it, i) => ({ ...it, fulfilment: partial.lines[i] })) : items,
-    ...(partial && { partial: { shipped: partial.shipped, total: partial.total, delivered: partial.delivered } }),
+    items,
     itemCount: items.reduce((s, i) => s + i.quantity, 0),
     pricing,
-    shipments: shipments.map((s) => ({
+    shipments: shipments.map(({ lines, ...s }) => ({
       ...s,
-      // Items are attached only where the parcel-to-item mapping was recorded.
-      items: s.itemIndexes ? s.itemIndexes.map((i) => items[i]).filter(Boolean).map((i) => ({ name: i.name, variant: i.variant, quantity: i.quantity, image: i.image })) : null,
+      // Items are attached only where the parcel-to-item mapping was recorded,
+      // each at the quantity in THIS parcel (2 of a "× 3" line).
+      items: lines ? lines.filter((l) => items[l.index]).map((l) => itemCard(items[l.index], l.qty)) : null,
     })),
+    // Units no parcel carries yet ("1 × Zoro katana ships separately").
+    pendingItems: pending.filter((l) => items[l.index]).map((l) => itemCard(items[l.index], l.qty)),
     timeline,
+    // Delay update from the team, or null (see buildNotice).
+    notice: buildNotice(order, stage, shipments, pending, now),
     delivery: buildDelivery(order),
     cancelledAt: isCancelled(order) ? iso(order.cancelledAt) : null,
     resolutions: buildResolutions(cases),
@@ -551,6 +592,6 @@ export const buildOrderSummary = (view) => ({
   preview: view.items.slice(0, 4).map((i) => ({ name: i.name, image: i.image, quantity: i.quantity, isFreeGift: i.isFreeGift })),
   extraItems: Math.max(0, view.items.length - 4),
   shipmentCount: view.shipments.length,
-  ...(view.partial && { partial: view.partial }),
+  pendingCount: (view.pendingItems || []).reduce((s, i) => s + i.quantity, 0),
   canTrack: view.actions.track,
 });

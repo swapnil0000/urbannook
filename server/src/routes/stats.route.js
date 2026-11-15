@@ -1,12 +1,49 @@
 import { Router } from "express";
 import { getSiteStats, getGoogleReviews, getGoogleBusinessReviews, fetchGoogleReviewPhoto, getPhotoReviews } from "../utils/siteStats.util.js";
+import { apiCache } from "../module/cache.manager.module.js";
+import mongoose from "mongoose";
+import Order from "../model/order.model.js";
+import Coupon from "../model/coupon.model.js";
+import User from "../model/user.model.js";
+import Testimonial from "../model/testimonial.model.js";
+import ProductReview from "../model/product.specific.testimonial.model.js";
+import { excludeTestOrdersMatch, testUsersMatch } from "../utils/testIdentities.js";
 
 const statsRouter = Router();
+
+// Real paid orders that weren't cancelled/refunded: website + Instagram (the admin panel's collection, read here without a model,
+// count only), team test orders left out (utils/testIdentities.js, same rule as the admin's "Exclude testing"). Also the review count
+// + average (approved product reviews and testimonials) and sign-ups minus testers. Cached 10 min like the other public stats.
+const LIVE = { status: "PAID", resolutionStatus: { $nin: ["CANCELLED", "REFUNDED"] } };
+const getLiveStats = () => apiCache.handle("site_live_stats", async () => {
+    const internal = await Coupon.find({ isInternal: true }, { couponId: 1 }).lean();
+    const real = { ...LIVE, ...excludeTestOrdersMatch(internal.map((c) => c.couponId)) };
+    const ratings = { $group: { _id: null, n: { $sum: 1 }, sum: { $sum: "$rating" } } };
+    const [web, instagram, users, testUsers, [pr], [tm]] = await Promise.all([
+      Order.countDocuments(real),
+      mongoose.connection.db.collection("instagramorders").countDocuments(real),
+      User.estimatedDocumentCount(),
+      User.countDocuments(testUsersMatch()),
+      ProductReview.aggregate([{ $match: { isApproved: true } }, ratings]),
+      Testimonial.aggregate([{ $match: { isApproved: true } }, ratings]),
+    ]);
+    const totalReviews = (pr?.n || 0) + (tm?.n || 0);
+    const ratingSum = (pr?.sum || 0) + (tm?.sum || 0);
+    return {
+      totalOrders: web + instagram,
+      totalReviews,
+      avgRating: totalReviews ? Math.round((ratingSum / totalReviews) * 100) / 100 : null,
+      members: Math.max(0, users - testUsers),
+    };
+});
 
 // Public endpoint - no auth required
 statsRouter.get("/stats/public", async (req, res) => {
   try {
-    return res.status(200).json({ success: true, data: await getSiteStats() });
+    // Our site stats (orders delivered, rating over approved reviews, Google review count) plus the live figures the
+    // homepage tiles, About page and login card read (real orders without team test orders, review count and average, members).
+    const [site, live] = await Promise.all([getSiteStats(), getLiveStats()]);
+    return res.status(200).json({ success: true, data: { ...site, ...live } });
   } catch (error) {
     return res.status(500).json({
       success: false,
