@@ -38,6 +38,7 @@ Verified with lint (no new issues vs `main`; compared via `-f json`), `vitest` (
 |---|---|---|
 | 13 | Tag badge (Trending/Bestseller) only on a product's first card, no longer on all 10 pen-stand colours | `utils/shopItems.js`, shop pages |
 | 14 | Header dropdowns (gyaanstore-style, UrbanNook ink/red/mono): Anime → by type + by series; single-product categories (Lamps) → their designs; others → products; featured image; "View all". Hover, keyboard focus and Esc. Every link is a real page | `component/layout/NavDropdown.jsx` (new), `utils/navMenu.js` (new), `NewHeader.jsx` |
+| 14a | Desktop header shows 4 categories in a fixed order: Lamps, Anime, Decor, Gaming (`NAV_PRIORITY`); a listed category with no products is skipped and the next one fills its slot. Superheroes moved out of the bar (still in the mobile drawer and Shop All). Gaming appears once a product is in that category (admin → Categories / product edit) | `NewHeader.jsx` |
 | 15 | Cart drawer slides in smoothly. It used to mount already open; measured 1440→1010px over ~300ms | `CartDrawer.jsx` |
 | 16 | Sale bar rotates **every live offer**: admin messages, or otherwise the theme headline + live combos ("Buy 3 Katanas · FREE Triple Stand") + public coupons ("₹100 off on orders above ₹1,000"). Template labels like `{save}` are skipped | `utils/saleBarMessages.js` (new), `NewsTicker.jsx` |
 | 17 | Category page pills use the same labels as the header | `CategoryPage.jsx` |

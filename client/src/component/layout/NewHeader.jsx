@@ -16,6 +16,11 @@ import MobileNavAccordion from './MobileNavAccordion';
 /* Labels the team already uses. Anything new falls back to the admin's own
    category name - better a plain "Decor" than an invented "Decors". */
 const MAX_NAV_CATEGORIES = 4; // beyond this the bar wraps; "Shop All" covers the rest
+/* Header order (stored category names). These come first when they have products;
+   any other category fills the remaining slots in catalogue order, and every one is
+   still in the mobile drawer and Shop All. Superheroes left the desktop bar for Gaming. */
+const NAV_PRIORITY = ['Lamp', 'Anime', 'Decor', 'Gaming'];
+const navRank = (c) => { const i = NAV_PRIORITY.indexOf(c); return i === -1 ? NAV_PRIORITY.length : i; };
 
 const SignupForm = lazy(() => import('./auth/SignupForm'));
 const LoginForm = lazy(() => import('./auth/LoginForm'));
@@ -62,7 +67,8 @@ const NewHeader = () => {
       const c = p?.productCategory;
       if (c && !seen.includes(c)) seen.push(c);
     });
-    return seen;
+    // Stable sort: priority categories first, the rest keep catalogue order.
+    return seen.map((c, i) => [c, i]).sort((a, b) => navRank(a[0]) - navRank(b[0]) || a[1] - b[1]).map(([c]) => c);
   }, [prodRes]);
 
   // Desktop dropdown per category (series/collections + its products), built
