@@ -37,6 +37,10 @@ const ProductVariantsPage = () => {
     .sort((a, b) => Number(b.soldTotal) - Number(a.soldTotal)).slice(0, 3).map((v) => v.sku));
   const variants = product?.variantDetails || [];
   const fromPrice = Math.min(...variants.map((v) => Number(v.variantPrice) || Infinity));
+  // Share/search image: the product's own photo, not the site logo (Google showed the
+  // logo as this URL's thumbnail). First active variant's first image; an admin SEO override still wins.
+  const seoImage = (variants.find((v) => v.isActive !== false && v.variantImage?.length) || variants.find((v) => v.variantImage?.length))?.variantImage?.[0]
+    || product?.productImg || undefined;
 
 
   useEffect(() => {
@@ -61,6 +65,7 @@ const ProductVariantsPage = () => {
         title={product?.productName || "Choose a Variant"}
         description={product?.productDes || "Choose a variant of this UrbanNook product."}
         url={`/product/${productId}`}
+        image={seoImage}
       />
 
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-brand/5 rounded-full blur-[120px] pointer-events-none"></div>
