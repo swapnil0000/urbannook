@@ -13,6 +13,8 @@
  * shipment state is unit-tested with plain fixtures.
  */
 
+import { payOnlineOfferOf } from "../utils/codPayOnlineOffer.js";
+
 const PAID_STATUSES = ["PAID", "CONFIRMED", "SHIPPED", "DELIVERED"];
 // The customer tracking page. `{awb}` is replaced per shipment; the real value (including the panel's own uid)
 // is configured as SHIPMOZO_TRACK_URL, so changing the link never needs a code change.
@@ -136,6 +138,8 @@ const buildPayment = (order, cases) => {
     paidAt: paid ? statusTime(order, "PAID") : null,
     // The gateway's payment id is a reference (it cannot move money); it is what support and the bank statement quote.
     paymentRef: payId ? String(payId) : null,
+    // COD order whose balance was later paid online: the second Razorpay payment (needed for any refund).
+    balancePaymentRef: order.codConversion?.status === "paid" ? order.codConversion.paymentId || null : null,
     paymentMethodName: method === "PREPAID" ? "Razorpay" : method === "PARTIAL_COD" ? "Razorpay advance + cash on delivery" : "Cash on delivery",
   };
 };
@@ -529,6 +533,11 @@ export const buildNotice = (order, stage, shipments, pending, now = new Date()) 
   return { kind: n.kind, message, at };
 };
 
+// COD balance on offer as a Razorpay link with the COD fee waived (services/codPrepaidLink.service.js) —
+// only while the link is open, the advance is paid and nothing has shipped.
+const buildPayOnlineOffer = (order, payment, shipments, now) =>
+  payment.state === "ADVANCE_PAID" && shipments.length === 0 ? payOnlineOfferOf(order, now) : null;
+
 export const buildOrderView = ({ order, shipments: records = [], cases = [], now = new Date(), trackUrlTemplate }) => {
   const payment = buildPayment(order, cases);
   const items = buildItems(order);
@@ -548,6 +557,7 @@ export const buildOrderView = ({ order, shipments: records = [], cases = [], now
     status: order.status,
     stage,
     payment,
+    payOnlineOffer: buildPayOnlineOffer(order, payment, shipments, now),
     items,
     itemCount: items.reduce((s, i) => s + i.quantity, 0),
     pricing,

@@ -7,7 +7,10 @@ vi.mock("react-redux", () => ({ useDispatch: () => vi.fn() }));
 vi.mock("../../hooks/useRedux", () => ({ useUI: () => ({ showNotification: vi.fn() }) }));
 vi.mock("../../config/appUrls", () => ({ getApiUrl: () => "http://api.test" }));
 vi.mock("../../component/layout/auth/GoogleLoginButton", () => ({ default: () => null }));
-vi.mock("../../component/orders/OrderPage", () => ({ OrderDetailsView: ({ orderId, mode }) => <div>Order page for {orderId} ({mode})</div> }));
+vi.mock("../../component/orders/OrderPage", () => ({
+  OrderDetailsView: ({ orderId, mode }) => <div>Order page for {orderId} ({mode})</div>,
+  PayOnlineOffer: ({ offer }) => <a href={offer.url}>Pay {offer.amount} online</a>,
+}));
 
 import OrderConfirm from "../OrderConfirm";
 
@@ -42,6 +45,18 @@ describe("order confirm page", () => {
     await open({ data: { status: "PAID", isGuestOrder: true, guestEmail: "g@example.com", isNewGuestAccount: true } });
     expect(await screen.findByText("Order Confirmed!")).toBeTruthy();
     expect(screen.getByText("g@example.com")).toBeTruthy();
+  });
+
+  it("guest COD order with the balance on offer: the pay-online link shows on the confirmation", async () => {
+    const offer = { url: "https://rzp.io/i/x", amount: 1451, feeWaived: 49, expiresAt: "2026-11-16T13:00:00.000Z" };
+    await open({ data: { status: "PAID", isGuestOrder: true, guestEmail: "g@example.com", isNewGuestAccount: false, payOnlineOffer: offer } });
+    expect((await screen.findByRole("link", { name: "Pay 1451 online" })).getAttribute("href")).toBe("https://rzp.io/i/x");
+  });
+
+  it("guest order without an offer: no pay-online link", async () => {
+    await open({ data: { status: "PAID", isGuestOrder: true, guestEmail: "g@example.com", isNewGuestAccount: false } });
+    expect(await screen.findByText("Order Confirmed!")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: /online/ })).toBeNull();
   });
 
   for (const status of ["CREATED", "PROCESSING"]) {

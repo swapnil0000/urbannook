@@ -232,17 +232,30 @@ const orderSchema = new mongoose.Schema(
       type: new mongoose.Schema({ name: String, arm: String }, { _id: false }),
       default: undefined,
     },
-    // Outcome of the WhatsApp order confirmation (rp.payment.controller →
-    // sendOrderConfirmationWhatsApp), written once when the order is paid.
-    // status: sent (Gupshup said "submitted") | failed (error = Gupshup's
-    // reason) | skipped (not configured / no number). Absent on older orders.
-    orderConfirmationWa: {
-      type: new mongoose.Schema({
-        status: { type: String, enum: ["sent", "failed", "skipped"] },
-        messageId: String,
-        error: String,
-        at: Date,
-      }, { _id: false }),
+    // COD balance offered as a Razorpay payment link, COD fee waived
+    // (services/codPrepaidLink.service.js has the status lifecycle). Admin
+    // holds the courier push while it is pending/sent.
+    codConversion: {
+      type: new mongoose.Schema(
+        {
+          status: {
+            type: String,
+            enum: ["pending", "creating", "sent", "failed", "paid", "expired", "cancelled", "refunded", "refund_failed"],
+          },
+          requestedAt: Date,
+          linkId: String,
+          shortUrl: String,
+          amount: Number,
+          feeWaived: Number,
+          expiresAt: Date,
+          paymentId: String,
+          paidAt: Date,
+          whatsappSent: Boolean,
+          refundId: String,
+          error: String,
+        },
+        { _id: false },
+      ),
       default: undefined,
     },
 

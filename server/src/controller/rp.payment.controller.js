@@ -35,6 +35,7 @@ import { asyncHandler } from "../middleware/errorHandler.middleware.js";
 import { ValidationError, NotFoundError } from "../utils/errors.js";
 import { computeOrderCharge } from "../utils/orderAmount.util.js";
 import { checkoutExperimentFrom } from "../utils/checkoutExperiment.js";
+import { codLinkPendingFields, offerCodPrepaidLink, applyCodLinkPaid, markCodLinkClosed } from "../services/codPrepaidLink.service.js";
 import { buildPlaceholderEmail, isPlaceholderEmail } from "../utils/placeholderEmail.js";
 import { uploadInvoiceToS3 } from "../utils/s3.utils.js";
 import Address from "../model/address.new.model.js";
@@ -1582,6 +1583,9 @@ const fulfilCapturedPayment = async (order, payment) => {
             ...(guestClaimContact
               ? { "payment.guestClaimContact": guestClaimContact }
               : {}),
+            // COD: in this same write, so admin holds the courier push from the
+            // first moment while the pay-online link is created below.
+            ...codLinkPendingFields(order),
           },
           $push: { statusHistory: { status: "PAID", timestamp: new Date(), note: historyNote } },
         },
@@ -2010,6 +2014,10 @@ const fulfilCapturedPayment = async (order, payment) => {
       // the browser loses. GA4 dedupes on transaction_id, so orders the
       // browser already reported are not double counted.
       await sendGa4ServerPurchase(order);
+
+      // COD: offer the balance online with the COD fee waived. Never fails the
+      // order — on any error it stays an ordinary COD order.
+      await offerCodPrepaidLink(claimed);
     }
   return order;
 };
@@ -2099,6 +2107,26 @@ const razorpayWebHookController = async (req, res) => {
         console.log("❌ Payment Failed:", payment.id, errorCode);
         break;
       }
+      // COD balance paid through the pay-online link (services/codPrepaidLink.service.js).
+      // Its payment.captured carries the link's own Razorpay order, which matches no
+      // order of ours, so that event passes by harmlessly.
+      case "payment_link.paid": {
+        const result = await applyCodLinkPaid({
+          link: payload.payload.payment_link?.entity,
+          payment: payload.payload.payment?.entity,
+        });
+        console.log("🔗 Payment link paid:", payload.payload.payment_link?.entity?.id, JSON.stringify(result));
+        break;
+      }
+      case "payment_link.expired":
+      case "payment_link.cancelled": {
+        await markCodLinkClosed({
+          link: payload.payload.payment_link?.entity,
+          status: event === "payment_link.expired" ? "expired" : "cancelled",
+        });
+        break;
+      }
+
       case "order.paid": {
         const orderEntity = payload.payload.order.entity;
         console.log("📦 Order Paid Event:", orderEntity.id);

@@ -171,8 +171,26 @@ const sendOrderConfirmationWhatsApp = async ({ mobileNumber, name, orderId, amou
     orderId,
   ]);
 
+/**
+ * COD balance pay-online link (services/codPrepaidLink.service.js). Template
+ * GUPSHUP_TEMPLATE_COD_PAY_LINK must be approved with these placeholders:
+ *   {{1}} customer name
+ *   {{2}} amount to pay now (₹, COD fee already taken off)
+ *   {{3}} COD fee saved (₹)
+ *   {{4}} payment link URL
+ * Until the template id is set, nothing is sent (Razorpay's SMS/email still go).
+ */
+const sendCodPayLinkWhatsApp = async ({ mobileNumber, name, amount, feeWaived, url }) =>
+  sendWhatsAppTemplate(mobileNumber, env.GUPSHUP_TEMPLATE_COD_PAY_LINK, [
+    name || "Customer",
+    `₹${Math.round(Number(amount) || 0)}`,
+    `₹${Math.round(Number(feeWaived) || 0)}`,
+    url,
+  ]);
+
 export {
   sendWhatsAppSessionMessage,
   sendWhatsAppTemplate,
   sendOrderConfirmationWhatsApp,
+  sendCodPayLinkWhatsApp,
 };
