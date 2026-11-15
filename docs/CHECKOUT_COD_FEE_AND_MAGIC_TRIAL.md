@@ -135,8 +135,12 @@ prepaid cost the customer exactly the same.
   `{{1}}` name, `{{2}}` amount to pay now, `{{3}}` COD fee saved, `{{4}}` link.
   Suggested text: "Hi {{1}}, your Urban Nook order is confirmed. Pay the balance of {{2}} online now
   and skip the {{3}} COD fee: {{4}} (valid for 2 hours)."
-  `codConversion.whatsappSent` records whether Gupshup accepted it. Until the template is set,
-  Razorpay's SMS and email still go out.
+  `codConversion.whatsappSent` is true only when Gupshup answered "submitted"; otherwise
+  `codConversion.whatsappError` has the reason ("Template id not configured" until the template is
+  set). Before 16 Nov 2026 every attempt was stored as `true` (an object result read as truthy).
+  Until the template is set, Razorpay's SMS and email still go out.
+- **Order confirmation WhatsApp:** its outcome is on `orderConfirmationWa` (sent / failed + reason /
+  skipped). The field had dropped out of the order schema, so it was never saved; restored.
 - **Testing locally:** with test-mode keys, a COD order gets a test link straight away. After you pay
   it, the reconcile cron switches the order to prepaid within 5 minutes, even though webhooks cannot
   reach localhost.

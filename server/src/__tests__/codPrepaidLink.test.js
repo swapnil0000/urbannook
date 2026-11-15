@@ -12,6 +12,7 @@ const links = [];
 const refunds = [];
 let linkError = null;
 let refundError = null;
+let waResult = { success: true, messageId: "m1" };
 const rpLinks = {}; // what Razorpay reports for a link id
 jest.unstable_mockModule("../services/rp.payement.service.js", () => ({
   razorpayCreateOrderService: async () => ({ data: { id: "order_x" } }),
@@ -46,7 +47,7 @@ jest.unstable_mockModule("../services/whatsapp.send.service.js", () => ({
   sendWhatsAppSessionMessage: async () => true,
   sendWhatsAppTemplate: async () => true,
   sendOrderConfirmationWhatsApp: async () => true,
-  sendCodPayLinkWhatsApp: async (args) => { whatsapps.push(args); return true; },
+  sendCodPayLinkWhatsApp: async (args) => { whatsapps.push(args); return waResult; },
 }));
 const alerts = [];
 jest.unstable_mockModule("../utils/alertSystem.js", () => ({ default: async (msg) => { alerts.push(msg); return { success: true }; } }));
@@ -88,7 +89,7 @@ beforeAll(async () => {
   ({ razorpayWebHookController } = await import("../controller/rp.payment.controller.js"));
   ({ getOrderStatus } = await import("../controller/user.cart.controller.js"));
 });
-beforeEach(() => { for (const k of Object.keys(rpLinks)) delete rpLinks[k]; whatsapps.length = 0; links.length = 0; refunds.length = 0; alerts.length = 0; linkError = null; refundError = null; process.env.COD_PREPAID_LINK_ENABLED = "true"; });
+beforeEach(() => { for (const k of Object.keys(rpLinks)) delete rpLinks[k]; whatsapps.length = 0; links.length = 0; refunds.length = 0; alerts.length = 0; linkError = null; refundError = null; waResult = { success: true, messageId: "m1" }; process.env.COD_PREPAID_LINK_ENABLED = "true"; });
 
 describe("which orders get a link", () => {
   const base = { paymentMethod: "COD", codDetails: { remainingAmount: 1500, codFee: 49 } };
@@ -128,6 +129,13 @@ describe("offering the link", () => {
     expect(whatsapps).toEqual([{ mobileNumber: "9876543210", name: "Aarav", amount: 1451, feeWaived: 49, url: "https://rzp.io/i/l1" }]);
     await svc.offerCodPrepaidLink(order, now); // the webhook and the status poll can both get here
     expect(links).toHaveLength(1);
+  });
+
+  it("a WhatsApp Gupshup did not accept is recorded as not sent, with the reason", async () => {
+    // sendWhatsAppTemplate returns an object; `!!sent` used to record this as sent.
+    waResult = { success: false, skipped: true, error: "Template id not configured" };
+    await svc.offerCodPrepaidLink(await seed());
+    expect((await get()).codConversion).toMatchObject({ status: "sent", whatsappSent: false, whatsappError: "Template id not configured" });
   });
 
   it("a placeholder (WhatsApp-login) email is not given to Razorpay", async () => {

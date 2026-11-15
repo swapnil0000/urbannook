@@ -68,3 +68,9 @@ test("order confirmation: 91-prefixed number, digits-only source, params in temp
   expect(sent.get("src.name")).toBe("testapp");
   expect(JSON.parse(sent.get("template"))).toEqual({ id: "tpl-order", params: ["Riya", "₹1997", "UrbanNook", "ORD1"] });
 });
+
+test("the order model keeps the WhatsApp outcome fields (strict mode drops unknown paths silently)", async () => {
+  const { default: Order } = await import("../../model/order.model.js");
+  expect(Order.schema.path("orderConfirmationWa")).toBeDefined();
+  expect(Order.schema.path("codConversion").schema.path("whatsappError")).toBeDefined();
+});

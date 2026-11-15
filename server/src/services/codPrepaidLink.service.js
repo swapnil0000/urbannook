@@ -111,8 +111,18 @@ export const offerCodPrepaidLink = async (order, now = new Date()) => {
       console.log(`[COD-LINK] ${claimed.orderId} | link ${link.id} ₹${amount} (fee ₹${fee} waived) until ${expiresAt.toISOString()}`);
       // WhatsApp too, once its template is approved (GUPSHUP_TEMPLATE_COD_PAY_LINK); never blocks.
       if (mobile) {
-        const sent = await sendCodPayLinkWhatsApp({ mobileNumber: mobile, name, amount, feeWaived: fee, url: link.short_url }).catch(() => false);
-        await Order.updateOne({ _id: claimed._id }, { $set: { "codConversion.whatsappSent": !!sent } });
+        // sendWhatsAppTemplate returns { success, skipped?, error }. An object is
+        // always truthy, so `!!sent` recorded every attempt — even a refused or
+        // skipped one (no template id) — as sent. Only Gupshup's "submitted" counts.
+        const sent = await sendCodPayLinkWhatsApp({ mobileNumber: mobile, name, amount, feeWaived: fee, url: link.short_url })
+          .catch((e) => ({ success: false, error: e.message }));
+        const ok = sent === true || sent?.success === true;
+        await Order.updateOne({ _id: claimed._id }, {
+          $set: {
+            "codConversion.whatsappSent": ok,
+            ...(ok ? {} : { "codConversion.whatsappError": String(sent?.error || "not sent").slice(0, 300) }),
+          },
+        });
       }
       return link;
     } catch (err) {
