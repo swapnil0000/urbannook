@@ -1863,18 +1863,6 @@ const fulfilCapturedPayment = async (order, payment) => {
             console.log(`[EMAIL] Skipped confirmation for ${order.orderId} — no real address on file`);
           }
 
-          // Same confirmation over WhatsApp. It gets read far more often
-          // than email, and a WhatsApp-login customer may have no real
-          // email address at all. Not awaited — a messaging hiccup must
-          // not hold up the payment response. Silently no-ops until the
-          // template id and API key are configured.
-          sendOrderConfirmationWhatsApp({
-            mobileNumber: order.userMobile,
-            name: order.userName,
-            orderId: order.orderId,
-            amount: order.amount,
-          }).catch(() => {});
-
           // For COD, only the advance was actually captured via Razorpay right now —
           // the receipt must reflect that amount, not the full order total.
           const paymentDetails = {
@@ -1896,6 +1884,36 @@ const fulfilCapturedPayment = async (order, payment) => {
       } catch (emailError) {
         console.error("Error sending emails:", emailError);
       }
+
+      // 2b. WHATSAPP ORDER CONFIRMATION. Its own step, not inside the email
+      // block above: it used to run there, after the email, so an order with
+      // no email or any error while building / sending the email skipped it
+      // without a trace. It gets read far more often than email, and a
+      // WhatsApp-login customer may have no real email at all.
+      // Not awaited — a messaging hiccup must not hold up the payment
+      // response. The outcome (sent / failed + Gupshup's reason / skipped) is
+      // stored on the order as `orderConfirmationWa`, so a missing message
+      // can be checked in the DB instead of guessed at.
+      sendOrderConfirmationWhatsApp({
+        mobileNumber: order.userMobile || order.guestInfo?.mobile || order.deliveryAddress?.mobileNumber,
+        name: order.userName || order.guestInfo?.name,
+        orderId: order.orderId,
+        amount: order.amount,
+      })
+        .then((r) => Order.updateOne(
+          { _id: order._id },
+          {
+            $set: {
+              orderConfirmationWa: {
+                status: r.success ? "sent" : r.skipped ? "skipped" : "failed",
+                messageId: r.messageId || null,
+                error: r.success ? null : r.error || null,
+                at: new Date(),
+              },
+            },
+          },
+        ))
+        .catch((err) => console.error(`[WHATSAPP SEND] order confirmation ${order.orderId}:`, err.message));
 
       try {
         if (!order.invoiceData || !order.invoiceData.isGenerated) {

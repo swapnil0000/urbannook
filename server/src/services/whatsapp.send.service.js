@@ -81,22 +81,26 @@ const sendWhatsAppSessionMessage = async (mobileNumber, text) => {
  * @param {string|number} mobileNumber 10 digit Indian number
  * @param {string} templateId Gupshup template id
  * @param {string[]} params values for {{1}}, {{2}}, … in order
- * @returns {Promise<boolean>} whether Gupshup accepted it
+ * @returns {Promise<{success: boolean, skipped?: boolean, messageId?: string|null, error?: string}>}
+ *   success only when Gupshup answers `status: "submitted"`. It answers HTTP
+ *   200 even when it refuses a message (wrong app / key, template not
+ *   approved, bad number), so a 2xx alone proves nothing — treating it as
+ *   "sent" is what hid failed order confirmations.
  */
 const sendWhatsAppTemplate = async (mobileNumber, templateId, params = []) => {
   const { GUPSHUP_API_KEY, GUPSHUP_APP_NAME, GUPSHUP_WHATSAPP_NUMBER } = env;
 
   if (!GUPSHUP_API_KEY || !GUPSHUP_APP_NAME || !GUPSHUP_WHATSAPP_NUMBER) {
-    return false;
+    return { success: false, skipped: true, error: "Gupshup not configured (GUPSHUP_API_KEY / GUPSHUP_APP_NAME / GUPSHUP_WHATSAPP_NUMBER)" };
   }
 
   if (!templateId) {
     // Not configured yet — the email still goes out, so stay quiet
-    return false;
+    return { success: false, skipped: true, error: "Template id not configured" };
   }
 
-  const digits = String(mobileNumber).replace(/\D/g, "");
-  if (!digits) return false;
+  const digits = String(mobileNumber ?? "").replace(/\D/g, "");
+  if (!digits) return { success: false, error: "No mobile number on the order" };
   const to = digits.length === 10 ? `91${digits}` : digits;
 
   try {
@@ -118,20 +122,25 @@ const sendWhatsAppTemplate = async (mobileNumber, templateId, params = []) => {
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body,
+      signal: AbortSignal.timeout(15000),
     });
 
-    if (!res.ok) {
-      const detail = await res.text();
-      console.error(
-        `[WHATSAPP SEND] Template ${templateId} rejected (${res.status}): ${detail.slice(0, 200)}`,
-      );
-      return false;
+    const text = await res.text();
+    let data = null;
+    try { data = JSON.parse(text); } catch { /* non-JSON error page */ }
+
+    if (res.ok && String(data?.status || "").toLowerCase() === "submitted") {
+      return { success: true, messageId: data.messageId || null };
     }
 
-    return true;
+    const reason = data?.message || data?.reason || text || "no response body";
+    const error = `HTTP ${res.status}: ${String(typeof reason === "string" ? reason : JSON.stringify(reason)).slice(0, 300)}`;
+    // Last 4 digits only — the customer's number stays out of the logs.
+    console.error(`[WHATSAPP SEND] Template ${templateId} to …${to.slice(-4)} not accepted: ${error}`);
+    return { success: false, error };
   } catch (error) {
     console.error(`[WHATSAPP SEND] Template ${templateId} failed:`, error.message);
-    return false;
+    return { success: false, error: error.message };
   }
 };
 
