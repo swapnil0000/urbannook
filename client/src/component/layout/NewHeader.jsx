@@ -8,7 +8,7 @@ import { setShowLoginModal, clearLoginCallback } from '../../store/slices/uiSlic
 import { useLogoutMutation } from '../../store/api/authApi';
 import { useAuth, useUI } from '../../hooks/useRedux';
 import { clearCsrfToken } from '../../store/api/apiSlice';
-import { categoryPath, CATEGORY_LABEL } from '../../utils/categoryUrl';
+import { categoryPath, CATEGORY_LABEL, sortByCategoryPriority } from '../../utils/categoryUrl';
 import { buildNavMenu } from '../../utils/navMenu';
 import NavDropdown from './NavDropdown';
 import MobileNavAccordion from './MobileNavAccordion';
@@ -16,6 +16,7 @@ import MobileNavAccordion from './MobileNavAccordion';
 /* Labels the team already uses. Anything new falls back to the admin's own
    category name - better a plain "Decor" than an invented "Decors". */
 const MAX_NAV_CATEGORIES = 4; // beyond this the bar wraps; "Shop All" covers the rest
+// Order: CATEGORY_PRIORITY (utils/categoryUrl.js). Every category stays in the mobile drawer.
 
 const SignupForm = lazy(() => import('./auth/SignupForm'));
 const LoginForm = lazy(() => import('./auth/LoginForm'));
@@ -62,7 +63,7 @@ const NewHeader = () => {
       const c = p?.productCategory;
       if (c && !seen.includes(c)) seen.push(c);
     });
-    return seen;
+    return sortByCategoryPriority(seen);
   }, [prodRes]);
 
   // Desktop dropdown per category (series/collections + its products), built
