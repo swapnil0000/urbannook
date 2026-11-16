@@ -14,14 +14,6 @@ const secondImg = (p) => p?.secondaryImages?.[0] || p?.variantDetails?.[1]?.vari
 // route through it so there is exactly one path into the PDP. (That page's
 // canonical is /product/<id>, so search engines treat it as the product.)
 const productHref = (p) => `/products/${p.productId}`;
-const badgeOf = (p) => {
-  const t = p?.tags || [];
-  if (t.includes('best_seller')) return 'Bestseller';
-  if (t.includes('trending')) return 'Trending';
-  if (t.includes('new_arrival')) return 'New';
-  if (t.includes('featured')) return 'Featured';
-  return null;
-};
 
 /**
  * GullyLabs-style product card - real data, hover 2nd image, wishlist.
@@ -32,7 +24,7 @@ const badgeOf = (p) => {
  * in and was swallowed - the card looked unclickable. Adding to cart happens on
  * the variant page the card links to.
  *
- * `href`, `badge` and `showWishlist` exist so a caller can reuse this exact
+ * `href` and `showWishlist` exist so a caller can reuse this exact
  * card for something that is not a whole product - the PDP's "Explore other
  * variants" row feeds it one variant at a time, and needs to link to that
  * variant's own page, mark it out of stock, and drop the wishlist heart
@@ -45,15 +37,11 @@ const UnProductCard = ({
   listId = 'grid',
   listName = 'Grid',
   href,
-  badge: badgeOverride,
   showWishlist = true,
-  demand = null,
-  trendCount = 0, // set by the Trending sort: units sold in 30 days (the sort key) // 'most-bought' | 'trending' (from real sales, see demandChips)
   offerLine = null, // [{ text, title }] live combo benefits (utils/productOfferLines.js)
 }) => {
   const v = firstVariant(p);
   const soldOut = allActiveVariantsOOS(p);
-  const badge = badgeOverride !== undefined ? badgeOverride : badgeOf(p);
   const img2 = secondImg(p);
   // Struck MRP + % off, same source of truth as ProductCard: the first
   // variant's own variantMrp (never a synthesised markup).
@@ -76,29 +64,12 @@ const UnProductCard = ({
         )}
         <img src={productImg(p)} alt={p.productName} loading="lazy" decoding="async" className="gl-img w-full h-full object-cover" onError={(e) => { e.currentTarget.src = '/assets/logo.webp'; }} />
         {img2 && <img src={img2} alt="" loading="lazy" decoding="async" className="gl-img2 absolute inset-0 w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
-        {/* Sold out wins the pill slot; otherwise % off - the first thing the eye lands on */}
-        {soldOut ? (
+        {/* No sale pills on the photo; only "Sold out" stays so shoppers know it can't be bought */}
+        {soldOut && (
           <span className="absolute bottom-2 left-2 z-10 rounded-full bg-ink px-2.5 py-0.5 text-[10.5px] font-extrabold uppercase tracking-wide text-white shadow-sm md:text-[11.5px]">Sold out</span>
-        ) : mrp > price && (
-          <span className="absolute bottom-2 left-2 z-10 rounded-full bg-sale px-2 py-0.5 text-[10.5px] font-extrabold text-white shadow-sm md:text-[11.5px]">
-            {Math.round(((mrp - price) / mrp) * 100)}% OFF
-          </span>
         )}
       </div>
       <div className="p-2.5 md:p-3 flex flex-col flex-1 min-w-0">
-        {/* Badges sit under the photo (never on it), max 3, one scrollless wrap row */}
-        {(() => {
-          const chips = [
-            demand && (demand === 'most-bought' ? 'Most bought' : trendCount > 0 ? null : 'Trending now'),
-            !demand && badge,
-          ].filter(Boolean).slice(0, 2);
-          return (
-            // row is always rendered (same height with or without chips) so titles line up
-            <div className="mb-1.5 flex h-[18px] flex-nowrap gap-1 md:h-5">
-              {chips.map((c) => <span key={c} className={`shrink-0 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-tight md:text-[11px] bg-ink text-paper`}>{c}</span>)}
-            </div>
-          );
-        })()}
         {/* A live offer on this product beats the generic sale tag: one short
             line (soft red tint, red text + accent bar) so it is the first thing read. */}
         {/* one quiet, consistent offer line (the sale itself is announced once, at the top of the page) */}

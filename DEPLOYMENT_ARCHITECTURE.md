@@ -76,10 +76,9 @@ The product-list and category-details APIs derive sales counts from order
 items for products in the requested result. Only orders in PAID, CONFIRMED, PROCESSING, SHIPPED, or
 DELIVERED status count. It returns all-time and 30-day counts for the existing
 "Most bought"/"Trending" sort signals, plus an exact 7-day unit count per
-product and variant. A product with at least five all-time units can show the
-"Most bought" badge on its two strongest variants, including on category pages.
-Product cards show the exact 7-day count on each product's top two matching
-variants when each has at least five units sold. Ranking uses the current
+product and variant. These counts drive sorting only: product cards show no
+tag or demand pills (no Bestseller/Trending/New/"Most bought" chip and no
+"% OFF" pill on the photo); a card's only photo pill is "Sold out". Ranking uses the current
 filter results, so availability, price, category, and type filters all apply
 together. Counts
 measure units sold, not distinct customers, and exclude free gift lines. These

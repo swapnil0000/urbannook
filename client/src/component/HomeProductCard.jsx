@@ -7,14 +7,6 @@ const firstVariant = (p) => p?.variantDetails?.[0] || {};
 const productImg = (p) => firstVariant(p)?.variantImage?.[0] || p?.productImg || p?.productImage || '/assets/logo.webp';
 const secondImg = (p) => p?.secondaryImages?.[0] || p?.variantDetails?.[1]?.variantImage?.[0] || null;
 const productHref = (p) => `/products/${p.productId}`;
-const badgeOf = (p) => {
-  const t = p?.tags || [];
-  if (t.includes('best_seller')) return 'Bestseller';
-  if (t.includes('trending')) return 'Trending';
-  if (t.includes('new_arrival')) return 'New';
-  if (t.includes('featured')) return 'Featured';
-  return null;
-};
 
 /**
  * Home-page-only product card. A dedicated copy of UnProductCard rather
@@ -31,7 +23,6 @@ const badgeOf = (p) => {
  */
 const HomeProductCard = ({ p, index = 0, listId = 'grid', listName = 'Grid' }) => {
   const v = firstVariant(p);
-  const badge = badgeOf(p);
   const img2 = secondImg(p);
   const price = Number(p?.effectivePrice ?? v.variantPrice ?? 0);
 
@@ -44,7 +35,6 @@ const HomeProductCard = ({ p, index = 0, listId = 'grid', listName = 'Grid' }) =
   return (
     <Link to={productHref(p)} onClick={track} className="gl-pcard group bg-white rounded-none border border-hair overflow-hidden flex flex-col h-full cursor-pointer">
       <div className="relative aspect-square overflow-hidden bg-surface">
-        {badge && <span className="absolute top-2 left-2 z-10 bg-sale text-white gl-lbl text-[9px] px-2 py-1 rounded-md shadow-sm">{badge}</span>}
         <div className="absolute top-2.5 right-2.5 z-10" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
           <WishlistButton productId={p.productId} />
         </div>
