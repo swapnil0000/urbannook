@@ -118,13 +118,16 @@ const pincodeNotServiceableError = (pincode) =>
 const isPincodeNotServiceable = (error) => error?.data?.code === PINCODE_NOT_SERVICEABLE;
 
 // cartValue = what the customer pays for the products (after offers); falls back to the list-price total.
-const calculateShippingRate = async ({ pincode, cartItems, paymentType = "PREPAID", cartValue }) => {
+// maxRetries / requestTimeoutMs: defaults are the checkout's (patient: 5 tries,
+// 15 s each). The Magic serviceability callback passes 1 try and a short
+// timeout, because Razorpay only waits a few seconds for its answer.
+const calculateShippingRate = async ({ pincode, cartItems, paymentType = "PREPAID", cartValue, maxRetries = 5, requestTimeoutMs = 15000 }) => {
   if (!pincode || !cartItems || !Array.isArray(cartItems)) {
     throw new ValidationError("Pincode and cart items are required");
   }
 
   const validPaymentType = ["PREPAID", "COD"].includes(paymentType) ? paymentType : "PREPAID";
-  const MAX_RETRIES = 5;
+  const MAX_RETRIES = Math.max(1, Number(maxRetries) || 1);
   let attempt = 0;
   let lastError = null;
 
@@ -230,7 +233,7 @@ const calculateShippingRate = async ({ pincode, cartItems, paymentType = "PREPAI
               "private-key": process.env.SHIPMOZO_PRIVATE_KEY,
               "public-key": process.env.SHIPMOZO_PUBLIC_KEY,
             },
-            timeout: 15000,
+            timeout: requestTimeoutMs,
           },
         );
 
