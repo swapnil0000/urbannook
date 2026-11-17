@@ -275,6 +275,21 @@ const orderSchema = new mongoose.Schema(
     // callback, which cannot see the cart rules — without this the customer
     // is charged shipping the cart told them they would not pay.
     freeShippingUnlocked: { type: Boolean, default: false },
+    // Razorpay Magic serviceability callback: what we answered (last 5 calls),
+    // written by magicShippingInfoController after the answer is sent.
+    // source = how each fee was found: "shipmozo" (rated in time), "timeout"
+    // (no ShipMozo answer within the 2 s budget → fixed charge), "error"
+    // (ShipMozo failed → fixed charge) or "unserviceable" (pincode blocked).
+    magicShippingQuotes: {
+      type: [{
+        _id: false,
+        at: Date,
+        ms: Number,
+        freeShipping: Boolean,
+        addresses: [{ _id: false, zipcode: String, fee: Number, serviceable: Boolean, source: String }],
+      }],
+      default: undefined,
+    },
     guestInfo: {
       name: { type: String, default: null },
       email: { type: String, default: null },
