@@ -142,27 +142,7 @@ const couponIdentityForOrder = async (order, payload) => {
    Razorpay never talks to ShipMozo. It asks us; we ask ShipMozo. That is why
    ShipMozo not being a listed shipping partner in the dashboard does not matter.
 ================================================================ */
-// Razorpay waits only a few seconds for this answer; when it is late, Magic
-// goes on WITHOUT a shipping fee — 21 of the first 116 Magic orders paid ₹0
-// delivery that way (ShipMozo slow: 15 s timeout × 5 retries). So the whole
-// answer has a 2 s budget: ShipMozo gets one try within what is left of it,
-// and if it isn't back in time the fixed charge (staticShippingCharge — the
-// same fee the checkout charges anyway) goes out with the address serviceable.
-// Only an answer that says "not serviceable" blocks a pincode.
-const MAGIC_SHIPPING_BUDGET_MS = 2000;
-const MAGIC_RATE_TIMEOUT = "MAGIC_RATE_TIMEOUT";
-
-// Resolves like `promise`, or rejects with code MAGIC_RATE_TIMEOUT after `ms`.
-const withDeadline = (promise, ms) => {
-  let timer;
-  const deadline = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(Object.assign(new Error(`no ShipMozo answer within ${ms} ms`), { code: MAGIC_RATE_TIMEOUT })), ms);
-  });
-  return Promise.race([promise, deadline]).finally(() => clearTimeout(timer));
-};
-
 export const magicShippingInfoController = asyncHandler(async (req, res) => {
-  const startedAt = Date.now();
   const payload = authedPayload("shipping", req, res);
   if (!payload) return;
 
@@ -228,31 +208,23 @@ export const magicShippingInfoController = asyncHandler(async (req, res) => {
     console.error(`${TAG}[shipping] free-shipping check failed, charging: ${err.message}`);
   }
 
-  // What each address was answered with, for the record kept on the order.
-  const quoted = [];
-  const quote = (addr, fee, serviceable, source) => quoted.push({ zipcode: String(addr.zipcode ?? ""), fee, serviceable, source });
-  // Time left of the 2 s budget (the DB lookups above used some of it).
-  const rateBudgetMs = Math.max(300, MAGIC_SHIPPING_BUDGET_MS - (Date.now() - startedAt) - 150);
-
   const results = await Promise.all(
     addresses.map(async (addr) => {
       try {
-        const rate = await withDeadline(
-          calculateShippingRate({
-            pincode: addr.zipcode,
-            paymentType: "PREPAID",
-            cartItems,
-            cartValue: shippingCartValue,
-            maxRetries: 1,
-            requestTimeoutMs: rateBudgetMs,
-          }),
-          rateBudgetMs,
-        );
+        const rate = await calculateShippingRate({
+          pincode: addr.zipcode,
+          paymentType: "PREPAID",
+          cartItems,
+          cartValue: shippingCartValue,
+        });
         // Still rate the pincode even when shipping is free — an unserviceable
         // pincode must be blocked regardless of who pays for delivery.
-        const fee = freeShipping ? 0 : (rate?.total_charges ?? staticShippingCharge(shippingCartValue));
-        quote(addr, fee, true, "shipmozo");
-        return toRazorpayServiceableAddress(addr, fee, true, { estimatedDays: rate?.estimatedDays });
+        return toRazorpayServiceableAddress(
+          addr,
+          freeShipping ? 0 : (rate?.total_charges ?? staticShippingCharge(shippingCartValue)),
+          true,
+          { estimatedDays: rate?.estimatedDays },
+        );
       } catch (err) {
         // A genuinely unserviceable pincode must block the order — we cannot
         // ship it. Anything else (API down, timeout) falls back to a flat rate
@@ -260,31 +232,22 @@ export const magicShippingInfoController = asyncHandler(async (req, res) => {
         // getShippingRateOrFallback in the standard checkout path.
         if (isPincodeNotServiceable(err)) {
           console.log(`${TAG}[shipping] pin ${addr.zipcode} unserviceable → blocked`);
-          quote(addr, 0, false, "unserviceable");
           return toRazorpayServiceableAddress(addr, 0, false);
         }
-        const fee = freeShipping ? 0 : staticShippingCharge(shippingCartValue);
-        console.error(`${TAG}[shipping] pin ${addr.zipcode} rate failed, static ₹${fee}: ${err.message}`);
-        quote(addr, fee, true, err?.code === MAGIC_RATE_TIMEOUT ? "timeout" : "error");
-        return toRazorpayServiceableAddress(addr, fee, true);
+        console.error(
+          `${TAG}[shipping] pin ${addr.zipcode} rate failed, static ₹${staticShippingCharge(shippingCartValue)}: ${err.message}`,
+        );
+        return toRazorpayServiceableAddress(
+          addr,
+          freeShipping ? 0 : staticShippingCharge(shippingCartValue),
+          true,
+        );
       }
     }),
   );
 
-  const ms = Date.now() - startedAt;
-  console.log(`${TAG}[shipping] final rates sent to Razorpay in ${ms} ms: ${JSON.stringify(results.map((r) => ({ id: r.id, shipping_fee: r.shipping_fee })))}`);
-  res.status(200).json({ addresses: results });
-
-  // Keep what we answered on the order (last 5 calls — Razorpay calls again
-  // when the customer changes address), so "why did this Magic order pay no
-  // shipping?" is one look at the order. Written after the answer has gone,
-  // so it never slows Razorpay down; a failure here only loses the record.
-  if (order?._id) {
-    Order.updateOne(
-      { _id: order._id },
-      { $push: { magicShippingQuotes: { $each: [{ at: new Date(startedAt), ms, freeShipping, addresses: quoted }], $slice: -5 } } },
-    ).catch((err) => console.error(`${TAG}[shipping] could not record the quote on the order: ${err.message}`));
-  }
+  console.log(`${TAG}[shipping] final rates sent to Razorpay: ${JSON.stringify(results.map((r) => ({ id: r.id, shipping_fee: r.shipping_fee })))}`);
+  return res.status(200).json({ addresses: results });
 });
 
 /* ===============================================================

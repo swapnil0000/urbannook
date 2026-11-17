@@ -3,13 +3,6 @@
 > API is still called only to confirm the pincode is serviceable (its quote is logged, not charged). Used by the checkout
 > rate endpoint, `razorpayCreateOrderController`, `guestCreateOrderController` and the Magic shipping-info callback.
 > The slab/courier description below is kept for history.
->
-> **Razorpay Magic Checkout:** the fee is added by Razorpay from the `/api/v1/magic/shipping-info` callback
-> (`magicShippingInfoController`), which must answer within a few seconds or Magic goes on with ₹0 shipping. The callback
-> therefore has a 2 s budget: `calculateShippingRate` is called with `maxRetries: 1` and a short `requestTimeoutMs`, and a
-> late or failed ShipMozo answer sends the fixed charge with the address serviceable (only "not serviceable" blocks). Each
-> answer is recorded on the order as `magicShippingQuotes` (last 5; per pincode: fee + source shipmozo / timeout / error /
-> unserviceable). The checkout's own calls keep the patient defaults (5 tries, 15 s each).
 
 # Shipping Calculation — Pura Flow (Current Logic)
 
